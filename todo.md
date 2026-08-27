@@ -20,3 +20,4 @@
 - [x] Prepare the triggerless Seoul CDR bootstrap final-approval package from the verified Developer Connect source, fixed commit, YAML hash, and minimum privilege boundary without submitting a build.
 - [x] Add Vitest coverage for authorization denials, entitlement/quota gates, billing event ordering/deduplication, upload capability denial, and bootstrap preflight immutability.
 - [x] Run typecheck and test suite, visually verify desktop and mobile UI, and record remaining external integration approvals.
+- [x] Produce a separate Next.js + Vercel deployment package that preserves the same fail-closed tenant, billing, and upload contracts without deploying it.
