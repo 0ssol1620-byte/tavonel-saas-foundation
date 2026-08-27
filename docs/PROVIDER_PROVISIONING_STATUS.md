@@ -18,13 +18,21 @@ The current browser session reaches the Paddle sandbox login screen but has no a
 
 ## Cloudflare R2 preflight
 
-The browser dashboard session was unauthenticated. Separately, an account-authorized Cloudflare binding was used to create the dedicated empty foundation bucket described below. No Worker, API token, access key, secret, CORS rule, public endpoint, object, or browser upload signer has been created. The existing production quarantine resources were not visited or changed. Browser-direct customer intake remains globally disabled in the foundation policy.
+The browser dashboard session was unauthenticated. Separately, an account-authorized Cloudflare binding was used to create the dedicated empty foundation bucket described below. No Worker, API token, access key, secret, CORS rule, public endpoint, or browser upload signer has been created. The existing production quarantine resources were not visited or changed. Browser-direct customer intake remains globally disabled in the foundation policy.
 
 ## Dedicated R2 quarantine bucket
 
 On 2026-08-27, the account-authorized Cloudflare binding created the separate empty bucket `tavonel-saas-foundation-quarantine`. Its provider metadata reports Standard storage, `APAC` location, and default jurisdiction. This is an APAC best-effort placement, not a Korea-residency guarantee. No Worker binding, public endpoint, API token, access key, secret, CORS rule, object, or signing capability was created. The bucket is not connected to this application and cannot accept browser uploads while the global intake policy remains disabled.
 
 Cloudflare’s documented browser-direct R2 mechanism is a server-side presigned `PUT` URL. It keeps R2 credentials out of the browser but requires a dedicated signing identity on the server or Worker.[1] No such identity or credential has been created for this foundation, so an R2 URL must not be issued. The future signer must bind a request to a validated workspace/document key, expected MIME type and content length, and a short expiry; it must not allow arbitrary keys or byte streaming through the application.
+
+On 2026-08-27, the exact Foundation bucket completed one authorized, harmless 69-byte ASCII marker `PUT` → same-key `GET` → immediate `DELETE` transaction. All three responses were HTTP 200 and the object was removed. This only proves the dedicated bucket control plane; it does not qualify a customer upload path, CORS, a signer, MIME/size enforcement, tenant authorization, CDR, or customer-data handling. The nonsecret record is `docs/SYNTHETIC_R2_QUALIFICATION_2026-08-27.md`.
+
+## Foundation CDR and GPU qualification status
+
+The isolated Google Cloud project `tavonel-saas-foundation` exists, but it has no linked billing because the account's additional paid-services-project quota request remains pending. Consequently, it has no Foundation Cloud Run service, Artifact Registry artifact, Secret Manager HMAC, or CDR request. The existing production CDR service is neither used nor changed. The Foundation-local CDR copy has passed its ten harmless fixture tests locally; it cannot be deployed or synthetically invoked until the Foundation billing decision is received and billing is linked only to this project.
+
+RunPod remains disconnected for this task. A provider-independent source contract now prevents even a future endpoint-create call unless immutable release evidence and fresh read-only capacity evidence are present, the request is synthetic-only, `QUALIFICATION_ONLY` behavior disables SSH, HTTP health is on port `8001`, minimum workers and persistent volume are both zero, container disk is at least 80 GiB, cumulative committed plus estimated spend is at most $5 USD, and no previous paid-write result exists. The contract does not invoke RunPod, issue a credential, or override the global disabled GPU-dispatch gate. Its four regression cases are in `server/foundation/runpodSyntheticQualification.test.ts`.
 
 ## References
 
