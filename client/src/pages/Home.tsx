@@ -48,6 +48,7 @@ export default function Home() {
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#758178]">Deliberate compute</p>
                 <h2 className="mt-4 max-w-md font-serif text-4xl tracking-[-0.055em] text-[#21382f]">Access is steady. GPU work is measured.</h2>
                 <p className="mt-4 max-w-md text-sm leading-6 text-[#66746a]">Credits keep GPU use bounded by design. They are reserved before a qualified job, settled against measured runtime, and never created by a checkout redirect.</p>
+                <p className="mt-3 max-w-md text-xs leading-5 text-[#758178]">A future verified signup is designed for one 2-credit, 7-day trial. Issuance remains unavailable until the controlled processing path is qualified.</p>
               </div>
               <CreditPacks onChoose={pack => notify(`${pack} is staged for Paddle sandbox only. No payment session or GPU capacity is created in foundation mode.`)} />
             </div>

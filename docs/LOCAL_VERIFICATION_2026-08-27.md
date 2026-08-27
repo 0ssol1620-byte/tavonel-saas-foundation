@@ -23,3 +23,7 @@ The following two tiles show the pricing header and its `presentation-only` prer
 The next two tiles confirm that the Studio and Institution cards retain hierarchy, contrast, button reachability, and complete feature lists on mobile. The following Deliberate Compute section repeats the bounded-compute invariant before the prepaid-card list begins; it does not introduce a live GPU action.
 
 The final mobile region confirms that Starter ($12 / 100 credits), Builder ($30 / 300 credits), and Scale ($75 / 800 credits) render as complete, separated, full-width cards with reachable `Preview pack` controls. The final “No unlimited GPU plans” guardrail and footer explicitly retain foundation-mode/no-live-intake wording. Together with the desktop interaction check, this completes the requested visual verification of the prepaid-credit presentation without enabling a checkout, upload, or GPU path.
+
+## Trial-credit presentation update
+
+After the trial-credit contract was added, the mobile compute region rendered the new one-time **2-credit, 7-day verified-signup trial** statement above the full Starter, Builder, and Scale card sequence. The statement continues to say issuance is unavailable until the controlled processing path is qualified. This is a policy presentation and not a live credit grant.

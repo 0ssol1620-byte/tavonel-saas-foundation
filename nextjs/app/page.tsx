@@ -1,15 +1,82 @@
 "use client";
 
-import { useState } from "react";
+import "./trial-credit.css";
 import Link from "next/link";
 import { Check, ChevronRight, CircleDashed, FileLock2, ShieldCheck, Sparkles } from "lucide-react";
+import { useState } from "react";
 
-const plans = [["Observer", "$29", "A considered first step."], ["Studio", "$99", "For teams building a governed corpus."], ["Institution", "Talk to us", "For policy-led knowledge operations."]] as const;
+const plans = [
+  ["Observer", "$29", "A considered first step."],
+  ["Studio", "$99", "For teams building a governed corpus."],
+  ["Institution", "Talk to us", "For policy-led knowledge operations."],
+] as const;
+
+const creditPacks = [
+  ["Starter", "$12", "100 credits"],
+  ["Builder", "$30", "300 credits"],
+  ["Scale", "$75", "800 credits"],
+] as const;
 
 export default function HomePage() {
   const [notice, setNotice] = useState<string | null>(null);
   const showNotice = () => setNotice("Foundation mode is active. Provider configuration and sandbox qualification are required before this action is available.");
-  return <main><header><Link href="/" className="brand"><span>T</span>TAVONEL</Link><nav><a href="#method">Method</a><a href="#pricing">Pricing</a><button onClick={showNotice}>Security</button></nav><button className="secondary" onClick={showNotice}>Sign in</button><button onClick={showNotice}>Join private pilot</button></header><section className="hero"><div><p className="eyebrow">● PRIVATE PILOT FOUNDATION</p><h1>Knowledge, kept <em>whole.</em></h1><p className="lead">TAVONEL turns qualified documents into a deliberate, reviewable knowledge system. Every meaningful transformation is governed; every result retains its lineage.</p><div className="actions"><button onClick={showNotice}>Request private-pilot access <ChevronRight size={16} /></button><Link className="secondary" href="/workspace">Explore the foundation <ChevronRight size={16} /></Link></div><p className="fine"><ShieldCheck size={15} /> No document bytes are accepted during foundation mode.</p></div><IntegrityChain /></section><section id="method" className="method"><div><p className="eyebrow">A CONSIDERED METHOD</p><h2>The source deserves a boundary.</h2></div><div className="method-grid"><Method icon={<FileLock2 size={20} />} title="Intentional intake" text="Large documents bypass the application and database." /><Method icon={<ShieldCheck size={20} />} title="Evidence before insight" text="A file must pass its safety chain before candidate analysis." /><Method icon={<Sparkles size={20} />} title="Candidate, not conclusion" text="Automated analysis makes a reviewable proposal, never an unattended world." /><Method icon={<Check size={20} />} title="Visible lineage" text="Canonical artifacts retain an immutable sanitization proof." /></div></section><section id="pricing" className="pricing"><p className="eyebrow">MEASURED ACCESS</p><h2>Plans for serious work.</h2><p className="lead small">Presentation-only prices. A signed Paddle sandbox entitlement is required before checkout can be opened.</p><div className="plan-grid">{plans.map(([name, price, text]) => <article key={name} className={name === "Studio" ? "featured" : ""}><p>{name === "Studio" ? "PRIVATE PILOT CHOICE" : ""}</p><h3>{name}</h3><span>{price}{price.startsWith("$") ? <small> / month</small> : null}</span><p>{text}</p><button onClick={showNotice}>{name === "Institution" ? "Start a conversation" : "Choose this plan"}<ChevronRight size={15} /></button></article>)}</div></section>{notice ? <p className="notice" role="status">{notice}</p> : null}</main>;
+  const showCreditNotice = () => setNotice("This credit pack is staged for Paddle sandbox only. No payment session or GPU capacity is created in foundation mode.");
+
+  return (
+    <main>
+      <header>
+        <Link href="/" className="brand"><span>T</span>TAVONEL</Link>
+        <nav><a href="#method">Method</a><a href="#pricing">Pricing</a><button onClick={showNotice}>Security</button></nav>
+        <button className="secondary" onClick={showNotice}>Sign in</button>
+        <button onClick={showNotice}>Join private pilot</button>
+      </header>
+
+      <section className="hero">
+        <div>
+          <p className="eyebrow">● PRIVATE PILOT FOUNDATION</p>
+          <h1>Knowledge, kept <em>whole.</em></h1>
+          <p className="lead">TAVONEL turns qualified documents into a deliberate, reviewable knowledge system. Every meaningful transformation is governed; every result retains its lineage.</p>
+          <div className="actions"><button onClick={showNotice}>Request private-pilot access <ChevronRight size={16} /></button><Link className="secondary" href="/workspace">Explore the foundation <ChevronRight size={16} /></Link></div>
+          <p className="fine"><ShieldCheck size={15} /> No document bytes are accepted during foundation mode.</p>
+        </div>
+        <IntegrityChain />
+      </section>
+
+      <section id="method" className="method">
+        <div><p className="eyebrow">A CONSIDERED METHOD</p><h2>The source deserves a boundary.</h2></div>
+        <div className="method-grid">
+          <Method icon={<FileLock2 size={20} />} title="Intentional intake" text="Large documents bypass the application and database." />
+          <Method icon={<ShieldCheck size={20} />} title="Evidence before insight" text="A file must pass its safety chain before candidate analysis." />
+          <Method icon={<Sparkles size={20} />} title="Candidate, not conclusion" text="Automated analysis makes a reviewable proposal, never an unattended world." />
+          <Method icon={<Check size={20} />} title="Visible lineage" text="Canonical artifacts retain an immutable sanitization proof." />
+        </div>
+      </section>
+
+      <section id="pricing" className="pricing">
+        <p className="eyebrow">MEASURED ACCESS</p>
+        <h2>Plans for serious work.</h2>
+        <p className="lead small">Presentation-only prices. A signed Paddle sandbox entitlement is required before checkout can be opened.</p>
+        <div className="plan-grid">
+          {plans.map(([name, price, text]) => <article key={name} className={name === "Studio" ? "featured" : ""}><p>{name === "Studio" ? "PRIVATE PILOT CHOICE" : ""}</p><h3>{name}</h3><span>{price}{price.startsWith("$") ? <small> / month</small> : null}</span><p>{text}</p><button onClick={showNotice}>{name === "Institution" ? "Start a conversation" : "Choose this plan"}<ChevronRight size={15} /></button></article>)}
+        </div>
+      </section>
+
+      <section className="compute">
+        <div className="compute-copy"><p className="eyebrow">DELIBERATE COMPUTE</p><h2>Access is steady. GPU work is measured.</h2><p>Credits are reserved before a qualified job, settled against observed runtime, and never created by a checkout redirect.</p><p className="trial">A future verified signup is designed for one 2-credit, 7-day trial. Issuance remains unavailable until the controlled processing path is qualified.</p></div>
+        <div className="credit-grid">{creditPacks.map(([name, price, credits]) => <article key={name} className={name === "Builder" ? "featured" : ""}><p>PREPAID CAPACITY</p><h3>{name}</h3><span>{price}<small>{credits}</small></span><button onClick={showCreditNotice}>Preview pack</button></article>)}</div>
+        <p className="fine compute-fine">No unlimited GPU plans. Hard job and workspace caps remain active even after a future credit purchase.</p>
+      </section>
+
+      {notice ? <p className="notice" role="status">{notice}</p> : null}
+    </main>
+  );
 }
-function IntegrityChain() { const stages = [["01", "Quarantine", "Browser-direct, tenant-scoped intake"], ["02", "Sanitize", "AV and mandatory CDR evidence"], ["03", "Understand", "Sanitized-only candidate analysis"], ["04", "Review", "Human decision before promotion"]]; return <aside className="chain"><p>● Knowledge integrity chain <CircleDashed size={14} /></p>{stages.map(([number, name, text], index) => <div key={number}><span>{number}</span><section><strong>{name}</strong><small>{text}</small></section><b>{index === 3 ? "review" : "held"}</b></div>)}<footer><strong>Designed to fail closed.</strong> The workflow opens only after each prior control is qualified.</footer></aside>; }
-function Method({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) { return <article>{icon}<h3>{title}</h3><p>{text}</p></article>; }
+
+function IntegrityChain() {
+  const stages = [["01", "Quarantine", "Browser-direct, tenant-scoped intake"], ["02", "Sanitize", "AV and mandatory CDR evidence"], ["03", "Understand", "Sanitized-only candidate analysis"], ["04", "Review", "Human decision before promotion"]];
+  return <aside className="chain"><p>● Knowledge integrity chain <CircleDashed size={14} /></p>{stages.map(([number, name, text], index) => <div key={number}><span>{number}</span><section><strong>{name}</strong><small>{text}</small></section><b>{index === 3 ? "review" : "held"}</b></div>)}<footer><strong>Designed to fail closed.</strong> The workflow opens only after each prior control is qualified.</footer></aside>;
+}
+
+function Method({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) {
+  return <article>{icon}<h3>{title}</h3><p>{text}</p></article>;
+}

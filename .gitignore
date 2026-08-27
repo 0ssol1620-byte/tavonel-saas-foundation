@@ -46,6 +46,10 @@ pids
 *.pid.lock
 *.bak
 
+# Python bytecode created by CDR fixture tests
+__pycache__/
+*.py[cod]
+
 # Coverage directory used by tools like istanbul
 coverage/
 *.lcov

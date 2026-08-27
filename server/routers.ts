@@ -4,6 +4,7 @@ import { activationPolicy } from "@shared/activationPolicy";
 import { cdrBootstrapPreflight } from "./foundation/cdrBootstrapPreflight";
 import { getDefaultAuthReadiness } from "./foundation/supabaseAuth";
 import { creditCatalog, creditGuardrails } from "@shared/creditEconomics";
+import { getTrialCreditReadiness } from "@shared/trialCredits";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
@@ -34,6 +35,7 @@ export const appRouter = router({
       catalog: creditCatalog,
       guardrails: creditGuardrails,
     })),
+    trialCreditReadiness: publicProcedure.query(() => getTrialCreditReadiness()),
   }),
 
   // TODO: add feature routers here, e.g.
