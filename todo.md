@@ -38,3 +38,4 @@
 - [x] Create a new private GitHub repository containing only the TAVONEL SaaS Foundation source and nonsecret handoff materials, then verify the remote commit for cross-account continuation.
 - [x] Replace the self-invalidating static GitHub handoff commit reference with source-of-truth `main` verification guidance for future cross-account clones.
 - [x] Clarify that a fresh GitHub clone uses `origin` for this private repository, while only the original managed workspace has a separate artifact `origin` and `github` handoff remote.
+- [x] Re-run §9 parent and Next.js local verification, then inspect desktop/mobile prepaid-credit UI while retaining every external provider and live data path in fail-closed state. (Parent: 13 files/27 tests, typecheck, build, diff check; Next.js: 2 files/2 tests, typecheck, explicit production build; desktop/mobile credit UI and presentation-only controls verified.)
