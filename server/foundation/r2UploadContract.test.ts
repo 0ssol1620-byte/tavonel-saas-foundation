@@ -7,7 +7,7 @@ const entitlement: WorkspaceEntitlement = { workspaceId: "workspace-a", status: 
 
 describe("R2 quarantine upload contract", () => {
   it("cannot produce an upload URL while global customer intake is fail-closed", () => {
-    const result = issueQuarantineUploadContract({ actorId: "user-a", workspaceId: "workspace-a", requestedBytes: 100, membership, entitlement });
+    const result = issueQuarantineUploadContract({ actorId: "user-a", workspaceId: "workspace-a", requestedBytes: 100, originalFilename: "synthetic.pdf", declaredMimeType: "application/pdf", membership, entitlement });
     expect(result).toEqual({ permitted: false, code: "INTAKE_DISABLED" });
   });
 });
