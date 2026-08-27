@@ -5,10 +5,23 @@
 - [x] Define tenant domain models for profiles, workspaces, memberships, plans, entitlements, document metadata, sanitization proofs, and candidate knowledge-graph metadata.
 - [x] Implement server-side tenant authorization helpers and fail-closed entitlement/quota evaluation contracts.
 - [x] Create Supabase migration and RLS policy package covering every browser-exposed table, including explicit allow and deny test cases.
-- [ ] Execute the table-by-table RLS allow/deny matrix against the dedicated Supabase test database before enabling browser sign-up.
-- [ ] Create or connect a dedicated Supabase Seoul project, apply the reviewed migration only after final project-target confirmation, and configure email plus Google OAuth redirect settings for the foundation domain.
+- [ ] If a branch-capable Supabase plan is separately approved, execute the table-by-table RLS allow/deny matrix against that disposable test database before enabling browser sign-up.
+- [x] Run the alternative main-project synthetic RLS probe only inside a single transaction that ends in `ROLLBACK`, after explicit confirmation that no persistent fixture rows may remain.
+- [ ] Configure dedicated foundation Supabase email and Google OAuth redirect settings only after contextual approval of the exact foundation origin, OAuth client, consent configuration, and secret-handling boundary.
+- [x] Create the approved dedicated Supabase Seoul project in `Phillip's projects`, verify its identity and empty state, and record only nonsecret metadata.
+- [x] Apply a reviewed follow-up Supabase migration that revokes public SECURITY DEFINER execution and makes the internal billing ledger’s default-deny RLS policy explicit.
+- [x] Re-run Supabase security advisor after the remediation and record the results without exposing credentials or user data.
+- [x] Record the final clean Supabase security-advisor result in a nonsecret project qualification document.
+- [x] Apply explicit restrictive default-deny RLS policies to credit ledger and GPU reservation tables, then verify a clean Supabase security advisor result.
 - [ ] Configure a dedicated Paddle sandbox catalog, webhook destination, and server-only sandbox secrets; keep all live checkout and production billing disabled.
-- [ ] Configure an APAC R2 quarantine bucket and minimal signer boundary only after reviewing the region disclosure and scoped credential model; keep customer intake disabled.
+- [x] Design a credit-first, GPU-cost-protected product catalog with subscription access tier, prepaid credit packs, hard per-job and per-tenant spending caps, and margin floor telemetry.
+- [x] Implement server-side credit catalog, pre-dispatch reservation, hard cap evaluation, and margin-floor dispatch pause contracts with regression tests.
+- [x] Wire margin-floor breach into an explicit server-side GPU dispatch pause decision and regression test.
+- [x] Implement a server-side GPU credit reservation and settlement contract with idempotency, release, and fail-closed behavior tests.
+- [x] Apply the reviewed credit ledger and GPU reservation schema migration to the confirmed empty Seoul foundation project, then verify RLS remains enabled.
+- [x] Document Paddle sandbox product/price mapping and event-to-credit ledger projection rules without configuring a live catalog.
+- [x] Add the approved prepaid credit packs and no-unlimited-GPU messaging to the public pricing experience while keeping all checkout controls in presentation mode.
+- [ ] Configure only the foundation-specific APAC R2 signer boundary after contextual approval of its scoped credential model, capability exposure, and non-residency disclosure; keep customer intake disabled.
 - [x] Complete the provider-independent security checklist, test evidence, and activation-ready handoff while external provider identity and secret configuration remain unavailable.
 - [x] Build a server-only Supabase Auth integration seam for email sign-up and Google OAuth, with personal workspace provisioning design and no credential fallback.
 - [x] Build an elegant public SaaS landing and pricing experience with a clear sign-up path, capability boundaries, and responsive accessible layout.
@@ -21,3 +34,4 @@
 - [x] Add Vitest coverage for authorization denials, entitlement/quota gates, billing event ordering/deduplication, upload capability denial, and bootstrap preflight immutability.
 - [x] Run typecheck and test suite, visually verify desktop and mobile UI, and record remaining external integration approvals.
 - [x] Produce a separate Next.js + Vercel deployment package that preserves the same fail-closed tenant, billing, and upload contracts without deploying it.
+- [x] Publish a detailed nonsecret continuation handoff for the next Manus session, including verified evidence, safety gates, and exact next actions.

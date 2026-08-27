@@ -3,6 +3,7 @@ import { getActivationReadiness } from "@shared/activationPolicy";
 import { activationPolicy } from "@shared/activationPolicy";
 import { cdrBootstrapPreflight } from "./foundation/cdrBootstrapPreflight";
 import { getDefaultAuthReadiness } from "./foundation/supabaseAuth";
+import { creditCatalog, creditGuardrails } from "@shared/creditEconomics";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
@@ -29,6 +30,10 @@ export const appRouter = router({
       upload: activationPolicy.customerIntake.enabled ? "not_implemented" : "fail_closed",
     })),
     cdrBootstrapPreflight: publicProcedure.query(() => cdrBootstrapPreflight),
+    creditCatalog: publicProcedure.query(() => ({
+      catalog: creditCatalog,
+      guardrails: creditGuardrails,
+    })),
   }),
 
   // TODO: add feature routers here, e.g.

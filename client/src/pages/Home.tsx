@@ -41,6 +41,19 @@ export default function Home() {
         <section id="pricing" className="mx-auto max-w-[1240px] px-5 py-20 md:px-8 md:py-28"><div className="flex flex-col justify-between gap-6 md:flex-row md:items-end"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#869188]">Measured access</p><h2 className="mt-4 font-serif text-5xl tracking-[-0.06em] text-[#21382f]">Plans for serious work.</h2><p className="mt-4 max-w-2xl text-sm leading-6 text-[#6d7a71]">Prices are presentation-only until Paddle sandbox, signature verification, and entitlement projection have been qualified.</p></div><div className="flex w-fit rounded-lg border border-[#d8dfd6] bg-[#fbfcf9] p-1 text-sm"><button onClick={() => setAnnual(false)} className={`rounded-md px-3 py-2 transition ${!annual ? "bg-[#233d34] text-white shadow-sm" : "text-[#718077]"}`}>Monthly</button><button onClick={() => setAnnual(true)} className={`rounded-md px-3 py-2 transition ${annual ? "bg-[#233d34] text-white shadow-sm" : "text-[#718077]"}`}>Annual <span className="ml-1 text-[10px] opacity-75">save 17%</span></button></div></div>
           <div className="mt-10 grid gap-5 lg:grid-cols-3">{plans.map(plan => <article key={plan.name} className={`relative rounded-2xl border p-6 ${plan.featured ? "border-[#2d4b3d] bg-[#273f36] text-[#f6f2e8] shadow-[0_18px_38px_rgba(31,54,43,0.16)]" : "border-[#dfe5dc] bg-[#fcfcf9] text-[#263c33]"}`}>{plan.featured && <span className="absolute -top-3 left-6 rounded-full bg-[#dbc56f] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.1em] text-[#344335]">Private pilot choice</span>}<h3 className="font-serif text-3xl tracking-[-0.04em]">{plan.name}</h3><p className={`mt-2 text-sm ${plan.featured ? "text-[#c8d3c7]" : "text-[#748178]"}`}>{plan.description}</p><div className="mt-7 flex items-baseline gap-1"><span className="font-serif text-4xl tracking-[-0.05em]">{annual ? plan.annual : plan.monthly}</span>{plan.monthly.startsWith("$") && <span className={`text-sm ${plan.featured ? "text-[#c8d3c7]" : "text-[#748178]"}`}>/ month</span>}</div><button onClick={() => notify(`${plan.name} is held in presentation mode. A signed Paddle sandbox entitlement is required before checkout can be opened.`)} className={`mt-7 flex h-11 w-full items-center justify-center gap-2 rounded-lg text-sm font-semibold transition active:scale-[0.98] ${plan.featured ? "bg-[#f7f1de] text-[#284538] hover:bg-white" : "border border-[#cad6ca] bg-white text-[#355447] hover:border-[#aebead]"}`}>{plan.name === "Institution" ? "Start a conversation" : "Choose this plan"}<ChevronRight className="h-4 w-4" /></button><ul className="mt-7 space-y-3 border-t border-current/10 pt-6">{plan.features.map(feature => <li key={feature} className={`flex gap-2 text-sm ${plan.featured ? "text-[#e0e7dd]" : "text-[#59685f]"}`}><Check className="mt-0.5 h-4 w-4 shrink-0 text-[#86a38b]" />{feature}</li>)}</ul></article>)}</div>
         </section>
+        <section className="border-t border-[#dfe4db] bg-[#eef2e9] px-5 py-20 md:px-8 md:py-24">
+          <div className="mx-auto max-w-[1240px]">
+            <div className="grid gap-8 lg:grid-cols-[0.78fr_1.22fr] lg:items-end">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#758178]">Deliberate compute</p>
+                <h2 className="mt-4 max-w-md font-serif text-4xl tracking-[-0.055em] text-[#21382f]">Access is steady. GPU work is measured.</h2>
+                <p className="mt-4 max-w-md text-sm leading-6 text-[#66746a]">Credits keep GPU use bounded by design. They are reserved before a qualified job, settled against measured runtime, and never created by a checkout redirect.</p>
+              </div>
+              <CreditPacks onChoose={pack => notify(`${pack} is staged for Paddle sandbox only. No payment session or GPU capacity is created in foundation mode.`)} />
+            </div>
+            <p className="mt-6 text-xs text-[#758178]">No unlimited GPU plans. Hard job and workspace caps remain active even after a future credit purchase.</p>
+          </div>
+        </section>
       </main>
 
       <footer className="border-t border-[#dfe4db] bg-[#fbfaf6]"><div className="mx-auto flex max-w-[1240px] flex-col justify-between gap-3 px-5 py-7 text-xs text-[#7d887f] sm:flex-row md:px-8"><p>© 2026 TAVONEL. A governed knowledge foundation.</p><p>Private pilot · no live document intake</p></div></footer>
@@ -57,6 +70,15 @@ function FlowCard({ number, title, text, kind }: { number: string; title: string
 
 function MethodCell({ icon: Icon, title, text }: { icon: typeof FileLock2; title: string; text: string }) {
   return <div className="bg-[#fbfaf6] p-6 md:p-7"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e9f0e7] text-[#55745f]"><Icon className="h-5 w-5" /></span><h3 className="mt-5 font-serif text-2xl tracking-[-0.035em] text-[#2a4036]">{title}</h3><p className="mt-2 text-sm leading-6 text-[#728077]">{text}</p></div>;
+}
+
+function CreditPacks({ onChoose }: { onChoose: (pack: string) => void }) {
+  const packs = [
+    { name: "Starter", price: "$12", credits: "100 credits", accent: false },
+    { name: "Builder", price: "$30", credits: "300 credits", accent: true },
+    { name: "Scale", price: "$75", credits: "800 credits", accent: false },
+  ];
+  return <div className="grid gap-3 sm:grid-cols-3">{packs.map(pack => <article key={pack.name} className={`rounded-2xl border p-5 ${pack.accent ? "border-[#345548] bg-[#29453a] text-[#f8f4e8] shadow-[0_12px_24px_rgba(35,61,52,0.13)]" : "border-[#dbe3d9] bg-[#fafbf8] text-[#284137]"}`}><p className={`text-[11px] font-semibold uppercase tracking-[0.15em] ${pack.accent ? "text-[#cbd8c8]" : "text-[#829087]"}`}>Prepaid capacity</p><h3 className="mt-4 font-serif text-3xl tracking-[-0.045em]">{pack.name}</h3><div className="mt-5 flex items-end justify-between"><span className="font-serif text-4xl tracking-[-0.06em]">{pack.price}</span><span className={`mb-1 text-xs ${pack.accent ? "text-[#dce5d9]" : "text-[#6c7b71]"}`}>{pack.credits}</span></div><button onClick={() => onChoose(pack.name)} className={`mt-5 w-full rounded-lg py-2.5 text-sm font-semibold transition active:scale-[0.98] ${pack.accent ? "bg-[#f4eedb] text-[#284538] hover:bg-white" : "border border-[#cad6ca] bg-white text-[#355447] hover:border-[#aebead]"}`}>Preview pack</button></article>)}</div>;
 }
 
 function AuthDialog({ onClose, onNotify }: { onClose: () => void; onNotify: (message: string) => void }) {
