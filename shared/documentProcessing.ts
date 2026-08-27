@@ -35,7 +35,11 @@ function hasSha256(value: string | null | undefined) {
 }
 
 function hasScopedObjectKey(key: string, kind: "sanitized" | "candidates", workspaceId: string, documentId: string) {
-  return key.startsWith(`${kind}/${workspaceId}/${documentId}/`);
+  const prefix = `${kind}/${workspaceId}/${documentId}/`;
+  if (!key.startsWith(prefix)) return false;
+  const suffix = key.slice(prefix.length);
+  if (!suffix || /[\u0000-\u001f\u007f\\]/.test(key)) return false;
+  return !key.split("/").some((segment) => !segment || segment === "." || segment === "..");
 }
 
 /** Validates only metadata binding; it never invokes CDR or accesses document bytes. */

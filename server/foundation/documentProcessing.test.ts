@@ -33,6 +33,7 @@ describe("document processing state machine", () => {
     expect(bindSanitizationProof(document, proof)).toEqual({ valid: true, code: "SANITIZATION_PROOF_BOUND", nextDocumentState: "sanitized" });
     expect(bindSanitizationProof(document, { ...proof, inputSha256: digestB }).code).toBe("SOURCE_DIGEST_MISMATCH");
     expect(bindSanitizationProof({ ...document, state: "requested" }, proof).code).toBe("DOCUMENT_NOT_QUARANTINED");
+    expect(bindSanitizationProof(document, { ...proof, immutableObjectKey: "sanitized/workspace-a/doc-a/../workspace-b/image-only.pdf" }).code).toBe("INVALID_SANITIZED_OBJECT_KEY");
   });
 
   it("requires the GPU receipt to consume exactly the proof output and a scoped candidate artifact", () => {
@@ -49,6 +50,8 @@ describe("document processing state machine", () => {
     expect(bindGpuReceiptToProof(sanitizedDocument, proof, receipt)).toEqual({ valid: true, code: "CANDIDATE_READY", nextDocumentState: "candidate_ready" });
     expect(bindGpuReceiptToProof(sanitizedDocument, proof, { ...receipt, inputSha256: digestA }).code).toBe("RECEIPT_INPUT_MISMATCH");
     expect(bindGpuReceiptToProof(sanitizedDocument, proof, { ...receipt, outputObjectKey: "candidates/workspace-b/doc-a/result.json" }).code).toBe("INVALID_CANDIDATE_OBJECT_KEY");
+    expect(bindGpuReceiptToProof(sanitizedDocument, proof, { ...receipt, outputObjectKey: "candidates/workspace-a/doc-a//result.json" }).code).toBe("INVALID_CANDIDATE_OBJECT_KEY");
+    expect(bindGpuReceiptToProof(sanitizedDocument, proof, { ...receipt, outputObjectKey: "candidates/workspace-a/doc-a/result\n.json" }).code).toBe("INVALID_CANDIDATE_OBJECT_KEY");
   });
 
   it("allows only a workspace owner or admin to review a pending candidate", () => {
