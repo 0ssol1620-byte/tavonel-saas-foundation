@@ -1,4 +1,5 @@
 import { activationPolicy } from "../../shared/activationPolicy";
+import type { QualifiedDocumentMime } from "../../shared/qualifiedDocumentInputs";
 import type { WorkspaceEntitlement, WorkspaceMembership } from "../../shared/tenantDomain";
 import { validateQualifiedDocumentInput } from "../../shared/qualifiedDocumentInputs";
 import { canAccessWorkspace, entitlementAllowsUpload } from "./tenantAuthorization";
@@ -21,6 +22,8 @@ export type UploadCapabilityDecision =
       code: "QUALIFIED";
       maxBytes: number;
       expiresInSeconds: number;
+      originalFilename: string;
+      normalizedMimeType: QualifiedDocumentMime;
       storageBoundary: "browser-direct-quarantine";
     };
 
@@ -36,7 +39,8 @@ export function evaluateUploadCapability(
     return { permitted: false, code: "FORBIDDEN" };
   }
 
-  if (!validateQualifiedDocumentInput(request).valid) {
+  const qualifiedInput = validateQualifiedDocumentInput(request);
+  if (!qualifiedInput.valid) {
     return { permitted: false, code: "UNQUALIFIED_INPUT" };
   }
 
@@ -49,6 +53,8 @@ export function evaluateUploadCapability(
     code: "QUALIFIED",
     maxBytes: request.requestedBytes,
     expiresInSeconds: 300,
+    originalFilename: qualifiedInput.originalFilename,
+    normalizedMimeType: qualifiedInput.normalizedMimeType,
     storageBoundary: "browser-direct-quarantine",
   };
 }

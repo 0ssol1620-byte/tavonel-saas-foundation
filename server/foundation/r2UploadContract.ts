@@ -31,8 +31,8 @@ export function issueQuarantineUploadContract(
     objectKey: `quarantine/${request.workspaceId}/${documentId}/source`,
     expiresInSeconds: decision.expiresInSeconds,
     contentLength: decision.maxBytes,
-    originalFilename: request.originalFilename,
-    declaredMimeType: request.declaredMimeType,
+    originalFilename: decision.originalFilename,
+    declaredMimeType: decision.normalizedMimeType,
     requiredBoundary: "browser-direct-quarantine",
     uploadUrl: null,
   };

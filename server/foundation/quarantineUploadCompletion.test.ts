@@ -33,7 +33,8 @@ describe("quarantine upload completion contract", () => {
   });
 
   it("keeps only the CDR-qualified filename and MIME pairs eligible for a future capability", () => {
-    expect(validateQualifiedDocumentInput({ originalFilename: "board.PDF", declaredMimeType: "application/pdf; charset=binary" })).toMatchObject({ valid: true, normalizedMimeType: "application/pdf" });
+    const normalized = validateQualifiedDocumentInput({ originalFilename: "board.PDF", declaredMimeType: "application/pdf; charset=binary" });
+    expect(normalized).toMatchObject({ valid: true, normalizedMimeType: "application/pdf", originalFilename: "board.PDF" });
     expect(validateQualifiedDocumentInput({ originalFilename: "../board.pdf", declaredMimeType: "application/pdf" })).toEqual({ valid: false, code: "INVALID_FILENAME" });
     expect(validateQualifiedDocumentInput({ originalFilename: "archive.zip", declaredMimeType: "application/zip" })).toEqual({ valid: false, code: "UNQUALIFIED_MIME" });
     expect(validateQualifiedDocumentInput({ originalFilename: "board.pdf", declaredMimeType: "image/png" })).toEqual({ valid: false, code: "FILENAME_MIME_MISMATCH" });
