@@ -20,6 +20,9 @@ export const documentStates = [
 ] as const;
 export type DocumentState = (typeof documentStates)[number];
 
+export const candidateStates = ["pending_review", "approved", "rejected"] as const;
+export type CandidateState = (typeof candidateStates)[number];
+
 export type WorkspaceMembership = {
   workspaceId: string;
   userId: string;
@@ -45,4 +48,22 @@ export type DocumentMetadata = {
   quarantineObjectKey: string;
   state: DocumentState;
   sourceSha256: string | null;
+};
+
+export type SanitizationProofMetadata = {
+  id: string;
+  documentId: string;
+  inputSha256: string;
+  outputSha256: string;
+  outputMimeType: "application/pdf";
+  sanitizerVersion: string;
+  immutableObjectKey: string;
+};
+
+export type KnowledgeGraphCandidateMetadata = {
+  id: string;
+  workspaceId: string;
+  documentId: string;
+  sanitizationProofId: string;
+  state: CandidateState;
 };
