@@ -36,3 +36,5 @@
 - [x] Produce a separate Next.js + Vercel deployment package that preserves the same fail-closed tenant, billing, and upload contracts without deploying it.
 - [x] Publish a detailed nonsecret continuation handoff for the next Manus session, including verified evidence, safety gates, and exact next actions.
 - [x] Create a new private GitHub repository containing only the TAVONEL SaaS Foundation source and nonsecret handoff materials, then verify the remote commit for cross-account continuation.
+- [x] Replace the self-invalidating static GitHub handoff commit reference with source-of-truth `main` verification guidance for future cross-account clones.
+- [x] Clarify that a fresh GitHub clone uses `origin` for this private repository, while only the original managed workspace has a separate artifact `origin` and `github` handoff remote.
