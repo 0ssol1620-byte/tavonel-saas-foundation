@@ -35,3 +35,4 @@
 - [x] Run typecheck and test suite, visually verify desktop and mobile UI, and record remaining external integration approvals.
 - [x] Produce a separate Next.js + Vercel deployment package that preserves the same fail-closed tenant, billing, and upload contracts without deploying it.
 - [x] Publish a detailed nonsecret continuation handoff for the next Manus session, including verified evidence, safety gates, and exact next actions.
+- [ ] Create a new private GitHub repository containing only the TAVONEL SaaS Foundation source and nonsecret handoff materials, then verify the remote commit for cross-account continuation.
