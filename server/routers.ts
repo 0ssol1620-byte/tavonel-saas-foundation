@@ -1,4 +1,8 @@
 import { COOKIE_NAME } from "@shared/const";
+import { getActivationReadiness } from "@shared/activationPolicy";
+import { activationPolicy } from "@shared/activationPolicy";
+import { cdrBootstrapPreflight } from "./foundation/cdrBootstrapPreflight";
+import { getDefaultAuthReadiness } from "./foundation/supabaseAuth";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
@@ -15,6 +19,16 @@ export const appRouter = router({
         success: true,
       } as const;
     }),
+  }),
+
+  foundation: router({
+    activationReadiness: publicProcedure.query(() => getActivationReadiness()),
+    integrationReadiness: publicProcedure.query(() => ({
+      auth: getDefaultAuthReadiness(),
+      billing: "sandbox_not_configured",
+      upload: activationPolicy.customerIntake.enabled ? "not_implemented" : "fail_closed",
+    })),
+    cdrBootstrapPreflight: publicProcedure.query(() => cdrBootstrapPreflight),
   }),
 
   // TODO: add feature routers here, e.g.

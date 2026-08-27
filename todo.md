@@ -1,0 +1,22 @@
+# Project TODO
+
+- [x] Preserve strict isolation from existing `tavonel` production and the CDR activation repository; document non-live activation boundaries.
+- [x] Codify disabled live intake, CDR, OCR/GPU, and candidate promotion states in shared server-consumed policy code.
+- [x] Define tenant domain models for profiles, workspaces, memberships, plans, entitlements, document metadata, sanitization proofs, and candidate knowledge-graph metadata.
+- [x] Implement server-side tenant authorization helpers and fail-closed entitlement/quota evaluation contracts.
+- [x] Create Supabase migration and RLS policy package covering every browser-exposed table, including explicit allow and deny test cases.
+- [ ] Execute the table-by-table RLS allow/deny matrix against the dedicated Supabase test database before enabling browser sign-up.
+- [ ] Create or connect a dedicated Supabase Seoul project, apply the reviewed migration only after final project-target confirmation, and configure email plus Google OAuth redirect settings for the foundation domain.
+- [ ] Configure a dedicated Paddle sandbox catalog, webhook destination, and server-only sandbox secrets; keep all live checkout and production billing disabled.
+- [ ] Configure an APAC R2 quarantine bucket and minimal signer boundary only after reviewing the region disclosure and scoped credential model; keep customer intake disabled.
+- [x] Complete the provider-independent security checklist, test evidence, and activation-ready handoff while external provider identity and secret configuration remain unavailable.
+- [x] Build a server-only Supabase Auth integration seam for email sign-up and Google OAuth, with personal workspace provisioning design and no credential fallback.
+- [x] Build an elegant public SaaS landing and pricing experience with a clear sign-up path, capability boundaries, and responsive accessible layout.
+- [x] Build an authenticated workspace shell with document intake status, quota visibility, knowledge candidate state, and explicit inactive CDR/OCR/GPU status.
+- [x] Implement Paddle Checkout launch contracts with server-controlled price allow-listing and no live payment activation.
+- [x] Implement raw-body Paddle webhook signature-verification, event-id deduplication, occurred-at ordering, and entitlement projection contracts.
+- [x] Implement a tenant-scoped, short-lived browser-direct R2 quarantine upload capability contract that never proxies document bytes through Vercel or the database.
+- [ ] Keep AV, CDR, OCR/GPU dispatch, candidate promotion, and live customer intake fail-closed until separate synthetic qualification and explicit approval.
+- [x] Prepare the triggerless Seoul CDR bootstrap final-approval package from the verified Developer Connect source, fixed commit, YAML hash, and minimum privilege boundary without submitting a build.
+- [x] Add Vitest coverage for authorization denials, entitlement/quota gates, billing event ordering/deduplication, upload capability denial, and bootstrap preflight immutability.
+- [x] Run typecheck and test suite, visually verify desktop and mobile UI, and record remaining external integration approvals.
