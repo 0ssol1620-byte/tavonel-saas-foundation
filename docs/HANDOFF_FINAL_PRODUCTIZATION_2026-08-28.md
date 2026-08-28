@@ -601,7 +601,9 @@ provider call이 필요한 경우 먼저 `docs/PROVIDER_PROVISIONING_STATUS.md`,
 - Foundation working tree: `todo.md`에 handoff 작업 항목이 추가된 상태
 - New evidence bundle: RunPod raw JSON와 repository audit summary를 Foundation 내부로 복사
 
-최종 handoff 작업자는 아래를 완료해야 한다.
+최종 handoff 작업은 완료되었다. 첫 동기화 commit은 `0f3ea8506424e95030b0086e1b6ebe2e67c883ca`이며, 이 문서의 최종 metadata 반영 commit은 다음 후속 commit으로 기록한다. Foundation private GitHub `main`에 push되었고 production/activation repository mutation은 없다.
+
+아래 명령은 새 세션에서 재검증할 때 사용한다.
 
 ```bash
 cd /home/ubuntu/tavonel-saas-foundation
@@ -622,11 +624,13 @@ git log -1 --oneline
 
 commit 후 아래 값을 이 문서의 마지막 기록에 추가한다.
 
-- Final handoff commit hash
-- GitHub remote URL
-- `main` clean 여부
-- tests/build summary
-- production/activation mutation 여부: 반드시 `none`
+- Handoff sync commit: `0f3ea8506424e95030b0086e1b6ebe2e67c883ca`
+- GitHub remote URL: `https://github.com/0ssol1620-byte/tavonel-saas-foundation`
+- Branch: `main`
+- Repository: private
+- Main clean after sync: yes at the time of push; verify again after final metadata commit
+- Tests/build summary: root 18 files/46 tests, root typecheck/build passed; Next 2 files/2 tests, typecheck and `NODE_ENV=production` build passed
+- Production/activation mutation: `none`
 
 ---
 
