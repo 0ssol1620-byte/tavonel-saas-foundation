@@ -6,13 +6,19 @@ import { useRef, useState } from "react";
 import { activationPolicy } from "@/lib/activation-policy";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
+function intakeNotice() {
+  if (!activationPolicy.customerIntake.enabled) {
+    return "Private pilot mode. No document bytes are accepted in this environment.";
+  }
+  if (activationPolicy.cdr.enabled) {
+    return "Private-pilot intake is open for signed-in test users. Files go to Foundation quarantine; CDR writes an immutable sanitized PDF. GPU stays closed.";
+  }
+  return "Private-pilot intake is open for signed-in test users. Files go to Foundation quarantine only; CDR and GPU stay closed.";
+}
+
 export default function WorkspacePage() {
   const fileRef = useRef<HTMLInputElement>(null);
-  const [notice, setNotice] = useState(
-    activationPolicy.customerIntake.enabled
-      ? "Private-pilot intake is open for signed-in test users. Files go to Foundation quarantine only; CDR and GPU stay closed."
-      : "Private pilot mode. No document bytes are accepted in this environment.",
-  );
+  const [notice, setNotice] = useState(intakeNotice);
   const [busy, setBusy] = useState(false);
 
   const uploadDocument = async (file: File) => {
@@ -52,7 +58,11 @@ export default function WorkspacePage() {
         setNotice(`Quarantine PUT failed (${put.status}). The file never entered the app server.`);
         return;
       }
-      setNotice(`${file.name} is in Foundation quarantine. CDR sanitization and GPU analysis are still closed.`);
+      setNotice(
+        activationPolicy.cdr.enabled
+          ? `${file.name} is in Foundation quarantine. CDR will sanitize it to an immutable PDF. GPU analysis stays closed.`
+          : `${file.name} is in Foundation quarantine. CDR sanitization and GPU analysis are still closed.`,
+      );
     } finally {
       setBusy(false);
       if (fileRef.current) fileRef.current.value = "";
