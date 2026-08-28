@@ -19,6 +19,7 @@ export default defineConfig({
       "server/**/*.spec.ts",
       "client/**/*.test.ts",
       "client/**/*.spec.ts",
+      "nextjs/lib/**/*.test.ts",
     ],
   },
 });

@@ -4,6 +4,7 @@ import "./trial-credit.css";
 import Link from "next/link";
 import { Check, ChevronRight, CircleDashed, FileLock2, ShieldCheck, Sparkles } from "lucide-react";
 import { useState } from "react";
+import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 const plans = [
   ["Observer", "$29", "A considered first step."],
@@ -22,12 +23,26 @@ export default function HomePage() {
   const showNotice = () => setNotice("Foundation mode is active. Provider configuration and sandbox qualification are required before this action is available.");
   const showCreditNotice = () => setNotice("This credit pack is staged for Paddle sandbox only. No payment session or GPU capacity is created in foundation mode.");
 
+  const signIn = async () => {
+    const client = getSupabaseBrowserClient();
+    if (!client) {
+      showNotice();
+      return;
+    }
+    const redirectTo = `${window.location.origin}/auth/callback`;
+    const { error } = await client.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo },
+    });
+    if (error) setNotice("Google sign-in could not start. Testing-mode users only.");
+  };
+
   return (
     <main>
       <header>
         <Link href="/" className="brand"><span>T</span>TAVONEL</Link>
         <nav><a href="#method">Method</a><a href="#pricing">Pricing</a><button onClick={showNotice}>Security</button></nav>
-        <button className="secondary" onClick={showNotice}>Sign in</button>
+        <button className="secondary" onClick={signIn}>Sign in</button>
         <button onClick={showNotice}>Join private pilot</button>
       </header>
 
