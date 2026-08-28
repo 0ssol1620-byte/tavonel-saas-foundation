@@ -81,7 +81,7 @@ function validIdentifier(value: string): boolean {
   return IDENTIFIER.test(value);
 }
 
-function validScopedObjectKey(key: string, tenantId: string, workspaceId: string): boolean {
+export function isImmutableScopedObjectKey(key: string, tenantId: string, workspaceId: string): boolean {
   const prefix = `immutable/${tenantId}/${workspaceId}/`;
   if (!key.startsWith(prefix)) return false;
   if (key.length === prefix.length || /[\u0000-\u001f\u007f\\]/.test(key)) return false;
@@ -100,7 +100,7 @@ export function validateCompileJobEnvelope(
     return { accepted: false, code: "IDENTIFIER_INVALID" };
   }
   if (!SHA256.test(input.source.contentSha256)) return { accepted: false, code: "DIGEST_INVALID" };
-  if (!validScopedObjectKey(input.source.immutableObjectKey, input.tenantId, input.workspaceId)) {
+  if (!isImmutableScopedObjectKey(input.source.immutableObjectKey, input.tenantId, input.workspaceId)) {
     return { accepted: false, code: "OBJECT_KEY_INVALID" };
   }
   if (input.source.sanitized !== true || !input.source.quarantineProofId) return { accepted: false, code: "SOURCE_NOT_IMMUTABLE" };
@@ -136,3 +136,4 @@ export function canPersistCandidate(receipt: CompileReceipt): boolean {
     receipt.workAvoided.rebuiltArtifacts <= receipt.workAvoided.totalArtifacts
   );
 }
+
