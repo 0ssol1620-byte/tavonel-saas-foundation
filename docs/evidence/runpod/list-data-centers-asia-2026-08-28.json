@@ -1,0 +1,32 @@
+{
+  "items": [
+    {
+      "compliance": [],
+      "globalNetwork": false,
+      "id": "AP-IN-1",
+      "name": "AP-IN-1",
+      "networkVolumeTypes": [],
+      "region": "ASIA"
+    },
+    {
+      "compliance": [
+        "GDPR",
+        "HIPAA"
+      ],
+      "globalNetwork": false,
+      "id": "AP-JP-1",
+      "name": "AP-JP-1",
+      "networkVolumeTypes": [
+        "STANDARD"
+      ],
+      "region": "ASIA"
+    }
+  ],
+  "pagination": {
+    "nextCursor": null,
+    "offset": 0,
+    "returned": 2,
+    "total": 2,
+    "truncated": false
+  }
+}
