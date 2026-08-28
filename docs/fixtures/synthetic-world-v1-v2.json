@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "tavonel.synthetic_world_fixture.v1",
+  "privacyPolicy": "foundation_synthetic_only",
+  "note": "Deterministic synthetic fixture. No customer data, no GPU, no real files of substance.",
+  "worlds": {
+    "v1": {
+      "worldStateId": "world_synthetic_v1",
+      "lifecycle": "candidate",
+      "parentWorldStateId": null,
+      "rules": [
+        {
+          "ruleId": "rule_retention",
+          "statement": "Retention period is 30 days."
+        }
+      ]
+    },
+    "v2": {
+      "worldStateId": "world_synthetic_v2",
+      "lifecycle": "candidate",
+      "parentWorldStateId": "world_synthetic_v1",
+      "rules": [
+        {
+          "ruleId": "rule_retention",
+          "statement": "Retention period is 90 days."
+        }
+      ]
+    }
+  },
+  "diff": {
+    "changedRuleIds": ["rule_retention"],
+    "changeKind": "one_rule_change"
+  }
+}

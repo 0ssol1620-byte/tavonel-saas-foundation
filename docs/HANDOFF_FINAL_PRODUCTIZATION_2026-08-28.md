@@ -658,3 +658,27 @@ Private repository 0ssol1620-byte/tavonel-saas-foundation의 main을 clone/pull�
 [10]: `https://docs.runpod.io/serverless/pricing` — RunPod Serverless pricing reference  
 [11]: `https://developers.cloudflare.com/r2/objects/upload-objects/` — R2 presigned upload reference  
 [12]: `https://developer.paddle.com/webhooks/overview` — Paddle webhook reference
+
+---
+
+## 18. Continuation 2026-08-28 KST — source-only slice (Desktop snapshot)
+
+This session edited the Desktop working tree in place. There is no `.git` here; nothing was committed or pushed. GitHub was inspect-only.
+
+**Added contracts**
+
+- `shared/productCoreFieldMap.ts` — Product job/receipt mapped to Core `tenant_id` / `document_id` / `document_version_id` / `source_sha256` / `workspace_id` / `world_state_id` / `WorldStateStatus` / `EquivalenceReport.equivalent` / `RecompilationPlan` counts. Unknown Core fields fail closed. `logical_id`, `blocks`, `compiler_version`, `created_at` are explicit TODOs with Core file+symbol evidence (commit `bd0fb334`).
+- `shared/candidateWorldContract.ts` — candidate is not Active; no partial promotion; receipt candidate+equivalence is necessary but not sufficient; Product approval token required; `activationPolicy.candidatePromotion` remains false; parent pointer must match current active or null.
+- `server/foundation/immutableObjectProofAdapter.ts` — unifies quarantine completion and immutable object-key proof; never reads bytes or calls R2.
+
+**Added docs/fixtures**
+
+- `docs/PORT_PACKAGE_RUNPOD_RECEIPT_2026-08-28.md`
+- `docs/P0_VERTICAL_SLICE_ACCEPTANCE.md`
+- `docs/REPO_CONVERGENCE_MATRIX.md` (pointer)
+- `docs/CANONICAL_ARCHITECTURE.md` (pointer)
+- `docs/CONTINUATION_SOURCE_ONLY_SLICE_2026-08-28.md`
+- `docs/fixtures/synthetic-world-v1-v2.json`
+- `docs/fixtures/synthetic-cost-ledger.json`
+
+**Unchanged gates:** Auth, Paddle, R2 signer/CORS, customer intake, CDR customer path, OCR/GPU, paid resources, live promotion. UI skipped.

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "tavonel.synthetic_cost_ledger.v1",
+  "privacyPolicy": "foundation_synthetic_only",
+  "note": "Contract-shaped example only. All amounts are zeros or synthetic credits. No paid GPU.",
+  "creditsIssued": 0,
+  "creditsReserved": 0,
+  "creditsSettled": 0,
+  "creditsReleased": 0,
+  "gpuSeconds": 0,
+  "usdSpent": 0,
+  "syntheticCredits": 0,
+  "jobs": []
+}
