@@ -51,3 +51,8 @@ Cloudmersive replied to a prior Advanced CDR sales inquiry. The vendor states th
 ## Signed synthetic CDR qualification — result
 
 Foundation Cloud Build `acb51e28-236a-4e67-8f81-51eb4605f597` completed successfully after the default Cloud Build compute identity received only `roles/secretmanager.secretAccessor` on `tavonel-cdr-hmac`. The one provider-internal step sent the deterministic 806-byte harmless PDF fixture to the Foundation endpoint and removed temporary fixture, response, and header files on exit. Nonsecret output recorded HTTP 200, `input_bytes=806`, `output_bytes=10717`, `content-type: application/pdf`, `x-tavonel-cdr-status: clean`, matching input digest headers, and an output SHA-256 digest. The HMAC payload was not printed. The Cloud Build command log includes the deterministic fixture base64 as command text; it contains no customer or personal data and is not a customer fixture. No second valid request, customer byte, GPU dispatch, R2 customer object, payment, or promotion action occurred.
+
+
+## RunPod MCP authentication note
+
+RunPod's official MCP documentation says the hosted `https://mcp.getrunpod.io/` server uses Sign in with Runpod (OAuth), while a RunPod API key may be used for a local server or as a hosted-server override via a bearer header. The Foundation connector is configured for hosted URL mode with instant OAuth; its authorization attempt was rejected with `redirect_uri is not allowed`, and the connector remains disabled. The safe alternative, if later separately approved, is a managed-secret API-key connector or a local MCP process, not an invented callback or a repeated OAuth attempt. No endpoint or GPU resource has been created. Source: https://docs.runpod.io/get-started/mcp-servers
