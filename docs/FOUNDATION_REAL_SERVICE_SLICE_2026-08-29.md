@@ -1,4 +1,4 @@
-# Foundation real-service slice (2026-08-29 KST)
+﻿# Foundation real-service slice (2026-08-29 KST)
 
 This slice wires Google sign-in and a Foundation-only R2 synthetic canary. It does not open customer intake, CDR customer path, OCR/GPU dispatch, or candidate promotion.
 
@@ -12,3 +12,6 @@ This slice wires Google sign-in and a Foundation-only R2 synthetic canary. It do
 ## Still fail-closed
 
 `activationPolicy` flags remain false. Workspace upload stays locked. GPU worker release stays blocked until immutable release evidence and compatible capacity exist. Paddle remains sandbox only.
+## Vercel git author
+
+Git pushes whose committer email is not a verified address on `0ssol1620-byte` are BLOCKED by Vercel collaboration protection. Production deploys of this slice should come from a GitHub merge (or a dashboard Redeploy) rather than an unverified local commit email.
