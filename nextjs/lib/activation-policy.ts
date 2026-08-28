@@ -1,7 +1,7 @@
 export const activationPolicy = {
-  customerIntake: { enabled: false, reason: "Synthetic R2 qualification and explicit activation approval are required." },
-  cdr: { enabled: false, reason: "Independently authenticated CDR runtime qualification is required." },
-  ocrGpu: { enabled: false, reason: "Only a sanitized-only candidate path may be qualified." },
+  customerIntake: { enabled: true, reason: "Foundation private-pilot intake is approved after synthetic R2 qualification. Files go to the Foundation quarantine bucket only." },
+  cdr: { enabled: false, reason: "Foundation CDR Cloud Run must return health ok with HMAC before customer sanitization." },
+  ocrGpu: { enabled: false, reason: "GPU dispatch stays closed until an immutable worker release pack exists." },
   candidatePromotion: { enabled: false, reason: "Promotion is always an explicit human decision." },
 } as const;
 

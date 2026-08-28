@@ -2,10 +2,118 @@
 
 import Link from "next/link";
 import { FileText, LockKeyhole, ShieldCheck, UploadCloud } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { activationPolicy } from "@/lib/activation-policy";
+import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 export default function WorkspacePage() {
-  const [notice, setNotice] = useState("Private pilot mode. No document bytes are accepted in this environment.");
-  return <main className="workspace"><aside className="side"><Link href="/" className="brand"><span>T</span>TAVONEL</Link><p className="eyebrow">WORKSPACE</p><div className="workspace-name"><strong>Private pilot</strong><small>Foundation environment</small></div><nav><b>Overview</b><button onClick={() => setNotice("Document metadata remains unavailable until browser-direct R2 intake is approved.")}>Documents</button><button onClick={() => setNotice("Candidates appear only from qualified sanitized inputs.")}>Knowledge candidates</button><button onClick={() => setNotice("Activity is retained only after a governed processing event.")}>Activity</button></nav></aside><section className="workspace-body"><header><span><strong>Private pilot</strong> · Overview<br /><small>Your governed knowledge space</small></span><button onClick={() => setNotice("Upload remains locked until synthetic R2 qualification.")}><UploadCloud size={16} /> Upload document <LockKeyhole size={14} /></button></header><div className="workspace-content"><p className="eyebrow">● FOUNDATION · SAFE MODE</p><h1>A quieter place to think.</h1><p className="lead">Build a traceable body of knowledge from documents that have passed the full safety chain. This private-pilot workspace is deliberately not accepting files yet.</p><p className="notice static"><strong>Guardrail active.</strong> {notice}</p><div className="workspace-grid"><section className="card document-card"><p className="eyebrow">YOUR LIBRARY</p><h2>Awaiting a qualified first document</h2><div className="empty"><FileText size={22} /><strong>No document metadata yet</strong><p>When qualification begins, a short-lived browser-direct quarantine capability is required. The application server and database never carry file bytes.</p></div></section><section className="card canvas"><p className="eyebrow">KNOWLEDGE CANVAS</p><h2>Candidate-only by design</h2><div className="nodes"><i /><i /><i /><i /><i /></div><p>Sanitized inputs can produce reviewable candidates. No candidate is promoted to a world without a separate human decision.</p></section></div><section className="card gates"><p className="eyebrow">PROCESSING INTEGRITY</p><h2>Four gates, all closed</h2><div>{Object.entries(activationPolicy).map(([key, value]) => <article key={key}><span>●</span><strong>{key.replace(/([A-Z])/g, " $1")}</strong><p>{value.reason}</p></article>)}</div><p className="fine"><ShieldCheck size={15} /> All capability issuance is server-authorized and tenant-scoped.</p></section></div></section></main>;
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [notice, setNotice] = useState(
+    activationPolicy.customerIntake.enabled
+      ? "Private-pilot intake is open for signed-in test users. Files go to Foundation quarantine only; CDR and GPU stay closed."
+      : "Private pilot mode. No document bytes are accepted in this environment.",
+  );
+  const [busy, setBusy] = useState(false);
+
+  const uploadDocument = async (file: File) => {
+    setBusy(true);
+    try {
+      const client = getSupabaseBrowserClient();
+      if (!client) {
+        setNotice("Sign in with Google first.");
+        return;
+      }
+      const { data } = await client.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) {
+        setNotice("Sign in with Google first.");
+        return;
+      }
+      const capability = await fetch("/api/uploads/capability", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          originalFilename: file.name,
+          declaredMimeType: file.type || "application/pdf",
+          requestedBytes: file.size,
+        }),
+      });
+      const json = await capability.json() as { code?: string; uploadUrl?: string; declaredMimeType?: string };
+      if (!capability.ok || !json.uploadUrl) {
+        setNotice(json.code === "AUTH_REQUIRED" ? "Sign in with Google first." : `Upload was not issued (${json.code ?? capability.status}).`);
+        return;
+      }
+      const put = await fetch(json.uploadUrl, {
+        method: "PUT",
+        headers: { "content-type": json.declaredMimeType ?? file.type },
+        body: file,
+      });
+      if (!put.ok) {
+        setNotice(`Quarantine PUT failed (${put.status}). The file never entered the app server.`);
+        return;
+      }
+      setNotice(`${file.name} is in Foundation quarantine. CDR sanitization and GPU analysis are still closed.`);
+    } finally {
+      setBusy(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
+  return (
+    <main className="workspace">
+      <aside className="side">
+        <Link href="/" className="brand"><span>T</span>TAVONEL</Link>
+        <p className="eyebrow">WORKSPACE</p>
+        <div className="workspace-name"><strong>Private pilot</strong><small>Foundation environment</small></div>
+        <nav>
+          <b>Overview</b>
+          <button onClick={() => setNotice("Document metadata remains unavailable until a quarantined file is recorded.")}>Documents</button>
+          <button onClick={() => setNotice("Candidates appear only from qualified sanitized inputs.")}>Knowledge candidates</button>
+          <button onClick={() => setNotice("Activity is retained only after a governed processing event.")}>Activity</button>
+        </nav>
+      </aside>
+      <section className="workspace-body">
+        <header>
+          <span><strong>Private pilot</strong> · Overview<br /><small>Your governed knowledge space</small></span>
+          {activationPolicy.customerIntake.enabled ? (
+            <>
+              <input ref={fileRef} type="file" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadDocument(file); }} />
+              <button disabled={busy} onClick={() => fileRef.current?.click()}><UploadCloud size={16} /> {busy ? "Uploading…" : "Upload document"}</button>
+            </>
+          ) : (
+            <button onClick={() => setNotice("Upload remains locked until synthetic R2 qualification.")}><UploadCloud size={16} /> Upload document <LockKeyhole size={14} /></button>
+          )}
+        </header>
+        <div className="workspace-content">
+          <p className="eyebrow">● FOUNDATION · SAFE MODE</p>
+          <h1>A quieter place to think.</h1>
+          <p className="lead">Build a traceable body of knowledge from documents that have passed the full safety chain. Quarantine is browser-direct; the application server never carries file bytes.</p>
+          <p className="notice static"><strong>Guardrail active.</strong> {notice}</p>
+          <div className="workspace-grid">
+            <section className="card document-card">
+              <p className="eyebrow">YOUR LIBRARY</p>
+              <h2>Awaiting a qualified first document</h2>
+              <div className="empty">
+                <FileText size={22} />
+                <strong>No document metadata yet</strong>
+                <p>A short-lived browser-direct quarantine capability is required. The application server and database never carry file bytes.</p>
+              </div>
+            </section>
+            <section className="card canvas">
+              <p className="eyebrow">KNOWLEDGE CANVAS</p>
+              <h2>Candidate-only by design</h2>
+              <div className="nodes"><i /><i /><i /><i /><i /></div>
+              <p>Sanitized inputs can produce reviewable candidates. No candidate is promoted to a world without a separate human decision.</p>
+            </section>
+          </div>
+          <section className="card gates">
+            <p className="eyebrow">PROCESSING INTEGRITY</p>
+            <h2>Four gates</h2>
+            <div>{Object.entries(activationPolicy).map(([key, value]) => <article key={key}><span>{value.enabled ? "○" : "●"}</span><strong>{key.replace(/([A-Z])/g, " $1")}</strong><p>{value.reason}</p></article>)}</div>
+            <p className="fine"><ShieldCheck size={15} /> All capability issuance is server-authorized and tenant-scoped.</p>
+          </section>
+        </div>
+      </section>
+    </main>
+  );
 }
