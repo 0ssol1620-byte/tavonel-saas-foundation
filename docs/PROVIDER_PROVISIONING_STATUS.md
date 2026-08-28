@@ -56,3 +56,17 @@ Foundation Cloud Build `acb51e28-236a-4e67-8f81-51eb4605f597` completed successf
 ## RunPod MCP authentication note
 
 RunPod's official MCP documentation says the hosted `https://mcp.getrunpod.io/` server uses Sign in with Runpod (OAuth), while a RunPod API key may be used for a local server or as a hosted-server override via a bearer header. The Foundation connector is configured for hosted URL mode with instant OAuth; its authorization attempt was rejected with `redirect_uri is not allowed`, and the connector remains disabled. The safe alternative, if later separately approved, is a managed-secret API-key connector or a local MCP process, not an invented callback or a repeated OAuth attempt. No endpoint or GPU resource has been created. Source: https://docs.runpod.io/get-started/mcp-servers
+
+## RunPod API-key MCP and APAC capacity preflight — 2026-08-28 (KST)
+
+The previously reported RunPod MCP `server not found` condition was resolved by using the enabled server key `runpod-foundation-read-only`, which maps to the Foundation-specific hosted MCP URL `https://mcp.getrunpod.io/`. The connector is enabled and its credential remains server-side; no secret value was printed, copied into source, or written to this record. The first successful call was the read-only `list-gpu-types` operation with `product=SERVERLESS`, `includeUnavailable=false`, `minMemoryGb=16`, and `limit=100`.
+
+The catalog returned deployable entries, including high-availability examples such as A40 (48 GB, listed Serverless rate $1.22/hour), RTX 4090 (24 GB, $1.10/hour), RTX 5090 (32 GB, $1.58/hour), H200 (141 GB, $5.93/hour), and RTX A5000 (24 GB, $0.69/hour). These are catalog observations only; they are not a quote for a specific workload, do not prove Seoul availability, and did not create or mutate any RunPod resource.
+
+A second read-only `get-capacity` deep probe was issued for Secure Cloud, one GPU, CUDA 12.9, and the candidate GPU IDs NVIDIA GeForce RTX 4090, NVIDIA A100 80GB PCIe, and NVIDIA H200. The structured result returned zero items and no error. Therefore the required CUDA 12.9 capacity was not evidenced for those candidates, and the synthetic GPU qualification build was not attempted. This is a fail-closed result, not a capacity failure diagnosis for every CUDA version or every GPU type.
+
+The read-only `list-data-centers` query for region `Asia` returned only `AP-IN-1` and `AP-JP-1`; no Seoul data center was returned. Consequently, the current preflight does not establish Seoul/APAC-local GPU placement. No endpoint, pod, template, network volume, job, worker, paid request, retry, or GPU spend occurred. The global OCR/GPU dispatch gate remains disabled, and the Foundation still requires an immutable approved worker release artifact, compatible runtime evidence, and a fresh capacity result before any one-shot paid mutation can even be considered.
+
+Evidence files are retained locally at `/home/ubuntu/.mcp/tool-results/2026-08-28_02-49-20.275889176_runpod-foundation-read-only_list-gpu-types_c45081e1.json`, `/home/ubuntu/.mcp/tool-results/2026-08-28_02-50-03.923430656_runpod-foundation-read-only_get-capacity_14d5c69b.json`, and `/home/ubuntu/.mcp/tool-results/2026-08-28_02-50-46.162606833_runpod-foundation-read-only_list-data-centers_72a4bf6e.json`. The provider's MCP overview and authentication model are documented at [2].
+
+[2]: https://docs.runpod.io/get-started/mcp-servers "RunPod MCP servers"
