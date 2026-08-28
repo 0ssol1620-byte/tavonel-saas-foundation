@@ -103,7 +103,7 @@ async function signedS3(
   const response = await fetch(`https://${host}${canonicalUri}`, {
     method,
     headers,
-    body,
+    body: body ? new Uint8Array(body) : undefined,
   });
   return response.status;
 }
