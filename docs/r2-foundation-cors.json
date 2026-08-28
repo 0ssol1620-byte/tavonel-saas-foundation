@@ -1,0 +1,12 @@
+﻿[
+  {
+    "AllowedOrigins": [
+      "https://tavonel-saas-foundation.vercel.app",
+      "https://tavonel-saas-foundation-phillips-projects-a8cf32fc.vercel.app"
+    ],
+    "AllowedMethods": ["GET", "PUT", "HEAD", "DELETE"],
+    "AllowedHeaders": ["Content-Type", "Content-Length", "Content-MD5"],
+    "ExposeHeaders": ["ETag", "Content-Length"],
+    "MaxAgeSeconds": 3600
+  }
+]
