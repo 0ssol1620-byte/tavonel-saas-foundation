@@ -1,0 +1,82 @@
+name: foundation-ocr-image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "workers/foundation-ocr/**"
+      - ".github/workflows/foundation-ocr-image.yml"
+  workflow_dispatch:
+
+permissions:
+  packages: write
+  contents: write
+  id-token: write
+
+env:
+  IMAGE: ghcr.io/0ssol1620-byte/tavonel-foundation-ocr
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push linux/amd64
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: workers/foundation-ocr
+          file: workers/foundation-ocr/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}
+          provenance: false
+
+      - name: Record image digest
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/ocr-evidence"
+          {
+            echo "# Foundation OCR GHCR digest"
+            echo
+            echo "- image: \`${IMAGE}\`"
+            echo "- digest: \`${DIGEST}\`"
+            echo "- commit: \`${GITHUB_SHA}\`"
+            echo "- recordedAtUtc: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo
+            echo "No secrets are included. ocrGpu stays false until this digest is copied into docs/evidence/ocr/release.json plus capacity and a \$5 one-shot qualification."
+          } | tee "$RUNNER_TEMP/ocr-evidence/FOUNDATION_OCR_IMAGE_DIGEST.md"
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+          echo "## Foundation OCR image" >> "$GITHUB_STEP_SUMMARY"
+          echo "- image: \`${IMAGE}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- digest: \`${DIGEST}\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload digest artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: foundation-ocr-image-digest
+          path: ${{ runner.temp }}/ocr-evidence/FOUNDATION_OCR_IMAGE_DIGEST.md
+
+      - name: Generate SBOM
+        continue-on-error: true
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.IMAGE }}@${{ steps.push.outputs.digest }}
+          format: spdx-json
+          artifact-name: foundation-ocr.spdx.json
+          upload-artifact: true

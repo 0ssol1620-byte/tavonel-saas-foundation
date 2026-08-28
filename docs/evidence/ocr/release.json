@@ -1,0 +1,18 @@
+{
+  "scope": "synthetic",
+  "imageName": "ghcr.io/0ssol1620-byte/tavonel-foundation-ocr",
+  "imageDigest": "",
+  "immutableReleaseEvidenceVerified": false,
+  "capacityReadAtUtc": "2026-08-28T00:00:00.000Z",
+  "capacityAvailable": true,
+  "qualificationOnly": true,
+  "sshDisabled": true,
+  "healthPort": 8001,
+  "minWorkers": 0,
+  "persistentVolumeGiB": 0,
+  "containerDiskGiB": 80,
+  "priorCommittedUsd": 0,
+  "estimatedQualificationUsd": 4.5,
+  "mutationAttemptsForRequest": 0,
+  "priorWriteResult": "none"
+}

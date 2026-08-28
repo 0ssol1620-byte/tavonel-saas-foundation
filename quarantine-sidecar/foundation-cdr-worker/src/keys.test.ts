@@ -7,6 +7,7 @@ import {
   hasForbiddenPath,
   immutableObjectKey,
   isQuarantineSourceKey,
+  ocrSiblingKey,
   parseQuarantineSourceKey,
   versionKeyFromOutputSha256,
 } from "./keys";
@@ -64,6 +65,12 @@ describe("immutable object key", () => {
   it("uses the first 32 hex chars when the digest hex is longer than 64", () => {
     const longHex = `${"ab".repeat(32)}ffff`;
     assert.equal(versionKeyFromOutputSha256(`sha256:${longHex}`), "ab".repeat(16));
+  });
+
+  it("maps sanitized.pdf to sibling ocr.json", () => {
+    const pdf = `immutable/ws_pilot/ws_pilot/doc_1/${"cd".repeat(32)}/sanitized.pdf`;
+    assert.equal(ocrSiblingKey(pdf), `immutable/ws_pilot/ws_pilot/doc_1/${"cd".repeat(32)}/ocr.json`);
+    assert.throws(() => ocrSiblingKey("immutable/ws/ws/doc/abc/other.bin"), PermanentReject);
   });
 });
 

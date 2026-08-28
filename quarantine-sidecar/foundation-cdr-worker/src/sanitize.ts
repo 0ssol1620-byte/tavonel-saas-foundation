@@ -7,6 +7,7 @@ import {
   immutableObjectKey,
   sourcePartFromR2Object,
 } from "./keys";
+import { dispatchOcrAfterSanitize, type OcrDispatchResult } from "./ocr";
 
 export type SanitizeResult = {
   sourceKey: string;
@@ -14,6 +15,7 @@ export type SanitizeResult = {
   inputSha256: string;
   outputSha256: string;
   status: "clean";
+  ocr: OcrDispatchResult;
 };
 
 export type R2ObjectLike = {
@@ -42,6 +44,8 @@ export type SanitizeEnv = {
   TAVONEL_CDR_HMAC?: string;
   TAVONEL_CDR_PROVIDER: string;
   FOUNDATION_R2_BUCKET: string;
+  FOUNDATION_OCR_URL?: string;
+  TAVONEL_OCR_HMAC?: string;
 };
 
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{16,160}$/;
@@ -144,11 +148,19 @@ export async function sanitizeObject(
     }
   }
 
+  let ocr: OcrDispatchResult;
+  try {
+    ocr = await dispatchOcrAfterSanitize(env, immutableKey, fetcher, now, newRequestId);
+  } catch {
+    ocr = { status: "failed", reason: "OCR dispatch failed after CDR" };
+  }
+
   return {
     sourceKey: objectKey,
     immutableKey,
     inputSha256,
     outputSha256: outputSha256Header,
     status: "clean",
+    ocr,
   };
 }

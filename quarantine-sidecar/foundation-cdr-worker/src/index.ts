@@ -10,6 +10,8 @@ export interface Env {
   TAVONEL_CDR_PROVIDER: string;
   FOUNDATION_R2_BUCKET: string;
   TAVONEL_CDR_HMAC: string;
+  FOUNDATION_OCR_URL?: string;
+  TAVONEL_OCR_HMAC?: string;
 }
 
 export function jsonResponse(status: number, body: Record<string, unknown>): Response {

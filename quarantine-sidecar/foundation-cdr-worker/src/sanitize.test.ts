@@ -4,13 +4,14 @@ import { describe, it } from "node:test";
 import { PermanentReject, RetryableError } from "./errors";
 import { cdrRequestSignature, sha256DigestHeader } from "./hmac";
 import { handleQueue, handleRequest, type Env } from "./index";
-import { immutableObjectKey } from "./keys";
+import { immutableObjectKey, ocrSiblingKey } from "./keys";
 import { sanitizeObject, type R2BucketLike, type R2ObjectLike } from "./sanitize";
 
 const FIXTURE_SECRET = "foundation-cdr-hmac-fixture-secret-ok";
 const SYNTHETIC_URL = "https://tavonel-cdr-synthetic-317850201666.asia-northeast3.run.app/v1/disarm";
 const SYNTHETIC_HEALTH = "https://tavonel-cdr-synthetic-317850201666.asia-northeast3.run.app/health";
 const PROD_URL = "https://tavonel-pdf-cdr.example.run.app/v1/disarm";
+const FOUNDATION_OCR = "https://tavonel-foundation-ocr.example/v1/ocr";
 const SOURCE_KEY = "quarantine/ws_pilot/doc_1/source";
 const SOURCE_BYTES = new TextEncoder().encode("%PDF-1.4 fixture");
 const SANITIZED_BYTES = new TextEncoder().encode("%PDF-1.4 sanitized-fixture");
@@ -65,6 +66,7 @@ function envFor(r2: FakeR2, overrides: Partial<Env> = {}): Env {
     TAVONEL_CDR_PROVIDER: "tavonel_pdf_raster",
     FOUNDATION_R2_BUCKET: "tavonel-saas-foundation-quarantine",
     TAVONEL_CDR_HMAC: FIXTURE_SECRET,
+    FOUNDATION_OCR_URL: "",
     ...overrides,
   };
 }
@@ -80,6 +82,12 @@ async function cleanCdrFetch(input: RequestInfo | URL, init?: RequestInit): Prom
   }
   if (url.includes("/health")) {
     return new Response(JSON.stringify({ status: "ok" }), { status: 200 });
+  }
+  if (url.includes("/v1/ocr")) {
+    return new Response(
+      JSON.stringify({ status: "ok", text: "TAVONEL OCR", pageCount: 1, inputSha256: "sha256:ocr" }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    );
   }
   const headers = new Headers(init?.headers);
   const inputSha = headers.get("x-tavonel-input-sha256") || "";
@@ -127,12 +135,14 @@ describe("sanitizeObject", () => {
     assert.equal(result.sourceKey, SOURCE_KEY);
     assert.equal(result.immutableKey, expectedImmutable);
     assert.equal(result.outputSha256, outputSha256());
+    assert.equal(result.ocr.status, "skipped");
     assert.equal(r2.objects.has(SOURCE_KEY), true);
     assert.equal(r2.deleted.length, 0);
     assert.equal(r2.puts[0]?.key, expectedImmutable);
     assert.equal(r2.puts[0]?.options.onlyIf?.etagDoesNotMatch, "*");
     assert.equal(r2.puts[0]?.options.customMetadata?.stage, "immutable-approved");
     assert.equal(sawLiveHost, false);
+    assert.equal(r2.objects.has(ocrSiblingKey(expectedImmutable)), false);
   });
 
   it("treats an already-present immutable object as success", async () => {
@@ -144,6 +154,31 @@ describe("sanitizeObject", () => {
     const result = await sanitizeObject(envFor(r2), SOURCE_KEY, cleanCdrFetch);
     assert.equal(result.status, "clean");
     assert.equal(result.immutableKey, immutableKey);
+    assert.equal(result.ocr.status, "skipped");
+  });
+
+  it("skips OCR when FOUNDATION_OCR_URL is empty and still returns CDR clean", async () => {
+    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
+    const result = await sanitizeObject(envFor(r2, { FOUNDATION_OCR_URL: "" }), SOURCE_KEY, cleanCdrFetch);
+    assert.equal(result.status, "clean");
+    assert.equal(result.ocr.status, "skipped");
+    assert.equal(r2.puts.every((entry) => entry.key.endsWith("sanitized.pdf")), true);
+  });
+
+  it("writes sibling ocr.json after CDR when FOUNDATION_OCR_URL is a Foundation target", async () => {
+    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
+    const result = await sanitizeObject(
+      envFor(r2, { FOUNDATION_OCR_URL: FOUNDATION_OCR, TAVONEL_OCR_HMAC: "foundation-ocr-hmac-fixture-secret-ok" }),
+      SOURCE_KEY,
+      cleanCdrFetch,
+    );
+    const expectedImmutable = immutableObjectKey("ws_pilot", "doc_1", outputSha256());
+    const expectedOcr = ocrSiblingKey(expectedImmutable);
+    assert.equal(result.status, "clean");
+    assert.equal(result.ocr.status, "written");
+    assert.equal(result.ocr.key, expectedOcr);
+    assert.equal(r2.puts.some((entry) => entry.key === expectedOcr), true);
+    assert.equal(r2.puts.find((entry) => entry.key === expectedOcr)?.options.onlyIf?.etagDoesNotMatch, "*");
   });
 
   it("refuses oversized objects before calling CDR", async () => {
@@ -227,7 +262,7 @@ describe("Worker HTTP and queue surface", () => {
             },
           },
         ],
-      },
+      } as never,
       envFor(r2),
       cleanCdrFetch,
     );
@@ -248,7 +283,7 @@ describe("Worker HTTP and queue surface", () => {
             },
           },
         ],
-      },
+      } as never,
       envFor(r2),
       async () => new Response("no", { status: 502 }),
     );

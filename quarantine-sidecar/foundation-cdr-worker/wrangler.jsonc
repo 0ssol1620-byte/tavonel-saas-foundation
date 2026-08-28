@@ -6,6 +6,7 @@
   // (or `wrangler secret put TAVONEL_CDR_HMAC`) from GCP Secret Manager
   // projects/tavonel-saas-foundation/secrets/tavonel-cdr-hmac.
   // Never put the HMAC in vars, source, committed .dev.vars, or chat.
+  // TAVONEL_OCR_HMAC is likewise dashboard-only after the OCR image exists.
   "r2_buckets": [
     {
       "binding": "FOUNDATION_QUARANTINE",
@@ -16,7 +17,10 @@
     "TAVONEL_CDR_URL": "https://tavonel-cdr-synthetic-317850201666.asia-northeast3.run.app/v1/disarm",
     "TAVONEL_CDR_HEALTH_URL": "https://tavonel-cdr-synthetic-317850201666.asia-northeast3.run.app/health",
     "TAVONEL_CDR_PROVIDER": "tavonel_pdf_raster",
-    "FOUNDATION_R2_BUCKET": "tavonel-saas-foundation-quarantine"
+    "FOUNDATION_R2_BUCKET": "tavonel-saas-foundation-quarantine",
+    // Dashboard sets FOUNDATION_OCR_URL after the GHCR image / endpoint exists.
+    // Leave empty so OCR is skipped. Do not point at production.
+    "FOUNDATION_OCR_URL": ""
   },
   "queues": {
     "consumers": [

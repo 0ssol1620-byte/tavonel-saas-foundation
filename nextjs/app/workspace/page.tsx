@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { FileText, LockKeyhole, ShieldCheck, UploadCloud } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { activationPolicy } from "@/lib/activation-policy";
+import type { DocumentListItem } from "@/lib/immutable-keys";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 function intakeNotice() {
@@ -11,7 +12,7 @@ function intakeNotice() {
     return "Private pilot mode. No document bytes are accepted in this environment.";
   }
   if (activationPolicy.cdr.enabled) {
-    return "Private-pilot intake is open for signed-in test users. Files go to Foundation quarantine; CDR writes an immutable sanitized PDF. GPU stays closed.";
+    return "Private-pilot intake is open for signed-in test users. Files go to Foundation quarantine; CDR writes an immutable sanitized PDF. GPU stays closed until a GHCR digest and a $5 one-shot exist. Candidate promotion stays closed.";
   }
   return "Private-pilot intake is open for signed-in test users. Files go to Foundation quarantine only; CDR and GPU stay closed.";
 }
@@ -20,6 +21,23 @@ export default function WorkspacePage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [notice, setNotice] = useState(intakeNotice);
   const [busy, setBusy] = useState(false);
+  const [documents, setDocuments] = useState<DocumentListItem[] | null>(null);
+
+  const loadDocuments = async () => {
+    const client = getSupabaseBrowserClient();
+    if (!client) return;
+    const { data } = await client.auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) return;
+    const response = await fetch("/api/documents", { headers: { authorization: `Bearer ${token}` } });
+    if (!response.ok) return;
+    const json = (await response.json()) as { documents?: DocumentListItem[] };
+    setDocuments(json.documents ?? []);
+  };
+
+  useEffect(() => {
+    void loadDocuments();
+  }, []);
 
   const uploadDocument = async (file: File) => {
     setBusy(true);
@@ -60,9 +78,10 @@ export default function WorkspacePage() {
       }
       setNotice(
         activationPolicy.cdr.enabled
-          ? `${file.name} is in Foundation quarantine. CDR will sanitize it to an immutable PDF. GPU analysis stays closed.`
+          ? `${file.name} is in Foundation quarantine. CDR will sanitize it to an immutable PDF. OCR candidates JSON is Worker-side only; GPU dispatch and candidate promotion stay closed.`
           : `${file.name} is in Foundation quarantine. CDR sanitization and GPU analysis are still closed.`,
       );
+      await loadDocuments();
     } finally {
       setBusy(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -77,8 +96,8 @@ export default function WorkspacePage() {
         <div className="workspace-name"><strong>Private pilot</strong><small>Foundation environment</small></div>
         <nav>
           <b>Overview</b>
-          <button onClick={() => setNotice("Document metadata remains unavailable until a quarantined file is recorded.")}>Documents</button>
-          <button onClick={() => setNotice("Candidates appear only from qualified sanitized inputs.")}>Knowledge candidates</button>
+          <button onClick={() => void loadDocuments()}>Documents</button>
+          <button onClick={() => setNotice("Candidates appear only from qualified sanitized inputs. Promotion stays a separate human decision.")}>Knowledge candidates</button>
           <button onClick={() => setNotice("Activity is retained only after a governed processing event.")}>Activity</button>
         </nav>
       </aside>
@@ -102,18 +121,30 @@ export default function WorkspacePage() {
           <div className="workspace-grid">
             <section className="card document-card">
               <p className="eyebrow">YOUR LIBRARY</p>
-              <h2>Awaiting a qualified first document</h2>
-              <div className="empty">
-                <FileText size={22} />
-                <strong>No document metadata yet</strong>
-                <p>A short-lived browser-direct quarantine capability is required. The application server and database never carry file bytes.</p>
-              </div>
+              <h2>{documents && documents.length > 0 ? "Immutable document metadata" : "Awaiting a qualified first document"}</h2>
+              {documents && documents.length > 0 ? (
+                <ul className="document-meta">
+                  {documents.map((doc) => (
+                    <li key={`${doc.documentId}-${doc.versionKey}`}>
+                      <strong>{doc.documentId}</strong>
+                      <small>{doc.sanitizedKey ?? "sanitized.pdf pending"}</small>
+                      <small>{doc.hasOcrJson ? `ocr.json ${doc.ocrJsonSize ?? 0} bytes` : "ocr.json not written yet"}</small>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="empty">
+                  <FileText size={22} />
+                  <strong>No document metadata yet</strong>
+                  <p>A short-lived browser-direct quarantine capability is required. The application server and database never carry file bytes. Sign in to load immutable keys after CDR.</p>
+                </div>
+              )}
             </section>
             <section className="card canvas">
               <p className="eyebrow">KNOWLEDGE CANVAS</p>
               <h2>Candidate-only by design</h2>
               <div className="nodes"><i /><i /><i /><i /><i /></div>
-              <p>Sanitized inputs can produce reviewable candidates. No candidate is promoted to a world without a separate human decision.</p>
+              <p>Sanitized inputs can produce reviewable candidates JSON. No candidate is promoted to a world without a separate human decision. candidatePromotion stays closed.</p>
             </section>
           </div>
           <section className="card gates">

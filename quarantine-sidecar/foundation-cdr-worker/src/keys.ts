@@ -48,6 +48,13 @@ export function immutableObjectKey(workspaceId: string, documentId: string, outp
   return `immutable/${workspaceId}/${workspaceId}/${documentId}/${versionKey}/sanitized.pdf`;
 }
 
+export function ocrSiblingKey(immutablePdfKey: string): string {
+  if (!immutablePdfKey.endsWith("/sanitized.pdf")) {
+    throw new PermanentReject("immutable PDF key is not a sanitized.pdf object");
+  }
+  return `${immutablePdfKey.slice(0, -"/sanitized.pdf".length)}/ocr.json`;
+}
+
 export function extractObjectKey(body: unknown): string | null {
   let value: unknown = body;
   if (typeof value === "string") {
