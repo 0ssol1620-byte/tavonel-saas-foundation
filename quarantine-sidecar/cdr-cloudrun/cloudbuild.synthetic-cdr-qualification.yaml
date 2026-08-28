@@ -1,0 +1,63 @@
+# One-shot harmless qualification for the independent Foundation PDF-raster CDR.
+#
+# Submit manually only after the deployed Foundation service, version-pinned HMAC,
+# and service-scoped request-log exclusion have been independently verified. The
+# HMAC is injected directly from Secret Manager into this provider-managed build
+# worker. It is never printed, copied to a file, passed as an argument, or stored
+# in repository source. The build writes no artifact and deletes its temporary
+# input, response body, and headers before exiting.
+#
+# This config is deliberately not idempotent: a failed or ambiguous build must be
+# diagnosed from metadata and logs before anyone considers another approved run.
+
+timeout: 300s
+
+steps:
+  - id: signed-harmless-cdr-fixture
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    secretEnv:
+      - TAVONEL_CDR_HMAC
+    args:
+      - -ceu
+      - |
+        readonly endpoint='https://tavonel-cdr-synthetic-317850201666.asia-northeast3.run.app/v1/disarm'
+        readonly fixture_b64='JVBERi0xLjcKJcK1wrYKCjEgMCBvYmoKPDwvVHlwZS9DYXRhbG9nL1BhZ2VzIDIgMCBSPj4KZW5kb2JqCgoyIDAgb2JqCjw8L1R5cGUvUGFnZXMvQ291bnQgMS9LaWRzWzQgMCBSXT4+CmVuZG9iagoKMyAwIG9iago8PC9Gb250PDwvaGVsdiA1IDAgUj4+Pj4KZW5kb2JqCgo0IDAgb2JqCjw8L1R5cGUvUGFnZS9NZWRpYUJveFswIDAgNTk1IDg0Ml0vUm90YXRlIDAvUmVzb3VyY2VzIDMgMCBSL1BhcmVudCAyIDAgUi9Db250ZW50c1s2IDAgUl0+PgplbmRvYmoKCjUgMCBvYmoKPDwvVHlwZS9Gb250L1N1YnR5cGUvVHlwZTEvQmFzZUZvbnQvSGVsdmV0aWNhL0VuY29kaW5nL1dpbkFuc2lFbmNvZGluZz4+CmVuZG9iagoKNiAwIG9iago8PC9MZW5ndGggMTEyL0ZpbHRlci9GbGF0ZURlY29kZT4+CnN0cmVhbQp42g2LsQoCQQxE+3xF/sBNdpLcglgINnZCuuOqcw8LLWz8fsPAK+bN0JeuScKtIhzKEY3zQ6fXfP9YhPPg9WyAmOPAhGHX5otLqD99d4seXVtx+AyUseLw6tAB01q7j1gCYfWxy5Z3uiU96A+3BBt3CmVuZHN0cmVhbQplbmRvYmoKCnhyZWYKMCA3CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDAxNiAwMDAwMCBuIAowMDAwMDAwMDYyIDAwMDAwIG4gCjAwMDAwMDAxMTQgMDAwMDAgbiAKMDAwMDAwMDE1NSAwMDAwMCBuIAowMDAwMDAwMjYyIDAwMDAwIG4gCjAwMDAwMDAzNTEgMDAwMDAgbiAKCnRyYWlsZXIKPDwvU2l6ZSA3L1Jvb3QgMSAwIFIvSURbPEMzOTQyRUMzQTBDMkFGQzI5NjQwQzI5RkMyQUNDM0EwPjw2OTZGMUVCMzk4ODdERkZCRTAyQjcwMzI2OUI3MDE1Qz5dPj4Kc3RhcnR4cmVmCjUzMgolJUVPRgo='
+        fixture_path="$(mktemp)"
+        response_path="$(mktemp)"
+        headers_path="$(mktemp)"
+        cleanup() {
+          rm -f "${fixture_path}" "${response_path}" "${headers_path}"
+          unset TAVONEL_CDR_HMAC
+        }
+        trap cleanup EXIT
+
+        printf '%s' "${fixture_b64}" | base64 --decode > "${fixture_path}"
+        input_digest="sha256:$(sha256sum "${fixture_path}" | awk '{print $1}')"
+        timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        request_id="$(head -c 18 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n')"
+        signature="$(python3 -c 'import base64, hashlib, hmac, os, sys; print(base64.urlsafe_b64encode(hmac.new(os.environ["TAVONEL_CDR_HMAC"].encode(), sys.argv[1].encode(), hashlib.sha256).digest()).rstrip(b"=").decode())' "${timestamp}.${request_id}.${input_digest}")"
+
+        status="$(curl --fail --silent --show-error --request POST "${endpoint}" --dump-header "${headers_path}" --output "${response_path}" --write-out '%{http_code}' --header "x-tavonel-input-sha256: ${input_digest}" --header "x-tavonel-cdr-timestamp: ${timestamp}" --header "x-tavonel-cdr-request-id: ${request_id}" --header "x-tavonel-cdr-signature: ${signature}" --form "source=@${fixture_path};filename=foundation-qualification.pdf;type=application/pdf")"
+        headers="$(tr -d '\r' < "${headers_path}")"
+        output_digest="sha256:$(sha256sum "${response_path}" | awk '{print $1}')"
+        output_bytes="$(wc -c < "${response_path}" | tr -d ' ' )"
+
+        test "${status}" = '200'
+        printf '%s\n' "${headers}" | grep -Fqx 'content-type: application/pdf'
+        printf '%s\n' "${headers}" | grep -Fqx 'x-tavonel-cdr-status: clean'
+        printf '%s\n' "${headers}" | grep -Fqx "x-tavonel-input-sha256: ${input_digest}"
+        printf '%s\n' "${headers}" | grep -Fqx 'x-tavonel-cdr-output-mime: application/pdf'
+        printf '%s\n' "${headers}" | grep -Fqx "x-tavonel-cdr-output-sha256: ${output_digest}"
+        test "${output_bytes}" -gt 0
+
+        printf 'TAVONEL_CDR_SYNTHETIC_QUALIFICATION_OK status=%s input_bytes=%s output_bytes=%s input_sha256=%s output_sha256=%s\n' "${status}" "$(wc -c < "${fixture_path}" | tr -d ' ')" "${output_bytes}" "${input_digest}" "${output_digest}"
+
+availableSecrets:
+  secretManager:
+    - versionName: projects/tavonel-saas-foundation/secrets/tavonel-cdr-hmac/versions/1
+      env: TAVONEL_CDR_HMAC
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
