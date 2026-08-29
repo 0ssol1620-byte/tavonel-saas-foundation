@@ -123,7 +123,7 @@ function canonicalize(value: unknown): string {
 
 export function readProductCoreV2Env(): ProductCoreV2Env | null {
   const url = process.env.FOUNDATION_CORE_V2_URL?.trim() ?? "";
-  const hmac = process.env.FOUNDATION_CORE_HMAC ?? "";
+  const hmac = process.env.FOUNDATION_CORE_V2_HMAC ?? "";
   if (!/^https:\/\/[A-Za-z0-9.-]+(?::\d+)?$/.test(url) || hmac.length < 32) return null;
   return { url: url.replace(/\/$/, ""), hmac };
 }
