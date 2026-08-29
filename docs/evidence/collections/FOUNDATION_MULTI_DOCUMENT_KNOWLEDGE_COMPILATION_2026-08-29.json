@@ -1,0 +1,139 @@
+{
+  "schemaVersion": "tavonel.foundation.collection-proof.v1",
+  "status": "qualified_foundation_candidate_compiler",
+  "observedAtUtc": "2026-08-29T06:03:00Z",
+  "production": {
+    "url": "https://tavonel-saas-foundation.vercel.app/workspace?foundation-proof=1&collection=collection-12be472fa51e4be53a69224551446e35",
+    "compileDeploymentId": "dpl_5gZFLRhy2xC4mz9EHZqesjbsRbEH",
+    "reloadVerificationDeploymentId": "dpl_4oAjm2yvcKJk8p9mrmaPPKDjgdQ9",
+    "reloadVerificationCommit": "817f86a9d7dd1163e2a334b5b3352dd9573cfff6",
+    "alias": "tavonel-saas-foundation.vercel.app",
+    "region": "icn1"
+  },
+  "input": {
+    "source": "public DART fixture dart-jtc-2026-q1.pdf",
+    "sourceBytes": 2276931,
+    "sourceSha256": "fb998430db82774afc0d69090383650421ab9a14e6e37c7f32821aa1c6a32eee",
+    "derivatives": [
+      {
+        "filename": "dart-jtc-page-1.pdf",
+        "bytes": 929510,
+        "sha256": "bbc9bcd5c5c3efce74755e451e04f62ca1ca97402a10908d309ba5645d63751a"
+      },
+      {
+        "filename": "dart-jtc-page-2.pdf",
+        "bytes": 403169,
+        "sha256": "cbcd0747921a49fc88420521e6d655ddfa0ee7febdc8895f204e61625c933ee6"
+      },
+      {
+        "filename": "dart-jtc-page-3.pdf",
+        "bytes": 370854,
+        "sha256": "2224c8c1ca8a0057992e1dba2605a7e5184edb22af820ab976ff6d900374ee53"
+      }
+    ],
+    "browserDigestVerifiedBeforeUpload": true,
+    "uploadMethod": "signed-in workspace UI -> three metadata capabilities -> three browser-direct signed R2 PUTs"
+  },
+  "documents": [
+    {
+      "documentId": "d59d90fa-0ed2-4917-bf95-27692b691b0c",
+      "versionKey": "626598e430cf31b5b9afc95340500b046f6deb6463c7fff40d22dc6d0bcf2a41",
+      "ocrJsonBytes": 1032
+    },
+    {
+      "documentId": "15d10386-7441-40fe-aa3f-a9d1cb5b77e4",
+      "versionKey": "144cc009435fe9580161e117b9282d67831f72d190c16a60cc4e40263dc8f450",
+      "ocrJsonBytes": 925
+    },
+    {
+      "documentId": "5f38e0f0-3087-4404-9746-90dcfe9bc586",
+      "versionKey": "f728dc455067280f92f31fb0626f49f7b6b8c70a31a090ebfdb836862e9efa78",
+      "ocrJsonBytes": 1126
+    }
+  ],
+  "runpod": {
+    "endpointId": "cohlugjzf0dk9i",
+    "endpointName": "tavonel-foundation-ocr-gpu",
+    "requestsBefore": 9,
+    "requestsAfter": 12,
+    "completedBefore": 1,
+    "completedAfter": 4,
+    "failedBefore": 8,
+    "failedAfter": 8,
+    "completedDelta": 3,
+    "failedDelta": 0,
+    "executionTimeTotalAfter": "21.39s",
+    "coldStartCountAfter": 2,
+    "coldStartTimeTotalAfter": "55.58s",
+    "postRunWorkers": 0,
+    "postRunJobsInProgress": 0,
+    "postRunJobsWaiting": 0,
+    "postRunSpendPerSecond": "$0.00000/s"
+  },
+  "collection": {
+    "collectionId": "collection-12be472fa51e4be53a69224551446e35",
+    "artifactKey": "immutable/pilot-969dc192daa24119/pilot-969dc192daa24119/collections/collection-12be472fa51e4be53a69224551446e35/17c5f06c16e462711d5ff787f1af5c6205ba2fc6d74500b29d6dcdeb8500a0e0/candidate-world.json",
+    "manifestDigest": "sha256:17c5f06c16e462711d5ff787f1af5c6205ba2fc6d74500b29d6dcdeb8500a0e0",
+    "lifecycle": "candidate",
+    "candidatePromotion": false,
+    "blueprint": "generic-mixed-corpus@1.0.0",
+    "directoryEntries": 31,
+    "packageFiles": 14,
+    "documents": 3,
+    "topics": 1,
+    "entities": 3,
+    "claims": 11,
+    "evidenceNodes": 3,
+    "relations": 17,
+    "requiredRoots": [
+      "source",
+      "canonical",
+      "obsidian",
+      "ontology",
+      "graph",
+      "rag",
+      "provenance",
+      "validation"
+    ],
+    "durableReloadVerified": true,
+    "durableReloadHttpStatus": 200,
+    "createOnce": true
+  },
+  "cloudflare": {
+    "queue": "foundation-quarantine-created",
+    "backlogAfterRun": 0,
+    "backlogBytesAfterRun": 0
+  },
+  "vercelRuntime": {
+    "compileDeployment": {
+      "uploadCapabilityRequests": 3,
+      "collectionCompileRequests": 1,
+      "observed2xxRequests": 24
+    },
+    "reloadDeployment": {
+      "collectionGetRequests": 1,
+      "observed200Requests": 4
+    }
+  },
+  "verification": {
+    "typecheck": "passed",
+    "unitTests": "38 passed",
+    "productionBuild": "passed",
+    "fullSequence": "browser multi-file proof -> signed R2 quarantine -> CDR sanitized PDFs -> RunPod GPU OCR x3 -> sibling ocr.json x3 -> deterministic collection candidate -> create-once R2 candidate-world.json -> authenticated durable reload"
+  },
+  "guardrails": {
+    "customerBytesCrossedVercel": false,
+    "candidatePromotion": false,
+    "runpodMaxWorkersChanged": false,
+    "runpodGpuSelectionChanged": false,
+    "legacyProductionStackChanged": false,
+    "folyntaWorktreeChanged": false
+  },
+  "scopeBoundary": {
+    "foundationDeterministicCandidateCompilerExecuted": true,
+    "coreGenericMixedCorpusContractAligned": true,
+    "separateCorePythonRuntimeExecuted": false,
+    "qwenKnowledgeModelExecuted": false,
+    "note": "This qualifies the live Foundation deterministic candidate compiler and portable ontology package. It does not claim that the separate Python Core A-D/Qwen semantic runtime was deployed or executed."
+  }
+}
