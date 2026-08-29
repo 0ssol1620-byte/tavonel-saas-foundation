@@ -1,0 +1,108 @@
+{
+  "schemaVersion": "tavonel.foundation.knowledge-package-qa.v1",
+  "observedAt": "2026-08-29T16:16:11+09:00",
+  "verdict": {
+    "structuralPackage": "passed",
+    "sourceTraceability": "passed",
+    "authenticatedDownload": "passed",
+    "privatePilotLogin": "passed",
+    "semanticKnowledgeQuality": "not_qualified",
+    "downstreamAiPerformanceMaximization": "not_measured",
+    "paymentSystem": "not_complete"
+  },
+  "production": {
+    "url": "https://tavonel-saas-foundation.vercel.app/workspace?foundation-proof=1&collection=collection-eaaeb1f290792c9753b2fc049e9c5bc4",
+    "deploymentId": "dpl_2T1es4sTv4A2kPSxEqGAnUzeFPrZ",
+    "implementationCommit": "0d8659b",
+    "status": "READY",
+    "region": "icn1"
+  },
+  "collection": {
+    "collectionId": "collection-eaaeb1f290792c9753b2fc049e9c5bc4",
+    "manifestDigest": "sha256:a72a58f1b2abf8890002793e6ef7f9cd6ba031ad24e49264bf66443a87556677",
+    "coreReceipt": "core-cd02571b-e941-4603-b274-5f510b01e1bd",
+    "documents": 3,
+    "directoryEntries": 31,
+    "packageFiles": 14,
+    "topics": 1,
+    "entities": 3,
+    "claims": 11,
+    "evidenceNodes": 3,
+    "relations": 17,
+    "candidatePromotion": false
+  },
+  "download": {
+    "route": "/api/collections/[id]/download",
+    "signedInBrowserResult": "passed",
+    "contentType": "application/zip",
+    "compilerPackageFilesVerified": 14,
+    "additionalArchiveManifestFiles": 2,
+    "checks": [
+      "tenant-scoped R2 lookup",
+      "completed separate-Core receipt",
+      "candidatePromotion=false",
+      "safe relative archive paths",
+      "unique package paths",
+      "declared UTF-8 byte counts",
+      "SHA-256 content digests",
+      "required ontology, graph, RAG, provenance and validation files",
+      "16 MiB uncompressed size cap"
+    ],
+    "unsignedRequestStatus": 401,
+    "unsignedRequestCode": "AUTH_REQUIRED",
+    "cachePolicy": "no-store"
+  },
+  "semanticAudit": {
+    "currentCompiler": "tavonel-foundation-core-deterministic-v1",
+    "observedImplementation": [
+      "five fixed topic keyword rules with General fallback",
+      "English-capitalization regular expression entity extraction",
+      "at most four sentence-shaped claims per document",
+      "one full-document RAG chunk per source document",
+      "validation checks materialization and evidence binding, not semantic correctness"
+    ],
+    "missingQualification": [
+      "OCR ground-truth accuracy",
+      "entity resolution precision and recall",
+      "claim entailment and contradiction detection",
+      "cross-document synthesis and temporal authority",
+      "page or region citation accuracy",
+      "adaptive semantic chunking",
+      "embedding or hybrid retrieval evaluation",
+      "downstream task comparison against a raw-document baseline",
+      "Python A-D or Qwen semantic runtime execution"
+    ],
+    "scope": "The three inputs are pages of one public DART report, so they prove the transport and packaging sequence but not mixed-corpus semantic quality."
+  },
+  "authentication": {
+    "provider": "Supabase Google OAuth",
+    "productionConfiguration": "google_oauth_configured",
+    "signedInHomeState": ["Sign out", "Open workspace"],
+    "protectedDocumentsApiUnsignedStatus": 401,
+    "protectedCollectionApiUnsignedStatus": 401,
+    "protectedDownloadApiUnsignedStatus": 401,
+    "pilotVerdict": "passed"
+  },
+  "billing": {
+    "productionConfiguration": "sandbox_configured",
+    "unsignedWebhookStatus": 401,
+    "unsignedWebhookCode": "INVALID_SIGNATURE",
+    "signatureVerificationImplemented": true,
+    "checkoutSessionCreationImplemented": false,
+    "transactionLedgerImplemented": false,
+    "subscriptionLifecycleImplemented": false,
+    "entitlementPersistenceImplemented": false,
+    "validWebhookApplication": "returns_503_ENTITLEMENT_STORE_NOT_CONFIGURED",
+    "livePaymentsEnabled": false,
+    "reason": "The Foundation handoff explicitly keeps Paddle off and requires separate approval."
+  },
+  "verification": {
+    "unitTests": "42 passed",
+    "typecheck": "passed",
+    "productionBuild": "passed",
+    "vercelDeployment": "READY",
+    "productionAuthenticatedReload": "passed",
+    "productionAuthenticatedDownload": "passed",
+    "productionUnauthenticatedIsolation": "passed"
+  }
+}
