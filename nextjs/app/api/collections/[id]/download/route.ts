@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { authorizeFoundationProduct } from "@/lib/billing-product-access";
 import { buildSignedCollectionZip, validateReviewableCollectionArtifact } from "@/lib/collection-download";
 import { readExportSignerEnv } from "@/lib/export-signing";
 import { loadPreferredCollectionCandidate } from "@/lib/collection-storage";
@@ -25,6 +26,8 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const access = foundationPilotAccess(user.id);
   if (!access) return NextResponse.json({ code: "PILOT_ACCESS_REQUIRED" }, { status: 403, headers: NO_STORE });
   const { membership } = access;
+  const productAccess = await authorizeFoundationProduct(membership.workspaceId, user.id, "observer");
+  if (!productAccess.ok) return NextResponse.json({ code: productAccess.code }, { status: productAccess.status, headers: NO_STORE });
   const loaded = await loadPreferredCollectionCandidate(signer, membership.workspaceId, id);
   if (!loaded.ok) {
     return NextResponse.json(

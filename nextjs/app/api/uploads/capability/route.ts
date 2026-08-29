@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { activationPolicy } from "@/lib/activation-policy";
+import { authorizeFoundationProduct } from "@/lib/billing-product-access";
 import { reserveFoundationCompute } from "@/lib/compute-reservation";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
 import { reserveFoundationIntake } from "@/lib/intake-admission";
@@ -47,6 +48,8 @@ export async function POST(request: Request) {
   const access = foundationPilotAccess(user.id);
   if (!access) return NextResponse.json({ code: "PILOT_ACCESS_REQUIRED" }, { status: 403, headers: { "Cache-Control": "no-store" } });
   const { membership } = access;
+  const productAccess = await authorizeFoundationProduct(membership.workspaceId, user.id, "studio");
+  if (!productAccess.ok) return NextResponse.json({ code: productAccess.code }, { status: productAccess.status, headers: { "Cache-Control": "no-store" } });
   const signer = readR2SignerEnv();
   if (!signer) {
     return NextResponse.json({ code: "SIGNER_NOT_CONFIGURED" }, { status: 503, headers: { "Cache-Control": "no-store" } });

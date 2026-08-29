@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { authorizeFoundationProduct } from "@/lib/billing-product-access";
 import { validatePromotableCollectionArtifact } from "@/lib/collection-download";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
 import {
@@ -78,6 +79,8 @@ export async function POST(
   const access = foundationPilotAccess(user.id);
   if (!access) return NextResponse.json({ code: "PILOT_ACCESS_REQUIRED" }, { status: 403, headers: NO_STORE });
   const { membership } = access;
+  const productAccess = await authorizeFoundationProduct(membership.workspaceId, user.id, "studio");
+  if (!productAccess.ok) return NextResponse.json({ code: productAccess.code }, { status: productAccess.status, headers: NO_STORE });
   if (membership.role !== "owner" && membership.role !== "admin") {
     return NextResponse.json(
       { code: "PROMOTION_ROLE_REQUIRED" },
