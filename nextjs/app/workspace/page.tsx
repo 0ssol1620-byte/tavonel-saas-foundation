@@ -16,6 +16,7 @@ import { buildPipeline, type LocalUpload } from "@/lib/pipeline";
 import { qualifyProgress, type OcrProgress } from "@/lib/ocr-progress";
 import PipelineBoard from "@/components/pipeline-board";
 import { trackFunnel } from "@/lib/funnel-events";
+import { accessPlanAction } from "@/lib/billing-plan-action";
 
 /** What this panel prints when it has no value. Not "0", and not a spinner that never resolves. */
 const UNKNOWN = "not read yet";
@@ -105,6 +106,11 @@ type BillingAccount = {
   subscriptionCancelAt: string | null;
   updatedAt: string | null;
 };
+
+const ACCESS_PLANS = [
+  ["Observer", "$29", "Review compiled evidence and active worlds.", "observer_access"],
+  ["Studio", "$99", "Upload, compile, review, and govern a corpus.", "studio_access"],
+] as const;
 
 function bytesToHex(bytes: Uint8Array) {
   return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -1214,6 +1220,33 @@ export default function WorkspacePage() {
             {!billingAccount ? (
               <p className="fine">Billing has not been read yet for this session. These are not zeroes &mdash; they are values this panel does not have.</p>
             ) : null}
+            <div className="workspace-access-plans" aria-label="Access plans">
+              {ACCESS_PLANS.map(([name, price, description, offerCode]) => {
+                const action = accessPlanAction(billingAccount, offerCode);
+                return (
+                  <article key={offerCode} data-current={billingAccount?.accessPlan === offerCode ? "true" : "false"}>
+                    <span className="tag">{offerCode === "studio_access" ? "COMPILER ACCESS" : "REVIEW ACCESS"}</span>
+                    <h3>{name}</h3>
+                    <span className="price">{price} <small>/ month</small></span>
+                    <p>{description}</p>
+                    <button
+                      type="button"
+                      disabled={Boolean(buying) || action.kind === "disabled"}
+                      onClick={() => {
+                        if (action.kind === "checkout") void buy(action.offerCode);
+                        if (action.kind === "portal") void openBillingPortal();
+                      }}
+                    >
+                      {buying === offerCode ? "Opening checkout..." : action.label}
+                    </button>
+                  </article>
+                );
+              })}
+            </div>
+            <p className="fine">
+              Studio is required for intake, compilation, and world lifecycle actions. A plan
+              changes only after Paddle sends a signed, idempotently persisted subscription event.
+            </p>
             <div className="packs workspace-packs">
               {([
                 ["Starter", "$12", "100 credits", "credit_starter"],
