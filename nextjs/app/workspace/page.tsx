@@ -12,6 +12,7 @@ import { useCheckout } from "@/lib/use-checkout";
 import { formatCount, formatTimestamp } from "@/lib/format";
 import { readOfferParam, takeCheckoutIntent } from "@/lib/checkout-intent";
 import { putWithProgress } from "@/lib/upload-transfer";
+import { runBounded } from "@/lib/concurrent";
 import { buildPipeline, type LocalUpload } from "@/lib/pipeline";
 import { qualifyProgress, type OcrProgress } from "@/lib/ocr-progress";
 import PipelineBoard from "@/components/pipeline-board";
@@ -19,6 +20,11 @@ import { trackFunnel } from "@/lib/funnel-events";
 
 /** What this panel prints when it has no value. Not "0", and not a spinner that never resolves. */
 const UNKNOWN = "not read yet";
+
+/* Transfers in flight at once. A browser allows about six connections per host, and the capability
+   calls and the document poll need slots of their own; past this the extra PUTs queue where nobody
+   can see them, which looks exactly like the serial upload this replaced. */
+const UPLOAD_CEILING = 3;
 
 const FOUNDATION_PROOF_PDF_URL = "/api/proof-pdf";
 const FOUNDATION_PROOF_PDF_SHA256 = "3df79d34abbca99308e79cb94461c1893582604d68329a41fd4bec1885e6adb4";
@@ -649,18 +655,32 @@ export default function WorkspacePage() {
     }
   };
 
+  /*
+   * A batch goes up several at a time.
+   *
+   * It used to go one at a time, and that made the whole surface lie about the system: a batch
+   * took the sum of its parts, and the board showed one document moving while the pipeline behind
+   * it is perfectly capable of sanitizing and reading many at once. The ceiling exists because a
+   * browser keeps roughly six connections to a host, and the capability calls and the document
+   * poll have to interleave with the transfers -- past that point the extra transfers queue
+   * invisibly and the panels simply stop updating.
+   *
+   * A file that fails no longer takes the batch with it. The old loop returned on the first
+   * failure and silently abandoned the rest; the ones already in the bucket are still there and
+   * still being read, so the report now names the failure and keeps going.
+   */
   const uploadDocuments = async (files: File[]) => {
     if (files.length === 0) return;
     setBusy(true);
     setCollectionResult(null);
     clearWorldState();
-    const ids: string[] = [];
     try {
-      for (let index = 0; index < files.length; index += 1) {
-        setNotice(`Uploading ${index + 1}/${files.length}: ${files[index].name}`);
-        const id = await uploadDocument(files[index], false);
-        if (!id) return;
-        ids.push(id);
+      setNotice(`Sending ${files.length} file(s) to Foundation quarantine, ${UPLOAD_CEILING} at a time.`);
+      const settled = await runBounded(files, UPLOAD_CEILING, (file) => uploadDocument(file, false));
+      const ids = settled.flatMap((result) => (result.ok && result.value ? [result.value] : []));
+      const lost = files.length - ids.length;
+      if (lost > 0) {
+        setNotice(`${ids.length} of ${files.length} reached quarantine. ${lost} did not, and nothing was retried on their behalf.`);
       }
       if (ids.length >= 2) await waitForOcrAndCompile(ids);
     } finally {

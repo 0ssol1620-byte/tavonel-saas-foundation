@@ -887,11 +887,28 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
    is driven by acknowledged bytes -- everything else changes when an object appears. */
 
 .board { gap: 14px; }
+.board-zone { display: grid; gap: 8px; }
+.board-zone-k { color: var(--decor); }
+/* Finished and stopped panels are four short cells; they pack tighter and do not need the width
+   a page and a column of text do. */
+.board-rows[data-zone="rest"] { grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr)); }
 .board-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .board-head > div { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .board-dismiss { flex: none; }
 
-.board-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; }
+ /* A floor, not a list. The work is concurrent between documents, and a single column made it
+    read as a queue -- one thing happening, the rest waiting their turn. Panels wrap to as many
+    columns as the width allows and each one carries its own live body.
+
+    `min(100%, 460px)` rather than a bare 460px: at a narrow width a bare minimum would make the
+    track wider than the container and push the page sideways. */
+.board-rows {
+  list-style: none; margin: 0; padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 460px), 1fr));
+  gap: 9px;
+  align-items: start;
+}
 .board-rows > li {
   border: 1px solid var(--hairline);
   border-left: 2px solid var(--hairline-hi);
@@ -899,7 +916,14 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
   background: var(--ground);
   padding: 12px 13px;
   display: flex; flex-direction: column; gap: 10px;
+  min-width: 0;
+  /* The panel, not the viewport, decides whether the reading view has room to sit side by side.
+     Two panels on a wide screen are each narrow, and a viewport query cannot know that. */
+  container-type: inline-size;
 }
+/* A reading panel deliberately does NOT span the floor. Spanning made the one document under the
+   reader the whole screen again, which is the single-column view this replaced. It keeps its
+   track and stacks its own two halves instead, so three documents can be read side by side. */
 /* A held document is the one thing on this board that wants a person, so it is the one thing
    marked. It is marked in the "changed" tone, not a failure tone: nothing is broken. */
 .board-rows > li[data-held="1"] { border-left-color: var(--changed); }
@@ -907,6 +931,21 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
 .board-id { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .board-id strong { color: var(--text-hi); font-weight: 500; font-size: 14px; overflow-wrap: anywhere; }
 .board-id small { font-family: var(--f-mono); font-size: 10px; color: var(--text-xlo); }
+
+/* One word for the whole panel. It repeats what the stage strip proves, at a size that survives
+   being one of twenty on screen. */
+.board-now {
+  align-self: flex-start;
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.13em;
+  color: var(--unresolved);
+  border: 1px solid var(--unresolved-dim);
+  border-radius: 2px;
+  padding: 2px 7px;
+  font-variant-numeric: tabular-nums;
+}
+.board-now[data-held="1"] { color: var(--changed); border-color: var(--changed-dim); }
 
 .board-transfer { height: 2px; background: var(--hairline); border-radius: 2px; overflow: hidden; }
 .board-transfer i { display: block; height: 100%; background: var(--verified); transition: width 140ms linear; }
@@ -937,6 +976,11 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
 
 .board-note { margin: 0; }
 
+/* Four stage cells need about this much panel to hold their labels without breaking words. The
+   query is on the panel, because a narrow panel on a wide screen has the same problem. */
+@container (max-width: 430px) {
+  .board-stages { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 @media (max-width: 620px) {
   .board-stages { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -1036,7 +1080,10 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
   display: grid;
   align-content: start;
   gap: 1px;
-  max-height: 290px;
+  /* Fixed, not a maximum. The column is a window onto a stream, and one document reporting six
+     regions while its neighbour reports nine should not make the two panels different heights --
+     that turned a floor of parallel work back into a ragged list. */
+  height: 290px;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -1058,11 +1105,21 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
 .rl.low .rl-c { color: var(--changed); }
 @keyframes rl-in { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
 
+/* Stacked, and the page goes first: narrow or not, the question is still which page is read.
+   Keyed to the panel rather than the viewport, because two panels on a wide screen are each
+   narrow and only the panel knows that. The viewport query stays as the floor for browsers
+   without container queries. */
+@container (max-width: 700px) {
+  .reading-panes { grid-template-columns: minmax(0, 1fr); }
+  /* Stacked, the page has the full panel width to sit in, so it is drawn larger rather than
+     floating as a small rectangle in a wide empty band. */
+  .reading-page { max-width: 240px; }
+  .reading-lines { height: 232px; }
+}
 @media (max-width: 720px) {
-  /* Stacked, and the page goes first: on a phone the question is still which page is being read. */
   .reading-panes { grid-template-columns: minmax(0, 1fr); }
   .reading-page { max-width: 150px; }
-  .reading-lines { max-height: 232px; }
+  .reading-lines { height: 232px; }
 }
 
 /* ---------------------------------------------------------- knowledge architecture */

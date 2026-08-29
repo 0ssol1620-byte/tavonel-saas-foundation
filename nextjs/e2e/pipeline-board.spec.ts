@@ -251,3 +251,93 @@ test("refuses a progress report it cannot draw honestly", async ({ page }) => {
   // Nothing is drawn from a report that does not qualify.
   await expect(page.locator(".reading")).toHaveCount(0);
 });
+
+/*
+ * The floor.
+ *
+ * The concurrency is between documents, and the surface has to show that or it is describing a
+ * different system than the one running. This is the assertion that the previous single-column
+ * board could not have passed: three documents under the reader at the same instant, each with
+ * its own page and its own lines, and the panels that have nothing streaming kept out of the way
+ * so they do not leave a hole the size of a reading beside every one of them.
+ */
+test("reads several documents at the same time, each with its own page", async ({ page }, testInfo) => {
+  const browserErrors: string[] = [];
+  page.on("console", message => { if (message.type() === "error") browserErrors.push(message.text()); });
+  page.on("pageerror", error => browserErrors.push(error.message));
+  await installSession(page);
+
+  const reading = (id: string) => ({
+    documentId: id, versionKey: "v1",
+    sanitizedKey: `w/${id}/v1/sanitized.pdf`, sanitizedSize: 481_112,
+    ocrJsonKey: null, ocrJsonSize: null, hasOcrJson: false,
+    cdrReceiptKey: `w/${id}/v1/cdr-receipt.json`, ocrReviewKey: null,
+    processingState: "sanitized",
+  });
+  await page.route("**/api/documents", route => route.fulfill({
+    json: { documents: [reading("doc-a"), reading("doc-b"), reading("doc-c"), DOCUMENTS[0]] },
+  }));
+  await page.route("**/api/billing/status", route => route.fulfill({
+    json: {
+      account: {
+        accessPlan: null, subscriptionStatus: "inactive", creditBalance: 0,
+        lifetimeCreditsPurchased: 0, lifetimeCreditsReversed: 0, billingHold: false,
+        paddleCustomerId: null, subscriptionCancelAt: null, updatedAt: null,
+      },
+    },
+  }));
+
+  // Each document reports its own page, so a shared or cached report would be visible immediately.
+  const PAGES: Record<string, [number, number, string]> = {
+    "doc-a": [4, 11, "제3조 (계약기간)"],
+    "doc-b": [2, 6, "본 계약의 기간은 1년으로 한다"],
+    "doc-c": [9, 24, "제5조 (비밀유지)"],
+  };
+  await page.route("**/api/documents/*/progress", route => {
+    const id = new URL(route.request().url()).pathname.split("/")[3];
+    return route.fulfill({ json: { code: "OK", readUrl: `https://r2.example.invalid/${id}.json` } });
+  });
+  await page.route("https://r2.example.invalid/*.json", route => {
+    const id = new URL(route.request().url()).pathname.slice(1).replace(".json", "");
+    const entry = PAGES[id];
+    if (!entry) return route.fulfill({ json: {} });
+    const [pagesRead, pageCount, text] = entry;
+    return route.fulfill({
+      json: {
+        schemaVersion: "tavonel.ocr_progress.v1", state: "reading",
+        pagesRead, pageCount, regionsFound: pagesRead * 4,
+        pages: [{
+          pageNumber1: pagesRead, pageCount, path: "raster", regionCount: 1, meanConfidence: 0.9,
+          boxes: [{ bbox1000: [100, 120, 900, 165], confidence: 0.93, text, regionId: `ocr-${id}` }],
+        }],
+      },
+    });
+  });
+
+  await page.goto("/workspace");
+  const board = page.locator(".board");
+  await expect(board).toBeVisible();
+
+  // Three readings on screen at once. This is the whole claim.
+  await expect(page.locator(".reading")).toHaveCount(3);
+  await expect(board).toContainText("reading 3");
+
+  // Each panel is reporting its own document, not a shared one.
+  for (const [id, [pagesRead, , text]] of Object.entries(PAGES)) {
+    const panel = page.locator(".board-rows > li").filter({ hasText: id }).first();
+    await expect(panel.locator(".board-now")).toContainText(`READING p.${String(pagesRead).padStart(2, "0")}`);
+    await expect(panel.locator(".reading-lines")).toContainText(text);
+  }
+
+  // The document with nothing streaming is kept in the other zone, so it cannot leave a hole the
+  // height of a reading panel beside it.
+  await expect(page.locator('.board-rows[data-zone="moving"] > li')).toHaveCount(3);
+  await expect(page.locator('.board-rows[data-zone="rest"] > li')).toHaveCount(1);
+  await expect(board).toContainText("STREAMING");
+  await expect(board).toContainText("NOT STREAMING");
+
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+  expect(browserErrors).toEqual([]);
+  await testInfo.attach("floor", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
+});

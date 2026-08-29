@@ -13,6 +13,21 @@
  * Nothing here animates on a timer. A cell changes when `buildPipeline` says an object exists,
  * and the only continuous motion in the whole board is the transfer bar, which is driven by
  * bytes the transport has actually acknowledged.
+ *
+ * It is laid out as a floor of panels rather than a list of rows, because the work really is
+ * concurrent and a single column made it look serial. The concurrency is between documents, not
+ * between stages: one document cannot be sanitized before it has arrived, but twenty documents
+ * can be at twenty different points at the same instant, and several of them can be under the
+ * reader at once. Each panel therefore carries its own live body, and they all move together at
+ * whatever rate their own reports arrive -- no panel is paced to look busy.
+ *
+ * Order is arrival order within each zone and does not change. Sorting the active ones to the
+ * front would make panels jump out from under the cursor every time one finished.
+ *
+ * There are two zones because a grid row is as tall as its tallest cell: a panel with a page and
+ * a column of text next to a panel with four short cells leaves a hole the size of the reading.
+ * The line is drawn where the height difference actually is -- whether the document has something
+ * streaming out of it right now -- and that is also the honest description of the two groups.
  */
 
 import type { PipelineRow } from "@/lib/pipeline";
@@ -33,6 +48,25 @@ export default function PipelineBoard({
 
   const held = rows.filter((row) => row.needsPerson).length;
   const sending = rows.filter((row) => row.transfer).length;
+  const beingRead = rows.filter((row) => row.stages[2].state === "active").length;
+
+  /** Something is coming out of this document right now: bytes going up, or pages coming back. */
+  const streaming = (row: PipelineRow): boolean =>
+    Boolean(row.transfer) || Boolean(reading[row.id] && row.stages[2].state === "active");
+
+  /** What this document is doing at this instant, taken from its own stages and nothing else. */
+  const now = (row: PipelineRow): string | null => {
+    if (row.needsPerson) return "STOPPED";
+    if (row.transfer) return "SENDING";
+    const active = row.stages.find((stage) => stage.state === "active");
+    if (!active) return null;
+    if (active.key === "read") {
+      const progress = reading[row.id];
+      const page = progress && progress.pagesRead > 0 ? String(progress.pagesRead).padStart(2, "0") : null;
+      return page ? `READING p.${page}` : "READING";
+    }
+    return active.label.toUpperCase();
+  };
 
   return (
     <section className="card board" aria-label="Document processing">
@@ -45,6 +79,7 @@ export default function PipelineBoard({
           <h2>
             {rows.length} document{rows.length === 1 ? "" : "s"}
             {sending > 0 ? ` · sending ${sending}` : ""}
+            {beingRead > 0 ? ` · reading ${beingRead}` : ""}
             {held > 0 ? ` · ${held} stopped for review` : ""}
           </h2>
         </div>
@@ -53,8 +88,17 @@ export default function PipelineBoard({
         ) : null}
       </div>
 
-      <ol className="board-rows">
-        {rows.map((row) => (
+      {[
+        { key: "moving", label: "STREAMING", items: rows.filter(streaming) },
+        { key: "rest", label: "NOT STREAMING", items: rows.filter((row) => !streaming(row)) },
+      ].filter((zone) => zone.items.length > 0).map((zone) => (
+      <div className="board-zone" key={zone.key}>
+        {/* The label is only worth its space when there is something in the other zone too. */}
+        {rows.some(streaming) && rows.some((row) => !streaming(row))
+          ? <p className="eyebrow board-zone-k">{zone.label} · {zone.items.length}</p>
+          : null}
+      <ol className="board-rows" data-zone={zone.key}>
+        {zone.items.map((row) => (
           <li key={row.id} data-held={row.needsPerson ? 1 : 0}>
             <div className="board-id">
               {/* The filename is what the visitor recognises; the id is what every receipt uses.
@@ -62,6 +106,10 @@ export default function PipelineBoard({
               <strong>{row.filename ?? row.id}</strong>
               {row.filename ? <small className="id">{row.id}</small> : null}
             </div>
+
+            {/* One word per panel, so a floor of twenty can be read without reading twenty
+                stage strips. It says nothing the strip below does not already prove. */}
+            {now(row) ? <span className="board-now" data-held={row.needsPerson ? 1 : 0}>{now(row)}</span> : null}
 
             {row.transfer ? (
               <div className="board-transfer" aria-hidden="true">
@@ -90,6 +138,8 @@ export default function PipelineBoard({
           </li>
         ))}
       </ol>
+      </div>
+      ))}
 
       {held > 0 ? (
         <p className="fine board-note">
