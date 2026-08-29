@@ -943,35 +943,126 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
 
 /* ---------------------------------------------------------- reading view */
 
-/* A page being read. Every rectangle is a region the reader reported at the coordinates it
-   reported; the only transition is the one that fades a new region in, and it is short enough
-   that the display never lags the report it came from. */
+/* Two halves of one fact: the page the reader is on, and what it got out of it. They share a
+   numbering, a colour for uncertainty, and a single hairline between them -- the seam is the
+   point, so it is one pixel and not a gap. The only motion is a short stagger as a page arrives;
+   it renders the reader's region order and is removed under reduced motion. */
 
-.reading { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 3px; overflow: hidden; }
-.reading-sheet { background: var(--ground); padding: 14px; display: grid; place-items: center; }
-.reading-page { position: relative; width: 100%; max-width: 156px; aspect-ratio: 1 / 1.414; background: var(--g1); border: 1px solid var(--hairline-hi); border-radius: 2px; }
-.rb {
-  position: absolute;
-  border: 1px solid var(--verified-dim);
-  background: rgba(123, 224, 190, 0.14);
-  border-radius: 1px;
-  animation: rb-in 220ms var(--ease) both;
+.reading { border: 1px solid var(--hairline); border-radius: 3px; overflow: hidden; background: var(--hairline); display: grid; gap: 1px; }
+
+/* An instrument strip, not a caption: the numbers sit on one baseline and never reflow as they
+   change, which is why they are tabular. */
+.reading-head {
+  background: var(--g1);
+  padding: 9px 13px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
 }
-/* The reader's own uncertainty, shown rather than smoothed away. */
-.rb.low { border-color: var(--changed-dim); background: rgba(242, 166, 90, 0.14); }
-@keyframes rb-in { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: none; } }
-
-/* Centred rather than top-aligned: four rows beside a page-shaped panel left a column of
-   empty ground that read as something missing. */
-.reading-readout { background: var(--ground); margin: 0; padding: 14px 16px; display: flex; flex-direction: column; justify-content: center; gap: 8px; min-width: 0; }
-.reading-readout > div { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; }
-.reading-readout dt { font-family: var(--f-mono); font-size: 9.5px; letter-spacing: 0.14em; color: var(--text-xlo); }
-.reading-readout dd { margin: 0; font-family: var(--f-mono); font-size: 12px; color: var(--text-hi); font-variant-numeric: tabular-nums; }
-.reading-meter { display: block; height: 2px; background: var(--hairline); border-radius: 2px; overflow: hidden; }
+.reading-head em { font-style: normal; font-size: 9.5px; letter-spacing: 0.14em; color: var(--text-xlo); margin-right: 7px; }
+.reading-head b { font-weight: 400; color: var(--text-hi); font-size: 12px; }
+.rh-page i { font-style: normal; color: var(--text-lo); margin-left: 4px; font-size: 12px; }
+.reading-meter { flex: 1 1 90px; min-width: 60px; height: 2px; background: var(--hairline-hi); border-radius: 2px; overflow: hidden; }
 .reading-meter i { display: block; height: 100%; background: var(--verified); transition: width 220ms linear; }
 
-@media (max-width: 620px) {
-  .reading { grid-template-columns: minmax(0, 1fr); }
+.reading-panes { display: grid; grid-template-columns: minmax(0, 260px) minmax(0, 1fr); gap: 1px; background: var(--hairline); }
+.reading-pane { background: var(--ground); margin: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); min-width: 0; }
+.reading-pane figcaption {
+  padding: 8px 13px;
+  border-bottom: 1px solid var(--hairline);
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  color: var(--text-xlo);
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.reading-pane figcaption b { font-weight: 400; letter-spacing: 0.06em; color: var(--text-lo); }
+
+.reading-sheet { padding: 16px; display: grid; place-items: center; }
+.reading-page {
+  position: relative;
+  width: 100%;
+  max-width: 186px;
+  aspect-ratio: 1 / 1.414;
+  background: var(--g2);
+  border: 1px solid var(--hairline-hi);
+  border-radius: 2px;
+  /* A page has an edge shadow; a rectangle does not. This is the whole difference. */
+  box-shadow: 0 10px 26px -18px #000, inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+.rb {
+  position: absolute;
+  overflow: hidden;
+  border: 1px solid var(--verified-dim);
+  background: rgba(123, 224, 190, 0.13);
+  border-radius: 1px;
+  animation: rb-in 260ms var(--ease) both;
+}
+/* The same mark as the line on the other side, small enough to be a tick rather than a label. */
+.rb::after {
+  content: attr(data-m);
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: var(--f-mono);
+  font-size: 6.5px;
+  line-height: 1;
+  color: var(--verified);
+  opacity: 0.62;
+}
+/* The reader's own uncertainty, shown rather than smoothed away. */
+.rb.low { border-color: var(--changed-dim); background: rgba(242, 166, 90, 0.13); }
+.rb.low::after { color: var(--changed); }
+@keyframes rb-in { from { opacity: 0; transform: scale(0.985); } to { opacity: 1; transform: none; } }
+
+/* The output column. It scrolls to its newest line rather than growing the page, because the
+   board around it has other documents on it and they must not be pushed off screen.
+
+   The padded mask is what keeps that from looking broken: a line half-cut by the top edge reads
+   as a rendering fault, and a line fading under an edge reads as a column that continues. The
+   padding is what lets the first and last lines sit clear of the fade at either end. */
+.reading-lines {
+  list-style: none;
+  margin: 0;
+  padding: 16px 0;
+  mask-image: linear-gradient(to bottom, transparent, #000 16px, #000 calc(100% - 16px), transparent);
+  display: grid;
+  align-content: start;
+  gap: 1px;
+  max-height: 290px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.rl {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 34px;
+  gap: 10px;
+  align-items: baseline;
+  padding: 4px 13px;
+  animation: rl-in 260ms var(--ease) both;
+}
+.rl-m { font-family: var(--f-mono); font-size: 9px; color: var(--decor); font-variant-numeric: tabular-nums; }
+/* The line the reader found is the evidence, so it is set in the reading face. */
+.rl-t { font-family: var(--f-sans); font-size: 13px; line-height: 1.45; color: var(--text-hi); overflow-wrap: anywhere; }
+.rl-t.none { font-family: var(--f-mono); font-size: 10px; color: var(--text-xlo); letter-spacing: 0.08em; }
+.rl-c { font-family: var(--f-mono); font-size: 9.5px; color: var(--text-xlo); text-align: right; font-variant-numeric: tabular-nums; }
+.rl.low { background: var(--changed-deep); }
+.rl.low .rl-t { color: var(--changed); }
+.rl.low .rl-c { color: var(--changed); }
+@keyframes rl-in { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+
+@media (max-width: 720px) {
+  /* Stacked, and the page goes first: on a phone the question is still which page is being read. */
+  .reading-panes { grid-template-columns: minmax(0, 1fr); }
+  .reading-page { max-width: 150px; }
+  .reading-lines { max-height: 232px; }
 }
 
 /* ---------------------------------------------------------- knowledge architecture */
@@ -1165,13 +1256,16 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
   html { scroll-behavior: auto; }
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
+    /* Without this a staggered delay would keep `both`-filled content hidden for a third of a
+       second after the motion it was pacing is already gone. */
+    animation-delay: 0ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
   /* Content is never withheld -- only the transition is removed. */
   .js .rv { opacity: 1; transform: none; }
   .tree-root { opacity: 1; transform: none; }
-  /* Regions still appear as they are found; only the fade is removed. */
-  .rb { animation: none; }
+  /* Regions and lines still appear as they are found; only the fade is removed. */
+  .rb, .rl { animation: none; }
   .js .rv.in .stop span::after { right: 0; }
 }

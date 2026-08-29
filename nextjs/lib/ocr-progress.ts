@@ -7,13 +7,21 @@
  * network, and for a specific one: a viewer that trusts these numbers would happily draw a page
  * count of 40 for a document with 3 pages, and that is a lie the product cannot afford.
  *
- * Nothing here reads or exposes document text. The stream deliberately does not carry it.
+ * It does carry the lines that were read, and that is deliberate. The object travels from the
+ * bucket to the browser on a signed URL, so the customer's own document reaches the customer's
+ * own screen without the application server being on the path -- which is the property the
+ * product actually promises. What must never happen is this content being relayed through the
+ * application: `app/api/documents/[id]/progress` never opens the object at all -- it decides who
+ * may read it, signs a URL, and returns that. Keep it that way.
  */
 
 export type ProgressBox = {
   /** [x0, y0, x1, y1] in a 0-1000 space, so it can be drawn without knowing the page size. */
   bbox1000: [number, number, number, number];
   confidence: number;
+  /** The line the reader found here. Empty when the reader reported none. */
+  text: string;
+  regionId: string;
 };
 
 export type ProgressPage = {
@@ -65,7 +73,13 @@ function qualifyPage(value: unknown): ProgressPage | null {
       const [x0, y0, x1, y1] = values as number[];
       // A box that is inverted or empty cannot be drawn honestly, so it is not drawn at all.
       if (x1 <= x0 || y1 <= y0) return [];
-      return [{ bbox1000: [x0, y0, x1, y1] as [number, number, number, number], confidence: number(box.confidence, 0, 1) ?? 0 }];
+      return [{
+        bbox1000: [x0, y0, x1, y1] as [number, number, number, number],
+        confidence: number(box.confidence, 0, 1) ?? 0,
+        // Trimmed for display only. A line the reader did not find is empty, never invented.
+        text: typeof box.text === "string" ? box.text.slice(0, 400) : "",
+        regionId: typeof box.regionId === "string" ? box.regionId.slice(0, 256) : "",
+      }];
     }),
   };
 }

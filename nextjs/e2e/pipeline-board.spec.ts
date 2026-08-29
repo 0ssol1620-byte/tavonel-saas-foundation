@@ -72,6 +72,15 @@ const DOCUMENTS = [
 
 async function mockWorkspace(page: Page) {
   await page.route("**/api/documents", route => route.fulfill({ json: { documents: DOCUMENTS } }));
+  /*
+   * A document mid-read is polled for progress, so every test that renders one has to answer that
+   * poll or the browser logs a 401 and the console assertion below trips. The default answer is a
+   * signed URL to an object that does not qualify -- which is the true state before the reader has
+   * written anything, and draws nothing. The tests that care override both routes.
+   */
+  await page.route("**/api/documents/*/progress", route =>
+    route.fulfill({ json: { code: "OK", readUrl: "https://r2.example.invalid/progress.json" } }));
+  await page.route("https://r2.example.invalid/progress.json", route => route.fulfill({ json: {} }));
   await page.route("**/api/billing/status", route => route.fulfill({
     json: {
       account: {
@@ -177,9 +186,9 @@ test("draws the regions the reader reported, and only while it is still reading"
           regionCount: 3,
           meanConfidence: 0.7412,
           boxes: [
-            { bbox1000: [100, 120, 900, 165], confidence: 0.93 },
-            { bbox1000: [100, 200, 780, 245], confidence: 0.61 },
-            { bbox1000: [100, 280, 860, 325], confidence: 0.88 },
+            { bbox1000: [100, 120, 900, 165], confidence: 0.93, text: "제3조 (계약기간 및 갱신)", regionId: "ocr-p0004-l00001" },
+            { bbox1000: [100, 200, 780, 245], confidence: 0.61, text: "본 계약의 기간은 체결일로부터 1년으로 한다.", regionId: "ocr-p0004-l00002" },
+            { bbox1000: [100, 280, 860, 325], confidence: 0.88, text: "", regionId: "ocr-p0004-l00003" },
           ],
         }],
       },
@@ -194,8 +203,22 @@ test("draws the regions the reader reported, and only while it is still reading"
   await expect(reading.locator(".rb")).toHaveCount(3);
   // The uncertain one is marked as uncertain.
   await expect(reading.locator(".rb.low")).toHaveCount(1);
+  // The other half of the view: the same three regions, as lines, sharing their numbering.
+  await expect(reading.locator(".reading-lines > li")).toHaveCount(3);
+  await expect(reading.locator(".rl").first()).toContainText("제3조 (계약기간 및 갱신)");
+  await expect(reading.locator(".rl.low")).toHaveCount(1);
+  await expect(reading.locator(".rl.low")).toContainText("본 계약의 기간은");
+  // A region the reader read nothing in stays on screen as itself, so the two sides stay in step.
+  await expect(reading.locator(".rl-t.none")).toHaveCount(1);
+  await expect(reading.locator(".rl").nth(2)).toContainText("03");
+  await expect(reading.locator('.rb[data-m="03"]')).toHaveCount(1);
+  // The page being read is named on the source side.
+  await expect(reading).toContainText("p.04");
+
   // The readout repeats the report rather than rounding it into something friendlier.
-  await expect(reading).toContainText("04 / 11");
+  // Page and total are separate elements so the total can be dimmed, hence the two assertions.
+  await expect(reading.locator(".rh-page")).toContainText("04");
+  await expect(reading.locator(".rh-page")).toContainText("/ 11");
   await expect(reading).toContainText("37");
   await expect(reading).toContainText("0.741");
   await expect(reading).toContainText("RASTER");

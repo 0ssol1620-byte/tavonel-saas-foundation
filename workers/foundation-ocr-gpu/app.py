@@ -429,8 +429,16 @@ def ocr(
                 "path": path,
                 "regionCount": len(regions),
                 "meanConfidence": round(sum(confidences) / len(confidences), 4) if confidences else 0.0,
+                # The text travels with the geometry. It reaches the browser through a signed
+                # read straight from the bucket, never through the application -- which is the
+                # only property that mattered, and the one the read path keeps.
                 "boxes": [
-                    {"bbox1000": r["bbox1000"], "confidence": r["confidence"]}
+                    {
+                        "bbox1000": r["bbox1000"],
+                        "confidence": r["confidence"],
+                        "text": r["text"][:400],
+                        "regionId": r["regionId"],
+                    }
                     for r in regions
                 ],
             })

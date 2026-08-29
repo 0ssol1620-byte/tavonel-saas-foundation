@@ -228,6 +228,8 @@ describe("dispatchOcrAfterSanitize · streamed reading", () => {
       boxes: Array.from({ length: regionCount }, (_unused, index) => ({
         bbox1000: [100, 100 + index * 40, 900, 130 + index * 40],
         confidence: 0.8,
+        text: `line ${index + 1} on page ${pageNumber1}`,
+        regionId: `ocr-p${String(pageNumber1).padStart(4, "0")}-l${String(index + 1).padStart(5, "0")}`,
       })),
     };
   }
@@ -284,19 +286,55 @@ describe("dispatchOcrAfterSanitize · streamed reading", () => {
     assert.equal(progress.sourceImmutableKey, IMMUTABLE);
   });
 
-  it("never copies document text into the progress object", async () => {
+  /*
+   * This test replaces one that asserted the opposite.
+   *
+   * The first version of the progress object deliberately carried no text, on the reasoning that
+   * showing the document body anywhere new was a risk. That was too broad: the object is written
+   * by this worker to the bucket and read by the browser from the bucket with a signed URL, so
+   * the text goes from the customer's storage to the customer's screen and the application server
+   * is not on that path. The promise the product makes is about the application server, and it
+   * still holds.
+   *
+   * So the guard moved rather than disappeared. What must stay true is that the object remains a
+   * bounded view and not a second copy of the document: only a rolling window of pages is kept.
+   */
+  it("keeps the read text, but only a bounded window of it", async () => {
     const r2 = new FakeR2({ [IMMUTABLE]: PDF_BYTES });
     await dispatchOcrAfterSanitize(
       envFor(r2, { FOUNDATION_OCR_URL: FOUNDATION_OCR }),
       IMMUTABLE,
       async (_url, init) => {
         const digest = String((init?.headers as Record<string, string>)["x-tavonel-input-sha256"]);
-        return ndjson([page(1, 1), ocrPayload(digest)]);
+        const pages = Array.from({ length: 40 }, (_unused, index) => page(index + 1, 40, 2));
+        return ndjson([...pages, ocrPayload(digest)]);
       },
     );
-    const raw = new TextDecoder().decode(r2.objects.get(PROGRESS)!);
-    assert.equal(raw.includes("TAVONEL OCR"), false);
-    assert.equal(raw.includes("\"text\""), false);
+    const progress = readProgress(r2);
+    // Every page was counted...
+    assert.equal(progress.pagesRead, 40);
+    assert.equal(progress.regionsFound, 80);
+    // ...but the object holds only the recent window, so it cannot become the document.
+    assert.ok(progress.pages.length <= 12, `retained ${progress.pages.length} pages`);
+    assert.equal(progress.pages.at(-1).pageNumber1, 40);
+    // The text that is retained is the text that was read.
+    assert.equal(progress.pages.at(-1).boxes[0].text, "line 1 on page 40");
+    assert.ok(progress.pages.at(-1).boxes[0].regionId.startsWith("ocr-p0040"));
+  });
+
+  it("truncates an unreasonably long line rather than storing it whole", async () => {
+    const r2 = new FakeR2({ [IMMUTABLE]: PDF_BYTES });
+    await dispatchOcrAfterSanitize(
+      envFor(r2, { FOUNDATION_OCR_URL: FOUNDATION_OCR }),
+      IMMUTABLE,
+      async (_url, init) => {
+        const digest = String((init?.headers as Record<string, string>)["x-tavonel-input-sha256"]);
+        const long = { ...page(1, 1, 1) };
+        long.boxes = [{ bbox1000: [1, 1, 999, 50], confidence: 0.9, text: "x".repeat(5000), regionId: "r1" }];
+        return ndjson([long, ocrPayload(digest)]);
+      },
+    );
+    assert.equal(readProgress(r2).pages[0].boxes[0].text.length, 400);
   });
 
   it("writes nothing when the stream ends without a result", async () => {

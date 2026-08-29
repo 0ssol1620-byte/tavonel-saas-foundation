@@ -202,6 +202,10 @@ def test_stream_reports_each_page_before_the_result() -> None:
         for box in page["boxes"]:
             assert len(box["bbox1000"]) == 4
             assert all(0 <= value <= 1000 for value in box["bbox1000"])
+            # The line that was read travels with the box it was read from, so a viewer can
+            # show the source page and the structured text filling in beside it.
+            assert isinstance(box["text"], str)
+            assert isinstance(box["regionId"], str) and box["regionId"]
     # The result is last, and nothing after it.
     assert lines[-1]["status"] == "ok"
     assert lines[-1]["schemaVersion"] == "tavonel.ocr_result.v2"
@@ -262,3 +266,22 @@ def test_a_client_that_does_not_ask_for_the_stream_still_gets_plain_json() -> No
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("application/json")
     assert response.json()["schemaVersion"] == "tavonel.ocr_result.v2"
+
+
+def test_streamed_text_matches_the_result_and_is_bounded() -> None:
+    client = TestClient(app)
+    payload = tiny_text_pdf()
+    digest = "sha256:" + hashlib.sha256(payload).hexdigest()
+    lines = stream_lines(client.post(
+        "/v1/ocr",
+        headers={**headers(digest), "accept": NDJSON},
+        files={"source": ("input.pdf", payload, "application/pdf")},
+    ))
+    by_region = {r["regionId"]: r["text"] for r in lines[-1]["regions"]}
+    streamed = [box for line in lines if line.get("type") == "page" for box in line["boxes"]]
+    assert streamed, "a document with regions must stream them"
+    for box in streamed:
+        # Same region, same text -- truncated only if it is very long, never rewritten.
+        assert box["regionId"] in by_region
+        assert by_region[box["regionId"]].startswith(box["text"][:50])
+        assert len(box["text"]) <= 400

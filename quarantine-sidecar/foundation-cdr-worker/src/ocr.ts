@@ -62,16 +62,22 @@ export type OcrProgressPage = {
   path: string;
   regionCount: number;
   meanConfidence: number;
-  boxes: Array<{ bbox1000: number[]; confidence: number }>;
+  boxes: Array<{ bbox1000: number[]; confidence: number; text: string; regionId: string }>;
 };
 
 /**
  * What is written to the progress object while a document is being read.
  *
- * Deliberately not the text. A viewer gets to see the shape of what was found -- how far the read
- * has got, how many regions per page, where they sit and how confident the reader is -- without
- * the document body being copied anywhere new. `ocr.json` remains the only place the text lands,
- * and it is still create-once.
+ * This carries the lines that were read, and it is worth being precise about why that is safe.
+ * The property the product actually promises is that the *application server* never carries file
+ * bytes -- and it does not: this object is written by the worker to the bucket, and the browser
+ * reads it from the bucket with a signed URL the application issues without ever seeing the
+ * content. Text living here is the customer's own document travelling from their storage to
+ * their screen, which is the same trip the original file already makes.
+ *
+ * Two limits keep it honest anyway. Only a rolling window of pages is retained, so the object
+ * never becomes a second copy of the document; and `ocr.json` is still the only record, still
+ * written create-once. This object is a view, expires, and is evidence of nothing.
  */
 export type OcrProgressDocument = {
   schemaVersion: typeof OCR_PROGRESS_SCHEMA;
@@ -110,7 +116,12 @@ export function qualifyProgressPage(line: unknown): OcrProgressPage | null {
       const bbox = Array.isArray(box.bbox1000) ? box.bbox1000 : [];
       if (bbox.length !== 4 || bbox.some((value) => typeof value !== "number" || value < 0 || value > 1000)) return [];
       const confidence = typeof box.confidence === "number" ? box.confidence : 0;
-      return [{ bbox1000: bbox as number[], confidence: Math.max(0, Math.min(1, confidence)) }];
+      return [{
+        bbox1000: bbox as number[],
+        confidence: Math.max(0, Math.min(1, confidence)),
+        text: typeof box.text === "string" ? box.text.slice(0, 400) : "",
+        regionId: typeof box.regionId === "string" ? box.regionId.slice(0, 256) : "",
+      }];
     }),
   };
 }

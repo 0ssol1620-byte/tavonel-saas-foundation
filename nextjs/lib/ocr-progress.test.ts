@@ -18,7 +18,7 @@ const page = (over: Record<string, unknown> = {}) => ({
   path: "raster",
   regionCount: 2,
   meanConfidence: 0.8,
-  boxes: [{ bbox1000: [100, 100, 900, 140], confidence: 0.9 }],
+  boxes: [{ bbox1000: [100, 100, 900, 140], confidence: 0.9, text: "제3조 (계약기간)", regionId: "ocr-p0001-l00001" }],
   ...over,
 });
 
@@ -106,8 +106,33 @@ describe("ocr progress", () => {
     expect(currentPage(progress!)).toBeNull();
   });
 
-  it("never surfaces document text, because the report does not carry it", () => {
-    const progress = qualifyProgress(body({ pages: [page({ text: "SECRET CONTRACT TEXT" })] }));
-    expect(JSON.stringify(progress)).not.toContain("SECRET CONTRACT TEXT");
+  /*
+   * This replaces a test that asserted text was never present.
+   *
+   * Carrying the line is the point of the view: a page of boxes with no words is a diagram, and
+   * what a person needs to see is their own document being understood. It is safe because the
+   * object reaches the browser from the bucket on a signed URL, and the /api route that hands out
+   * that URL never opens the object. What still bounds this is the worker side: a rolling page
+   * window, a truncated line, and `ocr.json` as the only create-once record. What is checked here
+   * is narrower and still worth checking -- that a line is never invented and never unbounded.
+   */
+  it("keeps the line that was read, trimmed for display", () => {
+    const progress = qualifyProgress(body());
+    expect(progress!.pages[0].boxes[0].text).toBe("제3조 (계약기간)");
+    expect(progress!.pages[0].boxes[0].regionId).toBe("ocr-p0001-l00001");
+  });
+
+  it("never invents a line the reader did not report", () => {
+    const progress = qualifyProgress(body({
+      pages: [page({ boxes: [{ bbox1000: [1, 1, 999, 40], confidence: 0.5 }] })],
+    }));
+    expect(progress!.pages[0].boxes[0].text).toBe("");
+  });
+
+  it("truncates a line rather than rendering an unbounded string", () => {
+    const progress = qualifyProgress(body({
+      pages: [page({ boxes: [{ bbox1000: [1, 1, 999, 40], confidence: 0.9, text: "가".repeat(2000) }] })],
+    }));
+    expect(progress!.pages[0].boxes[0].text).toHaveLength(400);
   });
 });
