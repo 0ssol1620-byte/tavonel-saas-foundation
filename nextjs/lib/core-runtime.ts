@@ -74,6 +74,8 @@ export async function dispatchCoreCompile(
     || json.runtime !== "tavonel-foundation-core-deterministic-v1"
     || !artifact
     || artifact.schemaVersion !== "tavonel.collection_candidate.v1"
+    || artifact.lifecycle !== "candidate"
+    || artifact.validation.status !== "passed"
     || artifact.candidatePromotion !== false
     || !receipt
     || receipt.schemaVersion !== "tavonel.compile_receipt.v1"

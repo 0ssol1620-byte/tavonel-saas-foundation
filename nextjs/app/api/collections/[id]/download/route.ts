@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { buildSignedCollectionZip, validateDownloadableCollectionArtifact } from "@/lib/collection-download";
+import { buildSignedCollectionZip, validateReviewableCollectionArtifact } from "@/lib/collection-download";
 import { readExportSignerEnv } from "@/lib/export-signing";
 import { loadPreferredCollectionCandidate } from "@/lib/collection-storage";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
@@ -30,7 +30,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       { status: loaded.code === "NOT_FOUND" ? 404 : 503, headers: NO_STORE },
     );
   }
-  const artifact = validateDownloadableCollectionArtifact(loaded.value.artifact, id);
+  const artifact = validateReviewableCollectionArtifact(loaded.value.artifact, id);
   if (!artifact) {
     return NextResponse.json({ code: "COLLECTION_PACKAGE_INVALID" }, { status: 422, headers: NO_STORE });
   }

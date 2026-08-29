@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CollectionOcrInput } from "./collection-compiler";
-import { validateDownloadableCollectionArtifact } from "./collection-download";
+import { validateDownloadableCollectionArtifact, validatePromotableCollectionArtifact } from "./collection-download";
 import {
   PRODUCT_CORE_RESPONSE_SCHEMA,
   buildProductCoreV2Request,
@@ -58,7 +58,9 @@ const requiredPaths = [
 async function candidateFixture() {
   const collectionId = "collection-00000000000000000000000000000001";
   const files = await Promise.all(requiredPaths.map(async (path) => {
-    const content = `${path}\n`;
+    const content = path === "validation/report.json"
+      ? `${JSON.stringify({ status: "passed", reviewReasons: [] })}\n`
+      : `${path}\n`;
     return {
       path,
       mediaType: path.endsWith(".csv") ? "text/csv" : "application/json",
@@ -200,5 +202,62 @@ describe("Python Product-Core v2 dispatch", () => {
       "pilot",
       inputs(),
     )).resolves.toEqual({ ok: false, code: "CORE_V2_RECEIPT_INVALID" });
+  });
+
+  it("projects review-required Core output for signed inspection without making it promotable", async () => {
+    const baseCandidate = await candidateFixture();
+    const reviewReasons = ["CONTRADICTION_CANDIDATE:claim-a:claim-b"];
+    const validationContent = `${JSON.stringify({ status: "review_required", reviewReasons })}\n`;
+    const candidate = {
+      ...baseCandidate,
+      lifecycle: "review_required" as const,
+      validation: { status: "review_required" },
+      reviewReasons,
+      package: {
+        ...baseCandidate.package,
+        files: await Promise.all(baseCandidate.package.files.map(async (file) => file.path === "validation/report.json" ? {
+          ...file,
+          content: validationContent,
+          sizeBytes: Buffer.byteLength(validationContent, "utf8"),
+          sha256: await digest(validationContent),
+        } : file)),
+      },
+    };
+    const result = {
+      schemaVersion: PRODUCT_CORE_RESPONSE_SCHEMA,
+      status: "review_required" as const,
+      runtime: "tavonel-python-core-v2" as const,
+      candidate,
+      artifacts: [],
+      receipt: {
+        requestId: "request-review",
+        inputSha256: sha("1"),
+        outputSha256: sha("2"),
+        coreReleaseDigest: sha("3"),
+        matchingPolicy: "legacy" as const,
+        candidatePromotion: false as const,
+        equivalence: "not_run" as const,
+        totalArtifacts: 0,
+        rebuiltArtifacts: 0,
+        workAvoidedArtifacts: 0,
+      },
+    };
+
+    const projected = projectProductCoreV2Candidate(result, inputs());
+    expect(projected).toEqual(expect.objectContaining({
+      lifecycle: "review_required",
+      reviewReasons: candidate.reviewReasons,
+      validation: expect.objectContaining({ status: "review_required" }),
+    }));
+    const stored = {
+      ...projected,
+      coreExecution: {
+        status: "review_required",
+        runtime: result.runtime,
+        receipt: result.receipt,
+      },
+    };
+    expect(validateDownloadableCollectionArtifact(stored, projected?.collectionId ?? "")).not.toBeNull();
+    expect(validatePromotableCollectionArtifact(stored, projected?.collectionId ?? "")).toBeNull();
   });
 });

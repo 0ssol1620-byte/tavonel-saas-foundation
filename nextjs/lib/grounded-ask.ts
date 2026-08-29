@@ -25,6 +25,24 @@ const STOP_WORDS = new Set([
   "있나요",
   "합니다",
 ]);
+const KOREAN_PARTICLES = [
+  "으로", "에서", "에게", "까지", "부터", "처럼", "보다",
+  "은", "는", "이", "가", "을", "를", "와", "과", "의", "에", "도", "만",
+] as const;
+const SYNONYM_GROUPS = [
+  ["revenue", "sales", "매출", "수익", "売上", "收入"],
+  ["increase", "increased", "growth", "증가", "상승", "増加", "增长"],
+  ["contract", "agreement", "계약", "契約", "合同"],
+  ["termination", "terminate", "cancel", "해지", "종료", "解除", "终止"],
+  ["period", "term", "days", "기간", "일", "期間", "天"],
+  ["research", "study", "연구", "研究"],
+  ["dataset", "data", "데이터셋", "데이터", "データ", "数据"],
+  ["policy", "rule", "정책", "규정", "方針", "政策"],
+  ["risk", "위험", "리스크", "リスク", "风险"],
+] as const;
+const SYNONYMS = new Map<string, readonly string[]>();
+for (const group of SYNONYM_GROUPS)
+  for (const token of group) SYNONYMS.set(token, group);
 
 type PackageFile = { path?: unknown; content?: unknown };
 type AskArtifact = {
@@ -43,6 +61,14 @@ type GroundedChunk = {
   pageNumber1: number;
   bbox1000: [number, number, number, number];
   authority: string;
+  authorityTier: string;
+  authorityScore: number;
+  claimIds: string[];
+  entityIds: string[];
+  entityNames: string[];
+  languages: string[];
+  temporalRefs: string[];
+  retrievalTerms: string[];
 };
 
 export type GroundedAnswer = {
@@ -57,12 +83,21 @@ export type GroundedAnswer = {
     bbox1000: [number, number, number, number];
     authority: string;
     relevance: number;
+    claimIds: string[];
+    entityIds: string[];
+    authorityTier: string;
+    relevanceBreakdown: {
+      lexical: number;
+      graph: number;
+      temporal: number;
+      authority: number;
+    };
     excerpt: string;
   }>;
   receipt: {
     collectionId: string;
     manifestDigest: string;
-    retrieval: "deterministic-bm25-region-v1";
+    retrieval: "adaptive-multilingual-region-v2";
     candidatePromotion: false;
     outputSha256: string;
   };
@@ -74,7 +109,43 @@ function tokens(value: string) {
       .normalize("NFKC")
       .toLocaleLowerCase("und")
       .match(/[\p{L}\p{N}]{2,}/gu) ?? []
-  ).filter(token => !STOP_WORDS.has(token));
+  )
+    .map(token => {
+      if (!/^[가-힣]{3,}$/u.test(token)) return token;
+      const particle = KOREAN_PARTICLES.find(
+        suffix => token.endsWith(suffix) && token.length - suffix.length >= 2
+      );
+      return particle ? token.slice(0, -particle.length) : token;
+    })
+    .filter(token => !STOP_WORDS.has(token));
+}
+
+function expandedTokens(value: string) {
+  return [
+    ...new Set(
+      tokens(value).flatMap(token => SYNONYMS.get(token) ?? [token])
+    ),
+  ];
+}
+
+function validStringArray(value: unknown, maxItems: number, maxLength: number): value is string[] {
+  return (
+    Array.isArray(value) &&
+    value.length <= maxItems &&
+    value.every(item => typeof item === "string" && item.length > 0 && item.length <= maxLength)
+  );
+}
+
+function legacyAuthority(authority: string) {
+  const normalized = authority.toLocaleLowerCase("und");
+  if (["official", "regulatory_filing", "authority_verified", "statute"].includes(normalized))
+    return { authorityTier: "official", authorityScore: 1 };
+  if (["peer_reviewed", "academic", "standard"].includes(normalized))
+    return { authorityTier: "reviewed", authorityScore: 0.85 };
+  if (["contract", "contractual", "policy", "internal_approved"].includes(normalized))
+    return { authorityTier: "controlled", authorityScore: 0.7 };
+  if (normalized === "unclassified") return { authorityTier: "unclassified", authorityScore: 0 };
+  return { authorityTier: "informal", authorityScore: 0.4 };
 }
 
 function validBbox(value: unknown): value is [number, number, number, number] {
@@ -110,7 +181,47 @@ function parseChunk(value: unknown): GroundedChunk | null {
     chunk.authority.length > 80
   )
     return null;
-  return chunk as unknown as GroundedChunk;
+  const optionalArrays = [
+    [chunk.claimIds, 200, 160],
+    [chunk.entityIds, 200, 160],
+    [chunk.entityNames, 200, 500],
+    [chunk.languages, 12, 20],
+    [chunk.temporalRefs, 100, 80],
+    [chunk.retrievalTerms, 2_000, 200],
+  ] as const;
+  if (optionalArrays.some(([item, maxItems, maxLength]) =>
+    item !== undefined && !validStringArray(item, maxItems, maxLength)
+  )) return null;
+  if (
+    chunk.authorityTier !== undefined &&
+    (typeof chunk.authorityTier !== "string" || chunk.authorityTier.length < 1 || chunk.authorityTier.length > 80)
+  ) return null;
+  if (
+    chunk.authorityScore !== undefined &&
+    (typeof chunk.authorityScore !== "number" || !Number.isFinite(chunk.authorityScore) || chunk.authorityScore < 0 || chunk.authorityScore > 1)
+  ) return null;
+  const legacy = legacyAuthority(chunk.authority);
+  return {
+    chunkId: chunk.chunkId,
+    logicalId: chunk.logicalId,
+    text: chunk.text,
+    sourceId: chunk.sourceId,
+    sourceVersionId: chunk.sourceVersionId,
+    evidenceId: chunk.evidenceId,
+    pageNumber1: Number(chunk.pageNumber1),
+    bbox1000: chunk.bbox1000,
+    authority: chunk.authority,
+    authorityTier: typeof chunk.authorityTier === "string" ? chunk.authorityTier : legacy.authorityTier,
+    authorityScore: typeof chunk.authorityScore === "number" ? chunk.authorityScore : legacy.authorityScore,
+    claimIds: validStringArray(chunk.claimIds, 200, 160) ? chunk.claimIds : [],
+    entityIds: validStringArray(chunk.entityIds, 200, 160) ? chunk.entityIds : [],
+    entityNames: validStringArray(chunk.entityNames, 200, 500) ? chunk.entityNames : [],
+    languages: validStringArray(chunk.languages, 12, 20) ? chunk.languages : [],
+    temporalRefs: validStringArray(chunk.temporalRefs, 100, 80) ? chunk.temporalRefs : [],
+    retrievalTerms: validStringArray(chunk.retrievalTerms, 2_000, 200)
+      ? chunk.retrievalTerms.map(item => item.normalize("NFKC").toLocaleLowerCase("und"))
+      : tokens(chunk.text),
+  };
 }
 
 function parseChunks(artifact: AskArtifact) {
@@ -173,12 +284,13 @@ export function answerGroundedQuestion(
     normalizedQuestion.length > 500
   )
     return null;
-  const queryTokens = [...new Set(tokens(normalizedQuestion))];
+  const rawQueryTokens = [...new Set(tokens(normalizedQuestion))];
+  const queryTokens = expandedTokens(normalizedQuestion);
   const chunks = parseChunks(artifact);
   if (queryTokens.length === 0 || chunks.length === 0) return null;
   const documentFrequency = new Map<string, number>();
   const chunkTokens = chunks.map(chunk => {
-    const row = tokens(chunk.text);
+    const row = [...new Set([...tokens(chunk.text), ...chunk.retrievalTerms])];
     for (const token of new Set(row))
       documentFrequency.set(token, (documentFrequency.get(token) ?? 0) + 1);
     return row;
@@ -186,19 +298,19 @@ export function answerGroundedQuestion(
   const averageLength =
     chunkTokens.reduce((sum, row) => sum + row.length, 0) /
     Math.max(1, chunks.length);
-  const ranked = chunks
+  const unnormalized = chunks
     .map((chunk, index) => {
       const row = chunkTokens[index];
       const frequencies = new Map<string, number>();
       for (const token of row)
         frequencies.set(token, (frequencies.get(token) ?? 0) + 1);
-      let score = 0;
+      let lexical = 0;
       for (const token of queryTokens) {
         const tf = frequencies.get(token) ?? 0;
         if (tf === 0) continue;
         const df = documentFrequency.get(token) ?? 0;
         const idf = Math.log(1 + (chunks.length - df + 0.5) / (df + 0.5));
-        score +=
+        lexical +=
           idf *
           ((tf * 2.2) /
             (tf +
@@ -209,10 +321,27 @@ export function answerGroundedQuestion(
           .toLocaleLowerCase("und")
           .includes(normalizedQuestion.toLocaleLowerCase("und"))
       )
-        score += 2;
-      return { chunk, score };
+        lexical += 2;
+      const entityTokens = new Set(chunk.entityNames.flatMap(tokens));
+      const graph =
+        rawQueryTokens.filter(token => entityTokens.has(token)).length /
+        Math.max(1, rawQueryTokens.length);
+      const queryYears = new Set(queryTokens.filter(token => /^\d{4}$/.test(token)));
+      const temporal = chunk.temporalRefs.some(item => queryYears.has(item)) ? 1 : 0;
+      return { chunk, lexical, graph, temporal };
     })
-    .filter(item => item.score > 0)
+    .filter(item => item.lexical > 0 || item.graph > 0 || item.temporal > 0);
+  const maxLexical = Math.max(0, ...unnormalized.map(item => item.lexical));
+  const ranked = unnormalized
+    .map(item => {
+      const lexical = maxLexical > 0 ? item.lexical / maxLexical : 0;
+      const score =
+        lexical * 0.7 +
+        item.graph * 0.1 +
+        item.temporal * 0.1 +
+        item.chunk.authorityScore * 0.1;
+      return { ...item, lexical, score };
+    })
     .sort(
       (left, right) =>
         right.score - left.score ||
@@ -220,7 +349,7 @@ export function answerGroundedQuestion(
     )
     .slice(0, 3);
 
-  const citations = ranked.map(({ chunk, score }) => ({
+  const citations = ranked.map(({ chunk, score, lexical, graph, temporal }) => ({
     evidenceId: chunk.evidenceId,
     sourceId: chunk.sourceId,
     sourceVersionId: chunk.sourceVersionId,
@@ -228,6 +357,15 @@ export function answerGroundedQuestion(
     bbox1000: chunk.bbox1000,
     authority: chunk.authority,
     relevance: Number(score.toFixed(6)),
+    claimIds: chunk.claimIds,
+    entityIds: chunk.entityIds,
+    authorityTier: chunk.authorityTier,
+    relevanceBreakdown: {
+      lexical: Number(lexical.toFixed(6)),
+      graph: Number(graph.toFixed(6)),
+      temporal: Number(temporal.toFixed(6)),
+      authority: Number(chunk.authorityScore.toFixed(6)),
+    },
     excerpt: excerpt(chunk.text),
   }));
   const status =
@@ -244,7 +382,7 @@ export function answerGroundedQuestion(
     receipt: {
       collectionId,
       manifestDigest,
-      retrieval: "deterministic-bm25-region-v1",
+      retrieval: "adaptive-multilingual-region-v2",
       candidatePromotion: false,
       outputSha256: `sha256:${createHash("sha256").update(canonicalize(unsigned)).digest("hex")}`,
     },

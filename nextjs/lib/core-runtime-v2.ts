@@ -209,7 +209,11 @@ export function projectProductCoreV2Candidate(
   result: ProductCoreV2CompileResponse,
   documents: CollectionOcrInput[],
 ): CollectionCandidateArtifact | null {
-  if (result.status !== "completed" || result.candidate.lifecycle !== "candidate") return null;
+  if (result.status === "rejected" || result.candidate.lifecycle === "rejected") return null;
+  if (
+    (result.status === "completed" && result.candidate.lifecycle !== "candidate") ||
+    (result.status === "review_required" && result.candidate.lifecycle !== "review_required")
+  ) return null;
   const model = result.candidate.canonicalKnowledgeModel;
   const collectionId = typeof model.collectionId === "string" ? model.collectionId : "";
   const objects = Array.isArray(model.objects) ? model.objects as Array<Record<string, unknown>> : [];
@@ -259,7 +263,7 @@ export function projectProductCoreV2Candidate(
   return {
     schemaVersion: "tavonel.collection_candidate.v1",
     executionAuthority: "tavonel-foundation-core-runtime-v1",
-    lifecycle: "candidate",
+    lifecycle: result.candidate.lifecycle,
     candidatePromotion: false,
     collectionId,
     manifestDigest: result.candidate.manifestDigest,
@@ -283,13 +287,16 @@ export function projectProductCoreV2Candidate(
       signatureStatus: result.candidate.package.signatureStatus,
     },
     validation: {
-      status: "passed",
+      status: result.status === "completed" ? "passed" : "review_required",
       deterministicMaterialization: true,
       sourceCoverage: true,
       evidenceCoverage: true,
       immutableInputsOnly: true,
+      fullRebuildEquivalence: result.receipt.equivalence,
+      reviewReasons: [...result.candidate.reviewReasons],
       counts,
     },
+    reviewReasons: [...result.candidate.reviewReasons],
   };
 }
 

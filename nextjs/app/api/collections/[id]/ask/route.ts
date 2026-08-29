@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { validateDownloadableCollectionArtifact } from "@/lib/collection-download";
+import { validatePromotableCollectionArtifact } from "@/lib/collection-download";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
 import { answerGroundedQuestion } from "@/lib/grounded-ask";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
@@ -82,7 +82,7 @@ export async function POST(
       { code: loaded.code },
       { status: 503, headers: NO_STORE }
     );
-  const artifact = validateDownloadableCollectionArtifact(loaded.json, id);
+  const artifact = validatePromotableCollectionArtifact(loaded.json, id);
   if (!artifact || artifact.manifestDigest !== active.world.manifestDigest) {
     return NextResponse.json(
       { code: "ACTIVE_WORLD_ARTIFACT_INVALID" },

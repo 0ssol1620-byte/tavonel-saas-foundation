@@ -24,24 +24,51 @@ type PackageFile = {
   content: string;
 };
 
-export type DownloadableCollectionArtifact = {
+export type ReviewableCollectionArtifact = {
   schemaVersion: typeof COLLECTION_CANDIDATE_SCHEMA;
   collectionId: string;
   manifestDigest: string;
-  lifecycle: "candidate";
+  lifecycle: "candidate" | "review_required";
   candidatePromotion: false;
   directoryPlan: unknown[];
   package: { files: PackageFile[] };
-  validation: { status: "passed" };
+  validation: {
+    status: "passed" | "review_required";
+    fullRebuildEquivalence?: "passed" | "failed" | "not_run";
+    reviewReasons?: string[];
+  };
+  reviewReasons?: string[];
   coreExecution: {
-    status: "completed";
+    status: "completed" | "review_required";
     runtime: string;
-    receipt: { requestId: string; outputSha256: string; candidatePromotion: false };
+    worldStateId?: string | null;
+    receipt: {
+      requestId: string;
+      outputSha256: string;
+      candidatePromotion: false;
+      equivalence?: "passed" | "failed" | "not_run";
+    };
   };
 };
 
+export type PromotableCollectionArtifact = ReviewableCollectionArtifact & {
+  lifecycle: "candidate";
+  validation: ReviewableCollectionArtifact["validation"] & { status: "passed" };
+  coreExecution: ReviewableCollectionArtifact["coreExecution"] & { status: "completed" };
+};
+
+export type DownloadableCollectionArtifact = ReviewableCollectionArtifact;
+
+const SHA256 = /^sha256:[a-f0-9]{64}$/;
+
 function sha256(value: string) {
   return `sha256:${createHash("sha256").update(value, "utf8").digest("hex")}`;
+}
+
+function sameStrings(left: string[], right: string[]) {
+  if (left.length !== right.length) return false;
+  const sortedRight = [...right].sort();
+  return [...left].sort().every((value, index) => value === sortedRight[index]);
 }
 
 export function isSafeArchivePath(path: string) {
@@ -55,24 +82,53 @@ export function isSafeArchivePath(path: string) {
   );
 }
 
-export function validateDownloadableCollectionArtifact(
+export function validateReviewableCollectionArtifact(
   value: unknown,
   expectedCollectionId: string,
-): DownloadableCollectionArtifact | null {
+): ReviewableCollectionArtifact | null {
   if (!value || typeof value !== "object") return null;
-  const artifact = value as Partial<DownloadableCollectionArtifact>;
+  const artifact = value as Partial<ReviewableCollectionArtifact>;
   if (
     artifact.schemaVersion !== COLLECTION_CANDIDATE_SCHEMA ||
     artifact.collectionId !== expectedCollectionId ||
-    artifact.lifecycle !== "candidate" ||
+    !SHA256.test(artifact.manifestDigest ?? "") ||
+    (artifact.lifecycle !== "candidate" && artifact.lifecycle !== "review_required") ||
     artifact.candidatePromotion !== false ||
-    artifact.validation?.status !== "passed" ||
-    artifact.coreExecution?.status !== "completed" ||
+    (artifact.validation?.status !== "passed" && artifact.validation?.status !== "review_required") ||
+    (artifact.coreExecution?.status !== "completed" && artifact.coreExecution?.status !== "review_required") ||
+    typeof artifact.coreExecution.runtime !== "string" ||
+    artifact.coreExecution.runtime.length === 0 ||
+    typeof artifact.coreExecution.receipt?.requestId !== "string" ||
+    artifact.coreExecution.receipt.requestId.length === 0 ||
+    !SHA256.test(artifact.coreExecution.receipt.outputSha256 ?? "") ||
     artifact.coreExecution.receipt?.candidatePromotion !== false ||
     !Array.isArray(artifact.directoryPlan) ||
     !Array.isArray(artifact.package?.files) ||
     artifact.package.files.length === 0 ||
     artifact.package.files.length > MAX_PACKAGE_FILES
+  ) {
+    return null;
+  }
+
+  const reviewReasons = artifact.reviewReasons ?? artifact.validation.reviewReasons ?? [];
+  if (
+    !Array.isArray(reviewReasons) ||
+    new Set(reviewReasons).size !== reviewReasons.length ||
+    reviewReasons.some((reason) => typeof reason !== "string" || reason.length === 0 || reason.length > 500) ||
+    (artifact.reviewReasons !== undefined && artifact.validation.reviewReasons !== undefined &&
+      !sameStrings(artifact.reviewReasons, artifact.validation.reviewReasons)) ||
+    (artifact.lifecycle === "candidate" && (
+      artifact.validation.status !== "passed" ||
+      artifact.coreExecution.status !== "completed" ||
+      reviewReasons.length !== 0 ||
+      artifact.coreExecution.receipt.equivalence === "failed" ||
+      artifact.validation.fullRebuildEquivalence === "failed"
+    )) ||
+    (artifact.lifecycle === "review_required" && (
+      artifact.validation.status !== "review_required" ||
+      artifact.coreExecution.status !== "review_required" ||
+      reviewReasons.length === 0
+    ))
   ) {
     return null;
   }
@@ -99,21 +155,47 @@ export function validateDownloadableCollectionArtifact(
     if (totalBytes > MAX_UNCOMPRESSED_BYTES) return null;
   }
   if (REQUIRED_PACKAGE_PATHS.some((path) => !paths.has(path))) return null;
-  return artifact as DownloadableCollectionArtifact;
+
+  const validationFile = artifact.package.files.find((file) => file.path === "validation/report.json")!;
+  try {
+    const report = JSON.parse(validationFile.content) as { status?: unknown; reviewReasons?: unknown };
+    if (report.status !== artifact.validation.status) return null;
+    if (
+      artifact.lifecycle === "review_required" &&
+      (!Array.isArray(report.reviewReasons) || !sameStrings(reviewReasons, report.reviewReasons))
+    ) return null;
+  } catch {
+    return null;
+  }
+  return artifact as ReviewableCollectionArtifact;
 }
 
-export function buildSignedCollectionZip(artifact: DownloadableCollectionArtifact, signer: ExportSigner) {
+export const validateDownloadableCollectionArtifact = validateReviewableCollectionArtifact;
+
+export function validatePromotableCollectionArtifact(
+  value: unknown,
+  expectedCollectionId: string,
+): PromotableCollectionArtifact | null {
+  const artifact = validateReviewableCollectionArtifact(value, expectedCollectionId);
+  return artifact?.lifecycle === "candidate" &&
+    artifact.validation.status === "passed" &&
+    artifact.coreExecution.status === "completed"
+    ? artifact as PromotableCollectionArtifact
+    : null;
+}
+
+export function buildSignedCollectionZip(artifact: ReviewableCollectionArtifact, signer: ExportSigner) {
   const entries: Record<string, Uint8Array> = {};
   for (const file of artifact.package.files) entries[file.path] = strToU8(file.content);
   const candidateWorld = `${JSON.stringify(artifact, null, 2)}\n`;
   const readme = [
-    "TAVONEL signed candidate knowledge package",
+    `TAVONEL signed ${artifact.lifecycle === "candidate" ? "candidate" : "human-review"} knowledge package`,
     `Collection: ${artifact.collectionId}`,
     `Manifest: ${artifact.manifestDigest}`,
     `Core receipt: ${artifact.coreExecution.receipt.requestId}`,
     `Export signer: ${signer.keyId}`,
     `Public key fingerprint: ${signer.publicKeySpkiSha256}`,
-    "Lifecycle: candidate",
+    `Lifecycle: ${artifact.lifecycle}`,
     "candidatePromotion=false",
     "",
     "Formats: Markdown, JSON, JSON-LD, Turtle, CSV and JSON Lines.",
@@ -134,7 +216,7 @@ export function buildSignedCollectionZip(artifact: DownloadableCollectionArtifac
     schemaVersion: "tavonel.signed_export_manifest.v1",
     collectionId: artifact.collectionId,
     manifestDigest: artifact.manifestDigest,
-    lifecycle: "candidate",
+    lifecycle: artifact.lifecycle,
     candidatePromotion: false,
     core: {
       runtime: artifact.coreExecution.runtime,

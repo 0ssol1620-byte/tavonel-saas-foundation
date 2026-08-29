@@ -56,7 +56,7 @@ async function installSession(page: Page) {
   );
 }
 
-async function mockWorkspace(page: Page) {
+async function mockWorkspace(page: Page, reviewRequired = false) {
   await page.route("**/api/documents", route =>
     route.fulfill({ json: { documents: [] } })
   );
@@ -86,10 +86,12 @@ async function mockWorkspace(page: Page) {
           schemaVersion: "tavonel.collection_candidate.v1",
           collectionId,
           manifestDigest: candidateManifest,
+          lifecycle: reviewRequired ? "review_required" : "candidate",
           candidatePromotion: false,
+          reviewReasons: reviewRequired ? ["CONTRADICTION_CANDIDATE:claim-a:claim-b"] : [],
           sourceDocuments: [{ documentId: "doc-a" }, { documentId: "doc-b" }],
           coreExecution: {
-            status: "completed",
+            status: reviewRequired ? "review_required" : "completed",
             runtime: "tavonel-python-core-v2",
             worldStateId: "world-candidate-b",
             receipt: {
@@ -102,7 +104,7 @@ async function mockWorkspace(page: Page) {
             { path: "knowledge", kind: "topic", sourceIds: ["doc-a", "doc-b"] },
           ],
           validation: {
-            status: "passed",
+            status: reviewRequired ? "review_required" : "passed",
             counts: {
               documents: 2,
               topics: 1,
@@ -175,13 +177,22 @@ async function mockWorkspace(page: Page) {
             pageNumber1: 2,
             bbox1000: [100, 200, 900, 300],
             authority: "official",
+            authorityTier: "official",
             relevance: 1.25,
+            claimIds: ["claim-1"],
+            entityIds: ["entity-1"],
+            relevanceBreakdown: {
+              lexical: 1,
+              graph: 0.5,
+              temporal: 0.5,
+              authority: 0.75,
+            },
             excerpt: "2026년 분기 매출은 120억원으로 증가했습니다.",
           },
         ],
         receipt: {
           manifestDigest: activeManifest,
-          retrieval: "deterministic-bm25-region-v1",
+          retrieval: "adaptive-multilingual-region-v2",
           outputSha256: `sha256:${"f".repeat(64)}`,
         },
       },
@@ -237,7 +248,7 @@ test("renders governed promotion, retained rollback and region-grounded Ask", as
     page.getByText("Page 2 · bbox [100, 200, 900, 300] · official")
   ).toBeVisible();
   await expect(
-    page.getByText("deterministic-bm25-region-v1", { exact: false })
+    page.getByText("adaptive-multilingual-region-v2", { exact: false })
   ).toBeVisible();
 
   const overflow = await page.evaluate(
@@ -248,6 +259,32 @@ test("renders governed promotion, retained rollback and region-grounded Ask", as
   expect(overflow).toBeLessThanOrEqual(1);
   expect(browserErrors).toEqual([]);
   await testInfo.attach("world-lifecycle", {
+    body: await page.screenshot({ fullPage: true }),
+    contentType: "image/png",
+  });
+});
+
+test("keeps review-required packages downloadable and promotion-closed", async ({
+  page,
+}, testInfo) => {
+  const browserErrors: string[] = [];
+  page.on("console", message => {
+    if (message.type() === "error") browserErrors.push(message.text());
+  });
+  page.on("pageerror", error => browserErrors.push(error.message));
+  await installSession(page);
+  await mockWorkspace(page, true);
+  await page.goto(`/workspace?collection=${collectionId}`);
+
+  await expect(page.getByText("Core requires review", { exact: false })).toBeVisible();
+  await expect(page.getByText("CONTRADICTION_CANDIDATE:claim-a:claim-b", { exact: false })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Download signed knowledge package" })).toBeEnabled();
+  const promote = page.getByRole("button", { name: "Promote reviewed candidate" });
+  await page.getByLabel("Human review record").fill("Reviewed contradiction evidence and retained the gate.");
+  await expect(promote).toBeDisabled();
+
+  expect(browserErrors).toEqual([]);
+  await testInfo.attach("review-required-gate", {
     body: await page.screenshot({ fullPage: true }),
     contentType: "image/png",
   });

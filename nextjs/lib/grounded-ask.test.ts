@@ -16,17 +16,33 @@ function artifact() {
       pageNumber1: 2,
       bbox1000: [100, 200, 900, 300],
       authority: "official",
+      authorityTier: "official",
+      authorityScore: 1,
+      claimIds: ["claim-semantic-1"],
+      entityIds: [],
+      entityNames: [],
+      languages: ["ko"],
+      temporalRefs: ["2026"],
+      retrievalTerms: ["2026", "분기", "매출", "증가"],
     },
     {
       chunkId: "chunk-2",
       logicalId: "claim-2",
-      text: "The board approved the security policy in August 2026.",
+      text: "The TAVONEL board approved the security policy in August 2026.",
       sourceId: "source-2",
       sourceVersionId: "version-2",
       evidenceId: "evidence-2",
       pageNumber1: 4,
       bbox1000: [120, 220, 880, 360],
       authority: "contractual",
+      authorityTier: "official",
+      authorityScore: 1,
+      claimIds: ["claim-semantic-2"],
+      entityIds: ["entity-tavonel"],
+      entityNames: ["TAVONEL"],
+      languages: ["en"],
+      temporalRefs: ["2026"],
+      retrievalTerms: ["tavonel", "board", "approved", "security", "policy", "august", "2026"],
     },
   ];
   return {
@@ -59,16 +75,52 @@ describe("active-world grounded Ask", () => {
       })
     );
     expect(result?.receipt.outputSha256).toMatch(/^sha256:[a-f0-9]{64}$/);
+    expect(result?.receipt.retrieval).toBe("adaptive-multilingual-region-v2");
+    expect(result?.citations[0].claimIds).toEqual(["claim-semantic-1"]);
   });
 
   it("retrieves English evidence without allowing prompt text to create a citation", () => {
     const result = answerGroundedQuestion(
       artifact(),
-      "When was the security policy approved?"
+      "When was the 2026 security policy approved?"
     );
     expect(result?.status).toBe("grounded");
     expect(result?.citations[0].sourceId).toBe("source-2");
     expect(result?.answer).toContain("August 2026");
+    expect(result?.citations[0].relevanceBreakdown.temporal).toBe(1);
+    expect(result?.citations[0].authorityTier).toBe("official");
+  });
+
+  it("uses multilingual expansion and entity graph without inventing new evidence", () => {
+    const translated = answerGroundedQuestion(artifact(), "revenue increase");
+    expect(translated?.citations[0].sourceId).toBe("source-1");
+    expect(translated?.citations[0].relevanceBreakdown.lexical).toBeGreaterThan(0);
+
+    const entity = answerGroundedQuestion(artifact(), "TAVONEL");
+    expect(entity?.citations[0].sourceId).toBe("source-2");
+    expect(entity?.citations[0].relevanceBreakdown.graph).toBe(1);
+    expect(entity?.citations[0].entityIds).toEqual(["entity-tavonel"]);
+  });
+
+  it("uses authority only as a tie-breaker, never as evidence eligibility", () => {
+    const tied = artifact();
+    const rows = tied.package.files[0].content.trim().split("\n").map(row => JSON.parse(row));
+    rows.push({
+      ...rows[1],
+      chunkId: "chunk-0",
+      logicalId: "claim-0",
+      sourceId: "source-informal",
+      sourceVersionId: "version-informal",
+      evidenceId: "evidence-informal",
+      authority: "informal",
+      authorityTier: "informal",
+      authorityScore: 0.4,
+      claimIds: ["claim-semantic-informal"],
+    });
+    tied.package.files[0].content = `${rows.map(row => JSON.stringify(row)).join("\n")}\n`;
+    const result = answerGroundedQuestion(tied, "security policy");
+    expect(result?.citations[0].sourceId).toBe("source-2");
+    expect(answerGroundedQuestion(tied, "quantum gravity")?.status).toBe("abstained");
   });
 
   it("abstains when no region-bound evidence matches", () => {

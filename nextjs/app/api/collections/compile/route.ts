@@ -82,7 +82,7 @@ export async function POST(request: Request) {
   const verifiedInputs = inputs.filter((item) => item !== null);
   let artifact: CollectionCandidateArtifact;
   let coreExecution: {
-    status: "completed";
+    status: "completed" | "review_required";
     runtime: string;
     worldStateId: string | null;
     receipt: Record<string, unknown> & { requestId: string; outputSha256: string; candidatePromotion: false };
@@ -91,14 +91,6 @@ export async function POST(request: Request) {
     const compiled = await dispatchProductCoreV2(coreV2, membership.workspaceId, verifiedInputs);
     if (!compiled.ok) {
       return NextResponse.json({ code: compiled.code }, { status: 503, headers: { "Cache-Control": "no-store" } });
-    }
-    if (compiled.result.status === "review_required") {
-      return NextResponse.json({
-        code: "CORE_V2_REVIEW_REQUIRED",
-        candidateWorldStateId: compiled.result.candidate.worldStateId,
-        reviewReasons: compiled.result.candidate.reviewReasons,
-        candidatePromotion: false,
-      }, { status: 409, headers: { "Cache-Control": "no-store" } });
     }
     if (compiled.result.status === "rejected") {
       return NextResponse.json({
@@ -114,7 +106,7 @@ export async function POST(request: Request) {
     }
     artifact = projected;
     coreExecution = {
-      status: "completed",
+      status: compiled.result.status,
       runtime: compiled.result.runtime,
       worldStateId: compiled.result.candidate.worldStateId,
       receipt: compiled.result.receipt,
@@ -146,7 +138,7 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({
-    code: "COLLECTION_CANDIDATE_READY",
+    code: artifact.lifecycle === "review_required" ? "COLLECTION_REVIEW_PACKAGE_READY" : "COLLECTION_CANDIDATE_READY",
     collectionId: artifact.collectionId,
     artifactKey: key,
     manifestDigest: artifact.manifestDigest,
@@ -159,5 +151,7 @@ export async function POST(request: Request) {
     directoryPlan: artifact.directoryPlan,
     ontology: artifact.ontology,
     validation: artifact.validation,
+    reviewReasons: artifact.reviewReasons ?? [],
+    lifecycle: artifact.lifecycle,
   }, { headers: { "Cache-Control": "no-store" } });
 }

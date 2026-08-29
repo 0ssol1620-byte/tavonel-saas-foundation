@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { validateDownloadableCollectionArtifact } from "@/lib/collection-download";
+import { validatePromotableCollectionArtifact } from "@/lib/collection-download";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
 import {
   collectionCandidateKey,
@@ -109,7 +109,7 @@ export async function POST(
       { status: loaded.code === "NOT_FOUND" ? 404 : 503, headers: NO_STORE }
     );
   }
-  const artifact = validateDownloadableCollectionArtifact(loaded.json, id);
+  const artifact = validatePromotableCollectionArtifact(loaded.json, id);
   const stored = loaded.json as {
     manifestDigest?: unknown;
     coreExecution?: {

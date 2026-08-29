@@ -68,7 +68,7 @@ type KnowledgeEdge = {
 export type CollectionCandidateArtifact = {
   schemaVersion: typeof COLLECTION_CANDIDATE_SCHEMA;
   executionAuthority: "tavonel-foundation-core-runtime-v1";
-  lifecycle: "candidate";
+  lifecycle: "candidate" | "review_required";
   candidatePromotion: false;
   collectionId: string;
   manifestDigest: string;
@@ -99,11 +99,13 @@ export type CollectionCandidateArtifact = {
     signatureStatus: "external_signer_required";
   };
   validation: {
-    status: "passed";
+    status: "passed" | "review_required";
     deterministicMaterialization: true;
     sourceCoverage: true;
     evidenceCoverage: true;
     immutableInputsOnly: true;
+    fullRebuildEquivalence?: "passed" | "failed" | "not_run";
+    reviewReasons?: string[];
     counts: {
       documents: number;
       topics: number;
@@ -114,6 +116,7 @@ export type CollectionCandidateArtifact = {
       packageFiles: number;
     };
   };
+  reviewReasons?: string[];
 };
 
 function canonicalize(value: unknown): string {

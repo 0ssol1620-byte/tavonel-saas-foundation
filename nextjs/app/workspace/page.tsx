@@ -19,17 +19,19 @@ type CollectionResult = {
   collectionId: string;
   artifactKey: string;
   manifestDigest: string;
+  lifecycle: "candidate" | "review_required";
   candidatePromotion: false;
+  reviewReasons?: string[];
   sourceDocuments: Array<{ documentId: string }>;
   coreExecution?: {
-    status: "completed";
+    status: "completed" | "review_required";
     runtime: string;
     worldStateId?: string;
     receipt: { requestId: string; outputSha256: string; candidatePromotion: false };
   };
   directoryPlan: Array<{ path: string; kind: string; sourceIds: string[] }>;
   validation: {
-    status: string;
+    status: "passed" | "review_required";
     counts: { documents: number; topics: number; entities: number; claims: number; evidence: number; relations: number; packageFiles: number };
   };
 };
@@ -64,7 +66,16 @@ type GroundedAnswer = {
     pageNumber1: number;
     bbox1000: [number, number, number, number];
     authority: string;
+    authorityTier?: string;
     relevance: number;
+    claimIds?: string[];
+    entityIds?: string[];
+    relevanceBreakdown?: {
+      lexical: number;
+      graph: number;
+      temporal: number;
+      authority: number;
+    };
     excerpt: string;
   }>;
   receipt: { manifestDigest: string; retrieval: string; outputSha256: string };
@@ -202,7 +213,10 @@ export default function WorkspacePage() {
       artifact.collectionId !== collectionId ||
       artifact.candidatePromotion !== false ||
       json.candidatePromotion !== false ||
-      artifact.validation.status !== "passed" ||
+      !(
+        (artifact.lifecycle === "candidate" && artifact.validation.status === "passed" && artifact.coreExecution?.status === "completed") ||
+        (artifact.lifecycle === "review_required" && artifact.validation.status === "review_required" && artifact.coreExecution?.status === "review_required" && (artifact.reviewReasons?.length ?? 0) > 0)
+      ) ||
       !paths.includes("ontology/knowledge.jsonld") ||
       !paths.includes("ontology/knowledge.ttl") ||
       !paths.includes("graph/nodes.csv") ||
@@ -334,7 +348,9 @@ export default function WorkspacePage() {
         url.searchParams.set("collection", json.collectionId);
         window.history.replaceState(null, "", url);
         setNotice(
-          `Collection ${json.collectionId} compiled from ${json.validation.counts.documents} documents: ${json.directoryPlan.length} directory entries, ${json.validation.counts.topics} topics, ${json.validation.counts.entities} entities, ${json.validation.counts.claims} claims and ${json.validation.counts.relations} evidence-bound relations. candidatePromotion=false.`,
+          json.lifecycle === "review_required"
+            ? `Collection ${json.collectionId} produced a signed review package with ${json.reviewReasons?.length ?? 0} review reason(s). Download and inspect it; promotion remains blocked.`
+            : `Collection ${json.collectionId} compiled from ${json.validation.counts.documents} documents: ${json.directoryPlan.length} directory entries, ${json.validation.counts.topics} topics, ${json.validation.counts.entities} entities, ${json.validation.counts.claims} claims and ${json.validation.counts.relations} evidence-bound relations. candidatePromotion=false.`,
         );
         return;
       }
@@ -365,13 +381,15 @@ export default function WorkspacePage() {
         body: JSON.stringify({ documentIds }),
       });
       const json = await response.json() as CollectionResult & { code?: string };
-      if (!response.ok || json.coreExecution?.status !== "completed") {
+      if (!response.ok || (json.coreExecution?.status !== "completed" && json.coreExecution?.status !== "review_required")) {
         setNotice(`Core compilation failed (${json.code ?? response.status}). No candidate was promoted.`);
         return;
       }
       setCollectionResult(json);
       await loadWorldState(json.collectionId, token);
-      setNotice(`Separate Core runtime completed ${json.collectionId}; receipt ${json.coreExecution.receipt.requestId}; output ${json.coreExecution.receipt.outputSha256}; candidatePromotion=false.`);
+      setNotice(json.coreExecution.status === "review_required"
+        ? `Separate Core produced a review-required package for ${json.collectionId}; ${json.reviewReasons?.join(", ") || "manual review required"}. Signed download is available and promotion remains blocked.`
+        : `Separate Core runtime completed ${json.collectionId}; receipt ${json.coreExecution.receipt.requestId}; output ${json.coreExecution.receipt.outputSha256}; candidatePromotion=false.`);
     } finally {
       setBusy(false);
     }
@@ -519,7 +537,13 @@ export default function WorkspacePage() {
 
   const promoteCandidate = async () => {
     if (!collectionResult || reviewReason.trim().length < 8) return;
-    if (collectionResult.coreExecution?.runtime !== "tavonel-python-core-v2" || !collectionResult.coreExecution.worldStateId) {
+    if (
+      collectionResult.lifecycle !== "candidate" ||
+      collectionResult.validation.status !== "passed" ||
+      collectionResult.coreExecution?.status !== "completed" ||
+      collectionResult.coreExecution.runtime !== "tavonel-python-core-v2" ||
+      !collectionResult.coreExecution.worldStateId
+    ) {
       setNotice("Only a completed Python Core v2 candidate with a bound world state can be promoted.");
       return;
     }
@@ -687,8 +711,9 @@ export default function WorkspacePage() {
                   <small>{collectionResult.manifestDigest}</small>
                   {collectionResult.coreExecution ? (
                     <>
-                      <small>Core completed · {collectionResult.coreExecution.runtime} · {collectionResult.coreExecution.receipt.requestId}</small>
-                      {collectionResult.coreExecution.worldStateId ? <small>Candidate world · {collectionResult.coreExecution.worldStateId}</small> : null}
+                      <small>Core {collectionResult.coreExecution.status === "completed" ? "completed" : "requires review"} · {collectionResult.coreExecution.runtime} · {collectionResult.coreExecution.receipt.requestId}</small>
+                      {collectionResult.coreExecution.worldStateId ? <small>{collectionResult.lifecycle === "candidate" ? "Candidate" : "Review"} world · {collectionResult.coreExecution.worldStateId}</small> : null}
+                      {collectionResult.reviewReasons?.length ? <small>Review gates · {collectionResult.reviewReasons.join(", ")}</small> : null}
                       <button className="download-package" disabled={downloading} onClick={() => void downloadCollection()}>
                         <Download size={15} aria-hidden="true" />
                         {downloading ? "Signing verified ZIP..." : "Download signed knowledge package"}
@@ -734,7 +759,7 @@ export default function WorkspacePage() {
                   <div className="world-actions">
                     <small>{reviewReason.trim().length}/500 · minimum 8 characters</small>
                     <button
-                      disabled={worldBusy || reviewReason.trim().length < 8 || collectionResult.coreExecution?.runtime !== "tavonel-python-core-v2" || !collectionResult.coreExecution.worldStateId || activeWorld?.manifestDigest === collectionResult.manifestDigest}
+                      disabled={worldBusy || reviewReason.trim().length < 8 || collectionResult.lifecycle !== "candidate" || collectionResult.validation.status !== "passed" || collectionResult.coreExecution?.status !== "completed" || collectionResult.coreExecution.runtime !== "tavonel-python-core-v2" || !collectionResult.coreExecution.worldStateId || activeWorld?.manifestDigest === collectionResult.manifestDigest}
                       onClick={() => void promoteCandidate()}
                     >
                       {activeWorld?.manifestDigest === collectionResult.manifestDigest ? "This candidate is active" : worldBusy ? "Recording decision..." : "Promote reviewed candidate"}
@@ -810,7 +835,15 @@ export default function WorkspacePage() {
                     {askResult.citations.map((citation) => (
                       <li key={`${citation.evidenceId}-${citation.pageNumber1}`}>
                         <b>{citation.evidenceId}</b>
-                        <span>Page {citation.pageNumber1} · bbox [{citation.bbox1000.join(", ")}] · {citation.authority}</span>
+                        <span>
+                          Page {citation.pageNumber1} · bbox [{citation.bbox1000.join(", ")}] · {citation.authorityTier ?? citation.authority}
+                          {citation.claimIds?.length ? ` · ${citation.claimIds.length} claim${citation.claimIds.length === 1 ? "" : "s"}` : ""}
+                        </span>
+                        {citation.relevanceBreakdown ? (
+                          <span>
+                            score {citation.relevance.toFixed(3)} · lexical {citation.relevanceBreakdown.lexical.toFixed(2)} · graph {citation.relevanceBreakdown.graph.toFixed(2)} · time {citation.relevanceBreakdown.temporal.toFixed(2)} · authority {citation.relevanceBreakdown.authority.toFixed(2)}
+                          </span>
+                        ) : null}
                         <q>{citation.excerpt}</q>
                       </li>
                     ))}

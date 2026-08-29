@@ -10,6 +10,8 @@ import {
   buildSignedCollectionZip,
   isSafeArchivePath,
   validateDownloadableCollectionArtifact,
+  validatePromotableCollectionArtifact,
+  validateReviewableCollectionArtifact,
 } from "./collection-download";
 import { createExportSigner, verifyExportSignature } from "./export-signing";
 
@@ -116,6 +118,43 @@ describe("Foundation collection package download", () => {
     } finally {
       unlinkSync(archivePath);
     }
+  });
+
+  it("signs review-required output for inspection but never accepts it for promotion", () => {
+    const source = completedArtifact();
+    const reviewReasons = ["CONTRADICTION_CANDIDATE:claim-a:claim-b"];
+    const validationContent = `${JSON.stringify({ status: "review_required", reviewReasons }, null, 2)}\n`;
+    const reviewRequired = {
+      ...source,
+      lifecycle: "review_required",
+      reviewReasons,
+      package: {
+        ...source.package,
+        files: source.package.files.map((file) => file.path === "validation/report.json" ? {
+          ...file,
+          content: validationContent,
+          sizeBytes: Buffer.byteLength(validationContent, "utf8"),
+          sha256: `sha256:${createHash("sha256").update(validationContent, "utf8").digest("hex")}`,
+        } : file),
+      },
+      validation: {
+        ...source.validation,
+        status: "review_required",
+        reviewReasons,
+      },
+      coreExecution: {
+        ...source.coreExecution,
+        status: "review_required",
+      },
+    };
+    const reviewable = validateReviewableCollectionArtifact(reviewRequired, source.collectionId);
+    expect(reviewable).not.toBeNull();
+    expect(validatePromotableCollectionArtifact(reviewRequired, source.collectionId)).toBeNull();
+
+    const signed = buildSignedCollectionZip(reviewable!, exportSigningMaterial().signer);
+    const entries = unzipSync(signed.archive);
+    expect(signed.exportManifest.lifecycle).toBe("review_required");
+    expect(strFromU8(entries["manifest/DOWNLOAD_README.txt"])).toContain("Lifecycle: review_required");
   });
 
   it("rejects traversal paths, altered bytes, non-Core artifacts and the wrong tenant collection", () => {

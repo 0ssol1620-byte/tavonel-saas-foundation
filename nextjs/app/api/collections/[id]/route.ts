@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { validateReviewableCollectionArtifact } from "@/lib/collection-download";
 import { loadPreferredCollectionCandidate } from "@/lib/collection-storage";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
@@ -26,5 +27,9 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const status = loaded.code === "NOT_FOUND" ? 404 : 503;
     return NextResponse.json({ code: loaded.code }, { status, headers: { "Cache-Control": "no-store" } });
   }
-  return NextResponse.json({ code: "OK", artifactKey: loaded.value.key, candidatePromotion: false, artifact: loaded.value.artifact }, { headers: { "Cache-Control": "no-store" } });
+  const artifact = validateReviewableCollectionArtifact(loaded.value.artifact, id);
+  if (!artifact) {
+    return NextResponse.json({ code: "COLLECTION_PACKAGE_INVALID" }, { status: 422, headers: { "Cache-Control": "no-store" } });
+  }
+  return NextResponse.json({ code: "OK", artifactKey: loaded.value.key, candidatePromotion: false, artifact }, { headers: { "Cache-Control": "no-store" } });
 }
