@@ -61,6 +61,14 @@ function intakeNotice() {
   return "Private-pilot intake is open for signed-in test users. Files go to Foundation quarantine only; CDR and GPU stay closed.";
 }
 
+/** Human labels for the activation-policy keys, so no camelCase reaches the screen. */
+const GATE_LABELS = {
+  customerIntake: "Document intake",
+  cdr: "Content disarm",
+  ocrGpu: "OCR on scans",
+  candidatePromotion: "Promotion to the live world",
+} as const;
+
 export default function WorkspacePage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [notice, setNotice] = useState(intakeNotice);
@@ -558,7 +566,19 @@ export default function WorkspacePage() {
           <section className="card gates">
             <p className="eyebrow">PROCESSING INTEGRITY</p>
             <h2>Four gates</h2>
-            <div>{Object.entries(activationPolicy).map(([key, value]) => <article key={key}><span>{value.enabled ? "○" : "●"}</span><strong>{key.replace(/([A-Z])/g, " $1")}</strong><p>{value.reason}</p></article>)}</div>
+            {/* Written labels, not the policy keys: "ocrGpu" split on capitals rendered as
+                "ocr Gpu" in the UI. The state marker is the same pill the public capability
+                grid uses, and it had the glyphs the wrong way round -- an open circle for an
+                *open* gate and a filled one for a closed gate reads as the opposite. */}
+            <div className="gate-list">
+              {Object.entries(activationPolicy).map(([key, value]) => (
+                <article key={key}>
+                  <strong>{GATE_LABELS[key as keyof typeof GATE_LABELS] ?? key}</strong>
+                  <span className="pill" data-v={value.enabled ? "current" : "held"}>{value.enabled ? "OPEN" : "CLOSED"}</span>
+                  <p>{value.reason}</p>
+                </article>
+              ))}
+            </div>
             <p className="fine"><ShieldCheck size={15} /> All capability issuance is server-authorized and tenant-scoped.</p>
           </section>
         </div>
