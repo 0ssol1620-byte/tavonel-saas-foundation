@@ -81,7 +81,12 @@ export async function POST(request: Request) {
 
   const verifiedInputs = inputs.filter((item) => item !== null);
   let artifact: CollectionCandidateArtifact;
-  let coreExecution: { status: "completed"; runtime: string; receipt: Record<string, unknown> & { requestId: string; outputSha256: string; candidatePromotion: false } };
+  let coreExecution: {
+    status: "completed";
+    runtime: string;
+    worldStateId: string | null;
+    receipt: Record<string, unknown> & { requestId: string; outputSha256: string; candidatePromotion: false };
+  };
   if (coreV2) {
     const compiled = await dispatchProductCoreV2(coreV2, membership.workspaceId, verifiedInputs);
     if (!compiled.ok) {
@@ -111,6 +116,7 @@ export async function POST(request: Request) {
     coreExecution = {
       status: "completed",
       runtime: compiled.result.runtime,
+      worldStateId: compiled.result.candidate.worldStateId,
       receipt: compiled.result.receipt,
     };
   } else {
@@ -122,6 +128,7 @@ export async function POST(request: Request) {
     coreExecution = {
       status: "completed",
       runtime: compiled.result.runtime,
+      worldStateId: null,
       receipt: compiled.result.receipt,
     };
   }

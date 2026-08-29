@@ -24,6 +24,7 @@ type CollectionResult = {
   coreExecution?: {
     status: "completed";
     runtime: string;
+    worldStateId?: string;
     receipt: { requestId: string; outputSha256: string; candidatePromotion: false };
   };
   directoryPlan: Array<{ path: string; kind: string; sourceIds: string[] }>;
@@ -31,6 +32,42 @@ type CollectionResult = {
     status: string;
     counts: { documents: number; topics: number; entities: number; claims: number; evidence: number; relations: number; packageFiles: number };
   };
+};
+
+type ActiveWorld = {
+  collectionId: string;
+  manifestDigest: string;
+  revision: number;
+  updatedAt: string;
+  candidateObjectKey: string;
+  worldStateId: string;
+  coreOutputSha256: string;
+};
+
+type WorldVersion = {
+  manifest_digest: string;
+  world_state_id: string;
+  lifecycle_status: "active" | "superseded";
+  first_promoted_at: string;
+  last_activated_at: string;
+  activation_count: number;
+};
+
+type GroundedAnswer = {
+  status: "grounded" | "abstained";
+  answer: string;
+  reason: string | null;
+  citations: Array<{
+    evidenceId: string;
+    sourceId: string;
+    sourceVersionId: string;
+    pageNumber1: number;
+    bbox1000: [number, number, number, number];
+    authority: string;
+    relevance: number;
+    excerpt: string;
+  }>;
+  receipt: { manifestDigest: string; retrieval: string; outputSha256: string };
 };
 
 type BillingAccount = {
@@ -71,6 +108,47 @@ export default function WorkspacePage() {
   const [downloading, setDownloading] = useState(false);
   const [billingAccount, setBillingAccount] = useState<BillingAccount | null>(null);
   const [billingBusy, setBillingBusy] = useState(false);
+  const [activeWorld, setActiveWorld] = useState<ActiveWorld | null>(null);
+  const [worldVersions, setWorldVersions] = useState<WorldVersion[]>([]);
+  const [worldBusy, setWorldBusy] = useState(false);
+  const [reviewReason, setReviewReason] = useState("");
+  const [rollbackReason, setRollbackReason] = useState("");
+  const [askQuestion, setAskQuestion] = useState("");
+  const [askResult, setAskResult] = useState<GroundedAnswer | null>(null);
+  const [askBusy, setAskBusy] = useState(false);
+
+  const getAuthToken = async () => {
+    const client = getSupabaseBrowserClient();
+    const { data } = client ? await client.auth.getSession() : { data: { session: null } };
+    return data.session?.access_token ?? null;
+  };
+
+  const clearWorldState = () => {
+    setActiveWorld(null);
+    setWorldVersions([]);
+    setAskResult(null);
+  };
+
+  const loadWorldState = async (collectionId: string, token?: string) => {
+    if (!/^collection-[a-f0-9]{32}$/.test(collectionId)) return;
+    const accessToken = token ?? await getAuthToken();
+    if (!accessToken) return;
+    const response = await fetch(`/api/collections/${collectionId}/world`, {
+      headers: { authorization: `Bearer ${accessToken}` },
+    });
+    const json = await response.json() as { code?: string; activeWorld?: ActiveWorld; versions?: WorldVersion[] };
+    if (response.status === 404 && json.code === "ACTIVE_WORLD_NOT_FOUND") {
+      clearWorldState();
+      return;
+    }
+    if (!response.ok || !json.activeWorld || !Array.isArray(json.versions)) {
+      setNotice(`Active world verification failed (${json.code ?? response.status}).`);
+      return;
+    }
+    setActiveWorld(json.activeWorld);
+    setWorldVersions(json.versions);
+    setAskResult(null);
+  };
 
   const loadDocuments = async (): Promise<DocumentListItem[]> => {
     const client = getSupabaseBrowserClient();
@@ -134,6 +212,7 @@ export default function WorkspacePage() {
       return;
     }
     setCollectionResult({ ...artifact, artifactKey: json.artifactKey ?? "" });
+    await loadWorldState(collectionId, token);
     setNotice(
       `Immutable collection ${collectionId} reloaded from R2 and verified: directory, ontology JSON-LD/Turtle, graph CSV, RAG, provenance and validation roots are present; manifest ${artifact.manifestDigest}; candidatePromotion=false.`,
     );
@@ -250,6 +329,7 @@ export default function WorkspacePage() {
           return;
         }
         setCollectionResult(json);
+        await loadWorldState(json.collectionId, token);
         const url = new URL(window.location.href);
         url.searchParams.set("collection", json.collectionId);
         window.history.replaceState(null, "", url);
@@ -290,6 +370,7 @@ export default function WorkspacePage() {
         return;
       }
       setCollectionResult(json);
+      await loadWorldState(json.collectionId, token);
       setNotice(`Separate Core runtime completed ${json.collectionId}; receipt ${json.coreExecution.receipt.requestId}; output ${json.coreExecution.receipt.outputSha256}; candidatePromotion=false.`);
     } finally {
       setBusy(false);
@@ -335,6 +416,7 @@ export default function WorkspacePage() {
     if (files.length === 0) return;
     setBusy(true);
     setCollectionResult(null);
+    clearWorldState();
     const ids: string[] = [];
     try {
       for (let index = 0; index < files.length; index += 1) {
@@ -375,6 +457,7 @@ export default function WorkspacePage() {
   const uploadPublicCollectionProof = async () => {
     setBusy(true);
     setCollectionResult(null);
+    clearWorldState();
     setNotice("Preparing three digest-pinned public DART report pages in this browser…");
     try {
       const files: File[] = [];
@@ -432,6 +515,105 @@ export default function WorkspacePage() {
     setNotice(
       `OCR JSON verified for ${target.documentId}: ${candidates.pageCount} page(s), ${candidates.text.length} text characters, digest ${digestMatches ? "matched" : "mismatched"}, immutable key ${keyMatches ? "matched" : "mismatched"}, candidatePromotion=${json.candidatePromotion === false ? "false" : "invalid"}.`,
     );
+  };
+
+  const promoteCandidate = async () => {
+    if (!collectionResult || reviewReason.trim().length < 8) return;
+    if (collectionResult.coreExecution?.runtime !== "tavonel-python-core-v2" || !collectionResult.coreExecution.worldStateId) {
+      setNotice("Only a completed Python Core v2 candidate with a bound world state can be promoted.");
+      return;
+    }
+    if (!window.confirm("Activate this exact immutable candidate as the collection's current world? This records your review reason and does not alter candidate bytes.")) return;
+    setWorldBusy(true);
+    try {
+      const token = await getAuthToken();
+      if (!token) {
+        setNotice("Sign in with Google before promoting a reviewed candidate.");
+        return;
+      }
+      const response = await fetch(`/api/collections/${collectionResult.collectionId}/promote`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          manifestDigest: collectionResult.manifestDigest,
+          expectedCurrentManifest: activeWorld?.manifestDigest ?? null,
+          reason: reviewReason.trim(),
+        }),
+      });
+      const json = await response.json() as { code?: string };
+      if (!response.ok) {
+        setNotice(`World promotion failed (${json.code ?? response.status}). The previous active pointer is unchanged.`);
+        if (response.status === 409) await loadWorldState(collectionResult.collectionId, token);
+        return;
+      }
+      await loadWorldState(collectionResult.collectionId, token);
+      setReviewReason("");
+      setNotice(`Human review recorded. ${collectionResult.manifestDigest} is now the active world; immutable candidate bytes remain candidatePromotion=false.`);
+    } finally {
+      setWorldBusy(false);
+    }
+  };
+
+  const rollbackWorld = async (targetManifestDigest: string) => {
+    if (!collectionResult || !activeWorld || rollbackReason.trim().length < 8) return;
+    if (!window.confirm(`Roll the active pointer back to ${targetManifestDigest}? No package bytes will be deleted or rewritten.`)) return;
+    setWorldBusy(true);
+    try {
+      const token = await getAuthToken();
+      if (!token) {
+        setNotice("Sign in with Google before rolling back a world.");
+        return;
+      }
+      const response = await fetch(`/api/collections/${collectionResult.collectionId}/world/rollback`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          targetManifestDigest,
+          expectedCurrentManifest: activeWorld.manifestDigest,
+          reason: rollbackReason.trim(),
+        }),
+      });
+      const json = await response.json() as { code?: string };
+      if (!response.ok) {
+        setNotice(`World rollback failed (${json.code ?? response.status}). The active pointer is unchanged.`);
+        if (response.status === 409) await loadWorldState(collectionResult.collectionId, token);
+        return;
+      }
+      await loadWorldState(collectionResult.collectionId, token);
+      setRollbackReason("");
+      setNotice(`Rollback recorded. ${targetManifestDigest} is active again; all immutable versions and the audit event remain retained.`);
+    } finally {
+      setWorldBusy(false);
+    }
+  };
+
+  const askActiveWorld = async () => {
+    if (!collectionResult || !activeWorld || askQuestion.trim().length < 3) return;
+    setAskBusy(true);
+    setAskResult(null);
+    try {
+      const token = await getAuthToken();
+      if (!token) {
+        setNotice("Sign in with Google before asking the active world.");
+        return;
+      }
+      const response = await fetch(`/api/collections/${collectionResult.collectionId}/ask`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({ question: askQuestion.trim() }),
+      });
+      const json = await response.json() as GroundedAnswer & { code?: string };
+      if (!response.ok || (json.status !== "grounded" && json.status !== "abstained")) {
+        setNotice(`Grounded Ask failed (${json.code ?? response.status}). No answer was inferred.`);
+        return;
+      }
+      setAskResult(json);
+      setNotice(json.status === "grounded"
+        ? `Answer returned from ${json.citations.length} exact source region(s) in active revision ${activeWorld.revision}.`
+        : "The active world abstained because no region-bound evidence matched the question.");
+    } finally {
+      setAskBusy(false);
+    }
   };
 
   return (
@@ -506,6 +688,7 @@ export default function WorkspacePage() {
                   {collectionResult.coreExecution ? (
                     <>
                       <small>Core completed · {collectionResult.coreExecution.runtime} · {collectionResult.coreExecution.receipt.requestId}</small>
+                      {collectionResult.coreExecution.worldStateId ? <small>Candidate world · {collectionResult.coreExecution.worldStateId}</small> : null}
                       <button className="download-package" disabled={downloading} onClick={() => void downloadCollection()}>
                         <Download size={15} aria-hidden="true" />
                         {downloading ? "Preparing verified ZIP..." : "Download knowledge package"}
@@ -519,6 +702,124 @@ export default function WorkspacePage() {
               <p>Sanitized inputs can produce a reviewable directory, ontology, graph, RAG and provenance package. No candidate is promoted to a world without a separate human decision. candidatePromotion stays closed.</p>
             </section>
           </div>
+          <section className="card world-studio" aria-labelledby="world-studio-title">
+            <div className="world-heading">
+              <div>
+                <p className="eyebrow">REVIEW STUDIO · WORLD LIFECYCLE</p>
+                <h2 id="world-studio-title">Candidate bytes stay immutable. Humans move the active pointer.</h2>
+              </div>
+              <output className={activeWorld ? "world-status active" : "world-status"}>
+                {activeWorld ? `ACTIVE · REVISION ${activeWorld.revision}` : "NO ACTIVE WORLD"}
+              </output>
+            </div>
+            {!collectionResult ? (
+              <p className="world-empty">Compile or reload a verified collection candidate to begin review.</p>
+            ) : (
+              <div className="world-layout">
+                <div className="review-panel">
+                  <div className="binding-list" aria-label="Candidate bindings">
+                    <span><b>Candidate manifest</b>{collectionResult.manifestDigest}</span>
+                    <span><b>Core output</b>{collectionResult.coreExecution?.receipt.outputSha256 ?? "No separate Core receipt"}</span>
+                    <span><b>World state</b>{collectionResult.coreExecution?.worldStateId ?? "Not bound by Python Core v2"}</span>
+                    <span><b>Current active</b>{activeWorld?.manifestDigest ?? "None"}</span>
+                  </div>
+                  <label htmlFor="review-reason">Human review record</label>
+                  <textarea
+                    id="review-reason"
+                    maxLength={500}
+                    placeholder="Record what you verified in the directory, ontology, graph, evidence links and validation receipt."
+                    value={reviewReason}
+                    onChange={(event) => setReviewReason(event.target.value)}
+                  />
+                  <div className="world-actions">
+                    <small>{reviewReason.trim().length}/500 · minimum 8 characters</small>
+                    <button
+                      disabled={worldBusy || reviewReason.trim().length < 8 || collectionResult.coreExecution?.runtime !== "tavonel-python-core-v2" || !collectionResult.coreExecution.worldStateId || activeWorld?.manifestDigest === collectionResult.manifestDigest}
+                      onClick={() => void promoteCandidate()}
+                    >
+                      {activeWorld?.manifestDigest === collectionResult.manifestDigest ? "This candidate is active" : worldBusy ? "Recording decision..." : "Promote reviewed candidate"}
+                    </button>
+                  </div>
+                  <p className="fine">Promotion uses compare-and-swap against the current manifest. A stale browser cannot overwrite a newer human decision.</p>
+                </div>
+                <div className="version-panel">
+                  <p className="eyebrow">RETAINED VERSIONS</p>
+                  {worldVersions.length === 0 ? (
+                    <p>No promoted version exists for this collection.</p>
+                  ) : (
+                    <ol className="version-list">
+                      {worldVersions.map((version) => (
+                        <li key={version.manifest_digest}>
+                          <div>
+                            <strong>{version.lifecycle_status}</strong>
+                            <small>{version.manifest_digest}</small>
+                            <small>{version.world_state_id} · activated {version.activation_count} time(s)</small>
+                          </div>
+                          {activeWorld && version.manifest_digest !== activeWorld.manifestDigest ? (
+                            <button
+                              disabled={worldBusy || rollbackReason.trim().length < 8}
+                              onClick={() => void rollbackWorld(version.manifest_digest)}
+                            >Rollback to this version</button>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                  {activeWorld && worldVersions.some((version) => version.manifest_digest !== activeWorld.manifestDigest) ? (
+                    <>
+                      <label htmlFor="rollback-reason">Rollback reason</label>
+                      <textarea
+                        id="rollback-reason"
+                        maxLength={500}
+                        placeholder="Record why the current active world must be replaced by a retained version."
+                        value={rollbackReason}
+                        onChange={(event) => setRollbackReason(event.target.value)}
+                      />
+                    </>
+                  ) : null}
+                </div>
+              </div>
+            )}
+          </section>
+          <section className="card ask-studio" aria-labelledby="ask-title">
+            <div>
+              <p className="eyebrow">GROUNDED ASK</p>
+              <h2 id="ask-title">Answers return to exact source regions.</h2>
+              <p>Retrieval runs only against the active world. If no page-and-bbox evidence matches, TAVONEL abstains.</p>
+            </div>
+            <form onSubmit={(event) => { event.preventDefault(); void askActiveWorld(); }}>
+              <label htmlFor="ask-question">Question</label>
+              <textarea
+                id="ask-question"
+                maxLength={500}
+                disabled={!activeWorld || askBusy}
+                placeholder={activeWorld ? "Ask in Korean or English about this active collection." : "Promote a reviewed world before asking."}
+                value={askQuestion}
+                onChange={(event) => setAskQuestion(event.target.value)}
+              />
+              <button type="submit" disabled={!activeWorld || askBusy || askQuestion.trim().length < 3}>
+                {askBusy ? "Checking evidence..." : "Ask active world"}
+              </button>
+            </form>
+            {askResult ? (
+              <div className={`ask-result ${askResult.status}`} role="status">
+                <strong>{askResult.status === "grounded" ? "Grounded answer" : "Abstained"}</strong>
+                <p>{askResult.status === "grounded" ? askResult.answer : "No region-bound evidence matched this question."}</p>
+                {askResult.citations.length > 0 ? (
+                  <ol>
+                    {askResult.citations.map((citation) => (
+                      <li key={`${citation.evidenceId}-${citation.pageNumber1}`}>
+                        <b>{citation.evidenceId}</b>
+                        <span>Page {citation.pageNumber1} · bbox [{citation.bbox1000.join(", ")}] · {citation.authority}</span>
+                        <q>{citation.excerpt}</q>
+                      </li>
+                    ))}
+                  </ol>
+                ) : null}
+                <small>{askResult.receipt.retrieval} · {askResult.receipt.outputSha256}</small>
+              </div>
+            ) : null}
+          </section>
           <section className="card billing-card">
             <div>
               <p className="eyebrow">BILLING & CAPACITY</p>
