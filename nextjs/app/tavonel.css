@@ -408,7 +408,7 @@ button { font: inherit; border: 0; background: none; cursor: pointer; color: inh
 
 /* --- source browser (§6.13: 36px rows, 16px icon, 16px indent) --- */
 .browser { border-right: 1px solid var(--rule); padding: calc(14 * var(--u)) 0; overflow: hidden; }
-.browser h3 {
+.browser .stage-panel-label {
   margin: 0 0 calc(8 * var(--u)); padding: 0 calc(16 * var(--u));
   font-family: var(--f-mono); font-size: calc(10 * var(--u));
   letter-spacing: 0.12em; color: var(--ink-2); font-weight: 500;
@@ -462,7 +462,7 @@ button { font: inherit; border: 0; background: none; cursor: pointer; color: inh
 
 /* --- discovery feed (§6.13: 38px rows, 7 visible, no stacking below .45) --- */
 .feed { border-left: 1px solid var(--rule); padding: calc(14 * var(--u)) 0; overflow: hidden; }
-.feed h3 {
+.feed .stage-panel-label {
   margin: 0 0 calc(6 * var(--u)); padding: 0 calc(15 * var(--u));
   font-family: var(--f-mono); font-size: calc(10 * var(--u));
   letter-spacing: 0.12em; color: var(--ink-2); font-weight: 500;

@@ -72,7 +72,7 @@ export default function ReplayStage() {
         <div className="stage-body">
           {/* ---------------------------------------------------------- source browser */}
           <aside className="browser">
-            <h3>SOURCES</h3>
+            <p className="stage-panel-label">SOURCES</p>
             {SOURCE_GROUPS.map((g, i) => (
               <div key={g.name} className="brow" data-in={t >= 0.65 + i * 0.12 ? 1 : 0}>
                 <span className="g-folder" aria-hidden="true" />
@@ -452,7 +452,7 @@ export default function ReplayStage() {
 
           {/* ---------------------------------------------------------- discovery feed */}
           <aside className="feed">
-            <h3>EVENTS</h3>
+            <p className="stage-panel-label">EVENTS</p>
             {visibleFeed.map((r) => (
               <div className="frow" key={`${r.at}-${r.verb}`} data-tone={r.tone}>
                 <span className="fv">{r.verb}</span>
