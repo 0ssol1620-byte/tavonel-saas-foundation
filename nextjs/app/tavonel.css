@@ -835,7 +835,11 @@ footer.site .shell { display: flex; flex-direction: column; gap: 14px; }
   color: var(--text-lo);
 }
 .document-meta { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
-.document-meta li { padding: 8px 10px; border: 1px solid var(--hairline); border-radius: 3px; background: var(--ground); }
+/* strong + small were inline, so an id and a 60-character object key ran together into one
+   unreadable string. Each part gets its own line; the keys wrap rather than widening the card. */
+.document-meta li { padding: 8px 10px; border: 1px solid var(--hairline); border-radius: 3px; background: var(--ground); display: flex; flex-direction: column; gap: 3px; overflow-wrap: anywhere; }
+.document-meta li strong { color: var(--text-mid); font-weight: 400; font-size: 11px; letter-spacing: 0.06em; }
+.document-meta li small { color: var(--text-xlo); font-size: 10px; line-height: 1.5; }
 .empty { display: flex; flex-direction: column; gap: 8px; color: var(--text-xlo); }
 .collection-result { display: grid; gap: 8px; }
 .billing-hold { color: var(--changed); }
@@ -877,7 +881,109 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
 .hero .lead { margin-top: 14px; }
 .hero .fine { margin-top: 18px; }
 
+/* ---------------------------------------------------------- processing board */
+
+/* Four stages per document. The only continuous motion in this block is the transfer bar, and it
+   is driven by acknowledged bytes -- everything else changes when an object appears. */
+
+.board { gap: 14px; }
+.board-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.board-head > div { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.board-dismiss { flex: none; }
+
+.board-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; }
+.board-rows > li {
+  border: 1px solid var(--hairline);
+  border-left: 2px solid var(--hairline-hi);
+  border-radius: 3px;
+  background: var(--ground);
+  padding: 12px 13px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+/* A held document is the one thing on this board that wants a person, so it is the one thing
+   marked. It is marked in the "changed" tone, not a failure tone: nothing is broken. */
+.board-rows > li[data-held="1"] { border-left-color: var(--changed); }
+
+.board-id { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.board-id strong { color: var(--text-hi); font-weight: 500; font-size: 14px; overflow-wrap: anywhere; }
+.board-id small { font-family: var(--f-mono); font-size: 10px; color: var(--text-xlo); }
+
+.board-transfer { height: 2px; background: var(--hairline); border-radius: 2px; overflow: hidden; }
+.board-transfer i { display: block; height: 100%; background: var(--verified); transition: width 140ms linear; }
+
+.board-stages { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 3px; overflow: hidden; }
+.board-stage { background: var(--g1); padding: 9px 11px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.board-stage-k { display: flex; align-items: center; gap: 7px; font-family: var(--f-mono); font-size: 9.5px; letter-spacing: 0.13em; color: var(--text-xlo); }
+.board-stage-k i { width: 6px; height: 6px; border-radius: 50%; background: var(--decor); flex: none; }
+.board-stage-d { font-family: var(--f-mono); font-size: 10px; color: var(--text-xlo); line-height: 1.5; overflow-wrap: anywhere; }
+
+.board-stage[data-s="active"] { background: var(--g2); }
+.board-stage[data-s="active"] .board-stage-k { color: var(--text-mid); }
+.board-stage[data-s="active"] .board-stage-k i { background: var(--unresolved); }
+.board-stage[data-s="active"] .board-stage-d { color: var(--text-lo); }
+
+.board-stage[data-s="done"] .board-stage-k { color: var(--text-mid); }
+.board-stage[data-s="done"] .board-stage-k i { background: var(--verified); }
+.board-stage[data-s="done"] .board-stage-d { color: var(--text-lo); }
+
+.board-stage[data-s="held"] { background: var(--changed-deep); }
+.board-stage[data-s="held"] .board-stage-k { color: var(--changed); }
+.board-stage[data-s="held"] .board-stage-k i { background: var(--changed); }
+.board-stage[data-s="held"] .board-stage-d { color: var(--changed); }
+
+.board-stage[data-s="failed"] .board-stage-k { color: var(--text-mid); }
+.board-stage[data-s="failed"] .board-stage-k i { background: var(--changed); box-shadow: inset 0 0 0 1px var(--ground); }
+.board-stage[data-s="failed"] .board-stage-d { color: var(--text-lo); }
+
+.board-note { margin: 0; }
+
+@media (max-width: 620px) {
+  .board-stages { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ---------------------------------------------------------- reading view */
+
+/* A page being read. Every rectangle is a region the reader reported at the coordinates it
+   reported; the only transition is the one that fades a new region in, and it is short enough
+   that the display never lags the report it came from. */
+
+.reading { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 3px; overflow: hidden; }
+.reading-sheet { background: var(--ground); padding: 14px; display: grid; place-items: center; }
+.reading-page { position: relative; width: 100%; max-width: 156px; aspect-ratio: 1 / 1.414; background: var(--g1); border: 1px solid var(--hairline-hi); border-radius: 2px; }
+.rb {
+  position: absolute;
+  border: 1px solid var(--verified-dim);
+  background: rgba(123, 224, 190, 0.14);
+  border-radius: 1px;
+  animation: rb-in 220ms var(--ease) both;
+}
+/* The reader's own uncertainty, shown rather than smoothed away. */
+.rb.low { border-color: var(--changed-dim); background: rgba(242, 166, 90, 0.14); }
+@keyframes rb-in { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: none; } }
+
+/* Centred rather than top-aligned: four rows beside a page-shaped panel left a column of
+   empty ground that read as something missing. */
+.reading-readout { background: var(--ground); margin: 0; padding: 14px 16px; display: flex; flex-direction: column; justify-content: center; gap: 8px; min-width: 0; }
+.reading-readout > div { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; }
+.reading-readout dt { font-family: var(--f-mono); font-size: 9.5px; letter-spacing: 0.14em; color: var(--text-xlo); }
+.reading-readout dd { margin: 0; font-family: var(--f-mono); font-size: 12px; color: var(--text-hi); font-variant-numeric: tabular-nums; }
+.reading-meter { display: block; height: 2px; background: var(--hairline); border-radius: 2px; overflow: hidden; }
+.reading-meter i { display: block; height: 100%; background: var(--verified); transition: width 220ms linear; }
+
+@media (max-width: 620px) {
+  .reading { grid-template-columns: minmax(0, 1fr); }
+}
+
 /* ---------------------------------------------------------- knowledge architecture */
+
+/* The six passes, by what each produced. Deliberately a ledger, not a timeline: there is no
+   duration to show, because the compile is a pure function that finishes in milliseconds. */
+.passes { display: grid; gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 3px; overflow: hidden; }
+.pass { background: var(--ground); padding: 8px 13px; display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 12px; align-items: baseline; font-family: var(--f-mono); font-size: 11px; }
+.pass-i { color: var(--decor); font-size: 9.5px; letter-spacing: 0.1em; }
+.pass-n { color: var(--text-mid); font-family: var(--f-sans); font-size: 13.5px; }
+.pass-v { color: var(--verified); font-variant-numeric: tabular-nums; }
+.pass[data-empty="1"] .pass-v { color: var(--text-xlo); }
 
 .arch-counts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 3px; overflow: hidden; }
 .ac { background: var(--ground); padding: 11px 13px; display: flex; flex-direction: column; gap: 3px; }
@@ -885,7 +991,11 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
 .ac-k { font-family: var(--f-mono); font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-xlo); }
 
 .tree { display: grid; gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 3px; overflow: hidden; }
-.tree-root { background: var(--ground); }
+/* The roots arrive in the order the compiler built them. This is not a loading state -- the whole
+   tree is in the DOM within a second and nothing waits on it -- so it never hides content for
+   long, and reduced motion skips it entirely (see the block at the end of this file). */
+.tree-root { background: var(--ground); opacity: 0; transform: translateY(4px); transition: opacity 320ms var(--ease), transform 320ms var(--ease); }
+.tree-root[data-in="1"] { opacity: 1; transform: none; }
 .tree-root > button { width: 100%; display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 13px; text-align: left; font-family: var(--f-mono); font-size: 11.5px; color: var(--text-mid); transition: color 180ms ease, background 180ms ease; }
 .tree-root > button:hover { color: var(--text-hi); background: var(--g1); }
 .tree-root .tw { color: var(--text-xlo); }
@@ -1060,5 +1170,8 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
   }
   /* Content is never withheld -- only the transition is removed. */
   .js .rv { opacity: 1; transform: none; }
+  .tree-root { opacity: 1; transform: none; }
+  /* Regions still appear as they are found; only the fade is removed. */
+  .rb { animation: none; }
   .js .rv.in .stop span::after { right: 0; }
 }

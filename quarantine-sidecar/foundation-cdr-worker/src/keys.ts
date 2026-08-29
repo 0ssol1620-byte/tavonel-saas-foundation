@@ -55,6 +55,21 @@ export function ocrSiblingKey(immutablePdfKey: string): string {
   return `${immutablePdfKey.slice(0, -"/sanitized.pdf".length)}/ocr.json`;
 }
 
+/**
+ * Where the live reading is reported.
+ *
+ * This object is deliberately *not* a sibling receipt in the sense the others are. It is mutable,
+ * it is overwritten as the read progresses, and it is not evidence of anything: `ocr.json` is the
+ * record, and it is still written create-once. The name says so, so that nobody later mistakes it
+ * for part of the immutable set.
+ */
+export function ocrProgressSiblingKey(immutablePdfKey: string): string {
+  if (!immutablePdfKey.endsWith("/sanitized.pdf")) {
+    throw new PermanentReject("immutable PDF key is not a sanitized.pdf object");
+  }
+  return `${immutablePdfKey.slice(0, -"/sanitized.pdf".length)}/ocr-progress.json`;
+}
+
 export function cdrReceiptSiblingKey(immutablePdfKey: string): string {
   if (!immutablePdfKey.endsWith("/sanitized.pdf")) {
     throw new PermanentReject("immutable PDF key is not a sanitized.pdf object");

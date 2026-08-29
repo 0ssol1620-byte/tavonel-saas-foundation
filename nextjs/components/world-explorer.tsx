@@ -14,7 +14,7 @@
  * something the tenant does not have.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 export interface CollectionShape {
   collectionId: string;
@@ -37,8 +37,64 @@ export interface CollectionShape {
 /** Directory roots, in the order the compiler creates them. */
 const ROOT_ORDER = ["Sources", "Topics", "Entities", "Claims", "Evidence", "Assets", "MOCs", "Packages"];
 
+/**
+ * What each compile pass produced, counted from the plan it actually returned.
+ *
+ * The landing page spends a scene on six passes and the workspace never mentioned them again.
+ * This closes that, and it closes it with the one honest material available: the compiler is a
+ * pure function that finishes in single-digit milliseconds -- measured, not assumed -- so there
+ * is no pass-by-pass progress to stream. Animating six steps over a 10ms function would be the
+ * fixture staging from the marketing page smuggled into the product.
+ *
+ * So the passes are reported by their output instead of their duration. Every number below is a
+ * count of entries the compiler put in the directory plan.
+ */
+const PASSES: Array<{ id: string; name: string; kinds: string[] }> = [
+  { id: "01", name: "Read", kinds: ["document"] },
+  { id: "02", name: "Bind evidence", kinds: ["evidence"] },
+  { id: "03", name: "Derive topics", kinds: ["topic"] },
+  { id: "04", name: "Resolve entities", kinds: ["entity"] },
+  { id: "05", name: "Extract claims", kinds: ["claim"] },
+  { id: "06", name: "Package", kinds: ["map-of-content", "package"] },
+];
+
+function CompilePasses({ collection }: { collection: CollectionShape }) {
+  const byKind = new Map<string, number>();
+  for (const entry of collection.directoryPlan) {
+    if (entry.kind === "root") continue;
+    byKind.set(entry.kind, (byKind.get(entry.kind) ?? 0) + 1);
+  }
+  return (
+    <div className="passes">
+      {PASSES.map((pass) => {
+        const produced = pass.kinds.reduce((total, kind) => total + (byKind.get(kind) ?? 0), 0);
+        return (
+          <div className="pass" key={pass.id} data-empty={produced === 0 ? 1 : 0}>
+            <span className="pass-i">{pass.id}</span>
+            <span className="pass-n">{pass.name}</span>
+            {/* A pass that produced nothing says so rather than being hidden. An absent row
+                would read as a pass that did not run. */}
+            <span className="pass-v">{produced === 0 ? "none" : produced.toLocaleString("en-US")}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function WorldExplorer({ collection, onUpload }: { collection: CollectionShape | null; onUpload?: () => void }) {
   const [openRoot, setOpenRoot] = useState<string | null>("Topics");
+  /**
+   * How many roots are on screen.
+   *
+   * The compiler builds these in a fixed order and the plan records it, so revealing them one at
+   * a time is showing the order the structure was actually created in -- not a decorative delay
+   * bolted onto a finished result. It runs once per collection, it never gates anything (every
+   * root is present in the DOM within a second), and a visitor who does not want it gets the
+   * whole tree immediately: the reveal is skipped entirely under reduced motion.
+   */
+  const [revealed, setRevealed] = useState(0);
+  const revealedFor = useRef<string | null>(null);
 
   const grouped = useMemo(() => {
     if (!collection) return [];
@@ -55,6 +111,25 @@ export default function WorldExplorer({ collection, onUpload }: { collection: Co
       entries: byRoot.get(root) ?? [],
     }));
   }, [collection]);
+
+  useEffect(() => {
+    const id = collection?.collectionId ?? null;
+    if (!id || grouped.length === 0) return;
+    if (revealedFor.current === id) return;
+    revealedFor.current = id;
+
+    const reduce = typeof window !== "undefined"
+      && window.matchMedia
+      && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) {
+      setRevealed(grouped.length);
+      return;
+    }
+    setRevealed(1);
+    const timers = grouped.map((_, index) =>
+      window.setTimeout(() => setRevealed((current) => Math.max(current, index + 1)), index * 110));
+    return () => timers.forEach(window.clearTimeout);
+  }, [collection?.collectionId, grouped]);
 
   if (!collection) {
     return (
@@ -91,6 +166,11 @@ export default function WorldExplorer({ collection, onUpload }: { collection: Co
           pushing the whole page sideways on a phone. */}
       <h2 className="id">{collection.collectionId}</h2>
 
+      {/* Six passes, reported by what they produced. See the note on PASSES above for why this
+          is a result and not a progress display. */}
+      <p className="eyebrow">SIX PASSES</p>
+      <CompilePasses collection={collection} />
+
       <div className="arch-counts">
         {[
           ["Documents", counts.documents],
@@ -110,10 +190,15 @@ export default function WorldExplorer({ collection, onUpload }: { collection: Co
       </div>
 
       <div className="tree">
-        {grouped.map(({ root, entries }) => {
+        {grouped.map(({ root, entries }, index) => {
           const open = openRoot === root;
           return (
-            <div className="tree-root" key={root} data-open={open ? 1 : 0}>
+            <div
+              className="tree-root"
+              key={root}
+              data-open={open ? 1 : 0}
+              data-in={index < revealed ? 1 : 0}
+            >
               <button type="button" onClick={() => setOpenRoot(open ? null : root)} aria-expanded={open}>
                 <span className="tw">{open ? "−" : "+"}</span>
                 <span className="tn">{root}</span>

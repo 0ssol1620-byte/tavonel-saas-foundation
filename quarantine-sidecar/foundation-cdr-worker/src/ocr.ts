@@ -1,5 +1,5 @@
 import { cdrRequestSignature, hmacSecretIsConfigured, sha256DigestHeader } from "./hmac";
-import { ocrSiblingKey } from "./keys";
+import { ocrProgressSiblingKey, ocrSiblingKey } from "./keys";
 
 type OcrR2Bucket = {
   get(key: string): Promise<{ arrayBuffer(): Promise<ArrayBuffer> } | null>;
@@ -9,7 +9,7 @@ type OcrR2Bucket = {
     options: {
       httpMetadata: { contentType: string };
       customMetadata: { stage: string };
-      onlyIf: { etagDoesNotMatch: string };
+      onlyIf?: { etagDoesNotMatch: string };
     },
   ): Promise<unknown>;
 };
@@ -50,6 +50,122 @@ const PROD_MARKERS = ["tavonel-pdf-cdr", "tavonel-prod", "tavonel-quarantine-sid
 const OCR_RESULT_SCHEMA = "tavonel.ocr_result.v2";
 const AUTHORITY_CLASSES = new Set(["unknown", "informal", "official", "contractual"]);
 export const OCR_REQUEST_TIMEOUT_MS = 25_000;
+/** One JSON document per line. Matches the worker's `tavonel.ocr_progress.v1` stream. */
+const OCR_PROGRESS_SCHEMA = "tavonel.ocr_progress.v1";
+const NDJSON_MEDIA_TYPE = "application/x-ndjson";
+/** The separator is the contract, so it is named rather than inlined. */
+const LINE_SEPARATOR = String.fromCharCode(10);
+
+export type OcrProgressPage = {
+  pageNumber1: number;
+  pageCount: number;
+  path: string;
+  regionCount: number;
+  meanConfidence: number;
+  boxes: Array<{ bbox1000: number[]; confidence: number }>;
+};
+
+/**
+ * What is written to the progress object while a document is being read.
+ *
+ * Deliberately not the text. A viewer gets to see the shape of what was found -- how far the read
+ * has got, how many regions per page, where they sit and how confident the reader is -- without
+ * the document body being copied anywhere new. `ocr.json` remains the only place the text lands,
+ * and it is still create-once.
+ */
+export type OcrProgressDocument = {
+  schemaVersion: typeof OCR_PROGRESS_SCHEMA;
+  sourceImmutableKey: string;
+  inputSha256: string;
+  state: "reading" | "read" | "refused";
+  pagesRead: number;
+  pageCount: number | null;
+  regionsFound: number;
+  pages: OcrProgressPage[];
+};
+
+/** Keeps the object small no matter how long the document is. The counts stay exact. */
+const PROGRESS_PAGE_WINDOW = 12;
+
+export function qualifyProgressPage(line: unknown): OcrProgressPage | null {
+  if (!line || typeof line !== "object") return null;
+  const page = line as Record<string, unknown>;
+  if (page.schemaVersion !== OCR_PROGRESS_SCHEMA || page.type !== "page") return null;
+  if (typeof page.pageNumber1 !== "number" || page.pageNumber1 < 1) return null;
+  if (typeof page.pageCount !== "number" || page.pageCount < 1) return null;
+  if (page.pageNumber1 > page.pageCount) return null;
+  if (typeof page.regionCount !== "number" || page.regionCount < 0) return null;
+  if (typeof page.meanConfidence !== "number" || page.meanConfidence < 0 || page.meanConfidence > 1) return null;
+  if (typeof page.path !== "string") return null;
+  const boxes = Array.isArray(page.boxes) ? page.boxes : [];
+  return {
+    pageNumber1: page.pageNumber1,
+    pageCount: page.pageCount,
+    path: page.path,
+    regionCount: page.regionCount,
+    meanConfidence: page.meanConfidence,
+    boxes: boxes.flatMap((entry) => {
+      if (!entry || typeof entry !== "object") return [];
+      const box = entry as Record<string, unknown>;
+      const bbox = Array.isArray(box.bbox1000) ? box.bbox1000 : [];
+      if (bbox.length !== 4 || bbox.some((value) => typeof value !== "number" || value < 0 || value > 1000)) return [];
+      const confidence = typeof box.confidence === "number" ? box.confidence : 0;
+      return [{ bbox1000: bbox as number[], confidence: Math.max(0, Math.min(1, confidence)) }];
+    }),
+  };
+}
+
+/**
+ * Reads an NDJSON body line by line, reporting each qualified page and returning the last line.
+ *
+ * The last line is the OCR result and is handed back untouched, so the same qualifier that
+ * guarded the buffered response guards this one. A line that does not qualify as a page is not an
+ * error -- it is simply not reported -- because the only line that decides anything is the last.
+ */
+export async function readOcrStream(
+  body: ReadableStream<Uint8Array>,
+  onPage: (page: OcrProgressPage) => Promise<void> | void,
+): Promise<unknown> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffered = "";
+  let last: unknown = null;
+
+  const consume = async (line: string) => {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch {
+      return;
+    }
+    const page = qualifyProgressPage(parsed);
+    if (page) {
+      await onPage(page);
+      return;
+    }
+    // Not a page: this is either the result or a refusal. Either way it is the answer, and the
+    // last one to arrive wins.
+    last = parsed;
+  };
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffered += decoder.decode(value, { stream: true });
+    let newline = buffered.indexOf(LINE_SEPARATOR);
+    while (newline >= 0) {
+      await consume(buffered.slice(0, newline));
+      buffered = buffered.slice(newline + 1);
+      newline = buffered.indexOf(LINE_SEPARATOR);
+    }
+  }
+  buffered += decoder.decode();
+  await consume(buffered);
+  return last;
+}
+
 
 type OcrRegion = {
   regionId: string;
@@ -206,6 +322,9 @@ export async function dispatchOcrAfterSanitize(
   const hmac = (env.TAVONEL_OCR_HMAC || env.TAVONEL_CDR_HMAC || "").trim();
   const headers: Record<string, string> = {
     "x-tavonel-input-sha256": inputSha256,
+    // Ask for the per-page view. A worker that does not implement it ignores this and answers
+    // with JSON exactly as before, which is why there is no capability check here.
+    accept: `${NDJSON_MEDIA_TYPE}, application/json`,
   };
   const runpodKey = (env.RUNPOD_API_KEY || "").trim();
   if (runpodKey) {
@@ -240,11 +359,57 @@ export async function dispatchOcrAfterSanitize(
     return { status: "failed", key: ocrKey, reasonCode: "OCR_HTTP_REJECTED", reason: `OCR returned HTTP ${response.status}`, requestId, inputSha256, computeCredits: 2 };
   }
 
+  /*
+   * Two ways to read the same answer.
+   *
+   * A streamed response is read line by line so the reading can be watched while it happens; a
+   * buffered one is read as it always was. Both end at `qualifyOcrResult` with the same object,
+   * because the worker builds the last line of the stream and the body of the JSON response from
+   * one function. Nothing below this point knows or cares which path was taken.
+   */
+  const progressKey = ocrProgressSiblingKey(immutablePdfKey);
   let payload: unknown;
-  try {
-    payload = (await response.json()) as typeof payload;
-  } catch {
-    return { status: "failed", key: ocrKey, reasonCode: "OCR_RESPONSE_NOT_JSON", reason: "OCR response is not JSON", requestId, inputSha256, computeCredits: 2 };
+  const streamed = (response.headers.get("content-type") || "").toLowerCase().includes(NDJSON_MEDIA_TYPE);
+  if (streamed && response.body) {
+    const progress: OcrProgressDocument = {
+      schemaVersion: OCR_PROGRESS_SCHEMA,
+      sourceImmutableKey: immutablePdfKey,
+      inputSha256,
+      state: "reading",
+      pagesRead: 0,
+      pageCount: null,
+      regionsFound: 0,
+      pages: [],
+    };
+    const writeProgress = async () => {
+      try {
+        await env.FOUNDATION_QUARANTINE.put(progressKey, new TextEncoder().encode(JSON.stringify(progress)), {
+          httpMetadata: { contentType: "application/json" },
+          customMetadata: { stage: "ocr-progress" },
+        });
+      } catch {
+        // A progress write is a convenience. Losing one must never cost the read.
+      }
+    };
+    try {
+      payload = await readOcrStream(response.body, async (page) => {
+        progress.pagesRead = Math.max(progress.pagesRead, page.pageNumber1);
+        progress.pageCount = page.pageCount;
+        progress.regionsFound += page.regionCount;
+        progress.pages = [...progress.pages, page].slice(-PROGRESS_PAGE_WINDOW);
+        await writeProgress();
+      });
+    } catch {
+      return { status: "failed", key: ocrKey, reasonCode: "OCR_TIMEOUT_OR_NETWORK", reason: "OCR stream ended before a result", requestId, inputSha256, computeCredits: 2 };
+    }
+    progress.state = "read";
+    await writeProgress();
+  } else {
+    try {
+      payload = (await response.json()) as typeof payload;
+    } catch {
+      return { status: "failed", key: ocrKey, reasonCode: "OCR_RESPONSE_NOT_JSON", reason: "OCR response is not JSON", requestId, inputSha256, computeCredits: 2 };
+    }
   }
   const qualified = qualifyOcrResult(payload, inputSha256);
   if (!qualified) {

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 import hmac
 import os
 import re
@@ -9,11 +10,12 @@ from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Lock, Thread
 from time import monotonic
+from collections.abc import Iterator
 from typing import Final, TypedDict
 
 import pypdfium2 as pdfium
 from fastapi import FastAPI, File, Header, HTTPException, Request, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 APP_NAME: Final = "tavonel-foundation-ocr-gpu"
 LISTEN_PORT: Final = 8001
@@ -72,7 +74,13 @@ def normalized_bbox(
     return [x1, y1, x2, y2]
 
 
-def raster_regions(document) -> list[OcrRegion]:
+def raster_regions(document, on_page: PageObserver | None = None) -> list[OcrRegion]:
+    """Reads every page. `on_page` is called once per page, as soon as that page is done.
+
+    The per-page callback exists so the reading can be watched while it happens. It changes
+    nothing about what this function returns: the caller still receives the complete region list,
+    and a caller that passes no observer behaves exactly as before.
+    """
     engine = rapidocr_engine()
     regions: list[OcrRegion] = []
     order = 0
@@ -116,6 +124,8 @@ def raster_regions(document) -> list[OcrRegion]:
                 "authority": "informal",
             })
             order += 1
+        if on_page is not None:
+            on_page(index + 1, len(document), "raster", [r for r in regions if r["pageIndex0"] == index])
     return regions
 
 
@@ -237,7 +247,17 @@ def reject_non_pdf(filename: str | None, mime: str | None, payload: bytes) -> No
         raise HTTPException(422, "OCR source is not a PDF")
 
 
-def extract_text(payload: bytes) -> tuple[str, int, list[OcrRegion]]:
+# (page_number1, page_count, path, regions_for_that_page)
+PageObserver = "object"
+
+
+def extract_text(payload: bytes, on_page=None) -> tuple[str, int, list[OcrRegion]]:
+    """Extracts text, optionally reporting each page as it is finished.
+
+    The observer is the only thing added here. It receives a page as soon as that page is read,
+    which is what makes a live view possible; it cannot change the result, and every existing
+    caller passes nothing and gets exactly what it got before.
+    """
     try:
         document = pdfium.PdfDocument(payload)
     except Exception as exc:
@@ -259,8 +279,12 @@ def extract_text(payload: bytes) -> tuple[str, int, list[OcrRegion]]:
             finally:
                 textpage.close()
                 page.close()
+            if on_page is not None:
+                on_page(index + 1, page_count, "native", [r for r in regions if r["pageIndex0"] == index])
         if not regions:
-            regions = raster_regions(document)
+            # No embedded text anywhere. The raster pass re-reads the same pages, so it reports
+            # them again rather than leaving the observer stuck at the last native page.
+            regions = raster_regions(document, on_page)
         text = "\n".join(region["text"] for region in regions).strip()
         if not text:
             raise HTTPException(422, "OCR source has no extractable text regions")
@@ -324,36 +348,108 @@ def healthz() -> JSONResponse:
 def ping() -> JSONResponse:
     return healthz()
 
-@app.post("/v1/ocr")
+NDJSON_MEDIA_TYPE: Final = "application/x-ndjson"
+# One JSON document per line; the separator is the contract, so it is named rather than inlined.
+NEWLINE: Final = chr(10)
+
+
+def ocr_result_body(text: str, page_count: int, regions: list[OcrRegion], input_sha256: str) -> dict:
+    """The one place the result shape is written.
+
+    Both the buffered response and the last line of the streamed response come from here, so a
+    client that reads the stream and a client that reads the JSON are looking at the same object.
+    Anything that qualifies one qualifies the other.
+    """
+    return {
+        "schemaVersion": "tavonel.ocr_result.v2",
+        "status": "ok",
+        "text": text,
+        "pageCount": page_count,
+        "inputSha256": input_sha256,
+        "regions": regions,
+    }
+
+
+# The two response classes are a union, which FastAPI cannot turn into a response model;
+# the endpoint returns Response objects directly, so there is no model to generate.
+@app.post("/v1/ocr", response_model=None)
 def ocr(
+    request: Request,
     source: UploadFile = File(...),
     x_tavonel_input_sha256: str | None = Header(default=None),
     x_tavonel_ocr_timestamp: str | None = Header(default=None),
     x_tavonel_ocr_request_id: str | None = Header(default=None),
     x_tavonel_ocr_signature: str | None = Header(default=None),
-) -> JSONResponse:
+) -> JSONResponse | StreamingResponse:
+    """Reads a PDF. Same contract as before, plus an optional per-page view of the reading.
+
+    A client that asks for `application/x-ndjson` gets one line per page while the document is
+    being read, and then the complete result as the final line -- the same object the buffered
+    response returns. Every other client, including every client that exists today, sends no
+    accept header we act on and receives exactly the JSON it received before.
+
+    Authentication, the digest check and the PDF check all happen before either path begins, so
+    streaming never becomes a way to get a partial answer out of an unqualified request.
+    """
     expected_digest = require_authentication(
         x_tavonel_input_sha256,
         x_tavonel_ocr_timestamp,
         x_tavonel_ocr_request_id,
         x_tavonel_ocr_signature,
     )
+    payload, actual_digest = copy_and_digest(source)
     try:
-        payload, actual_digest = copy_and_digest(source)
         if not hmac.compare_digest(expected_digest, actual_digest):
             raise HTTPException(422, "OCR source digest does not match the uploaded body")
         reject_non_pdf(source.filename, source.content_type, payload)
-        text, page_count, regions = extract_text(payload)
     finally:
         source.file.close()
-    return JSONResponse(
-        content={
-            "schemaVersion": "tavonel.ocr_result.v2",
-            "status": "ok",
-            "text": text,
-            "pageCount": page_count,
-            "inputSha256": expected_digest,
-            "regions": regions,
-        },
-        headers={"cache-control": "no-store"},
-    )
+
+    wants_stream = NDJSON_MEDIA_TYPE in (request.headers.get("accept") or "").lower()
+    if not wants_stream:
+        text, page_count, regions = extract_text(payload)
+        return JSONResponse(
+            content=ocr_result_body(text, page_count, regions, expected_digest),
+            headers={"cache-control": "no-store"},
+        )
+
+    def lines() -> Iterator[bytes]:
+        events: list[dict] = []
+
+        def on_page(page_number1: int, page_count: int, path: str, regions: list[OcrRegion]) -> None:
+            # What a reader can be shown about a page: where it is, how much was found, how
+            # confident the reader is, and where on the page each line sits. No page is reported
+            # before it has been read, and nothing is estimated.
+            confidences = [r["confidence"] for r in regions]
+            events.append({
+                "schemaVersion": "tavonel.ocr_progress.v1",
+                "type": "page",
+                "pageNumber1": page_number1,
+                "pageCount": page_count,
+                "path": path,
+                "regionCount": len(regions),
+                "meanConfidence": round(sum(confidences) / len(confidences), 4) if confidences else 0.0,
+                "boxes": [
+                    {"bbox1000": r["bbox1000"], "confidence": r["confidence"]}
+                    for r in regions
+                ],
+            })
+
+        try:
+            text, page_count, regions = extract_text(payload, on_page)
+        except HTTPException as exc:
+            # A refusal is part of the stream, not a broken connection. The status line is the
+            # last thing a reader sees, and it says why.
+            yield (json.dumps({
+                "schemaVersion": "tavonel.ocr_progress.v1",
+                "type": "refused",
+                "status": exc.status_code,
+                "detail": exc.detail,
+            }, ensure_ascii=False) + NEWLINE).encode("utf-8")
+            return
+
+        for event in events:
+            yield (json.dumps(event, ensure_ascii=False) + NEWLINE).encode("utf-8")
+        yield (json.dumps(ocr_result_body(text, page_count, regions, expected_digest), ensure_ascii=False) + NEWLINE).encode("utf-8")
+
+    return StreamingResponse(lines(), media_type=NDJSON_MEDIA_TYPE, headers={"cache-control": "no-store"})

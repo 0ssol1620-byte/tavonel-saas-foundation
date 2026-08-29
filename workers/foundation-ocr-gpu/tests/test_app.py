@@ -137,3 +137,128 @@ def test_ping_matches_health_shape(client: TestClient) -> None:
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
     assert response.json()["ssh"] is False
+
+
+# ---------------------------------------------------------------- streamed reading
+#
+# The stream exists so a person can watch a document being read. The risk it introduces is that
+# it becomes a second, weaker contract -- a way to get a partial or unauthenticated answer out of
+# the worker. These tests hold the two properties that prevent that: authentication is decided
+# before a single byte is streamed, and the last line of the stream is the same object the
+# buffered response returns.
+
+NDJSON = "application/x-ndjson"
+
+
+def stream_lines(response) -> list[dict]:
+    import json
+    return [json.loads(line) for line in response.text.splitlines() if line.strip()]
+
+
+def test_stream_returns_the_same_result_object_as_the_buffered_response() -> None:
+    client = TestClient(app)
+    payload = tiny_text_pdf()
+    digest = f"sha256:{hashlib.sha256(payload).hexdigest()}"
+
+    buffered = client.post(
+        "/v1/ocr",
+        headers=headers(digest),
+        files={"source": ("input.pdf", payload, "application/pdf")},
+    )
+    streamed = client.post(
+        "/v1/ocr",
+        headers={**headers(digest), "accept": NDJSON},
+        files={"source": ("input.pdf", payload, "application/pdf")},
+    )
+    assert buffered.status_code == 200
+    assert streamed.status_code == 200
+    assert streamed.headers["content-type"].startswith(NDJSON)
+
+    lines = stream_lines(streamed)
+    assert len(lines) >= 2
+    assert lines[-1] == buffered.json()
+
+
+def test_stream_reports_each_page_before_the_result() -> None:
+    client = TestClient(app)
+    payload = tiny_text_pdf()
+    digest = f"sha256:{hashlib.sha256(payload).hexdigest()}"
+    lines = stream_lines(client.post(
+        "/v1/ocr",
+        headers={**headers(digest), "accept": NDJSON},
+        files={"source": ("input.pdf", payload, "application/pdf")},
+    ))
+
+    pages = [line for line in lines if line.get("type") == "page"]
+    assert len(pages) == lines[-1]["pageCount"]
+    for index, page in enumerate(pages):
+        assert page["schemaVersion"] == "tavonel.ocr_progress.v1"
+        assert page["pageNumber1"] == index + 1
+        assert page["path"] in {"native", "raster"}
+        assert page["regionCount"] >= 0
+        assert 0.0 <= page["meanConfidence"] <= 1.0
+        # Boxes travel in the same normalized space the result uses, so a viewer can draw them
+        # without knowing the page size.
+        for box in page["boxes"]:
+            assert len(box["bbox1000"]) == 4
+            assert all(0 <= value <= 1000 for value in box["bbox1000"])
+    # The result is last, and nothing after it.
+    assert lines[-1]["status"] == "ok"
+    assert lines[-1]["schemaVersion"] == "tavonel.ocr_result.v2"
+
+
+def test_stream_reports_every_region_exactly_once_across_pages() -> None:
+    client = TestClient(app)
+    payload = tiny_text_pdf()
+    digest = f"sha256:{hashlib.sha256(payload).hexdigest()}"
+    lines = stream_lines(client.post(
+        "/v1/ocr",
+        headers={**headers(digest), "accept": NDJSON},
+        files={"source": ("input.pdf", payload, "application/pdf")},
+    ))
+    streamed_boxes = sum(len(line["boxes"]) for line in lines if line.get("type") == "page")
+    assert streamed_boxes == len(lines[-1]["regions"])
+
+
+def test_stream_refuses_an_unauthenticated_request_without_streaming_anything() -> None:
+    client = TestClient(app)
+    payload = tiny_text_pdf()
+    digest = f"sha256:{hashlib.sha256(payload).hexdigest()}"
+    response = client.post(
+        "/v1/ocr",
+        headers={
+            "x-tavonel-input-sha256": digest,
+            "accept": NDJSON,
+        },
+        files={"source": ("input.pdf", payload, "application/pdf")},
+    )
+    # Not a 200 carrying a refusal line: the request never becomes a stream at all.
+    assert response.status_code >= 400
+    assert not response.headers["content-type"].startswith(NDJSON)
+
+
+def test_stream_refuses_a_digest_mismatch_before_reading(monkeypatch) -> None:
+    client = TestClient(app)
+    payload = tiny_text_pdf()
+    wrong = f"sha256:{hashlib.sha256(b'a different document').hexdigest()}"
+    response = client.post(
+        "/v1/ocr",
+        headers={**headers(wrong), "accept": NDJSON},
+        files={"source": ("input.pdf", payload, "application/pdf")},
+    )
+    assert response.status_code == 422
+    assert not response.headers["content-type"].startswith(NDJSON)
+
+
+def test_a_client_that_does_not_ask_for_the_stream_still_gets_plain_json() -> None:
+    client = TestClient(app)
+    payload = tiny_text_pdf()
+    digest = f"sha256:{hashlib.sha256(payload).hexdigest()}"
+    response = client.post(
+        "/v1/ocr",
+        headers={**headers(digest), "accept": "*/*"},
+        files={"source": ("input.pdf", payload, "application/pdf")},
+    )
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/json")
+    assert response.json()["schemaVersion"] == "tavonel.ocr_result.v2"

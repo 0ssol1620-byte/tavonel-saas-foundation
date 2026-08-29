@@ -201,3 +201,194 @@ describe("OCR result contract", () => {
     }, digest), null);
   });
 });
+
+/*
+ * The streamed read.
+ *
+ * The risk the stream introduces is that it becomes a second, weaker way into the same write: a
+ * path where a partial or unqualified answer reaches `ocr.json`, or where the progress object --
+ * which is mutable and is not evidence -- starts being treated as if it were. These tests hold
+ * the boundary: the result still goes through the same qualifier, `ocr.json` is still written
+ * create-once, and a stream that never delivers a result writes nothing at all.
+ */
+describe("dispatchOcrAfterSanitize · streamed reading", () => {
+  const PROGRESS = "immutable/ws_pilot/ws_pilot/doc_1/abcdabcdabcdabcdabcdabcdabcdabcd/ocr-progress.json";
+  const OCR_JSON = ocrSiblingKey(IMMUTABLE);
+  const NL = String.fromCharCode(10);
+
+  function page(pageNumber1: number, pageCount: number, regionCount = 2) {
+    return {
+      schemaVersion: "tavonel.ocr_progress.v1",
+      type: "page",
+      pageNumber1,
+      pageCount,
+      path: "raster",
+      regionCount,
+      meanConfidence: 0.82,
+      boxes: Array.from({ length: regionCount }, (_unused, index) => ({
+        bbox1000: [100, 100 + index * 40, 900, 130 + index * 40],
+        confidence: 0.8,
+      })),
+    };
+  }
+
+  function ndjson(lines: unknown[]) {
+    return new Response(lines.map((line) => JSON.stringify(line)).join(NL) + NL, {
+      headers: { "content-type": "application/x-ndjson" },
+    });
+  }
+
+  function readProgress(r2: FakeR2) {
+    const bytes = r2.objects.get(PROGRESS);
+    return bytes ? JSON.parse(new TextDecoder().decode(bytes)) : null;
+  }
+
+  it("asks for the stream and still writes ocr.json from the final line", async () => {
+    const r2 = new FakeR2({ [IMMUTABLE]: PDF_BYTES });
+    let sentAccept = "";
+    const result = await dispatchOcrAfterSanitize(
+      envFor(r2, { FOUNDATION_OCR_URL: FOUNDATION_OCR }),
+      IMMUTABLE,
+      async (_url, init) => {
+        sentAccept = String((init?.headers as Record<string, string>)?.accept ?? "");
+        const digest = String((init?.headers as Record<string, string>)["x-tavonel-input-sha256"]);
+        return ndjson([page(1, 3), page(2, 3), page(3, 3), ocrPayload(digest)]);
+      },
+    );
+    assert.ok(sentAccept.includes("application/x-ndjson"));
+    assert.equal(result.status, "written");
+    assert.equal(result.key, OCR_JSON);
+    const written = JSON.parse(new TextDecoder().decode(r2.objects.get(OCR_JSON)!));
+    assert.equal(written.schemaVersion, "tavonel.ocr_result.v2");
+    assert.equal(written.pageCount, 1);
+    assert.equal(written.sourceImmutableKey, IMMUTABLE);
+  });
+
+  it("reports the read as it happens, and marks it read only at the end", async () => {
+    const r2 = new FakeR2({ [IMMUTABLE]: PDF_BYTES });
+    await dispatchOcrAfterSanitize(
+      envFor(r2, { FOUNDATION_OCR_URL: FOUNDATION_OCR }),
+      IMMUTABLE,
+      async (_url, init) => {
+        const digest = String((init?.headers as Record<string, string>)["x-tavonel-input-sha256"]);
+        return ndjson([page(1, 3, 2), page(2, 3, 4), page(3, 3, 1), ocrPayload(digest)]);
+      },
+    );
+    // One write per page, plus the final one.
+    assert.equal(r2.puts.filter((key) => key === PROGRESS).length, 4);
+    const progress = readProgress(r2);
+    assert.equal(progress.state, "read");
+    assert.equal(progress.pagesRead, 3);
+    assert.equal(progress.pageCount, 3);
+    assert.equal(progress.regionsFound, 7);
+    assert.equal(progress.sourceImmutableKey, IMMUTABLE);
+  });
+
+  it("never copies document text into the progress object", async () => {
+    const r2 = new FakeR2({ [IMMUTABLE]: PDF_BYTES });
+    await dispatchOcrAfterSanitize(
+      envFor(r2, { FOUNDATION_OCR_URL: FOUNDATION_OCR }),
+      IMMUTABLE,
+      async (_url, init) => {
+        const digest = String((init?.headers as Record<string, string>)["x-tavonel-input-sha256"]);
+        return ndjson([page(1, 1), ocrPayload(digest)]);
+      },
+    );
+    const raw = new TextDecoder().decode(r2.objects.get(PROGRESS)!);
+    assert.equal(raw.includes("TAVONEL OCR"), false);
+    assert.equal(raw.includes("\"text\""), false);
+  });
+
+  it("writes nothing when the stream ends without a result", async () => {
+    const r2 = new FakeR2({ [IMMUTABLE]: PDF_BYTES });
+    const result = await dispatchOcrAfterSanitize(
+      envFor(r2, { FOUNDATION_OCR_URL: FOUNDATION_OCR }),
+      IMMUTABLE,
+      async () => ndjson([page(1, 2), page(2, 2)]),
+    );
+    assert.equal(result.status, "failed");
+    assert.equal(result.reasonCode, "OCR_RESPONSE_INVALID");
+    assert.equal(r2.objects.has(OCR_JSON), false);
+  });
+
+  it("writes nothing when the final line is for a different document", async () => {
+    const r2 = new FakeR2({ [IMMUTABLE]: PDF_BYTES });
+    const result = await dispatchOcrAfterSanitize(
+      envFor(r2, { FOUNDATION_OCR_URL: FOUNDATION_OCR }),
+      IMMUTABLE,
+      async () => ndjson([page(1, 1), ocrPayload(`sha256:${"c".repeat(64)}`)]),
+    );
+    assert.equal(result.status, "failed");
+    assert.equal(result.reasonCode, "OCR_RESPONSE_INVALID");
+    assert.equal(r2.objects.has(OCR_JSON), false);
+  });
+
+  it("ignores malformed progress lines rather than failing the read", async () => {
+    const r2 = new FakeR2({ [IMMUTABLE]: PDF_BYTES });
+    const result = await dispatchOcrAfterSanitize(
+      envFor(r2, { FOUNDATION_OCR_URL: FOUNDATION_OCR }),
+      IMMUTABLE,
+      async (_url, init) => {
+        const digest = String((init?.headers as Record<string, string>)["x-tavonel-input-sha256"]);
+        const body = [
+          JSON.stringify(page(1, 2)),
+          "{ not json",
+          JSON.stringify({ schemaVersion: "tavonel.ocr_progress.v1", type: "page", pageNumber1: 9, pageCount: 2 }),
+          JSON.stringify(page(2, 2)),
+          JSON.stringify(ocrPayload(digest)),
+        ].join(NL);
+        return new Response(body + NL, { headers: { "content-type": "application/x-ndjson" } });
+      },
+    );
+    assert.equal(result.status, "written");
+    assert.equal(readProgress(r2).pagesRead, 2);
+  });
+
+  it("still reads a worker that answers with plain JSON", async () => {
+    const r2 = new FakeR2({ [IMMUTABLE]: PDF_BYTES });
+    const result = await dispatchOcrAfterSanitize(
+      envFor(r2, { FOUNDATION_OCR_URL: FOUNDATION_OCR }),
+      IMMUTABLE,
+      async (_url, init) => {
+        const digest = String((init?.headers as Record<string, string>)["x-tavonel-input-sha256"]);
+        return Response.json(ocrPayload(digest));
+      },
+    );
+    assert.equal(result.status, "written");
+    // No stream, so nothing claimed a live read.
+    assert.equal(r2.objects.has(PROGRESS), false);
+  });
+
+  /*
+   * The dangerous ordering. A page line arriving after the result must not become the answer --
+   * and a page line must never be able to *be* an answer. Without this, a worker that flushed one
+   * more page after its result would silently write nothing, or worse, write a page as a result.
+   */
+  it("refuses a page line as the result, whatever order it arrives in", async () => {
+    const r2 = new FakeR2({ [IMMUTABLE]: PDF_BYTES });
+    const result = await dispatchOcrAfterSanitize(
+      envFor(r2, { FOUNDATION_OCR_URL: FOUNDATION_OCR }),
+      IMMUTABLE,
+      async (_url, init) => {
+        const digest = String((init?.headers as Record<string, string>)["x-tavonel-input-sha256"]);
+        return ndjson([page(1, 2), ocrPayload(digest), page(2, 2)]);
+      },
+    );
+    // The result still stands: a page is a report, never an answer.
+    assert.equal(result.status, "written");
+    const written = JSON.parse(new TextDecoder().decode(r2.objects.get(OCR_JSON)!));
+    assert.equal(written.schemaVersion, "tavonel.ocr_result.v2");
+  });
+
+  it("keeps ocr.json create-once even on the streamed path", async () => {
+    const r2 = new FakeR2({ [IMMUTABLE]: PDF_BYTES, [OCR_JSON]: new TextEncoder().encode("{}") });
+    let fetched = 0;
+    const result = await dispatchOcrAfterSanitize(
+      envFor(r2, { FOUNDATION_OCR_URL: FOUNDATION_OCR }),
+      IMMUTABLE,
+      async () => { fetched += 1; return ndjson([]); },
+    );
+    assert.equal(result.status, "exists");
+    assert.equal(fetched, 0);
+  });
+});

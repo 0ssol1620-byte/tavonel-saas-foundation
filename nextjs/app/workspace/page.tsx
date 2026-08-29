@@ -11,6 +11,10 @@ import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { useCheckout } from "@/lib/use-checkout";
 import { formatCount, formatTimestamp } from "@/lib/format";
 import { readOfferParam, takeCheckoutIntent } from "@/lib/checkout-intent";
+import { putWithProgress } from "@/lib/upload-transfer";
+import { buildPipeline, type LocalUpload } from "@/lib/pipeline";
+import { qualifyProgress, type OcrProgress } from "@/lib/ocr-progress";
+import PipelineBoard from "@/components/pipeline-board";
 import { trackFunnel } from "@/lib/funnel-events";
 
 /** What this panel prints when it has no value. Not "0", and not a spinner that never resolves. */
@@ -137,6 +141,8 @@ const TABS: { id: WorkspaceTab; label: string }[] = [
 
 export default function WorkspacePage() {
   const fileRef = useRef<HTMLInputElement>(null);
+  /** Distinguishes two uploads of the same file in one session. */
+  const uploadSeq = useRef(0);
   const [notice, setNotice] = useState(intakeNotice);
   const { start: buy, busy: buying } = useCheckout(setNotice);
   // Read from the URL on mount so a linked or reloaded workspace opens on the same view.
@@ -152,6 +158,28 @@ export default function WorkspacePage() {
   const [downloading, setDownloading] = useState(false);
   const [billingAccount, setBillingAccount] = useState<BillingAccount | null>(null);
   const [billingBusy, setBillingBusy] = useState(false);
+  /**
+   * What this browser knows about files it is sending. The server list cannot see a document
+   * until CDR has written an immutable PDF for it, so without this the first stretch of every
+   * upload is a blank screen.
+   */
+  const [uploads, setUploads] = useState<LocalUpload[]>([]);
+  /**
+   * The live read, per document, keyed by document id.
+   *
+   * Fetched with a short-lived capability this server signs and then steps out of: the object
+   * comes from the bucket to the browser directly, the same way the file went the other way.
+   * Routing it through /api would put document geometry -- and eventually the document -- on a
+   * path this product tells people it never travels.
+   */
+  const [reading, setReading] = useState<Record<string, OcrProgress>>({});
+
+  /* The board is derived, never stored. Storing it would let it disagree with the objects. */
+  const pipelineRows = buildPipeline(
+    uploads,
+    documents,
+    collectionResult?.sourceDocuments.map((item) => item.documentId) ?? [],
+  );
   /**
    * Until this resolves the workspace knows nothing, and it must not fill that gap with
    * plausible-looking values. A signed-out visitor previously saw the whole shell -- tabs, a
@@ -321,6 +349,37 @@ export default function WorkspacePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /**
+   * Keeps the live view running for anything that is being read, including after a reload.
+   *
+   * The batch loop watches its own upload, but a visitor who refreshes -- or who comes back to a
+   * tab while CDR and OCR are still working -- was getting a static board. This effect owns that
+   * case: it refreshes the document list and the progress objects while, and only while, at least
+   * one document is genuinely mid-read. When nothing is being read it does nothing at all.
+   */
+  useEffect(() => {
+    if (session !== "signed-in" || !documents) return;
+    const readingNow = documents
+      .filter((item) => item.sanitizedKey && !item.hasOcrJson && item.processingState !== "operator_review")
+      .map((item) => item.documentId);
+    if (readingNow.length === 0) return;
+
+    let cancelled = false;
+    const tick = async () => {
+      const client = getSupabaseBrowserClient();
+      const { data } = client ? await client.auth.getSession() : { data: { session: null } };
+      const token = data.session?.access_token;
+      if (!token || cancelled) return;
+      await Promise.all(readingNow.map((documentId) => readProgressFor(documentId, token)));
+      if (!cancelled) await loadDocuments();
+    };
+    void tick();
+    const timer = window.setInterval(() => void tick(), 1_500);
+    return () => { cancelled = true; window.clearInterval(timer); };
+    // The identity of what is being read is the dependency; the handlers are read, not watched.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session, documents?.map((item) => `${item.documentId}:${item.hasOcrJson}:${item.processingState}`).join("|")]);
+
   const openBillingPortal = async () => {
     setBillingBusy(true);
     try {
@@ -346,17 +405,55 @@ export default function WorkspacePage() {
     }
   };
 
+  /**
+   * Reads one document's progress object.
+   *
+   * Two hops on purpose: this server issues a capability, the bucket serves the bytes. A failure
+   * at either hop is silent, because progress is a view and losing a frame of it must never
+   * surface as an error about the document itself.
+   */
+  const readProgressFor = async (documentId: string, token: string) => {
+    try {
+      const issued = await fetch(`/api/documents/${documentId}/progress`, {
+        headers: { authorization: `Bearer ${token}` },
+        cache: "no-store",
+      });
+      if (!issued.ok) return;
+      const { readUrl } = await issued.json() as { readUrl?: string };
+      if (!readUrl) return;
+      const object = await fetch(readUrl, { cache: "no-store" });
+      if (!object.ok) return;
+      const progress = qualifyProgress(await object.json());
+      if (!progress) return;
+      setReading((current) => ({ ...current, [documentId]: progress }));
+    } catch {
+      // A dropped frame of a live view is not an error about the document.
+    }
+  };
+
+  const patchUpload = (localId: string, patch: Partial<LocalUpload>) =>
+    setUploads((current) => current.map((item) => (item.localId === localId ? { ...item, ...patch } : item)));
+
   const uploadDocument = async (file: File, manageBusy = true): Promise<string | null> => {
     if (manageBusy) setBusy(true);
+    // The id is local until the capability call returns one. The board needs a row immediately,
+    // because issuing the capability is itself a wait the visitor should be able to see.
+    const localId = `local-${file.name}-${file.size}-${uploadSeq.current++}`;
+    setUploads((current) => [
+      ...current,
+      { localId, filename: file.name, bytes: file.size, documentId: null, phase: "issuing", loaded: 0 },
+    ]);
     try {
       const client = getSupabaseBrowserClient();
       if (!client) {
+        patchUpload(localId, { phase: "failed", reason: "not signed in" });
         setNotice("Sign in with Google first.");
         return null;
       }
       const { data } = await client.auth.getSession();
       const token = data.session?.access_token;
       if (!token) {
+        patchUpload(localId, { phase: "failed", reason: "not signed in" });
         setNotice("Sign in with Google first.");
         return null;
       }
@@ -371,18 +468,35 @@ export default function WorkspacePage() {
       });
       const json = await capability.json() as { code?: string; documentId?: string; uploadUrl?: string; declaredMimeType?: string };
       if (!capability.ok || !json.uploadUrl) {
+        patchUpload(localId, { phase: "failed", reason: `capability not issued (${json.code ?? capability.status})` });
         setNotice(json.code === "AUTH_REQUIRED" ? "Sign in with Google first." : `Upload was not issued (${json.code ?? capability.status}).`);
         return null;
       }
-      const put = await fetch(json.uploadUrl, {
-        method: "PUT",
-        headers: { "content-type": json.declaredMimeType ?? file.type },
-        body: file,
-      });
-      if (!put.ok) {
-        setNotice(`Quarantine PUT failed (${put.status}). The file never entered the app server.`);
+
+      /*
+       * The PUT moved from `fetch` to `XMLHttpRequest` for one reason: fetch cannot report upload
+       * progress, so a large scan was a frozen button for as long as it took. These are bytes the
+       * transport acknowledged on the way to the quarantine bucket -- the application server is
+       * not in this path, and showing the transfer did not put it there.
+       */
+      patchUpload(localId, { documentId: json.documentId ?? null, phase: "sending", loaded: 0 });
+      const transfer = putWithProgress(
+        json.uploadUrl,
+        file,
+        json.declaredMimeType ?? file.type,
+        ({ loaded }) => patchUpload(localId, { loaded }),
+      );
+      const result = await transfer.done;
+      if (!result.ok) {
+        const reason = result.reason === "http"
+          ? `quarantine PUT failed (${result.status})`
+          : result.reason === "aborted" ? "transfer cancelled" : "network did not complete the transfer";
+        patchUpload(localId, { phase: "failed", reason });
+        setNotice(`${reason}. The file never entered the app server.`);
         return null;
       }
+      patchUpload(localId, { phase: "stored", loaded: file.size });
+
       setNotice(
         activationPolicy.cdr.enabled
           ? activationPolicy.ocrGpu.enabled
@@ -407,11 +521,25 @@ export default function WorkspacePage() {
         const versions = current.filter((item) => item.documentId === id);
         return !versions.some((item) => item.hasOcrJson) && versions.some((item) => item.processingState === "operator_review");
       });
+      // Anything sanitized but not yet read is being read right now; that is what the live view
+      // is for. Documents already carrying ocr.json have nothing left to watch.
+      const stillReading = current
+        .filter((item) => item.sanitizedKey && !item.hasOcrJson && item.processingState !== "operator_review")
+        .map((item) => item.documentId)
+        .filter((documentId) => documentIds.includes(documentId));
+      if (stillReading.length > 0) {
+        const client = getSupabaseBrowserClient();
+        const { data } = client ? await client.auth.getSession() : { data: { session: null } };
+        const progressToken = data.session?.access_token;
+        if (progressToken) await Promise.all(stillReading.map((documentId) => readProgressFor(documentId, progressToken)));
+      }
       if (operatorReview.length > 0) {
         setNotice(`Batch processing stopped safely: ${operatorReview.length} document(s) require explicit OCR operator review. No paid retry or candidate compilation was attempted.`);
         return;
       }
-      setNotice(`Batch processing: ${ready}/${documentIds.length} document OCR outputs are immutable and ready.`);
+      // The board carries the detail now, so this line only has to say what the board cannot:
+      // that the batch is still running and nothing has been compiled yet.
+      setNotice(`Reading ${documentIds.length} documents. ${ready} have written immutable OCR output; no candidate is compiled until every one has.`);
       if (ready === documentIds.length) {
         const client = getSupabaseBrowserClient();
         const { data } = client ? await client.auth.getSession() : { data: { session: null } };
@@ -442,7 +570,10 @@ export default function WorkspacePage() {
         );
         return;
       }
-      await new Promise((resolve) => window.setTimeout(resolve, 5_000));
+      // Five seconds was invisible when the only output was a sentence. With a board on screen
+      // it is the refresh rate of the thing the visitor is watching, so it tightens while work is
+      // actually in flight and stays slow otherwise.
+      await new Promise((resolve) => window.setTimeout(resolve, 1_500));
     }
     setNotice("Batch processing timed out before every OCR output became immutable. No collection candidate was created.");
   };
@@ -819,13 +950,25 @@ export default function WorkspacePage() {
 
           {tab === "overview" ? (
           <>
+          {/*
+            The board goes above everything, including the headline. While documents are moving it
+            is the only thing on this page anyone is looking at, and when nothing is moving it
+            renders nothing at all.
+          */}
+          <PipelineBoard
+            rows={pipelineRows}
+            reading={reading}
+            onDismiss={uploads.length > 0 ? () => { setUploads([]); setReading({}); } : undefined}
+          />
           <p className="eyebrow">● FOUNDATION · SAFE MODE</p>
           <h1>A quieter place to think.</h1>
           <p className="lead">Build a traceable body of knowledge from documents that have passed the full safety chain. Quarantine is browser-direct; the application server never carries file bytes.</p>
           <div className="workspace-grid">
             <section className="card document-card">
-              <p className="eyebrow">YOUR LIBRARY</p>
-              <h2>{documents && documents.length > 0 ? "Immutable document metadata" : "Awaiting a qualified first document"}</h2>
+              {/* Status moved to the board above. What is left here is the part the board does
+                  not carry: the immutable keys every receipt refers to. */}
+              <p className="eyebrow">IMMUTABLE KEYS</p>
+              <h2>{documents && documents.length > 0 ? "What each document left behind" : "Awaiting a qualified first document"}</h2>
               {documents && documents.length > 0 ? (
                 <ul className="document-meta">
                   {documents.map((doc) => (
