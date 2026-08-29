@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import { createHash, createPublicKey, generateKeyPairSync, randomUUID } from "node:crypto";
 import { unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { strFromU8, unzipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 import { compileCollectionCandidate, type CollectionOcrInput } from "./collection-compiler";
@@ -99,10 +99,11 @@ describe("Foundation collection package download", () => {
     const archivePath = join(tmpdir(), `tavonel-export-${randomUUID()}.zip`);
     writeFileSync(archivePath, signed.archive);
     try {
+      const verifier = resolve(import.meta.dirname, "../scripts/verify-signed-export.mjs");
       const verify = (fingerprint: string) => spawnSync(
         process.execPath,
-        ["scripts/verify-signed-export.mjs", "--archive", archivePath, "--trusted-fingerprint", fingerprint],
-        { cwd: process.cwd(), encoding: "utf8" },
+        [verifier, "--archive", archivePath, "--trusted-fingerprint", fingerprint],
+        { encoding: "utf8" },
       );
       const accepted = verify(material.signer.publicKeySpkiSha256);
       expect(accepted.status, accepted.stderr).toBe(0);

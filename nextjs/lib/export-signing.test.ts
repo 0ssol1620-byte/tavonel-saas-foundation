@@ -2,6 +2,7 @@ import { createPublicKey, generateKeyPairSync } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   createExportSigner,
+  exportTrustRecord,
   readExportSignerEnv,
   verifyExportSignature,
 } from "./export-signing";
@@ -26,6 +27,14 @@ describe("Foundation signed exports", () => {
     expect(verifyExportSignature(Buffer.from("tampered\n"), signature, material.publicKeySpkiDer)).toBe(false);
     expect(verifyExportSignature(payload, { ...signature, signatureBase64: "AAAA" }, material.publicKeySpkiDer)).toBe(false);
     expect(verifyExportSignature(payload, { ...signature, signatureBase64: `${signature.signatureBase64}=` }, material.publicKeySpkiDer)).toBe(false);
+
+    expect(exportTrustRecord(signer!)).toEqual({
+      schemaVersion: "tavonel.export_trust.v1",
+      algorithm: "Ed25519",
+      keyId: "foundation-export-2026",
+      publicKeySpkiDerBase64: material.publicKeySpkiDer.toString("base64"),
+      publicKeySpkiSha256: signature.publicKeySpkiSha256,
+    });
   });
 
   it("fails closed for absent, malformed and non-Ed25519 environment keys", () => {

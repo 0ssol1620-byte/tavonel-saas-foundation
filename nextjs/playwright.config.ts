@@ -34,7 +34,9 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "pnpm dev --hostname 127.0.0.1 --port 3117",
+    // Exercise the production CSP. Next's development React Refresh runtime
+    // requires eval, which the shipped policy intentionally forbids.
+    command: "pnpm build && pnpm start --hostname 127.0.0.1 --port 3117",
     url: "http://127.0.0.1:3117/workspace",
     reuseExistingServer: false,
     timeout: 60_000,

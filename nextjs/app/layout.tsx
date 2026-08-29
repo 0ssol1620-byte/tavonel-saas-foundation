@@ -16,13 +16,18 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://tavonel-saas-foundation.vercel.app"),
   title: "TAVONEL — The Knowledge Compiler",
   description:
     "Watch scattered files become one current world. TAVONEL compiles sources into knowledge that stays current, and returns every answer to its evidence.",
+  alternates: {
+    canonical: "/",
+  },
   openGraph: {
     title: "TAVONEL — The Knowledge Compiler",
     description: "Watch scattered files become one current world.",
     type: "website",
+    url: "/",
   },
 };
 

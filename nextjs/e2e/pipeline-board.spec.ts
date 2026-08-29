@@ -79,8 +79,8 @@ async function mockWorkspace(page: Page) {
    * written anything, and draws nothing. The tests that care override both routes.
    */
   await page.route("**/api/documents/*/progress", route =>
-    route.fulfill({ json: { code: "OK", readUrl: "https://r2.example.invalid/progress.json" } }));
-  await page.route("https://r2.example.invalid/progress.json", route => route.fulfill({ json: {} }));
+    route.fulfill({ json: { code: "OK", readUrl: "https://progress.r2.cloudflarestorage.com/progress.json" } }));
+  await page.route("https://progress.r2.cloudflarestorage.com/progress.json", route => route.fulfill({ json: {} }));
   await page.route("**/api/billing/status", route => route.fulfill({
     json: {
       account: {
@@ -168,8 +168,8 @@ test("draws the regions the reader reported, and only while it is still reading"
   await mockWorkspace(page);
 
   await page.route("**/api/documents/*/progress", route =>
-    route.fulfill({ json: { code: "OK", readUrl: "https://r2.example.invalid/progress.json" } }));
-  await page.route("https://r2.example.invalid/progress.json", route =>
+    route.fulfill({ json: { code: "OK", readUrl: "https://progress.r2.cloudflarestorage.com/progress.json" } }));
+  await page.route("https://progress.r2.cloudflarestorage.com/progress.json", route =>
     route.fulfill({
       json: {
         schemaVersion: "tavonel.ocr_progress.v1",
@@ -236,9 +236,9 @@ test("refuses a progress report it cannot draw honestly", async ({ page }) => {
   await installSession(page);
   await mockWorkspace(page);
   await page.route("**/api/documents/*/progress", route =>
-    route.fulfill({ json: { code: "OK", readUrl: "https://r2.example.invalid/progress.json" } }));
+    route.fulfill({ json: { code: "OK", readUrl: "https://progress.r2.cloudflarestorage.com/progress.json" } }));
   // pagesRead beyond pageCount: a broken report, not a display problem.
-  await page.route("https://r2.example.invalid/progress.json", route =>
+  await page.route("https://progress.r2.cloudflarestorage.com/progress.json", route =>
     route.fulfill({
       json: {
         schemaVersion: "tavonel.ocr_progress.v1",

@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { activationPolicy } from "@/lib/activation-policy";
 import { readConfiguredBillingOffers, readPaddleBrowserConfig } from "@/lib/billing-catalog";
+import { readExportSignerEnv } from "@/lib/export-signing";
 import { readPaddleApiConfig } from "@/lib/paddle-api";
+import { readProductCoreV2Env } from "@/lib/core-runtime-v2";
 import { FOUNDATION_R2_BUCKET, readR2SignerEnv } from "@/lib/r2-synthetic-canary";
 import { readSupabaseAdminConfig } from "@/lib/supabase-admin";
 
@@ -28,8 +30,10 @@ export function GET() {
     : "sandbox_incomplete";
   const signer = readR2SignerEnv();
   const r2 = signer && signer.bucket === FOUNDATION_R2_BUCKET ? "signer_configured" : "signer_not_configured";
+  const signedExport = readExportSignerEnv() ? "signed_export_ready" : "signed_export_not_configured";
+  const coreV2 = readProductCoreV2Env() ? "python_core_v2_configured" : "python_core_v2_not_configured";
   return NextResponse.json(
-    { mode: "foundation", activationPolicy, auth, billing, r2 },
+    { mode: "foundation", activationPolicy, auth, billing, r2, signedExport, coreV2 },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

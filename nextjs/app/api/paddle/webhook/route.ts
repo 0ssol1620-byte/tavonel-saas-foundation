@@ -27,5 +27,10 @@ export async function POST(request: Request) {
   }
   const applied = await applyFoundationBillingAction(action);
   if (!applied.ok) return NextResponse.json({ code: applied.code }, { status: 503, headers });
+  console.info("foundation_billing_event_applied", {
+    eventType: action.eventType,
+    action: action.action,
+    result: typeof applied.result.status === "string" ? applied.result.status : "unknown",
+  });
   return NextResponse.json({ code: "EVENT_APPLIED", eventId: action.eventId, result: applied.result }, { status: 200, headers });
 }
