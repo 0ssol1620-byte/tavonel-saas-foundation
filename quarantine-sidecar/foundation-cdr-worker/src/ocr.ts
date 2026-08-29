@@ -33,7 +33,89 @@ export type OcrDispatchEnv = {
 };
 
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{16,160}$/;
+const SHA256_PATTERN = /^sha256:[a-f0-9]{64}$/;
 const PROD_MARKERS = ["tavonel-pdf-cdr", "tavonel-prod", "tavonel-quarantine-sidecar"];
+const OCR_RESULT_SCHEMA = "tavonel.ocr_result.v2";
+const AUTHORITY_CLASSES = new Set(["unknown", "informal", "official", "contractual"]);
+
+type OcrRegion = {
+  regionId: string;
+  pageIndex0: number;
+  pageNumber1: number;
+  order: number;
+  blockType: string;
+  text: string;
+  bbox1000: [number, number, number, number];
+  confidence: number;
+  authority: string;
+};
+
+type QualifiedOcrResult = {
+  schemaVersion: typeof OCR_RESULT_SCHEMA;
+  status: "ok";
+  text: string;
+  pageCount: number;
+  inputSha256: string;
+  regions: OcrRegion[];
+};
+
+export function qualifyOcrResult(payload: unknown, expectedInputSha256: string): QualifiedOcrResult | null {
+  if (!payload || typeof payload !== "object") return null;
+  const result = payload as Partial<QualifiedOcrResult>;
+  if (
+    result.schemaVersion !== OCR_RESULT_SCHEMA ||
+    result.status !== "ok" ||
+    typeof result.text !== "string" ||
+    result.text.length < 1 ||
+    result.text.length > 4_000_000 ||
+    !Number.isInteger(result.pageCount) ||
+    Number(result.pageCount) < 1 ||
+    Number(result.pageCount) > 80 ||
+    result.inputSha256 !== expectedInputSha256 ||
+    !SHA256_PATTERN.test(result.inputSha256) ||
+    !Array.isArray(result.regions) ||
+    result.regions.length < 1 ||
+    result.regions.length > 50_000
+  ) return null;
+
+  const regionIds = new Set<string>();
+  const orders = new Set<number>();
+  for (const region of result.regions) {
+    if (!region || typeof region !== "object") return null;
+    const bbox = region.bbox1000;
+    if (
+      typeof region.regionId !== "string" ||
+      !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/.test(region.regionId) ||
+      regionIds.has(region.regionId) ||
+      !Number.isInteger(region.pageIndex0) ||
+      region.pageIndex0 < 0 ||
+      region.pageIndex0 >= Number(result.pageCount) ||
+      region.pageNumber1 !== region.pageIndex0 + 1 ||
+      !Number.isInteger(region.order) ||
+      region.order < 0 ||
+      orders.has(region.order) ||
+      typeof region.blockType !== "string" ||
+      typeof region.text !== "string" ||
+      region.text.trim().length < 1 ||
+      region.text.length > 200_000 ||
+      !Array.isArray(bbox) ||
+      bbox.length !== 4 ||
+      bbox.some((coordinate) => !Number.isInteger(coordinate) || coordinate < 0 || coordinate > 1000) ||
+      bbox[0] >= bbox[2] ||
+      bbox[1] >= bbox[3] ||
+      typeof region.confidence !== "number" ||
+      !Number.isFinite(region.confidence) ||
+      region.confidence < 0 ||
+      region.confidence > 1 ||
+      !AUTHORITY_CLASSES.has(region.authority)
+    ) return null;
+    regionIds.add(region.regionId);
+    orders.add(region.order);
+  }
+  if (result.regions.some((_region, index) => !orders.has(index))) return null;
+  if (result.text !== result.regions.map((region) => region.text).join("\n").trim()) return null;
+  return result as QualifiedOcrResult;
+}
 
 export function ocrUrlHost(url: string): string {
   try {
@@ -137,27 +219,25 @@ export async function dispatchOcrAfterSanitize(
     return { status: "failed", key: ocrKey, reason: `OCR returned HTTP ${response.status}` };
   }
 
-  let payload: {
-    status?: unknown;
-    text?: unknown;
-    pageCount?: unknown;
-    inputSha256?: unknown;
-  };
+  let payload: unknown;
   try {
     payload = (await response.json()) as typeof payload;
   } catch {
     return { status: "failed", key: ocrKey, reason: "OCR response is not JSON" };
   }
-  if (payload.status !== "ok" || typeof payload.text !== "string" || typeof payload.pageCount !== "number") {
-    return { status: "failed", key: ocrKey, reason: "OCR response is missing required fields" };
+  const qualified = qualifyOcrResult(payload, inputSha256);
+  if (!qualified) {
+    return { status: "failed", key: ocrKey, reason: "OCR response contract is invalid" };
   }
 
   const body = JSON.stringify({
-    status: payload.status,
-    text: payload.text,
-    pageCount: payload.pageCount,
+    schemaVersion: qualified.schemaVersion,
+    status: qualified.status,
+    text: qualified.text,
+    pageCount: qualified.pageCount,
+    regions: qualified.regions,
     sourceImmutableKey: immutablePdfKey,
-    inputSha256: typeof payload.inputSha256 === "string" ? payload.inputSha256 : inputSha256,
+    inputSha256: qualified.inputSha256,
   });
 
   try {

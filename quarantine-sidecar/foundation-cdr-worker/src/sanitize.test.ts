@@ -84,8 +84,26 @@ async function cleanCdrFetch(input: RequestInfo | URL, init?: RequestInit): Prom
     return new Response(JSON.stringify({ status: "ok" }), { status: 200 });
   }
   if (url.includes("/v1/ocr")) {
+    const inputSha256 = new Headers(init?.headers).get("x-tavonel-input-sha256");
     return new Response(
-      JSON.stringify({ status: "ok", text: "TAVONEL OCR", pageCount: 1, inputSha256: "sha256:ocr" }),
+      JSON.stringify({
+        schemaVersion: "tavonel.ocr_result.v2",
+        status: "ok",
+        text: "TAVONEL OCR",
+        pageCount: 1,
+        inputSha256,
+        regions: [{
+          regionId: "native-p0001",
+          pageIndex0: 0,
+          pageNumber1: 1,
+          order: 0,
+          blockType: "paragraph",
+          text: "TAVONEL OCR",
+          bbox1000: [100, 100, 900, 200],
+          confidence: 1,
+          authority: "informal",
+        }],
+      }),
       { status: 200, headers: { "content-type": "application/json" } },
     );
   }

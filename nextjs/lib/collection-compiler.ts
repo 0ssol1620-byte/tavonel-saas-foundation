@@ -34,6 +34,19 @@ export type CollectionOcrInput = {
   text: string;
   inputSha256: string;
   sourceImmutableKey: string;
+  regions?: CollectionOcrRegion[];
+};
+
+export type CollectionOcrRegion = {
+  regionId: string;
+  pageIndex0: number;
+  pageNumber1: number;
+  order: number;
+  blockType: "paragraph";
+  text: string;
+  bbox1000: [number, number, number, number];
+  confidence: number;
+  authority: "unknown" | "informal" | "official" | "contractual";
 };
 
 type KnowledgeNode = {
@@ -199,6 +212,47 @@ export function validateCollectionOcrInput(value: unknown): CollectionOcrInput |
     input.inputSha256.toLowerCase() !== `sha256:${input.versionKey.toLowerCase()}`
   ) {
     return null;
+  }
+  if (input.regions !== undefined) {
+    if (!Array.isArray(input.regions) || input.regions.length < 1 || input.regions.length > 50_000) return null;
+    const ids = new Set<string>();
+    const orders = new Set<number>();
+    const authorities = new Set(["unknown", "informal", "official", "contractual"]);
+    for (const rawRegion of input.regions) {
+      if (!rawRegion || typeof rawRegion !== "object") return null;
+      const region = rawRegion as Record<string, unknown>;
+      const bbox = region.bbox1000;
+      if (
+        typeof region.regionId !== "string" ||
+        !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/.test(region.regionId) ||
+        ids.has(region.regionId) ||
+        !Number.isInteger(region.pageIndex0) ||
+        Number(region.pageIndex0) < 0 ||
+        Number(region.pageIndex0) >= Number(input.pageCount) ||
+        region.pageNumber1 !== Number(region.pageIndex0) + 1 ||
+        !Number.isInteger(region.order) ||
+        Number(region.order) < 0 ||
+        orders.has(Number(region.order)) ||
+        region.blockType !== "paragraph" ||
+        typeof region.text !== "string" ||
+        region.text.trim().length < 1 ||
+        !Array.isArray(bbox) ||
+        bbox.length !== 4 ||
+        bbox.some((coordinate) => !Number.isInteger(coordinate) || coordinate < 0 || coordinate > 1000) ||
+        Number(bbox[0]) >= Number(bbox[2]) ||
+        Number(bbox[1]) >= Number(bbox[3]) ||
+        typeof region.confidence !== "number" ||
+        !Number.isFinite(region.confidence) ||
+        region.confidence < 0 ||
+        region.confidence > 1 ||
+        typeof region.authority !== "string" ||
+        !authorities.has(region.authority)
+      ) return null;
+      ids.add(region.regionId);
+      orders.add(Number(region.order));
+    }
+    if (input.regions.some((_region, index) => !orders.has(index))) return null;
+    if (input.text !== input.regions.map((region) => (region as Record<string, unknown>).text).join("\n").trim()) return null;
   }
   return input as CollectionOcrInput;
 }

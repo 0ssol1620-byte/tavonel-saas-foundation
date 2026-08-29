@@ -58,4 +58,24 @@ describe("Foundation collection candidate compiler", () => {
       "collection_document_count_out_of_bounds",
     );
   });
+
+  it("accepts only page-bound OCR evidence regions with real positive-area coordinates", () => {
+    const source = input("region-doc", "c".repeat(64), "Region-bound evidence.");
+    const regions = [{
+      regionId: "native-p0001",
+      pageIndex0: 0,
+      pageNumber1: 1,
+      order: 0,
+      blockType: "paragraph",
+      text: source.text,
+      bbox1000: [100, 100, 900, 200],
+      confidence: 1,
+      authority: "informal",
+    }];
+    expect(validateCollectionOcrInput({ ...source, regions })).not.toBeNull();
+    expect(validateCollectionOcrInput({
+      ...source,
+      regions: [{ ...regions[0], bbox1000: [100, 100, 100, 200] }],
+    })).toBeNull();
+  });
 });
