@@ -12,6 +12,7 @@ export type FoundationBillingAccount = {
   billingHold: boolean;
   paddleCustomerId: string | null;
   paddleSubscriptionId: string | null;
+  subscriptionCancelAt: string | null;
   updatedAt: string | null;
 };
 
@@ -24,6 +25,7 @@ export const EMPTY_BILLING_ACCOUNT: Omit<FoundationBillingAccount, "workspaceKey
   billingHold: false,
   paddleCustomerId: null,
   paddleSubscriptionId: null,
+  subscriptionCancelAt: null,
   updatedAt: null,
 };
 
@@ -39,6 +41,7 @@ function normalizeAccount(row: Record<string, unknown>, workspaceKey: string, us
     billingHold: row.billing_hold === true,
     paddleCustomerId: typeof row.paddle_customer_id === "string" ? row.paddle_customer_id : null,
     paddleSubscriptionId: typeof row.paddle_subscription_id === "string" ? row.paddle_subscription_id : null,
+    subscriptionCancelAt: typeof row.subscription_cancel_at === "string" ? row.subscription_cancel_at : null,
     updatedAt: typeof row.updated_at === "string" ? row.updated_at : null,
   };
 }
@@ -47,7 +50,7 @@ export async function getFoundationBillingAccount(workspaceKey: string, userId: 
   const config = readSupabaseAdminConfig();
   if (!config) return { ok: false as const, code: "BILLING_STORE_NOT_CONFIGURED" };
   const query = new URLSearchParams({
-    select: "workspace_key,user_id,access_plan,subscription_status,credit_balance,lifetime_credits_purchased,lifetime_credits_reversed,billing_hold,paddle_customer_id,paddle_subscription_id,updated_at",
+    select: "workspace_key,user_id,access_plan,subscription_status,credit_balance,lifetime_credits_purchased,lifetime_credits_reversed,billing_hold,paddle_customer_id,paddle_subscription_id,subscription_cancel_at,updated_at",
     workspace_key: `eq.${workspaceKey}`,
     user_id: `eq.${userId}`,
     limit: "1",
@@ -97,5 +100,22 @@ export async function applyFoundationBillingAction(action: Exclude<PaddleBilling
     return { ok: false as const, code: "BILLING_EVENT_APPLY_FAILED" };
   }
   if (!response.ok) return { ok: false as const, code: "BILLING_EVENT_APPLY_FAILED" };
-  return { ok: true as const, result: await response.json() as Record<string, unknown> };
+  const result = await response.json() as Record<string, unknown>;
+  if (action.action === "subscription") {
+    try {
+      response = await supabaseAdminRequest(config, "/rest/v1/rpc/apply_foundation_subscription_schedule", {
+        method: "POST",
+        body: JSON.stringify({
+          p_event_id: action.eventId,
+          p_workspace_key: action.workspaceId,
+          p_subscription_id: action.subscriptionId,
+          p_subscription_cancel_at: action.subscriptionCancelAt,
+        }),
+      });
+    } catch {
+      return { ok: false as const, code: "BILLING_EVENT_APPLY_FAILED" };
+    }
+    if (!response.ok) return { ok: false as const, code: "BILLING_EVENT_APPLY_FAILED" };
+  }
+  return { ok: true as const, result };
 }

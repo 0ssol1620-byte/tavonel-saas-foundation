@@ -41,6 +41,7 @@ type BillingAccount = {
   lifetimeCreditsReversed: number;
   billingHold: boolean;
   paddleCustomerId: string | null;
+  subscriptionCancelAt: string | null;
   updatedAt: string | null;
 };
 
@@ -528,7 +529,14 @@ export default function WorkspacePage() {
               </p>
             </div>
             <dl>
-              <div><dt>Subscription</dt><dd>{billingAccount?.subscriptionStatus ?? "loading"}</dd></div>
+              <div>
+                <dt>Subscription</dt>
+                <dd>
+                  {billingAccount?.subscriptionCancelAt
+                    ? `active until ${new Date(billingAccount.subscriptionCancelAt).toLocaleString()}`
+                    : billingAccount?.subscriptionStatus ?? "loading"}
+                </dd>
+              </div>
               <div><dt>Available credits</dt><dd>{billingAccount?.creditBalance ?? 0}</dd></div>
               <div><dt>Purchased</dt><dd>{billingAccount?.lifetimeCreditsPurchased ?? 0}</dd></div>
               <div><dt>Reversed</dt><dd>{billingAccount?.lifetimeCreditsReversed ?? 0}</dd></div>
@@ -540,6 +548,11 @@ export default function WorkspacePage() {
               </button>
             </div>
             {billingAccount?.billingHold ? <p className="billing-hold" role="alert">Billing hold active. Refunded or disputed credits cannot be used.</p> : null}
+            {billingAccount?.subscriptionCancelAt ? (
+              <p className="billing-hold" role="status">
+                Cancellation is scheduled. Access remains active through the current paid period.
+              </p>
+            ) : null}
             {billingAccount?.updatedAt ? <small>Last persisted billing change · {new Date(billingAccount.updatedAt).toLocaleString()}</small> : null}
           </section>
           <section className="card gates">

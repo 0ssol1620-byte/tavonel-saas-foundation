@@ -65,6 +65,34 @@ describe("Paddle billing event projection", () => {
     }), env)).toMatchObject({ action: "subscription", offerCode: "observer_access", subscriptionStatus: status });
   });
 
+  it("projects a period-end cancellation without revoking active access", () => {
+    const binding = createCheckoutBinding({ ...bindingInput, offerCode: "observer_access" }, SECRET);
+    expect(parsePaddleBillingAction(body("subscription.updated", {
+      id: `sub_${"s".repeat(26)}`,
+      customer_id: `ctm_${"c".repeat(26)}`,
+      status: "active",
+      scheduled_change: { action: "cancel", effective_at: "2026-09-29T10:04:40Z" },
+      custom_data: binding,
+      items: [{ quantity: 1, price: { id: OBSERVER_PRICE } }],
+    }), env)).toMatchObject({
+      action: "subscription",
+      subscriptionStatus: "active",
+      subscriptionCancelAt: "2026-09-29T10:04:40.000Z",
+    });
+  });
+
+  it("rejects a malformed scheduled cancellation", () => {
+    const binding = createCheckoutBinding({ ...bindingInput, offerCode: "observer_access" }, SECRET);
+    expect(parsePaddleBillingAction(body("subscription.updated", {
+      id: `sub_${"s".repeat(26)}`,
+      customer_id: `ctm_${"c".repeat(26)}`,
+      status: "active",
+      scheduled_change: { action: "cancel", effective_at: "not-a-date" },
+      custom_data: binding,
+      items: [{ quantity: 1, price: { id: OBSERVER_PRICE } }],
+    }), env)).toMatchObject({ action: "ignored", reason: "subscription_contract_invalid" });
+  });
+
   it.each([
     ["adjustment.created", "refund"],
     ["adjustment.updated", "credit"],

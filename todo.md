@@ -13,7 +13,7 @@
 - [x] Re-run Supabase security advisor after the remediation and record the results without exposing credentials or user data.
 - [x] Record the final clean Supabase security-advisor result in a nonsecret project qualification document.
 - [x] Apply explicit restrictive default-deny RLS policies to credit ledger and GPU reservation tables, then verify a clean Supabase security advisor result.
-- [ ] Configure a dedicated Paddle sandbox catalog, webhook destination, and server-only sandbox secrets; keep all live checkout and production billing disabled.
+- [x] Configure the dedicated Paddle sandbox catalog, signed webhook destination, and server-only sandbox secrets; verify one prepaid purchase, one recurring subscription, redelivery idempotency, customer portal access, and period-end cancellation while keeping Paddle live mode disabled. (`docs/PADDLE_SANDBOX_BILLING_QUALIFICATION_2026-08-29.md`)
 - [x] Design a credit-first, GPU-cost-protected product catalog with subscription access tier, prepaid credit packs, hard per-job and per-tenant spending caps, and margin floor telemetry.
 - [x] Implement server-side credit catalog, pre-dispatch reservation, hard cap evaluation, and margin-floor dispatch pause contracts with regression tests.
 - [x] Wire margin-floor breach into an explicit server-side GPU dispatch pause decision and regression test.

@@ -1,7 +1,7 @@
--- Run with Supabase CLI db test after 0005_foundation_billing_projection.sql.
+-- Run with Supabase CLI db test after 0006_foundation_subscription_schedule.sql.
 -- Every fixture and projected event is rolled back.
 begin;
-select plan(26);
+select plan(31);
 
 select has_table('public', 'foundation_billing_accounts', 'billing accounts table exists');
 select has_table('public', 'foundation_billing_events', 'billing event receipt table exists');
@@ -14,6 +14,8 @@ select ok(not has_table_privilege('anon', 'public.foundation_billing_accounts', 
 select ok(not has_table_privilege('authenticated', 'public.foundation_billing_accounts', 'select'), 'authenticated clients cannot read billing directly');
 select ok(not has_function_privilege('authenticated', 'public.apply_foundation_billing_event(text,text,timestamptz,text,text,text,uuid,text,text,text,text,text,integer,text)', 'execute'), 'authenticated clients cannot execute billing projection');
 select ok(has_function_privilege('service_role', 'public.apply_foundation_billing_event(text,text,timestamptz,text,text,text,uuid,text,text,text,text,text,integer,text)', 'execute'), 'service role can execute billing projection');
+select ok(not has_function_privilege('authenticated', 'public.apply_foundation_subscription_schedule(text,text,text,timestamptz)', 'execute'), 'authenticated clients cannot project cancellation schedules');
+select ok(has_function_privilege('service_role', 'public.apply_foundation_subscription_schedule(text,text,text,timestamptz)', 'execute'), 'service role can project cancellation schedules');
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -83,6 +85,27 @@ select is(
   'older subscription event is ignored'
 );
 select is((select subscription_status from public.foundation_billing_accounts where workspace_key = 'pilot-billtest00000000'), 'active', 'newest subscription state wins');
+select is(
+  public.apply_foundation_subscription_schedule(
+    'evt_cccccccccccccccccccccccccc', 'pilot-billtest00000000',
+    'sub_ssssssssssssssssssssssssss', '2026-09-29T12:00:00Z'
+  )->>'status',
+  'processed',
+  'period-end cancellation schedule is projected'
+);
+select is(
+  (select subscription_cancel_at from public.foundation_billing_accounts where workspace_key = 'pilot-billtest00000000'),
+  '2026-09-29T12:00:00Z'::timestamptz,
+  'cancellation effective timestamp is retained while access remains active'
+);
+select is(
+  public.apply_foundation_subscription_schedule(
+    'evt_dddddddddddddddddddddddddd', 'pilot-billtest00000000',
+    'sub_ssssssssssssssssssssssssss', null
+  )->>'status',
+  'stale_subscription_schedule',
+  'older subscription event cannot clear a newer cancellation schedule'
+);
 
 select is(
   public.apply_foundation_billing_event(

@@ -4,17 +4,19 @@
 
 On 2026-08-27, a dedicated project named `tavonel-saas-foundation` was created in the `Phillip's projects` organization through the authenticated provider integration. Its immutable project reference is `tfcorhjkqcuisqhsjemz`; its selected region is **Northeast Asia (Seoul) / `ap-northeast-2`**; and its verified state is `ACTIVE_HEALTHY`. The project was empty before the reviewed migrations were applied.
 
-The foundation target has received `0001_tavonel_tenant_foundation`, `0002_credit_ledger_and_gpu_reservations`, `0003_harden_rls_function_exposure`, and `0004_harden_credit_ledger_rls`. It contains 13 public metadata/permission tables, all RLS-enabled and observed empty after migration. A rollback-only synthetic A/B tenant probe returned `rls_matrix_passed: true` with zero persisted fixture rows. The final Security Advisor scan returned `lints: []`; the detailed nonsecret evidence is in `docs/SUPABASE_QUALIFICATION.md`.
+The foundation target has received migrations `0001` through `0006`, including the dedicated webhook event ledger, prepaid-credit projection, subscription entitlement, and period-end cancellation schedule. Browser roles have no direct billing-table or billing-RPC privileges. The original 13-table tenant foundation passed a rollback-only A/B tenant probe and the final post-`0004` Security Advisor scan returned `lints: []`. The later billing projection passed a separate rollback-only live invariant probe after `0006`; no probe fixture remained. Detailed nonsecret evidence is in `docs/SUPABASE_QUALIFICATION.md` and `docs/PADDLE_SANDBOX_BILLING_QUALIFICATION_2026-08-29.md`.
 
 An earlier browser-only draft is permanently discarded because a provider-generated database credential surfaced in its transcript before the draft was canceled. That credential must never be retrieved, repeated, reused, transmitted, committed, or configured. The later dedicated project was created without reproducing that value.
 
 ## Next safe action
 
-Email and Google OAuth are still unconfigured. Before either provider is enabled, obtain contextual approval of the exact foundation HTTPS origin, redirect URI, newly dedicated Google OAuth client/consent configuration, and secure client-secret handling. Public Supabase configuration may be configured only after that approval; server-only credentials must remain in managed secret storage and outside browser code and source control.
+The Foundation production origin and Google OAuth login are configured. Paddle remains in test mode. Enabling Paddle live mode, creating live products/prices, or accepting a real charge requires a separate explicit launch decision, merchant review, tax/legal review, production webhook-secret rotation, and a live-mode rollback plan. The sandbox portal API key expires on 2026-11-27 and must be rotated in managed secret storage before then.
 
-## Paddle sandbox preflight
+## Paddle sandbox qualification
 
-The current browser session reaches the Paddle sandbox login screen but has no authenticated vendor session. No Paddle vendor account, catalog, checkout link, notification destination, signing secret, or live billing configuration was created or modified. The foundation therefore continues to return `BILLING_NOT_CONFIGURED` for every checkout intent.
+Paddle sandbox is configured for the Foundation production origin with five allow-listed prices, an active signed-webhook destination, a test-mode browser client token, and a narrowly scoped server-side customer-portal key. A real browser checkout completed one $12 Starter prepaid purchase and one $29/month Observer subscription using Paddle's sandbox payment method. Signed webhooks persisted 100 purchased credits, zero reversed credits, and active Observer access. Replaying the original Starter `transaction.paid` and Observer `subscription.activated` notifications did not mint credits again or change the latest billing timestamp.
+
+The authenticated workspace created a Paddle customer-portal session. Period-end cancellation was then scheduled in the portal for 2026-09-29 while current-period access remained active. Migration `0006_foundation_subscription_schedule.sql` stores the webhook `scheduled_change.effective_at` separately from the active subscription status, and a rollback-only live database probe proved that an older event cannot clear a newer cancellation schedule. Full nonsecret IDs, deployment evidence, test results, and remaining live-mode boundary are recorded in `docs/PADDLE_SANDBOX_BILLING_QUALIFICATION_2026-08-29.md`.
 
 ## Cloudflare R2 preflight
 

@@ -46,6 +46,7 @@ export type PaddleBillingAction =
       subscriptionId: string;
       customerId: string;
       subscriptionStatus: string;
+      subscriptionCancelAt: string | null;
     })
   | (CommonAction & {
       action: "reversal";
@@ -126,6 +127,19 @@ export function parsePaddleBillingAction(
     const subscriptionId = typeof data.id === "string" ? data.id : "";
     const customerId = typeof data.customer_id === "string" ? data.customer_id : "";
     const status = typeof data.status === "string" ? data.status : "";
+    let subscriptionCancelAt: string | null = null;
+    if (data.scheduled_change !== null && data.scheduled_change !== undefined) {
+      if (!isRecord(data.scheduled_change) || typeof data.scheduled_change.action !== "string") {
+        return { ...common, action: "ignored", reason: "subscription_contract_invalid" };
+      }
+      if (data.scheduled_change.action === "cancel") {
+        const effectiveAt = data.scheduled_change.effective_at;
+        if (typeof effectiveAt !== "string" || !Number.isFinite(Date.parse(effectiveAt))) {
+          return { ...common, action: "ignored", reason: "subscription_contract_invalid" };
+        }
+        subscriptionCancelAt = new Date(effectiveAt).toISOString();
+      }
+    }
     const prices = itemPriceIds(data);
     if (!binding) return { ...common, action: "ignored", reason: "binding_invalid" };
     if (!SUBSCRIPTION_ID.test(subscriptionId) || !CUSTOMER_ID.test(customerId) || !SUBSCRIPTION_STATUSES.has(status) || prices.length !== 1) {
@@ -144,6 +158,7 @@ export function parsePaddleBillingAction(
       subscriptionId,
       customerId,
       subscriptionStatus: status,
+      subscriptionCancelAt,
     };
   }
 
