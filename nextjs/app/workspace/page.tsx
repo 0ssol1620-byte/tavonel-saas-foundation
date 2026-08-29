@@ -10,6 +10,8 @@ import type { DocumentListItem } from "@/lib/immutable-keys";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { useCheckout } from "@/lib/use-checkout";
 import { formatCount, formatTimestamp } from "@/lib/format";
+import { readOfferParam, takeCheckoutIntent } from "@/lib/checkout-intent";
+import { trackFunnel } from "@/lib/funnel-events";
 
 /** What this panel prints when it has no value. Not "0", and not a spinner that never resolves. */
 const UNKNOWN = "not read yet";
@@ -297,6 +299,21 @@ export default function WorkspacePage() {
       void loadBilling();
       const collectionId = params.get("collection");
       if (collectionId) void loadCollectionCandidate(collectionId);
+
+      /*
+       * R1, last half. Someone who picked a plan before signing in arrives here carrying it --
+       * in the URL if they came straight through, in sessionStorage if Google's redirect ate the
+       * query string. The parameter is stripped before the checkout opens, so a reload or a
+       * back-navigation cannot fire a second checkout.
+       */
+      const resume = readOfferParam(window.location.search) ?? takeCheckoutIntent();
+      if (resume) {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("checkout");
+        window.history.replaceState(null, "", url.toString());
+        trackFunnel("checkout_opened", { offer: resume });
+        void buy(resume);
+      }
     })();
   }, []);
 

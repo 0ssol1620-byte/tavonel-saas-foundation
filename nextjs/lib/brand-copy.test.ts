@@ -38,6 +38,8 @@ const COPY_SURFACES = [
   "app/not-found.tsx",
   "app/error.tsx",
   "lib/capabilities.ts",
+  "lib/checkout-intent.ts",
+  "lib/funnel-events.ts",
   "lib/demo-world.ts",
 ];
 

@@ -387,6 +387,28 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 .bv.state[data-s="compiled"]::before, .bv.state[data-s="verified"]::before, .bv.state[data-s="current"]::before { background: var(--verified); }
 .bv.state[data-s="changed"]::before { background: var(--changed); }
 
+/* The bar's own control. It sits at the end of the row and reads as an instrument key rather
+   than a marketing button -- the same mono voice, the verified accent only on hover. */
+.bar-next {
+  flex: none;
+  margin-left: 16px;
+  padding: 5px 11px;
+  border: 1px solid var(--hairline-hi);
+  border-radius: 3px;
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  color: var(--text-mid);
+  transition: color 200ms ease, border-color 200ms ease, background 200ms ease;
+}
+.bar-next:hover { color: var(--verified); border-color: var(--verified-dim); background: var(--verified-deep); }
+
+/* The scene jumper only exists where the rail does not. */
+.bar-ticks { display: none; align-items: center; gap: 7px; padding: 0 16px; }
+.bt { width: 6px; height: 6px; border-radius: 50%; background: var(--decor); transition: background 220ms ease, transform 220ms ease; }
+.bt:hover { background: var(--text-lo); }
+.bt.on { background: var(--verified); transform: scale(1.35); }
+
 /* ============================================================ hero (01) */
 
 .scene.hero { min-height: 100vh; justify-content: center; padding-top: 104px; }
@@ -655,6 +677,11 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 .cap[data-tone="direction"] .cap-s::before { background: var(--unresolved); }
 .cap[data-tone="unknown"] .cap-s { color: var(--changed); }
 .cap[data-tone="unknown"] .cap-s::before { background: var(--changed); }
+
+/* The one line that connects the grid to the price. It is not a warning colour: these rows are
+   the product working as designed, and the sentence exists so nobody reads a plan as a way to
+   open them. */
+.fine.held { border-left: 2px solid var(--changed-dim); padding-left: 12px; color: var(--text-mid); }
 
 /* ============================================================ interlude */
 
@@ -969,6 +996,7 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
   .chaos { grid-template-columns: repeat(2, 1fr); }
   .twoworlds, .chain, .tiles { grid-template-columns: minmax(0, 1fr); }
   .bc.opt { display: none; }
+  .bar-ticks { display: flex; }
   .workspace { grid-template-columns: minmax(0, 1fr); }
   .side { border-right: 0; border-bottom: 1px solid var(--hairline); }
   .side nav { flex-direction: row; flex-wrap: wrap; }
@@ -987,14 +1015,23 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
 }
 
 @media (max-width: 620px) {
-  .nav { gap: 10px; padding: 10px 14px; }
-  .nav .btn.ghost { display: none; }
+  .nav { gap: 8px; padding: 10px 14px; }
+  /* The access verb stays. Hiding it here would undo the split it exists for: a phone visitor
+     would again be offered only "Sign in", the one control a first-time reader cannot use. */
+  .nav .btn.small { padding: 6px 10px; font-size: 9.5px; letter-spacing: 0.08em; }
   .caps, .checks, .plans, .packs, .stops, .legend { grid-template-columns: minmax(0, 1fr); }
   .cr, .wsrc { grid-template-columns: minmax(0, 1fr); gap: 4px; }
   .meter { grid-template-columns: minmax(0, 1fr) auto; }
   .meter .mb { grid-column: 1 / -1; }
   .log, .diff, .arch { font-size: 10.5px; }
   .beforeafter { gap: 20px; }
+  /* At this width the bar keeps only the two things a phone can act on -- where you are in the
+     sequence, and what to do next. The readouts measure out wider than the viewport once the
+     control is in the row, and a clipped control is worse than an absent readout. */
+  .bc { display: none; }
+  .bar { justify-content: space-between; padding: 0 14px; }
+  .bar-ticks { padding: 0; }
+  .bar-next { margin-left: 12px; }
 }
 
 @media (max-width: 520px) {

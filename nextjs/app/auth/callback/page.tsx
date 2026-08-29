@@ -16,6 +16,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import Logomark from "@/components/logomark";
+import { takeCheckoutIntent } from "@/lib/checkout-intent";
 
 type Phase = "working" | "unconfigured" | "failed";
 
@@ -37,7 +38,10 @@ export default function AuthCallbackPage() {
         setPhase("failed");
         return;
       }
-      window.location.replace("/workspace");
+      // If they came here mid-purchase, put them back where they were rather than in a
+      // workspace that has forgotten it.
+      const resume = takeCheckoutIntent();
+      window.location.replace(resume ? `/workspace?checkout=${resume}` : "/workspace");
     })();
     return () => { cancelled = true; };
   }, []);
