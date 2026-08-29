@@ -7,8 +7,8 @@ import { activationPolicy } from "@/lib/activation-policy";
 import type { DocumentListItem } from "@/lib/immutable-keys";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
-const FOUNDATION_PROOF_PDF_URL = "https://tavonel.vercel.app/proof-sources/dart-jtc-2026-q1.pdf";
-const FOUNDATION_PROOF_PDF_SHA256 = "fb998430db82774afc0d69090383650421ab9a14e6e37c7f32821aa1c6a32eee";
+const FOUNDATION_PROOF_PDF_URL = "/api/proof-pdf";
+const FOUNDATION_PROOF_PDF_SHA256 = "3df79d34abbca99308e79cb94461c1893582604d68329a41fd4bec1885e6adb4";
 
 function bytesToHex(bytes: Uint8Array) {
   return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -112,7 +112,7 @@ export default function WorkspacePage() {
         setNotice("Public proof PDF digest did not match. Nothing entered quarantine.");
         return;
       }
-      await uploadDocument(new File([bytes], "dart-jtc-2026-q1.pdf", { type: "application/pdf" }));
+      await uploadDocument(new File([bytes], "w3c-dummy.pdf", { type: "application/pdf" }));
     } catch {
       setNotice("Public proof PDF could not be prepared. Nothing entered quarantine.");
     } finally {
