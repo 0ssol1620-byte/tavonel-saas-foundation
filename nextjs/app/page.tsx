@@ -70,6 +70,9 @@ export default function HomePage() {
             <b>TAVONEL</b>
             <span>THE KNOWLEDGE COMPILER</span>
           </Link>
+          <span className="mode" title="Foundation mode: no document bytes, payment sessions or GPU capacity are created.">
+            <i aria-hidden="true" />FOUNDATION MODE
+          </span>
           <nav>
             <a href="#argument">Sequence</a>
             <a href="#proof">Proof</a>
@@ -77,7 +80,7 @@ export default function HomePage() {
             <a href="#security">Security</a>
             <a href="#pricing">Pricing</a>
           </nav>
-          <button className="btn ghost small" onClick={signIn}>Sign in</button>
+          <button className="signin" onClick={signIn}>Sign in</button>
           <button className="btn small" onClick={showNotice}>{CTA.primary}</button>
         </div>
       </header>
@@ -86,17 +89,15 @@ export default function HomePage() {
         {/* ---------------------------------------------------------- the replay */}
         <section className="shell stage-wrap">
           <div className="stage-lead">
-            <div>
-              <p className="t-brand" style={{ color: "var(--evidence)", margin: "0 0 12px" }}>THE KNOWLEDGE COMPILER</p>
-              <h1 className="t-statement">Watch scattered files become one current world.</h1>
-            </div>
-            <p className="t-body">
-              Fifty-six seconds, then the controls are yours. Nothing here is a recording of a
+            <p className="t-brand">THE KNOWLEDGE COMPILER</p>
+            <h1 className="t-statement">Watch scattered files become one current world.</h1>
+            <p className="t-lead">
+              Fifty-six seconds, then the controls are yours. Nothing below is a recording of a
               screen — it is the interface drawing a compilation from its own event stream.
             </p>
           </div>
           <ReplayStage />
-          <p className="fine" style={{ marginTop: 14 }}>{MOTION_LAW}</p>
+          <p className="law">{MOTION_LAW}</p>
         </section>
 
         {/* ---------------------------------------------------------- static argument layer */}
@@ -122,10 +123,8 @@ export default function HomePage() {
                   <div className="arg-beat" key={s.id} data-gate={s.gate ? 1 : 0}>
                     <span className="id">{s.id}</span>
                     <span className="tt">{s.startSeconds.toFixed(2)}–{s.endSeconds.toFixed(2)}</span>
-                    <span className="nm">
-                      {s.beat}
-                      <span className="tk">{s.takeaway}</span>
-                    </span>
+                    <span className="nm">{s.beat}</span>
+                    <span className="tk">{s.takeaway}</span>
                   </div>
                 ))}
               </div>
@@ -186,7 +185,7 @@ export default function HomePage() {
         </section>
 
         {/* ---------------------------------------------------------- 3 · security */}
-        <section id="security" className="shell band">
+        <section id="security" className="shell band dark">
           <div className="band-head">
             <span className="kicker">SOURCE BOUNDARY</span>
             <h2 className="t-section">Every document is treated as hostile data.</h2>
@@ -216,24 +215,24 @@ export default function HomePage() {
             <h2 className="t-section">What is measured, and what is only built.</h2>
             <span className="objection">“does any of this actually work”</span>
           </div>
-          <div className="tiles">
+          <div className="tiles pairs">
             <article className="tile">
-              <span className="n">MEASURED</span>
+              <span className="n" data-state="measured">MEASURED</span>
               <h3>Recovery changes the outcome</h3>
               <p>On a public benchmark with an unmodified scoring path, the recovery runtime moved a document extraction score substantially. It is our own measurement, published with its confidence interval — never placed beside a competitor’s number as if reproduced.</p>
             </article>
             <article className="tile">
-              <span className="n">MEASURED</span>
+              <span className="n" data-state="measured">MEASURED</span>
               <h3>Compilation refuses more than it emits, sometimes</h3>
               <p>Of a thousand documents offered in one campaign, four hundred and four were refused — every one for a link the compiler could not resolve. A vault with a broken link is not emitted, by design.</p>
             </article>
             <article className="tile">
-              <span className="n">NOT SUPPORTED</span>
+              <span className="n" data-state="unsupported">NOT SUPPORTED</span>
               <h3>Blind quality detection failed</h3>
               <p>We tested whether prediction-only signals could pick the worst documents without ground truth. They could not beat ranking by length alone. It is published as unsupported and is not shipped as a feature.</p>
             </article>
             <article className="tile">
-              <span className="n">BUILT, NOT PROVEN</span>
+              <span className="n" data-state="unproven">BUILT, NOT PROVEN</span>
               <h3>Most thresholds are uncalibrated</h3>
               <p>Tests show the code does what its author intended. They do not show a threshold is right. Nothing here presents an uncalibrated threshold as a measured result.</p>
             </article>

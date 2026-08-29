@@ -4,5 +4,5 @@
   "version": "0.1.0",
   "scripts": { "dev": "next dev", "build": "next build", "start": "next start", "test": "vitest run", "check": "tsc --noEmit", "proof:live-ocr": "node scripts/foundation-live-ocr-proof.mjs" },
   "dependencies": { "@supabase/supabase-js": "^2.112.4", "lucide-react": "^0.468.0", "next": "^15.5.9", "react": "^19.2.1", "react-dom": "^19.2.1" },
-  "devDependencies": { "@types/node": "^24.7.0", "@types/react": "^19.2.1", "@types/react-dom": "^19.2.1", "typescript": "^5.9.3", "vitest": "^2.1.4" }
+  "devDependencies": { "@types/node": "^24.7.0", "@types/react": "^19.2.1", "@types/react-dom": "^19.2.1", "typescript": "^5.9.3", "vitest": "^2.1.4", "wanted-sans": "^1.0.3" }
 }

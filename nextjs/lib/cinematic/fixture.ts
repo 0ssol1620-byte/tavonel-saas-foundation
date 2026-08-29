@@ -71,7 +71,36 @@ export const SOURCES: readonly SourceFile[] = [
   { id: "s9", name: "docs/release.md", kind: "code", group: "Research", route: "native" },
 ];
 
-export const SOURCE_GROUPS: readonly string[] = ["Projects", "Research", "Notes", "Policies"];
+/**
+ * The four source groups and the share of discovered files each holds. The share exists because
+ * dividing the discovered total evenly printed the same number four times down the rail, which
+ * reads as a placeholder rather than a world. Shares sum to exactly 1.
+ */
+export type SourceGroup = { readonly name: string; readonly share: number };
+
+export const SOURCE_GROUPS: readonly SourceGroup[] = [
+  { name: "Projects", share: 0.41 },
+  { name: "Research", share: 0.27 },
+  { name: "Notes", share: 0.19 },
+  { name: "Policies", share: 0.13 },
+];
+
+/**
+ * Allocate a running discovered total across the groups so the parts always sum to the whole.
+ * Rounding each share independently loses or gains files at most tick; taking the difference of
+ * cumulative rounds cannot.
+ */
+export function groupCounts(total: number): number[] {
+  let prev = 0;
+  let acc = 0;
+  return SOURCE_GROUPS.map((g, i) => {
+    acc += g.share;
+    const upto = i === SOURCE_GROUPS.length - 1 ? total : Math.round(total * acc);
+    const n = upto - prev;
+    prev = upto;
+    return n;
+  });
+}
 
 /** §6.9 — the routes a file can be sent down, with the label shown at S03. */
 export const ROUTE_LABELS: Record<SourceFile["route"], string> = {

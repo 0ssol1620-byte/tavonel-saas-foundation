@@ -1,20 +1,13 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, Instrument_Sans } from "next/font/google";
+import { IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 
 /**
- * SPEC §6.11 keeps the existing TAVONEL stack and forbids introducing a new display face.
- * Wanted Sans is not vendored into this repository, so the stack in `tavonel.css` names it
- * first and falls through to these two self-hosted faces. Adding the licensed family later is
- * a font-file change, not a design change.
+ * SPEC §6.11 — Wanted Sans is the display and text face. It is self-hosted from
+ * `public/fonts` (see the @font-face block at the top of `tavonel.css`), so no
+ * webfont host is contacted for it. Only the monospace utility face is fetched
+ * from Google; it carries the instrument voice — clocks, counts, state labels.
  */
-const sans = Instrument_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-sans",
-  display: "swap",
-});
-
 const mono = IBM_Plex_Mono({
   subsets: ["latin"],
   weight: ["400", "500", "600"],
@@ -35,8 +28,22 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${sans.variable} ${mono.variable}`}>
-      <body>{children}</body>
+    <html lang="en" className={mono.variable}>
+      <body>
+        {/* The statement is the LCP element and it is set in Wanted Sans, so the Latin subset is
+            requested with the document rather than after the stylesheet resolves. React hoists
+            this into <head>; writing a literal <head> here displaces the one Next.js builds and
+            the stylesheet link goes with it. Only the [90] subset is preloaded — it is the one
+            an English page actually uses. */}
+        <link
+          rel="preload"
+          as="font"
+          type="font/woff2"
+          href="/fonts/WantedSansVariable.split.90.woff2"
+          crossOrigin="anonymous"
+        />
+        {children}
+      </body>
     </html>
   );
 }

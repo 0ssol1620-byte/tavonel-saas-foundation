@@ -8,6 +8,36 @@
    shadow. Depth is luminance, occlusion and scale only.
    ============================================================================ */
 
+/* ---------------------------------------------------------------------------
+   Wanted Sans Variable — SIL Open Font License 1.1, licence text vendored beside
+   the files at public/fonts/OFL.txt. decision.md G-B chose this family; until now
+   nothing shipped it, so §6.11's stack silently fell through to a default
+   grotesque. Two Latin subsets are vendored from the upstream split build: [90]
+   basic Latin + punctuation + currency (44 KB) and [89] Latin Extended (21 KB).
+   The English page downloads [90] only. Korean subsets are deliberately not
+   vendored — add the ranges the copy actually needs, never the 1.28 MB complete
+   file, if Korean copy ever ships.
+   --------------------------------------------------------------------------- */
+@font-face {
+  font-family: "Wanted Sans Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 1000;
+  src: url("/fonts/WantedSansVariable.split.90.woff2") format("woff2-variations");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6-02C7,
+    U+02D0-02DD, U+2000-209F, U+20A0-20CF, U+2122, U+2190-2199, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Wanted Sans Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 1000;
+  src: url("/fonts/WantedSansVariable.split.89.woff2") format("woff2-variations");
+  unicode-range: U+0100-024F, U+0259, U+1E00-1EFF, U+2605-2606, U+2661, U+2665,
+    U+2669-266C, U+2C7C;
+}
+
 :root {
   /* Surfaces — warm paper. Neutrals carry a slight warm bias so they read as chosen. */
   --paper-0: #fcfaf6;
@@ -15,7 +45,7 @@
   --paper-2: #e8e3d9;
   --ink-0: #17161a;
   --ink-1: #3a3841;
-  --ink-2: #6e6a63;
+  --ink-2: #625f59;
   --rule: #d9d3c7;
   --rule-soft: #e7e1d6;
 
@@ -23,7 +53,7 @@
   --evidence: #0e6675;
   --evidence-soft: #dceced;
   --brand: #2b44c4;
-  --review: #8e5b0c;
+  --review: #7c4f08;
   --review-soft: #f3e8d4;
   --verified: #2c6741;
   --danger: #9b2c22;
@@ -34,10 +64,10 @@
 
   --overlay-shadow: 0 10px 34px rgba(23, 22, 26, 0.14);
 
-  /* §6.11 — Wanted Sans leads; the grotesque behind it is the fallback until the licensed
-     family is vendored into this repository. No new display face is introduced. */
-  --f-sans: "Wanted Sans Variable", "Wanted Sans", var(--font-sans), -apple-system,
-    BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  /* §6.11 — Wanted Sans is self-hosted above; the system stack behind it only covers the
+     swap window. No second display face is introduced. */
+  --f-sans: "Wanted Sans Variable", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
   --f-mono: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
 
   /* §7.2 — the only four motion durations. */
@@ -52,6 +82,38 @@
   --e-settle: cubic-bezier(0.22, 1, 0.36, 1);
   --e-exit: cubic-bezier(0.4, 0, 1, 1);
 
+  /* Type scale (§6.11). Every size on the page is drawn from a step here; nothing sets a
+     literal font-size outside this token layer. Wanted Sans carries a real 400–1000 weight
+     axis, so display weight is a chosen cut of the family rather than a synthesised bold. */
+  --ts-micro: 10px;
+  --ts-label: 11px;
+  --ts-status: 12px;
+  --ts-small: 13px;
+  --ts-ui: 15px;
+  --ts-body: 17px;
+  --ts-lead: 21px;
+  --ts-sub: 27px;
+  --ts-section: clamp(27px, 3.3vw, 38px);
+  --ts-answer: clamp(38px, 5vw, 54px);
+  --ts-statement: clamp(34px, 6.4vw, 76px);
+
+  --w-display: 640;
+  --w-head: 600;
+  --w-ui: 560;
+  --w-body: 420;
+
+  /* Spacing rhythm — a 4px base. Section padding and every vertical stack use these steps,
+     so the page has one measurable cadence instead of per-element guesses. */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 18px;
+  --s5: 26px;
+  --s6: 38px;
+  --s7: 56px;
+  --s8: 80px;
+  --s9: 112px;
+
   --radius: 4px;
   --page: 1200px;
 }
@@ -63,7 +125,7 @@
     --paper-2: #26242c;
     --ink-0: #eee9df;
     --ink-1: #c8c2b7;
-    --ink-2: #8e8880;
+    --ink-2: #a09a90;
     --rule: #34313b;
     --rule-soft: #272530;
     --evidence: #58c0cf;
@@ -85,7 +147,7 @@
   --paper-2: #26242c;
   --ink-0: #eee9df;
   --ink-1: #c8c2b7;
-  --ink-2: #8e8880;
+  --ink-2: #a09a90;
   --rule: #34313b;
   --rule-soft: #272530;
   --evidence: #58c0cf;
@@ -108,9 +170,9 @@ body {
   background: var(--paper-1);
   color: var(--ink-0);
   font-family: var(--f-sans);
-  font-size: 16px;
-  line-height: 1.5;
-  font-weight: 450;
+  font-size: var(--ts-body);
+  line-height: 1.55;
+  font-weight: var(--w-body);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -121,85 +183,192 @@ button { font: inherit; border: 0; background: none; cursor: pointer; color: inh
 
 .shell { max-width: var(--page); margin: 0 auto; padding: 0 28px; }
 
-/* ---------------------------------------------------------------- type tokens */
+/* ---------------------------------------------------------------- type tokens
+   Display sizes are fluid so the statement holds its presence from 375px to 1440px without a
+   breakpoint step. The 52px fixed size these replaced sat under every site in the competitive
+   set measured in WEBSITE_FINAL_DESIGN_2026-08-29.md; 76px puts it inside that field. */
 .t-brand {
-  font-size: 14px; line-height: 18px; font-weight: 590;
-  letter-spacing: 0.11em; text-transform: uppercase;
+  font-size: var(--ts-small); line-height: 1.3; font-weight: var(--w-ui);
+  letter-spacing: 0.15em; text-transform: uppercase; font-family: var(--f-mono);
 }
-.t-statement { font-size: 52px; line-height: 56px; font-weight: 510; letter-spacing: -0.025em; }
-.t-payoff { font-size: 60px; line-height: 62px; font-weight: 510; letter-spacing: -0.028em; }
+.t-statement {
+  font-size: var(--ts-statement); line-height: 0.99; font-weight: var(--w-display);
+  letter-spacing: -0.033em;
+}
+.t-payoff {
+  font-size: var(--ts-statement); line-height: 1.02; font-weight: var(--w-display);
+  letter-spacing: -0.033em;
+}
 .t-answer {
-  font-size: 54px; line-height: 56px; font-weight: 510;
-  letter-spacing: -0.025em; font-variant-numeric: tabular-nums;
+  font-size: var(--ts-answer); line-height: 1.04; font-weight: var(--w-display);
+  letter-spacing: -0.028em; font-variant-numeric: tabular-nums;
 }
-.t-section { font-size: 26px; line-height: 31px; font-weight: 560; letter-spacing: -0.018em; }
-.t-body { font-size: 16px; line-height: 24px; font-weight: 450; }
-.t-status { font-family: var(--f-mono); font-size: 12px; line-height: 16px; font-weight: 500; }
-.t-label { font-size: 11px; line-height: 14px; font-weight: 560; letter-spacing: 0.06em; }
-.t-micro { font-family: var(--f-mono); font-size: 10px; line-height: 13px; }
-
-@media (max-width: 760px) {
-  .t-brand { font-size: 12px; line-height: 16px; }
-  .t-statement { font-size: 30px; line-height: 34px; }
-  .t-payoff { font-size: 34px; line-height: 38px; }
-  .t-answer { font-size: 38px; line-height: 42px; }
-  .t-section { font-size: 22px; line-height: 27px; }
-  .t-body { font-size: 15px; line-height: 22px; }
-  .t-status { font-size: 11px; line-height: 15px; }
-  .t-label { font-size: 10px; line-height: 13px; }
+.t-section {
+  font-size: var(--ts-section); line-height: 1.12; font-weight: var(--w-head);
+  letter-spacing: -0.024em;
 }
+.t-lead { font-size: var(--ts-lead); line-height: 1.42; font-weight: var(--w-body); color: var(--ink-1); }
+.t-body { font-size: var(--ts-body); line-height: 1.55; font-weight: var(--w-body); }
+.t-status { font-family: var(--f-mono); font-size: var(--ts-status); line-height: 1.35; font-weight: 500; }
+.t-label { font-size: var(--ts-label); line-height: 1.3; font-weight: var(--w-ui); letter-spacing: 0.06em; }
+.t-micro { font-family: var(--f-mono); font-size: var(--ts-micro); line-height: 1.3; }
 
-/* ---------------------------------------------------------------- site chrome */
+/* ---------------------------------------------------------------- site chrome
+   Not a SaaS header: the left half states what the instrument is and what mode it is in, and
+   the mode pill reads from the same foundation-mode facts the footer discloses. One primary
+   action, not a pair of competing buttons. */
 .masthead {
   position: sticky; top: 0; z-index: 20;
-  background: var(--paper-1); border-bottom: 1px solid var(--rule);
+  background: color-mix(in srgb, var(--paper-1) 88%, transparent);
+  backdrop-filter: saturate(1.4) blur(10px);
+  border-bottom: 1px solid var(--rule);
 }
 .masthead > div {
-  max-width: var(--page); margin: 0 auto; padding: 14px 28px;
-  display: flex; align-items: center; gap: 24px;
+  max-width: var(--page); margin: 0 auto; padding: var(--s3) 28px;
+  display: flex; align-items: center; gap: var(--s4);
 }
-.wordmark { display: flex; align-items: baseline; gap: 10px; }
-.wordmark b { font-size: 17px; font-weight: 600; letter-spacing: 0.14em; }
-.wordmark span { color: var(--ink-2); font-size: 10px; letter-spacing: 0.13em; font-family: var(--f-mono); }
-.masthead nav { margin-left: auto; display: flex; gap: 22px; }
-.masthead nav a, .masthead nav button {
-  color: var(--ink-1); font-size: 13.5px; padding: 4px 0;
-  border-bottom: 1px solid transparent; transition: border-color var(--flash) var(--e-settle);
+.wordmark { display: flex; align-items: baseline; gap: 10px; white-space: nowrap; }
+.wordmark b {
+  font-size: var(--ts-lead); font-weight: 700; letter-spacing: 0.13em;
+  line-height: 1; color: var(--ink-0);
 }
-.masthead nav a:hover, .masthead nav button:hover { border-bottom-color: var(--ink-1); }
+.wordmark span {
+  color: var(--ink-2); font-size: var(--ts-micro); letter-spacing: 0.15em;
+  font-family: var(--f-mono);
+}
+
+/* The mode pill is a disclosure, not decoration: it names the state the product is actually
+   in, in the same voice the stage uses for its own state labels. */
+.mode {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: var(--f-mono); font-size: var(--ts-micro); letter-spacing: 0.13em;
+  color: var(--ink-2); border: 1px solid var(--rule); border-radius: 999px;
+  padding: 4px 10px 4px 8px; white-space: nowrap;
+}
+.mode i {
+  width: 5px; height: 5px; border-radius: 50%; background: var(--review);
+  box-shadow: 0 0 0 3px var(--review-soft); flex: none;
+}
+
+.masthead nav { margin-left: auto; display: flex; gap: var(--s4); white-space: nowrap; }
+.masthead nav a {
+  color: var(--ink-1); font-size: var(--ts-ui); padding: 4px 0;
+  border-bottom: 1px solid transparent;
+  transition: color var(--flash) var(--e-settle), border-color var(--flash) var(--e-settle);
+}
+.masthead nav a:hover { color: var(--ink-0); border-bottom-color: var(--ink-0); }
+.masthead .signin {
+  color: var(--ink-1); font-size: var(--ts-ui); white-space: nowrap;
+  border-bottom: 1px solid transparent; padding: 4px 0;
+  transition: color var(--flash) var(--e-settle), border-color var(--flash) var(--e-settle);
+}
+.masthead .signin:hover { color: var(--ink-0); border-bottom-color: var(--ink-0); }
 
 .btn {
-  display: inline-flex; align-items: center; gap: 8px; justify-content: center;
-  min-height: 44px; padding: 11px 18px; border-radius: var(--radius);
+  display: inline-flex; align-items: center; gap: var(--s2); justify-content: center;
+  min-height: 44px; padding: 11px var(--s4); border-radius: var(--radius);
   background: var(--ink-0); color: var(--paper-0);
-  font-size: 14px; font-weight: 560; letter-spacing: -0.005em;
-  transition: background var(--flash) var(--e-settle);
+  font-size: var(--ts-ui); font-weight: var(--w-ui); letter-spacing: -0.005em;
+  transition: background var(--flash) var(--e-settle), color var(--flash) var(--e-settle);
 }
 .btn:hover { background: var(--ink-1); }
 .btn.ghost { background: transparent; color: var(--ink-0); border: 1px solid var(--rule); }
-.btn.ghost:hover { background: var(--paper-2); }
+.btn.ghost:hover { background: var(--paper-2); border-color: var(--ink-2); }
 .btn.quiet { background: transparent; color: var(--ink-1); border: 1px solid transparent; padding-inline: 0; }
 .btn.quiet:hover { color: var(--ink-0); }
-.btn.small { min-height: 36px; padding: 8px 13px; font-size: 13px; }
+.btn.small { min-height: 38px; padding: 9px var(--s3); font-size: var(--ts-small); }
+.masthead .btn { white-space: nowrap; }
 
-/* ---------------------------------------------------------------- section frame */
-.band { padding: 72px 0; border-top: 1px solid var(--rule); }
-.band.first { border-top: 0; }
-.band-head { display: flex; align-items: baseline; gap: 16px; margin-bottom: 26px; flex-wrap: wrap; }
-.band-head .kicker { color: var(--evidence); font-family: var(--f-mono); font-size: 11px; letter-spacing: 0.12em; }
-.band-head h2 { margin: 0; flex: 1 1 340px; }
-.objection {
-  font-family: var(--f-mono); font-size: 11px; color: var(--ink-2);
-  border-left: 2px solid var(--rule); padding-left: 10px;
+/* The header carries five nav links, a mode pill, a sign-in and one action. Below 1180px the
+   secondary identifiers withdraw in order of how much they carry, rather than everything
+   wrapping at once into a three-line header. */
+@media (max-width: 1180px) {
+  .masthead .wordmark span { display: none; }
 }
-.prose { max-width: 62ch; color: var(--ink-1); }
+@media (max-width: 1020px) {
+  .masthead .mode { display: none; }
+}
+
+/* ---------------------------------------------------------------- section frame
+   Every section sets block padding only. A `padding: <y> 0` shorthand here overwrites the
+   inline padding .shell just set, which is how every band below the fold ended up flush
+   against the viewport edge at any width under 1200px. */
+.band { padding-block: var(--s8); border-top: 1px solid var(--rule); }
+.band.first { border-top: 0; }
+
+/* The band head is a masthead for its section: kicker and the objection it answers sit in a
+   narrow instrument column, the claim gets the width. One baseline row produced six identical
+   rows down the page; this gives the page a second rhythm. */
+.band-head {
+  display: grid; grid-template-columns: minmax(0, 200px) minmax(0, 1fr);
+  gap: var(--s3) var(--s6); align-items: start; margin-bottom: var(--s6);
+  padding-bottom: var(--s5); border-bottom: 1px solid var(--rule-soft);
+}
+.band-head .kicker {
+  color: var(--evidence); font-family: var(--f-mono);
+  font-size: var(--ts-label); letter-spacing: 0.13em; padding-top: 0.42em;
+}
+.band-head h2 { margin: 0; max-width: 22ch; }
+.objection {
+  grid-column: 2; font-family: var(--f-mono); font-size: var(--ts-label); color: var(--ink-2);
+  border-left: 2px solid var(--rule); padding-left: 10px; max-width: 46ch;
+}
+.prose { max-width: 62ch; color: var(--ink-1); font-size: var(--ts-body); }
 .prose p { margin: 0 0 14px; }
 
+/* One deliberate full-bleed dark band. §6.12 budgets 8% of the screen to instrument dark;
+   spending it on a single section is a rhythm change, not decoration, and it is the section
+   carrying the security argument. Tokens are re-bound inside the band so every child keeps
+   drawing from the same names and no component needs a dark-band variant. */
+.band.dark {
+  /* Full-bleed without leaving the centred .shell measure: the band paints its own ground out
+     to the viewport edge and clips the overspill, so no wrapper element and no horizontal
+     scrollbar. */
+  background: var(--instrument);
+  box-shadow: 0 0 0 100vmax var(--instrument);
+  clip-path: inset(0 -100vmax);
+  border-top: 0;
+  padding-block: var(--s9);
+  --paper-0: color-mix(in srgb, var(--instrument) 88%, #ffffff);
+  --paper-1: var(--instrument);
+  --paper-2: color-mix(in srgb, var(--instrument) 80%, #ffffff);
+  --ink-0: var(--instrument-ink);
+  --ink-1: color-mix(in srgb, var(--instrument-ink) 80%, var(--instrument));
+  --ink-2: color-mix(in srgb, var(--instrument-ink) 72%, var(--instrument));
+  --rule: color-mix(in srgb, var(--instrument-ink) 22%, var(--instrument));
+  --rule-soft: color-mix(in srgb, var(--instrument-ink) 13%, var(--instrument));
+  --evidence: #58c0cf;
+  --evidence-soft: #17343b;
+  --review: #d9a441;
+  --review-soft: #33280f;
+  color: var(--ink-0);
+}
+
 /* ---------------------------------------------------------------- replay stage */
-.stage-wrap { padding: 40px 0 8px; }
-.stage-lead { display: flex; align-items: flex-end; gap: 28px; flex-wrap: wrap; margin-bottom: 22px; }
-.stage-lead h1 { margin: 0; max-width: 19ch; }
-.stage-lead p { margin: 0; max-width: 42ch; color: var(--ink-1); }
+.stage-wrap { padding-block: var(--s7) var(--s2); }
+
+/* Editorial split: the statement takes the measure it needs and stops, and the lead sits in a
+   narrower column set against its last line. Stacking both at full width made the fold read as
+   a paragraph with a large first line. */
+.stage-lead {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 30ch);
+  gap: var(--s5) var(--s7); align-items: end; margin: 0 0 var(--s6);
+}
+.stage-lead .t-brand { grid-column: 1 / -1; color: var(--evidence); margin: 0; }
+.stage-lead h1 { grid-column: 1; margin: 0; max-width: 15ch; }
+.stage-lead .t-lead {
+  grid-column: 2; margin: 0 0 0.35em; padding-left: var(--s3);
+  border-left: 2px solid var(--rule); font-size: var(--ts-body);
+}
+
+/* §7.1 — the motion law is a public commitment, so it is set as a statement under the
+   instrument rather than filed away as fine print. */
+.law {
+  margin: var(--s5) 0 0; padding-top: var(--s3);
+  border-top: 1px solid var(--rule-soft);
+  font-family: var(--f-mono); font-size: var(--ts-status);
+  letter-spacing: 0.02em; color: var(--ink-1);
+}
 
 .stage {
   container-type: inline-size;
@@ -288,6 +457,7 @@ button { font: inherit; border: 0; background: none; cursor: pointer; color: inh
 .stage-kicker {
   font-family: var(--f-mono); font-size: calc(10.5 * var(--u));
   letter-spacing: 0.13em; color: var(--evidence); margin: 0 0 calc(12 * var(--u));
+  text-wrap: balance;
 }
 
 /* --- discovery feed (§6.13: 38px rows, 7 visible, no stacking below .45) --- */
@@ -466,19 +636,45 @@ button { font: inherit; border: 0; background: none; cursor: pointer; color: inh
 .answer .meta div { min-height: calc(30 * var(--u)); display: flex; align-items: center; gap: calc(9 * var(--u)); font-size: calc(11.5 * var(--u)); color: var(--ink-2); border-top: 1px solid var(--rule-soft); padding-top: calc(7 * var(--u)); }
 
 /* Handoff overlay — the only place a shadow is allowed (§6.12: floating overlay). */
+/* The last frame is a single composed block in the centre of the stage: statement, what the
+   sequence produced, then the controls. It sits in the flow of .scene-pad rather than being
+   pinned to the floor, so nothing above it is left empty. */
 .handoff {
-  position: absolute; inset: auto calc(26 * var(--u)) calc(26 * var(--u)) calc(26 * var(--u));
+  align-self: flex-start; max-width: calc(648 * var(--u));
   background: var(--paper-0); border: 1px solid var(--ink-0);
-  box-shadow: var(--overlay-shadow); padding: calc(20 * var(--u));
-  display: flex; align-items: center; gap: calc(16 * var(--u)); flex-wrap: wrap;
+  box-shadow: var(--overlay-shadow); padding: calc(26 * var(--u)) calc(28 * var(--u));
+  display: flex; flex-direction: column; gap: calc(16 * var(--u));
 }
-.handoff h3 { margin: 0; font-size: calc(24 * var(--u)); font-weight: 560; letter-spacing: -0.02em; flex: 1 1 auto; }
+.handoff h3 {
+  margin: 0; font-size: calc(40 * var(--u)); line-height: calc(43 * var(--u));
+  font-weight: var(--w-display); letter-spacing: -0.03em;
+}
+.handoff .stage-kicker { margin: 0; }
+
+/* What the sequence produced, read from PROJECTION — the figures the frame is entitled to. */
+.wsum {
+  margin: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: calc(14 * var(--u)); border-block: 1px solid var(--rule-soft);
+  padding-block: calc(14 * var(--u));
+}
+.wsum > div { display: flex; flex-direction: column; gap: calc(4 * var(--u)); min-width: 0; }
+.wsum dt {
+  font-family: var(--f-mono); font-size: calc(9.5 * var(--u));
+  letter-spacing: 0.12em; color: var(--ink-2);
+}
+.wsum dd {
+  margin: 0; font-size: calc(17 * var(--u)); font-weight: var(--w-ui);
+  letter-spacing: -0.01em; color: var(--ink-0); font-variant-numeric: tabular-nums;
+}
 .handoff .cta { display: flex; gap: calc(9 * var(--u)); flex-wrap: wrap; }
 .handoff .cta a {
-  min-height: calc(38 * var(--u)); display: inline-flex; align-items: center; padding: 0 calc(14 * var(--u));
+  min-height: calc(40 * var(--u)); display: inline-flex; align-items: center; padding: 0 calc(15 * var(--u));
   border: 1px solid var(--rule); font-size: calc(12.5 * var(--u)); border-radius: var(--radius); color: var(--ink-1);
+  transition: border-color var(--flash) var(--e-settle), color var(--flash) var(--e-settle);
 }
+.handoff .cta a:hover { color: var(--ink-0); border-color: var(--ink-2); }
 .handoff .cta a.primary { background: var(--ink-0); color: var(--paper-0); border-color: var(--ink-0); }
+.handoff .cta a.primary:hover { background: var(--ink-1); color: var(--paper-0); }
 
 /* ---------------------------------------------------------------- transport */
 .transport {
@@ -500,23 +696,49 @@ button { font: inherit; border: 0; background: none; cursor: pointer; color: inh
    The reduced-motion path, the crawler's document and the LCP target are one build (§17, §18.4).
    It is visible to everyone: the film is the fast read, this is the complete one. */
 .argument { display: grid; gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
-.arg-act { background: var(--paper-2); padding: 12px 18px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.arg-act b { font-family: var(--f-mono); font-size: 11px; letter-spacing: 0.12em; color: var(--ink-0); }
-.arg-act span { font-family: var(--f-mono); font-size: 11px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
-.arg-beat { background: var(--paper-0); padding: 13px 18px; display: grid; grid-template-columns: 52px 92px 1fr; gap: 16px; align-items: baseline; }
-.arg-beat[data-gate="1"] { background: var(--evidence-soft); }
-.arg-beat .id { font-family: var(--f-mono); font-size: 12px; font-weight: 600; color: var(--ink-1); }
+.arg-act { background: var(--paper-2); padding: 9px var(--s4); display: flex; justify-content: space-between; gap: var(--s3); flex-wrap: wrap; }
+.arg-act b { font-family: var(--f-mono); font-size: var(--ts-label); letter-spacing: 0.13em; color: var(--ink-0); }
+.arg-act span { font-family: var(--f-mono); font-size: var(--ts-label); color: var(--ink-2); font-variant-numeric: tabular-nums; }
+/* One row per beat, on one line. Twenty-one two-line rows made this reference table 1,700px
+   tall and walled the argument off from the replay; a reference table should be dense. */
+.arg-beat {
+  background: var(--paper-0); padding: 9px var(--s4);
+  display: grid; grid-template-columns: 46px 96px minmax(0, 27ch) minmax(0, 1fr);
+  gap: var(--s4); align-items: baseline;
+}
+.arg-beat[data-gate="1"] { background: var(--evidence-soft); box-shadow: inset 2px 0 0 var(--evidence); }
+.arg-beat .id { font-family: var(--f-mono); font-size: var(--ts-status); font-weight: 600; color: var(--ink-1); }
 .arg-beat[data-gate="1"] .id { color: var(--evidence); }
-.arg-beat .tt { font-family: var(--f-mono); font-size: 11px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
-.arg-beat .nm { font-size: 14.5px; font-weight: 560; letter-spacing: -0.01em; }
-.arg-beat .tk { display: block; font-weight: 450; color: var(--ink-1); font-size: 14px; margin-top: 3px; letter-spacing: 0; }
+.arg-beat .tt { font-family: var(--f-mono); font-size: var(--ts-label); color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.arg-beat .nm { font-size: var(--ts-ui); font-weight: var(--w-ui); letter-spacing: -0.01em; }
+.arg-beat .tk { font-weight: var(--w-body); color: var(--ink-1); font-size: var(--ts-ui); letter-spacing: 0; }
 
 /* ---------------------------------------------------------------- proof / scale / security */
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(232px, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
+/* Four tiles in an auto-fit three-up grid leave one dead cell showing the rule colour through
+   the gap. The evidence section is explicitly two-up, so its four claims make a full square —
+   and the section reads at a different cadence from the three-up proof grid above it. */
+.tiles.pairs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 640px) { .tiles.pairs { grid-template-columns: minmax(0, 1fr); } }
 .tile { background: var(--paper-0); padding: 22px 20px; }
 .tile h3 { margin: 0 0 8px; font-size: 16px; font-weight: 590; letter-spacing: -0.012em; }
 .tile p { margin: 0; font-size: 14px; color: var(--ink-1); line-height: 1.5; }
-.tile .n { font-family: var(--f-mono); font-size: 11px; letter-spacing: 0.11em; color: var(--evidence); display: block; margin-bottom: 10px; }
+.tile .n {
+  font-family: var(--f-mono); font-size: var(--ts-label); letter-spacing: 0.12em;
+  color: var(--evidence); display: block; margin-bottom: 10px;
+}
+
+/* On the evidence section these are not kickers, they are the status of a claim, so they are
+   drawn as states with the same chip the security chain uses. A published failure has to look
+   like a published failure — it is the section's whole point, and the vocabulary is the one
+   V4_MIGRATION_MATRIX.md already uses. */
+.tile .n[data-state] {
+  display: inline-block; margin-bottom: var(--s3);
+  padding: 4px 8px; border-radius: var(--radius); border: 1px solid currentColor;
+}
+.tile .n[data-state="measured"] { color: var(--verified); background: color-mix(in srgb, var(--verified) 12%, transparent); }
+.tile .n[data-state="unsupported"] { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.tile .n[data-state="unproven"] { color: var(--review); background: var(--review-soft); }
 
 .scales { display: grid; grid-template-columns: repeat(auto-fit, minmax(258px, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
 .scale { background: var(--paper-0); padding: 26px 22px; }
@@ -541,6 +763,9 @@ button { font: inherit; border: 0; background: none; cursor: pointer; color: inh
 .packs { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
 .plan, .pack { background: var(--paper-0); padding: 24px 22px; display: flex; flex-direction: column; gap: 10px; }
 .plan .tag, .pack .tag { font-family: var(--f-mono); font-size: 10px; letter-spacing: 0.12em; color: var(--ink-2); min-height: 13px; }
+/* The chosen plan is marked the same way an approval gate is marked in the argument table —
+   a 2px evidence rule on the leading edge. One mark, used for one meaning, everywhere. */
+.plan[data-featured="1"] { box-shadow: inset 0 2px 0 var(--evidence); }
 .plan[data-featured="1"] .tag { color: var(--evidence); }
 .plan h3, .pack h3 { margin: 0; font-size: 18px; font-weight: 590; letter-spacing: -0.012em; }
 .plan .price, .pack .price { font-size: 32px; font-weight: 510; letter-spacing: -0.025em; font-variant-numeric: tabular-nums; }
@@ -560,18 +785,27 @@ button { font: inherit; border: 0; background: none; cursor: pointer; color: inh
 }
 .notice button { margin-left: auto; color: var(--ink-2); font-size: 12px; }
 
-footer.site { border-top: 1px solid var(--rule); padding: 34px 0 56px; }
+footer.site { border-top: 1px solid var(--rule); padding-block: var(--s6) var(--s7); }
 footer.site .row2 { display: flex; gap: 22px; flex-wrap: wrap; align-items: baseline; }
 footer.site p { margin: 0; font-family: var(--f-mono); font-size: 11px; color: var(--ink-2); line-height: 1.8; max-width: 82ch; }
 
 /* ---------------------------------------------------------------- responsive (§16) */
 @media (max-width: 900px) {
   .shell { padding: 0 18px; }
+  .stage-lead { grid-template-columns: minmax(0, 1fr); gap: var(--s4); }
+  .stage-lead h1, .stage-lead .t-lead { grid-column: 1; max-width: none; }
+  .band-head { grid-template-columns: minmax(0, 1fr); gap: var(--s3); }
+  .band-head .kicker { padding-top: 0; }
+  .band-head h2 { max-width: none; }
+  .objection { grid-column: 1; }
+  .arg-beat { grid-template-columns: 44px minmax(0, 1fr); }
   .masthead > div { padding: 12px 18px; }
   .masthead nav { display: none; }
-  .band { padding: 52px 0; }
-  .arg-beat { grid-template-columns: 46px 1fr; }
+  .band { padding-block: var(--s7); }
+  .arg-beat { grid-template-columns: 46px minmax(0, 1fr); gap: var(--s2) var(--s3); }
   .arg-beat .tt { grid-column: 2; }
+  .arg-beat .nm { grid-column: 2; }
+  .arg-beat .tk { grid-column: 2; }
   /* §16.4 — the mobile cut is a re-edit, not a shrink: the stage becomes taller, the side
      columns are withdrawn, and the internal design is re-based on a ~390-unit width so the
      main stage keeps its own fit instead of shrinking the desktop one. */
@@ -581,12 +815,43 @@ footer.site p { margin: 0; font-family: var(--f-mono); font-size: 11px; color: v
   .rail { grid-template-columns: 1fr auto; height: calc(56 * var(--u)); }
   .rail-macro { display: none; }
 
-  /* The masthead must wrap rather than push its call to action off the page. */
-  .masthead > div { flex-wrap: wrap; gap: 10px 14px; }
-  .wordmark span { display: none; }
+  /* One row, always: the identity and the single action. Sign-in is reachable from the
+     workspace route, so it withdraws here rather than forcing the header onto two lines. */
+  .masthead > div { flex-wrap: nowrap; gap: var(--s3); }
+  .masthead .signin { display: none; }
+  footer.site .wordmark span { display: block; }
+  .masthead .btn { margin-left: auto; }
 
-  /* §16.4 — every control is at least a 44px touch target on mobile. */
-  .transport .btn.small, .handoff .cta a { min-height: 44px; }
+  /* The stage titlebar is a fixed 40-unit strip, so its labels must not wrap into it. */
+  .titlebar .tb-cat { display: none; }
+  .tb-version { white-space: nowrap; }
+
+  /* S14 and S17 compose as two parts side by side; on the narrow frame they stack instead of
+     running past the right edge of the stage. */
+  .scene-pad.row { flex-direction: column; align-items: stretch !important; }
+  .scene-pad.row > .col { width: 100%; }
+
+  /* The last frame has to fit inside the 3:4 stage, so the panel is re-cut rather than
+     scaled: shorter statement leading, tighter stack, two-up figures. */
+  .handoff { padding: calc(16 * var(--u)); gap: calc(10 * var(--u)); }
+  .handoff h3 { font-size: calc(27 * var(--u)); line-height: calc(30 * var(--u)); }
+  .wsum { padding-block: calc(9 * var(--u)); gap: calc(8 * var(--u)); }
+  .wsum dd { font-size: calc(15 * var(--u)); }
+  /* Two controls to a row, the primary on its own: three stacked 44px targets are taller than
+     the frame they have to sit inside. */
+  .handoff .cta { gap: calc(8 * var(--u)); }
+  .handoff .cta a { flex: 1 1 calc(45% - 8 * var(--u)); justify-content: center; text-align: center; }
+  .handoff .cta a.primary { flex-basis: 100%; }
+
+  /* Six stage names do not fit across 375px, and the bars carry the progress on their own.
+     The macro line above the rail already names the beat. */
+  .rail-stage .lab { display: none; }
+
+  /* §16.4 — every control is at least a 44px touch target on mobile, the header action and
+     the scrubber included. The range input's own box, not its wrapper, is what a thumb hits. */
+  .btn.small, .transport .btn.small, .handoff .cta a { min-height: 44px; }
+  .scrub input { height: 44px; }
+  .wordmark { padding-block: 3px; }
   .transport { gap: 10px; }
   .transport .clock { margin-left: 0; }
 
@@ -594,7 +859,11 @@ footer.site p { margin: 0; font-family: var(--f-mono); font-size: 11px; color: v
      the stage, and an answer object that fits the narrow frame. The world grid keeps all of
      its units — reducing it would destroy the one thing the signature beat has to show. */
   .stream .card88:nth-child(n + 7) { display: none; }
-  .scene .row, .hops { flex-wrap: wrap; }
+  /* Wrap the chip rows inside a scene, but never the scene pad itself: the pad is stacked to
+     a column above, and a column flex container that is allowed to wrap puts the overflow in a
+     second column off the right of the frame rather than on a second line. */
+  .scene .row:not(.scene-pad), .hops { flex-wrap: wrap; }
+  .scene-pad.row { flex-wrap: nowrap; }
   .answer { width: 100%; }
   .answer .a { font-size: calc(40 * var(--u)); line-height: calc(43 * var(--u)); }
   .scene-pad { inset: calc(18 * var(--u)); }
@@ -605,7 +874,8 @@ footer.site p { margin: 0; font-family: var(--f-mono); font-size: 11px; color: v
   .facing .spine { height: calc(18 * var(--u)); }
   .facing .spine i { left: 0; right: 0; top: 50%; bottom: auto; width: auto; height: 1px; }
   .facing .thread { display: none; }
-  .handoff { position: static; margin-top: auto; }
+  .handoff { max-width: none; }
+  .wsum { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (prefers-reduced-motion: reduce) {
