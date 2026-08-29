@@ -65,9 +65,54 @@ export default function WorkspacePage() {
     return next;
   };
 
+  const loadCollectionCandidate = async (collectionId: string) => {
+    if (!/^collection-[a-f0-9]{32}$/.test(collectionId)) return;
+    const client = getSupabaseBrowserClient();
+    const { data } = client ? await client.auth.getSession() : { data: { session: null } };
+    const token = data.session?.access_token;
+    if (!token) return;
+    const response = await fetch(`/api/collections/${collectionId}`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    const json = await response.json() as {
+      code?: string;
+      artifactKey?: string;
+      candidatePromotion?: boolean;
+      artifact?: CollectionResult & {
+        schemaVersion?: string;
+        package?: { roots?: unknown; files?: Array<{ path?: unknown }> };
+      };
+    };
+    const artifact = json.artifact;
+    const paths = artifact?.package?.files?.map((file) => file.path).filter((path): path is string => typeof path === "string") ?? [];
+    if (
+      !response.ok ||
+      !artifact ||
+      artifact.schemaVersion !== "tavonel.collection_candidate.v1" ||
+      artifact.collectionId !== collectionId ||
+      artifact.candidatePromotion !== false ||
+      json.candidatePromotion !== false ||
+      artifact.validation.status !== "passed" ||
+      !paths.includes("ontology/knowledge.jsonld") ||
+      !paths.includes("ontology/knowledge.ttl") ||
+      !paths.includes("graph/nodes.csv") ||
+      !paths.includes("graph/relationships.csv")
+    ) {
+      setNotice(`Immutable collection verification failed (${json.code ?? response.status}).`);
+      return;
+    }
+    setCollectionResult({ ...artifact, artifactKey: json.artifactKey ?? "" });
+    setNotice(
+      `Immutable collection ${collectionId} reloaded from R2 and verified: directory, ontology JSON-LD/Turtle, graph CSV, RAG, provenance and validation roots are present; manifest ${artifact.manifestDigest}; candidatePromotion=false.`,
+    );
+  };
+
   useEffect(() => {
-    setProofMode(new URLSearchParams(window.location.search).get("foundation-proof") === "1");
+    const params = new URLSearchParams(window.location.search);
+    setProofMode(params.get("foundation-proof") === "1");
     void loadDocuments();
+    const collectionId = params.get("collection");
+    if (collectionId) void loadCollectionCandidate(collectionId);
   }, []);
 
   const uploadDocument = async (file: File, manageBusy = true): Promise<string | null> => {
@@ -147,6 +192,9 @@ export default function WorkspacePage() {
           return;
         }
         setCollectionResult(json);
+        const url = new URL(window.location.href);
+        url.searchParams.set("collection", json.collectionId);
+        window.history.replaceState(null, "", url);
         setNotice(
           `Collection ${json.collectionId} compiled from ${json.validation.counts.documents} documents: ${json.directoryPlan.length} directory entries, ${json.validation.counts.topics} topics, ${json.validation.counts.entities} entities, ${json.validation.counts.claims} claims and ${json.validation.counts.relations} evidence-bound relations. candidatePromotion=false.`,
         );
