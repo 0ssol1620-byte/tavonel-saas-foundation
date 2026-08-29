@@ -9,7 +9,7 @@ export function parsePaddleSignature(header: string): Signature | null {
   return { timestamp: Number(timestampValue), hashes };
 }
 export function verifyPaddleSignature(rawBody: string, signatureHeader: string | null, secret: string | undefined, now = Date.now()) {
-  if (!signatureHeader || !secret || secret.length < 16) return false;
+  if (!signatureHeader || !secret || secret.length < 32) return false;
   const signature = parsePaddleSignature(signatureHeader);
   if (!signature || Math.abs(now - signature.timestamp * 1000) > 300_000) return false;
   const expected = createHmac("sha256", secret).update(`${signature.timestamp}:${rawBody}`, "utf8").digest();

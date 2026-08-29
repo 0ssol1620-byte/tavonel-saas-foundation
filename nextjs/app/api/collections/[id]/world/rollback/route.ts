@@ -65,7 +65,9 @@ export async function POST(
       { status: 400, headers: NO_STORE }
     );
   }
-  const { membership } = foundationPilotAccess(user.id);
+  const access = foundationPilotAccess(user.id);
+  if (!access) return NextResponse.json({ code: "PILOT_ACCESS_REQUIRED" }, { status: 403, headers: NO_STORE });
+  const { membership } = access;
   if (membership.role !== "owner" && membership.role !== "admin") {
     return NextResponse.json(
       { code: "ROLLBACK_ROLE_REQUIRED" },

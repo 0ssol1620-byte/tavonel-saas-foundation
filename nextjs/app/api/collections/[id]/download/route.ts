@@ -22,7 +22,9 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const signer = readR2SignerEnv();
   if (!signer) return NextResponse.json({ code: "SIGNER_NOT_CONFIGURED" }, { status: 503, headers: NO_STORE });
 
-  const { membership } = foundationPilotAccess(user.id);
+  const access = foundationPilotAccess(user.id);
+  if (!access) return NextResponse.json({ code: "PILOT_ACCESS_REQUIRED" }, { status: 403, headers: NO_STORE });
+  const { membership } = access;
   const loaded = await loadPreferredCollectionCandidate(signer, membership.workspaceId, id);
   if (!loaded.ok) {
     return NextResponse.json(

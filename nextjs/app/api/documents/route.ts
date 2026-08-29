@@ -13,7 +13,9 @@ export async function GET(request: Request) {
   if (!user) {
     return NextResponse.json({ code: "AUTH_REQUIRED" }, { status: 401, headers: { "Cache-Control": "no-store" } });
   }
-  const { membership } = foundationPilotAccess(user.id);
+  const access = foundationPilotAccess(user.id);
+  if (!access) return NextResponse.json({ code: "PILOT_ACCESS_REQUIRED" }, { status: 403, headers: { "Cache-Control": "no-store" } });
+  const { membership } = access;
   const signer = readR2SignerEnv();
   if (!signer) {
     return NextResponse.json({ code: "SIGNER_NOT_CONFIGURED" }, { status: 503, headers: { "Cache-Control": "no-store" } });

@@ -53,7 +53,15 @@ async function signedS3Get(
   const signature = createHmac("sha256", kSigning).update(stringToSign, "utf8").digest("hex");
   headers.authorization = `AWS4-HMAC-SHA256 Credential=${env.accessKeyId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
   const query = canonicalQuery ? `?${canonicalQuery}` : "";
-  return fetch(`https://${host}${canonicalUri}${query}`, { method: "GET", headers });
+  try {
+    return await fetch(`https://${host}${canonicalUri}${query}`, {
+      method: "GET",
+      headers,
+      signal: AbortSignal.timeout(8_000),
+    });
+  } catch {
+    return new Response(null, { status: 599 });
+  }
 }
 
 async function signedS3PutJson(
@@ -87,7 +95,16 @@ async function signedS3PutJson(
   const kSigning = hmac(kService, "aws4_request");
   const signature = createHmac("sha256", kSigning).update(stringToSign, "utf8").digest("hex");
   headers.authorization = `AWS4-HMAC-SHA256 Credential=${env.accessKeyId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
-  return fetch(`https://${host}${canonicalUri}`, { method: "PUT", headers, body: Uint8Array.from(bytes) });
+  try {
+    return await fetch(`https://${host}${canonicalUri}`, {
+      method: "PUT",
+      headers,
+      body: Uint8Array.from(bytes),
+      signal: AbortSignal.timeout(8_000),
+    });
+  } catch {
+    return new Response(null, { status: 599 });
+  }
 }
 
 function parseListContents(xml: string): ImmutableObjectMeta[] {

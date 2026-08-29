@@ -31,7 +31,9 @@ export async function POST(request: Request) {
   if (!paddle || !offer || secret.length < 32) {
     return NextResponse.json({ code: "BILLING_NOT_CONFIGURED" }, { status: 503, headers: NO_STORE });
   }
-  const { membership } = foundationPilotAccess(user.id);
+  const access = foundationPilotAccess(user.id);
+  if (!access) return NextResponse.json({ code: "PILOT_ACCESS_REQUIRED" }, { status: 403, headers: NO_STORE });
+  const { membership } = access;
   const customData = createCheckoutBinding(
     { userId: user.id, workspaceId: membership.workspaceId, offerCode: body.offerCode },
     secret,
