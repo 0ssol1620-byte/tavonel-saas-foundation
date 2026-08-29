@@ -62,10 +62,22 @@
   --hairline: #23282d;
   --hairline-hi: #2e353b;
 
+  /*
+    Four text tones, and the bottom two are the ones that go wrong. Both used to sit below WCAG AA
+    on the panel ground (3.89:1 and 2.54:1) while carrying real labels -- the field names in the
+    evidence chain, the state words in the capability grid, the whole explanatory block on the
+    sign-in page. They are raised here to 5.20:1 and 4.87:1.
+
+    The genuinely dim look was worth keeping, so it moved to --decor, which is for marks that are
+    not text a reader needs: a strikethrough rule, a tree glyph, an inert control. Splitting the
+    token rather than nudging one value is the part that lasts -- the next label reaching for the
+    faintest tone now finds one that passes.
+  */
   --text-hi: #edeae4;
   --text-mid: #9aa3a8;
-  --text-lo: #697278;
-  --text-xlo: #4c565c;
+  --text-lo: #7d878d;
+  --text-xlo: #78828a;
+  --decor: #4c565c;
 
   /* State. These four are the entire chromatic vocabulary of the product. */
   --verified: #7be0be;
@@ -216,8 +228,6 @@ h3 { font-size: 17px; letter-spacing: -0.012em; font-variation-settings: "wght" 
 .band-head { display: flex; flex-direction: column; gap: 6px; margin-top: 34px; }
 .band-head .kicker { font-family: var(--f-mono); font-size: 10px; letter-spacing: 0.18em; color: var(--text-xlo); }
 
-.ilink { color: var(--text-lo); border-bottom: 1px solid var(--hairline-hi); padding: 0; }
-.ilink:hover { color: var(--text-hi); }
 
 /* Prose sits over a live canvas. The halo is invisible against the ground but guarantees a
    line separates from whatever node happens to land behind it. */
@@ -293,7 +303,7 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
   transition: background 220ms ease, border-color 220ms ease, color 220ms ease;
 }
 .btn:hover { background: var(--verified-dim); border-color: var(--verified); }
-.btn:disabled { cursor: not-allowed; background: transparent; border-color: var(--hairline); color: var(--text-xlo); }
+.btn:disabled { cursor: not-allowed; background: transparent; border-color: var(--hairline); color: var(--decor); }
 .btn.ghost { background: transparent; border-color: var(--hairline-hi); color: var(--text-mid); }
 .btn.ghost:hover { border-color: var(--text-lo); color: var(--text-hi); background: var(--g1); }
 .btn.small { padding: 8px 14px; font-size: 10.5px; }
@@ -448,12 +458,6 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 }
 
 
-.conn { display: grid; gap: 1px; background: var(--hairline); }
-.cn { background: var(--g1); padding: 13px 16px; display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 14px; align-items: center; }
-.cn-i { display: grid; place-items: center; width: 30px; height: 20px; border: 1px solid var(--hairline-hi); border-radius: 2px; font-family: var(--f-mono); font-size: 8.5px; color: var(--text-lo); }
-.cn-n { color: var(--text-hi); font-size: 13.5px; }
-.cn-n span { display: block; font-family: var(--f-mono); font-size: 10.5px; color: var(--text-lo); margin-top: 4px; }
-.cn-s { font-family: var(--f-mono); font-size: 11px; color: var(--text-lo); }
 
 /* ---------------------------------------------------------- 03 compile pipeline */
 
@@ -493,8 +497,8 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 .stop { background: var(--g1); padding: 11px 14px; font-size: 13px; color: var(--text-mid); display: flex; align-items: center; gap: 10px; transition: color 420ms ease; }
 .stop i { width: 5px; height: 5px; border-radius: 50%; background: var(--changed); flex: none; transition: background 420ms ease, transform 420ms var(--ease); }
 .stop span { position: relative; }
-.stop span::after { content: ""; position: absolute; left: 0; right: 100%; top: 52%; height: 1px; background: var(--text-xlo); transition: right 620ms var(--ease); }
-.js .rv.in .stop { color: var(--text-xlo); }
+.stop span::after { content: ""; position: absolute; left: 0; right: 100%; top: 52%; height: 1px; background: var(--decor); transition: right 620ms var(--ease); }
+.js .rv.in .stop { color: var(--decor); }
 .js .rv.in .stop i { background: var(--verified-dim); transform: scale(0.7); }
 .js .rv.in .stop span::after { right: 0; }
 /* Stagger by row so the strike-through reads as a pass moving down the list. */
@@ -515,7 +519,7 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 .arch > div span { margin-left: auto; color: var(--text-lo); }
 .arch .t1 { color: var(--text-hi); letter-spacing: 0.1em; }
 .arch .t2 { color: var(--text-mid); padding-left: 20px; position: relative; }
-.arch .t2::before { content: "└─"; position: absolute; left: 0; color: var(--text-xlo); }
+.arch .t2::before { content: "└─"; position: absolute; left: 0; color: var(--decor); }
 
 .chain2 { padding: 4px 0; }
 .chain2 .fact { margin: 0; padding: 14px 18px 12px; color: var(--text-hi); font-size: 17px; letter-spacing: -0.012em; }
@@ -588,10 +592,6 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 .check[data-hold="1"] i { background: var(--unresolved); }
 
 .record { font-family: var(--f-mono); font-size: 11px; }
-.rr { display: grid; grid-template-columns: 172px minmax(0, 1fr); gap: 14px; padding: 8px 18px; border-bottom: 1px solid var(--hairline); }
-.rr:last-child { border-bottom: 0; }
-.rr .k { color: var(--text-xlo); letter-spacing: 0.08em; text-transform: uppercase; font-size: 9.5px; padding-top: 2px; }
-.rr .v { color: var(--text-mid); font-variant-numeric: tabular-nums; }
 
 /* ---------------------------------------------------------- 09 two worlds */
 
@@ -901,7 +901,6 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
   .interlude, footer.site { margin-left: 0; padding-left: 0; }
   .chaos { grid-template-columns: repeat(2, 1fr); }
   .twoworlds, .chain, .tiles { grid-template-columns: minmax(0, 1fr); }
-  .nav nav { display: none; }
   .bc.opt { display: none; }
   .workspace { grid-template-columns: minmax(0, 1fr); }
   .side { border-right: 0; border-bottom: 1px solid var(--hairline); }
@@ -911,11 +910,20 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
   .arch-counts { grid-template-columns: repeat(2, 1fr); }
 }
 
+/*
+   Section links survive to 760px. They were hidden from 900px down, which took them off tablets
+   that still had room for them -- a page whose order is its argument should keep the means to move
+   through that order for as long as it fits.
+*/
+@media (max-width: 760px) {
+  .nav nav { display: none; }
+}
+
 @media (max-width: 620px) {
   .nav { gap: 10px; padding: 10px 14px; }
   .nav .btn.ghost { display: none; }
   .caps, .checks, .plans, .packs, .stops, .legend { grid-template-columns: minmax(0, 1fr); }
-  .cr, .rr, .wsrc { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .cr, .wsrc { grid-template-columns: minmax(0, 1fr); gap: 4px; }
   .meter { grid-template-columns: minmax(0, 1fr) auto; }
   .meter .mb { grid-column: 1 / -1; }
   .log, .diff, .arch { font-size: 10.5px; }

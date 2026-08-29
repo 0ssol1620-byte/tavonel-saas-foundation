@@ -36,9 +36,9 @@ import CompilePipeline from "@/components/compile-pipeline";
 import Logomark from "@/components/logomark";
 import RebuildConsole from "@/components/rebuild-console";
 import WorldField, { type WorldMode } from "@/components/world-field";
-import type { BillingOfferCode } from "@/lib/billing-catalog";
 import { AREAS, CHANGE, DISCLOSURE, KEPT, REBUILT, SOURCE_CENSUS, WORLD, n } from "@/lib/demo-world";
 import { useCheckout } from "@/lib/use-checkout";
+import { readCapabilities, type StatusResponse } from "@/lib/capabilities";
 import { useScrollProgress, useScrollScenes } from "@/lib/use-scroll-scenes";
 
 /* ------------------------------------------------------------------ scene definitions */
@@ -109,54 +109,6 @@ const PACKS = [
   ["Builder", "$30", "300 credits", "credit_builder"],
   ["Scale", "$75", "800 credits", "credit_scale"],
 ] as const;
-
-/* -------------------------------------------------------------------- live capability state */
-
-type StatusResponse = {
-  mode?: string;
-  activationPolicy?: Record<string, { enabled?: boolean; reason?: string }>;
-  auth?: string;
-  billing?: string;
-  r2?: string;
-};
-
-type Cap = { name: string; state: string; tone: "open" | "closed" | "direction" | "unknown"; note: string };
-
-/**
- * Fail-closed by construction: every row starts "unknown", and only a successful response moves
- * one to "open". A status endpoint that is unreachable, slow or malformed leaves the grid saying
- * it does not know -- never that a capability is available.
- */
-function readCapabilities(status: StatusResponse | null, failed: boolean): Cap[] {
-  const policy = status?.activationPolicy ?? {};
-  const gate = (key: string, name: string, openText: string, closedText: string): Cap => {
-    if (failed) return { name, state: "Unknown", tone: "unknown", note: "Status could not be read from this deployment." };
-    const entry = policy[key];
-    if (!status || entry?.enabled === undefined) return { name, state: "Checking", tone: "unknown", note: "Reading live deployment state." };
-    return entry.enabled
-      ? { name, state: "Open", tone: "open", note: entry.reason ?? openText }
-      : { name, state: "Closed", tone: "closed", note: entry.reason ?? closedText };
-  };
-  const flag = (value: string | undefined, name: string, openValues: string[], openText: string, closedText: string): Cap => {
-    if (failed) return { name, state: "Unknown", tone: "unknown", note: "Status could not be read from this deployment." };
-    if (!status || !value) return { name, state: "Checking", tone: "unknown", note: "Reading live deployment state." };
-    return openValues.includes(value)
-      ? { name, state: "Configured", tone: "open", note: openText }
-      : { name, state: "Not configured", tone: "closed", note: closedText };
-  };
-
-  return [
-    gate("customerIntake", "Document intake", "Private-pilot intake is open.", "Intake is closed in this deployment."),
-    gate("cdr", "Content disarm", "Sanitization runs before anything is read.", "Sanitization is not active."),
-    gate("ocrGpu", "OCR on scans", "Qualified GPU OCR is available.", "GPU OCR is gated."),
-    gate("candidatePromotion", "Promotion to the live world", "", "Promotion is always an explicit human decision. Closed on purpose, not pending."),
-    flag(status?.auth, "Google sign-in", ["google_oauth_configured"], "Sign-in is available to pilot users.", "No auth provider is configured here."),
-    flag(status?.billing, "Checkout and credits", ["sandbox_checkout_ready"], "Paddle sandbox checkout is complete. Live mode is not enabled.", "Sandbox checkout is not fully configured."),
-    flag(status?.r2, "Quarantine storage", ["signer_configured"], "The scoped upload signer is configured.", "No upload signer is configured here."),
-    { name: "Knowledge architecture", state: "Direction", tone: "direction", note: DISCLOSURE.ontology },
-    { name: "Selective recompilation", state: "Direction", tone: "direction", note: "Demonstrated above on fixture data. Not offered as a shipped capability in this deployment." },
-  ];
-}
 
 /* ----------------------------------------------------------------------------- the page */
 
@@ -305,7 +257,7 @@ export default function HomePage() {
         </Scene>
 
         {/* ═══════════════════════════════════════════════════ 03 · the compiled world */}
-        <Scene id={3} eyebrow="THE COMPILED WORLD" title={<>Not searchable files.<br />An organization an&nbsp;AI can reason about.</>}>
+        <Scene id={3} eyebrow="COMPILED WORLD" title={<>Not searchable files.<br />An organization an&nbsp;AI can reason about.</>}>
           <p className="lede rv">
             TAVONEL works out how your knowledge fits together &mdash; what the things are, what area
             they belong to, what supports them and what they affect. <b>This returns a structure.</b>
@@ -367,7 +319,7 @@ export default function HomePage() {
         </Scene>
 
         {/* ═══════════════════════════ 05 · rebuild & verify (was rebuild + verify) */}
-        <Scene id={5} eyebrow="REBUILD ONLY WHAT MOVED" title={<>Rebuild {REBUILT}.<br />Keep {n(KEPT)}.</>}>
+        <Scene id={5} eyebrow="REBUILD & VERIFY" title={<>Rebuild {REBUILT}.<br />Keep {n(KEPT)}.</>}>
           <p className="lede rv">
             Three lines moved in one handbook. A system that re-indexes on a schedule would read
             all {n(WORLD.facts)} facts again to find them. TAVONEL follows the dependency graph,
@@ -396,7 +348,7 @@ export default function HomePage() {
         </Scene>
 
         {/* ═══════════════════════════════════════════════════ 06 · the answer */}
-        <Scene id={6} eyebrow="WHY ANY OF THIS MATTERS" title={<>The same question,<br />asked of two worlds.</>}>
+        <Scene id={6} eyebrow="THE ANSWER" title={<>The same question,<br />asked of two worlds.</>}>
           <p className="lede rv">
             On the left is the world as it stood before the handbook changed &mdash; the one a system
             that re-indexes on a schedule would still be answering from. On the right, the world

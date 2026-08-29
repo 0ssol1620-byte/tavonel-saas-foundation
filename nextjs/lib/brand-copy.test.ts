@@ -33,6 +33,11 @@ const COPY_SURFACES = [
   "components/change-lattice.tsx",
   "components/compile-pipeline.tsx",
   "components/rebuild-console.tsx",
+  "components/world-explorer.tsx",
+  "app/login/page.tsx",
+  "app/not-found.tsx",
+  "app/error.tsx",
+  "lib/capabilities.ts",
   "lib/demo-world.ts",
 ];
 
@@ -80,9 +85,27 @@ describe("public copy", () => {
   });
 
   it("still labels the two unshipped capabilities as directions", () => {
+    // The grid moved from app/page.tsx into lib/capabilities.ts so its fail-closed behaviour could
+    // be tested. This assertion follows it: the rule is about the two labels, not their address.
+    const grid = read("lib/capabilities.ts");
+    expect(grid).toContain('state: "Direction"');
+    expect(grid).toContain("Knowledge architecture");
+    expect(grid).toContain("Selective recompilation");
+    expect(read("app/page.tsx")).toContain("readCapabilities");
+  });
+
+  it("names each scene the same way in the eyebrow and the instrument bar", () => {
+    // Two scenes used a headline where the others used the scene name, so the bar and the page
+    // called the same scene different things. The rule is now: the eyebrow names the scene, the
+    // bar reads its state, and the name is one string.
     const page = read("app/page.tsx");
-    expect(page).toContain('state: "Direction"');
-    expect(page).toContain("Knowledge architecture");
-    expect(page).toContain("Selective recompilation");
+    const barLabels = [...page.matchAll(/\{ id: \d+, label: "([^"]+)"/g)].map((m) => m[1]);
+    const eyebrows = [...page.matchAll(/eyebrow="([^"]+)"/g)].map((m) => m[1]);
+
+    expect(barLabels.length).toBeGreaterThan(1);
+    // Scene 01 is the hero and carries no eyebrow of its own.
+    for (const label of barLabels.slice(1)) {
+      expect(eyebrows, `scene "${label}" must use its bar label as its eyebrow`).toContain(label);
+    }
   });
 });

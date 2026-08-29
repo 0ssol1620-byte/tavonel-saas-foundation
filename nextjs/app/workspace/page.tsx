@@ -9,6 +9,10 @@ import { activationPolicy } from "@/lib/activation-policy";
 import type { DocumentListItem } from "@/lib/immutable-keys";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { useCheckout } from "@/lib/use-checkout";
+import { formatCount, formatTimestamp } from "@/lib/format";
+
+/** What this panel prints when it has no value. Not "0", and not a spinner that never resolves. */
+const UNKNOWN = "not read yet";
 
 const FOUNDATION_PROOF_PDF_URL = "/api/proof-pdf";
 const FOUNDATION_PROOF_PDF_SHA256 = "3df79d34abbca99308e79cb94461c1893582604d68329a41fd4bec1885e6adb4";
@@ -98,6 +102,13 @@ export default function WorkspacePage() {
   const [downloading, setDownloading] = useState(false);
   const [billingAccount, setBillingAccount] = useState<BillingAccount | null>(null);
   const [billingBusy, setBillingBusy] = useState(false);
+  /**
+   * Until this resolves the workspace knows nothing, and it must not fill that gap with
+   * plausible-looking values. A signed-out visitor previously saw the whole shell -- tabs, a
+   * billing panel, even a Sign out control -- and every action failed one toast at a time, which
+   * left them unable to tell a signed-out session from a broken product.
+   */
+  const [session, setSession] = useState<"checking" | "anonymous" | "signed-in">("checking");
 
   const signOut = async () => {
     const client = getSupabaseBrowserClient();
@@ -176,10 +187,23 @@ export default function WorkspacePage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setProofMode(params.get("foundation-proof") === "1");
-    void loadDocuments();
-    void loadBilling();
-    const collectionId = params.get("collection");
-    if (collectionId) void loadCollectionCandidate(collectionId);
+
+    void (async () => {
+      const client = getSupabaseBrowserClient();
+      const { data } = client ? await client.auth.getSession() : { data: { session: null } };
+      if (!data.session) {
+        // Send them somewhere that can actually help. /login explains what this is and, where no
+        // provider is configured, says so instead of offering a control that will fail.
+        setSession("anonymous");
+        window.location.replace("/login");
+        return;
+      }
+      setSession("signed-in");
+      void loadDocuments();
+      void loadBilling();
+      const collectionId = params.get("collection");
+      if (collectionId) void loadCollectionCandidate(collectionId);
+    })();
   }, []);
 
   const openBillingPortal = async () => {
@@ -481,6 +505,36 @@ export default function WorkspacePage() {
     window.history.replaceState(null, "", url.toString());
   };
 
+  if (session !== "signed-in") {
+    // No shell, no tabs, no numbers. Anything drawn here would be describing a workspace this
+    // visitor has not been shown to own.
+    return (
+      <main className="auth">
+        <header>
+          <Link href="/" className="wordmark"><Logomark /><b>TAVONEL</b></Link>
+          <span className="mode"><i aria-hidden="true" />FOUNDATION MODE</span>
+        </header>
+        <div className="auth-body">
+          <div className="auth-card">
+            <p className="eyebrow">WORKSPACE</p>
+            <h1>{session === "checking" ? "Checking your session." : "Sign-in required."}</h1>
+            <p className="lead" role="status">
+              {session === "checking"
+                ? "Reading the session for this browser. Your workspace opens on its own if one is active."
+                : "This workspace is tenant-scoped and opens only for a signed-in account. Taking you to sign-in."}
+            </p>
+            {session === "anonymous" ? (
+              <div className="auth-actions">
+                <Link className="btn" href="/login">Go to sign-in</Link>
+                <Link className="btn ghost" href="/">Back to the site</Link>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="workspace">
       <aside className="side">
@@ -589,10 +643,32 @@ export default function WorkspacePage() {
           ) : null}
 
           {tab === "knowledge" ? (
-            <WorldExplorer
-              collection={collectionResult}
-              onUpload={activationPolicy.customerIntake.enabled ? () => fileRef.current?.click() : undefined}
-            />
+            <>
+              <WorldExplorer
+                collection={collectionResult}
+                onUpload={activationPolicy.customerIntake.enabled ? () => fileRef.current?.click() : undefined}
+              />
+              {/*
+                This control was lost when the sidebar buttons became tabs: the handler survived
+                the refactor and its button did not, so OCR candidate verification silently left
+                the product. It belongs on this tab -- the JSON it checks is the raw material the
+                architecture above is built from.
+              */}
+              <section className="card">
+                <p className="eyebrow">OCR CANDIDATES</p>
+                <h2>Verify the extracted JSON</h2>
+                <p>
+                  Reloads the immutable OCR result for the most recently processed document and
+                  checks its digest and object key against the receipt. It reads; it promotes
+                  nothing.
+                </p>
+                <div className="billing-actions">
+                  <button type="button" disabled={busy} onClick={() => void verifyLatestCandidates()}>
+                    {busy ? "Working..." : "Verify latest candidates"}
+                  </button>
+                </div>
+              </section>
+            </>
           ) : null}
 
           {tab === "billing" ? (
@@ -605,19 +681,30 @@ export default function WorkspacePage() {
                 never remove per-job, daily, timeout, or scale-to-zero controls.
               </p>
             </div>
+            {/*
+              Never print a number this panel does not have. Falling back to 0 stated a balance
+              rather than admitting one had not arrived, which is the same misreport the public
+              capability grid is built to make impossible -- reproduced on the side of the product
+              where the number is about someone's money.
+            */}
             <dl>
               <div>
                 <dt>Subscription</dt>
                 <dd>
-                  {billingAccount?.subscriptionCancelAt
-                    ? `active until ${new Date(billingAccount.subscriptionCancelAt).toLocaleString()}`
-                    : billingAccount?.subscriptionStatus ?? "loading"}
+                  {!billingAccount
+                    ? UNKNOWN
+                    : billingAccount.subscriptionCancelAt
+                      ? `active until ${formatTimestamp(billingAccount.subscriptionCancelAt) ?? UNKNOWN}`
+                      : billingAccount.subscriptionStatus ?? UNKNOWN}
                 </dd>
               </div>
-              <div><dt>Available credits</dt><dd>{billingAccount?.creditBalance ?? 0}</dd></div>
-              <div><dt>Purchased</dt><dd>{billingAccount?.lifetimeCreditsPurchased ?? 0}</dd></div>
-              <div><dt>Reversed</dt><dd>{billingAccount?.lifetimeCreditsReversed ?? 0}</dd></div>
+              <div><dt>Available credits</dt><dd>{billingAccount ? formatCount(billingAccount.creditBalance) : UNKNOWN}</dd></div>
+              <div><dt>Purchased</dt><dd>{billingAccount ? formatCount(billingAccount.lifetimeCreditsPurchased) : UNKNOWN}</dd></div>
+              <div><dt>Reversed</dt><dd>{billingAccount ? formatCount(billingAccount.lifetimeCreditsReversed) : UNKNOWN}</dd></div>
             </dl>
+            {!billingAccount ? (
+              <p className="fine">Billing has not been read yet for this session. These are not zeroes &mdash; they are values this panel does not have.</p>
+            ) : null}
             <div className="packs workspace-packs">
               {([
                 ["Starter", "$12", "100 credits", "credit_starter"],
@@ -651,7 +738,7 @@ export default function WorkspacePage() {
                 Cancellation is scheduled. Access remains active through the current paid period.
               </p>
             ) : null}
-            {billingAccount?.updatedAt ? <small>Last persisted billing change · {new Date(billingAccount.updatedAt).toLocaleString()}</small> : null}
+            {billingAccount?.updatedAt ? <small>Last persisted billing change · {formatTimestamp(billingAccount.updatedAt)}</small> : null}
           </section>
           ) : null}
 

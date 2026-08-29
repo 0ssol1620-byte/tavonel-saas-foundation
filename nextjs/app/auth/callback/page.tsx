@@ -1,47 +1,87 @@
 "use client";
 
+/**
+ * The OAuth return.
+ *
+ * This page was left behind by the redesign: it still carried the old letter mark and the old
+ * `.brand` / `.hero` classes, so the one screen every Google sign-in passes through looked like a
+ * different product than the page before it and the page after it.
+ *
+ * It was also a dead end. On failure it printed a sentence and offered nothing -- no retry, no way
+ * back -- and after an OAuth redirect the browser's back button rarely lands anywhere useful. A
+ * failure here is the most likely moment to lose a pilot user, so it is the last place that should
+ * leave someone without a control.
+ */
+
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
+import Logomark from "@/components/logomark";
+
+type Phase = "working" | "unconfigured" | "failed";
 
 export default function AuthCallbackPage() {
-  const [status, setStatus] = useState("Completing Google sign-in…");
+  const [phase, setPhase] = useState<Phase>("working");
 
   useEffect(() => {
-    const client = getSupabaseBrowserClient();
-    if (!client) {
-      setStatus("Auth is not configured in this deployment.");
-      return;
-    }
-
     let cancelled = false;
-    client.auth.getSession().then(({ data, error }) => {
+    void (async () => {
+      const { getSupabaseBrowserClient } = await import("@/lib/supabase-browser");
+      const client = getSupabaseBrowserClient();
+      if (!client) {
+        if (!cancelled) setPhase("unconfigured");
+        return;
+      }
+      const { data, error } = await client.auth.getSession();
       if (cancelled) return;
       if (error || !data.session) {
-        setStatus("Sign-in did not complete. Google testing-mode users only.");
+        setPhase("failed");
         return;
       }
       window.location.replace("/workspace");
-    });
-
-    return () => {
-      cancelled = true;
-    };
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   return (
-    <main>
+    <main className="auth">
       <header>
-        <Link href="/" className="brand"><span>T</span>TAVONEL</Link>
+        <Link href="/" className="wordmark"><Logomark /><b>TAVONEL</b></Link>
+        <span className="mode"><i aria-hidden="true" />FOUNDATION MODE</span>
       </header>
-      <section className="hero">
-        <div>
-          <p className="eyebrow">● AUTH CALLBACK</p>
-          <h1>Signing you in.</h1>
-          <p className="lead" role="status">{status}</p>
-          <p className="fine">Private-pilot intake and qualified GPU OCR are open. Candidate promotion stays closed.</p>
+
+      <div className="auth-body">
+        <div className="auth-card">
+          <p className="eyebrow">SIGN IN</p>
+
+          {phase === "working" ? (
+            <>
+              <h1>Signing you in.</h1>
+              <p className="lead" role="status">
+                Completing the handover from Google. This takes a moment, and your workspace opens
+                on its own when it finishes.
+              </p>
+            </>
+          ) : (
+            <>
+              <h1>Sign-in did not complete.</h1>
+              <p className="lead" role="status">
+                {phase === "unconfigured"
+                  ? "No auth provider is configured in this deployment, so the sign-in could not be completed here. Nothing is wrong with your account."
+                  : "Google returned, but no session was established. This pilot admits testing-mode users only, so an account outside that list will stop at exactly this point."}
+              </p>
+              <div className="auth-actions">
+                <Link className="btn" href="/login">Try again</Link>
+                <Link className="btn ghost" href="/">Back to the site</Link>
+              </div>
+            </>
+          )}
+
+          <p className="fine">
+            No password is created or stored. Nothing you upload is promoted into a live world
+            without you deciding it.
+          </p>
         </div>
-      </section>
+      </div>
     </main>
   );
 }
