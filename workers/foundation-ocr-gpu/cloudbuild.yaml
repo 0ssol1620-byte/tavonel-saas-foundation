@@ -1,0 +1,13 @@
+steps:
+- name: gcr.io/cloud-builders/docker
+  args:
+    - build
+    - -t
+    - asia-northeast3-docker.pkg.dev/tavonel-saas-foundation/tavonel-foundation-ocr/foundation-ocr-gpu:latest
+    - .
+images:
+- asia-northeast3-docker.pkg.dev/tavonel-saas-foundation/tavonel-foundation-ocr/foundation-ocr-gpu:latest
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
+timeout: 3600s
