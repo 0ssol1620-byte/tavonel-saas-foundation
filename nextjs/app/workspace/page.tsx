@@ -120,6 +120,40 @@ export default function WorkspacePage() {
     }
   };
 
+  const verifyLatestCandidates = async () => {
+    const target = documents?.find((document) => document.hasOcrJson && document.ocrJsonKey && document.sanitizedKey);
+    if (!target) {
+      setNotice("No OCR candidates JSON is available yet. Refresh Documents after processing completes.");
+      return;
+    }
+    const client = getSupabaseBrowserClient();
+    const { data } = client ? await client.auth.getSession() : { data: { session: null } };
+    const token = data.session?.access_token;
+    if (!token) {
+      setNotice("Sign in with Google first.");
+      return;
+    }
+    const response = await fetch(`/api/documents/${target.documentId}/candidates`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    const json = await response.json() as {
+      code?: string;
+      candidatePromotion?: boolean;
+      candidates?: { status?: unknown; text?: unknown; pageCount?: unknown; inputSha256?: unknown; sourceImmutableKey?: unknown };
+    };
+    const candidates = json.candidates;
+    if (!response.ok || candidates?.status !== "ok" || typeof candidates.text !== "string" || typeof candidates.pageCount !== "number") {
+      setNotice(`OCR candidates JSON verification failed (${json.code ?? response.status}).`);
+      return;
+    }
+    const versionKey = target.versionKey.toLowerCase();
+    const digestMatches = candidates.inputSha256 === `sha256:${versionKey}`;
+    const keyMatches = candidates.sourceImmutableKey === target.sanitizedKey;
+    setNotice(
+      `OCR JSON verified for ${target.documentId}: ${candidates.pageCount} page(s), ${candidates.text.length} text characters, digest ${digestMatches ? "matched" : "mismatched"}, immutable key ${keyMatches ? "matched" : "mismatched"}, candidatePromotion=${json.candidatePromotion === false ? "false" : "invalid"}.`,
+    );
+  };
+
   return (
     <main className="workspace">
       <aside className="side">
@@ -129,7 +163,7 @@ export default function WorkspacePage() {
         <nav>
           <b>Overview</b>
           <button onClick={() => void loadDocuments()}>Documents</button>
-          <button onClick={() => setNotice("Candidates appear only from qualified sanitized inputs. Promotion stays a separate human decision.")}>Knowledge candidates</button>
+          <button onClick={() => void verifyLatestCandidates()}>Knowledge candidates</button>
           <button onClick={() => setNotice("Activity is retained only after a governed processing event.")}>Activity</button>
         </nav>
       </aside>
