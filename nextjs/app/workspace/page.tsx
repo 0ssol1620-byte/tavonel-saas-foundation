@@ -20,6 +20,12 @@ type CollectionResult = {
   artifactKey: string;
   manifestDigest: string;
   candidatePromotion: false;
+  sourceDocuments: Array<{ documentId: string }>;
+  coreExecution?: {
+    status: "completed";
+    runtime: string;
+    receipt: { requestId: string; outputSha256: string; candidatePromotion: false };
+  };
   directoryPlan: Array<{ path: string; kind: string; sourceIds: string[] }>;
   validation: {
     status: string;
@@ -205,6 +211,39 @@ export default function WorkspacePage() {
     setNotice("Batch processing timed out before every OCR output became immutable. No collection candidate was created.");
   };
 
+  const recompileWithCore = async () => {
+    const documentIds = collectionResult?.sourceDocuments.map((document) => document.documentId) ?? [];
+    if (documentIds.length < 2) {
+      setNotice("The durable collection does not contain enough source bindings for Core recompilation.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const client = getSupabaseBrowserClient();
+      const { data } = client ? await client.auth.getSession() : { data: { session: null } };
+      const token = data.session?.access_token;
+      if (!token) {
+        setNotice("Sign in with Google first.");
+        return;
+      }
+      setNotice(`Dispatching ${documentIds.length} immutable OCR documents to the separate Core runtime...`);
+      const response = await fetch("/api/collections/compile", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({ documentIds }),
+      });
+      const json = await response.json() as CollectionResult & { code?: string };
+      if (!response.ok || json.coreExecution?.status !== "completed") {
+        setNotice(`Core compilation failed (${json.code ?? response.status}). No candidate was promoted.`);
+        return;
+      }
+      setCollectionResult(json);
+      setNotice(`Separate Core runtime completed ${json.collectionId}; receipt ${json.coreExecution.receipt.requestId}; output ${json.coreExecution.receipt.outputSha256}; candidatePromotion=false.`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const uploadDocuments = async (files: File[]) => {
     if (files.length === 0) return;
     setBusy(true);
@@ -377,6 +416,11 @@ export default function WorkspacePage() {
                   <small>{collectionResult.directoryPlan.length} directory entries · {collectionResult.validation.counts.packageFiles} package files</small>
                   <small>{collectionResult.artifactKey}</small>
                   <small>{collectionResult.manifestDigest}</small>
+                  {collectionResult.coreExecution ? (
+                    <small>Core completed · {collectionResult.coreExecution.runtime} · {collectionResult.coreExecution.receipt.requestId}</small>
+                  ) : (
+                    <button disabled={busy} onClick={() => void recompileWithCore()}>{busy ? "Running Core..." : "Recompile with separate Core"}</button>
+                  )}
                 </div>
               ) : <div className="nodes"><i /><i /><i /><i /><i /></div>}
               <p>Sanitized inputs can produce a reviewable directory, ontology, graph, RAG and provenance package. No candidate is promoted to a world without a separate human decision. candidatePromotion stays closed.</p>

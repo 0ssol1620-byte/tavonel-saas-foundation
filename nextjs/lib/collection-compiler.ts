@@ -54,6 +54,7 @@ type KnowledgeEdge = {
 
 export type CollectionCandidateArtifact = {
   schemaVersion: typeof COLLECTION_CANDIDATE_SCHEMA;
+  executionAuthority: "tavonel-foundation-core-runtime-v1";
   lifecycle: "candidate";
   candidatePromotion: false;
   collectionId: string;
@@ -359,6 +360,7 @@ export function compileCollectionCandidate(inputs: CollectionOcrInput[]): Collec
 
   const withoutDigest = {
     schemaVersion: COLLECTION_CANDIDATE_SCHEMA,
+    executionAuthority: "tavonel-foundation-core-runtime-v1" as const,
     lifecycle: "candidate" as const,
     candidatePromotion: false as const,
     collectionId,

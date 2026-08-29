@@ -25,13 +25,21 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   if (!listed.ok) {
     return NextResponse.json({ code: listed.code }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
-  const key = listed.objects.map((item) => item.key).find((item) => isCollectionCandidateKey(membership.workspaceId, item) && item.includes(`/collections/${id}/`));
-  if (!key) {
+  const keys = listed.objects
+    .map((item) => item.key)
+    .filter((item) => isCollectionCandidateKey(membership.workspaceId, item) && item.includes(`/collections/${id}/`))
+    .slice(0, 12);
+  if (keys.length === 0) {
     return NextResponse.json({ code: "NOT_FOUND" }, { status: 404, headers: { "Cache-Control": "no-store" } });
   }
-  const fetched = await getWorkspaceCollectionCandidate(signer, membership.workspaceId, key);
-  if (!fetched.ok) {
-    return NextResponse.json({ code: fetched.code }, { status: fetched.code === "NOT_FOUND" ? 404 : 503, headers: { "Cache-Control": "no-store" } });
+  const fetched = await Promise.all(keys.map(async (key) => ({ key, result: await getWorkspaceCollectionCandidate(signer, membership.workspaceId, key) })));
+  const available = fetched.filter((item): item is { key: string; result: { ok: true; json: unknown } } => item.result.ok);
+  const preferred = available.find((item) => {
+    const artifact = item.result.json as { coreExecution?: { status?: unknown; receipt?: { candidatePromotion?: unknown } } };
+    return artifact.coreExecution?.status === "completed" && artifact.coreExecution.receipt?.candidatePromotion === false;
+  }) ?? available[0];
+  if (!preferred) {
+    return NextResponse.json({ code: "GET_FAILED" }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
-  return NextResponse.json({ code: "OK", artifactKey: key, candidatePromotion: false, artifact: fetched.json }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ code: "OK", artifactKey: preferred.key, candidatePromotion: false, artifact: preferred.result.json }, { headers: { "Cache-Control": "no-store" } });
 }

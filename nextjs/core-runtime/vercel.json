@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
+  "regions": ["icn1"],
+  "builds": [
+    { "src": "core-runtime/api/compile.ts", "use": "@vercel/node" }
+  ],
+  "routes": [
+    { "src": "/health", "methods": ["GET"], "dest": "/core-runtime/api/compile.ts" },
+    { "src": "/v1/compile", "methods": ["POST"], "dest": "/core-runtime/api/compile.ts" }
+  ]
+}

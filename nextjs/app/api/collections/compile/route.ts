@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { compileCollectionCandidate, validateCollectionOcrInput } from "@/lib/collection-compiler";
+import { validateCollectionOcrInput } from "@/lib/collection-compiler";
+import { dispatchCoreCompile, readCoreRuntimeEnv } from "@/lib/core-runtime";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
 import { collectionCandidateKey, DOCUMENT_ID_PATTERN, groupImmutableDocuments } from "@/lib/immutable-keys";
 import { getWorkspaceOcrJson, listImmutableWorkspaceObjects, putWorkspaceCollectionCandidate } from "@/lib/r2-objects";
@@ -37,6 +38,10 @@ export async function POST(request: Request) {
   if (!signer) {
     return NextResponse.json({ code: "SIGNER_NOT_CONFIGURED" }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
+  const core = readCoreRuntimeEnv();
+  if (!core) {
+    return NextResponse.json({ code: "CORE_NOT_CONFIGURED" }, { status: 503, headers: { "Cache-Control": "no-store" } });
+  }
   const listed = await listImmutableWorkspaceObjects(signer, membership.workspaceId);
   if (!listed.ok) {
     return NextResponse.json({ code: listed.code }, { status: 503, headers: { "Cache-Control": "no-store" } });
@@ -67,12 +72,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ code: "OCR_BINDING_INVALID" }, { status: 422, headers: { "Cache-Control": "no-store" } });
   }
 
-  const artifact = compileCollectionCandidate(inputs.filter((item) => item !== null));
+  const compiled = await dispatchCoreCompile(core, membership.workspaceId, inputs.filter((item) => item !== null));
+  if (!compiled.ok) {
+    return NextResponse.json({ code: compiled.code }, { status: 503, headers: { "Cache-Control": "no-store" } });
+  }
+  const { artifact, receipt } = compiled.result;
   const key = collectionCandidateKey(membership.workspaceId, artifact.collectionId, artifact.manifestDigest.replace("sha256:", ""));
   if (!key) {
     return NextResponse.json({ code: "COLLECTION_KEY_INVALID" }, { status: 500, headers: { "Cache-Control": "no-store" } });
   }
-  const stored = await putWorkspaceCollectionCandidate(signer, membership.workspaceId, key, artifact);
+  const storedArtifact = {
+    ...artifact,
+    coreExecution: {
+      status: "completed" as const,
+      runtime: compiled.result.runtime,
+      receipt,
+    },
+  };
+  const stored = await putWorkspaceCollectionCandidate(signer, membership.workspaceId, key, storedArtifact);
   if (!stored.ok) {
     return NextResponse.json({ code: stored.code }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
@@ -85,6 +102,8 @@ export async function POST(request: Request) {
     writeStatus: stored.status,
     artifactBytes: stored.bytes,
     candidatePromotion: false,
+    sourceDocuments: artifact.sourceDocuments,
+    coreExecution: storedArtifact.coreExecution,
     blueprint: artifact.blueprint,
     directoryPlan: artifact.directoryPlan,
     ontology: artifact.ontology,

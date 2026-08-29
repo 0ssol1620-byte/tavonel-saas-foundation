@@ -27,6 +27,7 @@ describe("Foundation collection candidate compiler", () => {
     const second = compileCollectionCandidate([...inputs].reverse());
 
     expect(first).toEqual(second);
+    expect(first.executionAuthority).toBe("tavonel-foundation-core-runtime-v1");
     expect(first.lifecycle).toBe("candidate");
     expect(first.candidatePromotion).toBe(false);
     expect(first.sourceDocuments).toHaveLength(2);
