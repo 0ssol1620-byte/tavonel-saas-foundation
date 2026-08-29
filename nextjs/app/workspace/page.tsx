@@ -1,11 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import Logomark from "@/components/logomark";
+import WorldExplorer from "@/components/world-explorer";
 import { Download, FileText, LockKeyhole, ShieldCheck, UploadCloud } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { activationPolicy } from "@/lib/activation-policy";
 import type { DocumentListItem } from "@/lib/immutable-keys";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { useCheckout } from "@/lib/use-checkout";
 
 const FOUNDATION_PROOF_PDF_URL = "/api/proof-pdf";
 const FOUNDATION_PROOF_PDF_SHA256 = "3df79d34abbca99308e79cb94461c1893582604d68329a41fd4bec1885e6adb4";
@@ -69,9 +72,25 @@ const GATE_LABELS = {
   candidatePromotion: "Promotion to the live world",
 } as const;
 
+type WorkspaceTab = "overview" | "knowledge" | "billing" | "integrity";
+
+const TABS: { id: WorkspaceTab; label: string }[] = [
+  { id: "overview", label: "Overview" },
+  { id: "knowledge", label: "Knowledge" },
+  { id: "billing", label: "Billing & capacity" },
+  { id: "integrity", label: "Processing integrity" },
+];
+
 export default function WorkspacePage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [notice, setNotice] = useState(intakeNotice);
+  const { start: buy, busy: buying } = useCheckout(setNotice);
+  // Read from the URL on mount so a linked or reloaded workspace opens on the same view.
+  const [tab, setTab] = useState<WorkspaceTab>("overview");
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("tab");
+    if (TABS.some((t) => t.id === requested)) setTab(requested as WorkspaceTab);
+  }, []);
   const [busy, setBusy] = useState(false);
   const [documents, setDocuments] = useState<DocumentListItem[] | null>(null);
   const [proofMode, setProofMode] = useState(false);
@@ -79,6 +98,13 @@ export default function WorkspacePage() {
   const [downloading, setDownloading] = useState(false);
   const [billingAccount, setBillingAccount] = useState<BillingAccount | null>(null);
   const [billingBusy, setBillingBusy] = useState(false);
+
+  const signOut = async () => {
+    const client = getSupabaseBrowserClient();
+    if (!client) return;
+    await client.auth.signOut();
+    window.location.replace("/");
+  };
 
   const loadDocuments = async (): Promise<DocumentListItem[]> => {
     const client = getSupabaseBrowserClient();
@@ -442,22 +468,46 @@ export default function WorkspacePage() {
     );
   };
 
+  /**
+   * The sidebar used to be four buttons that called a loader or popped a toast: nothing switched
+   * view, so every panel was stacked on one page and "Activity" did nothing at all. These are
+   * real tabs now, and the choice is mirrored into the URL so a workspace view can be linked,
+   * reloaded and navigated back to.
+   */
+  const setTabAndUrl = (next: WorkspaceTab) => {
+    setTab(next);
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", next);
+    window.history.replaceState(null, "", url.toString());
+  };
+
   return (
     <main className="workspace">
       <aside className="side">
-        <Link href="/" className="brand"><span>T</span>TAVONEL</Link>
+        <Link href="/" className="brand"><Logomark size={22} />TAVONEL</Link>
         <p className="eyebrow">WORKSPACE</p>
         <div className="workspace-name"><strong>Private pilot</strong><small>Foundation environment</small></div>
-        <nav>
-          <b>Overview</b>
-          <button onClick={() => void loadDocuments()}>Documents</button>
-          <button onClick={() => void verifyLatestCandidates()}>Knowledge candidates</button>
-          <button onClick={() => setNotice("Activity is retained only after a governed processing event.")}>Activity</button>
+        <nav aria-label="Workspace sections">
+          {TABS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              aria-current={tab === item.id ? "page" : undefined}
+              className={tab === item.id ? "on" : undefined}
+              onClick={() => setTabAndUrl(item.id)}
+            >
+              {item.label}
+            </button>
+          ))}
         </nav>
+        <div className="side-foot">
+          <button type="button" onClick={() => void loadDocuments()}>Refresh documents</button>
+          <button type="button" onClick={() => void signOut()}>Sign out</button>
+        </div>
       </aside>
       <section className="workspace-body">
         <header>
-          <span><strong>Private pilot</strong> · Overview<br /><small>Your governed knowledge space</small></span>
+          <span><strong>Private pilot</strong> · {TABS.find((t) => t.id === tab)?.label}<br /><small>Your governed knowledge space</small></span>
           {activationPolicy.customerIntake.enabled ? (
             <>
               <input ref={fileRef} type="file" multiple hidden onChange={(event) => { const files = [...(event.target.files ?? [])]; if (files.length > 0) void uploadDocuments(files); }} />
@@ -475,10 +525,13 @@ export default function WorkspacePage() {
           )}
         </header>
         <div className="workspace-content">
+          <p className="notice static"><strong>Guardrail active.</strong> {notice}</p>
+
+          {tab === "overview" ? (
+          <>
           <p className="eyebrow">● FOUNDATION · SAFE MODE</p>
           <h1>A quieter place to think.</h1>
           <p className="lead">Build a traceable body of knowledge from documents that have passed the full safety chain. Quarantine is browser-direct; the application server never carries file bytes.</p>
-          <p className="notice static"><strong>Guardrail active.</strong> {notice}</p>
           <div className="workspace-grid">
             <section className="card document-card">
               <p className="eyebrow">YOUR LIBRARY</p>
@@ -498,6 +551,11 @@ export default function WorkspacePage() {
                   <FileText size={22} />
                   <strong>No document metadata yet</strong>
                   <p>A short-lived browser-direct quarantine capability is required. The application server and database never carry file bytes. Sign in to load immutable keys after CDR.</p>
+                  {activationPolicy.customerIntake.enabled ? (
+                    <div className="billing-actions">
+                      <button type="button" onClick={() => fileRef.current?.click()}>Upload your first document</button>
+                    </div>
+                  ) : null}
                 </div>
               )}
             </section>
@@ -524,9 +582,20 @@ export default function WorkspacePage() {
                   )}
                 </div>
               ) : <div className="nodes"><i /><i /><i /><i /><i /></div>}
-              <p>Sanitized inputs can produce a reviewable directory, ontology, graph, RAG and provenance package. No candidate is promoted to a world without a separate human decision. candidatePromotion stays closed.</p>
+              <p>Sanitized inputs can produce a reviewable directory, ontology, graph, RAG and provenance package. No candidate is promoted to a world without a separate human decision. Promotion to a live world stays closed.</p>
             </section>
           </div>
+          </>
+          ) : null}
+
+          {tab === "knowledge" ? (
+            <WorldExplorer
+              collection={collectionResult}
+              onUpload={activationPolicy.customerIntake.enabled ? () => fileRef.current?.click() : undefined}
+            />
+          ) : null}
+
+          {tab === "billing" ? (
           <section className="card billing-card">
             <div>
               <p className="eyebrow">BILLING & CAPACITY</p>
@@ -549,6 +618,27 @@ export default function WorkspacePage() {
               <div><dt>Purchased</dt><dd>{billingAccount?.lifetimeCreditsPurchased ?? 0}</dd></div>
               <div><dt>Reversed</dt><dd>{billingAccount?.lifetimeCreditsReversed ?? 0}</dd></div>
             </dl>
+            <div className="packs workspace-packs">
+              {([
+                ["Starter", "$12", "100 credits", "credit_starter"],
+                ["Builder", "$30", "300 credits", "credit_builder"],
+                ["Scale", "$75", "800 credits", "credit_scale"],
+              ] as const).map(([name, price, credits, offerCode]) => (
+                <article className="pack" key={name}>
+                  <span className="tag">PREPAID CAPACITY</span>
+                  <h3>{name}</h3>
+                  <span className="price">{price} <small>{credits}</small></span>
+                  <button type="button" disabled={Boolean(buying)} onClick={() => void buy(offerCode)}>
+                    {buying === offerCode ? "Opening checkout..." : "Buy credits"}
+                  </button>
+                </article>
+              ))}
+            </div>
+            <p className="fine">
+              Credits are reserved before a qualified job and settled against observed runtime.
+              A checkout never creates them &mdash; only a signed, idempotently persisted webhook
+              does &mdash; so a balance here can lag a completed payment by a moment.
+            </p>
             <div className="billing-actions">
               <button disabled={billingBusy} onClick={() => void loadBilling()}>Refresh billing</button>
               <button disabled={billingBusy || !billingAccount?.paddleCustomerId} onClick={() => void openBillingPortal()}>
@@ -563,6 +653,9 @@ export default function WorkspacePage() {
             ) : null}
             {billingAccount?.updatedAt ? <small>Last persisted billing change · {new Date(billingAccount.updatedAt).toLocaleString()}</small> : null}
           </section>
+          ) : null}
+
+          {tab === "integrity" ? (
           <section className="card gates">
             <p className="eyebrow">PROCESSING INTEGRITY</p>
             <h2>Four gates</h2>
@@ -581,6 +674,7 @@ export default function WorkspacePage() {
             </div>
             <p className="fine"><ShieldCheck size={15} /> All capability issuance is server-authorized and tenant-scoped.</p>
           </section>
+          ) : null}
         </div>
       </section>
     </main>

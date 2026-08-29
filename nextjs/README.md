@@ -11,3 +11,10 @@ Completed separate-Core collection candidates can be downloaded from the signed-
 Google OAuth is enabled for private-pilot users and protected APIs verify the Supabase bearer session. Paddle remains sandbox-only, but now includes overlay checkout, immutable event receipts, ordered subscription projection, prepaid-credit purchase and conservative refund/chargeback reversal, plus fresh customer-portal sessions. Live payment must not be enabled without a separate approval and qualification pass.
 
 Run `pnpm install`, then `pnpm test && pnpm run check && pnpm run build`. Do not release this package, configure live payment, or enable document intake until the provider checklist and synthetic qualification gates have passed.
+
+The public surface — landing, `/login`, and the signed-in workspace — is specified by
+[`docs/UI_ARCHITECTURE_2026-08-29.md`](../docs/UI_ARCHITECTURE_2026-08-29.md), which is canonical
+and supersedes the cinematic replay spec's definition of Home. Read it before changing anything
+under `app/` or `components/`: the capability grid is fail-closed against `/api/status`, every
+figure the landing prints is derived from `lib/demo-world.ts` under test, and `lib/brand-copy.test.ts`
+enforces the banned-phrase list rather than documenting it.

@@ -59,11 +59,11 @@ export default function ChangeLattice() {
   }, []);
 
   return (
-    // The interlude carries scene 05 rather than numbering itself. It has to be observable:
+    // The interlude carries scene 03 rather than numbering itself. It has to be observable:
     // with no data-scene at all, a viewport filled entirely by the interlude leaves the scene
     // observer with nothing intersecting, so a deep link or a fast scroll lands here with the
     // bar and rail still reading whatever they said last -- which is scene 01 on a fresh load.
-    <div className="interlude" data-scene="5">
+    <div className="interlude" data-scene="3">
       <canvas ref={canvasRef} className="lattice" aria-hidden="true" />
       <div className="interlude-copy">
         <p className="interlude-h">

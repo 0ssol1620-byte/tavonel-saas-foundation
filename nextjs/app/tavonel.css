@@ -293,7 +293,7 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
   transition: background 220ms ease, border-color 220ms ease, color 220ms ease;
 }
 .btn:hover { background: var(--verified-dim); border-color: var(--verified); }
-.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn:disabled { cursor: not-allowed; background: transparent; border-color: var(--hairline); color: var(--text-xlo); }
 .btn.ghost { background: transparent; border-color: var(--hairline-hi); color: var(--text-mid); }
 .btn.ghost:hover { border-color: var(--text-lo); color: var(--text-hi); background: var(--g1); }
 .btn.small { padding: 8px 14px; font-size: 10.5px; }
@@ -431,6 +431,22 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 .panel-head .right { color: var(--text-xlo); font-size: 9.5px; letter-spacing: 0.14em; }
 
 /* ---------------------------------------------------------- 02 sources */
+
+/* One chip per kind of system. This replaced a six-row ledger with per-source byte counts:
+   the ledger said "you point at what you already have" at six times the height, and nobody
+   was reading 8.1 GB as information. */
+.sources { display: flex; flex-wrap: wrap; gap: 7px; }
+.src {
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--text-lo);
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
+  padding: 5px 10px;
+  background: var(--g1);
+}
+
 
 .conn { display: grid; gap: 1px; background: var(--hairline); }
 .cn { background: var(--g1); padding: 13px 16px; display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 14px; align-items: center; }
@@ -703,20 +719,8 @@ footer.site .shell { display: flex; flex-direction: column; gap: 14px; }
   align-content: start;
   background: var(--g1);
 }
-.brand { display: inline-flex; align-items: center; gap: 10px; color: var(--text-hi); font-family: var(--f-mono); font-size: 12.5px; letter-spacing: 0.2em; }
-.brand > span:first-child {
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  border: 1px solid var(--verified-dim);
-  background: var(--verified-deep);
-  border-radius: 3px;
-  font-size: 10px;
-  color: var(--verified);
-  letter-spacing: 0;
-  flex: none;
-}
+.brand { display: inline-flex; align-items: center; gap: 9px; color: var(--text-hi); font-family: var(--f-mono); font-size: 12.5px; letter-spacing: 0.2em; }
+.brand .logomark { flex: none; color: var(--text-lo); }
 
 .workspace-name { display: flex; flex-direction: column; gap: 3px; }
 .workspace-name strong { color: var(--text-hi); font-size: 15px; font-weight: 500; letter-spacing: -0.01em; }
@@ -732,6 +736,13 @@ footer.site .shell { display: flex; flex-direction: column; gap: 14px; }
   transition: color 180ms ease, background 180ms ease;
 }
 .side nav button:hover, .side nav a:hover { color: var(--text-hi); background: var(--g2); }
+.side nav button.on { color: var(--text-hi); background: var(--g2); }
+/* The current tab gets the verified accent as a spine, the same marker the scene rail uses. */
+.side nav button.on { box-shadow: inset 2px 0 0 var(--verified); }
+
+.side-foot { margin-top: auto; display: flex; flex-direction: column; gap: 2px; padding-top: 16px; border-top: 1px solid var(--hairline); }
+.side-foot button { text-align: left; padding: 7px 10px; border-radius: 3px; font-family: var(--f-mono); font-size: 10.5px; letter-spacing: 0.08em; color: var(--text-xlo); transition: color 180ms ease; }
+.side-foot button:hover { color: var(--text-mid); }
 
 .workspace-body { display: flex; flex-direction: column; min-width: 0; }
 .workspace-body > header {
@@ -816,6 +827,10 @@ footer.site .shell { display: flex; flex-direction: column; gap: 14px; }
 .billing-card dt { font-family: var(--f-mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-xlo); }
 .billing-card dd { margin: 0; font-family: var(--f-mono); font-size: 12px; color: var(--text-hi); font-variant-numeric: tabular-nums; text-align: right; }
 .billing-card small { font-family: var(--f-mono); font-size: 10px; color: var(--text-xlo); }
+/* The pack grid inside the workspace sits on the card ground, not the page ground. */
+.workspace-packs { border-color: var(--hairline); }
+.workspace-packs .pack { background: var(--ground); padding: 14px; gap: 8px; }
+.workspace-packs .price { font-size: 22px; }
 .billing-card > div:first-child { display: flex; flex-direction: column; gap: 7px; }
 
 /* The guardrail line is a paragraph, not a toast: it stays in flow and its lead-in stays
@@ -834,6 +849,41 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
 .hero h1 { font-size: clamp(30px, 4.4vw, 52px); letter-spacing: -0.03em; }
 .hero .lead { margin-top: 14px; }
 .hero .fine { margin-top: 18px; }
+
+/* ---------------------------------------------------------- knowledge architecture */
+
+.arch-counts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 3px; overflow: hidden; }
+.ac { background: var(--ground); padding: 11px 13px; display: flex; flex-direction: column; gap: 3px; }
+.ac-v { font-size: 20px; color: var(--text-hi); letter-spacing: -0.02em; font-variation-settings: "wght" 560; font-variant-numeric: tabular-nums; }
+.ac-k { font-family: var(--f-mono); font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-xlo); }
+
+.tree { display: grid; gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 3px; overflow: hidden; }
+.tree-root { background: var(--ground); }
+.tree-root > button { width: 100%; display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 13px; text-align: left; font-family: var(--f-mono); font-size: 11.5px; color: var(--text-mid); transition: color 180ms ease, background 180ms ease; }
+.tree-root > button:hover { color: var(--text-hi); background: var(--g1); }
+.tree-root .tw { color: var(--text-xlo); }
+.tree-root[data-open="1"] > button { color: var(--text-hi); }
+.tree-root[data-open="1"] .tw { color: var(--verified); }
+.tree-root .tc { color: var(--text-xlo); font-variant-numeric: tabular-nums; }
+.tree-root ul { list-style: none; margin: 0; padding: 0 13px 12px 41px; display: grid; gap: 4px; }
+.tree-root li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; font-family: var(--f-mono); font-size: 10.5px; color: var(--text-lo); }
+.tree-root .tp { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree-root .tk { color: var(--text-xlo); }
+.tree-root li.more { color: var(--text-xlo); grid-template-columns: 1fr; }
+
+/* ============================================================ sign in */
+
+.auth { min-height: 100vh; display: flex; flex-direction: column; background: var(--ground); }
+.auth > header { display: flex; align-items: center; gap: 14px; padding: 16px clamp(20px, 4vw, 40px); border-bottom: 1px solid var(--hairline); }
+.auth-body { flex: 1; display: grid; place-items: center; padding: clamp(28px, 6vh, 72px) 20px; }
+.auth-card { width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 14px; border: 1px solid var(--hairline); border-radius: 5px; background: var(--g1); padding: clamp(22px, 4vw, 34px); }
+.auth-card h1 { font-size: clamp(26px, 3.4vw, 34px); letter-spacing: -0.03em; }
+.auth-card .lead { font-size: 14px; }
+.auth-actions { display: flex; flex-direction: column; gap: 9px; margin-top: 4px; }
+.auth-actions .btn { justify-content: center; }
+.auth-facts { list-style: none; margin: 6px 0 0; padding: 14px 0 0; border-top: 1px solid var(--hairline); display: grid; gap: 8px; }
+.auth-facts li { font-family: var(--f-mono); font-size: 10.5px; line-height: 1.65; color: var(--text-xlo); }
+.auth-facts b { color: var(--text-lo); font-weight: 500; }
 
 /* ============================================================ responsive */
 
@@ -856,6 +906,9 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
   .workspace { grid-template-columns: minmax(0, 1fr); }
   .side { border-right: 0; border-bottom: 1px solid var(--hairline); }
   .side nav { flex-direction: row; flex-wrap: wrap; }
+  .side nav button.on { box-shadow: inset 0 -2px 0 var(--verified); }
+  .side-foot { flex-direction: row; margin-top: 4px; }
+  .arch-counts { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (max-width: 620px) {
