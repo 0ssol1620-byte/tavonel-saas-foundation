@@ -295,9 +295,12 @@ test("reads several documents at the same time, each with its own page", async (
   };
   await page.route("**/api/documents/*/progress", route => {
     const id = new URL(route.request().url()).pathname.split("/")[3];
-    return route.fulfill({ json: { code: "OK", readUrl: `https://r2.example.invalid/${id}.json` } });
+    return route.fulfill({ json: { code: "OK", readUrl: `https://progress.r2.cloudflarestorage.com/${id}.json` } });
   });
-  await page.route("https://r2.example.invalid/*.json", route => {
+  // The host matters: the suite runs under the shipped CSP, whose connect-src admits the R2
+  // domain and nothing else. A made-up hostname here would be blocked before the fetch, and the
+  // failure would look like a bug in the view rather than in the test.
+  await page.route("https://progress.r2.cloudflarestorage.com/*.json", route => {
     const id = new URL(route.request().url()).pathname.slice(1).replace(".json", "");
     const entry = PAGES[id];
     if (!entry) return route.fulfill({ json: {} });
