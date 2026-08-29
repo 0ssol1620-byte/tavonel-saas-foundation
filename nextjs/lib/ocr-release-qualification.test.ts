@@ -12,10 +12,19 @@ const templatePath = join(dirname(fileURLToPath(import.meta.url)), "../../docs/e
 const template = JSON.parse(readFileSync(templatePath, "utf8")) as OcrReleaseEvidence;
 
 describe("OCR release qualification helper", () => {
-  it("keeps the committed template RELEASE_EVIDENCE_REQUIRED", () => {
-    expect(template.immutableReleaseEvidenceVerified).toBe(false);
-    expect(template.imageDigest).toBe("");
+  it("accepts the committed immutable release evidence for one-shot qualification", () => {
+    expect(template.immutableReleaseEvidenceVerified).toBe(true);
+    expect(template.imageDigest).toMatch(/^sha256:[a-f0-9]{64}$/i);
     expect(decideOcrReleaseQualification(template)).toEqual({
+      allowed: true,
+      code: "ONE_SHOT_QUALIFICATION_ALLOWED",
+      maximumAdditionalSpendUsd: 5,
+    });
+  });
+
+  it("keeps a release without immutable evidence fail closed", () => {
+    const pending = { ...template, immutableReleaseEvidenceVerified: false, imageDigest: "" };
+    expect(decideOcrReleaseQualification(pending)).toEqual({
       allowed: false,
       code: "RELEASE_EVIDENCE_REQUIRED",
     });

@@ -8,7 +8,7 @@ import {
 
 describe("r2 synthetic canary guards", () => {
   it("refuses a missing signer env", () => {
-    expect(readR2SignerEnv({})).toBeNull();
+    expect(readR2SignerEnv({ NODE_ENV: "test" })).toBeNull();
   });
 
   it("refuses any bucket other than the Foundation quarantine", () => {

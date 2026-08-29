@@ -7,6 +7,13 @@ import { activationPolicy } from "@/lib/activation-policy";
 import type { DocumentListItem } from "@/lib/immutable-keys";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
+const FOUNDATION_PROOF_PDF_URL = "https://tavonel.vercel.app/proof-sources/dart-jtc-2026-q1.pdf";
+const FOUNDATION_PROOF_PDF_SHA256 = "fb998430db82774afc0d69090383650421ab9a14e6e37c7f32821aa1c6a32eee";
+
+function bytesToHex(bytes: Uint8Array) {
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 function intakeNotice() {
   if (!activationPolicy.customerIntake.enabled) {
     return "Private pilot mode. No document bytes are accepted in this environment.";
@@ -22,6 +29,7 @@ export default function WorkspacePage() {
   const [notice, setNotice] = useState(intakeNotice);
   const [busy, setBusy] = useState(false);
   const [documents, setDocuments] = useState<DocumentListItem[] | null>(null);
+  const [proofMode, setProofMode] = useState(false);
 
   const loadDocuments = async () => {
     const client = getSupabaseBrowserClient();
@@ -36,6 +44,7 @@ export default function WorkspacePage() {
   };
 
   useEffect(() => {
+    setProofMode(new URLSearchParams(window.location.search).get("foundation-proof") === "1");
     void loadDocuments();
   }, []);
 
@@ -88,6 +97,29 @@ export default function WorkspacePage() {
     }
   };
 
+  const uploadPublicProof = async () => {
+    setBusy(true);
+    setNotice("Loading the public Foundation OCR proof PDF in this browser…");
+    try {
+      const response = await fetch(FOUNDATION_PROOF_PDF_URL, { cache: "no-store" });
+      if (!response.ok) {
+        setNotice(`Public proof PDF fetch failed (${response.status}). Nothing entered quarantine.`);
+        return;
+      }
+      const bytes = await response.arrayBuffer();
+      const digest = bytesToHex(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)));
+      if (digest !== FOUNDATION_PROOF_PDF_SHA256) {
+        setNotice("Public proof PDF digest did not match. Nothing entered quarantine.");
+        return;
+      }
+      await uploadDocument(new File([bytes], "dart-jtc-2026-q1.pdf", { type: "application/pdf" }));
+    } catch {
+      setNotice("Public proof PDF could not be prepared. Nothing entered quarantine.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <main className="workspace">
       <aside className="side">
@@ -107,7 +139,11 @@ export default function WorkspacePage() {
           {activationPolicy.customerIntake.enabled ? (
             <>
               <input ref={fileRef} type="file" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadDocument(file); }} />
-              <button disabled={busy} onClick={() => fileRef.current?.click()}><UploadCloud size={16} /> {busy ? "Uploading…" : "Upload document"}</button>
+              {proofMode ? (
+                <button disabled={busy} onClick={() => void uploadPublicProof()}><UploadCloud size={16} /> {busy ? "Running proof…" : "Run public PDF proof"}</button>
+              ) : (
+                <button disabled={busy} onClick={() => fileRef.current?.click()}><UploadCloud size={16} /> {busy ? "Uploading…" : "Upload document"}</button>
+              )}
             </>
           ) : (
             <button onClick={() => setNotice("Upload remains locked until synthetic R2 qualification.")}><UploadCloud size={16} /> Upload document <LockKeyhole size={14} /></button>
