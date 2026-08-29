@@ -1,7 +1,7 @@
 {
   "scope": "synthetic",
   "imageName": "asia-northeast3-docker.pkg.dev/tavonel-saas-foundation/tavonel-foundation-ocr/foundation-ocr-gpu",
-  "imageDigest": "sha256:d663200e56de41feb30f3b85688028e81cc3ca23fb0c2e7e659ec3ebc3523c7b",
+  "imageDigest": "sha256:488967ce99b1f48be6a30779a241b3f2dbcdae4750902ff5308b0df18b2d34d8",
   "immutableReleaseEvidenceVerified": true,
   "capacityReadAtUtc": "2026-08-28T00:00:00.000Z",
   "capacityAvailable": true,
