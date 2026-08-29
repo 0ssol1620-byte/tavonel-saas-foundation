@@ -27,6 +27,7 @@ export type OcrDispatchEnv = {
   FOUNDATION_QUARANTINE: OcrR2Bucket;
   FOUNDATION_OCR_URL?: string;
   TAVONEL_OCR_HMAC?: string;
+  TAVONEL_CDR_HMAC?: string;
   FOUNDATION_R2_BUCKET: string;
 };
 
@@ -103,14 +104,15 @@ export async function dispatchOcrAfterSanitize(
   const inputSha256 = await sha256DigestHeader(bytes);
   const timestamp = now().toISOString();
   const requestId = newRequestId();
+  const hmac = (env.TAVONEL_OCR_HMAC || env.TAVONEL_CDR_HMAC || "").trim();
   const headers: Record<string, string> = {
     "x-tavonel-input-sha256": inputSha256,
   };
-  if (hmacSecretIsConfigured(env.TAVONEL_OCR_HMAC) && REQUEST_ID_PATTERN.test(requestId)) {
+  if (hmacSecretIsConfigured(hmac) && REQUEST_ID_PATTERN.test(requestId)) {
     headers["x-tavonel-ocr-timestamp"] = timestamp;
     headers["x-tavonel-ocr-request-id"] = requestId;
     headers["x-tavonel-ocr-signature"] = await cdrRequestSignature(
-      env.TAVONEL_OCR_HMAC as string,
+      hmac,
       timestamp,
       requestId,
       inputSha256,

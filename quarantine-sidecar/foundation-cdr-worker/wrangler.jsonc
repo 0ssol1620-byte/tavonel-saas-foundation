@@ -20,7 +20,7 @@
     "FOUNDATION_R2_BUCKET": "tavonel-saas-foundation-quarantine",
     // Dashboard sets FOUNDATION_OCR_URL after the GHCR image / endpoint exists.
     // Leave empty so OCR is skipped. Do not point at production.
-    "FOUNDATION_OCR_URL": ""
+    "FOUNDATION_OCR_URL": "https://tavonel-ocr-synthetic-317850201666.asia-northeast3.run.app/v1/ocr"
   },
   "queues": {
     "consumers": [
