@@ -112,3 +112,10 @@ def test_extracts_text_from_tiny_pdf(client: TestClient) -> None:
     assert "TAVONEL OCR" in body["text"]
     assert body["inputSha256"] == digest
     assert "%PDF" not in body["text"]
+
+
+def test_ping_matches_health_shape(client: TestClient) -> None:
+    response = client.get("/ping")
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+    assert response.json()["ssh"] is False

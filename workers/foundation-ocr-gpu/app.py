@@ -6,7 +6,8 @@ import hmac
 import os
 import re
 from datetime import UTC, datetime
-from threading import Lock
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from threading import Lock, Thread
 from time import monotonic
 from typing import Final
 
@@ -187,6 +188,37 @@ def extract_text(payload: bytes) -> tuple[str, int]:
         document.close()
 
 
+
+class SidecarHealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self) -> None:
+        path = self.path.split("?", 1)[0]
+        if path not in {"/health", "/ping"}:
+            self.send_response(404)
+            self.end_headers()
+            return
+        body = b'{"status":"ok","port":8001,"ssh":false}'
+        self.send_response(200)
+        self.send_header("content-type", "application/json")
+        self.send_header("cache-control", "no-store")
+        self.send_header("content-length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, format: str, *args: object) -> None:
+        return
+
+
+def start_health_sidecar() -> None:
+    listen = int(os.getenv("PORT") or str(LISTEN_PORT))
+    health_port = int(os.getenv("PORT_HEALTH") or "8002")
+    if health_port == listen:
+        return
+    server = HTTPServer(("0.0.0.0", health_port), SidecarHealthHandler)
+    Thread(target=server.serve_forever, name="ocr-health-sidecar", daemon=True).start()
+
+
+start_health_sidecar()
+
 app = FastAPI(title=APP_NAME, docs_url=None, redoc_url=None, openapi_url=None)
 
 
@@ -205,6 +237,11 @@ def healthz() -> JSONResponse:
         headers={"cache-control": "no-store"},
     )
 
+
+
+@app.get("/ping")
+def ping() -> JSONResponse:
+    return healthz()
 
 @app.post("/v1/ocr")
 def ocr(

@@ -9,8 +9,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     HOME=/tmp \
     PORT=8001 \
-    PORT_HEALTH=8001 \
-    HEALTH_CHECK_PATH=/health \
+    PORT_HEALTH=8002 \
+    HEALTH_CHECK_PATH=/ping \
     PIP_BREAK_SYSTEM_PACKAGES=1
 
 RUN apt-get update \
@@ -29,7 +29,7 @@ COPY app.py ./
 RUN chown -R ocr:ocr /app /home/ocr
 USER ocr
 
-EXPOSE 8001
+EXPOSE 8001 8002
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
   CMD curl -fsS http://127.0.0.1:8001/health
 CMD ["python3", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8001", "--no-access-log"]
