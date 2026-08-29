@@ -87,7 +87,9 @@ export default function WorldExplorer({ collection, onUpload }: { collection: Co
   return (
     <section className="card">
       <p className="eyebrow">KNOWLEDGE ARCHITECTURE</p>
-      <h2>{collection.collectionId}</h2>
+      {/* An id and a digest are single unbreakable words. Marked so they wrap instead of
+          pushing the whole page sideways on a phone. */}
+      <h2 className="id">{collection.collectionId}</h2>
 
       <div className="arch-counts">
         {[
@@ -138,7 +140,7 @@ export default function WorldExplorer({ collection, onUpload }: { collection: Co
       </div>
 
       {collection.manifestDigest ? (
-        <p className="fine">Manifest {collection.manifestDigest}</p>
+        <p className="fine id">Manifest {collection.manifestDigest}</p>
       ) : null}
       <p className="fine">
         A candidate structure. Nothing here is promoted into a live world without an explicit

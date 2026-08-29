@@ -898,6 +898,11 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
 .tree-root .tk { color: var(--text-xlo); }
 .tree-root li.more { color: var(--text-xlo); grid-template-columns: 1fr; }
 
+/* Identifiers -- collection ids, manifest digests -- are single 40-to-71-character words with no
+   break opportunity in them. Left alone they set the width of the whole document on a phone: at
+   390px the workspace measured 597px wide because of exactly two of these. They break instead. */
+.id { overflow-wrap: anywhere; }
+
 /* ---------------------------------------------------------- review studio + grounded ask */
 
 /* Two surfaces that decide something irreversible-looking, so they are drawn to slow the

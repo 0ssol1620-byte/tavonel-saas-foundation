@@ -210,7 +210,10 @@ test("renders governed promotion, retained rollback and region-grounded Ask", as
   page.on("pageerror", error => browserErrors.push(error.message));
   await installSession(page);
   await mockWorkspace(page);
-  await page.goto(`/workspace?collection=${collectionId}`);
+  // The workspace sidebar became real tabs, and the review studio lives on the knowledge tab
+  // with the rest of the compiled-world surfaces. The tab is addressable, so the test asks for
+  // it directly rather than clicking through the shell.
+  await page.goto(`/workspace?collection=${collectionId}&tab=knowledge`);
 
   await expect(page.getByText("ACTIVE · REVISION 2")).toBeVisible();
   await expect(
@@ -279,6 +282,14 @@ test("keeps review-required packages downloadable and promotion-closed", async (
   await expect(page.getByText("Core requires review", { exact: false })).toBeVisible();
   await expect(page.getByText("CONTRADICTION_CANDIDATE:claim-a:claim-b", { exact: false })).toBeVisible();
   await expect(page.getByRole("button", { name: "Download signed knowledge package" })).toBeEnabled();
+  // The signed download sits with the collection result on overview; the review record sits with
+  // the review studio on knowledge. Crossing the two tabs is the point of this test -- a package
+  // held back for review must stay downloadable on one and unpromotable on the other.
+  await page.getByRole("button", { name: "Knowledge", exact: true }).click();
+  // The signed download sits with the collection result on overview; the review record sits with
+  // the review studio on knowledge. Crossing the two tabs is the point of this test -- a package
+  // held back for review must stay downloadable on one and unpromotable on the other.
+  await page.getByRole("button", { name: "Knowledge", exact: true }).click();
   const promote = page.getByRole("button", { name: "Promote reviewed candidate" });
   await page.getByLabel("Human review record").fill("Reviewed contradiction evidence and retained the gate.");
   await expect(promote).toBeDisabled();

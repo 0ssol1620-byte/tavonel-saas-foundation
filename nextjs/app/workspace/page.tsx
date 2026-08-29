@@ -315,6 +315,10 @@ export default function WorkspacePage() {
         void buy(resume);
       }
     })();
+    // This is the mount sequence and it must run exactly once. Re-running it would re-resolve the
+    // session, reload every list, and -- worse -- reopen a checkout the visitor has already been
+    // taken through. `buy` and `loadCollectionCandidate` are read here, never watched.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const openBillingPortal = async () => {
