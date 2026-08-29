@@ -29,6 +29,26 @@ export const EMPTY_BILLING_ACCOUNT: Omit<FoundationBillingAccount, "workspaceKey
   updatedAt: null,
 };
 
+async function reportBillingStoreFailure(stage: "projection" | "schedule", response: Response) {
+  let databaseCode = "unknown";
+  let databaseMessage = "unavailable";
+  try {
+    const body = await response.json() as { code?: unknown; message?: unknown };
+    if (typeof body.code === "string" && /^[A-Z0-9_]{1,32}$/i.test(body.code)) databaseCode = body.code;
+    if (typeof body.message === "string" && /^[A-Z0-9_ .:(),-]{1,200}$/i.test(body.message)) {
+      databaseMessage = body.message;
+    }
+  } catch {
+    // Keep diagnostics bounded and secret-free when PostgREST does not return JSON.
+  }
+  console.error("foundation_billing_store_failure", {
+    stage,
+    status: response.status,
+    databaseCode,
+    databaseMessage,
+  });
+}
+
 function normalizeAccount(row: Record<string, unknown>, workspaceKey: string, userId: string): FoundationBillingAccount {
   return {
     workspaceKey,
@@ -99,7 +119,10 @@ export async function applyFoundationBillingAction(action: Exclude<PaddleBilling
   } catch {
     return { ok: false as const, code: "BILLING_EVENT_APPLY_FAILED" };
   }
-  if (!response.ok) return { ok: false as const, code: "BILLING_EVENT_APPLY_FAILED" };
+  if (!response.ok) {
+    await reportBillingStoreFailure("projection", response);
+    return { ok: false as const, code: "BILLING_EVENT_APPLY_FAILED" };
+  }
   const result = await response.json() as Record<string, unknown>;
   if (action.action === "subscription") {
     try {
@@ -115,7 +138,10 @@ export async function applyFoundationBillingAction(action: Exclude<PaddleBilling
     } catch {
       return { ok: false as const, code: "BILLING_EVENT_APPLY_FAILED" };
     }
-    if (!response.ok) return { ok: false as const, code: "BILLING_EVENT_APPLY_FAILED" };
+    if (!response.ok) {
+      await reportBillingStoreFailure("schedule", response);
+      return { ok: false as const, code: "BILLING_EVENT_APPLY_FAILED" };
+    }
   }
   return { ok: true as const, result };
 }
