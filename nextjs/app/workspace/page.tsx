@@ -10,6 +10,8 @@ import type { DocumentListItem } from "@/lib/immutable-keys";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { useCheckout } from "@/lib/use-checkout";
 import { formatCount, formatTimestamp } from "@/lib/format";
+import { readOfferParam, takeCheckoutIntent } from "@/lib/checkout-intent";
+import { trackFunnel } from "@/lib/funnel-events";
 
 /** What this panel prints when it has no value. Not "0", and not a spinner that never resolves. */
 const UNKNOWN = "not read yet";
@@ -26,18 +28,66 @@ type CollectionResult = {
   collectionId: string;
   artifactKey: string;
   manifestDigest: string;
+  lifecycle: "candidate" | "review_required";
   candidatePromotion: false;
+  reviewReasons?: string[];
   sourceDocuments: Array<{ documentId: string }>;
   coreExecution?: {
-    status: "completed";
+    status: "completed" | "review_required";
     runtime: string;
+    worldStateId?: string;
     receipt: { requestId: string; outputSha256: string; candidatePromotion: false };
   };
   directoryPlan: Array<{ path: string; kind: string; sourceIds: string[] }>;
   validation: {
-    status: string;
+    status: "passed" | "review_required";
     counts: { documents: number; topics: number; entities: number; claims: number; evidence: number; relations: number; packageFiles: number };
   };
+};
+
+type ActiveWorld = {
+  collectionId: string;
+  manifestDigest: string;
+  revision: number;
+  updatedAt: string;
+  candidateObjectKey: string;
+  worldStateId: string;
+  coreOutputSha256: string;
+};
+
+type WorldVersion = {
+  manifest_digest: string;
+  world_state_id: string;
+  lifecycle_status: "active" | "superseded";
+  first_promoted_at: string;
+  last_activated_at: string;
+  activation_count: number;
+};
+
+type GroundedAnswer = {
+  status: "grounded" | "abstained";
+  answer: string;
+  reason: string | null;
+  citations: Array<{
+    evidenceId: string;
+    sourceId: string;
+    sourceVersionId: string;
+    pageNumber1: number;
+    bbox1000: [number, number, number, number];
+    authority: string;
+    authorityTier?: string;
+    relevance: number;
+    claimIds?: string[];
+    entityIds?: string[];
+    relevanceBreakdown?: {
+      lexical: number;
+      graph: number;
+      temporal: number;
+      authority: number;
+    };
+    excerpt: string;
+  }>;
+  receipt: { manifestDigest: string; retrieval: string; outputSha256: string };
 };
 
 type BillingAccount = {
@@ -117,6 +167,48 @@ export default function WorkspacePage() {
     window.location.replace("/");
   };
 
+  const [activeWorld, setActiveWorld] = useState<ActiveWorld | null>(null);
+  const [worldVersions, setWorldVersions] = useState<WorldVersion[]>([]);
+  const [worldBusy, setWorldBusy] = useState(false);
+  const [reviewReason, setReviewReason] = useState("");
+  const [rollbackReason, setRollbackReason] = useState("");
+  const [askQuestion, setAskQuestion] = useState("");
+  const [askResult, setAskResult] = useState<GroundedAnswer | null>(null);
+  const [askBusy, setAskBusy] = useState(false);
+
+  const getAuthToken = async () => {
+    const client = getSupabaseBrowserClient();
+    const { data } = client ? await client.auth.getSession() : { data: { session: null } };
+    return data.session?.access_token ?? null;
+  };
+
+  const clearWorldState = () => {
+    setActiveWorld(null);
+    setWorldVersions([]);
+    setAskResult(null);
+  };
+
+  const loadWorldState = async (collectionId: string, token?: string) => {
+    if (!/^collection-[a-f0-9]{32}$/.test(collectionId)) return;
+    const accessToken = token ?? await getAuthToken();
+    if (!accessToken) return;
+    const response = await fetch(`/api/collections/${collectionId}/world`, {
+      headers: { authorization: `Bearer ${accessToken}` },
+    });
+    const json = await response.json() as { code?: string; activeWorld?: ActiveWorld; versions?: WorldVersion[] };
+    if (response.status === 404 && json.code === "ACTIVE_WORLD_NOT_FOUND") {
+      clearWorldState();
+      return;
+    }
+    if (!response.ok || !json.activeWorld || !Array.isArray(json.versions)) {
+      setNotice(`Active world verification failed (${json.code ?? response.status}).`);
+      return;
+    }
+    setActiveWorld(json.activeWorld);
+    setWorldVersions(json.versions);
+    setAskResult(null);
+  };
+
   const loadDocuments = async (): Promise<DocumentListItem[]> => {
     const client = getSupabaseBrowserClient();
     if (!client) return [];
@@ -169,7 +261,10 @@ export default function WorkspacePage() {
       artifact.collectionId !== collectionId ||
       artifact.candidatePromotion !== false ||
       json.candidatePromotion !== false ||
-      artifact.validation.status !== "passed" ||
+      !(
+        (artifact.lifecycle === "candidate" && artifact.validation.status === "passed" && artifact.coreExecution?.status === "completed") ||
+        (artifact.lifecycle === "review_required" && artifact.validation.status === "review_required" && artifact.coreExecution?.status === "review_required" && (artifact.reviewReasons?.length ?? 0) > 0)
+      ) ||
       !paths.includes("ontology/knowledge.jsonld") ||
       !paths.includes("ontology/knowledge.ttl") ||
       !paths.includes("graph/nodes.csv") ||
@@ -179,6 +274,7 @@ export default function WorkspacePage() {
       return;
     }
     setCollectionResult({ ...artifact, artifactKey: json.artifactKey ?? "" });
+    await loadWorldState(collectionId, token);
     setNotice(
       `Immutable collection ${collectionId} reloaded from R2 and verified: directory, ontology JSON-LD/Turtle, graph CSV, RAG, provenance and validation roots are present; manifest ${artifact.manifestDigest}; candidatePromotion=false.`,
     );
@@ -203,6 +299,21 @@ export default function WorkspacePage() {
       void loadBilling();
       const collectionId = params.get("collection");
       if (collectionId) void loadCollectionCandidate(collectionId);
+
+      /*
+       * R1, last half. Someone who picked a plan before signing in arrives here carrying it --
+       * in the URL if they came straight through, in sessionStorage if Google's redirect ate the
+       * query string. The parameter is stripped before the checkout opens, so a reload or a
+       * back-navigation cannot fire a second checkout.
+       */
+      const resume = readOfferParam(window.location.search) ?? takeCheckoutIntent();
+      if (resume) {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("checkout");
+        window.history.replaceState(null, "", url.toString());
+        trackFunnel("checkout_opened", { offer: resume });
+        void buy(resume);
+      }
     })();
   }, []);
 
@@ -288,6 +399,14 @@ export default function WorkspacePage() {
     while (Date.now() < deadline) {
       const current = await loadDocuments();
       const ready = documentIds.filter((id) => current.some((item) => item.documentId === id && item.hasOcrJson)).length;
+      const operatorReview = documentIds.filter((id) => {
+        const versions = current.filter((item) => item.documentId === id);
+        return !versions.some((item) => item.hasOcrJson) && versions.some((item) => item.processingState === "operator_review");
+      });
+      if (operatorReview.length > 0) {
+        setNotice(`Batch processing stopped safely: ${operatorReview.length} document(s) require explicit OCR operator review. No paid retry or candidate compilation was attempted.`);
+        return;
+      }
       setNotice(`Batch processing: ${ready}/${documentIds.length} document OCR outputs are immutable and ready.`);
       if (ready === documentIds.length) {
         const client = getSupabaseBrowserClient();
@@ -308,11 +427,14 @@ export default function WorkspacePage() {
           return;
         }
         setCollectionResult(json);
+        await loadWorldState(json.collectionId, token);
         const url = new URL(window.location.href);
         url.searchParams.set("collection", json.collectionId);
         window.history.replaceState(null, "", url);
         setNotice(
-          `Collection ${json.collectionId} compiled from ${json.validation.counts.documents} documents: ${json.directoryPlan.length} directory entries, ${json.validation.counts.topics} topics, ${json.validation.counts.entities} entities, ${json.validation.counts.claims} claims and ${json.validation.counts.relations} evidence-bound relations. candidatePromotion=false.`,
+          json.lifecycle === "review_required"
+            ? `Collection ${json.collectionId} produced a signed review package with ${json.reviewReasons?.length ?? 0} review reason(s). Download and inspect it; promotion remains blocked.`
+            : `Collection ${json.collectionId} compiled from ${json.validation.counts.documents} documents: ${json.directoryPlan.length} directory entries, ${json.validation.counts.topics} topics, ${json.validation.counts.entities} entities, ${json.validation.counts.claims} claims and ${json.validation.counts.relations} evidence-bound relations. candidatePromotion=false.`,
         );
         return;
       }
@@ -343,12 +465,15 @@ export default function WorkspacePage() {
         body: JSON.stringify({ documentIds }),
       });
       const json = await response.json() as CollectionResult & { code?: string };
-      if (!response.ok || json.coreExecution?.status !== "completed") {
+      if (!response.ok || (json.coreExecution?.status !== "completed" && json.coreExecution?.status !== "review_required")) {
         setNotice(`Core compilation failed (${json.code ?? response.status}). No candidate was promoted.`);
         return;
       }
       setCollectionResult(json);
-      setNotice(`Separate Core runtime completed ${json.collectionId}; receipt ${json.coreExecution.receipt.requestId}; output ${json.coreExecution.receipt.outputSha256}; candidatePromotion=false.`);
+      await loadWorldState(json.collectionId, token);
+      setNotice(json.coreExecution.status === "review_required"
+        ? `Separate Core produced a review-required package for ${json.collectionId}; ${json.reviewReasons?.join(", ") || "manual review required"}. Signed download is available and promotion remains blocked.`
+        : `Separate Core runtime completed ${json.collectionId}; receipt ${json.coreExecution.receipt.requestId}; output ${json.coreExecution.receipt.outputSha256}; candidatePromotion=false.`);
     } finally {
       setBusy(false);
     }
@@ -370,7 +495,7 @@ export default function WorkspacePage() {
       });
       if (!response.ok || response.headers.get("content-type") !== "application/zip") {
         const json = await response.json().catch(() => ({ code: response.status }));
-        setNotice(`Knowledge package download failed (${json.code ?? response.status}).`);
+        setNotice(`Signed knowledge package download failed (${json.code ?? response.status}).`);
         return;
       }
       const url = URL.createObjectURL(await response.blob());
@@ -393,6 +518,7 @@ export default function WorkspacePage() {
     if (files.length === 0) return;
     setBusy(true);
     setCollectionResult(null);
+    clearWorldState();
     const ids: string[] = [];
     try {
       for (let index = 0; index < files.length; index += 1) {
@@ -433,6 +559,7 @@ export default function WorkspacePage() {
   const uploadPublicCollectionProof = async () => {
     setBusy(true);
     setCollectionResult(null);
+    clearWorldState();
     setNotice("Preparing three digest-pinned public DART report pages in this browser…");
     try {
       const files: File[] = [];
@@ -503,6 +630,111 @@ export default function WorkspacePage() {
     const url = new URL(window.location.href);
     url.searchParams.set("tab", next);
     window.history.replaceState(null, "", url.toString());
+  };
+
+  const promoteCandidate = async () => {
+    if (!collectionResult || reviewReason.trim().length < 8) return;
+    if (
+      collectionResult.lifecycle !== "candidate" ||
+      collectionResult.validation.status !== "passed" ||
+      collectionResult.coreExecution?.status !== "completed" ||
+      collectionResult.coreExecution.runtime !== "tavonel-python-core-v2" ||
+      !collectionResult.coreExecution.worldStateId
+    ) {
+      setNotice("Only a completed Python Core v2 candidate with a bound world state can be promoted.");
+      return;
+    }
+    if (!window.confirm("Activate this exact immutable candidate as the collection's current world? This records your review reason and does not alter candidate bytes.")) return;
+    setWorldBusy(true);
+    try {
+      const token = await getAuthToken();
+      if (!token) {
+        setNotice("Sign in with Google before promoting a reviewed candidate.");
+        return;
+      }
+      const response = await fetch(`/api/collections/${collectionResult.collectionId}/promote`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          manifestDigest: collectionResult.manifestDigest,
+          expectedCurrentManifest: activeWorld?.manifestDigest ?? null,
+          reason: reviewReason.trim(),
+        }),
+      });
+      const json = await response.json() as { code?: string };
+      if (!response.ok) {
+        setNotice(`World promotion failed (${json.code ?? response.status}). The previous active pointer is unchanged.`);
+        if (response.status === 409) await loadWorldState(collectionResult.collectionId, token);
+        return;
+      }
+      await loadWorldState(collectionResult.collectionId, token);
+      setReviewReason("");
+      setNotice(`Human review recorded. ${collectionResult.manifestDigest} is now the active world; immutable candidate bytes remain candidatePromotion=false.`);
+    } finally {
+      setWorldBusy(false);
+    }
+  };
+
+  const rollbackWorld = async (targetManifestDigest: string) => {
+    if (!collectionResult || !activeWorld || rollbackReason.trim().length < 8) return;
+    if (!window.confirm(`Roll the active pointer back to ${targetManifestDigest}? No package bytes will be deleted or rewritten.`)) return;
+    setWorldBusy(true);
+    try {
+      const token = await getAuthToken();
+      if (!token) {
+        setNotice("Sign in with Google before rolling back a world.");
+        return;
+      }
+      const response = await fetch(`/api/collections/${collectionResult.collectionId}/world/rollback`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          targetManifestDigest,
+          expectedCurrentManifest: activeWorld.manifestDigest,
+          reason: rollbackReason.trim(),
+        }),
+      });
+      const json = await response.json() as { code?: string };
+      if (!response.ok) {
+        setNotice(`World rollback failed (${json.code ?? response.status}). The active pointer is unchanged.`);
+        if (response.status === 409) await loadWorldState(collectionResult.collectionId, token);
+        return;
+      }
+      await loadWorldState(collectionResult.collectionId, token);
+      setRollbackReason("");
+      setNotice(`Rollback recorded. ${targetManifestDigest} is active again; all immutable versions and the audit event remain retained.`);
+    } finally {
+      setWorldBusy(false);
+    }
+  };
+
+  const askActiveWorld = async () => {
+    if (!collectionResult || !activeWorld || askQuestion.trim().length < 3) return;
+    setAskBusy(true);
+    setAskResult(null);
+    try {
+      const token = await getAuthToken();
+      if (!token) {
+        setNotice("Sign in with Google before asking the active world.");
+        return;
+      }
+      const response = await fetch(`/api/collections/${collectionResult.collectionId}/ask`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({ question: askQuestion.trim() }),
+      });
+      const json = await response.json() as GroundedAnswer & { code?: string };
+      if (!response.ok || (json.status !== "grounded" && json.status !== "abstained")) {
+        setNotice(`Grounded Ask failed (${json.code ?? response.status}). No answer was inferred.`);
+        return;
+      }
+      setAskResult(json);
+      setNotice(json.status === "grounded"
+        ? `Answer returned from ${json.citations.length} exact source region(s) in active revision ${activeWorld.revision}.`
+        : "The active world abstained because no region-bound evidence matched the question.");
+    } finally {
+      setAskBusy(false);
+    }
   };
 
   if (session !== "signed-in") {
@@ -596,7 +828,9 @@ export default function WorkspacePage() {
                     <li key={`${doc.documentId}-${doc.versionKey}`}>
                       <strong>{doc.documentId}</strong>
                       <small>{doc.sanitizedKey ?? "sanitized.pdf pending"}</small>
-                      <small>{doc.hasOcrJson ? `ocr.json ${doc.ocrJsonSize ?? 0} bytes` : "ocr.json not written yet"}</small>
+                      <small>{doc.hasOcrJson ? `ocr.json ${doc.ocrJsonSize ?? 0} bytes` : doc.processingState === "operator_review" ? `OCR operator review required${doc.ocrReviewReasonCode ? ` · ${doc.ocrReviewReasonCode}` : ""} · automatic paid retry disabled` : "ocr.json pending within bounded processing"}</small>
+                      {doc.cdrReceiptKey ? <small>CDR receipt · {doc.cdrReceiptKey}</small> : null}
+                      {doc.ocrReviewKey ? <small>OCR review receipt · {doc.ocrReviewKey}</small> : null}
                     </li>
                   ))}
                 </ul>
@@ -625,10 +859,12 @@ export default function WorkspacePage() {
                   <small>{collectionResult.manifestDigest}</small>
                   {collectionResult.coreExecution ? (
                     <>
-                      <small>Core completed · {collectionResult.coreExecution.runtime} · {collectionResult.coreExecution.receipt.requestId}</small>
+                      <small>Core {collectionResult.coreExecution.status === "completed" ? "completed" : "requires review"} · {collectionResult.coreExecution.runtime} · {collectionResult.coreExecution.receipt.requestId}</small>
+                      {collectionResult.coreExecution.worldStateId ? <small>{collectionResult.lifecycle === "candidate" ? "Candidate" : "Review"} world · {collectionResult.coreExecution.worldStateId}</small> : null}
+                      {collectionResult.reviewReasons?.length ? <small>Review gates · {collectionResult.reviewReasons.join(", ")}</small> : null}
                       <button className="download-package" disabled={downloading} onClick={() => void downloadCollection()}>
                         <Download size={15} aria-hidden="true" />
-                        {downloading ? "Preparing verified ZIP..." : "Download knowledge package"}
+                        {downloading ? "Signing verified ZIP..." : "Download signed knowledge package"}
                       </button>
                     </>
                   ) : (
@@ -667,6 +903,132 @@ export default function WorkspacePage() {
                     {busy ? "Working..." : "Verify latest candidates"}
                   </button>
                 </div>
+              </section>
+              <section className="card world-studio" aria-labelledby="world-studio-title">
+                <div className="world-heading">
+                  <div>
+                    <p className="eyebrow">REVIEW STUDIO · WORLD LIFECYCLE</p>
+                    <h2 id="world-studio-title">Candidate bytes stay immutable. Humans move the active pointer.</h2>
+                  </div>
+                  <output className={activeWorld ? "world-status active" : "world-status"}>
+                    {activeWorld ? `ACTIVE · REVISION ${activeWorld.revision}` : "NO ACTIVE WORLD"}
+                  </output>
+                </div>
+                {!collectionResult ? (
+                  <p className="world-empty">Compile or reload a verified collection candidate to begin review.</p>
+                ) : (
+                  <div className="world-layout">
+                    <div className="review-panel">
+                      <div className="binding-list" aria-label="Candidate bindings">
+                        <span><b>Candidate manifest</b>{collectionResult.manifestDigest}</span>
+                        <span><b>Core output</b>{collectionResult.coreExecution?.receipt.outputSha256 ?? "No separate Core receipt"}</span>
+                        <span><b>World state</b>{collectionResult.coreExecution?.worldStateId ?? "Not bound by Python Core v2"}</span>
+                        <span><b>Current active</b>{activeWorld?.manifestDigest ?? "None"}</span>
+                      </div>
+                      <label htmlFor="review-reason">Human review record</label>
+                      <textarea
+                        id="review-reason"
+                        maxLength={500}
+                        placeholder="Record what you verified in the directory, ontology, graph, evidence links and validation receipt."
+                        value={reviewReason}
+                        onChange={(event) => setReviewReason(event.target.value)}
+                      />
+                      <div className="world-actions">
+                        <small>{reviewReason.trim().length}/500 · minimum 8 characters</small>
+                        <button
+                          disabled={worldBusy || reviewReason.trim().length < 8 || collectionResult.lifecycle !== "candidate" || collectionResult.validation.status !== "passed" || collectionResult.coreExecution?.status !== "completed" || collectionResult.coreExecution.runtime !== "tavonel-python-core-v2" || !collectionResult.coreExecution.worldStateId || activeWorld?.manifestDigest === collectionResult.manifestDigest}
+                          onClick={() => void promoteCandidate()}
+                        >
+                          {activeWorld?.manifestDigest === collectionResult.manifestDigest ? "This candidate is active" : worldBusy ? "Recording decision..." : "Promote reviewed candidate"}
+                        </button>
+                      </div>
+                      <p className="fine">Promotion uses compare-and-swap against the current manifest. A stale browser cannot overwrite a newer human decision.</p>
+                    </div>
+                    <div className="version-panel">
+                      <p className="eyebrow">RETAINED VERSIONS</p>
+                      {worldVersions.length === 0 ? (
+                        <p>No promoted version exists for this collection.</p>
+                      ) : (
+                        <ol className="version-list">
+                          {worldVersions.map((version) => (
+                            <li key={version.manifest_digest}>
+                              <div>
+                                <strong>{version.lifecycle_status}</strong>
+                                <small>{version.manifest_digest}</small>
+                                <small>{version.world_state_id} · activated {version.activation_count} time(s)</small>
+                              </div>
+                              {activeWorld && version.manifest_digest !== activeWorld.manifestDigest ? (
+                                <button
+                                  disabled={worldBusy || rollbackReason.trim().length < 8}
+                                  onClick={() => void rollbackWorld(version.manifest_digest)}
+                                >Rollback to this version</button>
+                              ) : null}
+                            </li>
+                          ))}
+                        </ol>
+                      )}
+                      {activeWorld && worldVersions.some((version) => version.manifest_digest !== activeWorld.manifestDigest) ? (
+                        <>
+                          <label htmlFor="rollback-reason">Rollback reason</label>
+                          <textarea
+                            id="rollback-reason"
+                            maxLength={500}
+                            placeholder="Record why the current active world must be replaced by a retained version."
+                            value={rollbackReason}
+                            onChange={(event) => setRollbackReason(event.target.value)}
+                          />
+                        </>
+                      ) : null}
+                    </div>
+                  </div>
+                )}
+              </section>
+              <section className="card ask-studio" aria-labelledby="ask-title">
+                <div>
+                  <p className="eyebrow">GROUNDED ASK</p>
+                  <h2 id="ask-title">Answers return to exact source regions.</h2>
+                  <p>Retrieval runs only against the active world. If no page-and-bbox evidence matches, TAVONEL abstains.</p>
+                </div>
+                <form onSubmit={(event) => { event.preventDefault(); void askActiveWorld(); }}>
+                  <label htmlFor="ask-question">Question</label>
+                  <textarea
+                    id="ask-question"
+                    maxLength={500}
+                    disabled={!activeWorld || askBusy}
+                    placeholder={activeWorld ? "Ask in Korean or English about this active collection." : "Promote a reviewed world before asking."}
+                    value={askQuestion}
+                    onChange={(event) => setAskQuestion(event.target.value)}
+                  />
+                  <button type="submit" disabled={!activeWorld || askBusy || askQuestion.trim().length < 3}>
+                    {askBusy ? "Checking evidence..." : "Ask active world"}
+                  </button>
+                </form>
+                {askResult ? (
+                  <div className={`ask-result ${askResult.status}`} role="status">
+                    <strong>{askResult.status === "grounded" ? "Grounded answer" : "Abstained"}</strong>
+                    <p>{askResult.status === "grounded" ? askResult.answer : "No region-bound evidence matched this question."}</p>
+                    {askResult.citations.length > 0 ? (
+                      <ol>
+                        {askResult.citations.map((citation) => (
+                          <li key={`${citation.evidenceId}-${citation.pageNumber1}`}>
+                            <b>{citation.evidenceId}</b>
+                            <span>
+                              Page {citation.pageNumber1} · bbox [{citation.bbox1000.join(", ")}] · {citation.authorityTier ?? citation.authority}
+                              {citation.claimIds?.length ? ` · ${citation.claimIds.length} claim${citation.claimIds.length === 1 ? "" : "s"}` : ""}
+                            </span>
+                            {citation.relevanceBreakdown ? (
+                              <span>
+                                score {citation.relevance.toFixed(3)} · lexical {citation.relevanceBreakdown.lexical.toFixed(2)} · graph {citation.relevanceBreakdown.graph.toFixed(2)} · time {citation.relevanceBreakdown.temporal.toFixed(2)} · authority {citation.relevanceBreakdown.authority.toFixed(2)}
+                              </span>
+                            ) : null}
+                            <q>{citation.excerpt}</q>
+                          </li>
+                        ))}
+                      </ol>
+                    ) : null}
+                    <small>{askResult.receipt.retrieval} · {askResult.receipt.outputSha256}</small>
+                  </div>
+                ) : null}
               </section>
             </>
           ) : null}

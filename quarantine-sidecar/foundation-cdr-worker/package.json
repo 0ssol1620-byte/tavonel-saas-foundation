@@ -4,9 +4,10 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "test": "node --import tsx --test src/hmac.test.ts src/keys.test.ts src/guards.test.ts src/ocr.test.ts src/sanitize.test.ts"
+    "test": "node --import tsx --test src/hmac.test.ts src/keys.test.ts src/guards.test.ts src/ocr.test.ts src/sanitize.test.ts src/settlement.test.ts"
   },
   "devDependencies": {
-    "tsx": "^4.19.1"
+    "tsx": "^4.19.1",
+    "typescript": "^5.9.3"
   }
 }

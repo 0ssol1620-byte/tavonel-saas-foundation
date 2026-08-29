@@ -38,6 +38,9 @@ import RebuildConsole from "@/components/rebuild-console";
 import WorldField, { type WorldMode } from "@/components/world-field";
 import { AREAS, CHANGE, DISCLOSURE, KEPT, REBUILT, SOURCE_CENSUS, WORLD, n } from "@/lib/demo-world";
 import { useCheckout } from "@/lib/use-checkout";
+import { loginUrlForOffer } from "@/lib/checkout-intent";
+import { trackFunnel } from "@/lib/funnel-events";
+import type { BillingOfferCode } from "@/lib/billing-catalog";
 import { readCapabilities, type StatusResponse } from "@/lib/capabilities";
 import { useScrollProgress, useScrollScenes } from "@/lib/use-scroll-scenes";
 
@@ -123,6 +126,14 @@ export default function HomePage() {
   const progress = useScrollProgress();
   const active = SCENES.find((s) => s.id === scene) ?? SCENES[0];
   const capabilities = useMemo(() => readCapabilities(status, statusFailed), [status, statusFailed]);
+  /**
+   * Gates the grid does not report as open. Direction rows are excluded on purpose: they are not
+   * gates that could be opened, so counting them here would overstate what is being withheld.
+   */
+  const heldRows = useMemo(
+    () => capabilities.filter((cap) => cap.tone !== "open" && cap.tone !== "direction"),
+    [capabilities],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -157,9 +168,42 @@ export default function HomePage() {
   const showNotice = () =>
     setNotice("Foundation mode is active. Provider configuration and sandbox qualification are required before this action is available.");
 
+  /**
+   * R1 -- the intent to buy survives the sign-in.
+   *
+   * All six controls in scene 08 used to end here for a signed-out visitor: a toast saying "sign
+   * in first", and then a workspace that had forgotten which plan they picked. The choice is now
+   * carried to /login and resumed on the other side. The URL names an offer code and never a
+   * price; the server still owns the allow-list.
+   */
+  const chooseOffer = (offerCode: BillingOfferCode) => {
+    trackFunnel("offer_selected", { offer: offerCode, signedIn: signedIn ? "yes" : "no" });
+    if (signedIn) {
+      void startCheckout(offerCode);
+      return;
+    }
+    window.location.assign(loginUrlForOffer(offerCode));
+  };
+
   const jump = (id: number) => {
     document.getElementById(`s${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
+
+  /**
+   * What the bar offers, by where the reader is. The page argues in order -- mess, compile,
+   * world, change, rebuild, answer, evidence, access -- so the useful control is the next link in
+   * that argument, not the last one.
+   */
+  const nextStep = ((): { label: string; run: () => void } => {
+    if (scene <= 2) return { label: "SEE THE COMPILED WORLD", run: () => jump(3) };
+    if (scene <= 4) return { label: "SEE IT REBUILD", run: () => jump(5) };
+    if (scene === 5) return { label: "SEE THE ANSWER", run: () => jump(6) };
+    if (scene === 6) return { label: "SEE THE EVIDENCE", run: () => jump(7) };
+    if (scene === 7) return { label: "GET ACCESS", run: () => jump(8) };
+    return signedIn
+      ? { label: "OPEN WORKSPACE", run: () => window.location.assign("/workspace") }
+      : { label: "SIGN IN", run: () => window.location.assign("/login") };
+  })();
 
   return (
     <div className="page">
@@ -180,10 +224,20 @@ export default function HomePage() {
           <button type="button" onClick={() => jump(7)}>Evidence</button>
           <button type="button" onClick={() => jump(8)}>Access</button>
         </nav>
+        {/*
+          R4 -- the nav carried one verb, and it was the wrong one for most visitors. "Sign in" is
+          what a returning pilot user needs; a first-time reader has no account to sign in to and
+          nothing else to click. The primary verb now points at what this page can actually give
+          them -- the access section, with the live capability grid at the top of it -- and sign-in
+          stays as the quieter control for people who already have a workspace.
+        */}
         {signedIn ? (
           <Link className="btn small" href="/workspace">Open workspace</Link>
         ) : (
-          <Link className="btn small" href="/login">Sign in</Link>
+          <>
+            <button className="btn small ghost" type="button" onClick={() => jump(8)}>Get access</button>
+            <Link className="btn small" href="/login">Sign in</Link>
+          </>
         )}
       </header>
 
@@ -211,7 +265,9 @@ export default function HomePage() {
             </p>
             <div className="actions rv">
               <button className="btn" type="button" onClick={() => jump(2)}>Watch it compile</button>
-              <Link className="btn ghost" href="/login">Request access</Link>
+              {/* "Request access" pointed at /login, which is a sign-in and not a request. The hero now
+                  uses the same verb as the nav and sends people to the section that can answer it. */}
+              <button className="btn ghost" type="button" onClick={() => jump(8)}>Get access</button>
             </div>
             <div className="debris rv">
               {DEBRIS.map((name) => <span className="frag" key={name}>{name}</span>)}
@@ -397,46 +453,14 @@ export default function HomePage() {
             that world correct as reality changes.
           </p>
 
-          <div className="band-head rv"><span className="kicker">MEASURED ACCESS</span><h3>Plans for serious work.</h3></div>
-          <div className="plans rv">
-            {PLANS.map(([name, price, text, offerCode]) => (
-              <article className="plan" key={name} data-featured={name === "Studio" ? 1 : 0}>
-                <span className="tag">{name === "Studio" ? "PRIVATE PILOT CHOICE" : " "}</span>
-                <h3>{name}</h3>
-                <span className="price">{price}{price.startsWith("$") ? <small> / month</small> : null}</span>
-                <p>{text}</p>
-                <button
-                  className="btn ghost"
-                  type="button"
-                  disabled={Boolean(billingBusy)}
-                  onClick={() => (offerCode ? void startCheckout(offerCode) : showNotice())}
-                >
-                  {name === "Institution" ? "Start a conversation" : billingBusy === offerCode ? "Opening checkout…" : "Choose this plan"}
-                </button>
-              </article>
-            ))}
-          </div>
+          {/*
+            R3 -- the boundary is stated before the price, not after it.
 
-          <div className="band-head rv"><span className="kicker">DELIBERATE COMPUTE</span><h3>Access is steady. GPU work is measured.</h3></div>
-          <div className="packs rv">
-            {PACKS.map(([name, price, credits, offerCode]) => (
-              <article className="pack" key={name}>
-                <span className="tag">PREPAID CAPACITY</span>
-                <h3>{name}</h3>
-                <span className="price">{price} <small>{credits}</small></span>
-                <button className="btn ghost" type="button" disabled={Boolean(billingBusy)} onClick={() => void startCheckout(offerCode)}>
-                  {billingBusy === offerCode ? "Opening checkout…" : "Buy credits"}
-                </button>
-              </article>
-            ))}
-          </div>
-          <p className="fine rv">
-            Secure Paddle sandbox checkout, for signed-in pilot users. Access changes only after a
-            signed, idempotently persisted webhook &mdash; never on a checkout redirect. Credits are
-            reserved before a qualified job and settled against observed runtime. No unlimited GPU
-            plans; hard job and workspace caps stay active even after a purchase.
-          </p>
-
+            The grid used to sit below both pricing blocks, so a visitor read six controls and a
+            currency symbol before they were told which of those controls this deployment actually
+            has open. Reversing the order costs the page nothing, and it removes the one thing that
+            makes a fail-closed product read as an overclaiming one.
+          */}
           <div className="band-head rv"><span className="kicker">STATUS</span><h3>What exists in this deployment, right now.</h3></div>
           <div className="caps rv">
             {capabilities.map((cap) => (
@@ -449,6 +473,54 @@ export default function HomePage() {
           <p className="fine rv">
             Read live from this deployment when the page loads, not written by hand. A row this
             page cannot confirm reads <b>Unknown</b> &mdash; it never defaults to available.
+          </p>
+
+          {heldRows.length > 0 ? (
+            <p className="fine rv held">
+              {heldRows.length} of the {capabilities.length} controls above {heldRows.length === 1 ? "is" : "are"} not
+              open in this deployment. Buying access does not open any of them &mdash; each opens
+              only when the control behind it is qualified.
+            </p>
+          ) : null}
+
+          <div className="band-head rv"><span className="kicker">MEASURED ACCESS</span><h3>Plans for serious work.</h3></div>
+          <div className="plans rv">
+            {PLANS.map(([name, price, text, offerCode]) => (
+              <article className="plan" key={name} data-featured={name === "Studio" ? 1 : 0}>
+                <span className="tag">{name === "Studio" ? "PRIVATE PILOT CHOICE" : " "}</span>
+                <h3>{name}</h3>
+                <span className="price">{price}{price.startsWith("$") ? <small> / month</small> : null}</span>
+                <p>{text}</p>
+                <button
+                  className="btn ghost"
+                  type="button"
+                  disabled={Boolean(billingBusy)}
+                  onClick={() => (offerCode ? chooseOffer(offerCode) : showNotice())}
+                >
+                  {name === "Institution" ? "Start a conversation" : billingBusy === offerCode ? "Opening checkout…" : signedIn ? "Choose this plan" : "Choose this plan → sign in"}
+                </button>
+              </article>
+            ))}
+          </div>
+
+          <div className="band-head rv"><span className="kicker">DELIBERATE COMPUTE</span><h3>Access is steady. GPU work is measured.</h3></div>
+          <div className="packs rv">
+            {PACKS.map(([name, price, credits, offerCode]) => (
+              <article className="pack" key={name}>
+                <span className="tag">PREPAID CAPACITY</span>
+                <h3>{name}</h3>
+                <span className="price">{price} <small>{credits}</small></span>
+                <button className="btn ghost" type="button" disabled={Boolean(billingBusy)} onClick={() => chooseOffer(offerCode)}>
+                  {billingBusy === offerCode ? "Opening checkout…" : signedIn ? "Buy credits" : "Buy credits → sign in"}
+                </button>
+              </article>
+            ))}
+          </div>
+          <p className="fine rv">
+            Secure Paddle sandbox checkout, for signed-in pilot users. Access changes only after a
+            signed, idempotently persisted webhook &mdash; never on a checkout redirect. Credits are
+            reserved before a qualified job and settled against observed runtime. No unlimited GPU
+            plans; hard job and workspace caps stay active even after a purchase.
           </p>
 
           <div className="actions rv" style={{ marginTop: 30 }}>
@@ -479,7 +551,31 @@ export default function HomePage() {
         <span className="bc"><span className="bk">STATE</span><span className="bv state" data-s={active.state.toLowerCase()}>{active.state}</span></span>
         <span className="bc opt"><span className="bk">FACTS</span><span className="bv">{active.facts ? n(active.facts) : "—"}</span></span>
         <span className="bc opt"><span className="bk">NEEDS REVIEW</span><span className="bv">{scene >= 4 ? CHANGE.held : 0}</span></span>
+        {/*
+          R5 -- the scene rail is hidden below 900px, which left a phone with no way to move
+          through an eight-scene page except by scrolling all of it. The ticks come back here,
+          in the one element that is on screen at every scroll position.
+        */}
+        <span className="bar-ticks" aria-label="Scenes">
+          {SCENES.map((sc) => (
+            <button
+              key={sc.id}
+              type="button"
+              className={sc.id === scene ? "bt on" : "bt"}
+              aria-label={`Scene ${sc.id}: ${sc.label}`}
+              aria-current={sc.id === scene ? "true" : undefined}
+              onClick={() => jump(sc.id)}
+            />
+          ))}
+        </span>
         <span className="bc right"><span className="bv">SCENE {String(active.id).padStart(2, "0")} &middot; {active.label}</span></span>
+        {/*
+          R2 -- the bar reported state and never offered a move. A visitor three scenes in had the
+          whole argument in front of them and no control anywhere on screen. This one changes with
+          the scene, so it is always the next thing rather than a fixed CTA following them down
+          the page.
+        */}
+        <button className="bar-next" type="button" onClick={nextStep.run}>{nextStep.label}</button>
       </div>
 
       {notice ? (

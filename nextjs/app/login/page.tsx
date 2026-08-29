@@ -16,6 +16,9 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import Logomark from "@/components/logomark";
+import { readOfferParam, rememberCheckoutIntent, takeCheckoutIntent } from "@/lib/checkout-intent";
+import { trackFunnel } from "@/lib/funnel-events";
+import { BILLING_OFFERS, type BillingOfferCode } from "@/lib/billing-catalog";
 
 type AuthState = "checking" | "ready" | "unconfigured";
 
@@ -23,9 +26,23 @@ export default function LoginPage() {
   const [authState, setAuthState] = useState<AuthState>("checking");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * R1, second half. Someone who arrived by picking a plan is not here to "open a workspace" --
+   * they are part-way through a purchase, and the page has to say so or the detour looks like the
+   * product losing their place. The offer is read from the URL, validated against the offer list
+   * (never a price), and put in sessionStorage because the Google round trip returns to a fixed
+   * callback path that cannot carry a query string of ours.
+   */
+  const [intent, setIntent] = useState<BillingOfferCode | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    const offer = readOfferParam(window.location.search);
+    if (offer) {
+      setIntent(offer);
+      rememberCheckoutIntent(offer);
+      trackFunnel("login_reached_with_intent", { offer });
+    }
     void (async () => {
       // Already signed in? Do not make someone sign in twice.
       const { getSupabaseBrowserClient } = await import("@/lib/supabase-browser");
@@ -33,7 +50,8 @@ export default function LoginPage() {
       if (client) {
         const { data } = await client.auth.getSession();
         if (data.session && !cancelled) {
-          window.location.replace("/workspace");
+          const resume = takeCheckoutIntent();
+          window.location.replace(resume ? `/workspace?checkout=${resume}` : "/workspace");
           return;
         }
       }
@@ -79,14 +97,22 @@ export default function LoginPage() {
 
       <div className="auth-body">
         <div className="auth-card">
-          <p className="eyebrow">SIGN IN</p>
-          <h1>Open your workspace.</h1>
+          <p className="eyebrow">{intent ? "SIGN IN TO CONTINUE" : "SIGN IN"}</p>
+          <h1>{intent ? "One step before checkout." : "Open your workspace."}</h1>
           <p className="lead">
             TAVONEL compiles your documents into a structured world and keeps it correct as they
             change. Signing in gives you a private, tenant-scoped workspace &mdash; nothing is
             shared, and no document you upload is ever promoted into a live world without you
             deciding it.
           </p>
+
+          {intent ? (
+            <p className="notice static" role="status">
+              <strong>{BILLING_OFFERS[intent].label} is held for you.</strong> Checkout opens by
+              itself once you are in. Nothing is charged by signing in, and access changes only
+              after a signed webhook is persisted.
+            </p>
+          ) : null}
 
           <div className="auth-actions">
             <button className="btn" type="button" onClick={() => void signIn()} disabled={busy || authState !== "ready"}>

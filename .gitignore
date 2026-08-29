@@ -90,6 +90,9 @@ jspm_packages/
 
 # Next.js build output
 .next
+nextjs/.e2e_modules/
+nextjs/playwright-report/
+nextjs/test-results/
 
 # Nuxt.js build / generate output
 .nuxt

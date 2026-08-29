@@ -4,7 +4,9 @@ import { cdrRequestSignature, hmacSecretIsConfigured, sha256DigestHeader, sha256
 import {
   MAX_SOURCE_BYTES,
   assertProcessableSourceKey,
+  cdrReceiptSiblingKey,
   immutableObjectKey,
+  ocrReviewSiblingKey,
   sourcePartFromR2Object,
 } from "./keys";
 import { dispatchOcrAfterSanitize, type OcrDispatchResult } from "./ocr";
@@ -16,6 +18,8 @@ export type SanitizeResult = {
   outputSha256: string;
   status: "clean";
   ocr: OcrDispatchResult;
+  cdrReceipt: { key: string; status: "written" | "exists" | "failed" };
+  ocrReview?: { key: string; status: "written" | "exists" | "failed" };
 };
 
 export type R2ObjectLike = {
@@ -49,6 +53,24 @@ export type SanitizeEnv = {
 };
 
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{16,160}$/;
+
+async function putCreateOnceJson(
+  bucket: R2BucketLike,
+  key: string,
+  value: Record<string, unknown>,
+): Promise<"written" | "exists" | "failed"> {
+  try {
+    await bucket.put(key, new TextEncoder().encode(`${JSON.stringify(value)}\n`), {
+      httpMetadata: { contentType: "application/json" },
+      customMetadata: { stage: "processing-receipt" },
+      onlyIf: { etagDoesNotMatch: "*" },
+    });
+    return "written";
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    return /precondition|already exists|conflict/iu.test(message) ? "exists" : "failed";
+  }
+}
 
 export async function sanitizeObject(
   env: SanitizeEnv,
@@ -148,11 +170,56 @@ export async function sanitizeObject(
     }
   }
 
+  const cdrReceiptKey = cdrReceiptSiblingKey(immutableKey);
+  const cdrReceiptStatus = await putCreateOnceJson(env.FOUNDATION_QUARANTINE, cdrReceiptKey, {
+    schemaVersion: "tavonel.cdr_receipt.v1",
+    status: "clean",
+    sourceKey: objectKey,
+    immutableKey,
+    inputSha256,
+    outputSha256: outputSha256Header,
+    provider: env.TAVONEL_CDR_PROVIDER,
+    requestId,
+    occurredAt: timestamp,
+    candidatePromotion: false,
+  });
+
   let ocr: OcrDispatchResult;
   try {
-    ocr = await dispatchOcrAfterSanitize(env, immutableKey, fetcher, now, newRequestId);
+    const existingReview = await env.FOUNDATION_QUARANTINE.get(ocrReviewSiblingKey(immutableKey));
+    ocr = existingReview
+      ? {
+          status: "failed",
+          reasonCode: "OCR_REVIEW_ALREADY_EXISTS",
+          reason: "an immutable operator-review receipt already exists",
+          computeCredits: 2,
+        }
+      : await dispatchOcrAfterSanitize(env, immutableKey, fetcher, now, newRequestId);
   } catch {
-    ocr = { status: "failed", reason: "OCR dispatch failed after CDR" };
+    ocr = {
+      status: "failed",
+      reasonCode: "OCR_TIMEOUT_OR_NETWORK",
+      reason: "OCR dispatch failed after CDR",
+      computeCredits: 0,
+    };
+  }
+
+  let ocrReview: SanitizeResult["ocrReview"];
+  if (ocr.status === "failed") {
+    const reviewKey = ocrReviewSiblingKey(immutableKey);
+    const reviewStatus = await putCreateOnceJson(env.FOUNDATION_QUARANTINE, reviewKey, {
+      schemaVersion: "tavonel.ocr_review_receipt.v1",
+      status: "operator_review",
+      immutableKey,
+      inputSha256: ocr.inputSha256 ?? outputSha256Header,
+      reasonCode: ocr.reasonCode ?? "OCR_TIMEOUT_OR_NETWORK",
+      reason: ocr.reason ?? "OCR failed after CDR",
+      requestId: ocr.requestId ?? null,
+      occurredAt: now().toISOString(),
+      retryPolicy: "explicit_operator_only",
+      candidatePromotion: false,
+    });
+    ocrReview = { key: reviewKey, status: reviewStatus };
   }
 
   return {
@@ -162,5 +229,7 @@ export async function sanitizeObject(
     outputSha256: outputSha256Header,
     status: "clean",
     ocr,
+    cdrReceipt: { key: cdrReceiptKey, status: cdrReceiptStatus },
+    ...(ocrReview ? { ocrReview } : {}),
   };
 }

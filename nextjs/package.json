@@ -9,9 +9,11 @@
     "build": "next build",
     "start": "next start",
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "check": "tsc --noEmit && eslint app components lib",
+    "lint": "eslint app components lib",
     "proof:live-ocr": "node scripts/foundation-live-ocr-proof.mjs",
-    "lint": "eslint app components lib"
+    "verify:export": "node scripts/verify-signed-export.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.4",
@@ -23,6 +25,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.6",
+    "@playwright/test": "1.62.0",
     "@types/node": "^24.7.0",
     "@types/react": "^19.2.1",
     "@types/react-dom": "^19.2.1",

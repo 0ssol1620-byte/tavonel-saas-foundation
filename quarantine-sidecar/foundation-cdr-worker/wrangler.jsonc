@@ -19,6 +19,7 @@
     "TAVONEL_CDR_HEALTH_URL": "https://tavonel-cdr-synthetic-317850201666.asia-northeast3.run.app/health",
     "TAVONEL_CDR_PROVIDER": "tavonel_pdf_raster",
     "FOUNDATION_R2_BUCKET": "tavonel-saas-foundation-quarantine",
+    "FOUNDATION_BILLING_SETTLEMENT_URL": "https://tavonel-saas-foundation.vercel.app/api/internal/billing/settle",
     // Dashboard sets FOUNDATION_OCR_URL after the GHCR image / endpoint exists.
     // Leave empty so OCR is skipped. Do not point at production.
     "FOUNDATION_OCR_URL": "https://cohlugjzf0dk9i.api.runpod.ai/v1/ocr"
