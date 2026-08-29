@@ -27,6 +27,14 @@ export type ExportSigner = {
   signPayload: (payload: Uint8Array) => ExportSignature;
 };
 
+export type ExportTrustRecord = {
+  schemaVersion: "tavonel.export_trust.v1";
+  algorithm: "Ed25519";
+  keyId: string;
+  publicKeySpkiDerBase64: string;
+  publicKeySpkiSha256: string;
+};
+
 function sha256(value: Uint8Array) {
   return `sha256:${createHash("sha256").update(value).digest("hex")}`;
 }
@@ -97,6 +105,16 @@ export function readExportSignerEnv(
   const privateKeyPkcs8DerBase64 = env.TAVONEL_EXPORT_SIGNING_PRIVATE_KEY_PKCS8_DER_B64?.trim() ?? "";
   if (!keyId && !privateKeyPkcs8DerBase64) return null;
   return createExportSigner({ keyId, privateKeyPkcs8DerBase64 });
+}
+
+export function exportTrustRecord(signer: ExportSigner): ExportTrustRecord {
+  return {
+    schemaVersion: "tavonel.export_trust.v1",
+    algorithm: "Ed25519",
+    keyId: signer.keyId,
+    publicKeySpkiDerBase64: signer.publicKeySpkiDerBase64,
+    publicKeySpkiSha256: signer.publicKeySpkiSha256,
+  };
 }
 
 export function verifyExportSignature(payload: Uint8Array, signature: ExportSignature, publicKeySpkiDer: Uint8Array) {
