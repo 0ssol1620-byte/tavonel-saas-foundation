@@ -2,10 +2,13 @@ import { createHash, createHmac } from "node:crypto";
 import { FOUNDATION_R2_BUCKET, type R2SignerEnv } from "./r2-synthetic-canary";
 import {
   immutableWorkspacePrefix,
+  isCollectionCandidateKey,
   isKeyInsideWorkspacePrefix,
   isOcrJsonKey,
   type ImmutableObjectMeta,
 } from "./immutable-keys";
+
+const MAX_DERIVED_JSON_BYTES = 4 * 1024 * 1024;
 
 function hmac(key: Buffer | string, data: string) {
   return createHmac("sha256", key).update(data, "utf8").digest();
@@ -50,6 +53,40 @@ async function signedS3Get(
   headers.authorization = `AWS4-HMAC-SHA256 Credential=${env.accessKeyId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
   const query = canonicalQuery ? `?${canonicalQuery}` : "";
   return fetch(`https://${host}${canonicalUri}${query}`, { method: "GET", headers });
+}
+
+async function signedS3PutJson(
+  env: R2SignerEnv,
+  key: string,
+  bytes: Buffer,
+  now = new Date(),
+) {
+  const host = `${env.accountId}.r2.cloudflarestorage.com`;
+  const canonicalUri = `/${env.bucket}/${key.split("/").map(encodeURIComponent).join("/")}`;
+  const payloadHash = sha256Hex(bytes);
+  const { amzDate: xAmzDate, dateStamp } = amzDate(now);
+  const region = "auto";
+  const service = "s3";
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+    host,
+    "if-none-match": "*",
+    "x-amz-content-sha256": payloadHash,
+    "x-amz-date": xAmzDate,
+  };
+  const signedHeaderNames = Object.keys(headers).sort();
+  const canonicalHeaders = signedHeaderNames.map((name) => `${name}:${headers[name]}\n`).join("");
+  const signedHeaders = signedHeaderNames.join(";");
+  const canonicalRequest = ["PUT", canonicalUri, "", canonicalHeaders, signedHeaders, payloadHash].join("\n");
+  const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
+  const stringToSign = ["AWS4-HMAC-SHA256", xAmzDate, credentialScope, sha256Hex(canonicalRequest)].join("\n");
+  const kDate = hmac(`AWS4${env.secretAccessKey}`, dateStamp);
+  const kRegion = hmac(kDate, region);
+  const kService = hmac(kRegion, service);
+  const kSigning = hmac(kService, "aws4_request");
+  const signature = createHmac("sha256", kSigning).update(stringToSign, "utf8").digest("hex");
+  headers.authorization = `AWS4-HMAC-SHA256 Credential=${env.accessKeyId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+  return fetch(`https://${host}${canonicalUri}`, { method: "PUT", headers, body: Uint8Array.from(bytes) });
 }
 
 function parseListContents(xml: string): ImmutableObjectMeta[] {
@@ -130,7 +167,46 @@ export async function getWorkspaceOcrJson(
   if (response.status === 404) return { ok: false, code: "NOT_FOUND" };
   if (!response.ok) return { ok: false, code: "GET_FAILED" };
   const bytes = Buffer.from(await response.arrayBuffer());
+  if (bytes.length > MAX_DERIVED_JSON_BYTES) return { ok: false, code: "JSON_TOO_LARGE" };
   if (bytes.subarray(0, 4).toString("utf8") === "%PDF") return { ok: false, code: "PDF_BYTES_FORBIDDEN" };
+  try {
+    return { ok: true, json: JSON.parse(bytes.toString("utf8")) };
+  } catch {
+    return { ok: false, code: "NOT_JSON" };
+  }
+}
+
+export async function putWorkspaceCollectionCandidate(
+  env: R2SignerEnv,
+  workspaceId: string,
+  key: string,
+  value: unknown,
+  now = new Date(),
+): Promise<{ ok: true; status: "written" | "exists"; bytes: number } | { ok: false; code: string }> {
+  if (env.bucket !== FOUNDATION_R2_BUCKET) return { ok: false, code: "BUCKET_NOT_FOUNDATION" };
+  if (!isCollectionCandidateKey(workspaceId, key)) return { ok: false, code: "COLLECTION_JSON_PREFIX_REQUIRED" };
+  const bytes = Buffer.from(`${JSON.stringify(value)}\n`, "utf8");
+  if (bytes.length === 0 || bytes.length > MAX_DERIVED_JSON_BYTES) return { ok: false, code: "JSON_TOO_LARGE" };
+  const response = await signedS3PutJson(env, key, bytes, now);
+  if (response.status === 409 || response.status === 412) return { ok: true, status: "exists", bytes: bytes.length };
+  if (!response.ok) return { ok: false, code: "PUT_FAILED" };
+  return { ok: true, status: "written", bytes: bytes.length };
+}
+
+export async function getWorkspaceCollectionCandidate(
+  env: R2SignerEnv,
+  workspaceId: string,
+  key: string,
+  now = new Date(),
+): Promise<{ ok: true; json: unknown } | { ok: false; code: string }> {
+  if (env.bucket !== FOUNDATION_R2_BUCKET) return { ok: false, code: "BUCKET_NOT_FOUNDATION" };
+  if (!isCollectionCandidateKey(workspaceId, key)) return { ok: false, code: "COLLECTION_JSON_PREFIX_REQUIRED" };
+  const canonicalUri = `/${env.bucket}/${key.split("/").map(encodeURIComponent).join("/")}`;
+  const response = await signedS3Get(env, canonicalUri, "", now);
+  if (response.status === 404) return { ok: false, code: "NOT_FOUND" };
+  if (!response.ok) return { ok: false, code: "GET_FAILED" };
+  const bytes = Buffer.from(await response.arrayBuffer());
+  if (bytes.length > MAX_DERIVED_JSON_BYTES) return { ok: false, code: "JSON_TOO_LARGE" };
   try {
     return { ok: true, json: JSON.parse(bytes.toString("utf8")) };
   } catch {

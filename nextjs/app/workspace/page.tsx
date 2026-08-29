@@ -9,6 +9,23 @@ import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 const FOUNDATION_PROOF_PDF_URL = "/api/proof-pdf";
 const FOUNDATION_PROOF_PDF_SHA256 = "3df79d34abbca99308e79cb94461c1893582604d68329a41fd4bec1885e6adb4";
+const FOUNDATION_COLLECTION_PROOF = [
+  { url: "/proof-collection/dart-jtc-page-1.pdf", filename: "dart-jtc-page-1.pdf", sha256: "bbc9bcd5c5c3efce74755e451e04f62ca1ca97402a10908d309ba5645d63751a" },
+  { url: "/proof-collection/dart-jtc-page-2.pdf", filename: "dart-jtc-page-2.pdf", sha256: "cbcd0747921a49fc88420521e6d655ddfa0ee7febdc8895f204e61625c933ee6" },
+  { url: "/proof-collection/dart-jtc-page-3.pdf", filename: "dart-jtc-page-3.pdf", sha256: "2224c8c1ca8a0057992e1dba2605a7e5184edb22af820ab976ff6d900374ee53" },
+] as const;
+
+type CollectionResult = {
+  collectionId: string;
+  artifactKey: string;
+  manifestDigest: string;
+  candidatePromotion: false;
+  directoryPlan: Array<{ path: string; kind: string; sourceIds: string[] }>;
+  validation: {
+    status: string;
+    counts: { documents: number; topics: number; entities: number; claims: number; evidence: number; relations: number; packageFiles: number };
+  };
+};
 
 function bytesToHex(bytes: Uint8Array) {
   return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -32,17 +49,20 @@ export default function WorkspacePage() {
   const [busy, setBusy] = useState(false);
   const [documents, setDocuments] = useState<DocumentListItem[] | null>(null);
   const [proofMode, setProofMode] = useState(false);
+  const [collectionResult, setCollectionResult] = useState<CollectionResult | null>(null);
 
-  const loadDocuments = async () => {
+  const loadDocuments = async (): Promise<DocumentListItem[]> => {
     const client = getSupabaseBrowserClient();
-    if (!client) return;
+    if (!client) return [];
     const { data } = await client.auth.getSession();
     const token = data.session?.access_token;
-    if (!token) return;
+    if (!token) return [];
     const response = await fetch("/api/documents", { headers: { authorization: `Bearer ${token}` } });
-    if (!response.ok) return;
+    if (!response.ok) return [];
     const json = (await response.json()) as { documents?: DocumentListItem[] };
-    setDocuments(json.documents ?? []);
+    const next = json.documents ?? [];
+    setDocuments(next);
+    return next;
   };
 
   useEffect(() => {
@@ -50,19 +70,19 @@ export default function WorkspacePage() {
     void loadDocuments();
   }, []);
 
-  const uploadDocument = async (file: File) => {
-    setBusy(true);
+  const uploadDocument = async (file: File, manageBusy = true): Promise<string | null> => {
+    if (manageBusy) setBusy(true);
     try {
       const client = getSupabaseBrowserClient();
       if (!client) {
         setNotice("Sign in with Google first.");
-        return;
+        return null;
       }
       const { data } = await client.auth.getSession();
       const token = data.session?.access_token;
       if (!token) {
         setNotice("Sign in with Google first.");
-        return;
+        return null;
       }
       const capability = await fetch("/api/uploads/capability", {
         method: "POST",
@@ -73,10 +93,10 @@ export default function WorkspacePage() {
           requestedBytes: file.size,
         }),
       });
-      const json = await capability.json() as { code?: string; uploadUrl?: string; declaredMimeType?: string };
+      const json = await capability.json() as { code?: string; documentId?: string; uploadUrl?: string; declaredMimeType?: string };
       if (!capability.ok || !json.uploadUrl) {
         setNotice(json.code === "AUTH_REQUIRED" ? "Sign in with Google first." : `Upload was not issued (${json.code ?? capability.status}).`);
-        return;
+        return null;
       }
       const put = await fetch(json.uploadUrl, {
         method: "PUT",
@@ -85,7 +105,7 @@ export default function WorkspacePage() {
       });
       if (!put.ok) {
         setNotice(`Quarantine PUT failed (${put.status}). The file never entered the app server.`);
-        return;
+        return null;
       }
       setNotice(
         activationPolicy.cdr.enabled
@@ -95,9 +115,63 @@ export default function WorkspacePage() {
           : `${file.name} is in Foundation quarantine. CDR sanitization and GPU analysis are still closed.`,
       );
       await loadDocuments();
+      return json.documentId ?? null;
+    } finally {
+      if (manageBusy) setBusy(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
+  const waitForOcrAndCompile = async (documentIds: string[]) => {
+    const deadline = Date.now() + 15 * 60 * 1000;
+    while (Date.now() < deadline) {
+      const current = await loadDocuments();
+      const ready = documentIds.filter((id) => current.some((item) => item.documentId === id && item.hasOcrJson)).length;
+      setNotice(`Batch processing: ${ready}/${documentIds.length} document OCR outputs are immutable and ready.`);
+      if (ready === documentIds.length) {
+        const client = getSupabaseBrowserClient();
+        const { data } = client ? await client.auth.getSession() : { data: { session: null } };
+        const token = data.session?.access_token;
+        if (!token) {
+          setNotice("Sign in with Google first.");
+          return;
+        }
+        const response = await fetch("/api/collections/compile", {
+          method: "POST",
+          headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+          body: JSON.stringify({ documentIds }),
+        });
+        const json = await response.json() as CollectionResult & { code?: string };
+        if (!response.ok || !json.collectionId) {
+          setNotice(`Collection compilation failed (${json.code ?? response.status}). Candidate promotion remains closed.`);
+          return;
+        }
+        setCollectionResult(json);
+        setNotice(
+          `Collection ${json.collectionId} compiled from ${json.validation.counts.documents} documents: ${json.directoryPlan.length} directory entries, ${json.validation.counts.topics} topics, ${json.validation.counts.entities} entities, ${json.validation.counts.claims} claims and ${json.validation.counts.relations} evidence-bound relations. candidatePromotion=false.`,
+        );
+        return;
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, 5_000));
+    }
+    setNotice("Batch processing timed out before every OCR output became immutable. No collection candidate was created.");
+  };
+
+  const uploadDocuments = async (files: File[]) => {
+    if (files.length === 0) return;
+    setBusy(true);
+    setCollectionResult(null);
+    const ids: string[] = [];
+    try {
+      for (let index = 0; index < files.length; index += 1) {
+        setNotice(`Uploading ${index + 1}/${files.length}: ${files[index].name}`);
+        const id = await uploadDocument(files[index], false);
+        if (!id) return;
+        ids.push(id);
+      }
+      if (ids.length >= 2) await waitForOcrAndCompile(ids);
     } finally {
       setBusy(false);
-      if (fileRef.current) fileRef.current.value = "";
     }
   };
 
@@ -119,6 +193,34 @@ export default function WorkspacePage() {
       await uploadDocument(new File([bytes], "w3c-dummy.pdf", { type: "application/pdf" }));
     } catch {
       setNotice("Public proof PDF could not be prepared. Nothing entered quarantine.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const uploadPublicCollectionProof = async () => {
+    setBusy(true);
+    setCollectionResult(null);
+    setNotice("Preparing three digest-pinned public DART report pages in this browser…");
+    try {
+      const files: File[] = [];
+      for (const proof of FOUNDATION_COLLECTION_PROOF) {
+        const response = await fetch(proof.url, { cache: "no-store" });
+        if (!response.ok) {
+          setNotice(`Collection proof source failed (${response.status}). Nothing else was uploaded.`);
+          return;
+        }
+        const bytes = await response.arrayBuffer();
+        const digest = bytesToHex(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)));
+        if (digest !== proof.sha256) {
+          setNotice(`Collection proof digest mismatch for ${proof.filename}. Nothing else was uploaded.`);
+          return;
+        }
+        files.push(new File([bytes], proof.filename, { type: "application/pdf" }));
+      }
+      await uploadDocuments(files);
+    } catch {
+      setNotice("Public collection proof could not be prepared. Candidate promotion remains closed.");
     } finally {
       setBusy(false);
     }
@@ -176,11 +278,14 @@ export default function WorkspacePage() {
           <span><strong>Private pilot</strong> · Overview<br /><small>Your governed knowledge space</small></span>
           {activationPolicy.customerIntake.enabled ? (
             <>
-              <input ref={fileRef} type="file" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadDocument(file); }} />
+              <input ref={fileRef} type="file" multiple hidden onChange={(event) => { const files = [...(event.target.files ?? [])]; if (files.length > 0) void uploadDocuments(files); }} />
               {proofMode ? (
-                <button disabled={busy} onClick={() => void uploadPublicProof()}><UploadCloud size={16} /> {busy ? "Running proof…" : "Run public PDF proof"}</button>
+                <div className="proof-actions">
+                  <button disabled={busy} onClick={() => void uploadPublicProof()}><UploadCloud size={16} /> {busy ? "Running proof…" : "Run single PDF proof"}</button>
+                  <button disabled={busy} onClick={() => void uploadPublicCollectionProof()}><UploadCloud size={16} /> {busy ? "Compiling…" : "Run public 3-document proof"}</button>
+                </div>
               ) : (
-                <button disabled={busy} onClick={() => fileRef.current?.click()}><UploadCloud size={16} /> {busy ? "Uploading…" : "Upload document"}</button>
+                <button disabled={busy} onClick={() => fileRef.current?.click()}><UploadCloud size={16} /> {busy ? "Processing…" : "Upload files"}</button>
               )}
             </>
           ) : (
@@ -217,8 +322,16 @@ export default function WorkspacePage() {
             <section className="card canvas">
               <p className="eyebrow">KNOWLEDGE CANVAS</p>
               <h2>Candidate-only by design</h2>
-              <div className="nodes"><i /><i /><i /><i /><i /></div>
-              <p>Sanitized inputs can produce reviewable candidates JSON. No candidate is promoted to a world without a separate human decision. candidatePromotion stays closed.</p>
+              {collectionResult ? (
+                <div className="collection-result">
+                  <strong>{collectionResult.collectionId}</strong>
+                  <p>{collectionResult.validation.counts.documents} documents · {collectionResult.validation.counts.topics} topics · {collectionResult.validation.counts.entities} entities · {collectionResult.validation.counts.claims} claims · {collectionResult.validation.counts.relations} relations</p>
+                  <small>{collectionResult.directoryPlan.length} directory entries · {collectionResult.validation.counts.packageFiles} package files</small>
+                  <small>{collectionResult.artifactKey}</small>
+                  <small>{collectionResult.manifestDigest}</small>
+                </div>
+              ) : <div className="nodes"><i /><i /><i /><i /><i /></div>}
+              <p>Sanitized inputs can produce a reviewable directory, ontology, graph, RAG and provenance package. No candidate is promoted to a world without a separate human decision. candidatePromotion stays closed.</p>
             </section>
           </div>
           <section className="card gates">

@@ -1,5 +1,6 @@
 export const WORKSPACE_ID_PATTERN = /^[A-Za-z0-9_-]{1,80}$/;
 export const DOCUMENT_ID_PATTERN = /^[A-Za-z0-9_-]{1,80}$/;
+export const COLLECTION_ID_PATTERN = /^collection-[a-f0-9]{32}$/;
 
 export function immutableWorkspacePrefix(workspaceId: string): string {
   if (!WORKSPACE_ID_PATTERN.test(workspaceId)) {
@@ -32,6 +33,20 @@ export function isOcrJsonKey(workspaceId: string, key: string): boolean {
 
 export function isSanitizedPdfKey(workspaceId: string, key: string): boolean {
   return isKeyInsideWorkspacePrefix(workspaceId, key) && key.endsWith("/sanitized.pdf");
+}
+
+export function collectionCandidateKey(workspaceId: string, collectionId: string, manifestDigest: string): string {
+  if (!WORKSPACE_ID_PATTERN.test(workspaceId) || !COLLECTION_ID_PATTERN.test(collectionId) || !/^[a-f0-9]{64}$/.test(manifestDigest)) {
+    return "";
+  }
+  return `${immutableWorkspacePrefix(workspaceId)}collections/${collectionId}/${manifestDigest}/candidate-world.json`;
+}
+
+export function isCollectionCandidateKey(workspaceId: string, key: string): boolean {
+  if (!isKeyInsideWorkspacePrefix(workspaceId, key)) return false;
+  const rest = key.slice(immutableWorkspacePrefix(workspaceId).length);
+  const parts = rest.split("/");
+  return parts.length === 4 && parts[0] === "collections" && COLLECTION_ID_PATTERN.test(parts[1] ?? "") && /^[a-f0-9]{64}$/.test(parts[2] ?? "") && parts[3] === "candidate-world.json";
 }
 
 export type ImmutableObjectMeta = {

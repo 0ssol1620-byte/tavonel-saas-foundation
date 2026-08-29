@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  collectionCandidateKey,
   groupImmutableDocuments,
   immutableWorkspacePrefix,
+  isCollectionCandidateKey,
   isKeyInsideWorkspacePrefix,
   isOcrJsonKey,
 } from "./immutable-keys";
@@ -45,5 +47,13 @@ describe("immutable workspace prefix escape", () => {
     expect(items[0]?.hasOcrJson).toBe(true);
     expect(items[0]?.sanitizedSize).toBe(12);
     expect(items[0]?.ocrJsonKey?.endsWith("/ocr.json")).toBe(true);
+  });
+
+  it("scopes collection candidates to one immutable workspace", () => {
+    const collectionId = `collection-${"ab".repeat(16)}`;
+    const key = collectionCandidateKey(WS, collectionId, "cd".repeat(32));
+    expect(isCollectionCandidateKey(WS, key)).toBe(true);
+    expect(isCollectionCandidateKey("pilot-other", key)).toBe(false);
+    expect(collectionCandidateKey(WS, "../escape", "cd".repeat(32))).toBe("");
   });
 });
