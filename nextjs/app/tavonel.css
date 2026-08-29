@@ -743,7 +743,7 @@ footer.site .shell { display: flex; flex-direction: column; gap: 14px; }
   display: flex;
   flex-direction: column;
   gap: 20px;
-  align-content: start;
+  align-content: flex-start;
   background: var(--g1);
 }
 .brand { display: inline-flex; align-items: center; gap: 9px; color: var(--text-hi); font-family: var(--f-mono); font-size: 12.5px; letter-spacing: 0.2em; }
