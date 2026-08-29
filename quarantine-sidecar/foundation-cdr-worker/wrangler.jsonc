@@ -7,6 +7,7 @@
   // projects/tavonel-saas-foundation/secrets/tavonel-cdr-hmac.
   // Never put the HMAC in vars, source, committed .dev.vars, or chat.
   // TAVONEL_OCR_HMAC is likewise dashboard-only after the OCR image exists.
+  // RUNPOD_API_KEY is dashboard-only. Required for RunPod load-balancer /v1/ocr.
   "r2_buckets": [
     {
       "binding": "FOUNDATION_QUARANTINE",
@@ -20,7 +21,7 @@
     "FOUNDATION_R2_BUCKET": "tavonel-saas-foundation-quarantine",
     // Dashboard sets FOUNDATION_OCR_URL after the GHCR image / endpoint exists.
     // Leave empty so OCR is skipped. Do not point at production.
-    "FOUNDATION_OCR_URL": "https://tavonel-ocr-synthetic-317850201666.asia-northeast3.run.app/v1/ocr"
+    "FOUNDATION_OCR_URL": "https://cohlugjzf0dk9i.api.runpod.ai/v1/ocr"
   },
   "queues": {
     "consumers": [

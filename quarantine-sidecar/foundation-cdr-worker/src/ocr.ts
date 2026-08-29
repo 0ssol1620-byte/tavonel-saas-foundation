@@ -28,6 +28,7 @@ export type OcrDispatchEnv = {
   FOUNDATION_OCR_URL?: string;
   TAVONEL_OCR_HMAC?: string;
   TAVONEL_CDR_HMAC?: string;
+  RUNPOD_API_KEY?: string;
   FOUNDATION_R2_BUCKET: string;
 };
 
@@ -108,6 +109,10 @@ export async function dispatchOcrAfterSanitize(
   const headers: Record<string, string> = {
     "x-tavonel-input-sha256": inputSha256,
   };
+  const runpodKey = (env.RUNPOD_API_KEY || "").trim();
+  if (runpodKey) {
+    headers.Authorization = `Bearer ${runpodKey}`;
+  }
   if (hmacSecretIsConfigured(hmac) && REQUEST_ID_PATTERN.test(requestId)) {
     headers["x-tavonel-ocr-timestamp"] = timestamp;
     headers["x-tavonel-ocr-request-id"] = requestId;
