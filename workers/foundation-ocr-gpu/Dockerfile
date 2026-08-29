@@ -1,7 +1,8 @@
 # GPU OCR image for RunPod serverless (LOAD_BALANCER).
 # No OpenSSH, no port 22. Health and HMAC OCR listen on 8001.
-# CUDA runtime is present so RapidOCR/ONNX can use the GPU; Cloud Build does not need a GPU.
-FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+# Ubuntu 24.04 ships Python 3.12 so onnxruntime-gpu 1.20+ has wheels.
+# Cloud Build does not need a GPU.
+FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu24.04
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -9,13 +10,15 @@ ENV DEBIAN_FRONTEND=noninteractive \
     HOME=/tmp \
     PORT=8001 \
     PORT_HEALTH=8001 \
-    HEALTH_CHECK_PATH=/health
+    HEALTH_CHECK_PATH=/health \
+    PIP_BREAK_SYSTEM_PACKAGES=1
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         python3 python3-pip python3-venv ca-certificates curl \
         libgl1 libglib2.0-0 libgomp1 \
     && rm -rf /var/lib/apt/lists/* \
+    && python3 --version \
     && useradd --system --uid 10001 --create-home --home-dir /home/ocr ocr \
     && if dpkg -l | grep -qi openssh; then echo "OpenSSH must not be installed" >&2; exit 1; fi
 
