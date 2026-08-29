@@ -15,9 +15,14 @@ describe("cdrRequestSignature", () => {
   it("matches the Python unpadded base64url HMAC algorithm", async () => {
     const actual = await cdrRequestSignature(FIXTURE_SECRET, TIMESTAMP, REQUEST_ID, INPUT_SHA256);
     const script = path.join(path.dirname(fileURLToPath(import.meta.url)), "expected_signature.py");
-    const python = spawnSync("python", [script, FIXTURE_SECRET, TIMESTAMP, REQUEST_ID, INPUT_SHA256], {
+    let python = spawnSync("python", [script, FIXTURE_SECRET, TIMESTAMP, REQUEST_ID, INPUT_SHA256], {
       encoding: "utf8",
     });
+    if (python.error && (python.error as NodeJS.ErrnoException).code === "ENOENT") {
+      python = spawnSync("py", ["-3", script, FIXTURE_SECRET, TIMESTAMP, REQUEST_ID, INPUT_SHA256], {
+        encoding: "utf8",
+      });
+    }
     assert.equal(python.status, 0, python.stderr);
     assert.equal(python.stdout.trim(), PYTHON_VECTOR);
     assert.equal(actual, PYTHON_VECTOR);

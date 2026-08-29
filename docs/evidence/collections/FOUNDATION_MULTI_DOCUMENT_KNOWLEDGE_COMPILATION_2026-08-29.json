@@ -1,12 +1,12 @@
 {
   "schemaVersion": "tavonel.foundation.collection-proof.v1",
-  "status": "qualified_foundation_candidate_compiler",
-  "observedAtUtc": "2026-08-29T06:03:00Z",
+  "status": "qualified_separate_core_full_sequence",
+  "observedAtUtc": "2026-08-29T06:44:00Z",
   "production": {
-    "url": "https://tavonel-saas-foundation.vercel.app/workspace?foundation-proof=1&collection=collection-12be472fa51e4be53a69224551446e35",
-    "compileDeploymentId": "dpl_5gZFLRhy2xC4mz9EHZqesjbsRbEH",
-    "reloadVerificationDeploymentId": "dpl_4oAjm2yvcKJk8p9mrmaPPKDjgdQ9",
-    "reloadVerificationCommit": "817f86a9d7dd1163e2a334b5b3352dd9573cfff6",
+    "url": "https://tavonel-saas-foundation.vercel.app/workspace?foundation-proof=1&collection=collection-eaaeb1f290792c9753b2fc049e9c5bc4",
+    "deploymentId": "dpl_GU4iFkTwsygWaUaVy849rM1BhaGq",
+    "implementationCommit": "140754df5c5a479712bf634301a9a1c545131dba",
+    "deploymentCommit": "753587698bd721bd5495720ab558ff608e2adfb2",
     "alias": "tavonel-saas-foundation.vercel.app",
     "region": "icn1"
   },
@@ -36,44 +36,44 @@
   },
   "documents": [
     {
-      "documentId": "d59d90fa-0ed2-4917-bf95-27692b691b0c",
-      "versionKey": "626598e430cf31b5b9afc95340500b046f6deb6463c7fff40d22dc6d0bcf2a41",
+      "documentId": "5bd2e37a-069b-476a-b6a2-95347257e890",
+      "versionKey": "57fb585390d25cb151290acda38df5afe02249d3f1f92ee3dce02883f41bf2c9",
       "ocrJsonBytes": 1032
     },
     {
-      "documentId": "15d10386-7441-40fe-aa3f-a9d1cb5b77e4",
-      "versionKey": "144cc009435fe9580161e117b9282d67831f72d190c16a60cc4e40263dc8f450",
+      "documentId": "5c16a17e-4b3e-41b9-b97a-dafeec087153",
+      "versionKey": "2c6d12d8bdc499d2eda498b1febddd8eda1ee09d73ed33503f3117ac10e89eb7",
       "ocrJsonBytes": 925
     },
     {
-      "documentId": "5f38e0f0-3087-4404-9746-90dcfe9bc586",
-      "versionKey": "f728dc455067280f92f31fb0626f49f7b6b8c70a31a090ebfdb836862e9efa78",
+      "documentId": "f17cd7e3-320a-46e1-a1eb-5915f489ddc6",
+      "versionKey": "af61f6b096f91acb4a73e68228d5de9b7bd51ffd491ee2a0648d603c8fb0b21e",
       "ocrJsonBytes": 1126
     }
   ],
   "runpod": {
     "endpointId": "cohlugjzf0dk9i",
     "endpointName": "tavonel-foundation-ocr-gpu",
-    "requestsBefore": 9,
-    "requestsAfter": 12,
-    "completedBefore": 1,
-    "completedAfter": 4,
+    "requestsBefore": 12,
+    "requestsAfter": 15,
+    "completedBefore": 4,
+    "completedAfter": 7,
     "failedBefore": 8,
     "failedAfter": 8,
     "completedDelta": 3,
     "failedDelta": 0,
-    "executionTimeTotalAfter": "21.39s",
-    "coldStartCountAfter": 2,
-    "coldStartTimeTotalAfter": "55.58s",
+    "executionTimeTotalAfter": "44.07s",
+    "coldStartCountAfter": 3,
+    "coldStartTimeTotalAfter": "1m",
     "postRunWorkers": 0,
     "postRunJobsInProgress": 0,
     "postRunJobsWaiting": 0,
     "postRunSpendPerSecond": "$0.00000/s"
   },
   "collection": {
-    "collectionId": "collection-12be472fa51e4be53a69224551446e35",
-    "artifactKey": "immutable/pilot-969dc192daa24119/pilot-969dc192daa24119/collections/collection-12be472fa51e4be53a69224551446e35/17c5f06c16e462711d5ff787f1af5c6205ba2fc6d74500b29d6dcdeb8500a0e0/candidate-world.json",
-    "manifestDigest": "sha256:17c5f06c16e462711d5ff787f1af5c6205ba2fc6d74500b29d6dcdeb8500a0e0",
+    "collectionId": "collection-eaaeb1f290792c9753b2fc049e9c5bc4",
+    "artifactKey": "immutable/pilot-969dc192daa24119/pilot-969dc192daa24119/collections/collection-eaaeb1f290792c9753b2fc049e9c5bc4/a72a58f1b2abf8890002793e6ef7f9cd6ba031ad24e49264bf66443a87556677/candidate-world.json",
+    "manifestDigest": "sha256:a72a58f1b2abf8890002793e6ef7f9cd6ba031ad24e49264bf66443a87556677",
     "lifecycle": "candidate",
     "candidatePromotion": false,
     "blueprint": "generic-mixed-corpus@1.0.0",
@@ -99,27 +99,43 @@
     "durableReloadHttpStatus": 200,
     "createOnce": true
   },
+  "coreRuntime": {
+    "projectId": "prj_AmqtcnGBJHOAwAOv2jJhAkwnTqeZ",
+    "deploymentId": "dpl_6LBmxCGrhE9rfLduL2oc3wphBeG7",
+    "url": "https://tavonel-foundation-core.vercel.app",
+    "runtime": "tavonel-foundation-core-deterministic-v1",
+    "healthStatus": "ok",
+    "hmacConfigured": true,
+    "unsignedCompileStatus": 401,
+    "unsignedCompileCode": "CORE_AUTH_HEADERS_INVALID",
+    "completedReceiptId": "core-cd02571b-e941-4603-b274-5f510b01e1bd",
+    "foundationCompileObservedAtLocal": "2026-08-29T15:42:59+09:00",
+    "coreCompileObservedAtLocal": "2026-08-29T15:43:00+09:00"
+  },
   "cloudflare": {
     "queue": "foundation-quarantine-created",
+    "consumerCount": 1,
+    "deliveryPaused": false,
     "backlogAfterRun": 0,
-    "backlogBytesAfterRun": 0
+    "backlogBytesAfterRun": 0,
+    "oldestMessageTimestampMs": 0
   },
   "vercelRuntime": {
     "compileDeployment": {
       "uploadCapabilityRequests": 3,
-      "collectionCompileRequests": 1,
-      "observed2xxRequests": 24
+      "collectionCompileRequests": 1
     },
-    "reloadDeployment": {
+    "reloadVerification": {
       "collectionGetRequests": 1,
-      "observed200Requests": 4
+      "observedAtLocal": "2026-08-29T15:43:46+09:00"
     }
   },
   "verification": {
     "typecheck": "passed",
-    "unitTests": "38 passed",
+    "unitTests": "40 passed",
+    "cdrWorkerTests": "27 passed",
     "productionBuild": "passed",
-    "fullSequence": "browser multi-file proof -> signed R2 quarantine -> CDR sanitized PDFs -> RunPod GPU OCR x3 -> sibling ocr.json x3 -> deterministic collection candidate -> create-once R2 candidate-world.json -> authenticated durable reload"
+    "fullSequence": "browser multi-file proof -> signed R2 quarantine -> CDR sanitized PDFs -> RunPod GPU OCR x3 -> sibling ocr.json x3 -> HMAC-authenticated separate Core runtime -> digest-bound completed receipt -> create-once R2 candidate-world.json -> authenticated durable reload"
   },
   "guardrails": {
     "customerBytesCrossedVercel": false,
@@ -132,8 +148,9 @@
   "scopeBoundary": {
     "foundationDeterministicCandidateCompilerExecuted": true,
     "coreGenericMixedCorpusContractAligned": true,
+    "separateCoreRuntimeExecuted": true,
     "separateCorePythonRuntimeExecuted": false,
     "qwenKnowledgeModelExecuted": false,
-    "note": "This qualifies the live Foundation deterministic candidate compiler and portable ontology package. It does not claim that the separate Python Core A-D/Qwen semantic runtime was deployed or executed."
+    "note": "This qualifies the separately deployed deterministic Core runtime, its signed execution receipt, and the portable ontology package. It does not claim that the Python A-D/Qwen semantic runtime was deployed or executed."
   }
 }

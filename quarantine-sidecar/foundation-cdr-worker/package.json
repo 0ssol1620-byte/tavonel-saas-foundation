@@ -5,5 +5,8 @@
   "type": "module",
   "scripts": {
     "test": "node --import tsx --test src/hmac.test.ts src/keys.test.ts src/guards.test.ts src/ocr.test.ts src/sanitize.test.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.1"
   }
 }
