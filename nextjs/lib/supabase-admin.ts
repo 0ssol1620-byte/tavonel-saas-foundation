@@ -13,14 +13,14 @@ export async function supabaseAdminRequest(
   path: string,
   init: RequestInit = {},
 ) {
+  const headers = new Headers(init.headers);
+  headers.set("apikey", config.serviceRoleKey);
+  headers.set("content-type", "application/json");
+  if (config.serviceRoleKey.startsWith("sb_secret_")) headers.delete("authorization");
+  else headers.set("authorization", `Bearer ${config.serviceRoleKey}`);
   return fetch(`${config.url}${path}`, {
     ...init,
-    headers: {
-      apikey: config.serviceRoleKey,
-      authorization: `Bearer ${config.serviceRoleKey}`,
-      "content-type": "application/json",
-      ...init.headers,
-    },
+    headers,
     cache: "no-store",
     signal: init.signal ?? AbortSignal.timeout(4_000),
   });
