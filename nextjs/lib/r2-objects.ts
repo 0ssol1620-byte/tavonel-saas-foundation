@@ -4,6 +4,7 @@ import {
   immutableWorkspacePrefix,
   isCollectionCandidateKey,
   isKeyInsideWorkspacePrefix,
+  isOcrReviewKey,
   isOcrJsonKey,
   type ImmutableObjectMeta,
 } from "./immutable-keys";
@@ -169,6 +170,27 @@ export async function getWorkspaceOcrJson(
   const bytes = Buffer.from(await response.arrayBuffer());
   if (bytes.length > MAX_DERIVED_JSON_BYTES) return { ok: false, code: "JSON_TOO_LARGE" };
   if (bytes.subarray(0, 4).toString("utf8") === "%PDF") return { ok: false, code: "PDF_BYTES_FORBIDDEN" };
+  try {
+    return { ok: true, json: JSON.parse(bytes.toString("utf8")) };
+  } catch {
+    return { ok: false, code: "NOT_JSON" };
+  }
+}
+
+export async function getWorkspaceOcrReviewJson(
+  env: R2SignerEnv,
+  workspaceId: string,
+  key: string,
+  now = new Date(),
+): Promise<{ ok: true; json: unknown } | { ok: false; code: string }> {
+  if (env.bucket !== FOUNDATION_R2_BUCKET) return { ok: false, code: "BUCKET_NOT_FOUNDATION" };
+  if (!isOcrReviewKey(workspaceId, key)) return { ok: false, code: "OCR_REVIEW_PREFIX_REQUIRED" };
+  const canonicalUri = `/${env.bucket}/${key.split("/").map(encodeURIComponent).join("/")}`;
+  const response = await signedS3Get(env, canonicalUri, "", now);
+  if (response.status === 404) return { ok: false, code: "NOT_FOUND" };
+  if (!response.ok) return { ok: false, code: "GET_FAILED" };
+  const bytes = Buffer.from(await response.arrayBuffer());
+  if (bytes.length === 0 || bytes.length > 16_384) return { ok: false, code: "JSON_TOO_LARGE" };
   try {
     return { ok: true, json: JSON.parse(bytes.toString("utf8")) };
   } catch {

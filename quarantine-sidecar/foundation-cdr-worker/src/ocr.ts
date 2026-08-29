@@ -1,4 +1,3 @@
-import { RetryableError } from "./errors";
 import { cdrRequestSignature, hmacSecretIsConfigured, sha256DigestHeader } from "./hmac";
 import { ocrSiblingKey } from "./keys";
 
@@ -16,11 +15,22 @@ type OcrR2Bucket = {
 };
 
 export type OcrDispatchStatus = "skipped" | "written" | "exists" | "failed";
+export type OcrFailureCode =
+  | "OCR_SOURCE_MISSING"
+  | "OCR_SOURCE_EMPTY"
+  | "OCR_TIMEOUT_OR_NETWORK"
+  | "OCR_HTTP_REJECTED"
+  | "OCR_RESPONSE_NOT_JSON"
+  | "OCR_RESPONSE_INVALID"
+  | "OCR_RESULT_WRITE_FAILED";
 
 export type OcrDispatchResult = {
   status: OcrDispatchStatus;
   key?: string;
   reason?: string;
+  reasonCode?: OcrFailureCode;
+  requestId?: string;
+  inputSha256?: string;
 };
 
 export type OcrDispatchEnv = {
@@ -37,6 +47,7 @@ const SHA256_PATTERN = /^sha256:[a-f0-9]{64}$/;
 const PROD_MARKERS = ["tavonel-pdf-cdr", "tavonel-prod", "tavonel-quarantine-sidecar"];
 const OCR_RESULT_SCHEMA = "tavonel.ocr_result.v2";
 const AUTHORITY_CLASSES = new Set(["unknown", "informal", "official", "contractual"]);
+export const OCR_REQUEST_TIMEOUT_MS = 25_000;
 
 type OcrRegion = {
   regionId: string;
@@ -161,6 +172,7 @@ export async function dispatchOcrAfterSanitize(
   fetcher: typeof fetch = fetch,
   now: () => Date = () => new Date(),
   newRequestId: () => string = () => crypto.randomUUID(),
+  timeoutMs = OCR_REQUEST_TIMEOUT_MS,
 ): Promise<OcrDispatchResult> {
   const url = (env.FOUNDATION_OCR_URL || "").trim();
   if (!url) {
@@ -176,12 +188,12 @@ export async function dispatchOcrAfterSanitize(
   const ocrKey = ocrSiblingKey(immutablePdfKey);
   const pdf = await env.FOUNDATION_QUARANTINE.get(immutablePdfKey);
   if (!pdf) {
-    return { status: "failed", key: ocrKey, reason: "immutable PDF is not readable for OCR" };
+    return { status: "failed", key: ocrKey, reasonCode: "OCR_SOURCE_MISSING", reason: "immutable PDF is not readable for OCR" };
   }
 
   const bytes = await pdf.arrayBuffer();
   if (bytes.byteLength < 1) {
-    return { status: "failed", key: ocrKey, reason: "immutable PDF is empty" };
+    return { status: "failed", key: ocrKey, reasonCode: "OCR_SOURCE_EMPTY", reason: "immutable PDF is empty" };
   }
 
   const inputSha256 = await sha256DigestHeader(bytes);
@@ -211,23 +223,28 @@ export async function dispatchOcrAfterSanitize(
 
   let response: Response;
   try {
-    response = await fetcher(url, { method: "POST", headers, body: form });
+    response = await fetcher(url, {
+      method: "POST",
+      headers,
+      body: form,
+      signal: AbortSignal.timeout(timeoutMs),
+    });
   } catch {
-    return { status: "failed", key: ocrKey, reason: "OCR request failed" };
+    return { status: "failed", key: ocrKey, reasonCode: "OCR_TIMEOUT_OR_NETWORK", reason: "OCR request timed out or failed", requestId, inputSha256 };
   }
   if (!response.ok) {
-    return { status: "failed", key: ocrKey, reason: `OCR returned HTTP ${response.status}` };
+    return { status: "failed", key: ocrKey, reasonCode: "OCR_HTTP_REJECTED", reason: `OCR returned HTTP ${response.status}`, requestId, inputSha256 };
   }
 
   let payload: unknown;
   try {
     payload = (await response.json()) as typeof payload;
   } catch {
-    return { status: "failed", key: ocrKey, reason: "OCR response is not JSON" };
+    return { status: "failed", key: ocrKey, reasonCode: "OCR_RESPONSE_NOT_JSON", reason: "OCR response is not JSON", requestId, inputSha256 };
   }
   const qualified = qualifyOcrResult(payload, inputSha256);
   if (!qualified) {
-    return { status: "failed", key: ocrKey, reason: "OCR response contract is invalid" };
+    return { status: "failed", key: ocrKey, reasonCode: "OCR_RESPONSE_INVALID", reason: "OCR response contract is invalid", requestId, inputSha256 };
   }
 
   const body = JSON.stringify({
@@ -251,7 +268,7 @@ export async function dispatchOcrAfterSanitize(
     if (/precondition|already exists|conflict/iu.test(message)) {
       return { status: "exists", key: ocrKey };
     }
-    throw new RetryableError("ocr.json write failed");
+    return { status: "failed", key: ocrKey, reasonCode: "OCR_RESULT_WRITE_FAILED", reason: "ocr.json write failed", requestId, inputSha256 };
   }
-  return { status: "written", key: ocrKey };
+  return { status: "written", key: ocrKey, requestId, inputSha256 };
 }

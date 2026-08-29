@@ -31,6 +31,14 @@ export function isOcrJsonKey(workspaceId: string, key: string): boolean {
   return isKeyInsideWorkspacePrefix(workspaceId, key) && key.endsWith("/ocr.json");
 }
 
+export function isCdrReceiptKey(workspaceId: string, key: string): boolean {
+  return isKeyInsideWorkspacePrefix(workspaceId, key) && key.endsWith("/cdr-receipt.json");
+}
+
+export function isOcrReviewKey(workspaceId: string, key: string): boolean {
+  return isKeyInsideWorkspacePrefix(workspaceId, key) && key.endsWith("/ocr-review.json");
+}
+
 export function isSanitizedPdfKey(workspaceId: string, key: string): boolean {
   return isKeyInsideWorkspacePrefix(workspaceId, key) && key.endsWith("/sanitized.pdf");
 }
@@ -62,6 +70,10 @@ export type DocumentListItem = {
   ocrJsonKey: string | null;
   ocrJsonSize: number | null;
   hasOcrJson: boolean;
+  cdrReceiptKey: string | null;
+  ocrReviewKey: string | null;
+  processingState: "sanitized" | "ocr_ready" | "operator_review";
+  ocrReviewReasonCode?: string;
 };
 
 export function groupImmutableDocuments(
@@ -94,6 +106,9 @@ export function groupImmutableDocuments(
         ocrJsonKey: null,
         ocrJsonSize: null,
         hasOcrJson: false,
+        cdrReceiptKey: null,
+        ocrReviewKey: null,
+        processingState: "sanitized",
       } satisfies DocumentListItem);
     if (filename === "sanitized.pdf") {
       current.sanitizedKey = object.key;
@@ -102,10 +117,19 @@ export function groupImmutableDocuments(
       current.ocrJsonKey = object.key;
       current.ocrJsonSize = object.size;
       current.hasOcrJson = true;
+      current.processingState = "ocr_ready";
+    } else if (filename === "cdr-receipt.json") {
+      current.cdrReceiptKey = object.key;
+    } else if (filename === "ocr-review.json") {
+      current.ocrReviewKey = object.key;
+      if (!current.hasOcrJson) current.processingState = "operator_review";
     } else {
       continue;
     }
     grouped.set(id, current);
   }
-  return [...grouped.values()];
+  return [...grouped.values()].map((item) => ({
+    ...item,
+    processingState: item.hasOcrJson ? "ocr_ready" : item.ocrReviewKey ? "operator_review" : "sanitized",
+  }));
 }

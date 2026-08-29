@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import { PermanentReject, RetryableError } from "./errors";
 import { cdrRequestSignature, sha256DigestHeader } from "./hmac";
 import { handleQueue, handleRequest, type Env } from "./index";
-import { immutableObjectKey, ocrSiblingKey } from "./keys";
+import { cdrReceiptSiblingKey, immutableObjectKey, ocrReviewSiblingKey, ocrSiblingKey } from "./keys";
 import { sanitizeObject, type R2BucketLike, type R2ObjectLike } from "./sanitize";
 
 const FIXTURE_SECRET = "foundation-cdr-hmac-fixture-secret-ok";
@@ -159,6 +159,12 @@ describe("sanitizeObject", () => {
     assert.equal(r2.puts[0]?.key, expectedImmutable);
     assert.equal(r2.puts[0]?.options.onlyIf?.etagDoesNotMatch, "*");
     assert.equal(r2.puts[0]?.options.customMetadata?.stage, "immutable-approved");
+    assert.equal(result.cdrReceipt.key, cdrReceiptSiblingKey(expectedImmutable));
+    assert.equal(r2.objects.has(cdrReceiptSiblingKey(expectedImmutable)), true);
+    const receipt = JSON.parse(new TextDecoder().decode(r2.objects.get(cdrReceiptSiblingKey(expectedImmutable))?.bytes));
+    assert.equal(receipt.schemaVersion, "tavonel.cdr_receipt.v1");
+    assert.equal(receipt.candidatePromotion, false);
+    assert.equal(receipt.outputSha256, outputSha256());
     assert.equal(sawLiveHost, false);
     assert.equal(r2.objects.has(ocrSiblingKey(expectedImmutable)), false);
   });
@@ -180,7 +186,9 @@ describe("sanitizeObject", () => {
     const result = await sanitizeObject(envFor(r2, { FOUNDATION_OCR_URL: "" }), SOURCE_KEY, cleanCdrFetch);
     assert.equal(result.status, "clean");
     assert.equal(result.ocr.status, "skipped");
-    assert.equal(r2.puts.every((entry) => entry.key.endsWith("sanitized.pdf")), true);
+    assert.equal(r2.puts.some((entry) => entry.key.endsWith("cdr-receipt.json")), true);
+    assert.equal(r2.puts.some((entry) => entry.key.endsWith("ocr.json")), false);
+    assert.equal(r2.puts.some((entry) => entry.key.endsWith("ocr-review.json")), false);
   });
 
   it("writes sibling ocr.json after CDR when FOUNDATION_OCR_URL is a Foundation target", async () => {
@@ -197,6 +205,43 @@ describe("sanitizeObject", () => {
     assert.equal(result.ocr.key, expectedOcr);
     assert.equal(r2.puts.some((entry) => entry.key === expectedOcr), true);
     assert.equal(r2.puts.find((entry) => entry.key === expectedOcr)?.options.onlyIf?.etagDoesNotMatch, "*");
+  });
+
+  it("persists OCR failure for explicit operator review without an automatic paid retry", async () => {
+    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
+    const result = await sanitizeObject(
+      envFor(r2, { FOUNDATION_OCR_URL: FOUNDATION_OCR }),
+      SOURCE_KEY,
+      async (input, init) => String(input).includes("/v1/ocr")
+        ? new Response("capacity unavailable", { status: 503 })
+        : cleanCdrFetch(input, init),
+      () => new Date("2026-08-29T00:00:00Z"),
+      () => "fixture-review-request",
+    );
+    const immutableKey = immutableObjectKey("ws_pilot", "doc_1", outputSha256());
+    const reviewKey = ocrReviewSiblingKey(immutableKey);
+    assert.equal(result.ocr.status, "failed");
+    assert.equal(result.ocr.reasonCode, "OCR_HTTP_REJECTED");
+    assert.equal(result.ocrReview?.key, reviewKey);
+    const review = JSON.parse(new TextDecoder().decode(r2.objects.get(reviewKey)?.bytes));
+    assert.equal(review.status, "operator_review");
+    assert.equal(review.retryPolicy, "explicit_operator_only");
+    assert.equal(review.candidatePromotion, false);
+
+    const message = { ackCount: 0, retryCount: 0, body: { object: { key: SOURCE_KEY } } };
+    await handleQueue(
+      { messages: [{
+        body: message.body,
+        ack: () => { message.ackCount += 1; },
+        retry: () => { message.retryCount += 1; },
+      }] } as never,
+      envFor(new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES }), { FOUNDATION_OCR_URL: FOUNDATION_OCR }),
+      async (input, init) => String(input).includes("/v1/ocr")
+        ? new Response("capacity unavailable", { status: 503 })
+        : cleanCdrFetch(input, init),
+    );
+    assert.equal(message.ackCount, 1);
+    assert.equal(message.retryCount, 0);
   });
 
   it("refuses oversized objects before calling CDR", async () => {

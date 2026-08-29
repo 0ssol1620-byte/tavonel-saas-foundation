@@ -289,3 +289,44 @@ test("keeps review-required packages downloadable and promotion-closed", async (
     contentType: "image/png",
   });
 });
+
+test("surfaces immutable OCR operator-review receipts without offering an automatic retry", async ({
+  page,
+}, testInfo) => {
+  const browserErrors: string[] = [];
+  page.on("console", message => {
+    if (message.type() === "error") browserErrors.push(message.text());
+  });
+  page.on("pageerror", error => browserErrors.push(error.message));
+  await installSession(page);
+  await mockWorkspace(page);
+  await page.route("**/api/documents", route => route.fulfill({
+    json: {
+      documents: [{
+        documentId: "doc-timeout",
+        versionKey: "f".repeat(64),
+        sanitizedKey: `immutable/pilot-test/pilot-test/doc-timeout/${"f".repeat(64)}/sanitized.pdf`,
+        sanitizedSize: 1024,
+        ocrJsonKey: null,
+        ocrJsonSize: null,
+        hasOcrJson: false,
+        cdrReceiptKey: `immutable/pilot-test/pilot-test/doc-timeout/${"f".repeat(64)}/cdr-receipt.json`,
+        ocrReviewKey: `immutable/pilot-test/pilot-test/doc-timeout/${"f".repeat(64)}/ocr-review.json`,
+        processingState: "operator_review",
+        ocrReviewReasonCode: "OCR_TIMEOUT_OR_NETWORK",
+      }],
+    },
+  }));
+  await page.goto("/workspace");
+
+  await expect(page.getByText("OCR operator review required", { exact: false })).toContainText("OCR_TIMEOUT_OR_NETWORK");
+  await expect(page.getByText("automatic paid retry disabled", { exact: false })).toBeVisible();
+  await expect(page.getByText("ocr-review.json", { exact: false })).toBeVisible();
+  await expect(page.getByRole("button", { name: /retry/i })).toHaveCount(0);
+
+  expect(browserErrors).toEqual([]);
+  await testInfo.attach("ocr-operator-review", {
+    body: await page.screenshot({ fullPage: true }),
+    contentType: "image/png",
+  });
+});

@@ -130,6 +130,7 @@ describe("dispatchOcrAfterSanitize", () => {
       async (input, init) => {
         assert.equal(String(input), FOUNDATION_OCR);
         assert.equal(init?.method, "POST");
+        assert.ok(init?.signal instanceof AbortSignal);
         const body = init?.body;
         assert.ok(body instanceof FormData);
         assert.ok(body.get("source"));
@@ -164,6 +165,27 @@ describe("dispatchOcrAfterSanitize", () => {
       async () => Response.json(payload),
     );
     assert.equal(result.status, "failed");
+    assert.equal(result.reasonCode, "OCR_RESPONSE_INVALID");
+    assert.equal(r2.puts.length, 0);
+  });
+
+  it("bounds an unavailable GPU request and returns an operator-review code", async () => {
+    const r2 = new FakeR2({ [IMMUTABLE]: PDF_BYTES });
+    const result = await dispatchOcrAfterSanitize(
+      envFor(r2, { FOUNDATION_OCR_URL: FOUNDATION_OCR }),
+      IMMUTABLE,
+      async (_input, init) => {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        assert.equal(init?.signal?.aborted, true);
+        throw new Error("aborted");
+      },
+      () => new Date("2026-08-29T00:00:00Z"),
+      () => "fixture-timeout-request",
+      5,
+    );
+    assert.equal(result.status, "failed");
+    assert.equal(result.reasonCode, "OCR_TIMEOUT_OR_NETWORK");
+    assert.equal(result.requestId, "fixture-timeout-request");
     assert.equal(r2.puts.length, 0);
   });
 });

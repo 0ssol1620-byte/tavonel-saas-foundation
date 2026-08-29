@@ -323,6 +323,14 @@ export default function WorkspacePage() {
     while (Date.now() < deadline) {
       const current = await loadDocuments();
       const ready = documentIds.filter((id) => current.some((item) => item.documentId === id && item.hasOcrJson)).length;
+      const operatorReview = documentIds.filter((id) => {
+        const versions = current.filter((item) => item.documentId === id);
+        return !versions.some((item) => item.hasOcrJson) && versions.some((item) => item.processingState === "operator_review");
+      });
+      if (operatorReview.length > 0) {
+        setNotice(`Batch processing stopped safely: ${operatorReview.length} document(s) require explicit OCR operator review. No paid retry or candidate compilation was attempted.`);
+        return;
+      }
       setNotice(`Batch processing: ${ready}/${documentIds.length} document OCR outputs are immutable and ready.`);
       if (ready === documentIds.length) {
         const client = getSupabaseBrowserClient();
@@ -687,7 +695,9 @@ export default function WorkspacePage() {
                     <li key={`${doc.documentId}-${doc.versionKey}`}>
                       <strong>{doc.documentId}</strong>
                       <small>{doc.sanitizedKey ?? "sanitized.pdf pending"}</small>
-                      <small>{doc.hasOcrJson ? `ocr.json ${doc.ocrJsonSize ?? 0} bytes` : "ocr.json not written yet"}</small>
+                      <small>{doc.hasOcrJson ? `ocr.json ${doc.ocrJsonSize ?? 0} bytes` : doc.processingState === "operator_review" ? `OCR operator review required${doc.ocrReviewReasonCode ? ` · ${doc.ocrReviewReasonCode}` : ""} · automatic paid retry disabled` : "ocr.json pending within bounded processing"}</small>
+                      {doc.cdrReceiptKey ? <small>CDR receipt · {doc.cdrReceiptKey}</small> : null}
+                      {doc.ocrReviewKey ? <small>OCR review receipt · {doc.ocrReviewKey}</small> : null}
                     </li>
                   ))}
                 </ul>
