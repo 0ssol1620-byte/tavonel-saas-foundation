@@ -27,6 +27,8 @@ Secret values are stored only in Vercel managed environment variables. They were
 5. Replaying notification `ntf_01m16c73kw3avq019xqcg3aa54` produced delivered notification `ntf_01m16c9f01g7mp2544j19n48ry`. Replaying Starter notification `ntf_01m16c51n3n73y1fjqjy23zxeq` was also accepted. The balance and persisted-event timestamp did not change, proving event and transaction idempotency.
 6. The authenticated customer portal loaded the active Observer subscription and its paid first invoice.
 7. Period-end cancellation was confirmed in the portal. Paddle kept the subscription active through 2026-09-29 and delivered a new `subscription.updated` event.
+8. After the schedule projection was deployed, original cancellation notification `ntf_01m16fjfh2kvwdydpn397h3bmc` was replayed through Paddle's supported sandbox API. Paddle accepted it with HTTP 202 and created `ntf_01m16h6dmc5d26ezm980ze0yyh`; the destination log recorded `Succeeded` in one attempt. The minimum-permission replay key was immediately revoked and its in-memory value cleared.
+9. The authenticated production workspace then displayed `active until 2026-09-29 18:04:38` KST, the scheduled-cancellation notice, 100 available credits, 100 purchased credits, and zero reversed credits.
 
 ## Cancellation projection
 
@@ -41,6 +43,7 @@ The real Foundation database returned `Success. No rows returned` for both the m
 - Root production build: Vite and server bundle passed.
 - Next.js production build: Next.js 15.5.24 compiled, type-checked, generated all routes, and completed successfully.
 - Initial qualified deployment: Vercel deployment `dpl_3NexCB3KqaRdVZSMwqX9Zq9zzmdH`, aliased to the Foundation production origin.
+- Cancellation projection deployment: Vercel deployment `dpl_4WJBkgZs1uvhruWCHtSzZkY1ciQ8`, `READY` and aliased to the same production origin.
 
 ## Remaining boundary
 
