@@ -283,14 +283,17 @@ button { font: inherit; border: 0; background: none; cursor: pointer; color: inh
    secondary identifiers withdraw in order of how much they carry, rather than everything
    wrapping at once into a three-line header. */
 @media (max-width: 1180px) {
-  .wordmark span { display: none; }
+  .masthead .wordmark span { display: none; }
 }
 @media (max-width: 1020px) {
   .masthead .mode { display: none; }
 }
 
-/* ---------------------------------------------------------------- section frame */
-.band { padding: var(--s8) 0; border-top: 1px solid var(--rule); }
+/* ---------------------------------------------------------------- section frame
+   Every section sets block padding only. A `padding: <y> 0` shorthand here overwrites the
+   inline padding .shell just set, which is how every band below the fold ended up flush
+   against the viewport edge at any width under 1200px. */
+.band { padding-block: var(--s8); border-top: 1px solid var(--rule); }
 .band.first { border-top: 0; }
 
 /* The band head is a masthead for its section: kicker and the objection it answers sit in a
@@ -342,7 +345,7 @@ button { font: inherit; border: 0; background: none; cursor: pointer; color: inh
 }
 
 /* ---------------------------------------------------------------- replay stage */
-.stage-wrap { padding: var(--s7) 0 var(--s2); }
+.stage-wrap { padding-block: var(--s7) var(--s2); }
 
 /* Editorial split: the statement takes the measure it needs and stops, and the lead sits in a
    narrower column set against its last line. Stacking both at full width made the fold read as
@@ -762,7 +765,7 @@ button { font: inherit; border: 0; background: none; cursor: pointer; color: inh
 }
 .notice button { margin-left: auto; color: var(--ink-2); font-size: 12px; }
 
-footer.site { border-top: 1px solid var(--rule); padding: 34px 0 56px; }
+footer.site { border-top: 1px solid var(--rule); padding-block: var(--s6) var(--s7); }
 footer.site .row2 { display: flex; gap: 22px; flex-wrap: wrap; align-items: baseline; }
 footer.site p { margin: 0; font-family: var(--f-mono); font-size: 11px; color: var(--ink-2); line-height: 1.8; max-width: 82ch; }
 
@@ -778,7 +781,7 @@ footer.site p { margin: 0; font-family: var(--f-mono); font-size: 11px; color: v
   .arg-beat { grid-template-columns: 44px minmax(0, 1fr); }
   .masthead > div { padding: 12px 18px; }
   .masthead nav { display: none; }
-  .band { padding: 52px 0; }
+  .band { padding-block: var(--s7); }
   .arg-beat { grid-template-columns: 46px minmax(0, 1fr); gap: var(--s2) var(--s3); }
   .arg-beat .tt { grid-column: 2; }
   .arg-beat .nm { grid-column: 2; }
@@ -796,6 +799,7 @@ footer.site p { margin: 0; font-family: var(--f-mono); font-size: 11px; color: v
      workspace route, so it withdraws here rather than forcing the header onto two lines. */
   .masthead > div { flex-wrap: nowrap; gap: var(--s3); }
   .masthead .signin { display: none; }
+  footer.site .wordmark span { display: block; }
   .masthead .btn { margin-left: auto; }
 
   /* The stage titlebar is a fixed 40-unit strip, so its labels must not wrap into it. */
