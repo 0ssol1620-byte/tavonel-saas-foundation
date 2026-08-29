@@ -1,0 +1,40 @@
+import { isCollectionCandidateKey } from "./immutable-keys";
+import { getWorkspaceCollectionCandidate, listImmutableWorkspaceObjects } from "./r2-objects";
+import type { R2SignerEnv } from "./r2-synthetic-canary";
+
+type StoredCollection = {
+  key: string;
+  artifact: unknown;
+};
+
+export async function loadPreferredCollectionCandidate(
+  signer: R2SignerEnv,
+  workspaceId: string,
+  collectionId: string,
+): Promise<{ ok: true; value: StoredCollection } | { ok: false; code: string }> {
+  const listed = await listImmutableWorkspaceObjects(signer, workspaceId);
+  if (!listed.ok) return listed;
+
+  const keys = listed.objects
+    .map((item) => item.key)
+    .filter((key) => isCollectionCandidateKey(workspaceId, key) && key.includes(`/collections/${collectionId}/`))
+    .slice(0, 12);
+  if (keys.length === 0) return { ok: false, code: "NOT_FOUND" };
+
+  const fetched = await Promise.all(
+    keys.map(async (key) => ({ key, result: await getWorkspaceCollectionCandidate(signer, workspaceId, key) })),
+  );
+  const available = fetched.filter(
+    (item): item is { key: string; result: { ok: true; json: unknown } } => item.result.ok,
+  );
+  const preferred = available.find((item) => {
+    const artifact = item.result.json as {
+      coreExecution?: { status?: unknown; receipt?: { candidatePromotion?: unknown } };
+    };
+    return artifact.coreExecution?.status === "completed" && artifact.coreExecution.receipt?.candidatePromotion === false;
+  }) ?? available[0];
+
+  return preferred
+    ? { ok: true, value: { key: preferred.key, artifact: preferred.result.json } }
+    : { ok: false, code: "GET_FAILED" };
+}

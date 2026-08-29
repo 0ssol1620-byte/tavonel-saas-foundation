@@ -13,7 +13,7 @@
  */
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import ReplayStage from "@/components/replay-stage";
 import { ACTS, SHOTS } from "@/lib/cinematic/shots";
 import { CTA, MOTION_LAW } from "@/lib/cinematic/copy";
@@ -46,6 +46,15 @@ const chain = [
 
 export default function HomePage() {
   const [notice, setNotice] = useState<string | null>(null);
+  const [signedIn, setSignedIn] = useState(false);
+
+  useEffect(() => {
+    const client = getSupabaseBrowserClient();
+    if (!client) return;
+    void client.auth.getSession().then(({ data }) => setSignedIn(Boolean(data.session)));
+    const { data } = client.auth.onAuthStateChange((_event, session) => setSignedIn(Boolean(session)));
+    return () => data.subscription.unsubscribe();
+  }, []);
 
   const showNotice = () =>
     setNotice("Foundation mode is active. Provider configuration and sandbox qualification are required before this action is available.");
@@ -60,6 +69,13 @@ export default function HomePage() {
     const redirectTo = `${window.location.origin}/auth/callback`;
     const { error } = await client.auth.signInWithOAuth({ provider: "google", options: { redirectTo } });
     if (error) setNotice("Google sign-in could not start. Testing-mode users only.");
+  };
+
+  const signOut = async () => {
+    const client = getSupabaseBrowserClient();
+    if (!client) return;
+    const { error } = await client.auth.signOut();
+    setNotice(error ? "Sign-out could not be completed." : "Signed out from this browser.");
   };
 
   return (
@@ -80,8 +96,8 @@ export default function HomePage() {
             <a href="#security">Security</a>
             <a href="#pricing">Pricing</a>
           </nav>
-          <button className="signin" onClick={signIn}>Sign in</button>
-          <button className="btn small" onClick={showNotice}>{CTA.primary}</button>
+          <button className="signin" onClick={() => void (signedIn ? signOut() : signIn())}>{signedIn ? "Sign out" : "Sign in"}</button>
+          {signedIn ? <Link className="btn small" href="/workspace">Open workspace</Link> : <button className="btn small" onClick={showNotice}>{CTA.primary}</button>}
         </div>
       </header>
 

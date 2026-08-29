@@ -6,4 +6,8 @@ Set the Vercel project root directory to `nextjs`. The Vercel configuration targ
 
 `/api/uploads/capability` is metadata-only, enforces a small JSON request cap, and responds with a no-store 503 while customer intake is disabled. `/api/paddle/webhook` verifies the raw body’s `Paddle-Signature` HMAC and returns 503 until a dedicated entitlement store has been approved. No API route accepts or forwards document byte streams.
 
+Completed separate-Core collection candidates can be downloaded from the signed-in workspace through `GET /api/collections/[id]/download`. The endpoint reloads the tenant-scoped immutable R2 artifact, requires a completed Core receipt with `candidatePromotion=false`, verifies every package path, byte count, and SHA-256 digest, then returns a no-store ZIP. It does not qualify semantic accuracy or promote the candidate.
+
+Google OAuth is enabled for private-pilot users and protected APIs verify the Supabase bearer session. Paddle remains sandbox reception infrastructure only: there is no checkout session creation, transaction ledger, subscription lifecycle, or entitlement persistence, and live payment must not be enabled without a separately approved billing design.
+
 Run `pnpm install`, then `pnpm test && pnpm run check && pnpm run build`. Do not release this package, configure live payment, or enable document intake until the provider checklist and synthetic qualification gates have passed.

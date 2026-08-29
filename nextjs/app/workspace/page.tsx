@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FileText, LockKeyhole, ShieldCheck, UploadCloud } from "lucide-react";
+import { Download, FileText, LockKeyhole, ShieldCheck, UploadCloud } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { activationPolicy } from "@/lib/activation-policy";
 import type { DocumentListItem } from "@/lib/immutable-keys";
@@ -56,6 +56,7 @@ export default function WorkspacePage() {
   const [documents, setDocuments] = useState<DocumentListItem[] | null>(null);
   const [proofMode, setProofMode] = useState(false);
   const [collectionResult, setCollectionResult] = useState<CollectionResult | null>(null);
+  const [downloading, setDownloading] = useState(false);
 
   const loadDocuments = async (): Promise<DocumentListItem[]> => {
     const client = getSupabaseBrowserClient();
@@ -244,6 +245,41 @@ export default function WorkspacePage() {
     }
   };
 
+  const downloadCollection = async () => {
+    if (!collectionResult) return;
+    setDownloading(true);
+    try {
+      const client = getSupabaseBrowserClient();
+      const { data } = client ? await client.auth.getSession() : { data: { session: null } };
+      const token = data.session?.access_token;
+      if (!token) {
+        setNotice("Sign in with Google before downloading this private collection.");
+        return;
+      }
+      const response = await fetch(`/api/collections/${collectionResult.collectionId}/download`, {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      if (!response.ok || response.headers.get("content-type") !== "application/zip") {
+        const json = await response.json().catch(() => ({ code: response.status }));
+        setNotice(`Knowledge package download failed (${json.code ?? response.status}).`);
+        return;
+      }
+      const url = URL.createObjectURL(await response.blob());
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `tavonel-${collectionResult.collectionId}.zip`;
+      document.body.append(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      setNotice(
+        `Downloaded ${collectionResult.validation.counts.packageFiles} hash-verified package files plus the candidate manifest. candidatePromotion=false.`,
+      );
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   const uploadDocuments = async (files: File[]) => {
     if (files.length === 0) return;
     setBusy(true);
@@ -417,7 +453,13 @@ export default function WorkspacePage() {
                   <small>{collectionResult.artifactKey}</small>
                   <small>{collectionResult.manifestDigest}</small>
                   {collectionResult.coreExecution ? (
-                    <small>Core completed · {collectionResult.coreExecution.runtime} · {collectionResult.coreExecution.receipt.requestId}</small>
+                    <>
+                      <small>Core completed · {collectionResult.coreExecution.runtime} · {collectionResult.coreExecution.receipt.requestId}</small>
+                      <button className="download-package" disabled={downloading} onClick={() => void downloadCollection()}>
+                        <Download size={15} aria-hidden="true" />
+                        {downloading ? "Preparing verified ZIP..." : "Download knowledge package"}
+                      </button>
+                    </>
                   ) : (
                     <button disabled={busy} onClick={() => void recompileWithCore()}>{busy ? "Running Core..." : "Recompile with separate Core"}</button>
                   )}
