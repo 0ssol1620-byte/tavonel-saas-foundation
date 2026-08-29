@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { buildCollectionZip, validateDownloadableCollectionArtifact } from "@/lib/collection-download";
+import { authorizeFoundationProduct } from "@/lib/billing-product-access";
+import { buildSignedCollectionZip, validateReviewableCollectionArtifact } from "@/lib/collection-download";
+import { readExportSignerEnv } from "@/lib/export-signing";
 import { loadPreferredCollectionCandidate } from "@/lib/collection-storage";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
@@ -21,7 +23,11 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const signer = readR2SignerEnv();
   if (!signer) return NextResponse.json({ code: "SIGNER_NOT_CONFIGURED" }, { status: 503, headers: NO_STORE });
 
-  const { membership } = foundationPilotAccess(user.id);
+  const access = foundationPilotAccess(user.id);
+  if (!access) return NextResponse.json({ code: "PILOT_ACCESS_REQUIRED" }, { status: 403, headers: NO_STORE });
+  const { membership } = access;
+  const productAccess = await authorizeFoundationProduct(membership.workspaceId, user.id, "observer");
+  if (!productAccess.ok) return NextResponse.json({ code: productAccess.code }, { status: productAccess.status, headers: NO_STORE });
   const loaded = await loadPreferredCollectionCandidate(signer, membership.workspaceId, id);
   if (!loaded.ok) {
     return NextResponse.json(
@@ -29,21 +35,34 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       { status: loaded.code === "NOT_FOUND" ? 404 : 503, headers: NO_STORE },
     );
   }
-  const artifact = validateDownloadableCollectionArtifact(loaded.value.artifact, id);
+  const artifact = validateReviewableCollectionArtifact(loaded.value.artifact, id);
   if (!artifact) {
     return NextResponse.json({ code: "COLLECTION_PACKAGE_INVALID" }, { status: 422, headers: NO_STORE });
   }
 
-  const archive = buildCollectionZip(artifact);
-  return new Response(archive, {
+  const exportSigner = readExportSignerEnv();
+  if (!exportSigner) {
+    const configured = Boolean(
+      process.env.TAVONEL_EXPORT_SIGNING_KEY_ID ||
+      process.env.TAVONEL_EXPORT_SIGNING_PRIVATE_KEY_PKCS8_DER_B64,
+    );
+    return NextResponse.json(
+      { code: configured ? "EXPORT_SIGNER_INVALID" : "EXPORT_SIGNER_NOT_CONFIGURED" },
+      { status: 503, headers: NO_STORE },
+    );
+  }
+  const signed = buildSignedCollectionZip(artifact, exportSigner);
+  return new Response(signed.archive, {
     status: 200,
     headers: {
       ...NO_STORE,
       "Content-Type": "application/zip",
       "Content-Disposition": `attachment; filename="tavonel-${id}.zip"`,
-      "Content-Length": String(archive.byteLength),
+      "Content-Length": String(signed.archive.byteLength),
       "X-Content-Type-Options": "nosniff",
       "X-Tavonel-Candidate-Promotion": "false",
+      "X-Tavonel-Export-Manifest-Sha256": signed.signature.signedPayloadSha256,
+      "X-Tavonel-Export-Key-Id": signed.signature.keyId,
     },
   });
 }

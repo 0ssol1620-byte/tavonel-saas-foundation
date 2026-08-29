@@ -2,6 +2,7 @@ import { PermanentReject, isRetryable } from "./errors";
 import { evaluateHealth } from "./guards";
 import { extractObjectKey, isQuarantineSourceKey } from "./keys";
 import { sanitizeObject } from "./sanitize";
+import { dispatchComputeSettlement } from "./settlement";
 
 export interface Env {
   FOUNDATION_QUARANTINE: R2Bucket;
@@ -13,6 +14,8 @@ export interface Env {
   FOUNDATION_OCR_URL?: string;
   TAVONEL_OCR_HMAC?: string;
   RUNPOD_API_KEY?: string;
+  FOUNDATION_BILLING_SETTLEMENT_URL?: string;
+  FOUNDATION_BILLING_SETTLEMENT_HMAC?: string;
 }
 
 export function jsonResponse(status: number, body: Record<string, unknown>): Response {
@@ -44,11 +47,30 @@ export async function handleRequest(request: Request, env: Env, fetcher: typeof 
     }
     try {
       const result = await sanitizeObject(env, objectKey, fetcher);
+      const outcome = result.ocr.computeCredits === 0
+        ? "released"
+        : result.ocr.status === "failed" ? "operator_review" : "settled";
+      await dispatchComputeSettlement(
+        env,
+        objectKey,
+        outcome,
+        result.ocr.computeCredits,
+        result.ocr.reasonCode ?? (outcome === "settled" ? "OCR_COMPLETED" : "GPU_NOT_DISPATCHED"),
+        fetcher,
+      );
       return jsonResponse(200, result);
     } catch (error) {
       const message = error instanceof Error ? error.message : "sanitize failed";
       if (error instanceof PermanentReject) {
-        return jsonResponse(message.includes("5 MiB") ? 413 : 400, { error: message });
+        if (!isQuarantineSourceKey(objectKey)) {
+          return jsonResponse(message.includes("5 MiB") ? 413 : 400, { error: message });
+        }
+        try {
+          await dispatchComputeSettlement(env, objectKey, "released", 0, "CDR_PERMANENT_REJECT", fetcher);
+          return jsonResponse(message.includes("5 MiB") ? 413 : 400, { error: message });
+        } catch {
+          return jsonResponse(503, { error: "compute release failed" });
+        }
       }
       return jsonResponse(503, { error: message });
     }
@@ -64,9 +86,30 @@ export async function handleQueue(batch: MessageBatch<unknown>, env: Env, fetche
         message.ack();
         continue;
       }
-      await sanitizeObject(env, objectKey, fetcher);
+      const result = await sanitizeObject(env, objectKey, fetcher);
+      const outcome = result.ocr.computeCredits === 0
+        ? "released"
+        : result.ocr.status === "failed" ? "operator_review" : "settled";
+      await dispatchComputeSettlement(
+        env,
+        objectKey,
+        outcome,
+        result.ocr.computeCredits,
+        result.ocr.reasonCode ?? (outcome === "settled" ? "OCR_COMPLETED" : "GPU_NOT_DISPATCHED"),
+        fetcher,
+      );
       message.ack();
     } catch (error) {
+      if (error instanceof PermanentReject) {
+        try {
+          const objectKey = extractObjectKey(message.body);
+          if (objectKey) await dispatchComputeSettlement(env, objectKey, "released", 0, "CDR_PERMANENT_REJECT", fetcher);
+          message.ack();
+        } catch {
+          message.retry();
+        }
+        continue;
+      }
       if (isRetryable(error)) {
         message.retry();
       } else {

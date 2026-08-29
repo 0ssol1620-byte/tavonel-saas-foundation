@@ -3,11 +3,13 @@ import { describe, it } from "node:test";
 import { PermanentReject } from "./errors";
 import {
   assertProcessableSourceKey,
+  cdrReceiptSiblingKey,
   extractObjectKey,
   hasForbiddenPath,
   immutableObjectKey,
   isQuarantineSourceKey,
   ocrSiblingKey,
+  ocrReviewSiblingKey,
   parseQuarantineSourceKey,
   versionKeyFromOutputSha256,
 } from "./keys";
@@ -70,6 +72,8 @@ describe("immutable object key", () => {
   it("maps sanitized.pdf to sibling ocr.json", () => {
     const pdf = `immutable/ws_pilot/ws_pilot/doc_1/${"cd".repeat(32)}/sanitized.pdf`;
     assert.equal(ocrSiblingKey(pdf), `immutable/ws_pilot/ws_pilot/doc_1/${"cd".repeat(32)}/ocr.json`);
+    assert.equal(cdrReceiptSiblingKey(pdf), `immutable/ws_pilot/ws_pilot/doc_1/${"cd".repeat(32)}/cdr-receipt.json`);
+    assert.equal(ocrReviewSiblingKey(pdf), `immutable/ws_pilot/ws_pilot/doc_1/${"cd".repeat(32)}/ocr-review.json`);
     assert.throws(() => ocrSiblingKey("immutable/ws/ws/doc/abc/other.bin"), PermanentReject);
   });
 });

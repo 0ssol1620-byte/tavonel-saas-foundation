@@ -97,7 +97,7 @@ export function parsePaddleBillingAction(
   if (!envelope) return null;
   const { data, common } = envelope;
 
-  if (common.eventType === "transaction.paid") {
+  if (common.eventType === "transaction.completed") {
     const binding = verifyCheckoutBinding(data.custom_data, env.FOUNDATION_BILLING_HMAC);
     const transactionId = typeof data.id === "string" ? data.id : "";
     const customerId = typeof data.customer_id === "string" ? data.customer_id : "";

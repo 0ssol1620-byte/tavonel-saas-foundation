@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 os.environ.setdefault("TAVONEL_OCR_HMAC", "fixture-ocr-hmac-secret-that-is-long-enough-123")
 
-from app import app, ocr_request_signature  # noqa: E402
+from app import app, normalized_bbox, ocr_request_signature  # noqa: E402
 
 FIXTURE_SECRET = "fixture-ocr-hmac-secret-that-is-long-enough-123"
 
@@ -107,11 +107,29 @@ def test_extracts_text_from_tiny_pdf(client: TestClient) -> None:
     )
     assert response.status_code == 200, response.text
     body = response.json()
+    assert body["schemaVersion"] == "tavonel.ocr_result.v2"
     assert body["status"] == "ok"
     assert body["pageCount"] == 1
     assert "TAVONEL OCR" in body["text"]
     assert body["inputSha256"] == digest
     assert "%PDF" not in body["text"]
+    assert len(body["regions"]) == 1
+    region = body["regions"][0]
+    assert region["regionId"] == "native-p0001"
+    assert region["pageIndex0"] == 0
+    assert region["pageNumber1"] == 1
+    assert region["order"] == 0
+    assert region["authority"] == "informal"
+    assert region["confidence"] == 1.0
+    assert len(region["bbox1000"]) == 4
+    assert 0 <= region["bbox1000"][0] < region["bbox1000"][2] <= 1000
+    assert 0 <= region["bbox1000"][1] < region["bbox1000"][3] <= 1000
+
+
+def test_normalized_bbox_clamps_and_preserves_positive_area() -> None:
+    assert normalized_bbox(-5, -2, 120, 80, 100, 100) == [0, 0, 1000, 800]
+    assert normalized_bbox(50, 50, 50, 50, 100, 100) == [500, 500, 501, 501]
+    assert normalized_bbox(0, 0, 1, 1, 0, 100) is None
 
 
 def test_ping_matches_health_shape(client: TestClient) -> None:

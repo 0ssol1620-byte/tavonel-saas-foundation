@@ -5,6 +5,7 @@ import {
   dispatchOcrAfterSanitize,
   isForbiddenOcrUrl,
   looksLikeFoundationOcrUrl,
+  qualifyOcrResult,
   shouldDispatchOcr,
   type OcrDispatchEnv,
 } from "./ocr";
@@ -12,6 +13,27 @@ import {
 const FOUNDATION_OCR = "https://tavonel-foundation-ocr.example/v1/ocr";
 const IMMUTABLE = "immutable/ws_pilot/ws_pilot/doc_1/abcdabcdabcdabcdabcdabcdabcdabcd/sanitized.pdf";
 const PDF_BYTES = new TextEncoder().encode("%PDF-1.4 sanitized-fixture");
+
+function ocrPayload(inputSha256: string) {
+  return {
+    schemaVersion: "tavonel.ocr_result.v2",
+    status: "ok",
+    text: "TAVONEL OCR",
+    pageCount: 1,
+    inputSha256,
+    regions: [{
+      regionId: "native-p0001",
+      pageIndex0: 0,
+      pageNumber1: 1,
+      order: 0,
+      blockType: "paragraph",
+      text: "TAVONEL OCR",
+      bbox1000: [100, 100, 900, 200],
+      confidence: 1,
+      authority: "informal",
+    }],
+  };
+}
 
 class FakeR2 {
   readonly objects = new Map<string, Uint8Array>();
@@ -27,7 +49,7 @@ class FakeR2 {
     const bytes = this.objects.get(key);
     if (!bytes) return null;
     return {
-      arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+      arrayBuffer: async () => bytes.slice().buffer as ArrayBuffer,
     };
   }
 
@@ -108,16 +130,13 @@ describe("dispatchOcrAfterSanitize", () => {
       async (input, init) => {
         assert.equal(String(input), FOUNDATION_OCR);
         assert.equal(init?.method, "POST");
+        assert.ok(init?.signal instanceof AbortSignal);
         const body = init?.body;
         assert.ok(body instanceof FormData);
         assert.ok(body.get("source"));
+        const inputSha256 = new Headers(init?.headers).get("x-tavonel-input-sha256")!;
         return new Response(
-          JSON.stringify({
-            status: "ok",
-            text: "TAVONEL OCR",
-            pageCount: 1,
-            inputSha256: "sha256:abc",
-          }),
+          JSON.stringify(ocrPayload(inputSha256)),
           { status: 200, headers: { "content-type": "application/json" } },
         );
       },
@@ -128,10 +147,57 @@ describe("dispatchOcrAfterSanitize", () => {
     assert.equal(r2.puts[0], expectedKey);
     const stored = JSON.parse(new TextDecoder().decode(r2.objects.get(expectedKey)));
     assert.equal(stored.status, "ok");
+    assert.equal(stored.schemaVersion, "tavonel.ocr_result.v2");
     assert.equal(stored.text, "TAVONEL OCR");
     assert.equal(stored.pageCount, 1);
     assert.equal(stored.sourceImmutableKey, IMMUTABLE);
     assert.equal(typeof stored.inputSha256, "string");
+    assert.deepEqual(stored.regions[0].bbox1000, [100, 100, 900, 200]);
     assert.equal(Object.prototype.hasOwnProperty.call(stored, "pdf"), false);
+  });
+
+  it("fails closed on a forged OCR digest and does not write ocr.json", async () => {
+    const r2 = new FakeR2({ [IMMUTABLE]: PDF_BYTES });
+    const payload = ocrPayload(`sha256:${"0".repeat(64)}`);
+    const result = await dispatchOcrAfterSanitize(
+      envFor(r2, { FOUNDATION_OCR_URL: FOUNDATION_OCR }),
+      IMMUTABLE,
+      async () => Response.json(payload),
+    );
+    assert.equal(result.status, "failed");
+    assert.equal(result.reasonCode, "OCR_RESPONSE_INVALID");
+    assert.equal(r2.puts.length, 0);
+  });
+
+  it("bounds an unavailable GPU request and returns an operator-review code", async () => {
+    const r2 = new FakeR2({ [IMMUTABLE]: PDF_BYTES });
+    const result = await dispatchOcrAfterSanitize(
+      envFor(r2, { FOUNDATION_OCR_URL: FOUNDATION_OCR }),
+      IMMUTABLE,
+      async (_input, init) => {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        assert.equal(init?.signal?.aborted, true);
+        throw new Error("aborted");
+      },
+      () => new Date("2026-08-29T00:00:00Z"),
+      () => "fixture-timeout-request",
+      5,
+    );
+    assert.equal(result.status, "failed");
+    assert.equal(result.reasonCode, "OCR_TIMEOUT_OR_NETWORK");
+    assert.equal(result.requestId, "fixture-timeout-request");
+    assert.equal(r2.puts.length, 0);
+  });
+});
+
+describe("OCR result contract", () => {
+  it("rejects fabricated or degenerate region coordinates", () => {
+    const digest = `sha256:${"a".repeat(64)}`;
+    const valid = ocrPayload(digest);
+    assert.ok(qualifyOcrResult(valid, digest));
+    assert.equal(qualifyOcrResult({
+      ...valid,
+      regions: [{ ...valid.regions[0], bbox1000: [100, 100, 100, 200] }],
+    }, digest), null);
   });
 });

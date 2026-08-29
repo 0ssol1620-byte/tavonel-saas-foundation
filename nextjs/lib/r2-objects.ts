@@ -4,6 +4,7 @@ import {
   immutableWorkspacePrefix,
   isCollectionCandidateKey,
   isKeyInsideWorkspacePrefix,
+  isOcrReviewKey,
   isOcrJsonKey,
   type ImmutableObjectMeta,
 } from "./immutable-keys";
@@ -52,7 +53,15 @@ async function signedS3Get(
   const signature = createHmac("sha256", kSigning).update(stringToSign, "utf8").digest("hex");
   headers.authorization = `AWS4-HMAC-SHA256 Credential=${env.accessKeyId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
   const query = canonicalQuery ? `?${canonicalQuery}` : "";
-  return fetch(`https://${host}${canonicalUri}${query}`, { method: "GET", headers });
+  try {
+    return await fetch(`https://${host}${canonicalUri}${query}`, {
+      method: "GET",
+      headers,
+      signal: AbortSignal.timeout(8_000),
+    });
+  } catch {
+    return new Response(null, { status: 599 });
+  }
 }
 
 async function signedS3PutJson(
@@ -86,7 +95,16 @@ async function signedS3PutJson(
   const kSigning = hmac(kService, "aws4_request");
   const signature = createHmac("sha256", kSigning).update(stringToSign, "utf8").digest("hex");
   headers.authorization = `AWS4-HMAC-SHA256 Credential=${env.accessKeyId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
-  return fetch(`https://${host}${canonicalUri}`, { method: "PUT", headers, body: Uint8Array.from(bytes) });
+  try {
+    return await fetch(`https://${host}${canonicalUri}`, {
+      method: "PUT",
+      headers,
+      body: Uint8Array.from(bytes),
+      signal: AbortSignal.timeout(8_000),
+    });
+  } catch {
+    return new Response(null, { status: 599 });
+  }
 }
 
 function parseListContents(xml: string): ImmutableObjectMeta[] {
@@ -169,6 +187,27 @@ export async function getWorkspaceOcrJson(
   const bytes = Buffer.from(await response.arrayBuffer());
   if (bytes.length > MAX_DERIVED_JSON_BYTES) return { ok: false, code: "JSON_TOO_LARGE" };
   if (bytes.subarray(0, 4).toString("utf8") === "%PDF") return { ok: false, code: "PDF_BYTES_FORBIDDEN" };
+  try {
+    return { ok: true, json: JSON.parse(bytes.toString("utf8")) };
+  } catch {
+    return { ok: false, code: "NOT_JSON" };
+  }
+}
+
+export async function getWorkspaceOcrReviewJson(
+  env: R2SignerEnv,
+  workspaceId: string,
+  key: string,
+  now = new Date(),
+): Promise<{ ok: true; json: unknown } | { ok: false; code: string }> {
+  if (env.bucket !== FOUNDATION_R2_BUCKET) return { ok: false, code: "BUCKET_NOT_FOUNDATION" };
+  if (!isOcrReviewKey(workspaceId, key)) return { ok: false, code: "OCR_REVIEW_PREFIX_REQUIRED" };
+  const canonicalUri = `/${env.bucket}/${key.split("/").map(encodeURIComponent).join("/")}`;
+  const response = await signedS3Get(env, canonicalUri, "", now);
+  if (response.status === 404) return { ok: false, code: "NOT_FOUND" };
+  if (!response.ok) return { ok: false, code: "GET_FAILED" };
+  const bytes = Buffer.from(await response.arrayBuffer());
+  if (bytes.length === 0 || bytes.length > 16_384) return { ok: false, code: "JSON_TOO_LARGE" };
   try {
     return { ok: true, json: JSON.parse(bytes.toString("utf8")) };
   } catch {

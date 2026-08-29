@@ -871,6 +871,73 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
 .tree-root .tk { color: var(--text-xlo); }
 .tree-root li.more { color: var(--text-xlo); grid-template-columns: 1fr; }
 
+/* ---------------------------------------------------------- review studio + grounded ask */
+
+/* Two surfaces that decide something irreversible-looking, so they are drawn to slow the
+   operator down rather than to move them along: the state of the pointer is stated first, the
+   record of the human decision is a field they must fill, and the versions that already exist
+   are listed beside it so a promotion is always read against what it replaces. */
+
+.world-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.world-heading > div { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.world-status {
+  flex: none;
+  font-family: var(--f-mono); font-size: 10px; letter-spacing: 0.14em;
+  padding: 5px 10px; border-radius: 3px;
+  border: 1px solid var(--hairline-hi); background: var(--ground); color: var(--text-xlo);
+}
+.world-status.active { border-color: var(--verified-dim); background: var(--verified-deep); color: var(--verified); }
+
+.world-empty { font-family: var(--f-mono); font-size: 11px; color: var(--text-xlo); }
+.world-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 320px); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 3px; overflow: hidden; }
+.review-panel, .version-panel { background: var(--ground); padding: 15px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+
+.binding-list { display: grid; gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 3px; overflow: hidden; }
+.binding-list span { background: var(--g1); padding: 8px 11px; display: grid; grid-template-columns: 128px minmax(0, 1fr); gap: 12px; align-items: baseline; font-family: var(--f-mono); font-size: 10.5px; color: var(--text-lo); overflow-wrap: anywhere; }
+.binding-list b { font-weight: 400; font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-xlo); }
+
+.world-studio label, .ask-studio label { font-family: var(--f-mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-xlo); }
+.world-studio textarea, .ask-studio textarea {
+  width: 100%; min-height: 84px; resize: vertical;
+  padding: 10px 12px; border: 1px solid var(--hairline-hi); border-radius: 3px;
+  background: var(--g1); color: var(--text-hi);
+  font-family: var(--f-mono); font-size: 12px; line-height: 1.55;
+}
+.world-studio textarea::placeholder, .ask-studio textarea::placeholder { color: var(--decor); }
+.world-studio textarea:disabled, .ask-studio textarea:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.world-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.world-actions small { font-family: var(--f-mono); font-size: 10px; color: var(--text-xlo); font-variant-numeric: tabular-nums; }
+
+.version-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+/* The panel is 320px and a digest is 64 characters, so the row stacks rather than fighting a
+   rollback control for width -- a wrapped digest beside a button is unreadable at this size. */
+.version-list li { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 9px 11px; border: 1px solid var(--hairline); border-radius: 3px; background: var(--g1); }
+.version-list li > button { align-self: flex-start; }
+.version-list li > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.version-list strong { font-family: var(--f-mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-mid); font-weight: 400; }
+.version-list small { font-family: var(--f-mono); font-size: 10px; color: var(--text-xlo); overflow-wrap: anywhere; }
+.version-panel p { margin: 0; font-family: var(--f-mono); font-size: 11px; color: var(--text-xlo); }
+
+.ask-studio form { display: flex; flex-direction: column; gap: 9px; align-items: flex-start; }
+.ask-result { display: flex; flex-direction: column; gap: 9px; padding: 14px; border: 1px solid var(--hairline); border-left-width: 2px; border-radius: 3px; background: var(--g2); }
+.ask-result.grounded { border-left-color: var(--verified); }
+.ask-result.abstained { border-left-color: var(--changed); }
+.ask-result > strong { font-family: var(--f-mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 400; color: var(--text-mid); }
+.ask-result.grounded > strong { color: var(--verified); }
+.ask-result.abstained > strong { color: var(--changed); }
+.ask-result > p { margin: 0; font-size: 14px; color: var(--text-hi); font-family: var(--f-sans); }
+.ask-result ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.ask-result li { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border: 1px solid var(--hairline); border-radius: 3px; background: var(--ground); font-family: var(--f-mono); font-size: 10.5px; color: var(--text-lo); overflow-wrap: anywhere; }
+.ask-result li b { font-weight: 400; color: var(--text-mid); }
+/* The excerpt is the evidence, so it is the one line set in the reading face. */
+.ask-result q { font-family: var(--f-sans); font-size: 13px; color: var(--text-mid); }
+.ask-result > small { font-family: var(--f-mono); font-size: 10px; color: var(--text-xlo); overflow-wrap: anywhere; }
+
+@media (max-width: 900px) {
+  .world-layout { grid-template-columns: minmax(0, 1fr); }
+}
+
 /* ============================================================ sign in */
 
 .auth { min-height: 100vh; display: flex; flex-direction: column; background: var(--ground); }

@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Lock, Thread
 from time import monotonic
-from typing import Final
+from typing import Final, TypedDict
 
 import pypdfium2 as pdfium
 from fastapi import FastAPI, File, Header, HTTPException, Request, UploadFile
@@ -25,6 +25,18 @@ REQUEST_ID: Final = re.compile(r"^[A-Za-z0-9_-]{16,160}$")
 PDF_MAGIC: Final = b"%PDF"
 RENDER_SCALE: Final = 2.0
 _rapidocr = None
+
+
+class OcrRegion(TypedDict):
+    regionId: str
+    pageIndex0: int
+    pageNumber1: int
+    order: int
+    blockType: str
+    text: str
+    bbox1000: list[int]
+    confidence: float
+    authority: str
 
 
 def cuda_available() -> bool:
@@ -43,9 +55,27 @@ def rapidocr_engine():
     return _rapidocr
 
 
-def raster_text(document) -> str:
+def normalized_bbox(
+    left: float,
+    top: float,
+    right: float,
+    bottom: float,
+    width: float,
+    height: float,
+) -> list[int] | None:
+    if width <= 0 or height <= 0:
+        return None
+    x1 = max(0, min(999, round(1000 * left / width)))
+    y1 = max(0, min(999, round(1000 * top / height)))
+    x2 = max(x1 + 1, min(1000, round(1000 * right / width)))
+    y2 = max(y1 + 1, min(1000, round(1000 * bottom / height)))
+    return [x1, y1, x2, y2]
+
+
+def raster_regions(document) -> list[OcrRegion]:
     engine = rapidocr_engine()
-    pages: list[str] = []
+    regions: list[OcrRegion] = []
+    order = 0
     for index in range(len(document)):
         page = document[index]
         try:
@@ -59,15 +89,60 @@ def raster_text(document) -> str:
             page.close()
         if not result:
             continue
-        lines: list[str] = []
-        for row in result:
-            if isinstance(row, (list, tuple)) and len(row) >= 2 and isinstance(row[1], str):
-                text = row[1].strip()
-                if text:
-                    lines.append(text)
-        if lines:
-            pages.append("\n".join(lines))
-    return "\n".join(pages).strip()
+        width, height = image.size
+        for line_index, row in enumerate(result):
+            if not isinstance(row, (list, tuple)) or len(row) < 2 or not isinstance(row[1], str):
+                continue
+            text = row[1].strip()
+            polygon = row[0] if isinstance(row[0], (list, tuple)) else []
+            points = [point for point in polygon if isinstance(point, (list, tuple)) and len(point) >= 2]
+            if not text or not points:
+                continue
+            xs = [float(point[0]) for point in points]
+            ys = [float(point[1]) for point in points]
+            bbox = normalized_bbox(min(xs), min(ys), max(xs), max(ys), width, height)
+            if bbox is None:
+                continue
+            confidence = float(row[2]) if len(row) >= 3 and isinstance(row[2], (int, float)) else 0.0
+            regions.append({
+                "regionId": f"ocr-p{index + 1:04d}-l{line_index + 1:05d}",
+                "pageIndex0": index,
+                "pageNumber1": index + 1,
+                "order": order,
+                "blockType": "paragraph",
+                "text": text,
+                "bbox1000": bbox,
+                "confidence": max(0.0, min(1.0, confidence)),
+                "authority": "informal",
+            })
+            order += 1
+    return regions
+
+
+def native_page_region(page, textpage, text: str, page_index: int, order: int) -> OcrRegion | None:
+    width, height = page.get_size()
+    rectangle_count = textpage.count_rects()
+    if rectangle_count < 1:
+        return None
+    rectangles = [textpage.get_rect(index) for index in range(rectangle_count)]
+    left = min(rectangle[0] for rectangle in rectangles)
+    bottom = min(rectangle[1] for rectangle in rectangles)
+    right = max(rectangle[2] for rectangle in rectangles)
+    top = max(rectangle[3] for rectangle in rectangles)
+    bbox = normalized_bbox(left, height - top, right, height - bottom, width, height)
+    if bbox is None:
+        return None
+    return {
+        "regionId": f"native-p{page_index + 1:04d}",
+        "pageIndex0": page_index,
+        "pageNumber1": page_index + 1,
+        "order": order,
+        "blockType": "paragraph",
+        "text": text,
+        "bbox1000": bbox,
+        "confidence": 1.0,
+        "authority": "informal",
+    }
 
 
 
@@ -162,7 +237,7 @@ def reject_non_pdf(filename: str | None, mime: str | None, payload: bytes) -> No
         raise HTTPException(422, "OCR source is not a PDF")
 
 
-def extract_text(payload: bytes) -> tuple[str, int]:
+def extract_text(payload: bytes) -> tuple[str, int, list[OcrRegion]]:
     try:
         document = pdfium.PdfDocument(payload)
     except Exception as exc:
@@ -171,19 +246,25 @@ def extract_text(payload: bytes) -> tuple[str, int]:
         page_count = len(document)
         if page_count < 1 or page_count > MAX_PAGES:
             raise HTTPException(422, "OCR source page count is not qualified")
-        pages: list[str] = []
+        regions: list[OcrRegion] = []
         for index in range(page_count):
             page = document[index]
             textpage = page.get_textpage()
             try:
-                pages.append(textpage.get_text_bounded().strip())
+                text = textpage.get_text_bounded().strip()
+                if text:
+                    region = native_page_region(page, textpage, text, index, len(regions))
+                    if region:
+                        regions.append(region)
             finally:
                 textpage.close()
                 page.close()
-        text = "\n".join(part for part in pages if part).strip()
-        if text:
-            return text, page_count
-        return raster_text(document), page_count
+        if not regions:
+            regions = raster_regions(document)
+        text = "\n".join(region["text"] for region in regions).strip()
+        if not text:
+            raise HTTPException(422, "OCR source has no extractable text regions")
+        return text, page_count, regions
     finally:
         document.close()
 
@@ -262,15 +343,17 @@ def ocr(
         if not hmac.compare_digest(expected_digest, actual_digest):
             raise HTTPException(422, "OCR source digest does not match the uploaded body")
         reject_non_pdf(source.filename, source.content_type, payload)
-        text, page_count = extract_text(payload)
+        text, page_count, regions = extract_text(payload)
     finally:
         source.file.close()
     return JSONResponse(
         content={
+            "schemaVersion": "tavonel.ocr_result.v2",
             "status": "ok",
             "text": text,
             "pageCount": page_count,
             "inputSha256": expected_digest,
+            "regions": regions,
         },
         headers={"cache-control": "no-store"},
     )

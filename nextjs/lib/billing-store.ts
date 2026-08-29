@@ -77,7 +77,7 @@ export async function applyFoundationBillingAction(action: Exclude<PaddleBilling
   const isReversal = action.action === "reversal";
   let response: Response;
   try {
-    response = await supabaseAdminRequest(config, "/rest/v1/rpc/apply_foundation_billing_event", {
+    response = await supabaseAdminRequest(config, "/rest/v1/rpc/apply_foundation_billing_event_v3", {
       method: "POST",
       body: JSON.stringify({
         p_event_id: action.eventId,

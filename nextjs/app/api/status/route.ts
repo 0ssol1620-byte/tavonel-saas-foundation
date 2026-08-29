@@ -20,6 +20,7 @@ export function GET() {
     api: Boolean(readPaddleApiConfig()),
     store: Boolean(readSupabaseAdminConfig()),
     binding: (process.env.FOUNDATION_BILLING_HMAC?.trim().length ?? 0) >= 32,
+    settlement: (process.env.FOUNDATION_BILLING_SETTLEMENT_HMAC?.trim().length ?? 0) >= 32,
     catalog: readConfiguredBillingOffers().size === 5,
   };
   const billing = Object.values(billingChecks).every(Boolean)

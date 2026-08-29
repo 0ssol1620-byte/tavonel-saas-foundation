@@ -100,12 +100,17 @@ async function signedS3(
   const kSigning = hmac(kService, "aws4_request");
   const signature = createHmac("sha256", kSigning).update(stringToSign, "utf8").digest("hex");
   headers.authorization = `AWS4-HMAC-SHA256 Credential=${env.accessKeyId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
-  const response = await fetch(`https://${host}${canonicalUri}`, {
-    method,
-    headers,
-    body: body ? new Uint8Array(body) : undefined,
-  });
-  return response.status;
+  try {
+    const response = await fetch(`https://${host}${canonicalUri}`, {
+      method,
+      headers,
+      body: body ? new Uint8Array(body) : undefined,
+      signal: AbortSignal.timeout(8_000),
+    });
+    return response.status;
+  } catch {
+    return 599;
+  }
 }
 
 export async function runSyntheticR2Canary(env: R2SignerEnv, now = new Date()): Promise<SyntheticCanaryResult> {

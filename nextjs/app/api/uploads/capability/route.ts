@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { activationPolicy } from "@/lib/activation-policy";
+import { authorizeFoundationProduct } from "@/lib/billing-product-access";
+import { reserveFoundationCompute } from "@/lib/compute-reservation";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
+import { reserveFoundationIntake } from "@/lib/intake-admission";
 import { validateQualifiedDocumentInput } from "@/lib/qualified-input";
 import { FOUNDATION_INTAKE_MAX_BYTES, presignFoundationQuarantinePut } from "@/lib/r2-presign";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
@@ -42,7 +45,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ code: qualified.code }, { status: 400, headers: { "Cache-Control": "no-store" } });
   }
 
-  const { membership } = foundationPilotAccess(user.id);
+  const access = foundationPilotAccess(user.id);
+  if (!access) return NextResponse.json({ code: "PILOT_ACCESS_REQUIRED" }, { status: 403, headers: { "Cache-Control": "no-store" } });
+  const { membership } = access;
+  const productAccess = await authorizeFoundationProduct(membership.workspaceId, user.id, "studio");
+  if (!productAccess.ok) return NextResponse.json({ code: productAccess.code }, { status: productAccess.status, headers: { "Cache-Control": "no-store" } });
   const signer = readR2SignerEnv();
   if (!signer) {
     return NextResponse.json({ code: "SIGNER_NOT_CONFIGURED" }, { status: 503, headers: { "Cache-Control": "no-store" } });
@@ -50,6 +57,41 @@ export async function POST(request: Request) {
 
   const documentId = crypto.randomUUID();
   const objectKey = `quarantine/${membership.workspaceId}/${documentId}/source`;
+  const admission = await reserveFoundationIntake({
+    workspaceKey: membership.workspaceId,
+    documentId,
+    userId: user.id,
+    objectKey,
+    requestedBytes,
+    declaredMimeType: qualified.normalizedMimeType,
+  });
+  if (!admission.ok) {
+    const rateLimited = admission.code === "INTAKE_RATE_LIMITED" || admission.code === "INTAKE_DAILY_QUOTA_EXCEEDED";
+    const conflict = admission.code === "INTAKE_IDEMPOTENCY_CONFLICT";
+    return NextResponse.json(
+      { code: admission.code },
+      {
+        status: rateLimited ? 429 : conflict ? 409 : 503,
+        headers: {
+          "Cache-Control": "no-store",
+          ...(rateLimited ? { "Retry-After": admission.code === "INTAKE_RATE_LIMITED" ? "60" : "3600" } : {}),
+        },
+      },
+    );
+  }
+  const compute = await reserveFoundationCompute({
+    workspaceKey: membership.workspaceId,
+    documentId,
+    userId: user.id,
+  });
+  if (!compute.ok) {
+    const paymentRequired = compute.code === "STUDIO_SUBSCRIPTION_REQUIRED" || compute.code === "GPU_CREDITS_REQUIRED";
+    const conflict = compute.code === "COMPUTE_IDEMPOTENCY_CONFLICT";
+    return NextResponse.json(
+      { code: compute.code },
+      { status: paymentRequired ? 402 : conflict ? 409 : 503, headers: { "Cache-Control": "no-store" } },
+    );
+  }
   const signed = presignFoundationQuarantinePut(signer, {
     key: objectKey,
     contentType: qualified.normalizedMimeType,
@@ -70,5 +112,11 @@ export async function POST(request: Request) {
     originalFilename: qualified.originalFilename,
     declaredMimeType: qualified.normalizedMimeType,
     sanitization: "pending_cdr",
+    admissionExpiresAt: admission.result.expiresAt,
+    computeReservation: {
+      reservationId: compute.result.reservationId,
+      reservedCredits: compute.result.reservedCredits,
+      expiresAt: compute.result.expiresAt,
+    },
   }, { headers: { "Cache-Control": "no-store" } });
 }

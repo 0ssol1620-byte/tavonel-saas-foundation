@@ -12,7 +12,10 @@ export async function GET() {
   try {
     // This fixed public fixture is the only byte response Vercel serves. The route
     // accepts no URL or customer input and is not part of the quarantine data path.
-    const response = await fetch(PUBLIC_PROOF_URL, { cache: "no-store" });
+    const response = await fetch(PUBLIC_PROOF_URL, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(5_000),
+    });
     if (!response.ok) {
       return NextResponse.json({ code: "PUBLIC_PROOF_UNAVAILABLE" }, { status: 502 });
     }
