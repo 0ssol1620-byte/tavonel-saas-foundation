@@ -715,10 +715,30 @@ button { font: inherit; border: 0; background: none; cursor: pointer; color: inh
 
 /* ---------------------------------------------------------------- proof / scale / security */
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(232px, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
+/* Four tiles in an auto-fit three-up grid leave one dead cell showing the rule colour through
+   the gap. The evidence section is explicitly two-up, so its four claims make a full square —
+   and the section reads at a different cadence from the three-up proof grid above it. */
+.tiles.pairs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 640px) { .tiles.pairs { grid-template-columns: minmax(0, 1fr); } }
 .tile { background: var(--paper-0); padding: 22px 20px; }
 .tile h3 { margin: 0 0 8px; font-size: 16px; font-weight: 590; letter-spacing: -0.012em; }
 .tile p { margin: 0; font-size: 14px; color: var(--ink-1); line-height: 1.5; }
-.tile .n { font-family: var(--f-mono); font-size: 11px; letter-spacing: 0.11em; color: var(--evidence); display: block; margin-bottom: 10px; }
+.tile .n {
+  font-family: var(--f-mono); font-size: var(--ts-label); letter-spacing: 0.12em;
+  color: var(--evidence); display: block; margin-bottom: 10px;
+}
+
+/* On the evidence section these are not kickers, they are the status of a claim, so they are
+   drawn as states with the same chip the security chain uses. A published failure has to look
+   like a published failure — it is the section's whole point, and the vocabulary is the one
+   V4_MIGRATION_MATRIX.md already uses. */
+.tile .n[data-state] {
+  display: inline-block; margin-bottom: var(--s3);
+  padding: 4px 8px; border-radius: var(--radius); border: 1px solid currentColor;
+}
+.tile .n[data-state="measured"] { color: var(--verified); background: color-mix(in srgb, var(--verified) 12%, transparent); }
+.tile .n[data-state="unsupported"] { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.tile .n[data-state="unproven"] { color: var(--review); background: var(--review-soft); }
 
 .scales { display: grid; grid-template-columns: repeat(auto-fit, minmax(258px, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
 .scale { background: var(--paper-0); padding: 26px 22px; }

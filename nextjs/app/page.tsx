@@ -215,24 +215,24 @@ export default function HomePage() {
             <h2 className="t-section">What is measured, and what is only built.</h2>
             <span className="objection">“does any of this actually work”</span>
           </div>
-          <div className="tiles">
+          <div className="tiles pairs">
             <article className="tile">
-              <span className="n">MEASURED</span>
+              <span className="n" data-state="measured">MEASURED</span>
               <h3>Recovery changes the outcome</h3>
               <p>On a public benchmark with an unmodified scoring path, the recovery runtime moved a document extraction score substantially. It is our own measurement, published with its confidence interval — never placed beside a competitor’s number as if reproduced.</p>
             </article>
             <article className="tile">
-              <span className="n">MEASURED</span>
+              <span className="n" data-state="measured">MEASURED</span>
               <h3>Compilation refuses more than it emits, sometimes</h3>
               <p>Of a thousand documents offered in one campaign, four hundred and four were refused — every one for a link the compiler could not resolve. A vault with a broken link is not emitted, by design.</p>
             </article>
             <article className="tile">
-              <span className="n">NOT SUPPORTED</span>
+              <span className="n" data-state="unsupported">NOT SUPPORTED</span>
               <h3>Blind quality detection failed</h3>
               <p>We tested whether prediction-only signals could pick the worst documents without ground truth. They could not beat ranking by length alone. It is published as unsupported and is not shipped as a feature.</p>
             </article>
             <article className="tile">
-              <span className="n">BUILT, NOT PROVEN</span>
+              <span className="n" data-state="unproven">BUILT, NOT PROVEN</span>
               <h3>Most thresholds are uncalibrated</h3>
               <p>Tests show the code does what its author intended. They do not show a threshold is right. Nothing here presents an uncalibrated threshold as a measured result.</p>
             </article>
