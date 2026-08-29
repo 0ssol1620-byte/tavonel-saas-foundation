@@ -6,13 +6,13 @@ describe("Next.js activation policy", () => {
     expect(allCapabilitiesFailClosed()).toBe(false);
     expect(activationPolicy.customerIntake.enabled).toBe(true);
     expect(activationPolicy.cdr.enabled).toBe(true);
-    expect(activationPolicy.ocrGpu.enabled).toBe(false);
+    expect(activationPolicy.ocrGpu.enabled).toBe(true);
     expect(activationPolicy.candidatePromotion.enabled).toBe(false);
   });
 
-  it("describes OCR as in-repo pending GHCR digest rather than a forever-close", () => {
-    expect(activationPolicy.ocrGpu.reason).toMatch(/GHCR digest/i);
-    expect(activationPolicy.ocrGpu.reason).toMatch(/one-shot/i);
-    expect(activationPolicy.ocrGpu.reason).not.toMatch(/until an immutable worker release pack exists/i);
+  it("opens OCR only after the recorded full-sequence qualification", () => {
+    expect(activationPolicy.ocrGpu.reason).toMatch(/2026-08-29/i);
+    expect(activationPolicy.ocrGpu.reason).toMatch(/full-sequence evidence/i);
+    expect(activationPolicy.ocrGpu.reason).toMatch(/scale-to-zero/i);
   });
 });

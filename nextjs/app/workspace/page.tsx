@@ -19,7 +19,9 @@ function intakeNotice() {
     return "Private pilot mode. No document bytes are accepted in this environment.";
   }
   if (activationPolicy.cdr.enabled) {
-    return "Private-pilot intake is open for signed-in test users. Files go to Foundation quarantine; CDR writes an immutable sanitized PDF. GPU stays closed until a GHCR digest and a $5 one-shot exist. Candidate promotion stays closed.";
+    return activationPolicy.ocrGpu.enabled
+      ? "Private-pilot intake is open for signed-in test users. Files go to Foundation quarantine; CDR writes an immutable sanitized PDF and qualified RunPod OCR writes reviewable JSON. Candidate promotion stays closed."
+      : "Private-pilot intake is open for signed-in test users. Files go to Foundation quarantine; CDR writes an immutable sanitized PDF. GPU OCR and candidate promotion stay closed.";
   }
   return "Private-pilot intake is open for signed-in test users. Files go to Foundation quarantine only; CDR and GPU stay closed.";
 }
@@ -87,7 +89,9 @@ export default function WorkspacePage() {
       }
       setNotice(
         activationPolicy.cdr.enabled
-          ? `${file.name} is in Foundation quarantine. CDR will sanitize it to an immutable PDF. OCR candidates JSON is Worker-side only; GPU dispatch and candidate promotion stay closed.`
+          ? activationPolicy.ocrGpu.enabled
+            ? `${file.name} is in Foundation quarantine. CDR will sanitize it to an immutable PDF, then qualified RunPod OCR will write reviewable JSON. Candidate promotion stays closed.`
+            : `${file.name} is in Foundation quarantine. CDR will sanitize it to an immutable PDF. GPU OCR and candidate promotion stay closed.`
           : `${file.name} is in Foundation quarantine. CDR sanitization and GPU analysis are still closed.`,
       );
       await loadDocuments();

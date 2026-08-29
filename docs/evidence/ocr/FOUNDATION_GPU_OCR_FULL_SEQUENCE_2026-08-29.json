@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "status": "qualified",
+  "scope": "foundation-private-pilot-public-fixture",
+  "observedAtUtc": "2026-08-29T05:25:02.142Z",
+  "production": {
+    "url": "https://tavonel-saas-foundation.vercel.app",
+    "deploymentId": "dpl_8ZHGsyCEoAugkDDB1B2rSEA7njxD",
+    "readyState": "READY",
+    "gitCommit": "f4c63fa6cb1ca6938ef30696a9636061682cc481",
+    "gitAuthor": "0ssol1620-byte <0ssol1620@gmail.com>"
+  },
+  "input": {
+    "sourceUrl": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+    "foundationProofRoute": "/api/proof-pdf",
+    "filename": "w3c-dummy.pdf",
+    "bytes": 13264,
+    "sha256": "3df79d34abbca99308e79cb94461c1893582604d68329a41fd4bec1885e6adb4",
+    "pdfMagicVerified": true,
+    "browserSha256VerifiedBeforeUpload": true,
+    "uploadMethod": "signed-in workspace UI -> capability JSON -> browser-direct signed R2 PUT",
+    "workspaceId": "pilot-969dc192daa24119",
+    "documentId": "7b7d397d-dceb-4736-85a4-bfa491d9ceae",
+    "quarantineKey": "quarantine/pilot-969dc192daa24119/7b7d397d-dceb-4736-85a4-bfa491d9ceae/source",
+    "quarantineWrittenAtUtc": "2026-08-29T05:17:34.881Z"
+  },
+  "cdr": {
+    "worker": "tavonel-foundation-cdr",
+    "eventQueue": "foundation-quarantine-created",
+    "sanitizedKey": "immutable/pilot-969dc192daa24119/pilot-969dc192daa24119/7b7d397d-dceb-4736-85a4-bfa491d9ceae/0f7e9338b0eb6adf330d8efd8aed844bd19882b6aaed3e38682ba075efb56d4d/sanitized.pdf",
+    "sanitizedBytes": 9003,
+    "sanitizedWrittenAtUtc": "2026-08-29T05:17:38.185Z",
+    "stage": "immutable-approved",
+    "createOnce": true
+  },
+  "ocr": {
+    "endpointId": "cohlugjzf0dk9i",
+    "endpointName": "tavonel-foundation-ocr-gpu",
+    "imageDigest": "sha256:3d1845563c7d80bad01d6a050be4e9d7b2c34dbee7ccbe90cb246255194f47a8",
+    "ocrJsonKey": "immutable/pilot-969dc192daa24119/pilot-969dc192daa24119/7b7d397d-dceb-4736-85a4-bfa491d9ceae/0f7e9338b0eb6adf330d8efd8aed844bd19882b6aaed3e38682ba075efb56d4d/ocr.json",
+    "ocrJsonBytes": 336,
+    "ocrJsonWrittenAtUtc": "2026-08-29T05:18:15.046Z",
+    "stage": "ocr-json",
+    "uiCandidateVerification": {
+      "status": "ok",
+      "pageCount": 1,
+      "textCharacters": 14,
+      "inputDigestMatchesImmutableVersion": true,
+      "sourceImmutableKeyMatches": true,
+      "candidatePromotion": false
+    },
+    "runpodOneHourMetrics": {
+      "requestsTotal": 9,
+      "completed": 1,
+      "failedBeforeSuccess": 8,
+      "retried": 0,
+      "executionTimeTotal": "2.03s",
+      "coldStartCount": 1,
+      "coldStartTime": "29.81s"
+    },
+    "runpodLogs": {
+      "visibleRetainedRowsForSuccess": 0,
+      "note": "The dashboard Logs table retained no success row after scale-to-zero; the completed metric and immutable ocr.json are the terminal execution evidence."
+    }
+  },
+  "costAndIdle": {
+    "balanceBeforeUsd": 15.80,
+    "balanceAfterUsd": 15.79,
+    "observedBalanceDeltaUsd": 0.01,
+    "finalSpendRateUsdPerSecond": 0,
+    "finalRunningWorkers": 0,
+    "finalJobsInProgress": 0,
+    "finalJobsWaiting": 0,
+    "finalDashboardLifecycle": "Initializing with zero workers after scale-to-zero"
+  },
+  "rejectedGuardProbe": {
+    "filename": "dart-jtc-2026-q1.pdf",
+    "bytes": 2276931,
+    "sha256": "fb998430db82774afc0d69090383650421ab9a14e6e37c7f32821aa1c6a32eee",
+    "pages": 121,
+    "cdrHttpStatus": 400,
+    "reason": "The source exceeded the Foundation CDR MAX_PAGES=80 and total render-pixel budget; no immutable or GPU output was created."
+  },
+  "guardrails": {
+    "ocrGpuBeforeQualification": false,
+    "ocrGpuAfterQualification": true,
+    "candidatePromotion": false,
+    "legacyProductionStackChanged": false,
+    "folyntaWorktreeChanged": false,
+    "runpodMaxWorkers": 1,
+    "runpodMinimumWorkers": 0,
+    "runpodSshEnabled": false,
+    "networkVolumeAttached": false
+  },
+  "verification": {
+    "typecheck": "passed",
+    "unitTests": "31 passed",
+    "productionBuild": "passed",
+    "vercelProductionBuild": "passed",
+    "fullSequence": "browser UI -> signed R2 quarantine -> CDR sanitized.pdf -> RunPod GPU OCR -> sibling ocr.json -> authenticated UI verification"
+  }
+}

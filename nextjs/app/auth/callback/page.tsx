@@ -39,7 +39,7 @@ export default function AuthCallbackPage() {
           <p className="eyebrow">● AUTH CALLBACK</p>
           <h1>Signing you in.</h1>
           <p className="lead" role="status">{status}</p>
-          <p className="fine">Customer intake, GPU dispatch, and candidate promotion stay closed.</p>
+          <p className="fine">Private-pilot intake and qualified GPU OCR are open. Candidate promotion stays closed.</p>
         </div>
       </section>
     </main>
