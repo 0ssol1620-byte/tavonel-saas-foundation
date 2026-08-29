@@ -14,7 +14,7 @@
 import { useMemo, useRef } from "react";
 import {
   AFFECTED_COUNT, DATE_CANDIDATES, EVIDENCE, FEED, IDENTITY_CANDIDATES, IDENTITY_RESOLVED,
-  IMPACT_PATH, PROJECTION, RAIL_STAGES, ROUTE_LABELS, SOURCES, SOURCE_GROUPS,
+  IMPACT_PATH, PROJECTION, RAIL_STAGES, ROUTE_LABELS, SOURCES, SOURCE_GROUPS, groupCounts,
   WORLD_UNITS, CURRENT_AFTER, CURRENT_BEFORE,
 } from "@/lib/cinematic/fixture";
 import {
@@ -48,6 +48,7 @@ export default function ReplayStage() {
   const worldVersionState = t >= 36.8 ? "new" : t >= 32 ? "recompiling" : "stable";
 
   const filesFound = Math.round(PROJECTION.discovery.filesDiscovered * ramp(t, 1.45, 3.1));
+  const groupsFound = useMemo(() => groupCounts(filesFound), [filesFound]);
   const entities = Math.round(PROJECTION.worldTotals.entities * ramp(t, 5.8, 10.1));
   const relations = Math.round(PROJECTION.worldTotals.relations * ramp(t, 10.1, 11.65));
   const impactHops = Math.floor(ramp(t, 29.4, 31.6) * IMPACT_PATH.length);
@@ -73,10 +74,10 @@ export default function ReplayStage() {
           <aside className="browser">
             <h3>SOURCES</h3>
             {SOURCE_GROUPS.map((g, i) => (
-              <div key={g} className="brow" data-in={t >= 0.65 + i * 0.12 ? 1 : 0}>
+              <div key={g.name} className="brow" data-in={t >= 0.65 + i * 0.12 ? 1 : 0}>
                 <span className="g-folder" aria-hidden="true" />
-                <span>{g}</span>
-                <span className="count">{t >= 1.45 ? nf.format(Math.round(filesFound / SOURCE_GROUPS.length)) : "—"}</span>
+                <span>{g.name}</span>
+                <span className="count">{t >= 1.45 ? nf.format(groupsFound[i]) : "—"}</span>
               </div>
             ))}
             {SOURCES.slice(0, 6).map((s, i) => (
@@ -424,17 +425,26 @@ export default function ReplayStage() {
               </div>
             </div>
 
-            {/* S20 — control handoff */}
+            {/* S20 — control handoff. §1.4 asks the film to become the tool on its last frame, so
+                the last frame is one composed block rather than a slogan floating above a bar
+                that repeated it. What the sequence actually produced is stated beside the
+                controls, every figure read from PROJECTION. */}
             <div className="scene" data-on={on("S20")} aria-hidden={off("S20")}>
               <div className="scene-pad" style={{ justifyContent: "center" }}>
-                <p className="stage-payoff" style={{ fontSize: "calc(40 * var(--u))", lineHeight: "calc(44 * var(--u))" }}>{HANDOFF}</p>
-              </div>
-              <div className="handoff">
-                <h3>{HANDOFF}</h3>
-                <div className="cta">
-                  <a className="primary" href="#pricing">{CTA.primary}</a>
-                  <a href="#argument">Read the whole sequence</a>
-                  <a href="#proof">{CTA.tertiary}</a>
+                <div className="handoff">
+                  <p className="stage-kicker">THE SEQUENCE IS OVER · THE CONTROLS ARE YOURS</p>
+                  <h3>{HANDOFF}</h3>
+                  <dl className="wsum">
+                    <div><dt>WORLD</dt><dd>{PROJECTION.versions.after.replace("WORLD ", "")} · current</dd></div>
+                    <div><dt>UNITS</dt><dd>{nf.format(PROJECTION.worldTotals.units)}</dd></div>
+                    <div><dt>IDENTITIES</dt><dd>{nf.format(PROJECTION.worldTotals.entities)}</dd></div>
+                    <div><dt>RELATIONS</dt><dd>{nf.format(PROJECTION.worldTotals.relations)}</dd></div>
+                  </dl>
+                  <div className="cta">
+                    <a className="primary" href="#pricing">{CTA.primary}</a>
+                    <a href="#argument">Read the whole sequence</a>
+                    <a href="#proof">{CTA.tertiary}</a>
+                  </div>
                 </div>
               </div>
             </div>

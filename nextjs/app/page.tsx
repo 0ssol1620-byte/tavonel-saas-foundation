@@ -70,6 +70,9 @@ export default function HomePage() {
             <b>TAVONEL</b>
             <span>THE KNOWLEDGE COMPILER</span>
           </Link>
+          <span className="mode" title="Foundation mode: no document bytes, payment sessions or GPU capacity are created.">
+            <i aria-hidden="true" />FOUNDATION MODE
+          </span>
           <nav>
             <a href="#argument">Sequence</a>
             <a href="#proof">Proof</a>
@@ -77,7 +80,7 @@ export default function HomePage() {
             <a href="#security">Security</a>
             <a href="#pricing">Pricing</a>
           </nav>
-          <button className="btn ghost small" onClick={signIn}>Sign in</button>
+          <button className="signin" onClick={signIn}>Sign in</button>
           <button className="btn small" onClick={showNotice}>{CTA.primary}</button>
         </div>
       </header>
@@ -86,17 +89,15 @@ export default function HomePage() {
         {/* ---------------------------------------------------------- the replay */}
         <section className="shell stage-wrap">
           <div className="stage-lead">
-            <div>
-              <p className="t-brand" style={{ color: "var(--evidence)", margin: "0 0 12px" }}>THE KNOWLEDGE COMPILER</p>
-              <h1 className="t-statement">Watch scattered files become one current world.</h1>
-            </div>
-            <p className="t-body">
-              Fifty-six seconds, then the controls are yours. Nothing here is a recording of a
+            <p className="t-brand">THE KNOWLEDGE COMPILER</p>
+            <h1 className="t-statement">Watch scattered files become one current world.</h1>
+            <p className="t-lead">
+              Fifty-six seconds, then the controls are yours. Nothing below is a recording of a
               screen — it is the interface drawing a compilation from its own event stream.
             </p>
           </div>
           <ReplayStage />
-          <p className="fine" style={{ marginTop: 14 }}>{MOTION_LAW}</p>
+          <p className="law">{MOTION_LAW}</p>
         </section>
 
         {/* ---------------------------------------------------------- static argument layer */}
@@ -122,10 +123,8 @@ export default function HomePage() {
                   <div className="arg-beat" key={s.id} data-gate={s.gate ? 1 : 0}>
                     <span className="id">{s.id}</span>
                     <span className="tt">{s.startSeconds.toFixed(2)}–{s.endSeconds.toFixed(2)}</span>
-                    <span className="nm">
-                      {s.beat}
-                      <span className="tk">{s.takeaway}</span>
-                    </span>
+                    <span className="nm">{s.beat}</span>
+                    <span className="tk">{s.takeaway}</span>
                   </div>
                 ))}
               </div>
@@ -186,7 +185,7 @@ export default function HomePage() {
         </section>
 
         {/* ---------------------------------------------------------- 3 · security */}
-        <section id="security" className="shell band">
+        <section id="security" className="shell band dark">
           <div className="band-head">
             <span className="kicker">SOURCE BOUNDARY</span>
             <h2 className="t-section">Every document is treated as hostile data.</h2>

@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   ACTS, CANONICAL_FPS, GATE_SHOTS, SEQUENCE_DURATION_SECONDS, SHOTS, shotAt, shotProgress,
 } from "./shots";
-import { AFFECTED_COUNT, PROJECTION, WORLD_UNITS, FEED, RAIL_STAGES } from "./fixture";
+import {
+  AFFECTED_COUNT, PROJECTION, WORLD_UNITS, FEED, RAIL_STAGES, SOURCE_GROUPS, groupCounts,
+} from "./fixture";
 
 describe("shot board", () => {
   it("runs exactly 56.00s with no gap and no overlap", () => {
@@ -104,6 +106,22 @@ describe("showcase world fixture", () => {
     for (let i = 1; i < FEED.length; i += 1) {
       expect(FEED[i].at).toBeGreaterThanOrEqual(FEED[i - 1].at);
     }
+  });
+
+  it("splits discovered files across groups without inventing or losing one", () => {
+    const share = SOURCE_GROUPS.reduce((a, g) => a + g.share, 0);
+    expect(share).toBeCloseTo(1, 10);
+    for (const total of [0, 1, 7, 4213, PROJECTION.discovery.filesDiscovered]) {
+      const parts = groupCounts(total);
+      expect(parts).toHaveLength(SOURCE_GROUPS.length);
+      expect(parts.reduce((a, b) => a + b, 0)).toBe(total);
+      for (const n of parts) expect(n).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it("gives the groups different sizes, so the rail is a world and not a placeholder", () => {
+    const parts = groupCounts(PROJECTION.discovery.filesDiscovered);
+    expect(new Set(parts).size).toBe(parts.length);
   });
 
   it("runs the compiler rail through six stages inside the timelapse", () => {
