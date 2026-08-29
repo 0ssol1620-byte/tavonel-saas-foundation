@@ -186,12 +186,21 @@ export async function sanitizeObject(
 
   let ocr: OcrDispatchResult;
   try {
-    ocr = await dispatchOcrAfterSanitize(env, immutableKey, fetcher, now, newRequestId);
+    const existingReview = await env.FOUNDATION_QUARANTINE.get(ocrReviewSiblingKey(immutableKey));
+    ocr = existingReview
+      ? {
+          status: "failed",
+          reasonCode: "OCR_REVIEW_ALREADY_EXISTS",
+          reason: "an immutable operator-review receipt already exists",
+          computeCredits: 2,
+        }
+      : await dispatchOcrAfterSanitize(env, immutableKey, fetcher, now, newRequestId);
   } catch {
     ocr = {
       status: "failed",
       reasonCode: "OCR_TIMEOUT_OR_NETWORK",
       reason: "OCR dispatch failed after CDR",
+      computeCredits: 0,
     };
   }
 

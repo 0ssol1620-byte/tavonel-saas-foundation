@@ -27,7 +27,7 @@ function body(eventType: string, data: Record<string, unknown>, eventCharacter =
 describe("Paddle billing event projection", () => {
   it("issues prepaid credits only for the signed binding and allow-listed price", () => {
     const binding = createCheckoutBinding({ ...bindingInput, offerCode: "credit_starter" }, SECRET);
-    const action = parsePaddleBillingAction(body("transaction.paid", {
+    const action = parsePaddleBillingAction(body("transaction.completed", {
       id: `txn_${"t".repeat(26)}`,
       customer_id: `ctm_${"c".repeat(26)}`,
       custom_data: binding,
@@ -40,13 +40,23 @@ describe("Paddle billing event projection", () => {
       workspaceId: bindingInput.workspaceId,
     });
 
-    const tampered = parsePaddleBillingAction(body("transaction.paid", {
+    const tampered = parsePaddleBillingAction(body("transaction.completed", {
       id: `txn_${"t".repeat(26)}`,
       customer_id: `ctm_${"c".repeat(26)}`,
       custom_data: { ...binding, tavonel_offer_code: "credit_scale" },
       items: [{ quantity: 1, price: { id: STARTER_PRICE } }],
     }, "f"), env);
     expect(tampered).toMatchObject({ action: "ignored", reason: "binding_invalid" });
+  });
+
+  it("does not issue prepaid credits before Paddle completes the transaction", () => {
+    const binding = createCheckoutBinding({ ...bindingInput, offerCode: "credit_starter" }, SECRET);
+    expect(parsePaddleBillingAction(body("transaction.paid", {
+      id: `txn_${"t".repeat(26)}`,
+      customer_id: `ctm_${"c".repeat(26)}`,
+      custom_data: binding,
+      items: [{ quantity: 1, price: { id: STARTER_PRICE } }],
+    }), env)).toMatchObject({ action: "ignored", reason: "event_not_entitling" });
   });
 
   it.each([

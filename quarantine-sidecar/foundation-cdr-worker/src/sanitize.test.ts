@@ -12,6 +12,7 @@ const SYNTHETIC_URL = "https://tavonel-cdr-synthetic-317850201666.asia-northeast
 const SYNTHETIC_HEALTH = "https://tavonel-cdr-synthetic-317850201666.asia-northeast3.run.app/health";
 const PROD_URL = "https://tavonel-pdf-cdr.example.run.app/v1/disarm";
 const FOUNDATION_OCR = "https://tavonel-foundation-ocr.example/v1/ocr";
+const SETTLEMENT_URL = "https://tavonel-saas-foundation.vercel.app/api/internal/billing/settle";
 const SOURCE_KEY = "quarantine/ws_pilot/doc_1/source";
 const SOURCE_BYTES = new TextEncoder().encode("%PDF-1.4 fixture");
 const SANITIZED_BYTES = new TextEncoder().encode("%PDF-1.4 sanitized-fixture");
@@ -35,7 +36,7 @@ class FakeR2 implements R2BucketLike {
     return {
       size: found.bytes.byteLength,
       httpMetadata: { contentType: found.contentType },
-      arrayBuffer: async () => found.bytes.buffer.slice(found.bytes.byteOffset, found.bytes.byteOffset + found.bytes.byteLength),
+      arrayBuffer: async () => found.bytes.slice().buffer as ArrayBuffer,
     };
   }
 
@@ -67,6 +68,8 @@ function envFor(r2: FakeR2, overrides: Partial<Env> = {}): Env {
     FOUNDATION_R2_BUCKET: "tavonel-saas-foundation-quarantine",
     TAVONEL_CDR_HMAC: FIXTURE_SECRET,
     FOUNDATION_OCR_URL: "",
+    FOUNDATION_BILLING_SETTLEMENT_URL: SETTLEMENT_URL,
+    FOUNDATION_BILLING_SETTLEMENT_HMAC: "foundation-settlement-hmac-fixture-secret-ok",
     ...overrides,
   };
 }
@@ -82,6 +85,9 @@ async function cleanCdrFetch(input: RequestInfo | URL, init?: RequestInit): Prom
   }
   if (url.includes("/health")) {
     return new Response(JSON.stringify({ status: "ok" }), { status: 200 });
+  }
+  if (url === SETTLEMENT_URL) {
+    return new Response(JSON.stringify({ code: "SETTLEMENT_APPLIED" }), { status: 200 });
   }
   if (url.includes("/v1/ocr")) {
     const inputSha256 = new Headers(init?.headers).get("x-tavonel-input-sha256");
@@ -229,19 +235,25 @@ describe("sanitizeObject", () => {
     assert.equal(review.candidatePromotion, false);
 
     const message = { ackCount: 0, retryCount: 0, body: { object: { key: SOURCE_KEY } } };
+    let retriedOcrCalls = 0;
     await handleQueue(
       { messages: [{
         body: message.body,
         ack: () => { message.ackCount += 1; },
         retry: () => { message.retryCount += 1; },
       }] } as never,
-      envFor(new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES }), { FOUNDATION_OCR_URL: FOUNDATION_OCR }),
-      async (input, init) => String(input).includes("/v1/ocr")
-        ? new Response("capacity unavailable", { status: 503 })
-        : cleanCdrFetch(input, init),
+      envFor(r2, { FOUNDATION_OCR_URL: FOUNDATION_OCR }),
+      async (input, init) => {
+        if (String(input).includes("/v1/ocr")) {
+          retriedOcrCalls += 1;
+          return new Response("capacity unavailable", { status: 503 });
+        }
+        return cleanCdrFetch(input, init);
+      },
     );
     assert.equal(message.ackCount, 1);
     assert.equal(message.retryCount, 0);
+    assert.equal(retriedOcrCalls, 0);
   });
 
   it("refuses oversized objects before calling CDR", async () => {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { activationPolicy } from "@/lib/activation-policy";
+import { reserveFoundationCompute } from "@/lib/compute-reservation";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
 import { reserveFoundationIntake } from "@/lib/intake-admission";
 import { validateQualifiedDocumentInput } from "@/lib/qualified-input";
@@ -75,6 +76,19 @@ export async function POST(request: Request) {
       },
     );
   }
+  const compute = await reserveFoundationCompute({
+    workspaceKey: membership.workspaceId,
+    documentId,
+    userId: user.id,
+  });
+  if (!compute.ok) {
+    const paymentRequired = compute.code === "STUDIO_SUBSCRIPTION_REQUIRED" || compute.code === "GPU_CREDITS_REQUIRED";
+    const conflict = compute.code === "COMPUTE_IDEMPOTENCY_CONFLICT";
+    return NextResponse.json(
+      { code: compute.code },
+      { status: paymentRequired ? 402 : conflict ? 409 : 503, headers: { "Cache-Control": "no-store" } },
+    );
+  }
   const signed = presignFoundationQuarantinePut(signer, {
     key: objectKey,
     contentType: qualified.normalizedMimeType,
@@ -96,5 +110,10 @@ export async function POST(request: Request) {
     declaredMimeType: qualified.normalizedMimeType,
     sanitization: "pending_cdr",
     admissionExpiresAt: admission.result.expiresAt,
+    computeReservation: {
+      reservationId: compute.result.reservationId,
+      reservedCredits: compute.result.reservedCredits,
+      expiresAt: compute.result.expiresAt,
+    },
   }, { headers: { "Cache-Control": "no-store" } });
 }

@@ -16,6 +16,7 @@ type OcrR2Bucket = {
 
 export type OcrDispatchStatus = "skipped" | "written" | "exists" | "failed";
 export type OcrFailureCode =
+  | "OCR_REVIEW_ALREADY_EXISTS"
   | "OCR_SOURCE_MISSING"
   | "OCR_SOURCE_EMPTY"
   | "OCR_TIMEOUT_OR_NETWORK"
@@ -31,6 +32,7 @@ export type OcrDispatchResult = {
   reasonCode?: OcrFailureCode;
   requestId?: string;
   inputSha256?: string;
+  computeCredits: 0 | 2;
 };
 
 export type OcrDispatchEnv = {
@@ -176,24 +178,26 @@ export async function dispatchOcrAfterSanitize(
 ): Promise<OcrDispatchResult> {
   const url = (env.FOUNDATION_OCR_URL || "").trim();
   if (!url) {
-    return { status: "skipped", reason: "FOUNDATION_OCR_URL is unset" };
+    return { status: "skipped", reason: "FOUNDATION_OCR_URL is unset", computeCredits: 0 };
   }
   if (isForbiddenOcrUrl(url) || (env.FOUNDATION_R2_BUCKET || "").includes("tavonel-prod")) {
-    return { status: "skipped", reason: "OCR URL or bucket is not a Foundation target" };
+    return { status: "skipped", reason: "OCR URL or bucket is not a Foundation target", computeCredits: 0 };
   }
   if (!looksLikeFoundationOcrUrl(url)) {
-    return { status: "skipped", reason: "OCR URL is not a Foundation target" };
+    return { status: "skipped", reason: "OCR URL is not a Foundation target", computeCredits: 0 };
   }
 
   const ocrKey = ocrSiblingKey(immutablePdfKey);
+  const existingOcr = await env.FOUNDATION_QUARANTINE.get(ocrKey);
+  if (existingOcr) return { status: "exists", key: ocrKey, computeCredits: 2 };
   const pdf = await env.FOUNDATION_QUARANTINE.get(immutablePdfKey);
   if (!pdf) {
-    return { status: "failed", key: ocrKey, reasonCode: "OCR_SOURCE_MISSING", reason: "immutable PDF is not readable for OCR" };
+    return { status: "failed", key: ocrKey, reasonCode: "OCR_SOURCE_MISSING", reason: "immutable PDF is not readable for OCR", computeCredits: 0 };
   }
 
   const bytes = await pdf.arrayBuffer();
   if (bytes.byteLength < 1) {
-    return { status: "failed", key: ocrKey, reasonCode: "OCR_SOURCE_EMPTY", reason: "immutable PDF is empty" };
+    return { status: "failed", key: ocrKey, reasonCode: "OCR_SOURCE_EMPTY", reason: "immutable PDF is empty", computeCredits: 0 };
   }
 
   const inputSha256 = await sha256DigestHeader(bytes);
@@ -230,21 +234,21 @@ export async function dispatchOcrAfterSanitize(
       signal: AbortSignal.timeout(timeoutMs),
     });
   } catch {
-    return { status: "failed", key: ocrKey, reasonCode: "OCR_TIMEOUT_OR_NETWORK", reason: "OCR request timed out or failed", requestId, inputSha256 };
+    return { status: "failed", key: ocrKey, reasonCode: "OCR_TIMEOUT_OR_NETWORK", reason: "OCR request timed out or failed", requestId, inputSha256, computeCredits: 2 };
   }
   if (!response.ok) {
-    return { status: "failed", key: ocrKey, reasonCode: "OCR_HTTP_REJECTED", reason: `OCR returned HTTP ${response.status}`, requestId, inputSha256 };
+    return { status: "failed", key: ocrKey, reasonCode: "OCR_HTTP_REJECTED", reason: `OCR returned HTTP ${response.status}`, requestId, inputSha256, computeCredits: 2 };
   }
 
   let payload: unknown;
   try {
     payload = (await response.json()) as typeof payload;
   } catch {
-    return { status: "failed", key: ocrKey, reasonCode: "OCR_RESPONSE_NOT_JSON", reason: "OCR response is not JSON", requestId, inputSha256 };
+    return { status: "failed", key: ocrKey, reasonCode: "OCR_RESPONSE_NOT_JSON", reason: "OCR response is not JSON", requestId, inputSha256, computeCredits: 2 };
   }
   const qualified = qualifyOcrResult(payload, inputSha256);
   if (!qualified) {
-    return { status: "failed", key: ocrKey, reasonCode: "OCR_RESPONSE_INVALID", reason: "OCR response contract is invalid", requestId, inputSha256 };
+    return { status: "failed", key: ocrKey, reasonCode: "OCR_RESPONSE_INVALID", reason: "OCR response contract is invalid", requestId, inputSha256, computeCredits: 2 };
   }
 
   const body = JSON.stringify({
@@ -266,9 +270,9 @@ export async function dispatchOcrAfterSanitize(
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (/precondition|already exists|conflict/iu.test(message)) {
-      return { status: "exists", key: ocrKey };
+      return { status: "exists", key: ocrKey, computeCredits: 2 };
     }
-    return { status: "failed", key: ocrKey, reasonCode: "OCR_RESULT_WRITE_FAILED", reason: "ocr.json write failed", requestId, inputSha256 };
+    return { status: "failed", key: ocrKey, reasonCode: "OCR_RESULT_WRITE_FAILED", reason: "ocr.json write failed", requestId, inputSha256, computeCredits: 2 };
   }
-  return { status: "written", key: ocrKey, requestId, inputSha256 };
+  return { status: "written", key: ocrKey, requestId, inputSha256, computeCredits: 2 };
 }

@@ -49,7 +49,7 @@ class FakeR2 {
     const bytes = this.objects.get(key);
     if (!bytes) return null;
     return {
-      arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+      arrayBuffer: async () => bytes.slice().buffer as ArrayBuffer,
     };
   }
 
