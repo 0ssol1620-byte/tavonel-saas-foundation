@@ -24,8 +24,7 @@ RUN apt-get update \
 
 WORKDIR /app
 COPY requirements.txt ./
-RUN python3 -m pip install --no-cache-dir --upgrade pip \
-    && python3 -m pip install --no-cache-dir -r requirements.txt
+RUN python3 -m pip install --no-cache-dir --ignore-installed -r requirements.txt
 COPY app.py ./
 RUN chown -R ocr:ocr /app /home/ocr
 USER ocr
