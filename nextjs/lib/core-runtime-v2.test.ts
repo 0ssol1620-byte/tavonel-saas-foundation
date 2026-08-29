@@ -6,9 +6,13 @@ import {
   buildProductCoreV2Request,
   dispatchProductCoreV2,
   projectProductCoreV2Candidate,
+  readProductCoreV2Env,
 } from "./core-runtime-v2";
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+});
 
 const sha = (value: string) => `sha256:${value.repeat(64).slice(0, 64)}`;
 
@@ -95,6 +99,17 @@ async function candidateFixture() {
 }
 
 describe("Python Product-Core v2 dispatch", () => {
+  it("uses a dedicated v2 HMAC so the v1 fallback can rotate independently", () => {
+    vi.stubEnv("FOUNDATION_CORE_V2_URL", "https://core-v2.example");
+    vi.stubEnv("FOUNDATION_CORE_HMAC", "v1-secret-that-must-not-be-reused".repeat(2));
+    vi.stubEnv("FOUNDATION_CORE_V2_HMAC", "v2-secret-that-is-independently-rotatable".repeat(2));
+
+    expect(readProductCoreV2Env()).toEqual({
+      url: "https://core-v2.example",
+      hmac: "v2-secret-that-is-independently-rotatable".repeat(2),
+    });
+  });
+
   it("leaves Core-derived identities absent and never fabricates a region bbox", () => {
     const request = buildProductCoreV2Request("pilot", inputs(), new Date("2026-08-29T00:00:00Z"), "request-1");
 
