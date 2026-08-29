@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const config = readFileSync(resolve(process.cwd(), "next.config.mjs"), "utf8");
+const config = readFileSync(resolve(import.meta.dirname, "../next.config.mjs"), "utf8");
 
 describe("production security headers", () => {
   it("locks framing, objects, transport, and browser capabilities", () => {
