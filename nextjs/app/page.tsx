@@ -302,8 +302,10 @@ export default function HomePage() {
           </div>
           <CompilePipeline active={scene >= 2} />
           <div className="stops rv">
-            {STOPS.map((task) => (
-              <span className="stop" key={task}><i /><span>{task}</span></span>
+            {STOPS.map((task, index) => (
+              // The index drives the sweep delay, so the fourteen strikes read as one authored
+              // pass down the list rather than fourteen simultaneous cross-outs.
+              <span className="stop" key={task} style={{ "--i": index } as React.CSSProperties}><i /><span>{task}</span></span>
             ))}
           </div>
           <div className="beforeafter rv">
@@ -497,7 +499,7 @@ export default function HomePage() {
                   disabled={Boolean(billingBusy)}
                   onClick={() => (offerCode ? chooseOffer(offerCode) : showNotice())}
                 >
-                  {name === "Institution" ? "Start a conversation" : billingBusy === offerCode ? "Opening checkout…" : signedIn ? "Choose this plan" : "Choose this plan → sign in"}
+                  {name === "Institution" ? "Start a conversation" : billingBusy === offerCode ? "Opening checkout…" : signedIn ? "Choose this plan" : "Choose this plan → sign in"}
                 </button>
               </article>
             ))}
@@ -511,7 +513,7 @@ export default function HomePage() {
                 <h3>{name}</h3>
                 <span className="price">{price} <small>{credits}</small></span>
                 <button className="btn ghost" type="button" disabled={Boolean(billingBusy)} onClick={() => chooseOffer(offerCode)}>
-                  {billingBusy === offerCode ? "Opening checkout…" : signedIn ? "Buy credits" : "Buy credits → sign in"}
+                  {billingBusy === offerCode ? "Opening checkout…" : signedIn ? "Buy credits" : "Buy credits → sign in"}
                 </button>
               </article>
             ))}

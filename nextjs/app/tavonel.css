@@ -171,6 +171,13 @@ main { position: relative; z-index: 5; }
 }
 
 .body { display: grid; grid-template-columns: minmax(0, 380px) minmax(0, 1fr); gap: clamp(28px, 4vw, 72px); align-items: start; }
+/* The title column held one heading and then several hundred pixels of nothing, because the
+   evidence beside it is long. Pinning it is the fix that is also the better reading: the claim
+   stays on screen while the thing that supports it scrolls past. Only where there are two
+   columns -- below this the scene is one column and there is nothing to pin it against. */
+@media (min-width: 1000px) {
+  .body > .stack:first-child { position: sticky; top: 104px; }
+}
 .body.split { grid-template-columns: minmax(0, 400px) minmax(0, 1fr); }
 .stack { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
 
@@ -431,7 +438,7 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
    though data failed to load. */
 .chaos {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1px;
   background: var(--hairline);
   border: 1px solid var(--hairline);
@@ -514,13 +521,25 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 
 /* ---------------------------------------------------------- 04 work that stops */
 
-/* Fourteen cells, so the track count must divide 14 -- see the .chaos note. */
-.stops { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 4px; overflow: hidden; }
-.stop { background: var(--g1); padding: 11px 14px; font-size: 13px; color: var(--text-mid); display: flex; align-items: center; gap: 10px; transition: color 420ms ease; }
-.stop i { width: 5px; height: 5px; border-radius: 50%; background: var(--changed); flex: none; transition: background 420ms ease, transform 420ms var(--ease); }
+/* Fourteen cells, so the track count must divide 14 -- see the .chaos note.
+
+   `minmax(0, 1fr)` and not `1fr` here and in every sibling grid below: a bare `1fr` is
+   `minmax(auto, 1fr)`, so a single child that will not wrap widens its track past the container.
+   The plans grid was doing exactly that -- the third card ran 149px beyond its own border at
+   1280 and the button inside it was clipped by the overflow. */
+.stops { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 4px; overflow: hidden; }
+/* The strike sweeps. Fourteen rows crossing out on the same frame, in the same grey as the text
+   they cross, read as a rendering fault rather than a claim -- the line and the words became one
+   flat smudge and the section looked broken. So: a per-row delay, the line in the resolved tone
+   rather than in grey, and text that stays legible after it lands. What is being said is "this
+   is taken care of", and none of that survives if the reader cannot read the list. */
+.stop { background: var(--g1); padding: 11px 14px; font-size: 13px; color: var(--text-mid); display: flex; align-items: center; gap: 10px; transition: color 420ms ease calc(var(--i, 0) * 42ms); }
+.stop i { width: 5px; height: 5px; border-radius: 50%; background: var(--changed); flex: none; transition: background 420ms ease calc(var(--i, 0) * 42ms), transform 420ms var(--ease) calc(var(--i, 0) * 42ms); }
 .stop span { position: relative; }
-.stop span::after { content: ""; position: absolute; left: 0; right: 100%; top: 52%; height: 1px; background: var(--decor); transition: right 620ms var(--ease); }
-.js .rv.in .stop { color: var(--decor); }
+/* Through the middle of the line box. An earlier attempt at 0.42em from the bottom put it under
+   the baseline, where a strike stops reading as a strike and starts reading as a link. */
+.stop span::after { content: ""; position: absolute; left: 0; right: 100%; top: calc(50% - 0.5px); height: 1px; background: var(--verified-dim); transition: right 520ms var(--ease) calc(var(--i, 0) * 42ms); }
+.js .rv.in .stop { color: var(--text-lo); }
 .js .rv.in .stop i { background: var(--verified-dim); transform: scale(0.7); }
 .js .rv.in .stop span::after { right: 0; }
 /* Stagger by row so the strike-through reads as a pass moving down the list. */
@@ -561,7 +580,7 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 .diff .add::before { content: "+"; position: absolute; left: 2px; color: var(--changed-dim); }
 
 /* Four cells -- see the .chaos note. */
-.legend { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 4px; overflow: hidden; }
+.legend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 4px; overflow: hidden; }
 .lg { background: var(--g1); padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
 .lg p { margin: 0; font-size: 12.5px; color: var(--text-lo); }
 
@@ -607,7 +626,7 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 /* ---------------------------------------------------------- 08 checks + record */
 
 /* Six cells -- see the .chaos note. */
-.checks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 4px; overflow: hidden; }
+.checks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 4px; overflow: hidden; }
 .check { background: var(--g1); padding: 12px 14px; display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--text-mid); }
 .check i { width: 5px; height: 5px; border-radius: 50%; background: var(--verified); flex: none; }
 .check[data-hold="1"] { color: var(--unresolved); }
@@ -622,7 +641,7 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 .q:hover { color: var(--text-mid); border-color: var(--hairline-hi); }
 .q.on { color: var(--text-hi); border-color: var(--hairline-hi); background: var(--g2); }
 
-.twoworlds { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--hairline); }
+.twoworlds { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--hairline); }
 .wcol { background: var(--g1); padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
 .whead { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .wv { font-family: var(--f-mono); font-size: 10.5px; color: var(--text-mid); letter-spacing: 0.08em; }
@@ -636,14 +655,14 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 
 /* ---------------------------------------------------------- 10 source boundary */
 
-.chain { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 4px; overflow: hidden; }
+.chain { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 4px; overflow: hidden; }
 .link { background: var(--g1); padding: 16px 18px; display: flex; flex-direction: column; gap: 9px; align-items: flex-start; }
 .link .st { font-family: var(--f-mono); font-size: 10px; letter-spacing: 0.16em; color: var(--text-xlo); }
 .link p { margin: 0; font-size: 12.5px; color: var(--text-lo); }
 
 /* ---------------------------------------------------------- 11 evidence tiles */
 
-.tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 4px; overflow: hidden; }
+.tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 4px; overflow: hidden; }
 .tile { background: var(--g1); padding: 16px 18px; display: flex; flex-direction: column; gap: 9px; }
 .tile .n { font-family: var(--f-mono); font-size: 9.5px; letter-spacing: 0.16em; color: var(--text-xlo); }
 .tile[data-state="measured"] .n { color: var(--verified); }
@@ -653,7 +672,7 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 
 /* ---------------------------------------------------------- 12 access */
 
-.plans, .packs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 4px; overflow: hidden; }
+.plans, .packs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 4px; overflow: hidden; }
 .plan, .pack { background: var(--g1); padding: 18px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
 .plan[data-featured="1"] { background: var(--g2); }
 .tag { font-family: var(--f-mono); font-size: 9px; letter-spacing: 0.16em; color: var(--verified); }
@@ -661,10 +680,24 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 .price { font-size: 30px; color: var(--text-hi); letter-spacing: -0.025em; font-variation-settings: "wght" 560; }
 .price small { font-size: 11px; font-family: var(--f-mono); color: var(--text-xlo); letter-spacing: 0.06em; }
 .plan p { margin: 0; font-size: 12.5px; color: var(--text-lo); flex: 1; }
-.plan .btn, .pack .btn { margin-top: 4px; }
+/* A plan card is a third of a column, and at 1280 that is about 190px of content box. The
+   labels here are full sentences -- "Choose this plan -> sign in" says what happens next, which
+   is worth more than the one line it costs -- so the button wraps instead of running past the
+   card. `nowrap` on `.btn` is right everywhere it stands alone; inside a fixed track it is not. */
+.plan .btn, .pack .btn {
+  margin-top: 4px;
+  /* Full width, so three cards read as three equal choices rather than three different-length
+     labels. The card sets `align-items: flex-start` for everything above it. */
+  align-self: stretch;
+  white-space: normal;
+  text-align: center;
+  justify-content: center;
+  line-height: 1.45;
+  padding-inline: 14px;
+}
 
 /* Nine cells -- see the .chaos note. */
-.caps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 4px; overflow: hidden; }
+.caps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 4px; overflow: hidden; }
 .cap { background: var(--g1); padding: 13px 15px; display: flex; flex-direction: column; gap: 6px; }
 .cap-n { font-family: var(--f-mono); font-size: 11.5px; color: var(--text-mid); }
 .cap-s { display: inline-flex; align-items: center; gap: 7px; font-family: var(--f-mono); font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-xlo); }
@@ -685,8 +718,23 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 
 /* ============================================================ interlude */
 
+/* The interlude is the one place two full-bleed graphics would overlap: the ambient field's area
+   labels read through the gaps between lattice cells and neither could be seen properly. The
+   field is damped here rather than removed, so the change of scale still feels like the same
+   page. */
+.interlude::before { content: ""; position: absolute; inset: 0; background: var(--ground); opacity: 0.86; z-index: 0; }
+.interlude > * { position: relative; z-index: 1; }
 .interlude { position: relative; height: 78vh; min-height: 460px; display: grid; place-items: center; overflow: hidden; border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline); margin-left: var(--rail); }
-.lattice { position: absolute; inset: 0 clamp(16px, 3vw, 44px); width: auto; height: 100%; }
+/* Both axes are stated. A canvas is a replaced element, so `width: auto` with a definite height
+   is resolved from the backing store's own ratio and the `right` inset is discarded -- which is
+   why this grid used to stop 244px short of the frame on the right and nowhere on the left. */
+.lattice {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  left: clamp(16px, 3vw, 44px);
+  width: calc(100% - 2 * clamp(16px, 3vw, 44px));
+}
 .interlude-copy { position: relative; z-index: 2; text-align: center; padding: 0 24px; }
 .interlude-h { margin: 0; font-size: clamp(26px, 3.6vw, 46px); line-height: 1.1; letter-spacing: -0.03em; color: var(--text-hi); font-variation-settings: "wght" 600; }
 .interlude-sub { margin: 16px 0 0; font-family: var(--f-mono); font-size: 11px; letter-spacing: 0.06em; color: var(--text-xlo); display: inline-flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
@@ -1133,7 +1181,7 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
 .pass-v { color: var(--verified); font-variant-numeric: tabular-nums; }
 .pass[data-empty="1"] .pass-v { color: var(--text-xlo); }
 
-.arch-counts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 3px; overflow: hidden; }
+.arch-counts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 3px; overflow: hidden; }
 .ac { background: var(--ground); padding: 11px 13px; display: flex; flex-direction: column; gap: 3px; }
 .ac-v { font-size: 20px; color: var(--text-hi); letter-spacing: -0.02em; font-variation-settings: "wght" 560; font-variant-numeric: tabular-nums; }
 .ac-k { font-family: var(--f-mono); font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-xlo); }
@@ -1246,7 +1294,7 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
 
 @media (max-width: 1180px) {
   .body, .body.split { grid-template-columns: minmax(0, 1fr); gap: 24px; }
-  .caps, .checks, .plans, .packs { grid-template-columns: repeat(2, 1fr); }
+  .caps, .checks, .plans, .packs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .workspace-grid { grid-template-columns: minmax(0, 1fr); }
   .workspace { grid-template-columns: 232px minmax(0, 1fr); }
 }
@@ -1256,7 +1304,7 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
   .rail { display: none; }
   .scene { padding-left: 0; min-height: auto; padding-top: 76px; padding-bottom: 76px; }
   .interlude, footer.site { margin-left: 0; padding-left: 0; }
-  .chaos { grid-template-columns: repeat(2, 1fr); }
+  .chaos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .twoworlds, .chain, .tiles { grid-template-columns: minmax(0, 1fr); }
   .bc.opt { display: none; }
   .bar-ticks { display: flex; }
@@ -1265,7 +1313,7 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
   .side nav { flex-direction: row; flex-wrap: wrap; }
   .side nav button.on { box-shadow: inset 0 -2px 0 var(--verified); }
   .side-foot { flex-direction: row; margin-top: 4px; }
-  .arch-counts { grid-template-columns: repeat(2, 1fr); }
+  .arch-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /*
@@ -1318,6 +1366,9 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
     animation-delay: 0ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    /* Staggered delays would otherwise hold the end state back by half a second after the
+       motion they were pacing is gone. */
+    transition-delay: 0ms !important;
   }
   /* Content is never withheld -- only the transition is removed. */
   .js .rv { opacity: 1; transform: none; }

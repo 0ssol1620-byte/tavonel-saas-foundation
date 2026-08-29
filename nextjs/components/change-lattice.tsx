@@ -39,13 +39,21 @@ export default function ChangeLattice() {
       context.setTransform(ratio, 0, 0, ratio, 0, 0);
       context.clearRect(0, 0, width, height);
 
-      const cellW = width / COLS;
-      const cellH = height / ROWS;
-      const size = Math.max(2, Math.min(cellW, cellH) - 3);
+      /*
+       * One pitch for both axes, and the block centred in what is left.
+       *
+       * Stretching each axis to fill gave a horizontal gap of 3px and a vertical gap of 14, and
+       * the eye read that as banding rather than as a lattice -- the one thing this drawing has
+       * to be. A lattice with unequal spacing is a chart of nothing.
+       */
+      const pitch = Math.min(width / COLS, height / ROWS);
+      const size = Math.max(2, pitch - 3);
+      const originX = (width - pitch * COLS) / 2;
+      const originY = (height - pitch * ROWS) / 2;
 
       for (let i = 0; i < TOTAL; i += 1) {
-        const x = (i % COLS) * cellW + (cellW - size) / 2;
-        const y = Math.floor(i / COLS) * cellH + (cellH - size) / 2;
+        const x = originX + (i % COLS) * pitch + (pitch - size) / 2;
+        const y = originY + Math.floor(i / COLS) * pitch + (pitch - size) / 2;
         if (CHANGED.includes(i)) context.fillStyle = "rgba(242,166,90,0.95)";
         else if (HELD.includes(i)) context.fillStyle = "rgba(110,147,184,0.95)";
         else context.fillStyle = "rgba(105,114,120,0.13)";
