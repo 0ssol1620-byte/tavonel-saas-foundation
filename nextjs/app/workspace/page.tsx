@@ -1,11 +1,18 @@
 "use client";
 
 import Link from "next/link";
+import Logomark from "@/components/logomark";
+import WorldExplorer from "@/components/world-explorer";
 import { Download, FileText, LockKeyhole, ShieldCheck, UploadCloud } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { activationPolicy } from "@/lib/activation-policy";
 import type { DocumentListItem } from "@/lib/immutable-keys";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { useCheckout } from "@/lib/use-checkout";
+import { formatCount, formatTimestamp } from "@/lib/format";
+
+/** What this panel prints when it has no value. Not "0", and not a spinner that never resolves. */
+const UNKNOWN = "not read yet";
 
 const FOUNDATION_PROOF_PDF_URL = "/api/proof-pdf";
 const FOUNDATION_PROOF_PDF_SHA256 = "3df79d34abbca99308e79cb94461c1893582604d68329a41fd4bec1885e6adb4";
@@ -61,9 +68,33 @@ function intakeNotice() {
   return "Private-pilot intake is open for signed-in test users. Files go to Foundation quarantine only; CDR and GPU stay closed.";
 }
 
+/** Human labels for the activation-policy keys, so no camelCase reaches the screen. */
+const GATE_LABELS = {
+  customerIntake: "Document intake",
+  cdr: "Content disarm",
+  ocrGpu: "OCR on scans",
+  candidatePromotion: "Promotion to the live world",
+} as const;
+
+type WorkspaceTab = "overview" | "knowledge" | "billing" | "integrity";
+
+const TABS: { id: WorkspaceTab; label: string }[] = [
+  { id: "overview", label: "Overview" },
+  { id: "knowledge", label: "Knowledge" },
+  { id: "billing", label: "Billing & capacity" },
+  { id: "integrity", label: "Processing integrity" },
+];
+
 export default function WorkspacePage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [notice, setNotice] = useState(intakeNotice);
+  const { start: buy, busy: buying } = useCheckout(setNotice);
+  // Read from the URL on mount so a linked or reloaded workspace opens on the same view.
+  const [tab, setTab] = useState<WorkspaceTab>("overview");
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("tab");
+    if (TABS.some((t) => t.id === requested)) setTab(requested as WorkspaceTab);
+  }, []);
   const [busy, setBusy] = useState(false);
   const [documents, setDocuments] = useState<DocumentListItem[] | null>(null);
   const [proofMode, setProofMode] = useState(false);
@@ -71,6 +102,20 @@ export default function WorkspacePage() {
   const [downloading, setDownloading] = useState(false);
   const [billingAccount, setBillingAccount] = useState<BillingAccount | null>(null);
   const [billingBusy, setBillingBusy] = useState(false);
+  /**
+   * Until this resolves the workspace knows nothing, and it must not fill that gap with
+   * plausible-looking values. A signed-out visitor previously saw the whole shell -- tabs, a
+   * billing panel, even a Sign out control -- and every action failed one toast at a time, which
+   * left them unable to tell a signed-out session from a broken product.
+   */
+  const [session, setSession] = useState<"checking" | "anonymous" | "signed-in">("checking");
+
+  const signOut = async () => {
+    const client = getSupabaseBrowserClient();
+    if (!client) return;
+    await client.auth.signOut();
+    window.location.replace("/");
+  };
 
   const loadDocuments = async (): Promise<DocumentListItem[]> => {
     const client = getSupabaseBrowserClient();
@@ -142,10 +187,23 @@ export default function WorkspacePage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setProofMode(params.get("foundation-proof") === "1");
-    void loadDocuments();
-    void loadBilling();
-    const collectionId = params.get("collection");
-    if (collectionId) void loadCollectionCandidate(collectionId);
+
+    void (async () => {
+      const client = getSupabaseBrowserClient();
+      const { data } = client ? await client.auth.getSession() : { data: { session: null } };
+      if (!data.session) {
+        // Send them somewhere that can actually help. /login explains what this is and, where no
+        // provider is configured, says so instead of offering a control that will fail.
+        setSession("anonymous");
+        window.location.replace("/login");
+        return;
+      }
+      setSession("signed-in");
+      void loadDocuments();
+      void loadBilling();
+      const collectionId = params.get("collection");
+      if (collectionId) void loadCollectionCandidate(collectionId);
+    })();
   }, []);
 
   const openBillingPortal = async () => {
@@ -434,22 +492,76 @@ export default function WorkspacePage() {
     );
   };
 
+  /**
+   * The sidebar used to be four buttons that called a loader or popped a toast: nothing switched
+   * view, so every panel was stacked on one page and "Activity" did nothing at all. These are
+   * real tabs now, and the choice is mirrored into the URL so a workspace view can be linked,
+   * reloaded and navigated back to.
+   */
+  const setTabAndUrl = (next: WorkspaceTab) => {
+    setTab(next);
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", next);
+    window.history.replaceState(null, "", url.toString());
+  };
+
+  if (session !== "signed-in") {
+    // No shell, no tabs, no numbers. Anything drawn here would be describing a workspace this
+    // visitor has not been shown to own.
+    return (
+      <main className="auth">
+        <header>
+          <Link href="/" className="wordmark"><Logomark /><b>TAVONEL</b></Link>
+          <span className="mode"><i aria-hidden="true" />FOUNDATION MODE</span>
+        </header>
+        <div className="auth-body">
+          <div className="auth-card">
+            <p className="eyebrow">WORKSPACE</p>
+            <h1>{session === "checking" ? "Checking your session." : "Sign-in required."}</h1>
+            <p className="lead" role="status">
+              {session === "checking"
+                ? "Reading the session for this browser. Your workspace opens on its own if one is active."
+                : "This workspace is tenant-scoped and opens only for a signed-in account. Taking you to sign-in."}
+            </p>
+            {session === "anonymous" ? (
+              <div className="auth-actions">
+                <Link className="btn" href="/login">Go to sign-in</Link>
+                <Link className="btn ghost" href="/">Back to the site</Link>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="workspace">
       <aside className="side">
-        <Link href="/" className="brand"><span>T</span>TAVONEL</Link>
+        <Link href="/" className="brand"><Logomark size={22} />TAVONEL</Link>
         <p className="eyebrow">WORKSPACE</p>
         <div className="workspace-name"><strong>Private pilot</strong><small>Foundation environment</small></div>
-        <nav>
-          <b>Overview</b>
-          <button onClick={() => void loadDocuments()}>Documents</button>
-          <button onClick={() => void verifyLatestCandidates()}>Knowledge candidates</button>
-          <button onClick={() => setNotice("Activity is retained only after a governed processing event.")}>Activity</button>
+        <nav aria-label="Workspace sections">
+          {TABS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              aria-current={tab === item.id ? "page" : undefined}
+              className={tab === item.id ? "on" : undefined}
+              onClick={() => setTabAndUrl(item.id)}
+            >
+              {item.label}
+            </button>
+          ))}
         </nav>
+        <div className="side-foot">
+          <button type="button" onClick={() => void loadDocuments()}>Refresh documents</button>
+          <button type="button" onClick={() => void signOut()}>Sign out</button>
+        </div>
       </aside>
       <section className="workspace-body">
         <header>
-          <span><strong>Private pilot</strong> · Overview<br /><small>Your governed knowledge space</small></span>
+          <span><strong>Private pilot</strong> · {TABS.find((t) => t.id === tab)?.label}<br /><small>Your governed knowledge space</small></span>
           {activationPolicy.customerIntake.enabled ? (
             <>
               <input ref={fileRef} type="file" multiple hidden onChange={(event) => { const files = [...(event.target.files ?? [])]; if (files.length > 0) void uploadDocuments(files); }} />
@@ -467,10 +579,13 @@ export default function WorkspacePage() {
           )}
         </header>
         <div className="workspace-content">
+          <p className="notice static"><strong>Guardrail active.</strong> {notice}</p>
+
+          {tab === "overview" ? (
+          <>
           <p className="eyebrow">● FOUNDATION · SAFE MODE</p>
           <h1>A quieter place to think.</h1>
           <p className="lead">Build a traceable body of knowledge from documents that have passed the full safety chain. Quarantine is browser-direct; the application server never carries file bytes.</p>
-          <p className="notice static"><strong>Guardrail active.</strong> {notice}</p>
           <div className="workspace-grid">
             <section className="card document-card">
               <p className="eyebrow">YOUR LIBRARY</p>
@@ -490,6 +605,11 @@ export default function WorkspacePage() {
                   <FileText size={22} />
                   <strong>No document metadata yet</strong>
                   <p>A short-lived browser-direct quarantine capability is required. The application server and database never carry file bytes. Sign in to load immutable keys after CDR.</p>
+                  {activationPolicy.customerIntake.enabled ? (
+                    <div className="billing-actions">
+                      <button type="button" onClick={() => fileRef.current?.click()}>Upload your first document</button>
+                    </div>
+                  ) : null}
                 </div>
               )}
             </section>
@@ -516,9 +636,42 @@ export default function WorkspacePage() {
                   )}
                 </div>
               ) : <div className="nodes"><i /><i /><i /><i /><i /></div>}
-              <p>Sanitized inputs can produce a reviewable directory, ontology, graph, RAG and provenance package. No candidate is promoted to a world without a separate human decision. candidatePromotion stays closed.</p>
+              <p>Sanitized inputs can produce a reviewable directory, ontology, graph, RAG and provenance package. No candidate is promoted to a world without a separate human decision. Promotion to a live world stays closed.</p>
             </section>
           </div>
+          </>
+          ) : null}
+
+          {tab === "knowledge" ? (
+            <>
+              <WorldExplorer
+                collection={collectionResult}
+                onUpload={activationPolicy.customerIntake.enabled ? () => fileRef.current?.click() : undefined}
+              />
+              {/*
+                This control was lost when the sidebar buttons became tabs: the handler survived
+                the refactor and its button did not, so OCR candidate verification silently left
+                the product. It belongs on this tab -- the JSON it checks is the raw material the
+                architecture above is built from.
+              */}
+              <section className="card">
+                <p className="eyebrow">OCR CANDIDATES</p>
+                <h2>Verify the extracted JSON</h2>
+                <p>
+                  Reloads the immutable OCR result for the most recently processed document and
+                  checks its digest and object key against the receipt. It reads; it promotes
+                  nothing.
+                </p>
+                <div className="billing-actions">
+                  <button type="button" disabled={busy} onClick={() => void verifyLatestCandidates()}>
+                    {busy ? "Working..." : "Verify latest candidates"}
+                  </button>
+                </div>
+              </section>
+            </>
+          ) : null}
+
+          {tab === "billing" ? (
           <section className="card billing-card">
             <div>
               <p className="eyebrow">BILLING & CAPACITY</p>
@@ -528,19 +681,51 @@ export default function WorkspacePage() {
                 never remove per-job, daily, timeout, or scale-to-zero controls.
               </p>
             </div>
+            {/*
+              Never print a number this panel does not have. Falling back to 0 stated a balance
+              rather than admitting one had not arrived, which is the same misreport the public
+              capability grid is built to make impossible -- reproduced on the side of the product
+              where the number is about someone's money.
+            */}
             <dl>
               <div>
                 <dt>Subscription</dt>
                 <dd>
-                  {billingAccount?.subscriptionCancelAt
-                    ? `active until ${new Date(billingAccount.subscriptionCancelAt).toLocaleString()}`
-                    : billingAccount?.subscriptionStatus ?? "loading"}
+                  {!billingAccount
+                    ? UNKNOWN
+                    : billingAccount.subscriptionCancelAt
+                      ? `active until ${formatTimestamp(billingAccount.subscriptionCancelAt) ?? UNKNOWN}`
+                      : billingAccount.subscriptionStatus ?? UNKNOWN}
                 </dd>
               </div>
-              <div><dt>Available credits</dt><dd>{billingAccount?.creditBalance ?? 0}</dd></div>
-              <div><dt>Purchased</dt><dd>{billingAccount?.lifetimeCreditsPurchased ?? 0}</dd></div>
-              <div><dt>Reversed</dt><dd>{billingAccount?.lifetimeCreditsReversed ?? 0}</dd></div>
+              <div><dt>Available credits</dt><dd>{billingAccount ? formatCount(billingAccount.creditBalance) : UNKNOWN}</dd></div>
+              <div><dt>Purchased</dt><dd>{billingAccount ? formatCount(billingAccount.lifetimeCreditsPurchased) : UNKNOWN}</dd></div>
+              <div><dt>Reversed</dt><dd>{billingAccount ? formatCount(billingAccount.lifetimeCreditsReversed) : UNKNOWN}</dd></div>
             </dl>
+            {!billingAccount ? (
+              <p className="fine">Billing has not been read yet for this session. These are not zeroes &mdash; they are values this panel does not have.</p>
+            ) : null}
+            <div className="packs workspace-packs">
+              {([
+                ["Starter", "$12", "100 credits", "credit_starter"],
+                ["Builder", "$30", "300 credits", "credit_builder"],
+                ["Scale", "$75", "800 credits", "credit_scale"],
+              ] as const).map(([name, price, credits, offerCode]) => (
+                <article className="pack" key={name}>
+                  <span className="tag">PREPAID CAPACITY</span>
+                  <h3>{name}</h3>
+                  <span className="price">{price} <small>{credits}</small></span>
+                  <button type="button" disabled={Boolean(buying)} onClick={() => void buy(offerCode)}>
+                    {buying === offerCode ? "Opening checkout..." : "Buy credits"}
+                  </button>
+                </article>
+              ))}
+            </div>
+            <p className="fine">
+              Credits are reserved before a qualified job and settled against observed runtime.
+              A checkout never creates them &mdash; only a signed, idempotently persisted webhook
+              does &mdash; so a balance here can lag a completed payment by a moment.
+            </p>
             <div className="billing-actions">
               <button disabled={billingBusy} onClick={() => void loadBilling()}>Refresh billing</button>
               <button disabled={billingBusy || !billingAccount?.paddleCustomerId} onClick={() => void openBillingPortal()}>
@@ -553,14 +738,30 @@ export default function WorkspacePage() {
                 Cancellation is scheduled. Access remains active through the current paid period.
               </p>
             ) : null}
-            {billingAccount?.updatedAt ? <small>Last persisted billing change · {new Date(billingAccount.updatedAt).toLocaleString()}</small> : null}
+            {billingAccount?.updatedAt ? <small>Last persisted billing change · {formatTimestamp(billingAccount.updatedAt)}</small> : null}
           </section>
+          ) : null}
+
+          {tab === "integrity" ? (
           <section className="card gates">
             <p className="eyebrow">PROCESSING INTEGRITY</p>
             <h2>Four gates</h2>
-            <div>{Object.entries(activationPolicy).map(([key, value]) => <article key={key}><span>{value.enabled ? "○" : "●"}</span><strong>{key.replace(/([A-Z])/g, " $1")}</strong><p>{value.reason}</p></article>)}</div>
+            {/* Written labels, not the policy keys: "ocrGpu" split on capitals rendered as
+                "ocr Gpu" in the UI. The state marker is the same pill the public capability
+                grid uses, and it had the glyphs the wrong way round -- an open circle for an
+                *open* gate and a filled one for a closed gate reads as the opposite. */}
+            <div className="gate-list">
+              {Object.entries(activationPolicy).map(([key, value]) => (
+                <article key={key}>
+                  <strong>{GATE_LABELS[key as keyof typeof GATE_LABELS] ?? key}</strong>
+                  <span className="pill" data-v={value.enabled ? "current" : "held"}>{value.enabled ? "OPEN" : "CLOSED"}</span>
+                  <p>{value.reason}</p>
+                </article>
+              ))}
+            </div>
             <p className="fine"><ShieldCheck size={15} /> All capability issuance is server-authorized and tenant-scoped.</p>
           </section>
+          ) : null}
         </div>
       </section>
     </main>
