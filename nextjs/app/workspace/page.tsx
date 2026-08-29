@@ -393,7 +393,7 @@ export default function WorkspacePage() {
       });
       if (!response.ok || response.headers.get("content-type") !== "application/zip") {
         const json = await response.json().catch(() => ({ code: response.status }));
-        setNotice(`Knowledge package download failed (${json.code ?? response.status}).`);
+        setNotice(`Signed knowledge package download failed (${json.code ?? response.status}).`);
         return;
       }
       const url = URL.createObjectURL(await response.blob());
@@ -691,7 +691,7 @@ export default function WorkspacePage() {
                       {collectionResult.coreExecution.worldStateId ? <small>Candidate world · {collectionResult.coreExecution.worldStateId}</small> : null}
                       <button className="download-package" disabled={downloading} onClick={() => void downloadCollection()}>
                         <Download size={15} aria-hidden="true" />
-                        {downloading ? "Preparing verified ZIP..." : "Download knowledge package"}
+                        {downloading ? "Signing verified ZIP..." : "Download signed knowledge package"}
                       </button>
                     </>
                   ) : (

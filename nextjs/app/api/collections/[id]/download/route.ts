@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { buildCollectionZip, validateDownloadableCollectionArtifact } from "@/lib/collection-download";
+import { buildSignedCollectionZip, validateDownloadableCollectionArtifact } from "@/lib/collection-download";
+import { readExportSignerEnv } from "@/lib/export-signing";
 import { loadPreferredCollectionCandidate } from "@/lib/collection-storage";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
@@ -34,16 +35,29 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     return NextResponse.json({ code: "COLLECTION_PACKAGE_INVALID" }, { status: 422, headers: NO_STORE });
   }
 
-  const archive = buildCollectionZip(artifact);
-  return new Response(archive, {
+  const exportSigner = readExportSignerEnv();
+  if (!exportSigner) {
+    const configured = Boolean(
+      process.env.TAVONEL_EXPORT_SIGNING_KEY_ID ||
+      process.env.TAVONEL_EXPORT_SIGNING_PRIVATE_KEY_PKCS8_DER_B64,
+    );
+    return NextResponse.json(
+      { code: configured ? "EXPORT_SIGNER_INVALID" : "EXPORT_SIGNER_NOT_CONFIGURED" },
+      { status: 503, headers: NO_STORE },
+    );
+  }
+  const signed = buildSignedCollectionZip(artifact, exportSigner);
+  return new Response(signed.archive, {
     status: 200,
     headers: {
       ...NO_STORE,
       "Content-Type": "application/zip",
       "Content-Disposition": `attachment; filename="tavonel-${id}.zip"`,
-      "Content-Length": String(archive.byteLength),
+      "Content-Length": String(signed.archive.byteLength),
       "X-Content-Type-Options": "nosniff",
       "X-Tavonel-Candidate-Promotion": "false",
+      "X-Tavonel-Export-Manifest-Sha256": signed.signature.signedPayloadSha256,
+      "X-Tavonel-Export-Key-Id": signed.signature.keyId,
     },
   });
 }

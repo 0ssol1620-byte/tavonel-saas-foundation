@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "check": "tsc --noEmit",
-    "proof:live-ocr": "node scripts/foundation-live-ocr-proof.mjs"
+    "proof:live-ocr": "node scripts/foundation-live-ocr-proof.mjs",
+    "verify:export": "node scripts/verify-signed-export.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.4",

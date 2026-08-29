@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { strToU8, zipSync } from "fflate";
 import { COLLECTION_CANDIDATE_SCHEMA } from "./collection-compiler";
+import type { ExportSigner } from "./export-signing";
 
 const MAX_PACKAGE_FILES = 200;
 const MAX_UNCOMPRESSED_BYTES = 16 * 1024 * 1024;
@@ -101,23 +102,55 @@ export function validateDownloadableCollectionArtifact(
   return artifact as DownloadableCollectionArtifact;
 }
 
-export function buildCollectionZip(artifact: DownloadableCollectionArtifact) {
+export function buildSignedCollectionZip(artifact: DownloadableCollectionArtifact, signer: ExportSigner) {
   const entries: Record<string, Uint8Array> = {};
   for (const file of artifact.package.files) entries[file.path] = strToU8(file.content);
-  entries["manifest/candidate-world.json"] = strToU8(`${JSON.stringify(artifact, null, 2)}\n`);
-  entries["manifest/DOWNLOAD_README.txt"] = strToU8(
-    [
-      "TAVONEL candidate knowledge package",
-      `Collection: ${artifact.collectionId}`,
-      `Manifest: ${artifact.manifestDigest}`,
-      `Core receipt: ${artifact.coreExecution.receipt.requestId}`,
-      "Lifecycle: candidate",
-      "candidatePromotion=false",
-      "",
-      "This package is reviewable output. It is not a human-approved world or a semantic-quality benchmark.",
-      "Every compiler-produced package file was SHA-256 checked before this archive was created.",
-      "",
-    ].join("\n"),
-  );
-  return zipSync(entries, { level: 6, mtime: new Date("1980-01-01T00:00:00.000Z") });
+  const candidateWorld = `${JSON.stringify(artifact, null, 2)}\n`;
+  const readme = [
+    "TAVONEL signed candidate knowledge package",
+    `Collection: ${artifact.collectionId}`,
+    `Manifest: ${artifact.manifestDigest}`,
+    `Core receipt: ${artifact.coreExecution.receipt.requestId}`,
+    `Export signer: ${signer.keyId}`,
+    `Public key fingerprint: ${signer.publicKeySpkiSha256}`,
+    "Lifecycle: candidate",
+    "candidatePromotion=false",
+    "",
+    "Formats: Markdown, JSON, JSON-LD, Turtle, CSV and JSON Lines.",
+    "This package is reviewable output. It is not a human-approved world or a semantic-quality benchmark.",
+    "Every listed file was SHA-256 checked, then the exact export manifest bytes were signed with Ed25519.",
+    "Verify manifest/export-manifest.json against signatures/export-manifest.ed25519.json before import.",
+    "",
+  ].join("\n");
+  entries["manifest/candidate-world.json"] = strToU8(candidateWorld);
+  entries["manifest/DOWNLOAD_README.txt"] = strToU8(readme);
+
+  const files = [
+    ...artifact.package.files.map((file) => ({ path: file.path, mediaType: file.mediaType, sizeBytes: file.sizeBytes, sha256: file.sha256 })),
+    { path: "manifest/candidate-world.json", mediaType: "application/json", sizeBytes: Buffer.byteLength(candidateWorld), sha256: sha256(candidateWorld) },
+    { path: "manifest/DOWNLOAD_README.txt", mediaType: "text/plain; charset=utf-8", sizeBytes: Buffer.byteLength(readme), sha256: sha256(readme) },
+  ].sort((left, right) => left.path.localeCompare(right.path));
+  const exportManifest = {
+    schemaVersion: "tavonel.signed_export_manifest.v1",
+    collectionId: artifact.collectionId,
+    manifestDigest: artifact.manifestDigest,
+    lifecycle: "candidate",
+    candidatePromotion: false,
+    core: {
+      runtime: artifact.coreExecution.runtime,
+      requestId: artifact.coreExecution.receipt.requestId,
+      outputSha256: artifact.coreExecution.receipt.outputSha256,
+    },
+    formats: ["text/markdown", "application/json", "application/ld+json", "text/turtle", "text/csv", "application/x-ndjson"],
+    files,
+  } as const;
+  const manifestBytes = strToU8(`${JSON.stringify(exportManifest, null, 2)}\n`);
+  const signature = signer.signPayload(manifestBytes);
+  entries["manifest/export-manifest.json"] = manifestBytes;
+  entries["signatures/export-manifest.ed25519.json"] = strToU8(`${JSON.stringify(signature, null, 2)}\n`);
+  return {
+    archive: zipSync(entries, { level: 6, mtime: new Date("1980-01-01T00:00:00.000Z") }),
+    signature,
+    exportManifest,
+  };
 }
