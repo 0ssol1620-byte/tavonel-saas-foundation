@@ -15,20 +15,22 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import ReplayStage from "@/components/replay-stage";
+import type { BillingOfferCode } from "@/lib/billing-catalog";
 import { ACTS, SHOTS } from "@/lib/cinematic/shots";
 import { CTA, MOTION_LAW } from "@/lib/cinematic/copy";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { initializePaddleBrowser } from "@/lib/paddle-browser";
 
 const plans = [
-  ["Observer", "$29", "A considered first step."],
-  ["Studio", "$99", "For teams building a governed corpus."],
-  ["Institution", "Talk to us", "For policy-led knowledge operations."],
+  ["Observer", "$29", "A considered first step.", "observer_access"],
+  ["Studio", "$99", "For teams building a governed corpus.", "studio_access"],
+  ["Institution", "Talk to us", "For policy-led knowledge operations.", null],
 ] as const;
 
 const creditPacks = [
-  ["Starter", "$12", "100 credits"],
-  ["Builder", "$30", "300 credits"],
-  ["Scale", "$75", "800 credits"],
+  ["Starter", "$12", "100 credits", "credit_starter"],
+  ["Builder", "$30", "300 credits", "credit_builder"],
+  ["Scale", "$75", "800 credits", "credit_scale"],
 ] as const;
 
 const scales = [
@@ -47,6 +49,7 @@ const chain = [
 export default function HomePage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [signedIn, setSignedIn] = useState(false);
+  const [billingBusy, setBillingBusy] = useState<BillingOfferCode | null>(null);
 
   useEffect(() => {
     const client = getSupabaseBrowserClient();
@@ -58,8 +61,6 @@ export default function HomePage() {
 
   const showNotice = () =>
     setNotice("Foundation mode is active. Provider configuration and sandbox qualification are required before this action is available.");
-  const showCreditNotice = () =>
-    setNotice("This credit pack is staged for Paddle sandbox only. No payment session or GPU capacity is created in foundation mode.");
   const showProofNotice = () =>
     setNotice("The public-filing proof surface is built in the Core Engine repository and is not deployed here yet. It is described rather than linked, because a route that does not exist is not advertised.");
 
@@ -78,6 +79,61 @@ export default function HomePage() {
     setNotice(error ? "Sign-out could not be completed." : "Signed out from this browser.");
   };
 
+  const startCheckout = async (offerCode: BillingOfferCode) => {
+    const client = getSupabaseBrowserClient();
+    if (!client) return showNotice();
+    const { data } = await client.auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) {
+      setNotice("Sign in with Google before opening the secure Paddle checkout.");
+      return;
+    }
+    setBillingBusy(offerCode);
+    try {
+      const response = await fetch("/api/billing/checkout", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({ offerCode }),
+      });
+      const checkout = await response.json() as {
+        code?: string;
+        environment?: "sandbox" | "production";
+        clientToken?: string;
+        offer?: { priceId?: string; label?: string };
+        customer?: { email?: string };
+        customData?: Record<string, string>;
+      };
+      if (!response.ok || !checkout.clientToken || !checkout.environment || !checkout.offer?.priceId || !checkout.customData) {
+        setNotice(`Checkout is unavailable (${checkout.code ?? response.status}).`);
+        return;
+      }
+      const paddle = await initializePaddleBrowser({
+        token: checkout.clientToken,
+        environment: checkout.environment,
+        eventCallback: (event) => {
+          if (event.name === "checkout.completed") {
+            setNotice("Paddle accepted the sandbox payment. Access and credits remain pending until the signed webhook is persisted.");
+          }
+        },
+      });
+      if (!paddle) {
+        setNotice("Paddle checkout could not initialize.");
+        return;
+      }
+      paddle.Checkout.open({
+        items: [{ priceId: checkout.offer.priceId, quantity: 1 }],
+        customer: checkout.customer?.email ? { email: checkout.customer.email } : undefined,
+        customData: checkout.customData,
+        settings: { displayMode: "overlay", theme: "light", locale: "en" },
+      });
+      setNotice(`${checkout.offer.label ?? "Selected offer"} sandbox checkout opened. Only a verified webhook can change entitlements.`);
+    } catch {
+      setNotice("Paddle checkout could not be opened. No entitlement was changed.");
+    } finally {
+      setBillingBusy(null);
+    }
+  };
+
   return (
     <>
       <header className="masthead">
@@ -86,7 +142,7 @@ export default function HomePage() {
             <b>TAVONEL</b>
             <span>THE KNOWLEDGE COMPILER</span>
           </Link>
-          <span className="mode" title="Foundation mode: no document bytes, payment sessions or GPU capacity are created.">
+          <span className="mode" title="Foundation mode: billing is sandbox-only and GPU capacity remains separately gated.">
             <i aria-hidden="true" />FOUNDATION MODE
           </span>
           <nav>
@@ -263,18 +319,18 @@ export default function HomePage() {
             <span className="objection">“so what do I do next”</span>
           </div>
           <p className="prose t-body" style={{ marginBottom: 22 }}>
-            Presentation-only prices. A signed Paddle sandbox entitlement is required before
-            checkout can be opened.
+            Secure Paddle sandbox checkout is available to signed-in pilot users. Access changes
+            only after a signed, idempotently persisted webhook.
           </p>
           <div className="plans">
-            {plans.map(([name, price, text]) => (
+            {plans.map(([name, price, text, offerCode]) => (
               <article className="plan" key={name} data-featured={name === "Studio" ? 1 : 0}>
                 <span className="tag">{name === "Studio" ? "PRIVATE PILOT CHOICE" : ""}</span>
                 <h3>{name}</h3>
                 <span className="price">{price}{price.startsWith("$") ? <small> / month</small> : null}</span>
                 <p>{text}</p>
-                <button className="btn ghost" onClick={showNotice}>
-                  {name === "Institution" ? "Start a conversation" : "Choose this plan"}
+                <button className="btn ghost" disabled={Boolean(billingBusy)} onClick={() => offerCode ? void startCheckout(offerCode) : showNotice()}>
+                  {name === "Institution" ? "Start a conversation" : billingBusy === offerCode ? "Opening checkout..." : "Choose this plan"}
                 </button>
               </article>
             ))}
@@ -291,12 +347,14 @@ export default function HomePage() {
             path is qualified.
           </p>
           <div className="packs">
-            {creditPacks.map(([name, price, credits]) => (
+            {creditPacks.map(([name, price, credits, offerCode]) => (
               <article className="pack" key={name}>
                 <span className="tag">PREPAID CAPACITY</span>
                 <h3>{name}</h3>
                 <span className="price">{price} <small>{credits}</small></span>
-                <button className="btn ghost" onClick={showCreditNotice}>Preview pack</button>
+                <button className="btn ghost" disabled={Boolean(billingBusy)} onClick={() => void startCheckout(offerCode)}>
+                  {billingBusy === offerCode ? "Opening checkout..." : "Buy credits"}
+                </button>
               </article>
             ))}
           </div>
@@ -320,8 +378,8 @@ export default function HomePage() {
           The sequence above runs on a declared fictional fixture and is labelled as such on
           screen. It is not a recording of a compiler run: the canonical event schema and a
           recorded run are both prerequisites that do not exist yet, and the label will change
-          only when they do. Prices are presentation-only. No document bytes, payment sessions or
-          GPU capacity are created in foundation mode.
+          only when they do. Paddle checkout is sandbox-only; signed webhooks persist access and
+          prepaid credits, while GPU capacity remains separately gated.
         </p>
       </footer>
 

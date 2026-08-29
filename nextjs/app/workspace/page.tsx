@@ -33,6 +33,17 @@ type CollectionResult = {
   };
 };
 
+type BillingAccount = {
+  accessPlan: string | null;
+  subscriptionStatus: string;
+  creditBalance: number;
+  lifetimeCreditsPurchased: number;
+  lifetimeCreditsReversed: number;
+  billingHold: boolean;
+  paddleCustomerId: string | null;
+  updatedAt: string | null;
+};
+
 function bytesToHex(bytes: Uint8Array) {
   return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
@@ -57,6 +68,8 @@ export default function WorkspacePage() {
   const [proofMode, setProofMode] = useState(false);
   const [collectionResult, setCollectionResult] = useState<CollectionResult | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [billingAccount, setBillingAccount] = useState<BillingAccount | null>(null);
+  const [billingBusy, setBillingBusy] = useState(false);
 
   const loadDocuments = async (): Promise<DocumentListItem[]> => {
     const client = getSupabaseBrowserClient();
@@ -70,6 +83,17 @@ export default function WorkspacePage() {
     const next = json.documents ?? [];
     setDocuments(next);
     return next;
+  };
+
+  const loadBilling = async () => {
+    const client = getSupabaseBrowserClient();
+    const { data } = client ? await client.auth.getSession() : { data: { session: null } };
+    const token = data.session?.access_token;
+    if (!token) return;
+    const response = await fetch("/api/billing/status", { headers: { authorization: `Bearer ${token}` } });
+    if (!response.ok) return;
+    const json = await response.json() as { account?: BillingAccount };
+    if (json.account) setBillingAccount(json.account);
   };
 
   const loadCollectionCandidate = async (collectionId: string) => {
@@ -118,9 +142,35 @@ export default function WorkspacePage() {
     const params = new URLSearchParams(window.location.search);
     setProofMode(params.get("foundation-proof") === "1");
     void loadDocuments();
+    void loadBilling();
     const collectionId = params.get("collection");
     if (collectionId) void loadCollectionCandidate(collectionId);
   }, []);
+
+  const openBillingPortal = async () => {
+    setBillingBusy(true);
+    try {
+      const client = getSupabaseBrowserClient();
+      const { data } = client ? await client.auth.getSession() : { data: { session: null } };
+      const token = data.session?.access_token;
+      if (!token) {
+        setNotice("Sign in with Google before managing billing.");
+        return;
+      }
+      const response = await fetch("/api/billing/portal", {
+        method: "POST",
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const json = await response.json() as { code?: string; url?: string };
+      if (!response.ok || !json.url) {
+        setNotice(`Billing portal is unavailable (${json.code ?? response.status}).`);
+        return;
+      }
+      window.location.assign(json.url);
+    } finally {
+      setBillingBusy(false);
+    }
+  };
 
   const uploadDocument = async (file: File, manageBusy = true): Promise<string | null> => {
     if (manageBusy) setBusy(true);
@@ -468,6 +518,30 @@ export default function WorkspacePage() {
               <p>Sanitized inputs can produce a reviewable directory, ontology, graph, RAG and provenance package. No candidate is promoted to a world without a separate human decision. candidatePromotion stays closed.</p>
             </section>
           </div>
+          <section className="card billing-card">
+            <div>
+              <p className="eyebrow">BILLING & CAPACITY</p>
+              <h2>{billingAccount?.accessPlan ? `${billingAccount.accessPlan.replace("_access", "")} access` : "Private-pilot billing"}</h2>
+              <p>
+                Paddle webhooks, not checkout redirects, own this balance. Purchased GPU credits
+                never remove per-job, daily, timeout, or scale-to-zero controls.
+              </p>
+            </div>
+            <dl>
+              <div><dt>Subscription</dt><dd>{billingAccount?.subscriptionStatus ?? "loading"}</dd></div>
+              <div><dt>Available credits</dt><dd>{billingAccount?.creditBalance ?? 0}</dd></div>
+              <div><dt>Purchased</dt><dd>{billingAccount?.lifetimeCreditsPurchased ?? 0}</dd></div>
+              <div><dt>Reversed</dt><dd>{billingAccount?.lifetimeCreditsReversed ?? 0}</dd></div>
+            </dl>
+            <div className="billing-actions">
+              <button disabled={billingBusy} onClick={() => void loadBilling()}>Refresh billing</button>
+              <button disabled={billingBusy || !billingAccount?.paddleCustomerId} onClick={() => void openBillingPortal()}>
+                {billingBusy ? "Opening..." : "Manage billing"}
+              </button>
+            </div>
+            {billingAccount?.billingHold ? <p className="billing-hold" role="alert">Billing hold active. Refunded or disputed credits cannot be used.</p> : null}
+            {billingAccount?.updatedAt ? <small>Last persisted billing change · {new Date(billingAccount.updatedAt).toLocaleString()}</small> : null}
+          </section>
           <section className="card gates">
             <p className="eyebrow">PROCESSING INTEGRITY</p>
             <h2>Four gates</h2>
