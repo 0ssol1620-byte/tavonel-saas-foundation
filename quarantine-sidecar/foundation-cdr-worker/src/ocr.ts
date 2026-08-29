@@ -49,7 +49,10 @@ const SHA256_PATTERN = /^sha256:[a-f0-9]{64}$/;
 const PROD_MARKERS = ["tavonel-pdf-cdr", "tavonel-prod", "tavonel-quarantine-sidecar"];
 const OCR_RESULT_SCHEMA = "tavonel.ocr_result.v2";
 const AUTHORITY_CLASSES = new Set(["unknown", "informal", "official", "contractual"]);
-export const OCR_REQUEST_TIMEOUT_MS = 25_000;
+// The qualified RunPod release has a measured cold start near 30 seconds. Keep one bounded
+// request long enough for cold start plus multi-page reading without introducing an automatic
+// paid retry; queue delivery remains idempotent through the create-once review/result siblings.
+export const OCR_REQUEST_TIMEOUT_MS = 120_000;
 /** One JSON document per line. Matches the worker's `tavonel.ocr_progress.v1` stream. */
 const OCR_PROGRESS_SCHEMA = "tavonel.ocr_progress.v1";
 const NDJSON_MEDIA_TYPE = "application/x-ndjson";
