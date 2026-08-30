@@ -62,6 +62,11 @@ export async function POST(request: Request) {
   if (selected.some((item) => !item?.sanitizedKey || !item.ocrJsonKey)) {
     return NextResponse.json({ code: "OCR_NOT_READY" }, { status: 409, headers: { "Cache-Control": "no-store", "Retry-After": "5" } });
   }
+  const ocrWrittenAt = selected.map((item) => item?.ocrJsonLastModified).filter((value): value is string => Boolean(value));
+  if (ocrWrittenAt.length !== selected.length || ocrWrittenAt.some((value) => !Number.isFinite(Date.parse(value)))) {
+    return NextResponse.json({ code: "OCR_DURABLE_TIMESTAMP_REQUIRED" }, { status: 422, headers: { "Cache-Control": "no-store" } });
+  }
+  const compileRequestedAt = new Date(Math.max(...ocrWrittenAt.map((value) => Date.parse(value))));
 
   const fetched = await Promise.all(selected.map((item) => getWorkspaceOcrJson(signer, membership.workspaceId, item!.ocrJsonKey!)));
   const inputs = fetched.map((result, index) => {
@@ -93,7 +98,7 @@ export async function POST(request: Request) {
     receipt: Record<string, unknown> & { requestId: string; outputSha256: string; candidatePromotion: false };
   };
   if (coreV2) {
-    const compiled = await dispatchProductCoreV2(coreV2, membership.workspaceId, verifiedInputs);
+    const compiled = await dispatchProductCoreV2(coreV2, membership.workspaceId, verifiedInputs, new Date(), compileRequestedAt);
     if (!compiled.ok) {
       return NextResponse.json({ code: compiled.code }, { status: 503, headers: { "Cache-Control": "no-store" } });
     }

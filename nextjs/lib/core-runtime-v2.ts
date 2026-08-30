@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomUUID } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import {
   GENERIC_MIXED_CORPUS_BLUEPRINT,
   type CollectionCandidateArtifact,
@@ -131,22 +131,23 @@ export function readProductCoreV2Env(): ProductCoreV2Env | null {
 export function buildProductCoreV2Request(
   workspaceId: string,
   documents: CollectionOcrInput[],
-  now = new Date(),
-  requestId = `core-${randomUUID()}`,
+  requestedAt = new Date(),
+  requestId?: string,
 ): ProductCoreV2CompileRequest {
   const binding = [...documents]
     .sort((left, right) => left.documentId.localeCompare(right.documentId))
     .map((document) => `${document.documentId}:${document.versionKey}`)
     .join("\n");
-  const collectionId = `collection-${sha256(`${workspaceId}\n${binding}`).slice(0, 32)}`;
+  const operationDigest = sha256(`${workspaceId}\n${binding}`);
+  const collectionId = `collection-${operationDigest.slice(0, 32)}`;
   return {
     schemaVersion: PRODUCT_CORE_REQUEST_SCHEMA,
-    requestId,
-    idempotencyKey: `compile-${sha256(`${workspaceId}\n${binding}`).slice(0, 40)}`,
+    requestId: requestId ?? `core-${operationDigest.slice(0, 40)}`,
+    idempotencyKey: `compile-v2-${operationDigest.slice(0, 40)}`,
     tenantId: workspaceId,
     workspaceId,
     collectionId,
-    requestedAt: now.toISOString(),
+    requestedAt: requestedAt.toISOString(),
     route: {
       operationClass: "initial_compile",
       qualityRequirement: "high_assurance",
@@ -305,8 +306,9 @@ export async function dispatchProductCoreV2(
   workspaceId: string,
   documents: CollectionOcrInput[],
   now = new Date(),
+  requestedAt = now,
 ): Promise<{ ok: true; result: ProductCoreV2CompileResponse } | { ok: false; code: string }> {
-  const envelope = buildProductCoreV2Request(workspaceId, documents, now);
+  const envelope = buildProductCoreV2Request(workspaceId, documents, requestedAt);
   const body = JSON.stringify(envelope);
   const inputSha256 = `sha256:${sha256(body)}`;
   const timestamp = String(Math.floor(now.getTime() / 1000));

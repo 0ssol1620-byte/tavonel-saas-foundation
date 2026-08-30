@@ -60,6 +60,7 @@ export function isCollectionCandidateKey(workspaceId: string, key: string): bool
 export type ImmutableObjectMeta = {
   key: string;
   size: number;
+  lastModified?: string;
 };
 
 export type DocumentListItem = {
@@ -69,6 +70,7 @@ export type DocumentListItem = {
   sanitizedSize: number | null;
   ocrJsonKey: string | null;
   ocrJsonSize: number | null;
+  ocrJsonLastModified?: string;
   hasOcrJson: boolean;
   cdrReceiptKey: string | null;
   ocrReviewKey: string | null;
@@ -116,6 +118,7 @@ export function groupImmutableDocuments(
     } else if (filename === "ocr.json") {
       current.ocrJsonKey = object.key;
       current.ocrJsonSize = object.size;
+      current.ocrJsonLastModified = object.lastModified;
       current.hasOcrJson = true;
       current.processingState = "ocr_ready";
     } else if (filename === "cdr-receipt.json") {

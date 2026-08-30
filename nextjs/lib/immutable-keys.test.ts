@@ -38,7 +38,7 @@ describe("immutable workspace prefix escape", () => {
     const digest = "ab".repeat(32);
     const items = groupImmutableDocuments(WS, [
       { key: `${PREFIX}doc1/${digest}/sanitized.pdf`, size: 12 },
-      { key: `${PREFIX}doc1/${digest}/ocr.json`, size: 4 },
+      { key: `${PREFIX}doc1/${digest}/ocr.json`, size: 4, lastModified: "2026-08-29T23:58:01.000Z" },
       { key: `${PREFIX}doc1/${digest}/cdr-receipt.json`, size: 5 },
       { key: `${PREFIX}doc1/${digest}/ocr-review.json`, size: 6 },
       { key: `immutable/evil/evil/doc1/${digest}/ocr.json`, size: 99 },
@@ -49,6 +49,7 @@ describe("immutable workspace prefix escape", () => {
     expect(items[0]?.hasOcrJson).toBe(true);
     expect(items[0]?.sanitizedSize).toBe(12);
     expect(items[0]?.ocrJsonKey?.endsWith("/ocr.json")).toBe(true);
+    expect(items[0]?.ocrJsonLastModified).toBe("2026-08-29T23:58:01.000Z");
     expect(items[0]?.cdrReceiptKey?.endsWith("/cdr-receipt.json")).toBe(true);
     expect(items[0]?.ocrReviewKey?.endsWith("/ocr-review.json")).toBe(true);
     expect(items[0]?.processingState).toBe("ocr_ready");

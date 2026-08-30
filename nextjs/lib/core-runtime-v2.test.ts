@@ -99,6 +99,16 @@ async function candidateFixture() {
 }
 
 describe("Python Product-Core v2 dispatch", () => {
+  it("replays the same durable document set with an identical v2 envelope", () => {
+    const requestedAt = new Date("2026-08-29T23:58:01.000Z");
+    const first = buildProductCoreV2Request("pilot", inputs(), requestedAt);
+    const second = buildProductCoreV2Request("pilot", [...inputs()].reverse(), requestedAt);
+
+    expect(second).toEqual(first);
+    expect(first.requestId).toMatch(/^core-[0-9a-f]{40}$/);
+    expect(first.idempotencyKey).toMatch(/^compile-v2-[0-9a-f]{40}$/);
+  });
+
   it("uses a dedicated v2 HMAC so the v1 fallback can rotate independently", () => {
     vi.stubEnv("FOUNDATION_CORE_V2_URL", "https://core-v2.example");
     vi.stubEnv("FOUNDATION_CORE_HMAC", "v1-secret-that-must-not-be-reused".repeat(2));
