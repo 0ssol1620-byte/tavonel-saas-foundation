@@ -33,6 +33,7 @@ import { useEffect, useMemo, useState } from "react";
 import AnswerSwitch from "@/components/answer-switch";
 import ChangeLattice from "@/components/change-lattice";
 import CompilePipeline from "@/components/compile-pipeline";
+import ReadingDemo from "@/components/reading-demo";
 import Logomark from "@/components/logomark";
 import RebuildConsole from "@/components/rebuild-console";
 import WorldField, { type WorldMode } from "@/components/world-field";
@@ -359,6 +360,21 @@ export default function HomePage() {
           <div className="sources rv">
             {SOURCES.map((source) => <span className="src" key={source}>{source}</span>)}
           </div>
+          {/*
+            B5 -- the first pass, shown rather than summarised.
+            Reading is one line in the ledger below and it is the line people do not believe, so
+            it happens here first: a page of the agreement, region by region, with the words that
+            came out of each one and the confidence the reader gave it. It is the same view the
+            workspace draws during a real read, on declared fixture data like everything else in
+            this demonstration.
+          */}
+          <ReadingDemo active={scene >= 2} />
+          <p className="fine rv">
+            One page of {CHANGE.documentPages}, at the reader’s own pace.
+            The region marked at 0.57 is an ink stamp, and it is shown as uncertain because it is
+            — a reader that never reports doubt cannot be believed later when it says a document
+            needs a person.
+          </p>
           <CompilePipeline active={scene >= 2} />
           <div className="stops rv">
             {STOPS.map((task, index) => (

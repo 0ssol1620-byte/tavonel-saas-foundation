@@ -65,7 +65,8 @@ export const CHANGE = {
   revisionFrom: 17,
   revisionTo: 18,
   documentFacts: 1_240,
-  documentPages: 142,
+  /** Pages in the amended agreement. The reading demonstration counts against this. */
+  documentPages: 18,
   changed: 3,
   affected: 39,
   held: 1,
