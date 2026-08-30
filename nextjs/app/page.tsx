@@ -663,6 +663,10 @@ export default function HomePage() {
               </article>
             ))}
           </div>
+          <p className="fine rv">
+            Institution and custom engagement guidelines are available in the{" "}
+            <a href="/legal/TAVONEL_ENTERPRISE_PRICING_2026-08-30.pdf">Enterprise pricing sheet</a>.
+          </p>
 
           <div className="band-head rv"><span className="kicker">DELIBERATE COMPUTE</span><h3>Access is steady. GPU work is measured.</h3></div>
           <div className="packs rv">
