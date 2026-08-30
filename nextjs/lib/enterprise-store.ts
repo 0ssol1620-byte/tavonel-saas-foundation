@@ -39,7 +39,7 @@ async function readRows(path: string) {
 
 export async function getEnterpriseAccess(workspaceKey: string, userId: string) {
   const workspaceQuery = new URLSearchParams({
-    select: "workspace_key,display_name,organization_id,enterprise_organizations(name,status)",
+    select: "workspace_key,display_name,organization_id",
     workspace_key: `eq.${workspaceKey}`,
     limit: "1",
   });
@@ -50,18 +50,21 @@ export async function getEnterpriseAccess(workspaceKey: string, userId: string) 
   const orgQuery = new URLSearchParams({
     select: "role", organization_id: `eq.${organizationId}`, user_id: `eq.${userId}`, limit: "1",
   });
+  const organizationQuery = new URLSearchParams({
+    select: "name,status", organization_id: `eq.${organizationId}`, limit: "1",
+  });
   const workspaceMembershipQuery = new URLSearchParams({
     select: "role", workspace_key: `eq.${workspaceKey}`, user_id: `eq.${userId}`, limit: "1",
   });
-  const [orgRows, membershipRows] = await Promise.all([
+  const [organizationRows, orgRows, membershipRows] = await Promise.all([
+    readRows(`/rest/v1/enterprise_organizations?${organizationQuery}`),
     readRows(`/rest/v1/enterprise_organization_memberships?${orgQuery}`),
     readRows(`/rest/v1/enterprise_workspace_memberships?${workspaceMembershipQuery}`),
   ]);
-  if (!orgRows || !membershipRows) return { ok: false as const, code: "ENTERPRISE_STORE_UNAVAILABLE" };
+  if (!organizationRows || !orgRows || !membershipRows) return { ok: false as const, code: "ENTERPRISE_STORE_UNAVAILABLE" };
   const organizationRole = orgRows[0]?.role;
   if (typeof organizationRole !== "string") return { ok: false as const, code: "ENTERPRISE_ACCESS_DENIED" };
-  const embedded = workspace.enterprise_organizations;
-  const organization = Array.isArray(embedded) ? embedded[0] : embedded;
+  const organization = organizationRows[0];
   if (!organization || typeof organization !== "object" || (organization as Record<string, unknown>).status !== "active") {
     return { ok: false as const, code: "ENTERPRISE_ACCESS_DENIED" };
   }

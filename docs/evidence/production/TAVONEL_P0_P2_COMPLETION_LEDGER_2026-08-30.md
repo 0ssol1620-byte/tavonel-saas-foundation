@@ -4,12 +4,18 @@ Recorded: 2026-08-30 KST
 
 ## Production release
 
-- Deployment: `dpl_8q6PgdqHQ7qx6uabQ8z9XcTo72Ji`
+- Release source: GitHub `main`; canonical production alias verified after each
+  source-linked deployment
 - Canonical URL: `https://tavonel.com`
 - Vercel state: `READY`, production alias assigned
-- Supabase migrations: `0013_connector_oauth.sql` and
-  `0014_enterprise_control_plane.sql` committed successfully in the production
-  SQL editor
+- Supabase migrations: `0013_connector_oauth.sql`,
+  `0014_enterprise_control_plane.sql` and
+  `0015_enterprise_pilot_bootstrap.sql` committed successfully in the
+  production SQL editor
+- The sole production owner was bound idempotently to an enterprise
+  organization and workspace by the service-role-only bootstrap RPC; the
+  bootstrap also created the default governance policy and immutable audit
+  event
 - Public readiness: `ready=true`; authentication, document pipeline and
   signed export are operational; billing remains `test_only`
 - Anonymous enterprise and OAuth connector requests return `401`
@@ -53,7 +59,7 @@ Recorded: 2026-08-30 KST
 
 ### Quality and runtime
 
-- Unit and contract tests: `297/297`
+- Unit and contract tests: `298/298`
 - Full browser E2E: `159 passed`, `3 skipped`, `0 failed`
 - Launch browser QA: Chromium, Firefox and WebKit
 - Required widths: `1920, 1440, 1280, 1024, 768, 390, 360`, plus reduced
