@@ -20,10 +20,11 @@ const through = (time: number, from: number, to: number) =>
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
 type Kind = "letter" | "title" | "meta" | "h" | "p" | "sign";
+type Form = "contract" | "scan" | "manual" | "handbook" | "sheet";
 type Line = { kind: Kind; text: string; ocr?: boolean };
-type Doc = { file: string; md: string; lines: Line[] };
+type Doc = { file: string; form: Form; md: string; lines: Line[] };
 
-const PERIOD = 1.45;
+const PERIOD = 2.15;
 const ORIG_LAG = 0;
 const EXT_LAG = 1.7;
 
@@ -55,11 +56,19 @@ const AREA_RGB: [number, number, number][] = [
 const DOCS: Doc[] = [
   {
     file: CHANGE.document,
+    form: "contract",
     md: `# Services Agreement
-invoices_due: 45 days
 source: §3.2 · p.7
-change_order: $50,000
-source: §5.4`,
+
+| Item | Qty | Amount |
+| --- | --- | --- |
+| Survey | 1 | £4,200 |
+| Line 4 OT | 12 | £1,860 |
+
+![Fig. 2 Bay layout](attachment)
+
+invoices_due: 45 days
+change_order: $50,000`,
     lines: [
       { kind: "letter", text: "ACME HOLDINGS  ·  CONFIDENTIAL" },
       { kind: "title", text: "Services Agreement" },
@@ -76,11 +85,15 @@ source: §5.4`,
   },
   {
     file: "scan_0140.pdf",
+    form: "scan",
     md: `# Site visit notes
+path: ocr
+no_text_layer: true
+
+![Photo pack — 14 files, unfiled](scan_0140)
+
 warehouse_b: closed 18:00
-line_4: safety sign-off outstanding
-invoice_clock: 30 days requested
-source: scan_0140 · no text layer`,
+line_4: safety sign-off outstanding`,
     lines: [
       { kind: "letter", text: "SCAN 0140  ·  NO TEXT LAYER" },
       { kind: "title", text: "Site visit notes" },
@@ -95,10 +108,12 @@ source: scan_0140 · no text layer`,
   },
   {
     file: "Operations Manual.docx",
+    form: "manual",
     md: `# Operations Manual
 po_policy: cite live payment terms
 archived_45_day: do not use
-source: Rev 9 · §4.1`,
+
+> Figure omitted. Caption only: “Handoff between Finance and Legal.”`,
     lines: [
       { kind: "letter", text: "OPERATIONS  ·  INTERNAL  ·  REV 9" },
       { kind: "title", text: "Operations Manual" },
@@ -112,10 +127,12 @@ source: Rev 9 · §4.1`,
   },
   {
     file: "Employee Handbook 2026.pdf",
+    form: "handbook",
     md: `# Employee Handbook 2026
 notice: 30 days
 confidentiality: 3 years
-source: policy · 2026`,
+
+Where handbook and agreement disagree, the agreement wins.`,
     lines: [
       { kind: "letter", text: "PEOPLE  ·  POLICY" },
       { kind: "title", text: "Employee Handbook 2026" },
@@ -129,10 +146,17 @@ source: policy · 2026`,
   },
   {
     file: "Q3 forecast.xlsx",
+    form: "sheet",
     md: `# Q3 forecast
-invoices_modelled: 30-day clock
-threshold_alert: $25,000
-source: Q3 forecast.xlsx`,
+kind: spreadsheet
+
+| Cell | Meaning |
+| --- | --- |
+| yellow | threshold |
+| green | actual |
+| grey | commentary |
+
+Do not hard-code $50,000.`,
     lines: [
       { kind: "letter", text: "FINANCE  ·  MODEL" },
       { kind: "title", text: "Q3 forecast" },
@@ -401,6 +425,47 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
       return y + h + 12 * scale;
     };
 
+    const drawSheet = (x: number, y: number, w: number, alpha: number, scale: number) => {
+      const cols = 4;
+      const rows = 5;
+      const cw = w / cols;
+      const rh = 13 * scale;
+      context.globalAlpha = alpha;
+      for (let r = 0; r < rows; r += 1) {
+        for (let c = 0; c < cols; c += 1) {
+          const xx = x + c * cw;
+          const yy = y + r * rh;
+          context.fillStyle = r === 0 ? "#c5ddd0" : c === 2 && r === 3 ? "#e8d48a" : "#eef3ea";
+          context.fillRect(xx, yy, cw, rh);
+          context.strokeStyle = "#9aa89a";
+          context.strokeRect(xx, yy, cw, rh);
+        }
+      }
+      context.fillStyle = "#1a1612";
+      context.font = `500 ${7.5 * scale}px ui-monospace, Menlo, monospace`;
+      context.fillText("Q3", x + 4, y + 10 * scale);
+      context.globalAlpha = 1;
+      return y + rows * rh + 10 * scale;
+    };
+
+    const drawScanPhoto = (x: number, y: number, w: number, alpha: number, scale: number) => {
+      const h = 48 * scale;
+      context.globalAlpha = alpha;
+      context.fillStyle = "#c8c0b0";
+      context.fillRect(x, y, w, h);
+      if (paper) {
+        context.globalAlpha = alpha * 0.4;
+        context.drawImage(paper, x, y, w, h);
+      }
+      context.globalAlpha = alpha;
+      context.strokeStyle = "#6a645c";
+      context.strokeRect(x, y, w, h);
+      context.fillStyle = "#3a342e";
+      context.font = `italic ${8 * scale}px Georgia, serif`;
+      context.fillText("photo · no text layer", x + 6, y + h - 8);
+      context.globalAlpha = 1;
+      return y + h + 10 * scale;
+    };
     const drawStamp = (x: number, y: number, alpha: number, scale: number) => {
       context.save();
       context.translate(x, y);
@@ -427,6 +492,7 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
     const drawPage = (
       x: number, y: number, w: number, h: number,
       lines: Line[], scan: number, lockAll: boolean, scale: number, ink: string,
+      form: Form, matter: boolean,
     ) => {
       context.save();
       roundRect(context, x, y, w, h, 2);
@@ -456,10 +522,13 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
             context.globalAlpha = 1;
             ty += size * 1.28;
           });
-          if (lineIndex === 2) ty = drawTable(mx, ty, maxW, alpha, scale);
-          if (lineIndex === 4) ty = drawFigure(mx, ty, maxW, alpha, scale);
+          if (matter && form === "contract" && lineIndex === 2) ty = drawTable(mx, ty, maxW, alpha, scale);
+          if (matter && form === "contract" && lineIndex === 4) ty = drawFigure(mx, ty, maxW, alpha, scale);
+          if (matter && form === "scan" && lineIndex === 1) ty = drawScanPhoto(mx, ty, maxW, alpha, scale);
+          if (matter && form === "sheet" && lineIndex === 2) ty = drawSheet(mx, ty, maxW, alpha, scale);
         });
-        drawStamp(x + w - 78 * scale, y + 18 * scale, alpha, scale);
+        if (matter && form === "contract") drawStamp(x + w - 78 * scale, y + 18 * scale, alpha, scale);
+        if (!matter) return;
         let f = 0;
         context.font = face("p", 10.5 * scale);
         context.fillStyle = "#322e28";
@@ -478,7 +547,6 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
       if (lockAll) {
         paint(1);
       } else {
-        paint(0.18);
         context.save();
         context.beginPath();
         context.rect(x, y, w, Math.max(0, scanY - y));
@@ -566,9 +634,8 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
 
     const draw = (t: number) => {
       studio();
-      const recede = through(t, ACT.end, ACT.stop);
-      const bw = width * lerp(0.94, 0.88, recede);
-      const bh = height * lerp(0.72, 0.62, recede);
+      const bw = width * 0.94;
+      const bh = height * 0.72;
       const bx = (width - bw) / 2;
       const by = height * 0.07;
       const gap = 10;
@@ -610,12 +677,12 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
       pane(xs[1], colY, colW, colH, "ORIGINAL", `${origI + 1}/${DOCS.length}`);
       context.save();
       context.translate(lerp(22, 0, 1 - flip), 0);
-      drawPage(xs[1] + 8, colY + 30, colW - 16, colH - 38, orig.lines, 1, true, 1.02, inkO);
+      drawPage(xs[1] + 8, colY + 30, colW - 16, colH - 38, orig.lines, 1, true, 1.02, inkO, orig.form, true);
       context.restore();
 
       pane(xs[2], colY, colW, colH, "EXTRACT", `SCAN ${extI + 1}/${DOCS.length}`);
       const topH = colH * 0.62;
-      drawPage(xs[2] + 8, colY + 30, colW - 16, topH - 8, ext.lines, local, false, 0.92, inkE);
+      drawPage(xs[2] + 8, colY + 30, colW - 16, topH - 8, ext.lines, local, false, 0.92, inkE, ext.form, false);
       drawMd(xs[2] + 8, colY + 26 + topH, colW - 16, colH - topH - 34, ext.md, local);
 
       pane(xs[3], colY, colW, colH, "WORLD", "linking");
@@ -676,7 +743,7 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
     <div className="film">
       <canvas ref={canvasRef} className="film-canvas" aria-hidden="true" />
       <div className={`film-caption${atEnd ? " is-end" : ""}`} aria-live="polite">
-        {atEnd && caption ? (
+        {caption ? (
           <div key={caption.line} className="film-caption-in">
             {caption.kicker ? <p className="film-kicker">{caption.kicker}</p> : null}
             <p className="film-line">{caption.line}</p>

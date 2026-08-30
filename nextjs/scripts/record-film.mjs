@@ -27,13 +27,13 @@ await page.waitForFunction(() => {
 }, { timeout: 20_000 });
 await page.waitForTimeout(800);
 await page.screenshot({ path: `${frameDir}/cinematic-start.png` });
-await page.waitForTimeout(3_200);
+await page.waitForTimeout(4_200);
 await page.screenshot({ path: `${frameDir}/t05.png` });
-await page.waitForTimeout(4_000);
+await page.waitForTimeout(6_000);
 await page.screenshot({ path: `${frameDir}/t15.png` });
-await page.waitForTimeout(5_000);
-await page.screenshot({ path: `${frameDir}/t34.png` });
 await page.waitForTimeout(4_000);
+await page.screenshot({ path: `${frameDir}/t34.png` });
+await page.waitForTimeout(3_500);
 await page.screenshot({ path: `${frameDir}/cinematic-end.png` });
 await context.close();
 await browser.close();

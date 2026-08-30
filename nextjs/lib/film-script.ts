@@ -3,17 +3,17 @@
  */
 import { CHANGE, KEPT, REBUILT, WORLD, n } from "./demo-world";
 
-export const FILM_DURATION = 16;
+export const FILM_DURATION = 18;
 
 export const FILM_ACT = {
   drop: 0,
-  classify: 1.5,
-  ocr: 3.5,
-  markdown: 5.5,
-  directory: 8.0,
-  world: 9.5,
-  change: 11.5,
-  end: 14.2,
+  classify: 2.0,
+  ocr: 5.0,
+  markdown: 8.0,
+  directory: 11.0,
+  world: 13.0,
+  change: 15.0,
+  end: 16.8,
   stop: FILM_DURATION,
 } as const;
 
@@ -25,14 +25,21 @@ export const FILM_CAPTIONS: FilmCaption[] = [
     until: FILM_ACT.ocr,
     kicker: "EXAMPLE",
     line: "This is the mess.",
-    sub: "The files stay. They are already yours.",
+    sub: "Drive, original, extract, world — four rooms, already working.",
   },
   {
     at: FILM_ACT.ocr,
+    until: FILM_ACT.markdown,
+    kicker: "EXAMPLE",
+    line: "Originals keep changing form.",
+    sub: "Contract. Scan. Sheet. Handbook. Not one page on a loop.",
+  },
+  {
+    at: FILM_ACT.markdown,
     until: FILM_ACT.world,
     kicker: "EXAMPLE",
-    line: "Read. Resolve. Compile.",
-    sub: "Nothing waits for the lens.",
+    line: "Scan reveals. Markdown cites.",
+    sub: "A table becomes rows. A figure becomes a caption. The picture does not copy.",
   },
   {
     at: FILM_ACT.world,
