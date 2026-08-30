@@ -243,7 +243,9 @@ export async function getWorkspaceCollectionCandidate(
   const canonicalUri = `/${env.bucket}/${key.split("/").map(encodeURIComponent).join("/")}`;
   const response = await signedS3Get(env, canonicalUri, "", now);
   if (response.status === 404) return { ok: false, code: "NOT_FOUND" };
-  if (!response.ok) return { ok: false, code: "GET_FAILED" };
+  if (response.status === 403) return { ok: false, code: "GET_FORBIDDEN" };
+  if (response.status === 599) return { ok: false, code: "GET_TIMEOUT" };
+  if (!response.ok) return { ok: false, code: `GET_FAILED_${response.status}` };
   const bytes = Buffer.from(await response.arrayBuffer());
   if (bytes.length > MAX_DERIVED_JSON_BYTES) return { ok: false, code: "JSON_TOO_LARGE" };
   try {

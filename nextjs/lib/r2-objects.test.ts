@@ -74,4 +74,21 @@ describe("R2 document listing prefix", () => {
     });
     expect(fetchMock).toHaveBeenCalledOnce();
   });
+
+  it.each([
+    [403, "GET_FORBIDDEN"],
+    [500, "GET_FAILED_500"],
+    [599, "GET_TIMEOUT"],
+  ])("preserves safe collection read failure detail for HTTP %s", async (status, code) => {
+    const env = {
+      accountId: "acct",
+      bucket: FOUNDATION_R2_BUCKET,
+      accessKeyId: "AKIAEXAMPLE",
+      secretAccessKey: "secret",
+    };
+    const key = `immutable/${WS}/${WS}/collections/collection-${"ab".repeat(16)}/${"cd".repeat(32)}/candidate-world.json`;
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status })));
+
+    await expect(getWorkspaceCollectionCandidate(env, WS, key)).resolves.toEqual({ ok: false, code });
+  });
 });
