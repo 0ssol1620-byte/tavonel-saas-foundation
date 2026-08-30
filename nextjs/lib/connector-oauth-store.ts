@@ -8,6 +8,7 @@ export type OAuthAuthorizationRecord = {
   pkceVerifierReference: string;
   redirectUri: string;
   requestedScopes: string[];
+  userId: string;
 };
 
 export type OAuthConnection = {
@@ -109,16 +110,16 @@ export async function createOAuthAuthorization(input: {
   }
 }
 
-export async function consumeOAuthAuthorization(stateSha256: string, provider: OAuthConnectorProvider, userId: string) {
+export async function consumeOAuthAuthorization(stateSha256: string, provider: OAuthConnectorProvider) {
   const config = readSupabaseAdminConfig();
   if (!config) return { ok: false as const, code: "OAUTH_STORE_NOT_CONFIGURED" };
   try {
     const response = await supabaseAdminRequest(config, "/rest/v1/rpc/consume_foundation_oauth_authorization", {
       method: "POST",
-      body: JSON.stringify({ p_state_sha256: stateSha256, p_provider: provider, p_user_id: userId }),
+      body: JSON.stringify({ p_state_sha256: stateSha256, p_provider: provider }),
     });
     const row = await response.json().catch(() => ({})) as Record<string, unknown>;
-    if (!response.ok || typeof row.authorizationId !== "string" || typeof row.workspaceKey !== "string" || typeof row.displayName !== "string" || typeof row.pkceVerifierReference !== "string" || typeof row.redirectUri !== "string" || !Array.isArray(row.requestedScopes)) {
+    if (!response.ok || typeof row.authorizationId !== "string" || typeof row.workspaceKey !== "string" || typeof row.userId !== "string" || typeof row.displayName !== "string" || typeof row.pkceVerifierReference !== "string" || typeof row.redirectUri !== "string" || !Array.isArray(row.requestedScopes)) {
       return { ok: false as const, code: "OAUTH_AUTHORIZATION_INVALID" };
     }
     return { ok: true as const, authorization: row as unknown as OAuthAuthorizationRecord };

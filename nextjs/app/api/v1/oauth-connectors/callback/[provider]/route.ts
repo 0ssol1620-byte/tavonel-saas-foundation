@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { requireFoundationSession } from "@/lib/developer-auth";
 import { exchangeOAuthCode, fetchOAuthProviderIdentity, parseOAuthConnectorProvider, readOAuthProviderRuntime, sha256Hex } from "@/lib/connector-oauth";
 import { deleteOAuthSecret, putOAuthSecret, readOAuthSecret, readOAuthSecretBrokerConfig } from "@/lib/connector-oauth-secrets";
 import { consumeOAuthAuthorization, createOAuthConnection } from "@/lib/connector-oauth-store";
@@ -19,8 +18,6 @@ export async function GET(request: Request, context: { params: Promise<{ provide
   const { provider: rawProvider } = await context.params;
   const provider = parseOAuthConnectorProvider(rawProvider);
   if (!provider) return workspaceRedirect(request, "failed", rawProvider, "OAUTH_PROVIDER_INVALID");
-  const auth = await requireFoundationSession(request, "studio");
-  if (!auth.ok) return workspaceRedirect(request, "failed", provider, auth.code);
   const url = new URL(request.url);
   if (url.searchParams.has("error")) return workspaceRedirect(request, "failed", provider, "OAUTH_PROVIDER_DENIED");
   const code = url.searchParams.get("code") ?? "";
@@ -30,8 +27,8 @@ export async function GET(request: Request, context: { params: Promise<{ provide
   const broker = readOAuthSecretBrokerConfig();
   if (!runtime || !broker) return workspaceRedirect(request, "failed", provider, "OAUTH_PROVIDER_NOT_CONFIGURED");
 
-  const consumed = await consumeOAuthAuthorization(await sha256Hex(state), provider, auth.principal.userId);
-  if (!consumed.ok || consumed.authorization.workspaceKey !== auth.principal.workspaceKey || consumed.authorization.redirectUri !== runtime.redirectUri) {
+  const consumed = await consumeOAuthAuthorization(await sha256Hex(state), provider);
+  if (!consumed.ok || consumed.authorization.redirectUri !== runtime.redirectUri) {
     return workspaceRedirect(request, "failed", provider, "OAUTH_AUTHORIZATION_INVALID");
   }
   const authorization = consumed.authorization;
@@ -45,12 +42,12 @@ export async function GET(request: Request, context: { params: Promise<{ provide
     const identity = await fetchOAuthProviderIdentity(provider, tokens.accessToken);
     refreshTokenReference = await putOAuthSecret(
       broker,
-      `oauth/refresh/${auth.principal.workspaceKey}/${provider}/${await sha256Hex(identity.accountId)}`,
+      `oauth/refresh/${authorization.workspaceKey}/${provider}/${await sha256Hex(identity.accountId)}`,
       tokens.refreshToken,
     );
     const created = await createOAuthConnection({
-      workspaceKey: auth.principal.workspaceKey,
-      userId: auth.principal.userId,
+      workspaceKey: authorization.workspaceKey,
+      userId: authorization.userId,
       provider,
       displayName: authorization.displayName,
       providerAccountId: identity.accountId,
