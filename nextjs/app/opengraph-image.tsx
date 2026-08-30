@@ -60,7 +60,7 @@ export default function OpengraphImage() {
               padding: "7px 13px",
             }}
           >
-            FOUNDATION MODE
+            PRIVATE PILOT
           </div>
         </div>
 

@@ -16,17 +16,30 @@ const mono = IBM_Plex_Mono({
   display: "swap",
 });
 
+/**
+ * G2 -- named by the problem, not by the product.
+ *
+ * Nobody searches for "knowledge compiler". It is a category that does not exist yet, so a title
+ * built out of it is findable only by people who already know the name -- which is nobody. The
+ * words that survive are the ones a person in trouble would actually type: a document changed,
+ * and the answers that came from it are now wrong.
+ *
+ * The product name stays, because a title has to identify who is speaking, but it no longer
+ * carries the whole burden of being recognised. This costs nothing today -- robots.ts still
+ * disallows everything, deliberately, for a private pilot -- and it is the only part of being
+ * found that can be got right before the index is opened.
+ */
 export const metadata: Metadata = {
   metadataBase: new URL("https://tavonel-saas-foundation.vercel.app"),
-  title: "TAVONEL — The Knowledge Compiler",
+  title: "When a document changes, what else is now wrong? — TAVONEL",
   description:
-    "Watch scattered files become one current world. TAVONEL compiles sources into knowledge that stays current, and returns every answer to its evidence.",
+    "TAVONEL compiles your files into structured, AI-ready knowledge and keeps it correct as the sources change: it rebuilds only what a change actually reached, holds what has two readings, and returns every answer to the line it came from.",
   alternates: {
     canonical: "/",
   },
   openGraph: {
-    title: "TAVONEL — The Knowledge Compiler",
-    description: "Watch scattered files become one current world.",
+    title: "When a document changes, what else is now wrong?",
+    description: "Watch scattered files become one current world — and watch it stay current.",
     type: "website",
     url: "/",
   },

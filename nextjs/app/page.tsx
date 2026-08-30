@@ -115,6 +115,19 @@ const PLANS = [
   ["Institution", "Talk to us", "For policy-led knowledge operations.", null],
 ] as const;
 
+/**
+ * C6 -- what leaves with the customer. Every line is a thing the workspace already does.
+ *
+ * Written from the export path rather than from ambition: the package is a hash-verified
+ * directory of files, it is signed with Ed25519, and the public half of the signing key is
+ * served at /api/export/trust so the signature can be checked without an account here.
+ */
+const TAKEAWAY = [
+  ["The package", "A directory of files, not a database dump: the ontology, the graph, the retrieval corpus and the provenance, each one hash-verified on the way out."],
+  ["The signature", "Signed with Ed25519 over the payload digest. A package that has been altered stops verifying."],
+  ["The public key", "Published, so the signature can be checked by a third party who has no account here and no reason to trust us."],
+] as const;
+
 const PACKS = [
   ["Starter", "$12", "100 credits", "credit_starter"],
   ["Builder", "$30", "300 credits", "credit_builder"],
@@ -185,7 +198,7 @@ export default function HomePage() {
   }, []);
 
   const showNotice = () =>
-    setNotice("Foundation mode is active. Provider configuration and sandbox qualification are required before this action is available.");
+    setNotice("This deployment is a private pilot. Provider configuration and sandbox qualification are required before this action is available.");
 
   /**
    * R1 -- the intent to buy survives the sign-in.
@@ -245,9 +258,17 @@ export default function HomePage() {
           <Logomark />
           <b>TAVONEL</b>
         </Link>
-        <span className="mode" title="Foundation mode: billing is sandbox-only and GPU capacity remains separately gated.">
+        {/*
+          C3 -- the same facts, named as the decision they are.
+          "FOUNDATION MODE" reads to a buyer as "not finished yet". It is not: this deployment is
+          deliberately closed while each control is qualified, the search index is closed too,
+          and the plans already call the middle tier the private pilot choice. The badge now says
+          which of those it is, and the exact meaning stays one hover away rather than being
+          replaced by a vaguer word.
+        */}
+        <span className="mode" title="Private pilot: this deployment is invitation-only, billing runs in Paddle sandbox, and GPU capacity stays separately gated until each control is qualified.">
           <i aria-hidden="true" />
-          FOUNDATION MODE
+          PRIVATE PILOT
         </span>
         <nav aria-label="Sections">
           <button type="button" onClick={() => jump(2)}>Compile</button>
@@ -565,6 +586,28 @@ export default function HomePage() {
             signed, idempotently persisted webhook &mdash; never on a checkout redirect. Credits are
             reserved before a qualified job and settled against observed runtime. No unlimited GPU
             plans; hard job and workspace caps stay active even after a purchase.
+          </p>
+
+          {/*
+            C6 -- the question nobody asks out loud before signing a yearly bill.
+            The signed export has existed in the product from the start and the page never
+            mentioned it, which meant the honest answer to "what happens if we leave" was
+            sitting in the workspace where only customers could find it. It belongs here, beside
+            the price, because that is where the question is actually being weighed.
+          */}
+          <div className="band-head rv"><span className="kicker">NO LOCK-IN</span><h3>What you can take with you.</h3></div>
+          <div className="caps rv">
+            {TAKEAWAY.map(([name, text]) => (
+              <article className="cap" key={name}>
+                <h3>{name}</h3>
+                <p>{text}</p>
+              </article>
+            ))}
+          </div>
+          <p className="fine rv">
+            The signing key’s public half is published at <code>/api/export/trust</code>, so a
+            package can be verified by someone who does not trust us and does not have an account
+            here. A record you can only check inside the system that produced it is not a record.
           </p>
 
           <div className="actions rv" style={{ marginTop: 30 }}>
