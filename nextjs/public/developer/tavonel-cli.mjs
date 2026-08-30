@@ -76,10 +76,14 @@ async function main() {
     return console.log(JSON.stringify(await response.json(), null, 2));
   }
   if (command === "download" && args[0] && args[1]) {
+    const { createHash } = await import("node:crypto");
     const { writeFile } = await import("node:fs/promises");
     const response = await request(`/api/v1/collections/${encodeURIComponent(args[0])}/download`);
-    await writeFile(args[1], new Uint8Array(await response.arrayBuffer()), { flag: "wx" });
-    console.log(`Wrote ${args[1]} (${response.headers.get("x-tavonel-export-manifest-sha256") || "manifest header unavailable"})`);
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    await writeFile(args[1], bytes, { flag: "wx" });
+    const archiveSha256 = `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+    const manifestSha256 = response.headers.get("x-tavonel-export-manifest-sha256") || "unavailable";
+    console.log(`Wrote ${args[1]} (archive=${archiveSha256}; manifest=${manifestSha256})`);
     return;
   }
   throw new Error(`Invalid command.\n\n${usage()}`);

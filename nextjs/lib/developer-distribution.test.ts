@@ -1,5 +1,9 @@
-import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { createServer } from "node:http";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { GET as openApi } from "../app/api/openapi/route";
 
@@ -30,6 +34,50 @@ describe("developer distribution", () => {
     expect(child.status).toBe(0);
     expect(child.stdout).toContain("node tavonel-cli.mjs documents");
     expect(child.stdout).toContain("node tavonel-cli.mjs connections");
+  });
+
+  it("labels archive and manifest digests independently after a download", async () => {
+    const archive = Buffer.from("signed export bytes", "utf8");
+    const archiveSha256 = `sha256:${createHash("sha256").update(archive).digest("hex")}`;
+    const manifestSha256 = `sha256:${"a".repeat(64)}`;
+    const server = createServer((request, response) => {
+      if (request.url !== "/api/v1/collections/collection-test/download") {
+        response.writeHead(404).end();
+        return;
+      }
+      response.writeHead(200, {
+        "content-type": "application/zip",
+        "content-length": String(archive.length),
+        "x-tavonel-export-manifest-sha256": manifestSha256,
+      });
+      response.end(archive);
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("test server did not bind a TCP port");
+    const directory = mkdtempSync(join(tmpdir(), "tavonel-cli-"));
+    const output = join(directory, "candidate.zip");
+    try {
+      const child = spawn(process.execPath, ["public/developer/tavonel-cli.mjs", "download", "collection-test", output], {
+        env: { ...process.env, TAVONEL_API_KEY: "tvnl_live_test", TAVONEL_BASE_URL: `http://127.0.0.1:${address.port}` },
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      let stdout = "";
+      let stderr = "";
+      child.stdout.setEncoding("utf8").on("data", (chunk: string) => { stdout += chunk; });
+      child.stderr.setEncoding("utf8").on("data", (chunk: string) => { stderr += chunk; });
+      const status = await new Promise<number | null>((resolve, reject) => {
+        child.once("error", reject);
+        child.once("close", resolve);
+      });
+      expect(status, stderr).toBe(0);
+      expect(readFileSync(output)).toEqual(archive);
+      expect(stdout).toContain(`archive=${archiveSha256}`);
+      expect(stdout).toContain(`manifest=${manifestSha256}`);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 
   it("ships a source agent with environment-only secrets and durable cursor ordering", () => {
