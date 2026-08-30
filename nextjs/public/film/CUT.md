@@ -1,6 +1,6 @@
 # Locked compile cut
 
-`compile-cut.mp4` is the frozen 18s four-up. It is the cut that will sit at the top of the site when we wire the header.
+`compile-cut.mp4` is the frozen **18.00s** four-up. It is the cut that will sit at the top of the site when we wire the header.
 
 - SHA that matches the canvas: `1f876a3`
 - Camera: off, wide, `s = 1`
