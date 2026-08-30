@@ -728,8 +728,12 @@ export default function HomePage() {
           <nav className="site-links" aria-label="More">
             <CanvasTransitionLink href="/film">Watch the sixteen-second version</CanvasTransitionLink>
             <Link href="/evidence">What we measured</Link>
-            <Link href="/security">Where your documents go</Link>
-            <Link href={"/contact" as Route}>Talk to us</Link>
+             <Link href="/security">Where your documents go</Link>
+             <Link href={"/contact" as Route}>Talk to us</Link>
+             <Link href={"/status" as Route}>Service status</Link>
+             <Link href={"/privacy" as Route}>Privacy</Link>
+             <Link href={"/terms" as Route}>Terms</Link>
+             <Link href={"/refunds" as Route}>Refunds</Link>
           </nav>
           <p className="fine">
             {DISCLOSURE.staged} Paddle checkout is sandbox-only; signed webhooks persist access and

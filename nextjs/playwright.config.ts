@@ -39,7 +39,7 @@ export default defineConfig({
     command: "pnpm build && pnpm start --hostname 127.0.0.1 --port 3117",
     url: "http://127.0.0.1:3117/workspace",
     reuseExistingServer: false,
-    timeout: 60_000,
+    timeout: 120_000,
     env: {
       NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
       NEXT_PUBLIC_SUPABASE_ANON_KEY: "foundation-browser-e2e-anon-key",
