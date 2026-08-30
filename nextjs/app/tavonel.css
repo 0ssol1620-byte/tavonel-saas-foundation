@@ -1047,6 +1047,56 @@ footer.site .shell { display: flex; flex-direction: column; gap: 14px; }
 .document-meta li { padding: 8px 10px; border: 1px solid var(--hairline); border-radius: 3px; background: var(--ground); display: flex; flex-direction: column; gap: 3px; overflow-wrap: anywhere; }
 .document-meta li strong { color: var(--text-mid); font-weight: 400; font-size: 11px; letter-spacing: 0.06em; }
 .document-meta li small { color: var(--text-xlo); font-size: 10px; line-height: 1.5; }
+/* The document is now named, so the name takes the weight and the id steps back to a caption. */
+.document-meta li strong { color: var(--text-hi); font-size: 12px; letter-spacing: 0; }
+.document-meta li .doc-id {
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  color: var(--text-xlo);
+  letter-spacing: 0.02em;
+  margin-top: -1px;
+}
+
+/*
+  A receipt key: label, the key itself on one line, and a control that copies it whole.
+  `min-width: 0` on the code element is what keeps the elided string from widening the card --
+  a grid child's default `auto` minimum is its content, and these strings have no break
+  opportunities a browser will take.
+*/
+.key-line {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 8px;
+}
+.key-line.pending { display: block; }
+.key-k { font-family: var(--f-mono); font-size: 9px; letter-spacing: 0.12em; color: var(--decor); text-transform: uppercase; }
+.key-line code {
+  min-width: 0;
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  color: var(--text-lo);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.key-copy {
+  font-family: var(--f-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.12em;
+  color: var(--text-xlo);
+  border: 1px solid var(--hairline);
+  border-radius: 2px;
+  padding: 2px 6px;
+  transition: color 180ms ease, border-color 180ms ease;
+}
+.key-copy:hover { color: var(--verified); border-color: var(--verified-dim); }
+
+@media (max-width: 620px) {
+  /* The label and the control keep their row; the key gets the full width underneath it. */
+  .key-line { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 8px; }
+  .key-line code { grid-column: 1 / -1; }
+}
 .empty { display: flex; flex-direction: column; gap: 8px; color: var(--text-xlo); }
 .collection-result { display: grid; gap: 8px; }
 .billing-hold { color: var(--changed); }

@@ -16,6 +16,7 @@ import { runBounded } from "@/lib/concurrent";
 import { buildPipeline, type LocalUpload } from "@/lib/pipeline";
 import { qualifyProgress, type OcrProgress } from "@/lib/ocr-progress";
 import PipelineBoard from "@/components/pipeline-board";
+import { displayName, elideKey, recallDocumentNames, rememberDocumentName, type DocumentNames } from "@/lib/document-names";
 import { trackFunnel } from "@/lib/funnel-events";
 
 /** What this panel prints when it has no value. Not "0", and not a spinner that never resolves. */
@@ -145,6 +146,39 @@ const TABS: { id: WorkspaceTab; label: string }[] = [
   { id: "integrity", label: "Processing integrity" },
 ];
 
+/**
+ * One immutable key, drawn short and copied whole.
+ *
+ * Every value here is a receipt: a customer has to be able to take it, paste it into a bucket
+ * listing or a support thread, and have it match byte for byte. So the string in the DOM is
+ * always the complete key -- `elideKey` only decides what is painted, `title` gives it to a
+ * hover, and the button puts the untouched value on the clipboard.
+ */
+function KeyLine({ label, value, pending }: { label: string; value?: string | null; pending?: string }) {
+  const [copied, setCopied] = useState(false);
+  if (!value) return pending ? <small className="key-line pending">{pending}</small> : null;
+  return (
+    <small className="key-line">
+      <span className="key-k">{label}</span>
+      <code title={value}>{elideKey(value)}</code>
+      <button
+        type="button"
+        className="key-copy"
+        aria-label={`Copy the full ${label.toLowerCase()} key`}
+        onClick={() => {
+          void navigator.clipboard?.writeText(value).then(
+            () => { setCopied(true); window.setTimeout(() => setCopied(false), 1600); },
+            // A refused clipboard leaves the key on screen and in the title; nothing is lost.
+            () => undefined,
+          );
+        }}
+      >
+        {copied ? "COPIED" : "COPY"}
+      </button>
+    </small>
+  );
+}
+
 export default function WorkspacePage() {
   const fileRef = useRef<HTMLInputElement>(null);
   /** Distinguishes two uploads of the same file in one session. */
@@ -170,6 +204,16 @@ export default function WorkspacePage() {
    * upload is a blank screen.
    */
   const [uploads, setUploads] = useState<LocalUpload[]>([]);
+  /**
+   * What this browser calls each document.
+   *
+   * The server does not return filenames and is not going to: a filename is customer content,
+   * and the intake boundary keeps what it stores to the minimum. So the name lives here, in the
+   * browser that did the upload, and the workspace reads it back on load -- which is the part
+   * that was missing. Without it every document became a UUID the moment the tab was reloaded.
+   */
+  const [names, setNames] = useState<DocumentNames>({});
+  useEffect(() => { setNames(recallDocumentNames()); }, []);
   /**
    * The live read, per document, keyed by document id.
    *
@@ -486,6 +530,9 @@ export default function WorkspacePage() {
        * not in this path, and showing the transfer did not put it there.
        */
       patchUpload(localId, { documentId: json.documentId ?? null, phase: "sending", loaded: 0 });
+      // The one moment both halves exist in the same scope: the id the server just issued, and
+      // the name the visitor picked the file by.
+      if (json.documentId) setNames(rememberDocumentName(json.documentId, file.name));
       const transfer = putWithProgress(
         json.uploadUrl,
         file,
@@ -978,6 +1025,7 @@ export default function WorkspacePage() {
           <PipelineBoard
             rows={pipelineRows}
             reading={reading}
+            names={names}
             onDismiss={uploads.length > 0 ? () => { setUploads([]); setReading({}); } : undefined}
           />
           <p className="eyebrow">● FOUNDATION · SAFE MODE</p>
@@ -993,11 +1041,27 @@ export default function WorkspacePage() {
                 <ul className="document-meta">
                   {documents.map((doc) => (
                     <li key={`${doc.documentId}-${doc.versionKey}`}>
-                      <strong>{doc.documentId}</strong>
-                      <small>{doc.sanitizedKey ?? "sanitized.pdf pending"}</small>
+                      {/*
+                        The same rule as the floor above: a name a person recognises, then the
+                        id underneath for the receipts to hang off.
+                      */}
+                      <strong>{displayName(doc.documentId, names)}</strong>
+                      <small className="doc-id" title={doc.documentId}>{doc.documentId}</small>
+                      {/*
+                        A receipt key is 200 characters of bucket, tenant, document, digest and
+                        artifact, and it used to be printed whole -- four of them per document,
+                        wrapping across three lines each, until the panel was a wall of hex with
+                        the one useful word ("sanitized.pdf") buried at the end of it.
+
+                        Only the drawing is shortened. The value is never altered and never
+                        truncated in the DOM: the full key is on the element, so it is what a
+                        copy takes and what a title reveals. A receipt you cannot copy whole is
+                        not a receipt.
+                      */}
+                      <KeyLine label="Sanitized" value={doc.sanitizedKey} pending="sanitized.pdf pending" />
                       <small>{doc.hasOcrJson ? `ocr.json ${doc.ocrJsonSize ?? 0} bytes` : doc.processingState === "operator_review" ? `OCR operator review required${doc.ocrReviewReasonCode ? ` · ${doc.ocrReviewReasonCode}` : ""} · automatic paid retry disabled` : "ocr.json pending within bounded processing"}</small>
-                      {doc.cdrReceiptKey ? <small>CDR receipt · {doc.cdrReceiptKey}</small> : null}
-                      {doc.ocrReviewKey ? <small>OCR review receipt · {doc.ocrReviewKey}</small> : null}
+                      {doc.cdrReceiptKey ? <KeyLine label="CDR receipt" value={doc.cdrReceiptKey} /> : null}
+                      {doc.ocrReviewKey ? <KeyLine label="OCR review" value={doc.ocrReviewKey} /> : null}
                     </li>
                   ))}
                 </ul>

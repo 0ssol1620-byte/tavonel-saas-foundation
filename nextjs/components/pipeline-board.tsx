@@ -33,15 +33,22 @@
 import type { PipelineRow } from "@/lib/pipeline";
 import type { OcrProgress } from "@/lib/ocr-progress";
 import ReadingView from "./reading-view";
+import { displayName, type DocumentNames } from "@/lib/document-names";
 
 export default function PipelineBoard({
   rows,
   reading = {},
+  names = {},
   onDismiss,
 }: {
   rows: PipelineRow[];
   /** Live read, per document id. Absent for documents with nothing in flight to watch. */
   reading?: Record<string, OcrProgress>;
+  /**
+   * What this browser remembers each document was called. Empty on a device that did not do
+   * the upload, which is the case `displayName` falls back through.
+   */
+  names?: DocumentNames;
   onDismiss?: () => void;
 }) {
   if (rows.length === 0) return null;
@@ -101,10 +108,18 @@ export default function PipelineBoard({
         {zone.items.map((row) => (
           <li key={row.id} data-held={row.needsPerson ? 1 : 0}>
             <div className="board-id">
-              {/* The filename is what the visitor recognises; the id is what every receipt uses.
-                  Both are shown, and the id wraps rather than widening the page. */}
-              <strong>{row.filename ?? row.id}</strong>
-              {row.filename ? <small className="id">{row.id}</small> : null}
+              {/*
+                A name first, and never a bare UUID.
+
+                This used to print `row.filename ?? row.id`, and `filename` is known only for an
+                upload made in this tab -- so a reload turned every document on the floor into
+                `10fc3cfd-2cef-49f6-8ff5-7a2bb6ed360d` and nothing else. The name now comes from
+                what the browser remembered, then from the upload still in flight, and failing
+                both from a short handle. The full id stays underneath in every case, because it
+                is what the receipts, the keys and the audit lines all refer to.
+              */}
+              <strong>{displayName(row.id, names, row.filename)}</strong>
+              <small className="id" title={row.id}>{row.id}</small>
             </div>
 
             {/* One word per panel, so a floor of twenty can be read without reading twenty
