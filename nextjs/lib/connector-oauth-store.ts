@@ -89,8 +89,15 @@ export async function createOAuthAuthorization(input: {
         expires_at: expiresAt,
       }),
     });
-    const row = ((await response.json().catch(() => [])) as Array<Record<string, unknown>>)[0];
-    if (!response.ok || typeof row?.authorization_id !== "string") return { ok: false as const, code: "OAUTH_AUTHORIZATION_CREATE_FAILED" };
+    const payload = await response.json().catch(() => []);
+    const row = (Array.isArray(payload) ? payload : [])[0] as Record<string, unknown> | undefined;
+    if (!response.ok || typeof row?.authorization_id !== "string") {
+      const databaseCode = !Array.isArray(payload) && payload && typeof payload === "object" && "code" in payload && typeof payload.code === "string"
+        ? payload.code
+        : "UNKNOWN";
+      console.error("OAuth authorization insert failed", { status: response.status, databaseCode });
+      return { ok: false as const, code: "OAUTH_AUTHORIZATION_CREATE_FAILED" };
+    }
     const audited = await insertOAuthAudit(input.workspaceKey, input.userId, "oauth_authorization_started", row.authorization_id, { provider: input.provider });
     if (!audited) {
       await supabaseAdminRequest(config, `/rest/v1/foundation_oauth_authorizations?authorization_id=eq.${row.authorization_id}`, { method: "DELETE" }).catch(() => undefined);
