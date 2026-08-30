@@ -219,7 +219,7 @@ export async function getOAuthConnectionSecretReference(workspaceKey: string, oa
   const config = readSupabaseAdminConfig();
   if (!config) return { ok: false as const, code: "OAUTH_STORE_NOT_CONFIGURED" };
   const query = new URLSearchParams({
-    select: "refresh_token_reference",
+    select: "provider,refresh_token_reference",
     oauth_connection_id: `eq.${oauthConnectionId}`,
     workspace_key: `eq.${workspaceKey}`,
     status: "neq.revoked",
@@ -229,9 +229,47 @@ export async function getOAuthConnectionSecretReference(workspaceKey: string, oa
     const response = await supabaseAdminRequest(config, `/rest/v1/foundation_oauth_connections?${query}`);
     const row = ((await response.json().catch(() => [])) as Array<Record<string, unknown>>)[0];
     if (!response.ok) return { ok: false as const, code: "OAUTH_CONNECTION_READ_FAILED" };
-    if (!row || typeof row.refresh_token_reference !== "string") return { ok: false as const, code: "OAUTH_CONNECTION_NOT_FOUND" };
-    return { ok: true as const, refreshTokenReference: row.refresh_token_reference };
+    if (!row || typeof row.refresh_token_reference !== "string" || !["google_drive", "dropbox", "microsoft_graph"].includes(String(row.provider))) {
+      return { ok: false as const, code: "OAUTH_CONNECTION_NOT_FOUND" };
+    }
+    return { ok: true as const, provider: row.provider as OAuthConnectorProvider, refreshTokenReference: row.refresh_token_reference };
   } catch {
     return { ok: false as const, code: "OAUTH_CONNECTION_READ_FAILED" };
+  }
+}
+
+export async function recordOAuthConnectionSync(input: {
+  workspaceKey: string;
+  userId: string;
+  oauthConnectionId: string;
+  cursorSha256: string;
+  scanned: number;
+  imported: number;
+}) {
+  const config = readSupabaseAdminConfig();
+  if (!config) return { ok: false as const, code: "OAUTH_STORE_NOT_CONFIGURED" };
+  try {
+    const response = await supabaseAdminRequest(config, `/rest/v1/foundation_oauth_connections?oauth_connection_id=eq.${input.oauthConnectionId}&workspace_key=eq.${input.workspaceKey}&status=neq.revoked`, {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({
+        status: "active",
+        cursor_sha256: input.cursorSha256,
+        last_sync_at: new Date().toISOString(),
+        last_error_code: null,
+        updated_by: input.userId,
+        updated_at: new Date().toISOString(),
+      }),
+    });
+    const rows = await response.json().catch(() => []) as Array<Record<string, unknown>>;
+    if (!response.ok || rows.length !== 1) return { ok: false as const, code: "OAUTH_CONNECTION_SYNC_WRITE_FAILED" };
+    if (!await insertOAuthAudit(input.workspaceKey, input.userId, "oauth_connection_synced", input.oauthConnectionId, {
+      scanned: input.scanned,
+      imported: input.imported,
+      cursorSha256: input.cursorSha256,
+    })) return { ok: false as const, code: "DEVELOPER_AUDIT_WRITE_FAILED" };
+    return { ok: true as const };
+  } catch {
+    return { ok: false as const, code: "OAUTH_CONNECTION_SYNC_WRITE_FAILED" };
   }
 }

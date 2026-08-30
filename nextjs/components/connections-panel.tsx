@@ -207,6 +207,32 @@ export default function ConnectionsPanel() {
     }
   };
 
+  const syncOAuth = async (connection: OAuthConnection, maxImports: 0 | 1) => {
+    setBusy(true);
+    try {
+      const token = await sessionToken();
+      if (!token) {
+        setNotice("Session expired. Sign in again before scanning a source.");
+        return;
+      }
+      setNotice(maxImports === 0 ? `Scanning ${connection.displayName} metadata.` : `Scanning ${connection.displayName} and importing one qualified file.`);
+      const response = await fetch(`/api/v1/oauth-connectors/connections/${connection.oauthConnectionId}/sync`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+        body: JSON.stringify({ maxImports }),
+      });
+      const json = await response.json().catch(() => ({})) as { code?: string; scanned?: number; imported?: Array<{ documentId: string }> };
+      if (!response.ok || typeof json.scanned !== "number" || !Array.isArray(json.imported)) {
+        setNotice(`Source scan failed (${json.code ?? response.status}).`);
+        return;
+      }
+      setNotice(`${connection.displayName}: ${json.scanned} item(s) scanned, ${json.imported.length} qualified file(s) placed in quarantine.`);
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <section className="connection-studio" aria-labelledby="connections-title">
       <header className="studio-heading">
@@ -272,6 +298,8 @@ export default function ConnectionsPanel() {
                 <small>{connection.lastSyncAt ? `Last durable sync ${new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(connection.lastSyncAt))}` : "Connected; awaiting first source scan"}</small>
                 <small>{connection.cursorSha256 ?? "No cursor committed"}</small>
                 {connection.lastErrorCode ? <small className="connection-error">{connection.lastErrorCode}</small> : null}
+                <button type="button" disabled={busy} onClick={() => void syncOAuth(connection, 0)}>Scan metadata</button>
+                <button type="button" disabled={busy} onClick={() => void syncOAuth(connection, 1)}>Scan &amp; import 1 file · 2 GPU credits</button>
               </div>
               <button type="button" className="icon-action" disabled={busy} onClick={() => void revokeOAuth(connection)} aria-label={`Revoke ${connection.displayName}`}><Trash2 size={15} /></button>
             </article>
