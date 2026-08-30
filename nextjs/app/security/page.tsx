@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Logomark from "@/components/logomark";
 import { BOUNDARY } from "@/lib/evidence-record";
+import { activationPolicy } from "@/lib/activation-policy";
 
 export const metadata: Metadata = {
   title: "Where your documents go — TAVONEL",
   description:
-    "The path a document takes through TAVONEL, what holds its bytes, what never sees them, and which capabilities are switched off in this deployment.",
+    "The path a document takes through TAVONEL, what holds its bytes, what never sees them, and the current capability controls.",
 };
 
 /**
@@ -23,13 +24,12 @@ export const metadata: Metadata = {
  * and which capabilities are switched off right now.
  */
 
-/** What this deployment deliberately does not do yet. Stated as flatly as it is enforced. */
-const INACTIVE = [
-  "Accept customer document bytes",
-  "Call antivirus, content-disarm, OCR or GPU providers",
-  "Dispatch GPU work",
-  "Promote a candidate knowledge graph into a live world",
-] as const;
+const CAPABILITY_LABELS = {
+  customerIntake: "Customer document intake",
+  cdr: "Content disarm and reconstruction",
+  ocrGpu: "GPU OCR candidate processing",
+  candidatePromotion: "Candidate promotion into a live world",
+} as const;
 
 const PATH = [
   ["The browser", "Holds a short-lived, narrowly scoped upload capability, issued only after the server has checked who you are, what you are entitled to, and what quota is left. It never holds a service key, a webhook secret, storage credentials or a signing credential."],
@@ -96,15 +96,20 @@ export default function SecurityPage() {
                   browser may hold a provider&rsquo;s own publishable token and nothing else.
                 </p>
 
-                <p className="slate"><span />SWITCHED OFF IN THIS DEPLOYMENT</p>
-                <ul className="offlist">
-                  {INACTIVE.map((item) => <li key={item}>{item}</li>)}
-                </ul>
+                <p className="slate"><span />CURRENT DEPLOYMENT CONTROLS</p>
+                <div className="status-list">
+                  {Object.entries(activationPolicy).map(([key, value]) => (
+                    <article key={key} data-state={value.enabled ? "operational" : "restricted"}>
+                      <span>{value.enabled ? "enabled" : "human gate"}</span>
+                      <h3>{CAPABILITY_LABELS[key as keyof typeof CAPABILITY_LABELS]}</h3>
+                      <p>{value.reason}</p>
+                    </article>
+                  ))}
+                </div>
                 <p className="fine">
-                  These are not missing features we forgot to mention. Each one stays closed until
-                  its provider is qualified in a sandbox and separately approved, and the access
-                  section of the front page reports live which controls are open right now rather
-                  than repeating this list from memory.
+                  Intake, content disarm and GPU OCR opened only after the recorded 2026-08-29
+                  full-sequence qualification. Promotion remains closed by design: a candidate
+                  becomes active only after an authenticated human approval.
                 </p>
 
                 <div className="actions">
@@ -122,8 +127,7 @@ export default function SecurityPage() {
           <span className="wordmark"><Logomark /><b>TAVONEL</b></span>
           <p className="fine">
             Nothing on this page is a demonstration, an audit result or a compliance claim. It
-            describes the architecture this deployment enforces and the capabilities it keeps
-            closed.
+            describes the architecture and current controls this deployment enforces.
           </p>
         </div>
       </footer>
