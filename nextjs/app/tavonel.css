@@ -550,6 +550,35 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
   border-radius: 3px;
   padding: 4px 9px;
   background: rgba(14, 16, 17, 0.7);
+  /*
+    A permanent, tiny tilt, set per chip from its index in the markup.
+    Half a degree either side is enough to stop the row reading as a component and start it
+    reading as a pile; more than about two and a half degrees and the chips begin to fight the
+    grid everything else on the page is built on. The rotation is on a wrapper axis the layout
+    ignores -- a transform does not change the box, so the flex wrap and the container-overflow
+    guard in the e2e suite are unaffected.
+  */
+  transform: rotate(var(--tilt, 0deg));
+  transform-origin: 50% 60%;
+}
+
+/*
+  ...and arrives one at a time, out of the dark.
+  The subject of this row is somebody's drive, and it used to fade in as a single tidy block:
+  twelve filenames appearing together, evenly spaced, perfectly aligned. Now each one drops in
+  on its own beat, slightly further and slightly later than the last, so the row assembles the
+  way a folder listing actually fills. 34ms is the smallest step where twelve items still read
+  as a sequence rather than as one event.
+*/
+.js .debris .frag {
+  opacity: 0;
+  transform: translateY(10px) rotate(0deg);
+}
+.js .debris.in .frag {
+  opacity: 1;
+  transform: rotate(var(--tilt, 0deg));
+  transition: opacity 420ms var(--ease), transform 520ms var(--ease);
+  transition-delay: calc(var(--i, 0) * 34ms);
 }
 
 /* Explicit column counts, never auto-fit: there are exactly six cells, and a track count that
@@ -1476,11 +1505,30 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
   .bar { justify-content: space-between; padding: 0 14px; }
   .bar-ticks { padding: 0; }
   .bar-next { margin-left: 12px; }
+  /*
+    Not in the hero.
+    On a wide screen the bar's control and the hero's own control are a screen apart and offer
+    the same move at two different moments. On a phone they are both on the first screen saying
+    the identical words, which is the four-CTA fold the hero was just cleaned of, reappearing at
+    a narrower width. The bar keeps its control everywhere the hero's is not on screen.
+  */
+  .bar[data-scene="1"] .bar-next { display: none; }
 }
 
 @media (max-width: 520px) {
   .mode { display: none; }
-  .chaos { grid-template-columns: minmax(0, 1fr); }
+  /*
+    Two columns, not one.
+    Six figures stacked in a single column is 423px of numbers -- half a phone screen, arriving
+    as the second thing a first-time visitor sees, with no frame around them yet. It reads as a
+    spreadsheet at exactly the moment the page is meant to be showing rather than tabulating.
+    In two columns the same census is three compact rows, the type comes down to match, and the
+    reader gets past it to the demonstration that explains it.
+  */
+  .chaos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ch { padding: 11px 12px; }
+  .ch-v { font-size: 19px; }
+  .ch-k { font-size: 8.5px; letter-spacing: 0.1em; margin-top: 4px; }
 }
 
 /* Short viewports: a full-height centred hero must not push its own content under the nav. */

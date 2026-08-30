@@ -29,7 +29,7 @@
  */
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import AnswerSwitch from "@/components/answer-switch";
 import ChangeLattice from "@/components/change-lattice";
 import CompilePipeline from "@/components/compile-pipeline";
@@ -147,6 +147,29 @@ export default function HomePage() {
   const progress = useScrollProgress();
   const active = SCENES.find((s) => s.id === scene) ?? SCENES[0];
   const world = BANDS[(band as BandName) in BANDS ? (band as BandName) : "scatter"];
+  /**
+   * The opening move.
+   *
+   * The field had seven states and reached none of them until the reader scrolled into scene 02.
+   * On a wide screen that was survivable -- the graph sits beside the panels and a fresh load
+   * still looks alive. On a phone the panels fill the width, the field is behind them, and the
+   * first two and a half screens of the most watchable thing on this page were completely
+   * still. So the world starts drawing itself as soon as the page is up: scattered on arrival,
+   * then pulled a third of the way in, under the headline, before anyone has scrolled at all.
+   *
+   * `ingest` already existed as a mode and no scene ever used it. It is exactly this state.
+   *
+   * It waits rather than starting at zero because the move has to be seen to begin. A field
+   * that is already drifting when the first frame paints reads as a static texture; one that is
+   * still, and then starts, reads as a machine that just woke up.
+   */
+  const [opened, setOpened] = useState(false);
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const timer = window.setTimeout(() => setOpened(true), 900);
+    return () => window.clearTimeout(timer);
+  }, []);
+  const fieldMode: WorldMode = band === "scatter" && opened ? "ingest" : world.mode;
   const reachedChange = BAND_ORDER.indexOf(band as BandName) >= BAND_ORDER.indexOf("change");
   const capabilities = useMemo(() => readCapabilities(status, statusFailed), [status, statusFailed]);
   /**
@@ -251,7 +274,7 @@ export default function HomePage() {
 
   return (
     <div className="page">
-      <WorldField mode={world.mode} />
+      <WorldField mode={fieldMode} />
 
       <header className="nav" data-stuck={progress > 0.005 ? 1 : 0}>
         <Link href="/" className="wordmark" aria-label="TAVONEL home">
@@ -308,9 +331,16 @@ export default function HomePage() {
               <span className="line"><i>Your knowledge is everywhere.</i></span>
               <span className="line dim"><i>Compile it.</i></span>
             </h1>
+            {/*
+              One sentence, and it no longer lists what the chips underneath already show.
+              "scattered files, documents, cloud drives and repositories" was the debris row in
+              words, printed directly above the debris row. Cutting the list halves this
+              paragraph on a phone and stops the page saying the same thing three times before
+              it has shown anything.
+            */}
             <p className="lede rv">
-              TAVONEL turns scattered files, documents, cloud drives and repositories into
-              structured, <b>AI-ready knowledge</b> &mdash; and keeps it correct as your sources change.
+              TAVONEL turns everything your company has already written into structured,
+              <b> AI-ready knowledge</b> &mdash; and keeps it correct as the sources change.
             </p>
             {/*
               C1 -- who this is for, said as a situation rather than an industry.
@@ -320,8 +350,8 @@ export default function HomePage() {
               it is the fastest way to be believed by the people who do recognise it.
             */}
             <p className="who rv">
-              For teams whose answers live in documents that keep changing — agreements, specs,
-              policies, price lists, procedures. <b>If your files never change, you do not need this.</b>
+              For teams whose answers live in documents that keep changing.
+              <b> If your files never change, you do not need this.</b>
             </p>
             {/*
               A4 -- one verb above the fold. There were four controls in the first screen: two in
@@ -333,8 +363,26 @@ export default function HomePage() {
             <div className="actions rv">
               <button className="btn" type="button" onClick={cta("hero_primary", () => jump(2))}>Watch it compile</button>
             </div>
+            {/*
+              The mess, arriving as one.
+
+              This is the only element on the first screen whose subject is disorder, and it was
+              the tidiest thing on it: an evenly spaced, left-aligned, perfectly wrapped list of
+              filenames, which reads as a set of tags rather than as somebody's drive. Each chip
+              now sits at its own slight angle and arrives on its own beat. The offsets come from
+              the index rather than from a random draw, so the server and the client render the
+              same page and the disorder is the same disorder every time.
+            */}
             <div className="debris rv">
-              {DEBRIS.map((name) => <span className="frag" key={name}>{name}</span>)}
+              {DEBRIS.map((name, index) => (
+                <span
+                  className="frag"
+                  key={name}
+                  style={{ "--i": index, "--tilt": `${(((index * 37) % 11) - 5) * 0.5}deg` } as React.CSSProperties}
+                >
+                  {name}
+                </span>
+              ))}
             </div>
             <div className="chaos rv">
               <Cell value={n(SOURCE_CENSUS.files)} label="Files" />
@@ -641,7 +689,7 @@ export default function HomePage() {
         </div>
       </footer>
 
-      <div className="bar" role="status" aria-live="off">
+      <div className="bar" role="status" aria-live="off" data-scene={scene}>
         <span className="scroll" style={{ width: `${progress * 100}%` }} />
         <span className="bc"><span className="bk">WORLD</span><span className="bv">{world.version}</span></span>
         <span className="bc"><span className="bk">STATE</span><span className="bv state" data-s={world.state.toLowerCase()}>{world.state}</span></span>
@@ -686,10 +734,57 @@ export default function HomePage() {
 
 /* ------------------------------------------------------------------------------ pieces */
 
+/** Long enough to read as a count, short enough that nobody waits for the total. */
+const COUNT_MS = 900;
+
+/**
+ * A census cell that arrives at its number instead of already holding it.
+ *
+ * The six figures under the hero were the second thing a visitor saw and they were a table. A
+ * table is something you read; a number climbing to 37,842 is something you watch, and watching
+ * is what this page is asking for. Nothing about the figure changes -- it is the same declared
+ * fixture, and it lands on exactly the value the server rendered.
+ *
+ * Three things this deliberately does not do. It does not animate a value that is not a number:
+ * "18.4 GB" and the em dash for "no relationships" are printed as they are, because counting a
+ * unit up would be a flourish pretending to be a measurement. It does not run under reduced
+ * motion. And it does not render an empty or zero cell on the server -- the markup ships the
+ * final figure, so a reader with no JavaScript, or a crawler, sees the census complete, and the
+ * ramp is written straight to the node on mount rather than through state.
+ */
 function Cell({ value, label, warn }: { value: string; label: string; warn?: boolean }) {
+  const node = useRef<HTMLSpanElement | null>(null);
+
+  useEffect(() => {
+    const element = node.current;
+    if (!element) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const target = Number(value.replace(/,/g, ""));
+    if (!Number.isFinite(target) || target <= 0 || !/^[\d,]+$/.test(value)) return;
+
+    let frame = 0;
+    const started = performance.now();
+    const step = (now: number) => {
+      // Cubic ease-out: fast enough at the start to read as a burst, slow enough at the end
+      // that the last few hundred are legible rather than a blur settling.
+      const t = Math.min(1, (now - started) / COUNT_MS);
+      const eased = 1 - (1 - t) ** 3;
+      element.textContent = Math.round(target * eased).toLocaleString("en-US");
+      if (t < 1) frame = window.requestAnimationFrame(step);
+    };
+    element.textContent = "0";
+    frame = window.requestAnimationFrame(step);
+    return () => window.cancelAnimationFrame(frame);
+  }, [value]);
+
   return (
     <div className="ch">
-      <span className={warn ? "ch-v warn" : "ch-v"} dangerouslySetInnerHTML={{ __html: value }} />
+      <span
+        ref={node}
+        className={warn ? "ch-v warn" : "ch-v"}
+        dangerouslySetInnerHTML={{ __html: value }}
+      />
       <span className="ch-k">{label}</span>
     </div>
   );
