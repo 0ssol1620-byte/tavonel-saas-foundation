@@ -27,6 +27,7 @@ type Doc = { file: string; form: Form; md: string; lines: Line[] };
 const PERIOD = 1.05;
 const ORIG_LAG = 0;
 const EXT_LAG = 0.22;
+const EXTRACT_SCAN = 0.56;
 
 const FILLER = [
   "Notices may be given by email and are deemed received the next business day.",
@@ -758,10 +759,10 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
       const ey = colY + 30;
       const ew = colW - 16;
       const eh = colH - 38;
-      const scanMax = eh * 0.58;
-      const paperH = 40 + local * (scanMax - 40);
-      drawPage(ex, ey, ew, paperH, ext.lines, 1, true, 0.92, inkE, ext.form, true);
-      drawMd(ex, ey + paperH + 4, ew, eh - paperH - 4, ext.md, local);
+      const scanBox = Math.round(eh * EXTRACT_SCAN);
+      const mdBox = eh - scanBox - 4;
+      drawPage(ex, ey, ew, scanBox, ext.lines, local, false, 0.92, inkE, ext.form, true);
+      drawMd(ex, ey + scanBox + 4, ew, mdBox, ext.md, local);
 
       pane(xs[3], colY, colW, colH, "WORLD", "nodes");
       drawWorld(xs[3] + 6, colY + 30, colW - 12, colH - 38, t);
