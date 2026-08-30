@@ -17,6 +17,16 @@ This record is the implementation and external-gate ledger for the ten P0 operat
 | Security operations | SECURITY.md, CODEOWNERS, CI, CodeQL and Dependabot | Enable branch protection, secret scanning, DNSSEC and reviewed CAA records |
 | Cost controls | Fail-closed billing/runtime gates and readiness reporting | Set Vercel/RunPod/Cloudflare alert thresholds and emergency stop owners |
 
+## Verified external state, 2026-08-30 KST
+
+- Cloudflare DNSSEC was enabled and is pending automatic DS registration at the registrar. Public DS validation must pass before this item is closed.
+- DMARC was changed from monitoring-only to staged enforcement: `p=quarantine; pct=25`, with aggregate reports routed to `security@tavonel.com`. The new TXT value was confirmed through the `1.1.1.1` public resolver.
+- Resend reports `tavonel.com` verified in Tokyo, with DKIM, SPF and sending enabled. Receiving remains off to avoid conflicting with Cloudflare Email Routing.
+- Paddle sandbox reports all four integration stages complete: catalog, pricing/checkout, fulfillment/provisioning and end-to-end testing. Paddle Live is a separate account session and remains gated by live login and account review.
+- RunPod endpoint `cohlugjzf0dk9i` reported zero active workers, maximum workers `1`, idle timeout `5 seconds`, zero current spend rate and one completed recent request. Account MFA remains an external security gate.
+- Supabase project `tfcorhjkqcuisqhsjemz` is on the Free plan. The dashboard explicitly reports no project backups. Pro starts at `$25/month` and includes daily backups retained for seven days. Spend cap is enabled, so usage cannot silently create overage charges.
+- Vercel preview deployment `dpl_Hk9vTi8LVJ529DqGzvPnPZKSCMd4` reached READY. Public legal pages, sitemap and liveness returned HTTP 200; readiness correctly returned 503 because production-only signer/compiler secrets are not copied to Preview.
+
 ## Backup and restore runbook
 
 1. Record Supabase backup type, oldest restorable point and region without copying secrets into this repository.
