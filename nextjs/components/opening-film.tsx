@@ -24,9 +24,9 @@ type Form = "contract" | "scan" | "manual" | "handbook" | "sheet";
 type Line = { kind: Kind; text: string; ocr?: boolean };
 type Doc = { file: string; form: Form; md: string; lines: Line[] };
 
-const PERIOD = 3.2;
+const PERIOD = 1.05;
 const ORIG_LAG = 0;
-const EXT_LAG = 1.7;
+const EXT_LAG = 0.22;
 
 const FILLER = [
   "Notices may be given by email and are deemed received the next business day.",
@@ -225,6 +225,18 @@ const DRIVE_FILES = [
   "contract_scan_2.pdf",
   "SOW_alpha.docx",
   "SOW_beta.docx",
+  "change_order_03.pdf",
+  "PO_4418.pdf",
+  "warehouse_B_photos",
+  "legal_hold_index.csv",
+  "policy_archive.zip",
+  "minutes_Apr.pdf",
+  "capex_Q3.xlsx",
+  "vendor_NDA_C.pdf",
+  "access_log.csv",
+  "scan_0141.pdf",
+  "scan_0142.pdf",
+  "handbook_addendum.pdf",
 ];
 
 function roundRect(
@@ -366,7 +378,11 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
     };
 
     const drawDrive = (x: number, y: number, w: number, h: number, t: number, active: string) => {
-      pane(x, y, w, h, "DRIVE  ·  Acme", `${Math.min(DRIVE_FILES.length, 1 + Math.floor(t / 0.32))} files`, true);
+      const rowH = 18;
+      const listTop = y + 42;
+      const maxRows = Math.max(8, Math.floor((h - 52) / rowH));
+      const live = Math.min(DRIVE_FILES.length, 6 + Math.floor(t / 0.14));
+      pane(x, y, w, h, "DRIVE  ·  Acme", `${live} files`, true);
       const rail = 64;
       context.fillStyle = "#ddd8ce";
       context.fillRect(x, y + 26, rail, h - 26);
@@ -375,18 +391,11 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
         context.font = "500 10px Wanted Sans Variable, system-ui, sans-serif";
         context.fillText(label, x + 8, y + 46 + i * 18);
       });
-      const shown = Math.min(DRIVE_FILES.length, 12 + Math.floor(t / 0.26));
-      const rowH = 20;
-      const listTop = y + 44;
-      const maxRows = Math.floor((h - 56) / rowH);
-      const start = Math.max(0, shown - maxRows);
-      DRIVE_FILES.forEach((name, i) => {
-        if (i >= shown) return;
-        const vis = i - start;
-        if (vis < 0 || vis >= maxRows) return;
+      const start = Math.floor(t / 0.16);
+      for (let vis = 0; vis < maxRows; vis += 1) {
+        const i = start + vis;
+        const name = DRIVE_FILES[i % DRIVE_FILES.length];
         const iy = listTop + vis * rowH;
-        const enter = i < 12 ? 1 : through(t, (i - 12) * 0.26, (i - 12) * 0.26 + 0.2);
-        context.globalAlpha = enter;
         if (name === active) {
           context.fillStyle = "rgba(40,140,110,0.16)";
           context.fillRect(x + rail, iy - 12, w - rail, 18);
@@ -397,8 +406,7 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
         context.fillStyle = "#2a2622";
         context.font = "500 11px Wanted Sans Variable, system-ui, sans-serif";
         context.fillText(name.length > 22 ? `${name.slice(0, 20)}…` : name, x + rail + 20, iy);
-        context.globalAlpha = 1;
-      });
+      }
     };
 
     const TABLES: Record<Form, string[][]> = {
@@ -562,63 +570,66 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
     ) => {
       context.save();
       roundRect(context, x, y, w, h, 2);
-      context.fillStyle = "#f7f2e8";
+      context.fillStyle = lockAll ? "#f7f2e8" : "#101214";
       context.fill();
       context.beginPath();
       roundRect(context, x, y, w, h, 2);
       context.clip();
-      if (paper) {
-        context.globalAlpha = 0.26;
-        context.drawImage(paper, x, y, w, h);
-        context.globalAlpha = 1;
-      }
       const mx = x + w * 0.055;
       const maxW = w * 0.89;
       const scanY = y + lerp(8, h - 8, scan);
-      const paint = (alpha: number) => {
-        let ty = y + 14 * scale;
-        lines.forEach((line, lineIndex) => {
-          const size = (line.kind === "title" ? 15 : line.kind === "h" ? 11 : line.kind === "letter" ? 7.5 : 10.5) * scale;
-          context.font = face(line.kind, size);
-          const rows = line.kind === "p" || line.kind === "sign" ? wrap(context, line.text, maxW) : [line.text];
-          rows.forEach((row) => {
-            context.globalAlpha = alpha;
-            context.fillStyle = line.kind === "title" || line.kind === "h" ? ink : "#322e28";
-            context.fillText(row, mx, ty);
-            context.globalAlpha = 1;
-            ty += size * 1.28;
-          });
-          if (matter && TABLES[form].length && lineIndex === 2) ty = drawTable(mx, ty, maxW, alpha, scale, TABLES[form]);
-          if (matter && form === "contract" && lineIndex === 4) ty = drawFigure(mx, ty, maxW, alpha, scale);
-          if (matter && form === "scan" && lineIndex === 1) ty = drawScanPhoto(mx, ty, maxW, alpha, scale);
-          if (matter && form === "sheet" && lineIndex === 2) ty = drawSheet(mx, ty, maxW, alpha, scale);
-        });
-        if (matter && form === "contract") drawStamp(x + w - 78 * scale, y + 18 * scale, alpha, scale);
-        if (!matter) return;
-        let f = 0;
-        context.font = face("p", 10.5 * scale);
-        context.fillStyle = "#322e28";
-        while (ty < y + h - 16 && f < FILLER.length * 3) {
-          const row = FILLER[f % FILLER.length];
-          context.globalAlpha = alpha * 0.92;
-          wrap(context, row, maxW).forEach((part) => {
-            if (ty >= y + h - 16) return;
-            context.fillText(part, mx, ty);
-            ty += 10.5 * scale * 1.28;
-          });
-          context.globalAlpha = 1;
-          f += 1;
-        }
-      };
-      if (lockAll) {
-        paint(1);
-      } else {
+      const paperH = lockAll ? h : Math.max(0, scanY - y);
+      if (paperH > 2) {
         context.save();
         context.beginPath();
-        context.rect(x, y, w, Math.max(0, scanY - y));
+        context.rect(x, y, w, paperH);
         context.clip();
+        context.fillStyle = "#f7f2e8";
+        context.fillRect(x, y, w, paperH);
+        if (paper) {
+          context.globalAlpha = 0.26;
+          context.drawImage(paper, x, y, w, h);
+          context.globalAlpha = 1;
+        }
+        const paint = (alpha: number) => {
+          let ty = y + 14 * scale;
+          lines.forEach((line, lineIndex) => {
+            const size = (line.kind === "title" ? 15 : line.kind === "h" ? 11 : line.kind === "letter" ? 7.5 : 10.5) * scale;
+            context.font = face(line.kind, size);
+            const rows = line.kind === "p" || line.kind === "sign" ? wrap(context, line.text, maxW) : [line.text];
+            rows.forEach((row) => {
+              context.globalAlpha = alpha;
+              context.fillStyle = line.kind === "title" || line.kind === "h" ? ink : "#322e28";
+              context.fillText(row, mx, ty);
+              context.globalAlpha = 1;
+              ty += size * 1.28;
+            });
+            if (matter && TABLES[form].length && lineIndex === 2) ty = drawTable(mx, ty, maxW, alpha, scale, TABLES[form]);
+            if (matter && form === "contract" && lineIndex === 4) ty = drawFigure(mx, ty, maxW, alpha, scale);
+            if (matter && form === "scan" && lineIndex === 1) ty = drawScanPhoto(mx, ty, maxW, alpha, scale);
+            if (matter && form === "sheet" && lineIndex === 2) ty = drawSheet(mx, ty, maxW, alpha, scale);
+          });
+          if (matter && form === "contract") drawStamp(x + w - 78 * scale, y + 18 * scale, alpha, scale);
+          if (!matter) return;
+          let f = 0;
+          context.font = face("p", 10.5 * scale);
+          context.fillStyle = "#322e28";
+          while (ty < y + h - 16 && f < FILLER.length * 3) {
+            const row = FILLER[f % FILLER.length];
+            context.globalAlpha = alpha * 0.92;
+            wrap(context, row, maxW).forEach((part) => {
+              if (ty >= y + h - 16) return;
+              context.fillText(part, mx, ty);
+              ty += 10.5 * scale * 1.28;
+            });
+            context.globalAlpha = 1;
+            f += 1;
+          }
+        };
         paint(1);
         context.restore();
+      }
+      if (!lockAll && scan > 0.02 && scan < 0.98) {
         context.fillStyle = "rgba(255,236,180,0.55)";
         context.fillRect(x, scanY - 2, w, 4);
         context.fillStyle = "rgba(255,252,240,0.9)";
@@ -633,9 +644,10 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
       context.fillStyle = "rgba(123,224,190,0.85)";
       context.font = "500 8px ui-monospace, Menlo, monospace";
       context.fillText("WORKING COPY.md", x + 8, y + 12);
-      const typed = Math.min(1, Math.max(0.12, local));
-      const count = Math.max(1, Math.floor(typed * md.length));
-      const caret = typed < 0.98 && Math.floor(typed * 20) % 2 === 0 ? "▌" : "";
+      const typed = clamp01(local);
+      const count = Math.floor(typed * md.length);
+      if (count <= 0) return;
+      const caret = typed < 0.98 && Math.floor(typed * 24) % 2 === 0 ? "▌" : "";
       context.font = "400 9px ui-monospace, Menlo, monospace";
       const maxW = w - 16;
       const lines: string[] = [];
@@ -643,17 +655,7 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
         wrap(context, row.length ? row : " ", maxW).forEach((part) => lines.push(part));
       });
       const rowH = 11;
-      const maxRows = Math.max(6, Math.floor((h - 20) / rowH));
-      if (lines.length) {
-        let i = 0;
-        while (lines.length < maxRows) {
-          const extra = lines[i % Math.max(1, Math.min(lines.length, 8))];
-          if (!extra || extra === "▌") break;
-          lines.push(extra);
-          i += 1;
-          if (i > 80) break;
-        }
-      }
+      const maxRows = Math.max(4, Math.floor((h - 20) / rowH));
       lines.slice(0, maxRows).forEach((row, i) => {
         context.fillStyle = row.startsWith("#")
           ? "#edeae4"
@@ -677,12 +679,7 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
       const gw = w - 12;
       const gh = h - 28;
       const nNodes = g.nodes.length;
-      const born = (i: number) => {
-        const n = Math.max(1, nNodes);
-        const early = Math.floor(n * 0.16);
-        if (i < early) return 1.2 + (i / Math.max(1, early)) * 4.2;
-        return 5.5 + ((i - early) / Math.max(1, n - early)) * 7.5;
-      };
+      const born = (i: number) => (i / Math.max(1, nNodes)) * 16.2;
       const front = t < ACT.change ? -1 : through(t, ACT.change, ACT.end) * 3.4;
 
       g.nodes.forEach((node, i) => {
@@ -740,20 +737,18 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
       const local = (Math.max(0, t - EXT_LAG) % PERIOD) / PERIOD;
       const inkO = INK[origI];
       const inkE = INK[extI];
-      const flip = 1 - through(t, ORIG_LAG + origI * PERIOD, ORIG_LAG + origI * PERIOD + 0.28);
 
       drawDrive(xs[0], colY, colW, colH, t, orig.file);
 
       pane(xs[1], colY, colW, colH, "ORIGINAL", `${origI + 1}/${DOCS.length}`);
-      context.save();
-      context.translate(lerp(22, 0, 1 - flip), 0);
       drawPage(xs[1] + 8, colY + 30, colW - 16, colH - 38, orig.lines, 1, true, 1.02, inkO, orig.form, true);
-      context.restore();
 
       pane(xs[2], colY, colW, colH, "EXTRACT", `SCAN ${extI + 1}/${DOCS.length}`);
-      const topH = colH * 0.34;
-      drawPage(xs[2] + 8, colY + 30, colW - 16, topH - 8, ext.lines, local, false, 0.92, inkE, ext.form, false);
-      drawMd(xs[2] + 8, colY + 26 + topH, colW - 16, colH - topH - 34, ext.md, Math.min(1, 0.28 + local * 1.9));
+      const scanH = 32 + local * (colH * 0.48);
+      drawPage(xs[2] + 8, colY + 30, colW - 16, scanH, ext.lines, 1, true, 0.92, inkE, ext.form, false);
+      const mdY = colY + 34 + scanH;
+      const mdH = Math.max(48, colY + colH - mdY - 10);
+      drawMd(xs[2] + 8, mdY, colW - 16, mdH, ext.md, local);
 
       pane(xs[3], colY, colW, colH, "WORLD", "nodes");
       drawWorld(xs[3] + 6, colY + 30, colW - 12, colH - 38, t);
