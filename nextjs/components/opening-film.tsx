@@ -570,7 +570,7 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
     ) => {
       context.save();
       roundRect(context, x, y, w, h, 2);
-      context.fillStyle = lockAll ? "#f7f2e8" : "#101214";
+      context.fillStyle = lockAll ? "#f7f2e8" : "#1a1614";
       context.fill();
       context.beginPath();
       roundRect(context, x, y, w, h, 2);
@@ -644,18 +644,28 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
       context.fillStyle = "rgba(123,224,190,0.85)";
       context.font = "500 8px ui-monospace, Menlo, monospace";
       context.fillText("WORKING COPY.md", x + 8, y + 12);
+      const rowH = 11;
+      const maxRows = Math.max(4, Math.floor((h - 20) / rowH));
+      const gutter = 22;
+      context.fillStyle = "#121416";
+      context.fillRect(x, y + 16, gutter, h - 16);
+      for (let i = 0; i < maxRows; i += 1) {
+        context.fillStyle = "#1a1e22";
+        context.fillRect(x + gutter, y + 16 + i * rowH, w - gutter, 1);
+        context.fillStyle = "#3a4248";
+        context.font = "400 8px ui-monospace, Menlo, monospace";
+        context.fillText(String(i + 1), x + 4, y + 24 + i * rowH);
+      }
       const typed = clamp01(local);
       const count = Math.floor(typed * md.length);
       if (count <= 0) return;
       const caret = typed < 0.98 && Math.floor(typed * 24) % 2 === 0 ? "▌" : "";
       context.font = "400 9px ui-monospace, Menlo, monospace";
-      const maxW = w - 16;
+      const maxW = w - gutter - 10;
       const lines: string[] = [];
       (md.slice(0, count) + caret).split("\n").forEach((row) => {
         wrap(context, row.length ? row : " ", maxW).forEach((part) => lines.push(part));
       });
-      const rowH = 11;
-      const maxRows = Math.max(4, Math.floor((h - 20) / rowH));
       lines.slice(0, maxRows).forEach((row, i) => {
         context.fillStyle = row.startsWith("#")
           ? "#edeae4"
@@ -664,7 +674,7 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
             : row.startsWith(">") || row.startsWith("source") || row.startsWith("path")
               ? "#7d878d"
               : "#c8ced2";
-        context.fillText(row, x + 8, y + 24 + i * rowH);
+        context.fillText(row, x + gutter + 6, y + 24 + i * rowH);
       });
     };
 
@@ -744,11 +754,14 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
       drawPage(xs[1] + 8, colY + 30, colW - 16, colH - 38, orig.lines, 1, true, 1.02, inkO, orig.form, true);
 
       pane(xs[2], colY, colW, colH, "EXTRACT", `SCAN ${extI + 1}/${DOCS.length}`);
-      const scanH = 32 + local * (colH * 0.48);
-      drawPage(xs[2] + 8, colY + 30, colW - 16, scanH, ext.lines, 1, true, 0.92, inkE, ext.form, false);
-      const mdY = colY + 34 + scanH;
-      const mdH = Math.max(48, colY + colH - mdY - 10);
-      drawMd(xs[2] + 8, mdY, colW - 16, mdH, ext.md, local);
+      const ex = xs[2] + 8;
+      const ey = colY + 30;
+      const ew = colW - 16;
+      const eh = colH - 38;
+      const scanMax = eh * 0.58;
+      const paperH = 40 + local * (scanMax - 40);
+      drawPage(ex, ey, ew, paperH, ext.lines, 1, true, 0.92, inkE, ext.form, true);
+      drawMd(ex, ey + paperH + 4, ew, eh - paperH - 4, ext.md, local);
 
       pane(xs[3], colY, colW, colH, "WORLD", "nodes");
       drawWorld(xs[3] + 6, colY + 30, colW - 12, colH - 38, t);
