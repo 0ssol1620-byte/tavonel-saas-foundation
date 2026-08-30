@@ -19,7 +19,21 @@ async function readRows(path: string) {
   const config = readSupabaseAdminConfig();
   if (!config) return null;
   const response = await supabaseAdminRequest(config, path);
-  if (!response.ok) return null;
+  if (!response.ok) {
+    let code = "UNKNOWN";
+    try {
+      const body = await response.json() as { code?: unknown };
+      if (typeof body.code === "string" && /^[A-Z0-9_]{2,32}$/i.test(body.code)) code = body.code;
+    } catch {
+      // The status and bounded route name are sufficient when the body is not JSON.
+    }
+    console.error("enterprise_store_read_failed", {
+      route: path.split("?")[0],
+      status: response.status,
+      code,
+    });
+    return null;
+  }
   return await response.json() as Array<Record<string, unknown>>;
 }
 
