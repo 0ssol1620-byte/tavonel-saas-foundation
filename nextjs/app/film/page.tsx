@@ -7,7 +7,7 @@ import OpeningFilm from "@/components/opening-film";
 export const metadata: Metadata = {
   title: "Sixteen seconds — TAVONEL",
   description:
-    "The whole argument, drawn rather than recorded: scattered files pulled into one world, a change travelling only as far as it actually reaches, and the one fact that was held back for a person.",
+    "A staged compile: mess, read, resolve, world, evidence, a change that does not consume the graph. Drawn, not recorded.",
 };
 
 /**
@@ -16,6 +16,10 @@ export const metadata: Metadata = {
  * The landing page makes this case across five scenes and a scroll, which is right for someone
  * who has already decided to spend a minute and useless for someone deciding whether to spend
  * ten seconds. This page is the version that can be opened, watched and sent.
+ *
+ * The cut is documents, not a particle field: mess → one page read → one world → a change
+ * that does not consume the graph → one held fact. Pause and Skip are on screen because the
+ * cut is longer than five seconds.
  *
  * It is not embedded above the front page and is not meant to be. A sequence that plays before
  * the content gates the content, and the first screen is where readers are already thinnest --

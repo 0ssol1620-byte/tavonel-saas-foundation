@@ -18,17 +18,8 @@ const mono = IBM_Plex_Mono({
 });
 
 /**
- * G2 -- named by the problem, not by the product.
- *
- * Nobody searches for "knowledge compiler". It is a category that does not exist yet, so a title
- * built out of it is findable only by people who already know the name -- which is nobody. The
- * words that survive are the ones a person in trouble would actually type: a document changed,
- * and the answers that came from it are now wrong.
- *
- * The product name stays, because a title has to identify who is speaking, but it no longer
- * carries the whole burden of being recognised. This costs nothing today -- robots.ts still
- * disallows everything, deliberately, for a private pilot -- and it is the only part of being
- * found that can be got right before the index is opened.
+ * Category title. The document-change question is a campaign line, not the product name.
+ * robots.ts still disallows the index for the private pilot.
  */
 export const metadata: Metadata = {
   /*
@@ -40,15 +31,16 @@ export const metadata: Metadata = {
     www.tavonel.com already 308s to it.
   */
   metadataBase: new URL("https://tavonel.com"),
-  title: "When a document changes, what else is now wrong? — TAVONEL",
+  title: "Knowledge Compiler for AI — TAVONEL",
   description:
-    "TAVONEL compiles your files into structured, AI-ready knowledge and keeps it correct as the sources change: it rebuilds only what a change actually reached, holds what has two readings, and returns every answer to the line it came from.",
+    "Compile documents, scans, code and connected systems into source-grounded, AI-ready knowledge with structured relationships, provenance and reusable retrieval artifacts.",
   alternates: {
     canonical: "/",
   },
   openGraph: {
-    title: "When a document changes, what else is now wrong?",
-    description: "Watch scattered files become one current world — and watch it stay current.",
+    title: "Your knowledge already exists. Compile it.",
+    description:
+      "TAVONEL compiles documents, scans, code and connected systems into a source-grounded world AI can reason about.",
     type: "website",
     url: "/",
   },
@@ -77,6 +69,35 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           of it on every page. Visually hidden until focused, and then a real, visible control.
         */}
         <a className="skip" href="#main">Skip to content</a>
+        {/*
+          Organization + SoftwareApplication only. No availability, offer, or
+          aggregateRating — this deployment is a private pilot, not a GA claim.
+        */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@graph": [
+                {
+                  "@type": "Organization",
+                  name: "TAVONEL",
+                  url: "https://tavonel.com",
+                  description:
+                    "Compile documents, scans, code and connected systems into source-grounded knowledge.",
+                },
+                {
+                  "@type": "SoftwareApplication",
+                  name: "TAVONEL",
+                  url: "https://tavonel.com",
+                  applicationCategory: "Knowledge Compiler",
+                  description:
+                    "Compile documents, scans, code and connected systems into source-grounded knowledge.",
+                },
+              ],
+            }),
+          }}
+        />
         <RouteBoot />
         {children}
         {/*

@@ -32,7 +32,7 @@ const UNCERTAIN_BELOW = 0.75;
 const LINE_STEP_MS = 24;
 const LINE_STEP_CAP = 14;
 
-export default function ReadingView({ progress }: { progress: OcrProgress }) {
+export default function ReadingView({ progress, facsimile = false }: { progress: OcrProgress; facsimile?: boolean }) {
   const page = currentPage(progress);
   const fraction = readFraction(progress);
   const lines = useRef<HTMLOListElement | null>(null);
@@ -72,6 +72,24 @@ export default function ReadingView({ progress }: { progress: OcrProgress }) {
           </figcaption>
           <div className="reading-sheet">
             <div className="reading-page">
+            {facsimile ? (
+              <div className="reading-facsimile" aria-hidden="true">
+                <p className="rf-title">SERVICES AGREEMENT 2026</p>
+                <p className="rf-h">§3.2  Payment terms</p>
+                <table className="rf-table">
+                  <thead><tr><th>Item</th><th>Qty</th><th>Amount</th></tr></thead>
+                  <tbody>
+                    <tr><td>Survey</td><td>1</td><td>£4,200</td></tr>
+                    <tr><td>Line 4 OT</td><td>12</td><td>£1,860</td></tr>
+                  </tbody>
+                </table>
+                <div className="rf-fig">
+                  <i /><i />
+                  <span>Fig. 2 Bay layout</span>
+                </div>
+                <span className="rf-stamp">RECEIVED</span>
+              </div>
+            ) : null}
               {page?.boxes.map((box, index) => {
                 const [x0, y0, x1, y1] = box.bbox1000;
                 return (

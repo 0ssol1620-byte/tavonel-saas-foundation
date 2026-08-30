@@ -54,11 +54,12 @@ export default function ReadingDemo({ active }: { active: boolean }) {
     <div className="panel rv">
       <div className="panel-head">
         <span>reading {CHANGE.document}</span>
+        <span className="right">TITLE · PARAGRAPH · TABLE · STAMP · FOOTNOTE</span>
         <button className="mini" onClick={play} type="button">
           Run again
         </button>
       </div>
-      <ReadingView progress={demoProgress(revealed)} />
+      <ReadingView progress={demoProgress(revealed)} facsimile />
     </div>
   );
 }

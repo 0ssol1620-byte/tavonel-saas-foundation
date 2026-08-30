@@ -7,8 +7,10 @@
  * An earlier version of this page bought its change of scale with a stock photograph. On a page
  * whose whole argument is that every claim traces back to real evidence, a stock-library credit
  * line is the one element a reader is right to discount. This draws the same composition -- a
- * regular grid, almost entirely dark, a scattered few lit -- except the lit cells are the
- * actual figures the console prints two scenes later.
+ * regular grid, almost entirely dark, a scattered few lit -- origins in amber, a sparse wave of
+ * dependents in verified green, one held cell, and the rest untouched. Eighteen affected cells,
+ * not the full `CHANGE.affected` count: thirty-nine would start to fill, and the argument is
+ * that the wave is sparse.
  */
 
 import { useEffect, useRef } from "react";
@@ -21,6 +23,10 @@ const TOTAL = COLS * ROWS; // 1,240 -- one per fact in the contract
 /** Fixed positions, so the marked cells sit where they were composed to sit. */
 const CHANGED = [247, 613, 1102];
 const HELD = [884];
+/** Dependents of the three origins -- clustered near them, plus a few satellites. */
+const AFFECTED = [
+  184, 185, 246, 308, 401, 550, 551, 552, 612, 675, 676, 720, 965, 1039, 1040, 1101, 1163, 1164,
+];
 
 export default function ChangeLattice() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -56,7 +62,12 @@ export default function ChangeLattice() {
         const y = originY + Math.floor(i / COLS) * pitch + (pitch - size) / 2;
         if (CHANGED.includes(i)) context.fillStyle = "rgba(242,166,90,0.95)";
         else if (HELD.includes(i)) context.fillStyle = "rgba(110,147,184,0.95)";
-        else context.fillStyle = "rgba(105,114,120,0.13)";
+        else if (AFFECTED.includes(i)) {
+          // Same verified green, three alphas, so the wave reads as a family rather than a stamp.
+          const wave = AFFECTED.indexOf(i) % 3;
+          context.fillStyle =
+            wave === 0 ? "rgba(123,224,190,0.92)" : wave === 1 ? "rgba(123,224,190,0.68)" : "rgba(123,224,190,0.48)";
+        } else context.fillStyle = "rgba(105,114,120,0.13)";
         context.fillRect(x, y, size, size);
       }
     };
@@ -80,13 +91,17 @@ export default function ChangeLattice() {
           and most of it doesn&rsquo;t.
         </p>
         <p className="interlude-sub">
+          The wave reaches only what depended on the change
+          <span className="sep">&middot;</span>
           {CHANGE.documentFacts.toLocaleString("en-US")} facts in one contract
           <span className="sep">&middot;</span>
           <b data-tone="changed">{CHANGE.changed} moved</b>
           <span className="sep">&middot;</span>
+          <b data-tone="verified">dependents reached</b>
+          <span className="sep">&middot;</span>
           <b data-tone="held">{CHANGE.held} held</b>
           <span className="sep">&middot;</span>
-          {(CHANGE.documentFacts - CHANGE.changed - CHANGE.held).toLocaleString("en-US")} untouched
+          rest untouched
         </p>
       </div>
     </div>

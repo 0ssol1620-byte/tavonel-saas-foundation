@@ -15,7 +15,7 @@ import { SOURCE_CENSUS, WORLD, n } from "@/lib/demo-world";
 const PASSES: { id: string; name: string; items: [string, string][] }[] = [
   {
     id: "01",
-    name: "Reading",
+    name: "READ",
     items: [
       ["files", n(SOURCE_CENSUS.files)],
       ["archives unpacked", n(SOURCE_CENSUS.archivesUnpacked)],
@@ -24,7 +24,7 @@ const PASSES: { id: string; name: string; items: [string, string][] }[] = [
   },
   {
     id: "02",
-    name: "Recognizing",
+    name: "RECONSTRUCT",
     items: [
       ["tables", "41,208"],
       ["headings", "96,441"],
@@ -34,7 +34,7 @@ const PASSES: { id: string; name: string; items: [string, string][] }[] = [
   },
   {
     id: "03",
-    name: "Resolving",
+    name: "RESOLVE",
     items: [
       ["near-duplicates merged", n(SOURCE_CENSUS.nearDuplicates)],
       ["competing versions", n(SOURCE_CENSUS.competingVersions)],
@@ -43,7 +43,7 @@ const PASSES: { id: string; name: string; items: [string, string][] }[] = [
   },
   {
     id: "04",
-    name: "Structuring",
+    name: "MODEL",
     items: [
       ["facts", n(WORLD.facts)],
       ["entities", n(WORLD.entities)],
@@ -53,20 +53,21 @@ const PASSES: { id: string; name: string; items: [string, string][] }[] = [
   },
   {
     id: "05",
-    name: "Organizing",
-    items: [
-      ["areas", "8"],
-      ["taxonomies", n(WORLD.taxonomies)],
-      ["hierarchies", n(WORLD.hierarchies)],
-    ],
-  },
-  {
-    id: "06",
-    name: "Verifying",
+    name: "VERIFY",
     items: [
       ["evidence resolves", n(WORLD.facts)],
       ["unsupported claims dropped", "0"],
       ["checks", `${WORLD.checksPassed} / ${WORLD.checksTotal}`],
+    ],
+  },
+  {
+    id: "06",
+    name: "COMPILE",
+    items: [
+      ["ontology", "JSON-LD / Turtle"],
+      ["graph", "CSV"],
+      ["retrieval", "package"],
+      ["provenance", "package"],
     ],
   },
 ];

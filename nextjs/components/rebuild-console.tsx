@@ -74,6 +74,7 @@ export default function RebuildConsole({ active }: { active: boolean }) {
           Run again
         </button>
       </div>
+      <p className="panel-hierarchy">REBUILT · PRESERVED · HELD</p>
       <div className="log" role="log" aria-live="polite">
         {LINES.slice(0, shown).map(([time, tone, text], index) => (
           <p key={index} className={tone}>
@@ -107,6 +108,10 @@ export default function RebuildConsole({ active }: { active: boolean }) {
           </span>
         </div>
       </div>
+      <p className="panel-note">
+        <b>Direction</b>
+        Selective recompilation is a research direction on declared fixture data.
+      </p>
     </div>
   );
 }

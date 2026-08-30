@@ -138,6 +138,32 @@ export default function WorldField({ mode }: { mode: WorldMode }) {
         }
       }
 
+      /* Evidence tether: one origin fact keeps a visible path back through the wavefront. */
+      if (current.form > 0.8 && current.labels > 0.2) {
+        const origin = graph.nodes.findIndex((node) => node.depth === 0 && node.state === "changed");
+        if (origin >= 0) {
+          const hops: number[] = [origin];
+          for (const [a, b] of graph.edges) {
+            if (hops.length >= 4) break;
+            const last = hops[hops.length - 1];
+            if (a === last && graph.nodes[b].depth >= 0 && !hops.includes(b)) hops.push(b);
+            else if (b === last && graph.nodes[a].depth >= 0 && !hops.includes(a)) hops.push(a);
+          }
+          if (hops.length >= 2) {
+            context.lineWidth = 1.4;
+            context.strokeStyle = `${INK.changed}${(0.45 * current.idle).toFixed(3)})`;
+            context.beginPath();
+            hops.forEach((index, i) => {
+              const p = at(index);
+              if (i === 0) context.moveTo(p.x, p.y);
+              else context.lineTo(p.x, p.y);
+            });
+            context.stroke();
+            context.lineWidth = 1;
+          }
+        }
+      }
+
       for (let i = 0; i < graph.nodes.length; i += 1) {
         const node = graph.nodes[i];
         const point = at(i);

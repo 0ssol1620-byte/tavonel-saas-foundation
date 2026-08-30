@@ -1,123 +1,276 @@
 "use client";
 
 /**
- * The whole argument, in sixteen seconds, with nothing to read for the first three.
- *
- * The landing page makes this case across five scenes and a scroll. That works for someone who
- * has decided to spend a minute; it does nothing for someone deciding whether to spend ten
- * seconds, and it cannot be sent to anybody. This is the same case, compressed to the point
- * where it can be watched instead of read.
- *
- * It is drawn, not recorded. Every node, every edge and every count comes from
- * `buildWorldGraph` and `lib/demo-world` -- the same functions the page itself draws from, with
- * the same seed -- so the film cannot drift away from what the product page claims, and it
- * cannot show a cascade the real graph would not produce. A rendered film would be a recording
- * of a thing we once made; this is the thing, running.
- *
- * The wavefront is the reason the film exists. Reading "we rebuild only what the change
- * reached" is a claim. Watching three points light, push outward through four areas, and stop
- * -- with three-quarters of the world visibly untouched behind it -- is the claim demonstrating
- * itself, and it takes about four seconds.
- *
- * Under reduced motion nothing animates: the last frame is painted once, with the final title,
- * which is the honest still of the same argument.
+ * 45s. Four live columns. Camera fits one column at a time (no crop).
+ * Each column keeps flipping to the next document — throughput, not one page.
  */
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AREAS, CHANGE, KEPT, REBUILT, WORLD, n } from "@/lib/demo-world";
-import { buildWorldGraph, type WorldGraph } from "@/lib/world-graph";
+import { CHANGE, SOURCE_CENSUS, WORLD, n } from "@/lib/demo-world";
+import { FILM_ACT as ACT, FILM_CAPTIONS } from "@/lib/film-script";
+import { buildWorldGraph, nodeBudget, type WorldGraph } from "@/lib/world-graph";
 
-/* ------------------------------------------------------------------------- the timeline */
+export { FILM_CAPTIONS, FILM_DURATION } from "@/lib/film-script";
 
-/**
- * Act boundaries in seconds. Deliberately uneven: the compile is allowed to take its time, the
- * cascade is the fastest thing in the film because that is what it is like, and the last act
- * holds longer than it needs to so the final number is still on screen when the film loops.
- */
-const ACTS = {
-  scatterIn: 0,
-  compile: 3.0,
-  world: 6.2,
-  change: 8.6,
-  held: 12.4,
-  end: 16.0,
-} as const;
+const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - ((-2 * t + 2) ** 3) / 2);
+const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
+const through = (time: number, from: number, to: number) =>
+  ease(clamp01((time - from) / Math.max(0.001, to - from)));
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
-type Caption = { at: number; until: number; kicker?: string; line: string; sub?: string };
+type Kind = "letter" | "title" | "meta" | "h" | "p" | "sign";
+type Line = { kind: Kind; text: string; ocr?: boolean };
+type Doc = { file: string; md: string; lines: Line[] };
 
-/**
- * What is said, and when. Six captions in sixteen seconds, none of them jargon.
- *
- * The numbers are interpolated from the same module the page prints them from, so a change to
- * the fixture rewrites the film's dialogue rather than leaving it contradicting the page.
- */
-const CAPTIONS: Caption[] = [
-  { at: 0.9, until: 2.9, line: "Your knowledge is everywhere." },
-  { at: 3.4, until: 6.0, line: "Compile it." },
-  {
-    at: 6.5, until: 8.4,
-    kicker: "ONE WORLD",
-    line: `${n(WORLD.facts)} facts`,
-    sub: "Every one of them pointing back at the line it came from.",
-  },
-  {
-    at: 9.0, until: 12.2,
-    kicker: "SOMETHING CHANGES",
-    line: `${CHANGE.changed} lines moved`,
-    sub: `${REBUILT} facts rebuilt. ${n(KEPT)} proven untouched, and left alone.`,
-  },
-  {
-    at: 12.8, until: 15.2,
-    kicker: "AND ONE DID NOT",
-    line: "One fact had two readings",
-    sub: "So it was held back for a person, not averaged into a confident sentence.",
-  },
-  // The end card has no `until`: a film that ends on black has thrown away the one frame a
-  // viewer is most likely to still be looking at when they decide what to do next.
-  { at: 15.2, until: Number.POSITIVE_INFINITY, line: "TAVONEL", sub: "The knowledge compiler." },
+const PERIOD = 1.45;
+const ORIG_LAG = 0;
+const EXT_LAG = 1.7;
+
+const FILLER = [
+  "Notices may be given by email and are deemed received the next business day.",
+  "The Supplier shall keep ordinary books and make them available on ten days’ notice.",
+  "Neither party assigns this agreement without prior written consent, except to an affiliate.",
+  "If a clause is held unenforceable, the remainder continues in full force.",
+  "Governing law is England. Courts of London have exclusive jurisdiction.",
+  "Headings are for convenience only and do not affect interpretation.",
+  "Counterparts may be executed electronically and together form one instrument.",
+  "The order of precedence is: this agreement, then schedules, then policies.",
+  "Force majeure does not excuse payment of amounts already due.",
+  "Any waiver must be in writing. Silence is not a waiver.",
 ];
 
-const INK = {
-  kept: "105,114,120",
-  changed: "242,166,90",
-  affected: "123,224,190",
-  held: "110,147,184",
-  edge: "46,53,59",
-  label: "104,116,124",
-} as const;
+const INK = ["#1a1612", "#163050", "#173028", "#2a1736", "#1a2c18"];
+const AREA_RGB: [number, number, number][] = [
+  [242, 166, 90],
+  [80, 210, 170],
+  [90, 170, 230],
+  [180, 130, 255],
+  [255, 120, 170],
+  [120, 220, 110],
+  [255, 170, 90],
+  [90, 210, 230],
+];
 
-/** Cubic in-out: the only easing in the film, so every move feels like the same hand. */
-const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
-const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
-/** Progress through a window, eased. 0 before it, 1 after it. */
-const through = (time: number, from: number, to: number) => ease(clamp01((time - from) / (to - from)));
+const DOCS: Doc[] = [
+  {
+    file: CHANGE.document,
+    md: `# Services Agreement
+invoices_due: 45 days
+source: §3.2 · p.7
+change_order: $50,000
+source: §5.4`,
+    lines: [
+      { kind: "letter", text: "ACME HOLDINGS  ·  CONFIDENTIAL" },
+      { kind: "title", text: "Services Agreement" },
+      { kind: "meta", text: "Version 17  ·  18 pages  ·  1 January 2026" },
+      { kind: "h", text: "3.2  Payment terms" },
+      { kind: "p", text: "Invoices are due 45 days after receipt of a valid invoice.", ocr: true },
+      { kind: "p", text: "Late amounts accrue 1.5% per month. Disputes need written notice in ten days." },
+      { kind: "h", text: "5.4  Change orders" },
+      { kind: "p", text: "Work above $50,000 needs a signed change order before any additional cost.", ocr: true },
+      { kind: "h", text: "9.1  Termination" },
+      { kind: "p", text: "Termination notice shall be thirty (30) days.", ocr: true },
+      { kind: "sign", text: "IN WITNESS WHEREOF the parties have executed this agreement." },
+    ],
+  },
+  {
+    file: "scan_0140.pdf",
+    md: `# Site visit notes
+warehouse_b: closed 18:00
+line_4: safety sign-off outstanding
+invoice_clock: 30 days requested
+source: scan_0140 · no text layer`,
+    lines: [
+      { kind: "letter", text: "SCAN 0140  ·  NO TEXT LAYER" },
+      { kind: "title", text: "Site visit notes" },
+      { kind: "meta", text: "Handwritten  ·  12 March 2026  ·  Warehouse B" },
+      { kind: "p", text: "Loading bay closed after 18:00. Gate staff had no revised schedule." },
+      { kind: "p", text: "Safety sign-off still outstanding on Line 4. Supervisor will not run overtime." },
+      { kind: "p", text: "Asked for the 30-day invoice clock in writing. See payment terms.", ocr: true },
+      { kind: "p", text: "Photo pack in Customer Research 2026.zip — 14 files, unfiled." },
+      { kind: "p", text: "Bay 2 lighting failed at 17:40. Logged against Operations Manual 4.3." },
+      { kind: "p", text: "Names in the margin: Park, Singh, unnamed contractor. Confirm later." },
+    ],
+  },
+  {
+    file: "Operations Manual.docx",
+    md: `# Operations Manual
+po_policy: cite live payment terms
+archived_45_day: do not use
+source: Rev 9 · §4.1`,
+    lines: [
+      { kind: "letter", text: "OPERATIONS  ·  INTERNAL  ·  REV 9" },
+      { kind: "title", text: "Operations Manual" },
+      { kind: "meta", text: "47 pages  ·  controlled copy" },
+      { kind: "h", text: "4.1  Purchase orders" },
+      { kind: "p", text: "POs above policy must cite the live payment terms, not the archived 45-day schedule.", ocr: true },
+      { kind: "p", text: "A change order is required before the supplier starts work above the threshold." },
+      { kind: "h", text: "4.3  Handoffs" },
+      { kind: "p", text: "Finance and Legal both sign. Silence is not approval." },
+    ],
+  },
+  {
+    file: "Employee Handbook 2026.pdf",
+    md: `# Employee Handbook 2026
+notice: 30 days
+confidentiality: 3 years
+source: policy · 2026`,
+    lines: [
+      { kind: "letter", text: "PEOPLE  ·  POLICY" },
+      { kind: "title", text: "Employee Handbook 2026" },
+      { kind: "meta", text: "Effective 1 January 2026" },
+      { kind: "h", text: "12.  Notice" },
+      { kind: "p", text: "Either party may end employment with thirty (30) days’ written notice.", ocr: true },
+      { kind: "p", text: "Confidentiality survives for three years after the last day of employment." },
+      { kind: "h", text: "14.  Conflicts" },
+      { kind: "p", text: "Where this handbook and a services agreement disagree, the agreement wins." },
+    ],
+  },
+  {
+    file: "Q3 forecast.xlsx",
+    md: `# Q3 forecast
+invoices_modelled: 30-day clock
+threshold_alert: $25,000
+source: Q3 forecast.xlsx`,
+    lines: [
+      { kind: "letter", text: "FINANCE  ·  MODEL" },
+      { kind: "title", text: "Q3 forecast" },
+      { kind: "meta", text: "xlsx  ·  2.4 MB  ·  not a contract" },
+      { kind: "p", text: "Cash assumes invoices clear on the live payment clock, not 45 days." },
+      { kind: "p", text: "Change-order threshold is a yellow cell. Do not hard-code $50,000.", ocr: true },
+      { kind: "p", text: "The forecast sheet is linked to live terms. Do not paste a number." },
+      { kind: "p", text: "Yellow cells are thresholds. Green cells are actuals. Grey is commentary." },
+      { kind: "p", text: "Q2 close used 45 days and overstated cash. That error must not repeat." },
+      { kind: "p", text: "Owner: Finance. Reviewer: Legal. The model is not a source of truth." },
+    ],
+  },
+];
+
+function docIndex(t: number, lag: number) {
+  return Math.floor(Math.max(0, t - lag) / PERIOD) % DOCS.length;
+}
+
+const DRIVE_FILES = [
+  ...DOCS.map((d) => d.file),
+  "Invoice_batch_0312.pdf",
+  "NDA_supplier_A.pdf",
+  "NDA_supplier_B.pdf",
+  "lease_HQ.pdf",
+  "audit_2025.xlsx",
+  "payroll_Feb.csv",
+  "Slack export.zip",
+  "Board minutes Mar.pdf",
+  "vendor_list.xlsx",
+  "ISO_policy.pdf",
+  "travel_receipts",
+  "Untitled folder (4)",
+  "IMG_8841.jpg",
+  "contract_scan_2.pdf",
+  "SOW_alpha.docx",
+  "SOW_beta.docx",
+];
+
+function roundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, w: number, h: number, r: number,
+) {
+  const radius = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.arcTo(x + w, y, x + w, y + h, radius);
+  ctx.arcTo(x + w, y + h, x, y + h, radius);
+  ctx.arcTo(x, y + h, x, y, radius);
+  ctx.arcTo(x, y, x + w, y, radius);
+  ctx.closePath();
+}
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error(src));
+    image.src = src;
+  });
+}
+
+function face(kind: Kind, size: number): string {
+  if (kind === "title" || kind === "h") return `600 ${size}px Georgia, "Times New Roman", serif`;
+  if (kind === "letter" || kind === "meta") return `500 ${size}px ui-monospace, Menlo, monospace`;
+  return `400 ${size}px Georgia, "Times New Roman", serif`;
+}
+
+function wrap(ctx: CanvasRenderingContext2D, text: string, maxW: number): string[] {
+  const words = text.split(" ");
+  const out: string[] = [];
+  let cur = "";
+  for (const word of words) {
+    const test = cur ? `${cur} ${word}` : word;
+    if (cur && ctx.measureText(test).width > maxW) {
+      out.push(cur);
+      cur = word;
+    } else cur = test;
+  }
+  if (cur) out.push(cur);
+  return out;
+}
 
 export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(true);
-  const startRef = useRef<number>(0);
+  const [runId, setRunId] = useState(0);
+  const playingRef = useRef(true);
+  const startRef = useRef(0);
+  const elapsedRef = useRef(0);
   const reducedRef = useRef(false);
+  const endedRef = useRef(false);
 
   const replay = useCallback(() => {
     startRef.current = 0;
+    elapsedRef.current = 0;
+    endedRef.current = false;
+    playingRef.current = true;
     setTime(0);
     setPlaying(true);
+    setRunId((id) => id + 1);
   }, []);
+  const toggle = useCallback(() => {
+    if (elapsedRef.current >= ACT.stop - 0.05) { replay(); return; }
+    playingRef.current = !playingRef.current;
+    startRef.current = 0;
+    setPlaying(playingRef.current);
+  }, [replay]);
+  const skipToEnd = useCallback(() => {
+    elapsedRef.current = ACT.end;
+    startRef.current = 0;
+    playingRef.current = false;
+    setTime(ACT.end);
+    setPlaying(false);
+  }, []);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.code === "Space") { event.preventDefault(); toggle(); }
+      if (event.key === "Escape") skipToEnd();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [toggle, skipToEnd]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     const context = canvas?.getContext("2d");
     if (!canvas || !context) return;
-
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     reducedRef.current = reduced;
-
-    let graph: WorldGraph | null = null;
-    let scattered: { x: number; y: number }[] = [];
     let width = 0;
     let height = 0;
     let frame = 0;
+    let paper: HTMLImageElement | null = null;
+    let plaster: HTMLImageElement | null = null;
+    let graph: WorldGraph | null = null;
+    let cancelled = false;
 
     const layout = () => {
       const ratio = Math.min(window.devicePixelRatio || 1, 2);
@@ -126,200 +279,404 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
       canvas.width = Math.round(width * ratio);
       canvas.height = Math.round(height * ratio);
       context.setTransform(ratio, 0, 0, ratio, 0, 0);
+      graph = buildWorldGraph(Math.min(420, nodeBudget(width, height)));
+    };
 
-      // A fixed budget rather than one scaled to the viewport: this is a film, and the same
-      // frame has to come out of a phone, a laptop and a 1920 capture.
-      graph = buildWorldGraph(620);
-      scattered = graph.nodes.map((_, index) => {
-        const a = Math.sin(index * 12.9898) * 43758.5453;
-        const b = Math.sin(index * 78.233) * 12345.6789;
-        return { x: (a - Math.floor(a)) * width, y: (b - Math.floor(b)) * height };
+    const studio = () => {
+      context.fillStyle = "#070809";
+      context.fillRect(0, 0, width, height);
+      if (plaster) {
+        context.globalAlpha = 0.07;
+        context.drawImage(plaster, 0, 0, width, height);
+        context.globalAlpha = 1;
+      }
+    };
+
+    const pane = (x: number, y: number, w: number, h: number, title: string, live: string, light?: boolean) => {
+      roundRect(context, x, y, w, h, 8);
+      context.fillStyle = light ? "#e8e4dc" : "#101214";
+      context.fill();
+      context.strokeStyle = light ? "#c8c2b6" : "#2e353b";
+      context.stroke();
+      context.fillStyle = light ? "#f4f1ea" : "#16191c";
+      context.fillRect(x, y, w, 26);
+      context.fillStyle = light ? "#2a2622" : "#edeae4";
+      context.font = "500 10px ui-monospace, Menlo, monospace";
+      context.fillText(title, x + 10, y + 17);
+      context.fillStyle = "rgba(40,140,110,0.95)";
+      context.textAlign = "right";
+      context.fillText(live, x + w - 8, y + 17);
+      context.textAlign = "left";
+    };
+
+    const drawDrive = (x: number, y: number, w: number, h: number, t: number, active: string) => {
+      pane(x, y, w, h, "DRIVE  ·  Acme", `${Math.min(DRIVE_FILES.length, 1 + Math.floor(t / 0.32))} files`, true);
+      const rail = 64;
+      context.fillStyle = "#ddd8ce";
+      context.fillRect(x, y + 26, rail, h - 26);
+      ["Work", "Scan", "Notes"].forEach((label, i) => {
+        context.fillStyle = i === 0 ? "#2a2622" : "#6a645c";
+        context.font = "500 10px Wanted Sans Variable, system-ui, sans-serif";
+        context.fillText(label, x + 8, y + 46 + i * 18);
+      });
+      const shown = Math.min(DRIVE_FILES.length, 12 + Math.floor(t / 0.26));
+      const rowH = 20;
+      const listTop = y + 44;
+      const maxRows = Math.floor((h - 56) / rowH);
+      const start = Math.max(0, shown - maxRows);
+      DRIVE_FILES.forEach((name, i) => {
+        if (i >= shown) return;
+        const vis = i - start;
+        if (vis < 0 || vis >= maxRows) return;
+        const iy = listTop + vis * rowH;
+        const enter = i < 12 ? 1 : through(t, (i - 12) * 0.26, (i - 12) * 0.26 + 0.2);
+        context.globalAlpha = enter;
+        if (name === active) {
+          context.fillStyle = "rgba(40,140,110,0.16)";
+          context.fillRect(x + rail, iy - 12, w - rail, 18);
+        }
+        context.fillStyle = "#c45c2a";
+        roundRect(context, x + rail + 8, iy - 8, 7, 9, 1.5);
+        context.fill();
+        context.fillStyle = "#2a2622";
+        context.font = "500 11px Wanted Sans Variable, system-ui, sans-serif";
+        context.fillText(name.length > 22 ? `${name.slice(0, 20)}…` : name, x + rail + 20, iy);
+        context.globalAlpha = 1;
       });
     };
 
-    /**
-     * How far the cascade has travelled, as a fractional depth.
-     *
-     * A node lights when the wavefront passes its own depth, so the levels arrive in order and
-     * the last one lands a beat after the first. This is the single most load-bearing number in
-     * the film: it is what makes "only what the change reached" visible rather than asserted.
-     */
-    const frontAt = (t: number) => {
-      if (t < ACTS.change) return -1;
-      const span = ACTS.held - ACTS.change - 0.5;
-      return clamp01((t - ACTS.change) / span) * (CHANGE.levels.length + 0.6);
+    const drawTable = (x: number, y: number, w: number, alpha: number, scale: number) => {
+      const rows = [
+        ["Item", "Qty", "Unit", "Amount"],
+        ["On-site survey", "1", "ls", "£4,200"],
+        ["Line 4 overtime", "12", "hr", "£1,860"],
+        ["Change order 3", "1", "ls", "£25,000"],
+      ];
+      const colW = [w * 0.42, w * 0.14, w * 0.16, w * 0.28];
+      const rowH = 14 * scale;
+      context.globalAlpha = alpha;
+      context.strokeStyle = "#8a8174";
+      context.fillStyle = "#ebe4d4";
+      context.fillRect(x, y, w, rowH * rows.length);
+      let yy = y;
+      rows.forEach((row, r) => {
+        let xx = x;
+        row.forEach((cell, c) => {
+          context.strokeRect(xx, yy, colW[c], rowH);
+          context.fillStyle = r === 0 ? "#1a1612" : "#322e28";
+          context.font = `${r === 0 ? "600" : "400"} ${8.5 * scale}px ui-monospace, Menlo, monospace`;
+          context.fillText(cell, xx + 4 * scale, yy + 10 * scale);
+          xx += colW[c];
+        });
+        yy += rowH;
+      });
+      context.globalAlpha = 1;
+      return yy + 10 * scale;
+    };
+
+    const drawFigure = (x: number, y: number, w: number, alpha: number, scale: number) => {
+      const h = 56 * scale;
+      context.globalAlpha = alpha;
+      context.fillStyle = "#d8d0c0";
+      context.fillRect(x, y, w * 0.58, h);
+      if (paper) {
+        context.globalAlpha = alpha * 0.35;
+        context.drawImage(paper, x, y, w * 0.58, h);
+        context.globalAlpha = alpha;
+      }
+      context.strokeStyle = "#2a2622";
+      context.strokeRect(x + 6, y + 8, w * 0.22, h - 16);
+      context.strokeRect(x + w * 0.28, y + 14, w * 0.22, h - 22);
+      context.beginPath();
+      context.moveTo(x + w * 0.22 + 6, y + h / 2);
+      context.lineTo(x + w * 0.28, y + h / 2);
+      context.stroke();
+      context.fillStyle = "#2a2622";
+      context.font = `500 ${8 * scale}px Wanted Sans Variable, system-ui, sans-serif`;
+      context.fillText("Fig. 2  Bay layout — Line 4", x + w * 0.6, y + 14 * scale);
+      context.fillStyle = "#5a5348";
+      context.font = `400 ${7.5 * scale}px Georgia, serif`;
+      context.fillText("Photo pack, unfiled.", x + w * 0.6, y + 28 * scale);
+      context.globalAlpha = 1;
+      return y + h + 12 * scale;
+    };
+
+    const drawStamp = (x: number, y: number, alpha: number, scale: number) => {
+      context.save();
+      context.translate(x, y);
+      context.rotate(-0.18);
+      context.globalAlpha = alpha * 0.75;
+      context.strokeStyle = "#9b2c2c";
+      context.lineWidth = 1.4;
+      context.beginPath();
+      context.arc(0, 0, 22 * scale, 0, Math.PI * 2);
+      context.stroke();
+      context.beginPath();
+      context.arc(0, 0, 18 * scale, 0, Math.PI * 2);
+      context.stroke();
+      context.fillStyle = "#9b2c2c";
+      context.font = `700 ${7 * scale}px ui-monospace, Menlo, monospace`;
+      context.textAlign = "center";
+      context.fillText("RECEIVED", 0, -2 * scale);
+      context.font = `500 ${6 * scale}px ui-monospace, Menlo, monospace`;
+      context.fillText("04 MAR 26", 0, 8 * scale);
+      context.textAlign = "left";
+      context.restore();
+    };
+
+    const drawPage = (
+      x: number, y: number, w: number, h: number,
+      lines: Line[], scan: number, lockAll: boolean, scale: number, ink: string,
+    ) => {
+      context.save();
+      roundRect(context, x, y, w, h, 2);
+      context.fillStyle = "#f7f2e8";
+      context.fill();
+      context.beginPath();
+      roundRect(context, x, y, w, h, 2);
+      context.clip();
+      if (paper) {
+        context.globalAlpha = 0.26;
+        context.drawImage(paper, x, y, w, h);
+        context.globalAlpha = 1;
+      }
+      const mx = x + w * 0.055;
+      const maxW = w * 0.89;
+      const scanY = y + lerp(8, h - 8, scan);
+      const paint = (alpha: number) => {
+        let ty = y + 14 * scale;
+        lines.forEach((line, lineIndex) => {
+          const size = (line.kind === "title" ? 15 : line.kind === "h" ? 11 : line.kind === "letter" ? 7.5 : 10.5) * scale;
+          context.font = face(line.kind, size);
+          const rows = line.kind === "p" || line.kind === "sign" ? wrap(context, line.text, maxW) : [line.text];
+          rows.forEach((row) => {
+            context.globalAlpha = alpha;
+            context.fillStyle = line.kind === "title" || line.kind === "h" ? ink : "#322e28";
+            context.fillText(row, mx, ty);
+            context.globalAlpha = 1;
+            ty += size * 1.28;
+          });
+          if (lineIndex === 2) ty = drawTable(mx, ty, maxW, alpha, scale);
+          if (lineIndex === 4) ty = drawFigure(mx, ty, maxW, alpha, scale);
+        });
+        drawStamp(x + w - 78 * scale, y + 18 * scale, alpha, scale);
+        let f = 0;
+        context.font = face("p", 10.5 * scale);
+        context.fillStyle = "#322e28";
+        while (ty < y + h - 16 && f < FILLER.length * 3) {
+          const row = FILLER[f % FILLER.length];
+          context.globalAlpha = alpha * 0.92;
+          wrap(context, row, maxW).forEach((part) => {
+            if (ty >= y + h - 16) return;
+            context.fillText(part, mx, ty);
+            ty += 10.5 * scale * 1.28;
+          });
+          context.globalAlpha = 1;
+          f += 1;
+        }
+      };
+      if (lockAll) {
+        paint(1);
+      } else {
+        paint(0.18);
+        context.save();
+        context.beginPath();
+        context.rect(x, y, w, Math.max(0, scanY - y));
+        context.clip();
+        paint(1);
+        context.restore();
+        context.fillStyle = "rgba(255,236,180,0.55)";
+        context.fillRect(x, scanY - 2, w, 4);
+        context.fillStyle = "rgba(255,252,240,0.9)";
+        context.fillRect(x, scanY - 1, w, 2);
+      }
+      context.restore();
+    };
+
+    const drawMd = (x: number, y: number, w: number, h: number, md: string, local: number) => {
+      context.fillStyle = "#0b0d0e";
+      context.fillRect(x, y, w, h);
+      const count = Math.floor(local * md.length);
+      const caret = local < 0.98 && Math.floor(local * 20) % 2 === 0 ? "▌" : "";
+      context.fillStyle = "rgba(123,224,190,0.85)";
+      context.font = "500 8px ui-monospace, Menlo, monospace";
+      context.fillText("WORKING COPY.md", x + 8, y + 12);
+      context.font = "400 10px ui-monospace, Menlo, monospace";
+      (md.slice(0, count) + caret).split("\n").forEach((row, i) => {
+        context.fillStyle = row.startsWith("#") ? "#edeae4" : row.startsWith("source") ? "#7d878d" : "#c8ced2";
+        context.fillText(row, x + 8, y + 28 + i * 13);
+      });
+    };
+
+    const drawWorld = (x: number, y: number, w: number, h: number, t: number) => {
+      context.fillStyle = "#edeae4";
+      context.font = "500 9px ui-monospace, Menlo, monospace";
+      context.fillText("COMPANY KNOWLEDGE", x + 8, y + 12);
+      if (!graph) return;
+      const g = graph;
+      const ox = x + 6;
+      const oy = y + 22;
+      const gw = w - 12;
+      const gh = h - 28;
+      const nNodes = g.nodes.length;
+      const born = (i: number) => {
+        const n = Math.max(1, nNodes);
+        const early = Math.floor(n * 0.16);
+        if (i < early) return 1.2 + (i / Math.max(1, early)) * 4.2;
+        return 5.5 + ((i - early) / Math.max(1, n - early)) * 7.5;
+      };
+      const front = t < ACT.change ? -1 : through(t, ACT.change, ACT.end) * 3.4;
+
+      g.edges.forEach(([ia, ib]) => {
+        const t0 = Math.max(born(ia), born(ib)) + 0.12;
+        const grow = through(t, t0, t0 + 0.5);
+        if (grow < 0.02) return;
+        const na = g.nodes[ia];
+        const nb = g.nodes[ib];
+        const x0 = ox + na.x * gw;
+        const y0 = oy + na.y * gh;
+        const x1 = ox + lerp(na.x, nb.x, grow) * gw;
+        const y1 = oy + lerp(na.y, nb.y, grow) * gh;
+        const rgb = AREA_RGB[na.area % AREA_RGB.length];
+        context.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${0.35 + grow * 0.45})`;
+        context.lineWidth = 1.2;
+        context.beginPath();
+        context.moveTo(x0, y0);
+        context.lineTo(x1, y1);
+        context.stroke();
+        context.lineWidth = 1;
+      });
+
+      g.nodes.forEach((node, i) => {
+        const pop = through(t, born(i), born(i) + 0.32);
+        if (pop < 0.02) return;
+        const rgb = AREA_RGB[node.area % AREA_RGB.length];
+        const lit = front > 0 && node.depth >= 0 && front > node.depth;
+        const r = (lit ? 3.1 : 2.0) * node.radius * (pop < 1 ? pop * 1.25 : 1);
+        context.fillStyle = lit
+          ? node.state === "held"
+            ? "rgb(110,147,184)"
+            : `rgb(${Math.min(255, rgb[0] + 40)},${rgb[1]},${rgb[2]})`
+          : `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${0.55 + pop * 0.45})`;
+        context.beginPath();
+        context.arc(ox + node.x * gw, oy + node.y * gh, r, 0, Math.PI * 2);
+        context.fill();
+      });
     };
 
     const draw = (t: number) => {
-      if (!graph) return;
-      const form = through(t, ACTS.scatterIn + 0.4, ACTS.compile + 2.4);
-      const edgeAlpha = through(t, ACTS.compile + 0.9, ACTS.world);
-      const labels = through(t, ACTS.world - 0.4, ACTS.world + 1.2);
-      const front = frontAt(t);
-      // The last act desaturates everything that is not the held fact, so the eye has one place
-      // to go at the moment the film makes its least obvious point.
-      const focus = through(t, ACTS.held, ACTS.held + 0.9);
+      studio();
+      const recede = through(t, ACT.end, ACT.stop);
+      const bw = width * lerp(0.94, 0.88, recede);
+      const bh = height * lerp(0.72, 0.62, recede);
+      const bx = (width - bw) / 2;
+      const by = height * 0.07;
+      const gap = 10;
+      const colY = by + 38;
+      const colH = bh - 42;
+      const colW = (bw - gap * 3) / 4;
+      const xs = [0, 1, 2, 3].map((i) => bx + i * (colW + gap));
+      const cam = { x: 0, y: 0, s: 1 };
 
-      context.clearRect(0, 0, width, height);
+      context.save();
+      context.translate(width / 2, height / 2);
+      context.scale(cam.s, cam.s);
+      context.translate(-width / 2 + cam.x, -height / 2 + cam.y);
 
-      const at = (index: number) => {
-        const node = graph!.nodes[index];
-        const start = scattered[index];
-        return {
-          x: start.x + (node.x * width - start.x) * form,
-          y: start.y + (node.y * height - start.y) * form,
-        };
-      };
+      context.fillStyle = "#14171a";
+      context.fillRect(bx, by, bw, 32);
+      context.fillStyle = "rgba(123,224,190,0.9)";
+      context.beginPath();
+      context.arc(bx + 14, by + 16, 4, 0, Math.PI * 2);
+      context.fill();
+      context.fillStyle = "#edeae4";
+      context.font = "500 12px Wanted Sans Variable, system-ui, sans-serif";
+      context.fillText("TAVONEL  ·  Compile", bx + 26, by + 20);
+      context.fillStyle = "#7d878d";
+      context.font = "500 10px ui-monospace, Menlo, monospace";
+      context.fillText(`${n(SOURCE_CENSUS.files)} → ${n(WORLD.facts)}`, bx + bw - 148, by + 20);
 
-      /** 0 before the wavefront reaches this node, 1 once it has fully arrived. */
-      const lit = (depth: number) => (depth < 0 ? 0 : clamp01(front - depth));
+      const origI = docIndex(t, ORIG_LAG);
+      const extI = docIndex(t, EXT_LAG);
+      const orig = DOCS[origI];
+      const ext = DOCS[extI];
+      const local = (Math.max(0, t - EXT_LAG) % PERIOD) / PERIOD;
+      const inkO = INK[origI];
+      const inkE = INK[extI];
+      const flip = 1 - through(t, ORIG_LAG + origI * PERIOD, ORIG_LAG + origI * PERIOD + 0.28);
 
-      /* -- edges ------------------------------------------------------------------- */
-      if (edgeAlpha > 0.01) {
-        context.lineWidth = 1;
-        for (const [a, b] of graph.edges) {
-          const na = graph.nodes[a];
-          const nb = graph.nodes[b];
-          const pa = at(a);
-          const pb = at(b);
-          // An edge carries the cascade only if both ends are in it: a half-lit edge would
-          // imply the change travelled somewhere it did not.
-          const carry = Math.min(lit(na.depth), lit(nb.depth));
-          if (carry > 0.02) {
-            context.strokeStyle = `rgba(${INK.affected},${(0.30 * carry * (1 - focus * 0.55)).toFixed(3)})`;
-          } else {
-            context.strokeStyle = `rgba(${INK.edge},${(0.62 * edgeAlpha * (1 - focus * 0.4)).toFixed(3)})`;
-          }
-          context.beginPath();
-          context.moveTo(pa.x, pa.y);
-          context.lineTo(pb.x, pb.y);
-          context.stroke();
-        }
-      }
+      drawDrive(xs[0], colY, colW, colH, t, orig.file);
 
-      /* -- nodes ------------------------------------------------------------------- */
-      for (let i = 0; i < graph.nodes.length; i += 1) {
-        const node = graph.nodes[i];
-        const point = at(i);
-        const carry = lit(node.depth);
-        const isHeld = node.state === "held";
+      pane(xs[1], colY, colW, colH, "ORIGINAL", `${origI + 1}/${DOCS.length}`);
+      context.save();
+      context.translate(lerp(22, 0, 1 - flip), 0);
+      drawPage(xs[1] + 8, colY + 30, colW - 16, colH - 38, orig.lines, 1, true, 1.02, inkO);
+      context.restore();
 
-        let ink: string = INK.kept;
-        let alpha = 0.20 + 0.30 * form;
-        let radius = node.radius;
+      pane(xs[2], colY, colW, colH, "EXTRACT", `SCAN ${extI + 1}/${DOCS.length}`);
+      const topH = colH * 0.62;
+      drawPage(xs[2] + 8, colY + 30, colW - 16, topH - 8, ext.lines, local, false, 0.92, inkE);
+      drawMd(xs[2] + 8, colY + 26 + topH, colW - 16, colH - topH - 34, ext.md, local);
 
-        if (carry > 0.02) {
-          ink = node.state === "changed" ? INK.changed : INK.affected;
-          alpha = 0.35 + 0.55 * carry;
-          // A brief overshoot as the front passes, so a node arriving reads as an event.
-          radius = node.radius * (1.4 + 1.5 * carry * (1 - carry) * 4);
-        }
-        if (isHeld && t > ACTS.held) {
-          const pulse = 0.5 + 0.5 * Math.sin((t - ACTS.held) * 4.2);
-          ink = INK.held;
-          alpha = 0.75 + 0.25 * pulse;
-          // An absolute size, not a multiple of its own. The held node is whichever unclaimed
-          // node the graph happened to pick, so its base radius is a lottery -- and the film's
-          // climax cannot be a 3px dot because the draw came out small.
-          radius = 6.5 + 2.2 * pulse;
-          // A ring that keeps expanding away from it. One fact out of 128,470 has to be findable
-          // on a frame with six hundred other dots on it, and a slightly bigger dot is not.
-          const ripple = ((t - ACTS.held) % 1.6) / 1.6;
-          context.strokeStyle = `rgba(${INK.held},${(0.8 * (1 - ripple)).toFixed(3)})`;
-          context.lineWidth = 1.2;
-          context.beginPath();
-          context.arc(point.x, point.y, 6 + ripple * 34, 0, Math.PI * 2);
-          context.stroke();
-        } else if (focus > 0 && carry <= 0.02) {
-          alpha *= 1 - focus * 0.6;
-        }
+      pane(xs[3], colY, colW, colH, "WORLD", "linking");
+      drawWorld(xs[3] + 6, colY + 30, colW - 12, colH - 38, t);
 
-        if (carry > 0.02 || (isHeld && t > ACTS.held)) {
-          context.shadowBlur = (isHeld ? 20 : 12 * carry);
-          context.shadowColor = `rgba(${ink},0.5)`;
-        }
-        context.fillStyle = `rgba(${ink},${alpha.toFixed(3)})`;
-        context.beginPath();
-        context.arc(point.x, point.y, radius, 0, Math.PI * 2);
-        context.fill();
-        context.shadowBlur = 0;
-      }
-
-      /* -- area labels ------------------------------------------------------------- */
-      if (labels > 0.03) {
-        context.font = '600 10px ui-monospace, SFMono-Regular, Menlo, monospace';
-        context.textAlign = "center";
-        graph.byArea.forEach((members, area) => {
-          if (!members.length) return;
-          let x = 0;
-          let y = 0;
-          for (const index of members) {
-            const point = at(index);
-            x += point.x;
-            y += point.y;
-          }
-          const reached = graph!.reachByArea[area] > 0 && front > 0;
-          const alpha = 0.85 * labels * (reached ? 1 : 1 - focus * 0.5);
-          context.fillStyle = reached
-            ? `rgba(${INK.affected},${(alpha * 0.9).toFixed(3)})`
-            : `rgba(${INK.label},${alpha.toFixed(3)})`;
-          context.fillText(
-            AREAS[area]?.name ?? "",
-            x / members.length,
-            y / members.length - 14,
-          );
-        });
-      }
+      context.restore();
     };
 
-    layout();
-
-    if (reduced) {
-      draw(ACTS.end - 0.2);
-      setTime(ACTS.end - 0.2);
-      setPlaying(false);
-      const onResize = () => { layout(); draw(ACTS.end - 0.2); };
-      window.addEventListener("resize", onResize);
-      return () => window.removeEventListener("resize", onResize);
-    }
-
-    const tick = (now: number) => {
-      if (!startRef.current) startRef.current = now;
-      const t = (now - startRef.current) / 1000;
-      draw(t);
-      setTime(t);
-      if (t < ACTS.end) {
-        frame = window.requestAnimationFrame(tick);
-      } else {
+    const startLoop = () => {
+      if (cancelled) return;
+      layout();
+      if (reduced) {
+        draw(ACT.stop - 0.2);
+        setTime(ACT.end);
+        playingRef.current = false;
         setPlaying(false);
-        onEnded?.();
+        const onResize = () => { layout(); draw(ACT.stop - 0.2); };
+        window.addEventListener("resize", onResize);
+        return () => window.removeEventListener("resize", onResize);
       }
+      draw(elapsedRef.current);
+      const tick = (now: number) => {
+        if (!startRef.current) startRef.current = now;
+        if (playingRef.current) elapsedRef.current += (now - startRef.current) / 1000;
+        startRef.current = now;
+        const current = Math.min(elapsedRef.current, ACT.stop);
+        draw(current);
+        setTime(current);
+        if (current < ACT.stop) frame = window.requestAnimationFrame(tick);
+        else if (!endedRef.current) {
+          endedRef.current = true;
+          playingRef.current = false;
+          setPlaying(false);
+          onEnded?.();
+        }
+      };
+      frame = window.requestAnimationFrame(tick);
+      const onResize = () => layout();
+      window.addEventListener("resize", onResize);
+      return () => {
+        window.cancelAnimationFrame(frame);
+        window.removeEventListener("resize", onResize);
+      };
     };
-    frame = window.requestAnimationFrame(tick);
 
-    const onResize = () => layout();
-    window.addEventListener("resize", onResize);
-    return () => {
-      window.cancelAnimationFrame(frame);
-      window.removeEventListener("resize", onResize);
-    };
-    // `playing` is the replay trigger: a change to it restarts the whole effect.
-  }, [playing, onEnded]);
+    let stop: (() => void) | undefined;
+    void Promise.all([loadImage("/film/paper-color.jpg"), loadImage("/film/plaster-1k.jpg")])
+      .then(([p, pl]) => { if (cancelled) return; paper = p; plaster = pl; stop = startLoop(); })
+      .catch(() => { if (!cancelled) stop = startLoop(); });
+    return () => { cancelled = true; stop?.(); };
+  }, [onEnded, runId]);
 
-  const caption = CAPTIONS.find((item) => time >= item.at && time < item.until)
-    ?? (reducedRef.current ? CAPTIONS[CAPTIONS.length - 1] : undefined);
+  const caption = FILM_CAPTIONS.find((item) => time >= item.at && time < item.until)
+    ?? (reducedRef.current || time >= ACT.end ? FILM_CAPTIONS[FILM_CAPTIONS.length - 1] : FILM_CAPTIONS[0]);
+  const atEnd = time >= ACT.end - 0.05;
 
   return (
     <div className="film">
       <canvas ref={canvasRef} className="film-canvas" aria-hidden="true" />
-
-      {/*
-        Captions are DOM, not canvas. Canvas text is a bitmap: it will not hint, will not respect
-        the reader's font settings, cannot be selected and cannot be read out. Everything said
-        in this film is a real paragraph sitting over the drawing.
-      */}
-      <div className="film-caption" aria-live="polite">
-        {caption ? (
+      <div className={`film-caption${atEnd ? " is-end" : ""}`} aria-live="polite">
+        {atEnd && caption ? (
           <div key={caption.line} className="film-caption-in">
             {caption.kicker ? <p className="film-kicker">{caption.kicker}</p> : null}
             <p className="film-line">{caption.line}</p>
@@ -327,15 +684,18 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
           </div>
         ) : null}
       </div>
-
-      {/* The progress of the film, and the only two controls it needs. */}
       <div className="film-bar">
         <span className="film-meter" aria-hidden="true">
-          <i style={{ width: `${Math.min(100, (time / ACTS.end) * 100)}%` }} />
+          <i style={{ width: `${Math.min(100, (time / ACT.stop) * 100)}%` }} />
         </span>
-        {!playing ? (
-          <button type="button" className="film-btn" onClick={replay}>Replay</button>
-        ) : null}
+        <button type="button" className="film-btn" onClick={toggle}>
+          {playing ? "Pause" : atEnd ? "Replay" : "Play"}
+        </button>
+        {!atEnd ? (
+          <button type="button" className="film-btn" onClick={skipToEnd}>Skip</button>
+        ) : (
+          <Link href="/" className="film-btn film-btn-hi">Open the compiler</Link>
+        )}
       </div>
     </div>
   );

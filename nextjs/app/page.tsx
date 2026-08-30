@@ -36,14 +36,13 @@ import CanvasTransitionLink from "@/components/canvas-transition-link";
 import ChangeLattice from "@/components/change-lattice";
 import CompilePipeline from "@/components/compile-pipeline";
 import ReadingDemo from "@/components/reading-demo";
+import EvidenceTether from "@/components/evidence-tether";
+import IdentityResolve from "@/components/identity-resolve";
 import Logomark from "@/components/logomark";
 import RebuildConsole from "@/components/rebuild-console";
 import WorldField, { type WorldMode } from "@/components/world-field";
 import { AREAS, CHANGE, DISCLOSURE, KEPT, REBUILT, SOURCE_CENSUS, WORLD, n } from "@/lib/demo-world";
-import { useCheckout } from "@/lib/use-checkout";
-import { loginUrlForOffer } from "@/lib/checkout-intent";
 import { trackFunnel, trackSceneDepth } from "@/lib/funnel-events";
-import type { BillingOfferCode } from "@/lib/billing-catalog";
 import { readCapabilities, type StatusResponse } from "@/lib/capabilities";
 import { useScrollProgress, useScrollScenes } from "@/lib/use-scroll-scenes";
 
@@ -68,8 +67,8 @@ const SCENES = [
   { id: 1, label: "THE MESS" },
   { id: 2, label: "COMPILE" },
   { id: 3, label: "KEEPING IT TRUE" },
-  { id: 4, label: "THE ANSWER" },
-  { id: 5, label: "ACCESS" },
+  { id: 4, label: "USE THE WORLD" },
+  { id: 5, label: "PROOF & ACCESS" },
 ] as const;
 
 type BandName = "scatter" | "structure" | "world" | "change" | "rebuild" | "answer" | "access";
@@ -111,11 +110,7 @@ const STOPS = [
   "Wiring citations back to sources", "Re-running all of it next quarter",
 ];
 
-const PLANS = [
-  ["Observer", "$29", "A considered first step.", "observer_access"],
-  ["Studio", "$99", "For teams building a governed corpus.", "studio_access"],
-  ["Institution", "Talk to us", "For policy-led knowledge operations.", null],
-] as const;
+const DESTINATIONS = ["Retrieval", "Agents", "MCP", "API", "Search", "Your applications"];
 
 /**
  * C6 -- what leaves with the customer. Every line is a thing the workspace already does.
@@ -130,12 +125,6 @@ const TAKEAWAY = [
   ["The public key", "Published, so the signature can be checked by a third party who has no account here and no reason to trust us."],
 ] as const;
 
-const PACKS = [
-  ["Starter", "$12", "100 credits", "credit_starter"],
-  ["Builder", "$30", "300 credits", "credit_builder"],
-  ["Scale", "$75", "800 credits", "credit_scale"],
-] as const;
-
 /* ----------------------------------------------------------------------------- the page */
 
 export default function HomePage() {
@@ -143,7 +132,6 @@ export default function HomePage() {
   const [signedIn, setSignedIn] = useState(false);
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [statusFailed, setStatusFailed] = useState(false);
-  const { start: startCheckout, busy: billingBusy } = useCheckout(setNotice);
 
   const { scene, band } = useScrollScenes(SCENES.length);
   const progress = useScrollProgress();
@@ -268,26 +256,6 @@ export default function HomePage() {
     return () => { cancelled = true; };
   }, []);
 
-  const showNotice = () =>
-    setNotice("This deployment is a private pilot. Provider configuration and sandbox qualification are required before this action is available.");
-
-  /**
-   * R1 -- the intent to buy survives the sign-in.
-   *
-   * All six controls in scene 08 used to end here for a signed-out visitor: a toast saying "sign
-   * in first", and then a workspace that had forgotten which plan they picked. The choice is now
-   * carried to /login and resumed on the other side. The URL names an offer code and never a
-   * price; the server still owns the allow-list.
-   */
-  const chooseOffer = (offerCode: BillingOfferCode) => {
-    trackFunnel("offer_selected", { offer: offerCode, signedIn: signedIn ? "yes" : "no" });
-    if (signedIn) {
-      void startCheckout(offerCode);
-      return;
-    }
-    window.location.assign(loginUrlForOffer(offerCode));
-  };
-
   const jump = (id: number) => {
     document.getElementById(`s${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
@@ -311,10 +279,10 @@ export default function HomePage() {
    * not the last one.
    */
   const nextStep = ((): { label: string; run: () => void } => {
-    if (scene <= 1) return { label: "WATCH IT COMPILE", run: () => jump(2) };
-    if (scene === 2) return { label: "SEE IT KEEP UP", run: () => jump(3) };
-    if (scene === 3) return { label: "SEE THE ANSWER", run: () => jump(4) };
-    if (scene === 4) return { label: "GET ACCESS", run: () => jump(5) };
+    if (scene <= 1) return { label: "WATCH IT COMPILE", run: () => window.location.assign("/film") };
+    if (scene === 2) return { label: "KEEPING IT TRUE", run: () => jump(3) };
+    if (scene === 3) return { label: "USE THE WORLD", run: () => jump(4) };
+    if (scene === 4) return { label: "PROOF & ACCESS", run: () => jump(5) };
     return signedIn
       ? { label: "OPEN WORKSPACE", run: () => window.location.assign("/workspace") }
       : { label: "SIGN IN", run: () => window.location.assign("/login") };
@@ -343,9 +311,10 @@ export default function HomePage() {
         </span>
         <nav aria-label="Sections">
           <button type="button" onClick={() => jump(2)}>Compile</button>
-          <button type="button" onClick={() => jump(3)}>Keep current</button>
+          <Link href="/product">Product</Link>
+          <Link href="/research">Research</Link>
+          <Link href="/developers">Developers</Link>
           <Link href="/evidence">Evidence</Link>
-          <button type="button" onClick={() => jump(5)}>Access</button>
         </nav>
         {/*
           R4 -- the nav carried one verb, and it was the wrong one for most visitors. "Sign in" is
@@ -376,41 +345,21 @@ export default function HomePage() {
           <div className="shell">
             <p className="slate"><b>TAVONEL</b><span /> KNOWLEDGE COMPILER</p>
             <h1>
-              <span className="line"><i>Your knowledge is everywhere.</i></span>
-              <span className="line dim"><i>Compile it.</i></span>
+              <span className="line"><i>{revealWords("Compile your knowledge")}</i></span>
+              <span className="line dim"><i>{revealWords("into a world AI can reason about.", 4)}</i></span>
             </h1>
-            {/*
-              One sentence, and it no longer lists what the chips underneath already show.
-              "scattered files, documents, cloud drives and repositories" was the debris row in
-              words, printed directly above the debris row. Cutting the list halves this
-              paragraph on a phone and stops the page saying the same thing three times before
-              it has shown anything.
-            */}
-            <p className="lede">
-              TAVONEL turns everything your company has already written into structured,
-              <b> AI-ready knowledge</b> &mdash; and keeps it correct as the sources change.
+            <p className="lede rv">
+              Documents, scans, code and connected systems go in.
+              <b> Structured knowledge, evidence, graph and retrieval artifacts come out.</b>
             </p>
-            {/*
-              C1 -- who this is for, said as a situation rather than an industry.
-              Naming a vertical would exclude everyone outside it and convince nobody inside it.
-              A situation does the opposite: a reader either recognises it in the first clause or
-              is told, in the second, that they can stop reading. The disqualifier is not modesty;
-              it is the fastest way to be believed by the people who do recognise it.
-            */}
-            <p className="who">
-              For teams whose answers live in documents that keep changing.
-              <b> If your files never change, you do not need this.</b>
-            </p>
-            {/*
-              A4 -- one verb above the fold. There were four controls in the first screen: two in
-              the nav and two here, offering three different next steps to a reader who had been
-              given one sentence to decide on. The page's own argument is that it is worth
-              watching, so the fold now asks for exactly that, and sign-in stays as the quiet
-              control for people who already have a workspace.
-            */}
-            <div className="actions">
-              <button className="btn" type="button" onClick={cta("hero_primary", () => jump(2))}>Watch it compile</button>
+            <div className="actions rv">
+              <CanvasTransitionLink href="/film" className="btn">Watch it compile</CanvasTransitionLink>
+              <Link className="btn ghost" href={signedIn ? "/workspace" : "/login"}>Compile sample data</Link>
             </div>
+            <p className="fine rv">
+              <Link href="/evidence">Read the evidence</Link>
+              {" · "}Measured where we have evidence. Marked as research where we do not.
+            </p>
             {/*
               The mess, arriving as one.
 
@@ -457,22 +406,17 @@ export default function HomePage() {
           <div className="shell">
             <span className="creed-k">THE RULE</span>
             <p>
-              No customer logos. No certifications. No benchmark numbers. <b>A brand rule bars them
-              without registered evidence</b> — so rather than borrow anyone else’s credibility, we
-              publish <Link href="/evidence">our own record</Link>, including the part of it that
-              did not work.
+              <b>Measured where we have evidence. Marked as research where we do not.</b>
+              {" "}Detail lives in the <Link href="/evidence">evidence record</Link>.
             </p>
           </div>
         </div>
         {/* ═══════════════════════ 02 · compile (was connect + compile + work that stops) */}
-        <Scene id={2} band="structure" eyebrow="COMPILE" title={<>Six passes turn {n(SOURCE_CENSUS.files)} files into a world.</>}>
+        <Scene id={2} band="structure" eyebrow="COMPILE" title="Files are only the source material.">
           <p className="lede rv">
-            You point at the systems your work already lives in and leave them exactly as they
-            are &mdash; no export, no restructuring, no tidying the drive first. Reading them is the
-            easy part. What takes a team months is everything after it: what a document actually
-            says, which of four copies is real, what each thing <i>is</i>, and how it all
-            connects. <b>That is the compile</b> &mdash; and every task in the second list below
-            stops being a project the moment it runs.
+            TAVONEL reads the document, reconstructs its structure, resolves versions and identities,
+            maps relationships, keeps the evidence attached, and compiles the result into reusable
+            knowledge. <b>READ → RECONSTRUCT → RESOLVE → MODEL → VERIFY → COMPILE.</b>
           </p>
           <div className="sources rv">
             {SOURCES.map((source) => <span className="src" key={source}>{source}</span>)}
@@ -492,6 +436,7 @@ export default function HomePage() {
             — a reader that never reports doubt cannot be believed later when it says a document
             needs a person.
           </p>
+          <IdentityResolve active={scene >= 2} />
           <CompilePipeline active={scene >= 2} />
           <div className="stops rv">
             {STOPS.map((task, index) => (
@@ -521,32 +466,18 @@ export default function HomePage() {
               ))}
             </div>
           </div>
-          <div className="panel rv">
-            <div className="panel-head"><span>one fact, and where it came from</span><span className="right">DEMO DATA</span></div>
-            <div className="chain2">
-              <p className="fact">Invoices are due 30 days after receipt</p>
-              {[
-                ["Source", `${CHANGE.document} · version ${CHANGE.revisionTo}`],
-                ["Evidence", "“Payment is due within 30 days of receipt of a valid invoice, reduced from 45 under the previous schedule.” · §3.2 · page 7 · lines 14–16"],
-                ["Entity", "Payment terms"],
-                ["Depends on", "Purchase order template · Late-payment escalation"],
-              ].map(([k, v]) => (
-                <div className="cr" key={k}><span className="k">{k}</span><span className="v">{v}</span></div>
-              ))}
-            </div>
-          </div>
+          <EvidenceTether active={scene >= 2} />
           <p className="fine rv">{DISCLOSURE.ontology}</p>
         </SceneMore>
 
         <ChangeLattice />
 
         {/* ═══════════════════════════════════════════════════ 04 · something changes */}
-        <Scene id={3} band="change" eyebrow="KEEPING IT TRUE" title="A compile that only ever runs once is worthless.">
+        <Scene id={3} band="change" eyebrow="KEEPING IT TRUE" title="Knowledge changes when reality does.">
           <p className="lede rv">
-            Contracts get amended. Specs move. Policies are revised, code lands, prices change,
-            people leave. Compiling your knowledge is the first half of the job.
-            <b> Keeping it true is the half that never ends</b> &mdash; and the half that quietly breaks
-            every retrieval system built on a schedule.
+            A revised source should not silently leave yesterday’s answer in today’s AI.
+            <b> The compiler is designed to follow those dependencies, hold ambiguity, and rebuild
+            only what the change reached.</b>
           </p>
           <div className="panel rv">
             <div className="panel-head"><span>{CHANGE.document}</span><span className="right">VERSION {CHANGE.revisionFrom} &rarr; {CHANGE.revisionTo}</span></div>
@@ -566,15 +497,16 @@ export default function HomePage() {
             <div className="lg"><span className="pill" data-v="current">AFFECTED</span><p>Not edited, but depends on something that was.</p></div>
             <div className="lg"><span className="pill" data-v="unchanged">UNTOUCHED</span><p>Proven unconnected to the change, and carried across.</p></div>
           </div>
+          <p className="fine rv">
+            Research direction shown on declared demonstration data until measurement closes.
+            {DISCLOSURE.fixture}
+          </p>
         </Scene>
-
-        {/* ═══════════════════════════ 05 · rebuild & verify (was rebuild + verify) */}
         <SceneMore id={3} band="rebuild" eyebrow="REBUILD & VERIFY" title={<>Rebuild {REBUILT}.<br />Keep {n(KEPT)}.</>}>
           <p className="lede rv">
             Three lines moved in one contract. A system that re-indexes on a schedule would read
-            all {n(WORLD.facts)} facts again to find them. TAVONEL follows the dependency graph,
-            rebuilds the {REBUILT} facts the change actually reached, carries the rest forward
-            untouched &mdash; and then <b>nothing goes live until it passes.</b>
+            all {n(WORLD.facts)} facts again to find them. The compiler is designed to follow the
+            dependency graph and rebuild the {REBUILT} facts the change actually reached.
           </p>
           <RebuildConsole active={scene >= 3} />
           <div className="checks rv">
@@ -598,30 +530,23 @@ export default function HomePage() {
         </SceneMore>
 
         {/* ═══════════════════════════════════════════════════ 06 · the answer */}
-        <Scene id={4} band="answer" eyebrow="THE ANSWER" title={<>The same question,<br />asked of two worlds.</>}>
+        <Scene id={4} band="answer" eyebrow="USE THE WORLD" title={<>One compiled world.<br />Every AI.</>}>
           <p className="lede rv">
-            On the left is the world as it stood before the contract changed &mdash; the one a system
-            that re-indexes on a schedule would still be answering from. On the right, the world
-            TAVONEL published two minutes later. <b>Same question. Same files. Different truth.</b>
+            Use the same grounded knowledge across retrieval, agents, MCP, APIs and your own applications.
+            <b> The model can change. Your knowledge should remain traceable.</b>
           </p>
+          <div className="sources rv">
+            {DESTINATIONS.map((name) => <span className="src" key={name}>{name}</span>)}
+          </div>
           <AnswerSwitch />
         </Scene>
 
-        {/* ═══════════════════════════════════════════════════ 08 · access */}
-        <Scene id={5} band="access" eyebrow="ACCESS" title={<>Stop preparing<br />data for AI.</>}>
+        <Scene id={5} band="access" eyebrow="PROOF & ACCESS" title={<>Stop rebuilding knowledge<br />for every AI project.</>}>
           <p className="lede rv">
-            TAVONEL compiles everything you know into a structured, AI-ready world &mdash; and keeps
-            that world correct as reality changes.
+            TAVONEL compiles everything you know into a structured, AI-ready world &mdash; and is
+            designed to keep that world aligned as sources change.
           </p>
 
-          {/*
-            R3 -- the boundary is stated before the price, not after it.
-
-            The grid used to sit below both pricing blocks, so a visitor read six controls and a
-            currency symbol before they were told which of those controls this deployment actually
-            has open. Reversing the order costs the page nothing, and it removes the one thing that
-            makes a fail-closed product read as an overclaiming one.
-          */}
           <div className="band-head rv"><span className="kicker">STATUS</span><h3>What exists in this deployment, right now.</h3></div>
           <div className="caps rv">
             {capabilities.map((cap) => (
@@ -644,57 +569,6 @@ export default function HomePage() {
             </p>
           ) : null}
 
-          <div className="band-head rv"><span className="kicker">MEASURED ACCESS</span><h3>Plans for serious work.</h3></div>
-          <div className="plans rv">
-            {PLANS.map(([name, price, text, offerCode]) => (
-              <article className="plan" key={name} data-featured={name === "Studio" ? 1 : 0}>
-                <span className="tag">{name === "Studio" ? "PRIVATE PILOT CHOICE" : " "}</span>
-                <h3>{name}</h3>
-                <span className="price">{price}{price.startsWith("$") ? <small> / month</small> : null}</span>
-                <p>{text}</p>
-                <button
-                  className="btn ghost"
-                  type="button"
-                  disabled={Boolean(billingBusy)}
-                  onClick={() => (offerCode ? chooseOffer(offerCode) : showNotice())}
-                >
-                  {name === "Institution" ? "Start a conversation" : billingBusy === offerCode ? "Opening checkout…" : signedIn ? "Choose this plan" : "Choose this plan → sign in"}
-                </button>
-              </article>
-            ))}
-          </div>
-          <p className="fine rv">
-            Institution and custom engagement guidelines are available in the{" "}
-            <a href="/legal/TAVONEL_ENTERPRISE_PRICING_2026-08-30.pdf">Enterprise pricing sheet</a>.
-          </p>
-
-          <div className="band-head rv"><span className="kicker">DELIBERATE COMPUTE</span><h3>Access is steady. GPU work is measured.</h3></div>
-          <div className="packs rv">
-            {PACKS.map(([name, price, credits, offerCode]) => (
-              <article className="pack" key={name}>
-                <span className="tag">PREPAID CAPACITY</span>
-                <h3>{name}</h3>
-                <span className="price">{price} <small>{credits}</small></span>
-                <button className="btn ghost" type="button" disabled={Boolean(billingBusy)} onClick={() => chooseOffer(offerCode)}>
-                  {billingBusy === offerCode ? "Opening checkout…" : signedIn ? "Buy credits" : "Buy credits → sign in"}
-                </button>
-              </article>
-            ))}
-          </div>
-          <p className="fine rv">
-            Secure Paddle sandbox checkout, for signed-in pilot users. Access changes only after a
-            signed, idempotently persisted webhook &mdash; never on a checkout redirect. Credits are
-            reserved before a qualified job and settled against observed runtime. No unlimited GPU
-            plans; hard job and workspace caps stay active even after a purchase.
-          </p>
-
-          {/*
-            C6 -- the question nobody asks out loud before signing a yearly bill.
-            The signed export has existed in the product from the start and the page never
-            mentioned it, which meant the honest answer to "what happens if we leave" was
-            sitting in the workspace where only customers could find it. It belongs here, beside
-            the price, because that is where the question is actually being weighed.
-          */}
           <div className="band-head rv"><span className="kicker">NO LOCK-IN</span><h3>What you can take with you.</h3></div>
           <div className="caps rv">
             {TAKEAWAY.map(([name, text]) => (
@@ -704,20 +578,17 @@ export default function HomePage() {
               </article>
             ))}
           </div>
-          <p className="fine rv">
-            The signing key’s public half is published at <code>/api/export/trust</code>, so a
-            package can be verified by someone who does not trust us and does not have an account
-            here. A record you can only check inside the system that produced it is not a record.
-          </p>
 
           <div className="actions rv" style={{ marginTop: 30 }}>
             <Link className="btn" href={signedIn ? "/workspace" : "/login"}>
-              {signedIn ? "Open workspace" : "Sign in with Google"}
+              {signedIn ? "Open workspace" : "Compile sample data"}
             </Link>
-            <button className="btn ghost" type="button" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
-              Replay from the start
-            </button>
+            <Link className="btn ghost" href="/evidence">Inspect evidence</Link>
+            <Link className="btn ghost" href={"/contact" as Route}>Talk to us</Link>
           </div>
+          <p className="fine rv">
+            Plans live on <Link href="/pricing">pricing</Link>. Measured compute. Hard spend limits.
+          </p>
         </Scene>
       </main>
 
@@ -730,19 +601,20 @@ export default function HomePage() {
             argument, not during it -- and the rule band already links the record from the top.
           */}
           <nav className="site-links" aria-label="More">
-            <CanvasTransitionLink href="/film">Watch the sixteen-second version</CanvasTransitionLink>
+            <CanvasTransitionLink href="/film">Watch it compile</CanvasTransitionLink>
+            <Link href="/research">Research</Link>
+            <Link href="/developers">Developers</Link>
+            <Link href="/pricing">Pricing</Link>
             <Link href="/evidence">What we measured</Link>
-             <Link href="/security">Where your documents go</Link>
-             <Link href={"/contact" as Route}>Talk to us</Link>
-             <Link href={"/status" as Route}>Service status</Link>
-             <Link href={"/privacy" as Route}>Privacy</Link>
-             <Link href={"/terms" as Route}>Terms</Link>
-             <Link href={"/refunds" as Route}>Refunds</Link>
+            <Link href="/security">Where your documents go</Link>
+            <Link href={"/contact" as Route}>Talk to us</Link>
+            <Link href={"/status" as Route}>Service status</Link>
+            <Link href={"/privacy" as Route}>Privacy</Link>
+            <Link href={"/terms" as Route}>Terms</Link>
+            <Link href={"/refunds" as Route}>Refunds</Link>
           </nav>
           <p className="fine">
-            {DISCLOSURE.staged} Paddle checkout is sandbox-only; signed webhooks persist access and
-            prepaid credits, while GPU capacity remains separately gated. No customer,
-            certification, benchmark or performance claim is represented on this page.
+            {DISCLOSURE.staged} No customer, certification, benchmark or performance claim is represented on this page.
           </p>
         </div>
       </footer>

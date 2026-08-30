@@ -33,10 +33,12 @@ export const EVIDENCE = [
   ["measured", "Compilation refuses more than it emits, sometimes", "Of a thousand documents offered in one campaign, four hundred and four were refused, every one for a link the compiler could not resolve. A vault with a broken link is not emitted, by design."],
   ["unsupported", "Blind quality detection failed", "We tested whether prediction-only signals could pick the worst documents without ground truth. They could not beat ranking by length alone. Published as unsupported, and not shipped as a feature."],
   ["unproven", "Most thresholds are uncalibrated", "Tests show the code does what its author intended. They do not show a threshold is right. Nothing here presents an uncalibrated threshold as a measured result."],
+  ["unproven", "Selective recompilation", "The landing demonstration follows a dependency path on declared fixture data. That is not a measurement of production impact precision, and it is not a shipped capability."],
 ] as const;
 
 export const EVIDENCE_STATE: Record<string, string> = {
   measured: "MEASURED",
   unsupported: "NOT SUPPORTED",
   unproven: "BUILT, NOT PROVEN",
+  direction: "IN PROGRESS",
 };

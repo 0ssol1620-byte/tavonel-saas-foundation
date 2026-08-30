@@ -63,10 +63,10 @@ export default function SecurityPage() {
               </div>
               <div className="stack">
                 <p className="lede">
-                  This page holds no certification and claims none. What it can tell you is the
-                  path a document takes, which component is allowed to hold it, and what this
-                  deployment is not permitted to do at all. <b>Every external operation fails
-                  closed</b> &mdash; a control opens only after the one before it is qualified.
+                  Automation can propose. Promotion is a decision. The path:
+                  browser (signed direct upload) → quarantine → sanitize / CDR → isolated analysis → candidate world → human promotion.
+                  <b> Every external operation fails closed</b> — a control opens only after the one before it is qualified.
+                  This page holds no certification and claims none.
                 </p>
 
                 <p className="slate"><span />THE BOUNDARY, IN THE ORDER IT IS ENFORCED</p>

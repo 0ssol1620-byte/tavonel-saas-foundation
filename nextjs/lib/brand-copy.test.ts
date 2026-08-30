@@ -32,6 +32,8 @@ const COPY_SURFACES = [
   "components/answer-switch.tsx",
   "components/change-lattice.tsx",
   "components/compile-pipeline.tsx",
+  "components/evidence-tether.tsx",
+  "components/identity-resolve.tsx",
   "components/rebuild-console.tsx",
   "components/world-explorer.tsx",
   "app/login/page.tsx",
@@ -41,6 +43,18 @@ const COPY_SURFACES = [
   "lib/checkout-intent.ts",
   "lib/funnel-events.ts",
   "lib/demo-world.ts",
+  "lib/film-script.ts",
+  "components/opening-film.tsx",
+  "app/film/page.tsx",
+  "app/research/page.tsx",
+  "app/developers/page.tsx",
+  "app/pricing/page.tsx",
+  "app/product/page.tsx",
+  "app/product/knowledge-compiler/page.tsx",
+  "app/product/document-understanding/page.tsx",
+  "app/product/compiled-world/page.tsx",
+  "app/product/continuous-knowledge/page.tsx",
+  "app/enterprise/page.tsx",
 ];
 
 const BARRED = [
@@ -49,6 +63,7 @@ const BARRED = [
   "100% accurate",
   "never hallucinates",
   "better than rag",
+  "ai brain",
 ];
 
 /**
