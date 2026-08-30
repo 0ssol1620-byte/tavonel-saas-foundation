@@ -8,7 +8,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CHANGE, SOURCE_CENSUS, WORLD, n } from "@/lib/demo-world";
-import { FILM_ACT as ACT, FILM_CAPTIONS } from "@/lib/film-script";
+import { FILM_ACT as ACT } from "@/lib/film-script";
 import { buildWorldGraph, nodeBudget, type WorldGraph } from "@/lib/world-graph";
 
 export { FILM_CAPTIONS, FILM_DURATION } from "@/lib/film-script";
@@ -59,10 +59,9 @@ const DOCS: Doc[] = [
     form: "contract",
     md: `# Services Agreement
 source: §3.2 · p.7 · lines 14–16
-
 ## Payment
 Invoices are due 45 days after receipt of a valid invoice.
-
+Late amounts accrue 1.5% per month. Disputes need written notice in ten days.
 | Description | Basis | Amount |
 | --- | --- | --- |
 | Warehouse B survey | two days | £4,200.00 |
@@ -70,12 +69,18 @@ Invoices are due 45 days after receipt of a valid invoice.
 | Change order 3 | 4 March | £25,000.00 |
 | Retention 5% | snagging | £1,553.00 |
 | Total certified | this period | £32,613.00 |
-
 ![Fig. 2 Bay layout — Line 4](attachment)
-
 ## Change orders
 Work above $50,000 needs a signed change order before any additional cost.
-Late amounts accrue 1.5% per month.`,
+Termination notice shall be thirty (30) days.
+Governing law is England. Courts of London have exclusive jurisdiction.
+Notices may be given by email and are deemed received the next business day.
+Neither party assigns this agreement without prior written consent.
+If a clause is held unenforceable, the remainder continues in full force.
+Counterparts may be executed electronically and together form one instrument.
+The order of precedence is: this agreement, then schedules, then policies.
+Force majeure does not excuse payment of amounts already due.
+Any waiver must be in writing. Silence is not a waiver.`,
     lines: [
       { kind: "letter", text: "ACME HOLDINGS  ·  CONFIDENTIAL" },
       { kind: "title", text: "Services Agreement" },
@@ -94,18 +99,17 @@ Late amounts accrue 1.5% per month.`,
     file: "scan_0140.pdf",
     form: "scan",
     md: `# Site visit notes
-path: ocr
-no_text_layer: true
-page: scan_0140
-
+path: ocr · no_text_layer: true · page: scan_0140
 Warehouse B closed after 18:00. Gate staff had no revised schedule.
 Line 4 safety sign-off outstanding. Supervisor will not run overtime.
-
 ![Photo pack — 14 files, unfiled](scan_0140)
-
 Asked for the 30-day invoice clock in writing.
 Bay 2 lighting failed at 17:40. Logged against Operations Manual 4.3.
-Names in the margin: Park, Singh, unnamed contractor.`,
+Names in the margin: Park, Singh, unnamed contractor.
+Loading bay closed after 18:00. Gate staff had no revised schedule.
+Photo pack in Customer Research 2026.zip — 14 files, unfiled.
+Confirm names later. Do not invent a person from a margin mark.
+The scan has no text layer. Every line is OCR.`,
     lines: [
       { kind: "letter", text: "SCAN 0140  ·  NO TEXT LAYER" },
       { kind: "title", text: "Site visit notes" },
@@ -123,15 +127,15 @@ Names in the margin: Park, Singh, unnamed contractor.`,
     form: "manual",
     md: `# Operations Manual
 controlled copy · rev 9
-
 ## 4.1 Purchase orders
 POs above policy must cite the live payment terms, not the archived 45-day schedule.
 A change order is required before the supplier starts work above the threshold.
-
 ## 4.3 Handoffs
 Finance and Legal both sign. Silence is not approval.
-
-> Figure omitted. Caption only: “Handoff between Finance and Legal.”`,
+> Figure omitted. Caption only: “Handoff between Finance and Legal.”
+Headings are for convenience only and do not affect interpretation.
+The Supplier shall keep ordinary books and make them available on ten days’ notice.
+Where this handbook and a services agreement disagree, the agreement wins.`,
     lines: [
       { kind: "letter", text: "OPERATIONS  ·  INTERNAL  ·  REV 9" },
       { kind: "title", text: "Operations Manual" },
@@ -148,14 +152,17 @@ Finance and Legal both sign. Silence is not approval.
     form: "handbook",
     md: `# Employee Handbook 2026
 effective: 1 January 2026
-
 ## 12. Notice
 Either party may end employment with thirty (30) days’ written notice.
 Confidentiality survives for three years after the last day of employment.
-
 ## 14. Conflicts
 Where this handbook and a services agreement disagree, the agreement wins.
-Do not paste a number from a forecast sheet into a policy.`,
+Do not paste a number from a forecast sheet into a policy.
+| Clause | Rule | Term |
+| --- | --- | --- |
+| 12 Notice | thirty days written | 2026 |
+| Confidentiality | survives exit | 3 years |
+| 14 Conflicts | agreement wins | always |`,
     lines: [
       { kind: "letter", text: "PEOPLE  ·  POLICY" },
       { kind: "title", text: "Employee Handbook 2026" },
@@ -171,19 +178,17 @@ Do not paste a number from a forecast sheet into a policy.`,
     file: "Q3 forecast.xlsx",
     form: "sheet",
     md: `# Q3 forecast
-kind: spreadsheet
-owner: Finance
-reviewer: Legal
-
+kind: spreadsheet · owner: Finance · reviewer: Legal
 | Cell | Jan | Feb | Mar | Q3 |
 | --- | --- | --- | --- | --- |
 | Cash | 1.2 | 1.1 | 0.9 | 3.2 |
 | Invoices | 0.8 | 1.4 | 1.1 | 3.3 |
 | Threshold | 25k | 25k | 25k | 25k |
 | Actual | 22k | 31k | 28k | 81k |
-
 Yellow cells are thresholds. Green cells are actuals.
-Do not hard-code $50,000. The model is not a source of truth.`,
+Do not hard-code $50,000. The model is not a source of truth.
+Cash assumes invoices clear on the live payment clock, not 45 days.
+Q2 close used 45 days and overstated cash. That error must not repeat.`,
     lines: [
       { kind: "letter", text: "FINANCE  ·  MODEL" },
       { kind: "title", text: "Q3 forecast" },
@@ -628,25 +633,36 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
       context.fillStyle = "rgba(123,224,190,0.85)";
       context.font = "500 8px ui-monospace, Menlo, monospace";
       context.fillText("WORKING COPY.md", x + 8, y + 12);
-      const count = Math.max(1, Math.floor(local * md.length));
-      const caret = local < 0.98 && Math.floor(local * 20) % 2 === 0 ? "▌" : "";
+      const typed = Math.min(1, Math.max(0.12, local));
+      const count = Math.max(1, Math.floor(typed * md.length));
+      const caret = typed < 0.98 && Math.floor(typed * 20) % 2 === 0 ? "▌" : "";
       context.font = "400 9px ui-monospace, Menlo, monospace";
       const maxW = w - 16;
       const lines: string[] = [];
       (md.slice(0, count) + caret).split("\n").forEach((row) => {
         wrap(context, row.length ? row : " ", maxW).forEach((part) => lines.push(part));
       });
-      const rowH = 12;
-      const maxRows = Math.max(4, Math.floor((h - 22) / rowH));
+      const rowH = 11;
+      const maxRows = Math.max(6, Math.floor((h - 20) / rowH));
+      if (lines.length) {
+        let i = 0;
+        while (lines.length < maxRows) {
+          const extra = lines[i % Math.max(1, Math.min(lines.length, 8))];
+          if (!extra || extra === "▌") break;
+          lines.push(extra);
+          i += 1;
+          if (i > 80) break;
+        }
+      }
       lines.slice(0, maxRows).forEach((row, i) => {
         context.fillStyle = row.startsWith("#")
           ? "#edeae4"
           : row.startsWith("|") || row.startsWith("!")
             ? "#7be0be"
-            : row.startsWith(">") || row.startsWith("source")
+            : row.startsWith(">") || row.startsWith("source") || row.startsWith("path")
               ? "#7d878d"
               : "#c8ced2";
-        context.fillText(row, x + 8, y + 26 + i * rowH);
+        context.fillText(row, x + 8, y + 24 + i * rowH);
       });
     };
 
@@ -669,26 +685,6 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
       };
       const front = t < ACT.change ? -1 : through(t, ACT.change, ACT.end) * 3.4;
 
-      g.edges.forEach(([ia, ib]) => {
-        const t0 = Math.max(born(ia), born(ib)) + 0.12;
-        const grow = through(t, t0, t0 + 0.5);
-        if (grow < 0.02) return;
-        const na = g.nodes[ia];
-        const nb = g.nodes[ib];
-        const x0 = ox + na.x * gw;
-        const y0 = oy + na.y * gh;
-        const x1 = ox + lerp(na.x, nb.x, grow) * gw;
-        const y1 = oy + lerp(na.y, nb.y, grow) * gh;
-        const rgb = AREA_RGB[na.area % AREA_RGB.length];
-        context.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${0.35 + grow * 0.45})`;
-        context.lineWidth = 1.2;
-        context.beginPath();
-        context.moveTo(x0, y0);
-        context.lineTo(x1, y1);
-        context.stroke();
-        context.lineWidth = 1;
-      });
-
       g.nodes.forEach((node, i) => {
         const pop = through(t, born(i), born(i) + 0.32);
         if (pop < 0.02) return;
@@ -708,10 +704,10 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
 
     const draw = (t: number) => {
       studio();
-      const bw = width * 0.94;
-      const bh = height * 0.64;
+      const bw = width * 0.96;
+      const bh = height * 0.88;
       const bx = (width - bw) / 2;
-      const by = height * 0.05;
+      const by = height * 0.04;
       const gap = 10;
       const colY = by + 38;
       const colH = bh - 42;
@@ -755,11 +751,11 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
       context.restore();
 
       pane(xs[2], colY, colW, colH, "EXTRACT", `SCAN ${extI + 1}/${DOCS.length}`);
-      const topH = colH * 0.4;
+      const topH = colH * 0.34;
       drawPage(xs[2] + 8, colY + 30, colW - 16, topH - 8, ext.lines, local, false, 0.92, inkE, ext.form, false);
-      drawMd(xs[2] + 8, colY + 26 + topH, colW - 16, colH - topH - 34, ext.md, Math.min(1, local * 1.7));
+      drawMd(xs[2] + 8, colY + 26 + topH, colW - 16, colH - topH - 34, ext.md, Math.min(1, 0.28 + local * 1.9));
 
-      pane(xs[3], colY, colW, colH, "WORLD", "linking");
+      pane(xs[3], colY, colW, colH, "WORLD", "nodes");
       drawWorld(xs[3] + 6, colY + 30, colW - 12, colH - 38, t);
 
       context.restore();
@@ -809,22 +805,11 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
     return () => { cancelled = true; stop?.(); };
   }, [onEnded, runId]);
 
-  const caption = FILM_CAPTIONS.find((item) => time >= item.at && time < item.until)
-    ?? (reducedRef.current || time >= ACT.end ? FILM_CAPTIONS[FILM_CAPTIONS.length - 1] : FILM_CAPTIONS[0]);
   const atEnd = time >= ACT.end - 0.05;
 
   return (
     <div className="film">
       <canvas ref={canvasRef} className="film-canvas" aria-hidden="true" />
-      <div className={`film-caption${atEnd ? " is-end" : ""}`} aria-live="polite">
-        {caption ? (
-          <div key={caption.line} className="film-caption-in">
-            {caption.kicker ? <p className="film-kicker">{caption.kicker}</p> : null}
-            <p className="film-line">{caption.line}</p>
-            {caption.sub ? <p className="film-sub">{caption.sub}</p> : null}
-          </div>
-        ) : null}
-      </div>
       <div className="film-bar">
         <span className="film-meter" aria-hidden="true">
           <i style={{ width: `${Math.min(100, (time / ACT.stop) * 100)}%` }} />

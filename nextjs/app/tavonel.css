@@ -2031,7 +2031,7 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
 
 .film-bar {
   position: absolute;
-  inset: auto clamp(24px, 7vw, 120px) 16px clamp(24px, 7vw, 120px);
+  inset: auto clamp(24px, 7vw, 120px) 10px clamp(24px, 7vw, 120px);
   display: flex;
   align-items: center;
   gap: 18px;
