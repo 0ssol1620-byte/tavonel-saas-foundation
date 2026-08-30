@@ -143,8 +143,15 @@ a { color: inherit; text-decoration: none; }
   height: 100%;
   z-index: 0;
   pointer-events: none;
-  /* A backdrop, not a subject. It must never compete with the panels in front of it. */
-  opacity: 0.5;
+  /*
+    A1 -- the field was held at 0.5 and disappeared.
+    "A backdrop, not a subject" was the right principle applied to the wrong number. At half
+    opacity the compiled world -- the one thing on this page that is genuinely beautiful and the
+    only thing that shows the product's shape rather than describing it -- read as noise on a
+    dark ground. It is now legible as a graph. The panels in front of it are opaque and the type
+    over it is set on the highest-contrast tokens, so it still never competes for the reading.
+  */
+  opacity: 0.85;
 }
 
 .shell {

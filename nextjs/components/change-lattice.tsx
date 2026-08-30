@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The interlude -- one cell per fact in the handbook, at the hinge between "compile it" and
+ * The interlude -- one cell per fact in the contract, at the hinge between "compile it" and
  * "keep it compiled".
  *
  * An earlier version of this page bought its change of scale with a stock photograph. On a page
@@ -16,7 +16,7 @@ import { CHANGE } from "@/lib/demo-world";
 
 const COLS = 62;
 const ROWS = 20;
-const TOTAL = COLS * ROWS; // 1,240 -- one per fact in the handbook
+const TOTAL = COLS * ROWS; // 1,240 -- one per fact in the contract
 
 /** Fixed positions, so the marked cells sit where they were composed to sit. */
 const CHANGED = [247, 613, 1102];
@@ -80,7 +80,7 @@ export default function ChangeLattice() {
           and most of it doesn&rsquo;t.
         </p>
         <p className="interlude-sub">
-          {CHANGE.documentFacts.toLocaleString("en-US")} facts in one handbook
+          {CHANGE.documentFacts.toLocaleString("en-US")} facts in one contract
           <span className="sep">&middot;</span>
           <b data-tone="changed">{CHANGE.changed} moved</b>
           <span className="sep">&middot;</span>

@@ -1,7 +1,7 @@
 /**
  * The background field is a claim, not decoration.
  *
- * It asserts that a change in Policy & HR reaches Finance, Operations, Legal and Support and
+ * It asserts that a change in Contracts & Policy reaches Finance, Operations, Legal and Support and
  * provably does not reach Engineering, Product or Customers. That has to be true of the actual
  * graph, so the graph is built here as a pure function and checked in `world-graph.test.ts`.
  * The canvas component only draws what this returns.
@@ -50,14 +50,14 @@ const AREA_ANGLES = [-90, -45, 0, 45, 90, 135, 180, 225];
 
 /**
  * Cross-area dependencies, as [fromArea, toArea, count]. Only these four pairs exist, which is
- * precisely why the last three areas are unreachable from Policy & HR. Adding a pair here
+ * precisely why the last three areas are unreachable from Contracts & Policy. Adding a pair here
  * changes the reach counts -- and the test that pins them will say so.
  */
 const BRIDGES: [number, number, number][] = [
-  [0, 1, 6], // Policy & HR -> Finance
-  [0, 2, 6], // Policy & HR -> Operations
-  [0, 3, 4], // Policy & HR -> Legal
-  [0, 4, 3], // Policy & HR -> Support
+  [0, 1, 6], // Contracts & Policy -> Finance
+  [0, 2, 6], // Contracts & Policy -> Operations
+  [0, 3, 4], // Contracts & Policy -> Legal
+  [0, 4, 3], // Contracts & Policy -> Support
   [6, 7, 4], // Product -> Customers      (exists, but not reachable from Policy)
   [5, 6, 3], // Engineering -> Product     (likewise)
 ];
@@ -122,7 +122,7 @@ export function buildWorldGraph(total: number, seed: number = WORLD_SEED): World
 
   /* -- the wavefront ------------------------------------------------------------------ */
 
-  // Origins are bridge-adjacent Policy & HR nodes, so the very first level visibly leaves its
+  // Origins are bridge-adjacent Contracts & Policy nodes, so the very first level visibly leaves its
   // own area instead of pooling where it started.
   const policy = byArea[0];
   const origins = [policy[2], policy[7], policy[12]].filter((index) => index !== undefined);

@@ -24,34 +24,34 @@ interface Answer {
 
 const ANSWERS: Answer[] = [
   {
-    question: "How many days a week do I need to be in the office?",
+    question: "When do we have to pay this invoice?",
     before: {
       verdict: "stale",
-      headline: "Three days a week.",
-      note: "Confident, sourced, and wrong since 11:04 this morning.",
+      headline: "Within 45 days.",
+      note: "Confident, sourced, and wrong since 11:04 this morning. Acting on it pays late.",
     },
     after: {
       verdict: "current",
-      headline: "Two days a week.",
-      note: "The handbook changed this morning. This answer changed with it.",
+      headline: "Within 30 days.",
+      note: "The agreement was amended this morning. This answer changed with it.",
     },
-    source: "Employee Handbook 2026.pdf · §3.2 · page 7 · lines 14–16",
+    source: "Services Agreement 2026.pdf · §3.2 · page 7 · lines 14–16",
   },
   {
-    question: "What is the expense approval limit?",
-    before: { verdict: "stale", headline: "Above $500.", note: "The figure the old world still holds." },
-    after: { verdict: "current", headline: "Above $1,000.", note: "Raised in version 18, and traced to the line that raised it." },
-    source: "Employee Handbook 2026.pdf · §5.4 · page 22 · lines 3–9",
+    question: "How much work can we do before a change order?",
+    before: { verdict: "stale", headline: "Up to $50,000.", note: "The figure the old world still holds." },
+    after: { verdict: "current", headline: "Up to $25,000.", note: "Halved in version 18, and traced to the line that halved it." },
+    source: "Services Agreement 2026.pdf · §5.4 · page 22 · lines 3–9",
   },
   {
-    question: "Who approves a remote-work exception?",
-    before: { verdict: "stale", headline: "Your manager.", note: "One reading, stated as if it were the only one." },
+    question: "Who can approve an exception to the payment terms?",
+    before: { verdict: "stale", headline: "Your account manager.", note: "One reading, stated as if it were the only one." },
     after: {
       verdict: "held",
       headline: "I can’t answer this one yet.",
       note: "Version 18 names two different approvers for the same exception. Rather than average them into a confident sentence, this fact is held out of the live world and a person has been notified.",
     },
-    source: "Employee Handbook 2026.pdf · §4.1 and §9.6 · two readings",
+    source: "Services Agreement 2026.pdf · §4.1 and §9.6 · two readings",
   },
   {
     question: "What is the company mission?",

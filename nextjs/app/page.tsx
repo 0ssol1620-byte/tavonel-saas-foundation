@@ -59,10 +59,10 @@ const SCENES = [
 
 /** Filenames as a visitor's own drive would show them: dated, versioned, and not tidy. */
 const DEBRIS = [
-  "Handbook_2026_FINAL.pdf", "Handbook_2026_FINAL_v2.pdf", "scan_0140.pdf",
+  "Services_Agreement_FINAL.pdf", "Services_Agreement_FINAL_v2.pdf", "scan_0140.pdf",
   "Q3 forecast.xlsx", "acme/product-docs", "Untitled folder (3)",
   "Customer Research 2026.zip", "Operations Manual.docx", "pricing_OLD.csv",
-  "support.acme.com", "Board deck.pptx", "contract_signed.pdf",
+  "support.acme.com", "Board deck.pptx", "Employee Handbook 2026.pdf",
 ];
 
 /**
@@ -354,12 +354,12 @@ export default function HomePage() {
           <div className="panel rv">
             <div className="panel-head"><span>one fact, and where it came from</span><span className="right">DEMO DATA</span></div>
             <div className="chain2">
-              <p className="fact">Employees work from the office 2 days per week</p>
+              <p className="fact">Invoices are due 30 days after receipt</p>
               {[
                 ["Source", `${CHANGE.document} · version ${CHANGE.revisionTo}`],
-                ["Evidence", "“Employees are expected in the office 2 days per week, down from 3 under the previous policy.” · §3.2 · page 7 · lines 14–16"],
-                ["Entity", "Office attendance policy"],
-                ["Depends on", "New-hire onboarding guide · Remote-work exception process"],
+                ["Evidence", "“Payment is due within 30 days of receipt of a valid invoice, reduced from 45 under the previous schedule.” · §3.2 · page 7 · lines 14–16"],
+                ["Entity", "Payment terms"],
+                ["Depends on", "Purchase order template · Late-payment escalation"],
               ].map(([k, v]) => (
                 <div className="cr" key={k}><span className="k">{k}</span><span className="v">{v}</span></div>
               ))}
@@ -381,13 +381,13 @@ export default function HomePage() {
           <div className="panel rv">
             <div className="panel-head"><span>{CHANGE.document}</span><span className="right">VERSION {CHANGE.revisionFrom} &rarr; {CHANGE.revisionTo}</span></div>
             <div className="diff">
-              <p className="ctx">§3.2 Office attendance</p>
-              <p className="del">Employees work from the office 3 days per week</p>
-              <p className="add">Employees work from the office 2 days per week</p>
-              <p className="ctx">§5.4 Expense approval</p>
-              <p className="del">Expenses above $500 need director approval</p>
-              <p className="add">Expenses above $1,000 need director approval</p>
-              <p className="ctx">§9.1 Parental leave &middot; 12 weeks &rarr; 16 weeks</p>
+              <p className="ctx">§3.2 Payment terms</p>
+              <p className="del">Invoices are due 45 days after receipt</p>
+              <p className="add">Invoices are due 30 days after receipt</p>
+              <p className="ctx">§5.4 Change orders</p>
+              <p className="del">Work above $50,000 needs a signed change order</p>
+              <p className="add">Work above $25,000 needs a signed change order</p>
+              <p className="ctx">§9.1 Termination notice &middot; 30 days &rarr; 60 days</p>
             </div>
           </div>
           <div className="legend rv">
@@ -401,7 +401,7 @@ export default function HomePage() {
         {/* ═══════════════════════════ 05 · rebuild & verify (was rebuild + verify) */}
         <Scene id={5} eyebrow="REBUILD & VERIFY" title={<>Rebuild {REBUILT}.<br />Keep {n(KEPT)}.</>}>
           <p className="lede rv">
-            Three lines moved in one handbook. A system that re-indexes on a schedule would read
+            Three lines moved in one contract. A system that re-indexes on a schedule would read
             all {n(WORLD.facts)} facts again to find them. TAVONEL follows the dependency graph,
             rebuilds the {REBUILT} facts the change actually reached, carries the rest forward
             untouched &mdash; and then <b>nothing goes live until it passes.</b>
@@ -430,7 +430,7 @@ export default function HomePage() {
         {/* ═══════════════════════════════════════════════════ 06 · the answer */}
         <Scene id={6} eyebrow="THE ANSWER" title={<>The same question,<br />asked of two worlds.</>}>
           <p className="lede rv">
-            On the left is the world as it stood before the handbook changed &mdash; the one a system
+            On the left is the world as it stood before the contract changed &mdash; the one a system
             that re-indexes on a schedule would still be answering from. On the right, the world
             TAVONEL published two minutes later. <b>Same question. Same files. Different truth.</b>
           </p>

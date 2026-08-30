@@ -42,7 +42,7 @@ export const WORLD = {
 
 /** Facts per area. The list is the tree in scene 05 and the cluster set in the canvas field. */
 export const AREAS = [
-  { name: "Policy & HR", facts: 1_240 },
+  { name: "Contracts & Policy", facts: 1_240 },
   { name: "Finance", facts: 18_406 },
   { name: "Operations", facts: 12_204 },
   { name: "Legal", facts: 9_830 },
@@ -55,13 +55,13 @@ export const AREAS = [
 /* -------------------------------------------------------------------- the change (06--08) */
 
 /**
- * One handbook revision. `changed` facts are the origins; `affected` are reached through the
+ * One contract revision. `changed` facts are the origins; `affected` are reached through the
  * dependency graph; `held` is the single fact with two readings that is kept out of the live
  * world. Everything else is proven untouched and carried across unchanged -- which is the
  * claim the whole back half of the page rests on, so it is computed, never typed.
  */
 export const CHANGE = {
-  document: "Employee Handbook 2026.pdf",
+  document: "Services Agreement 2026.pdf",
   revisionFrom: 17,
   revisionTo: 18,
   documentFacts: 1_240,

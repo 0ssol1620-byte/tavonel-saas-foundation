@@ -24,7 +24,7 @@ describe("world graph", () => {
     expect(held?.depth).toBe(-1);
   });
 
-  it("starts every origin in Policy & HR", () => {
+  it("starts every origin in Contracts & Policy", () => {
     for (const node of graph.nodes.filter((n) => n.depth === 0)) expect(node.area).toBe(0);
   });
 
