@@ -1,0 +1,68 @@
+{
+  "schemaVersion": "tavonel.product_surfaces_full_sequence.v1",
+  "completedAt": "2026-08-30T06:21:15.238Z",
+  "baseUrl": "https://tavonel.com",
+  "verifiedDeployment": {
+    "id": "dpl_CdqxC4arjgQj2yBP134m3wtrvNRi",
+    "commit": "26410d0",
+    "region": "icn1",
+    "status": "ready"
+  },
+  "webUploadRunPod": {
+    "status": "passed",
+    "documentId": "8f6297a9-dd3b-4021-b60e-4869f87c939a",
+    "sanitizedSize": 126343,
+    "ocrJsonSize": 11283,
+    "processingState": "ocr_ready"
+  },
+  "sourceAgentRunPod": {
+    "status": "passed",
+    "connectionId": "ee7cbdf3-f621-41e3-bf99-e392def5df6e",
+    "batchId": "4f45115a-df76-4cdf-ba0f-e728da0a7dc8",
+    "firstSync": { "status": "applied", "eventCount": 1 },
+    "replay": { "status": "unchanged", "eventCount": 0 },
+    "documentId": "57da6490-e2d2-51f6-832d-dc0443ee7d85",
+    "sanitizedSize": 140240,
+    "ocrJsonSize": 16861,
+    "processingState": "ocr_ready"
+  },
+  "api": {
+    "status": "passed",
+    "documentCount": 25,
+    "connectionCount": 1,
+    "collectionId": "collection-4063cce55e88f05c81fc45481edcabaf",
+    "packageFiles": 23,
+    "manifestDigest": "sha256:8cd1e66453ae50949d41729015983f2562752030e4803715c53ef88f9bbedc82"
+  },
+  "cli": {
+    "status": "passed",
+    "archiveSha256": "sha256:833ed46cca64d4ef36402b52c405b7208541e37b37e14634f4963c25150e57cf",
+    "manifestSha256": "sha256:dddbc5a8aea9e66e8dae6b15fac60c0c64d9bf469ac0bef74a459820c8e29ce0"
+  },
+  "mcp": {
+    "status": "passed",
+    "protocolVersion": "2025-06-18",
+    "tools": ["list_documents", "get_collection", "get_active_world", "ask_active_world"],
+    "callsPassed": ["list_documents", "get_collection"]
+  },
+  "signedDownload": {
+    "status": "passed",
+    "archivePath": "C:\\Users\\yspow\\Downloads\\TAVONEL_collection-4063cce55e88f05c81fc45481edcabaf_2026-08-30.zip",
+    "archiveBytes": 4238892,
+    "archiveSha256": "sha256:833ed46cca64d4ef36402b52c405b7208541e37b37e14634f4963c25150e57cf",
+    "filesVerified": 25,
+    "keyId": "tavonel-export-2026-08-30-v1",
+    "publicKeyFingerprint": "sha256:0c00c0ad170aa9ab2a10732a14d1d4015667db9858b075be2f92d8c1ca936d29"
+  },
+  "distributionSha256": {
+    "tavonel-cli.mjs": "sha256:1b04591f13449dfea720ba03542e618863bc27d6e220bd8be0f14a6233cf0134",
+    "tavonel-mcp.mjs": "sha256:8bb21f942c26c93d5a9dc70588a0fdb475fa672663540a4f570fdbad0430b2f0",
+    "tavonel-source-agent.py": "sha256:f8d4bbd8fa622d65812f31a8359ede04bac6d886d5dead3fa46e89d18b9fc7c4"
+  },
+  "temporaryApiKey": {
+    "name": "Codex production surface proof 2026-08-30",
+    "revokedAfterProof": true,
+    "activeKeyCountAfterReload": 0,
+    "plaintextRetained": false
+  }
+}
