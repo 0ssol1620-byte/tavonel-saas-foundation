@@ -34,7 +34,9 @@ export async function loadPreferredCollectionCandidate(
     return artifact.coreExecution?.status === "completed" && artifact.coreExecution.receipt?.candidatePromotion === false;
   }) ?? available[0];
 
-  return preferred
-    ? { ok: true, value: { key: preferred.key, artifact: preferred.result.json } }
+  if (preferred) return { ok: true, value: { key: preferred.key, artifact: preferred.result.json } };
+  const firstFailure = fetched.find((item) => !item.result.ok);
+  return firstFailure && !firstFailure.result.ok
+    ? firstFailure.result
     : { ok: false, code: "GET_FAILED" };
 }
