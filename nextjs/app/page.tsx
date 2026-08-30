@@ -678,6 +678,7 @@ export default function HomePage() {
             argument, not during it -- and the rule band already links the record from the top.
           */}
           <nav className="site-links" aria-label="More">
+            <Link href="/film">Watch the sixteen-second version</Link>
             <Link href="/evidence">What we measured</Link>
             <Link href="/security">Where your documents go</Link>
           </nav>

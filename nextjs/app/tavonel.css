@@ -1608,3 +1608,110 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
   .rb, .rl { animation: none; }
   .js .rv.in .stop span::after { right: 0; }
 }
+
+/* ============================================================ the film (/film) */
+
+/*
+  A page that is one moving image and two words.
+  Everything here is sized in viewport units rather than the shell, because the subject is the
+  frame: the drawing has to reach every edge, and the caption has to sit in the lower third the
+  way a caption does, not in a column the way a paragraph does.
+*/
+.film-page { min-height: 100vh; background: var(--ground); }
+.film-nav { background: transparent; border-bottom: 0; }
+.film-nav nav a {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--text-xlo);
+  transition: color 200ms ease;
+}
+.film-nav nav a:hover { color: var(--text-hi); }
+
+.film { position: relative; width: 100%; height: 100vh; overflow: hidden; }
+.film-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+/*
+  The lower third, and a floor under it.
+  The gradient is doing real work: the graph is at its densest exactly where the caption sits,
+  and without a ground the type would be read through a lattice of edges.
+*/
+.film-caption {
+  position: absolute;
+  inset: auto 0 0 0;
+  min-height: 42vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 0 clamp(24px, 7vw, 120px) clamp(74px, 12vh, 130px);
+  background: linear-gradient(to top, var(--ground) 12%, rgba(10, 12, 13, 0.82) 46%, transparent 100%);
+  pointer-events: none;
+}
+
+/* One entrance, used by every caption. The key on the wrapper restarts it per line. */
+@keyframes film-caption-in {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: none; }
+}
+/*
+  The measure is set in px, not ch.
+  `ch` resolves against this element's own font-size -- the inherited body size -- while the
+  line inside it is up to 88px, so a `22ch` wrapper was about 176px wide and broke a
+  three-word title across three lines.
+*/
+.film-caption-in { animation: film-caption-in 760ms var(--ease) both; max-width: min(820px, 62vw); }
+
+.film-kicker {
+  margin: 0 0 12px;
+  font-family: var(--f-mono);
+  font-size: clamp(9.5px, 0.85vw, 11px);
+  letter-spacing: 0.22em;
+  color: var(--verified);
+}
+.film-line {
+  margin: 0;
+  font-size: clamp(34px, 6.2vw, 88px);
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+  color: var(--text-hi);
+  font-weight: 500;
+  text-wrap: balance;
+}
+.film-sub {
+  margin: 18px 0 0;
+  max-width: 44ch;
+  font-size: clamp(13.5px, 1.15vw, 17px);
+  line-height: 1.55;
+  color: var(--text-lo);
+  text-wrap: pretty;
+}
+
+.film-bar {
+  position: absolute;
+  inset: auto clamp(24px, 7vw, 120px) clamp(28px, 5vh, 48px) clamp(24px, 7vw, 120px);
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.film-meter { flex: 1; height: 1px; background: var(--hairline-hi); }
+.film-meter i { display: block; height: 100%; background: var(--verified); transition: width 90ms linear; }
+.film-btn {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-lo);
+  border: 1px solid var(--hairline-hi);
+  border-radius: 2px;
+  padding: 8px 16px;
+  transition: color 200ms ease, border-color 200ms ease;
+}
+.film-btn:hover { color: var(--verified); border-color: var(--verified-dim); }
+
+/* A phone holds the film in the upper half and the words in the lower, rather than shrinking
+   both until neither works. */
+@media (max-width: 620px) {
+  .film-caption { min-height: 52vh; padding-bottom: 96px; }
+  .film-caption-in { max-width: 100%; }
+  .film-sub { max-width: 100%; }
+}
