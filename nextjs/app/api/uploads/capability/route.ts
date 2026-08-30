@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { activationPolicy } from "@/lib/activation-policy";
-import { authorizeFoundationProduct } from "@/lib/billing-product-access";
+import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { reserveFoundationCompute } from "@/lib/compute-reservation";
-import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
 import { reserveFoundationIntake } from "@/lib/intake-admission";
 import { validateQualifiedDocumentInput } from "@/lib/qualified-input";
 import { FOUNDATION_INTAKE_MAX_BYTES, presignFoundationQuarantinePut } from "@/lib/r2-presign";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
+import { deterministicSourceDocumentId, validSourceIdempotencyKey } from "@/lib/source-intake";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -21,10 +21,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ code: "INTAKE_DISABLED", reason: activationPolicy.customerIntake.reason }, { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "60" } });
   }
 
-  const user = await getRequestUser(request);
-  if (!user) {
-    return NextResponse.json({ code: "AUTH_REQUIRED" }, { status: 401, headers: { "Cache-Control": "no-store" } });
-  }
+  const auth = await authorizeFoundationRequest(request, "documents:intake", "studio");
+  if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: { "Cache-Control": "no-store" } });
 
   let body: { originalFilename?: unknown; declaredMimeType?: unknown; requestedBytes?: unknown };
   try {
@@ -45,22 +43,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ code: qualified.code }, { status: 400, headers: { "Cache-Control": "no-store" } });
   }
 
-  const access = foundationPilotAccess(user.id);
-  if (!access) return NextResponse.json({ code: "PILOT_ACCESS_REQUIRED" }, { status: 403, headers: { "Cache-Control": "no-store" } });
-  const { membership } = access;
-  const productAccess = await authorizeFoundationProduct(membership.workspaceId, user.id, "studio");
-  if (!productAccess.ok) return NextResponse.json({ code: productAccess.code }, { status: productAccess.status, headers: { "Cache-Control": "no-store" } });
+  const workspaceId = auth.principal.workspaceKey;
   const signer = readR2SignerEnv();
   if (!signer) {
     return NextResponse.json({ code: "SIGNER_NOT_CONFIGURED" }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
 
-  const documentId = crypto.randomUUID();
-  const objectKey = `quarantine/${membership.workspaceId}/${documentId}/source`;
+  const sourceIdempotencyKey = request.headers.get("x-tavonel-source-idempotency-key");
+  if (sourceIdempotencyKey !== null && !validSourceIdempotencyKey(sourceIdempotencyKey)) {
+    return NextResponse.json({ code: "SOURCE_IDEMPOTENCY_KEY_INVALID" }, { status: 400, headers: { "Cache-Control": "no-store" } });
+  }
+  const documentId = sourceIdempotencyKey
+    ? await deterministicSourceDocumentId(workspaceId, sourceIdempotencyKey)
+    : crypto.randomUUID();
+  const objectKey = `quarantine/${workspaceId}/${documentId}/source`;
   const admission = await reserveFoundationIntake({
-    workspaceKey: membership.workspaceId,
+    workspaceKey: workspaceId,
     documentId,
-    userId: user.id,
+    userId: auth.principal.userId,
     objectKey,
     requestedBytes,
     declaredMimeType: qualified.normalizedMimeType,
@@ -80,9 +80,9 @@ export async function POST(request: Request) {
     );
   }
   const compute = await reserveFoundationCompute({
-    workspaceKey: membership.workspaceId,
+    workspaceKey: workspaceId,
     documentId,
-    userId: user.id,
+    userId: auth.principal.userId,
   });
   if (!compute.ok) {
     const paymentRequired = compute.code === "STUDIO_SUBSCRIPTION_REQUIRED" || compute.code === "GPU_CREDITS_REQUIRED";
@@ -112,6 +112,7 @@ export async function POST(request: Request) {
     originalFilename: qualified.originalFilename,
     declaredMimeType: qualified.normalizedMimeType,
     sanitization: "pending_cdr",
+    sourceIdempotency: sourceIdempotencyKey ? "stable" : "none",
     admissionExpiresAt: admission.result.expiresAt,
     computeReservation: {
       reservationId: compute.result.reservationId,

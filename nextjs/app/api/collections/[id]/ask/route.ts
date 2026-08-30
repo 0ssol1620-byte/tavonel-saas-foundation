@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { authorizeFoundationProduct } from "@/lib/billing-product-access";
+import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { validatePromotableCollectionArtifact } from "@/lib/collection-download";
-import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
 import { answerGroundedQuestion } from "@/lib/grounded-ask";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
 import { getWorkspaceCollectionCandidate } from "@/lib/r2-objects";
@@ -23,12 +22,8 @@ export async function POST(
       { status: 413, headers: NO_STORE }
     );
   }
-  const user = await getRequestUser(request);
-  if (!user)
-    return NextResponse.json(
-      { code: "AUTH_REQUIRED" },
-      { status: 401, headers: NO_STORE }
-    );
+  const auth = await authorizeFoundationRequest(request, "ask:read", "observer");
+  if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: NO_STORE });
   const { id } = await context.params;
   if (!COLLECTION_ID_PATTERN.test(id)) {
     return NextResponse.json(
@@ -56,12 +51,7 @@ export async function POST(
     );
   }
 
-  const access = foundationPilotAccess(user.id);
-  if (!access) return NextResponse.json({ code: "PILOT_ACCESS_REQUIRED" }, { status: 403, headers: NO_STORE });
-  const { membership } = access;
-  const productAccess = await authorizeFoundationProduct(membership.workspaceId, user.id, "observer");
-  if (!productAccess.ok) return NextResponse.json({ code: productAccess.code }, { status: productAccess.status, headers: NO_STORE });
-  const active = await getFoundationActiveWorld(membership.workspaceId, id);
+  const active = await getFoundationActiveWorld(auth.principal.workspaceKey, id);
   if (!active.ok) {
     return NextResponse.json(
       { code: active.code },
@@ -79,7 +69,7 @@ export async function POST(
     );
   const loaded = await getWorkspaceCollectionCandidate(
     signer,
-    membership.workspaceId,
+    auth.principal.workspaceKey,
     active.world.candidateObjectKey
   );
   if (!loaded.ok)

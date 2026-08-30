@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { authorizeFoundationProduct } from "@/lib/billing-product-access";
+import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { type CollectionCandidateArtifact, validateCollectionOcrInput } from "@/lib/collection-compiler";
 import { dispatchCoreCompile, readCoreRuntimeEnv } from "@/lib/core-runtime";
 import {
@@ -7,7 +7,6 @@ import {
   projectProductCoreV2Candidate,
   readProductCoreV2Env,
 } from "@/lib/core-runtime-v2";
-import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
 import { collectionCandidateKey, DOCUMENT_ID_PATTERN, groupImmutableDocuments } from "@/lib/immutable-keys";
 import { getWorkspaceOcrJson, listImmutableWorkspaceObjects, putWorkspaceCollectionCandidate } from "@/lib/r2-objects";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
@@ -21,10 +20,8 @@ export async function POST(request: Request) {
   if (!Number.isFinite(contentLength) || contentLength > 4_096) {
     return NextResponse.json({ code: "METADATA_ONLY_ENDPOINT" }, { status: 415, headers: { "Cache-Control": "no-store" } });
   }
-  const user = await getRequestUser(request);
-  if (!user) {
-    return NextResponse.json({ code: "AUTH_REQUIRED" }, { status: 401, headers: { "Cache-Control": "no-store" } });
-  }
+  const auth = await authorizeFoundationRequest(request, "collections:compile", "studio");
+  if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: { "Cache-Control": "no-store" } });
   let body: { documentIds?: unknown };
   try {
     body = await request.json();
@@ -39,11 +36,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ code: "DOCUMENT_SET_UNQUALIFIED" }, { status: 400, headers: { "Cache-Control": "no-store" } });
   }
 
-  const access = foundationPilotAccess(user.id);
-  if (!access) return NextResponse.json({ code: "PILOT_ACCESS_REQUIRED" }, { status: 403, headers: { "Cache-Control": "no-store" } });
-  const { membership } = access;
-  const productAccess = await authorizeFoundationProduct(membership.workspaceId, user.id, "studio");
-  if (!productAccess.ok) return NextResponse.json({ code: productAccess.code }, { status: productAccess.status, headers: { "Cache-Control": "no-store" } });
+  const workspaceId = auth.principal.workspaceKey;
   const signer = readR2SignerEnv();
   if (!signer) {
     return NextResponse.json({ code: "SIGNER_NOT_CONFIGURED" }, { status: 503, headers: { "Cache-Control": "no-store" } });
@@ -53,17 +46,17 @@ export async function POST(request: Request) {
   if (!coreV2 && !coreV1) {
     return NextResponse.json({ code: "CORE_NOT_CONFIGURED" }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
-  const listed = await listImmutableWorkspaceObjects(signer, membership.workspaceId);
+  const listed = await listImmutableWorkspaceObjects(signer, workspaceId);
   if (!listed.ok) {
     return NextResponse.json({ code: listed.code }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
-  const documents = groupImmutableDocuments(membership.workspaceId, listed.objects);
+  const documents = groupImmutableDocuments(workspaceId, listed.objects);
   const selected = documentIds.map((id) => documents.find((item) => item.documentId === id && item.hasOcrJson));
   if (selected.some((item) => !item?.sanitizedKey || !item.ocrJsonKey)) {
     return NextResponse.json({ code: "OCR_NOT_READY" }, { status: 409, headers: { "Cache-Control": "no-store", "Retry-After": "5" } });
   }
 
-  const fetched = await Promise.all(selected.map((item) => getWorkspaceOcrJson(signer, membership.workspaceId, item!.ocrJsonKey!)));
+  const fetched = await Promise.all(selected.map((item) => getWorkspaceOcrJson(signer, workspaceId, item!.ocrJsonKey!)));
   const inputs = fetched.map((result, index) => {
     const document = selected[index]!;
     if (!result.ok || !document.sanitizedKey || !document.ocrJsonKey) return null;
@@ -93,7 +86,7 @@ export async function POST(request: Request) {
     receipt: Record<string, unknown> & { requestId: string; outputSha256: string; candidatePromotion: false };
   };
   if (coreV2) {
-    const compiled = await dispatchProductCoreV2(coreV2, membership.workspaceId, verifiedInputs);
+    const compiled = await dispatchProductCoreV2(coreV2, workspaceId, verifiedInputs);
     if (!compiled.ok) {
       return NextResponse.json({ code: compiled.code }, { status: 503, headers: { "Cache-Control": "no-store" } });
     }
@@ -117,7 +110,7 @@ export async function POST(request: Request) {
       receipt: compiled.result.receipt,
     };
   } else {
-    const compiled = await dispatchCoreCompile(coreV1!, membership.workspaceId, verifiedInputs);
+    const compiled = await dispatchCoreCompile(coreV1!, workspaceId, verifiedInputs);
     if (!compiled.ok) {
       return NextResponse.json({ code: compiled.code }, { status: 503, headers: { "Cache-Control": "no-store" } });
     }
@@ -129,7 +122,7 @@ export async function POST(request: Request) {
       receipt: compiled.result.receipt,
     };
   }
-  const key = collectionCandidateKey(membership.workspaceId, artifact.collectionId, artifact.manifestDigest.replace("sha256:", ""));
+  const key = collectionCandidateKey(workspaceId, artifact.collectionId, artifact.manifestDigest.replace("sha256:", ""));
   if (!key) {
     return NextResponse.json({ code: "COLLECTION_KEY_INVALID" }, { status: 500, headers: { "Cache-Control": "no-store" } });
   }
@@ -137,7 +130,7 @@ export async function POST(request: Request) {
     ...artifact,
     coreExecution,
   };
-  const stored = await putWorkspaceCollectionCandidate(signer, membership.workspaceId, key, storedArtifact);
+  const stored = await putWorkspaceCollectionCandidate(signer, workspaceId, key, storedArtifact);
   if (!stored.ok) {
     return NextResponse.json({ code: stored.code }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }

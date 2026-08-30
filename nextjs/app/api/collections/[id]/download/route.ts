@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import { authorizeFoundationProduct } from "@/lib/billing-product-access";
+import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { buildSignedCollectionZip, validateReviewableCollectionArtifact } from "@/lib/collection-download";
 import { readExportSignerEnv } from "@/lib/export-signing";
 import { loadPreferredCollectionCandidate } from "@/lib/collection-storage";
-import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
 
@@ -13,8 +12,8 @@ export const runtime = "nodejs";
 const NO_STORE = { "Cache-Control": "no-store" };
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
-  const user = await getRequestUser(request);
-  if (!user) return NextResponse.json({ code: "AUTH_REQUIRED" }, { status: 401, headers: NO_STORE });
+  const auth = await authorizeFoundationRequest(request, "collections:download", "observer");
+  if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: NO_STORE });
 
   const { id } = await context.params;
   if (!COLLECTION_ID_PATTERN.test(id)) {
@@ -23,12 +22,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const signer = readR2SignerEnv();
   if (!signer) return NextResponse.json({ code: "SIGNER_NOT_CONFIGURED" }, { status: 503, headers: NO_STORE });
 
-  const access = foundationPilotAccess(user.id);
-  if (!access) return NextResponse.json({ code: "PILOT_ACCESS_REQUIRED" }, { status: 403, headers: NO_STORE });
-  const { membership } = access;
-  const productAccess = await authorizeFoundationProduct(membership.workspaceId, user.id, "observer");
-  if (!productAccess.ok) return NextResponse.json({ code: productAccess.code }, { status: productAccess.status, headers: NO_STORE });
-  const loaded = await loadPreferredCollectionCandidate(signer, membership.workspaceId, id);
+  const loaded = await loadPreferredCollectionCandidate(signer, auth.principal.workspaceKey, id);
   if (!loaded.ok) {
     return NextResponse.json(
       { code: loaded.code },

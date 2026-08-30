@@ -18,6 +18,8 @@ import { qualifyProgress, type OcrProgress } from "@/lib/ocr-progress";
 import PipelineBoard from "@/components/pipeline-board";
 import { displayName, elideKey, recallDocumentNames, rememberDocumentName, type DocumentNames } from "@/lib/document-names";
 import { trackFunnel } from "@/lib/funnel-events";
+import ConnectionsPanel from "@/components/connections-panel";
+import DeveloperPanel from "@/components/developer-panel";
 
 /** What this panel prints when it has no value. Not "0", and not a spinner that never resolves. */
 const UNKNOWN = "not read yet";
@@ -137,11 +139,13 @@ const GATE_LABELS = {
   candidatePromotion: "Promotion to the live world",
 } as const;
 
-type WorkspaceTab = "overview" | "knowledge" | "billing" | "integrity";
+type WorkspaceTab = "overview" | "knowledge" | "connections" | "developers" | "billing" | "integrity";
 
 const TABS: { id: WorkspaceTab; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "knowledge", label: "Knowledge" },
+  { id: "connections", label: "Connections" },
+  { id: "developers", label: "Developers" },
   { id: "billing", label: "Billing & capacity" },
   { id: "integrity", label: "Processing integrity" },
 ];
@@ -1349,6 +1353,10 @@ export default function WorkspacePage() {
             {billingAccount?.updatedAt ? <small>Last persisted billing change · {formatTimestamp(billingAccount.updatedAt)}</small> : null}
           </section>
           ) : null}
+
+          {tab === "connections" ? <ConnectionsPanel /> : null}
+
+          {tab === "developers" ? <DeveloperPanel /> : null}
 
           {tab === "integrity" ? (
           <section className="card gates">
