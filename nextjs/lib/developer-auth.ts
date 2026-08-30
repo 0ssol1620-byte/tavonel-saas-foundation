@@ -37,6 +37,10 @@ export async function authorizeFoundationRequest(
     if (!authenticated.ok) return { ok: false as const, code: authenticated.code, status: 401 };
     if (!authenticated.principal.scopes.includes(scope)) return { ok: false as const, code: "API_SCOPE_REQUIRED", status: 403 };
     principal = authenticated.principal;
+    const pilot = foundationPilotAccess(principal.userId);
+    if (!pilot || pilot.membership.workspaceId !== principal.workspaceKey) {
+      return { ok: false as const, code: "PILOT_ACCESS_REQUIRED", status: 403 };
+    }
     const rate = await consumeDeveloperApiRateLimit({
       keyId: principal.keyId!,
       workspaceKey: principal.workspaceKey,

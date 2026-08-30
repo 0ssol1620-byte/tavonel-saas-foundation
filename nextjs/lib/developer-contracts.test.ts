@@ -6,6 +6,7 @@ import {
   parseDeveloperScopes,
   sha256Prefixed,
 } from "./developer-contracts";
+import { deterministicSourceDocumentId } from "./source-intake";
 
 describe("developer connection contracts", () => {
   it("accepts OS-mounted file servers without credential material", () => {
@@ -39,20 +40,20 @@ describe("developer connection contracts", () => {
     })).toBeNull();
   });
 
-  it("requires an external secret reference only for cloud pull", () => {
+  it("exposes only deployed local-agent cloud access", () => {
     expect(parseConnectionInput({
       provider: "r2",
-      mode: "cloud_pull",
+      mode: "local_agent",
       displayName: "Evidence archive",
       configuration: { bucket: "evidence", prefix: "approved/" },
-      secretReference: "vercel://tavonel/R2_READONLY",
+      secretReference: null,
     })).not.toBeNull();
     expect(parseConnectionInput({
       provider: "s3",
       mode: "cloud_pull",
-      displayName: "Missing reference",
+      displayName: "Managed worker not deployed",
       configuration: { bucket: "evidence" },
-      secretReference: null,
+      secretReference: "vault://tavonel/research-readonly",
     })).toBeNull();
   });
 
@@ -73,6 +74,7 @@ describe("connection sync batch", () => {
       sizeBytes: 1_024,
       mimeType: "application/pdf",
       documentId: "59d42924-a3cc-4a09-b92d-9c86b58901a1",
+      sourceIdempotencyKey: "d".repeat(64),
     }];
     const manifestSha256 = await sha256Prefixed(canonicalJson(events));
     await expect(parseConnectionBatchInput({
@@ -100,6 +102,7 @@ describe("connection sync batch", () => {
       sizeBytes: null,
       mimeType: null,
       documentId: null,
+      sourceIdempotencyKey: null,
     }];
     await expect(parseConnectionBatchInput({
       batchId: "49d42924-a3cc-4a09-b92d-9c86b58901a1",
@@ -108,5 +111,35 @@ describe("connection sync batch", () => {
       manifestSha256: await sha256Prefixed(canonicalJson(events)),
       events,
     })).resolves.toBeNull();
+  });
+
+  it("rebinds uploaded document IDs to the tenant and source-event key", async () => {
+    const workspaceKey = "pilot-1234567890abcdef";
+    const sourceIdempotencyKey = "e".repeat(64);
+    const documentId = await deterministicSourceDocumentId(workspaceKey, sourceIdempotencyKey);
+    const events = [{
+      kind: "added",
+      nativeId: "folder/report.pdf",
+      revision: "sha256:source",
+      contentSha256: "a".repeat(64),
+      sizeBytes: 128,
+      mimeType: "application/pdf",
+      documentId,
+      sourceIdempotencyKey,
+    }];
+    const input = {
+      batchId: "49d42924-a3cc-4a09-b92d-9c86b58901a1",
+      previousCursorSha256: null,
+      nextCursorSha256: `sha256:${"b".repeat(64)}`,
+      manifestSha256: await sha256Prefixed(canonicalJson(events)),
+      events,
+    };
+    await expect(parseConnectionBatchInput(input, workspaceKey)).resolves.not.toBeNull();
+    const forgedEvents = [{ ...events[0], documentId: "59d42924-a3cc-4a09-b92d-9c86b58901a1" }];
+    await expect(parseConnectionBatchInput({
+      ...input,
+      manifestSha256: await sha256Prefixed(canonicalJson(forgedEvents)),
+      events: forgedEvents,
+    }, workspaceKey)).resolves.toBeNull();
   });
 });

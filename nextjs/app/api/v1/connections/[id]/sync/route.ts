@@ -24,7 +24,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   } catch {
     return NextResponse.json({ code: "INVALID_JSON" }, { status: 400, headers: NO_STORE });
   }
-  const batch = await parseConnectionBatchInput(body);
+  const batch = await parseConnectionBatchInput(body, auth.principal.workspaceKey);
   if (!batch) return NextResponse.json({ code: "CONNECTION_BATCH_INVALID" }, { status: 400, headers: NO_STORE });
   const result = await applyFoundationConnectionBatch(auth.principal.workspaceKey, id, {
     userId: auth.principal.userId,

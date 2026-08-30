@@ -13,7 +13,7 @@ describe("developer control-plane migration", () => {
   });
 
   it("enables RLS and grants no authenticated table access", () => {
-    for (const table of ["foundation_api_keys", "foundation_connections", "foundation_connection_batches", "foundation_developer_audit_events"]) {
+    for (const table of ["foundation_api_keys", "foundation_api_rate_windows", "foundation_connections", "foundation_connection_batches", "foundation_developer_audit_events"]) {
       expect(sql).toContain(`alter table public.${table} enable row level security`);
     }
     expect(sql).toContain("from public, anon, authenticated");
@@ -27,6 +27,14 @@ describe("developer control-plane migration", () => {
     expect(sql).toContain("request_count < p_limit");
     const rateFunction = sql.slice(sql.indexOf("create or replace function public.consume_foundation_api_rate_limit"));
     expect(rateFunction).toContain("delete from public.foundation_api_rate_windows");
+    expect(rateFunction).toContain("set last_used_at = clock_timestamp()");
+  });
+
+  it("enforces an atomic active-key cap and revalidates sync actors", () => {
+    expect(sql).toContain("foundation_active_api_key_limit");
+    expect(sql).toContain("pg_advisory_xact_lock");
+    expect(sql).toContain("connection_batch_actor_invalid");
+    expect(sql).toContain("'connections:sync' = any(scopes)");
   });
 
   it("applies batches under a locked expected cursor and idempotency contract", () => {

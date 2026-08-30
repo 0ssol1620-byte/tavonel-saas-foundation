@@ -183,10 +183,6 @@ export async function authenticateDeveloperApiKey(token: string) {
     const row = ((await response.json()) as Array<Record<string, unknown>>)[0];
     if (!row || row.revoked_at || typeof row.key_id !== "string" || typeof row.workspace_key !== "string" || typeof row.created_by !== "string" || !Array.isArray(row.scopes)) return { ok: false as const, code: "API_KEY_INVALID" };
     if (typeof row.expires_at === "string" && Date.parse(row.expires_at) <= Date.now()) return { ok: false as const, code: "API_KEY_EXPIRED" };
-    void supabaseAdminRequest(config, `/rest/v1/foundation_api_keys?key_id=eq.${row.key_id}`, {
-      method: "PATCH",
-      body: JSON.stringify({ last_used_at: new Date().toISOString() }),
-    }).catch(() => undefined);
     return {
       ok: true as const,
       principal: {

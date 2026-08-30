@@ -165,7 +165,7 @@ export default function ConnectionsPanel() {
         </form>
         <div className="connection-list" aria-live="polite">
           {connections === null ? <p className="world-empty">Connection state has not been read yet.</p> : null}
-          {connections?.length === 0 ? <p className="world-empty">Create a connection, then use a scoped sync key with the local agent or cloud pull worker.</p> : null}
+          {connections?.length === 0 ? <p className="world-empty">Create a connection, then use a scoped sync key with the local source agent.</p> : null}
           {connections?.map((connection) => (
             <article key={connection.connectionId}>
               <span className="connection-icon" aria-hidden="true">{connection.provider === "file_server" ? <Server size={18} /> : <Cloud size={18} />}</span>

@@ -25,6 +25,9 @@ describe("developer request authorization", () => {
     vi.clearAllMocks();
     authorizeFoundationProduct.mockResolvedValue({ ok: true });
     consumeDeveloperApiRateLimit.mockResolvedValue({ ok: true });
+    foundationPilotAccess.mockImplementation((userId: string) => ({
+      membership: { workspaceId: userId === "user" ? "pilot-user" : "pilot-1234567890abcdef" },
+    }));
   });
 
   it("authorizes a scoped API key without sending it to Supabase Auth", async () => {
@@ -85,5 +88,18 @@ describe("developer request authorization", () => {
     }), "documents:read");
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.principal.kind).toBe("session");
+  });
+
+  it("revokes API access when the key creator leaves the pilot allowlist", async () => {
+    authenticateDeveloperApiKey.mockResolvedValue({
+      ok: true,
+      principal: { kind: "api-key", keyId: "key", workspaceKey: "pilot-user", userId: "departed", scopes: ["documents:read"] },
+    });
+    foundationPilotAccess.mockReturnValue(null);
+    const result = await authorizeFoundationRequest(new Request("https://tavonel.com/api/v1/documents", {
+      headers: { authorization: `Bearer tvnl_live_abcdefghijkl_${"a".repeat(43)}` },
+    }), "documents:read");
+    expect(result).toEqual({ ok: false, code: "PILOT_ACCESS_REQUIRED", status: 403 });
+    expect(consumeDeveloperApiRateLimit).not.toHaveBeenCalled();
   });
 });

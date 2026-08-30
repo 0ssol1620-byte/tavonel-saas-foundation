@@ -8,6 +8,8 @@ describe("developer distribution", () => {
     const document = await response.json() as { paths: Record<string, unknown>; [key: string]: unknown };
     expect(document.openapi).toBe("3.1.0");
     expect(document.paths["/documents"]).toBeTruthy();
+    expect(document.paths["/connections"]).toBeTruthy();
+    expect(document.paths["/connections/{id}"]).toBeTruthy();
     expect(document.paths["/connections/{id}/sync"]).toBeTruthy();
     expect(Object.keys(document.paths).some((path) => path.includes("promote") || path.includes("rollback"))).toBe(false);
     expect(document["x-tavonel-decision-gates"]).toEqual({ promotion: "browser-session-only", rollback: "browser-session-only", mcp: "read-only" });
@@ -26,5 +28,6 @@ describe("developer distribution", () => {
     const child = spawnSync(process.execPath, ["public/developer/tavonel-cli.mjs", "help"], { encoding: "utf8", timeout: 5_000 });
     expect(child.status).toBe(0);
     expect(child.stdout).toContain("node tavonel-cli.mjs documents");
+    expect(child.stdout).toContain("node tavonel-cli.mjs connections");
   });
 });

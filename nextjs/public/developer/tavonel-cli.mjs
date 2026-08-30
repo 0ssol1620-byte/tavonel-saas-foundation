@@ -15,6 +15,9 @@ Usage:
   node tavonel-cli.mjs ask <collection-id> <question>
   node tavonel-cli.mjs compile <document-id> <document-id> [...]
   node tavonel-cli.mjs download <collection-id> <output.zip>
+  node tavonel-cli.mjs connections
+  node tavonel-cli.mjs connection-add <provider> <display-name> [configuration-json]
+  node tavonel-cli.mjs connection-revoke <connection-id>
 
 Environment:
   TAVONEL_API_KEY   Scoped tvnl_live_... token (required except status)
@@ -47,6 +50,21 @@ async function main() {
     return;
   }
   if (command === "documents") return console.log(JSON.stringify(await (await request("/api/v1/documents")).json(), null, 2));
+  if (command === "connections") return console.log(JSON.stringify(await (await request("/api/v1/connections")).json(), null, 2));
+  if (command === "connection-add" && args[0] && args[1]) {
+    const provider = args[0];
+    const configuration = args[2] ? JSON.parse(args[2]) : {};
+    const response = await request("/api/v1/connections", {
+      method: "POST",
+      body: JSON.stringify({ provider, mode: "local_agent", displayName: args[1], configuration, secretReference: null }),
+    });
+    return console.log(JSON.stringify(await response.json(), null, 2));
+  }
+  if (command === "connection-revoke" && args[0]) {
+    await request(`/api/v1/connections/${encodeURIComponent(args[0])}`, { method: "DELETE" });
+    console.log(`Revoked ${args[0]}. Immutable outputs were retained.`);
+    return;
+  }
   if (command === "collection" && args[0]) return console.log(JSON.stringify(await (await request(`/api/v1/collections/${encodeURIComponent(args[0])}`)).json(), null, 2));
   if (command === "world" && args[0]) return console.log(JSON.stringify(await (await request(`/api/v1/collections/${encodeURIComponent(args[0])}/world`)).json(), null, 2));
   if (command === "ask" && args[0] && args.slice(1).join(" ").length >= 3) {

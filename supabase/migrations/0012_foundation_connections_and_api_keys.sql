@@ -29,6 +29,28 @@ create index foundation_api_keys_workspace_idx
 create index foundation_api_keys_active_prefix_idx
   on public.foundation_api_keys (key_prefix) where revoked_at is null;
 
+create or replace function public.enforce_foundation_api_key_limit()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(new.workspace_key, 0));
+  if (
+    select count(*) from public.foundation_api_keys
+    where workspace_key = new.workspace_key and revoked_at is null
+      and (expires_at is null or expires_at > clock_timestamp())
+  ) >= 20 then
+    raise exception 'foundation_active_api_key_limit';
+  end if;
+  return new;
+end;
+$$;
+create trigger foundation_api_key_limit_before_insert
+  before insert on public.foundation_api_keys
+  for each row execute function public.enforce_foundation_api_key_limit();
+
 create table public.foundation_api_rate_windows (
   key_id uuid not null references public.foundation_api_keys(key_id) on delete cascade,
   workspace_key text not null check (workspace_key ~ '^pilot-[A-Za-z0-9]{1,16}$'),
@@ -161,6 +183,18 @@ begin
     or ((p_actor_user_id is null) = (p_actor_key_id is null)) then
     raise exception 'connection_batch_contract_invalid';
   end if;
+  if p_actor_key_id is not null and not exists (
+    select 1 from public.foundation_api_keys
+    where key_id = p_actor_key_id and workspace_key = p_workspace_key
+      and revoked_at is null and (expires_at is null or expires_at > clock_timestamp())
+      and 'connections:sync' = any(scopes)
+  ) then
+    raise exception 'connection_batch_actor_invalid';
+  end if;
+  if p_actor_user_id is not null and p_workspace_key is distinct from
+    'pilot-' || substring(replace(p_actor_user_id::text, '-', '') from 1 for 16) then
+    raise exception 'connection_batch_actor_invalid';
+  end if;
 
   select * into v_connection from public.foundation_connections
     where connection_id = p_connection_id and workspace_key = p_workspace_key for update;
@@ -248,6 +282,10 @@ begin
     set request_count = public.foundation_api_rate_windows.request_count + 1
     where public.foundation_api_rate_windows.request_count < p_limit
   returning request_count into v_count;
+  if v_count is not null and v_count <= p_limit then
+    update public.foundation_api_keys set last_used_at = clock_timestamp()
+      where key_id = p_key_id;
+  end if;
   return v_count is not null and v_count <= p_limit;
 end;
 $$;
@@ -262,5 +300,7 @@ revoke all on function public.consume_foundation_api_rate_limit(uuid, text, text
   from public, anon, authenticated;
 grant execute on function public.consume_foundation_api_rate_limit(uuid, text, text, integer)
   to service_role;
+revoke all on function public.enforce_foundation_api_key_limit()
+  from public, anon, authenticated;
 
 commit;

@@ -1,3 +1,5 @@
+import { deterministicSourceDocumentId } from "./source-intake";
+
 export const DEVELOPER_SCOPES = [
   "documents:read",
   "documents:intake",
@@ -17,7 +19,6 @@ export type ConnectionMode = "local_agent" | "cloud_pull";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
-const SECRET_REFERENCE = /^(vercel|aws-sm|gcp-sm|azure-kv|vault):\/\/[A-Za-z0-9._/@:+-]{3,500}$/;
 const FORBIDDEN_CONFIG_KEY = /(secret|password|token|credential|access[_-]?key|private[_-]?key)/i;
 const CONFIG_KEYS = new Set([
   "bucket",
@@ -46,6 +47,7 @@ export type ConnectionEvent = {
   sizeBytes: number | null;
   mimeType: string | null;
   documentId: string | null;
+  sourceIdempotencyKey: string | null;
 };
 
 export type ConnectionBatchInput = {
@@ -91,10 +93,9 @@ export function parseConnectionInput(value: unknown): ConnectionInput | null {
     ? null
     : typeof value.secretReference === "string" ? value.secretReference.trim() : "";
   if (!(["file_server", "s3", "r2", "minio"] as unknown[]).includes(provider)) return null;
-  if (!(["local_agent", "cloud_pull"] as unknown[]).includes(mode)) return null;
+  if (mode !== "local_agent") return null;
   if (!displayName || displayName.length > 100 || !validConfiguration(configuration)) return null;
   if (provider === "file_server" && (mode !== "local_agent" || secretReference !== null)) return null;
-  if (provider !== "file_server" && mode === "cloud_pull" && (!secretReference || !SECRET_REFERENCE.test(secretReference))) return null;
   if (mode === "local_agent" && secretReference !== null) return null;
   return { provider, mode, displayName, configuration, secretReference } as ConnectionInput;
 }
@@ -117,7 +118,7 @@ export async function sha256Prefixed(value: string) {
   return `sha256:${[...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("")}`;
 }
 
-export async function parseConnectionBatchInput(value: unknown): Promise<ConnectionBatchInput | null> {
+export async function parseConnectionBatchInput(value: unknown, workspaceKey?: string): Promise<ConnectionBatchInput | null> {
   if (!isPlainObject(value) || !UUID.test(String(value.batchId ?? ""))) return null;
   if (value.previousCursorSha256 !== null && !SHA256.test(String(value.previousCursorSha256 ?? ""))) return null;
   if (!SHA256.test(String(value.nextCursorSha256 ?? "")) || !SHA256.test(String(value.manifestSha256 ?? ""))) return null;
@@ -131,13 +132,19 @@ export async function parseConnectionBatchInput(value: unknown): Promise<Connect
     const sizeBytes = raw.sizeBytes === null ? null : Number(raw.sizeBytes);
     const mimeType = raw.mimeType === null ? null : typeof raw.mimeType === "string" ? raw.mimeType : "";
     const documentId = raw.documentId === null ? null : typeof raw.documentId === "string" ? raw.documentId : "";
+    const sourceIdempotencyKey = raw.sourceIdempotencyKey === null ? null : typeof raw.sourceIdempotencyKey === "string" ? raw.sourceIdempotencyKey : "";
     if (!nativeId || nativeId.length > 1024 || !revision || revision.length > 512) return null;
     if (contentSha256 !== null && !/^[a-f0-9]{64}$/.test(contentSha256)) return null;
     if (sizeBytes !== null && (!Number.isSafeInteger(sizeBytes) || sizeBytes < 0 || sizeBytes > 524_288_000)) return null;
     if (mimeType !== null && (!/^[a-z0-9.+-]+\/[a-z0-9.+-]+$/i.test(mimeType) || mimeType.length > 127)) return null;
     if (documentId !== null && !UUID.test(documentId)) return null;
-    if (raw.kind === "deleted" && (contentSha256 !== null || sizeBytes !== null || mimeType !== null || documentId !== null)) return null;
-    events.push({ kind: raw.kind, nativeId, revision, contentSha256, sizeBytes, mimeType, documentId } as ConnectionEvent);
+    if (sourceIdempotencyKey !== null && !/^[a-f0-9]{64}$/.test(sourceIdempotencyKey)) return null;
+    if ((documentId === null) !== (sourceIdempotencyKey === null)) return null;
+    if (documentId !== null && workspaceKey) {
+      if (await deterministicSourceDocumentId(workspaceKey, sourceIdempotencyKey!) !== documentId) return null;
+    }
+    if (raw.kind === "deleted" && (contentSha256 !== null || sizeBytes !== null || mimeType !== null || documentId !== null || sourceIdempotencyKey !== null)) return null;
+    events.push({ kind: raw.kind, nativeId, revision, contentSha256, sizeBytes, mimeType, documentId, sourceIdempotencyKey } as ConnectionEvent);
   }
   const manifestSha256 = String(value.manifestSha256);
   if (await sha256Prefixed(canonicalJson(events)) !== manifestSha256) return null;
