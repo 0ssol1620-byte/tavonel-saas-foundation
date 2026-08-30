@@ -39,7 +39,7 @@ import WorldField, { type WorldMode } from "@/components/world-field";
 import { AREAS, CHANGE, DISCLOSURE, KEPT, REBUILT, SOURCE_CENSUS, WORLD, n } from "@/lib/demo-world";
 import { useCheckout } from "@/lib/use-checkout";
 import { loginUrlForOffer } from "@/lib/checkout-intent";
-import { trackFunnel } from "@/lib/funnel-events";
+import { trackFunnel, trackSceneDepth } from "@/lib/funnel-events";
 import type { BillingOfferCode } from "@/lib/billing-catalog";
 import { readCapabilities, type StatusResponse } from "@/lib/capabilities";
 import { useScrollProgress, useScrollScenes } from "@/lib/use-scroll-scenes";
@@ -135,6 +135,15 @@ export default function HomePage() {
     [capabilities],
   );
 
+  /**
+   * E2 -- where people stop reading.
+   *
+   * This is the one number the page cannot get from inspection. Everything else about the
+   * argument -- whether it is clear, whether it is honest, whether it is too long -- can be
+   * judged by looking at it. Whether anyone gets past scene 03 cannot.
+   */
+  useEffect(() => { trackSceneDepth(scene); }, [scene]);
+
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -190,6 +199,19 @@ export default function HomePage() {
   };
 
   /**
+   * Calls to action are counted by *where they sit*, not by what they say. Labels are copy and
+   * copy gets rewritten; "hero_primary" survives the rewrite and stays comparable across it.
+   *
+   * The scene rail and the nav's section links are deliberately not counted here. They are
+   * navigation -- a reader moving around inside the argument -- and folding them in would make
+   * a page that is easy to browse look like a page that converts.
+   */
+  const cta = (name: string, run: () => void) => () => {
+    trackFunnel("cta_clicked", { cta: name, scene: String(scene) });
+    run();
+  };
+
+  /**
    * What the bar offers, by where the reader is. The page argues in order -- mess, compile,
    * world, change, rebuild, answer, evidence, access -- so the useful control is the next link in
    * that argument, not the last one.
@@ -235,7 +257,7 @@ export default function HomePage() {
           <Link className="btn small" href="/workspace">Open workspace</Link>
         ) : (
           <>
-            <button className="btn small ghost" type="button" onClick={() => jump(8)}>Get access</button>
+            <button className="btn small ghost" type="button" onClick={cta("nav_access", () => jump(8))}>Get access</button>
             <Link className="btn small" href="/login">Sign in</Link>
           </>
         )}
@@ -264,10 +286,10 @@ export default function HomePage() {
               structured, <b>AI-ready knowledge</b> &mdash; and keeps it correct as your sources change.
             </p>
             <div className="actions rv">
-              <button className="btn" type="button" onClick={() => jump(2)}>Watch it compile</button>
+              <button className="btn" type="button" onClick={cta("hero_primary", () => jump(2))}>Watch it compile</button>
               {/* "Request access" pointed at /login, which is a sign-in and not a request. The hero now
                   uses the same verb as the nav and sends people to the section that can answer it. */}
-              <button className="btn ghost" type="button" onClick={() => jump(8)}>Get access</button>
+              <button className="btn ghost" type="button" onClick={cta("hero_secondary", () => jump(8))}>Get access</button>
             </div>
             <div className="debris rv">
               {DEBRIS.map((name) => <span className="frag" key={name}>{name}</span>)}
@@ -577,7 +599,7 @@ export default function HomePage() {
           the scene, so it is always the next thing rather than a fixed CTA following them down
           the page.
         */}
-        <button className="bar-next" type="button" onClick={nextStep.run}>{nextStep.label}</button>
+        <button className="bar-next" type="button" onClick={cta("instrument_bar", nextStep.run)}>{nextStep.label}</button>
       </div>
 
       {notice ? (

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import { IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -48,6 +49,17 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           crossOrigin="anonymous"
         />
         {children}
+        {/*
+          Measurement, on the same terms as everything else here.
+
+          Nothing in this product could be judged before this: the page argues for a sequence of
+          eight scenes and nobody knew how far down anyone got. It is Vercel's own analytics for
+          one specific reason -- it loads from `/_vercel/insights` on this origin, so the strict
+          CSP above admits it without a single directive being widened, and no third party is
+          contacted. It sets no cookie, which is why this page still has no consent banner to
+          apologise for.
+        */}
+        <Analytics />
       </body>
     </html>
   );
