@@ -53,13 +53,13 @@ export default function SecurityPage() {
         <Link className="btn small" href="/login">Sign in</Link>
       </header>
 
-      <main id="main">
+      <main id="main" tabIndex={-1}>
         <section className="scene doc">
           <div className="shell">
             <div className="body">
               <div className="stack">
                 <p className="slate"><b>RECORD</b><span />SECURITY &amp; DATA PATH</p>
-                <h2>Where your documents go,<br />and what never sees them.</h2>
+                <h1 className="document-title">Where your documents go,<br />and what never sees them.</h1>
               </div>
               <div className="stack">
                 <p className="lede">
@@ -74,7 +74,7 @@ export default function SecurityPage() {
                   {BOUNDARY.map(([num, name, text]) => (
                     <article className="link" key={num}>
                       <span className="st">{num}</span>
-                      <h3>{name}</h3>
+                      <h2>{name}</h2>
                       <p>{text}</p>
                     </article>
                   ))}
@@ -84,7 +84,7 @@ export default function SecurityPage() {
                 <div className="chain">
                   {PATH.map(([name, text]) => (
                     <article className="link" key={name}>
-                      <h3>{name}</h3>
+                      <h2>{name}</h2>
                       <p>{text}</p>
                     </article>
                   ))}
@@ -101,7 +101,7 @@ export default function SecurityPage() {
                   {Object.entries(activationPolicy).map(([key, value]) => (
                     <article key={key} data-state={value.enabled ? "operational" : "restricted"}>
                       <span>{value.enabled ? "enabled" : "human gate"}</span>
-                      <h3>{CAPABILITY_LABELS[key as keyof typeof CAPABILITY_LABELS]}</h3>
+                      <h2>{CAPABILITY_LABELS[key as keyof typeof CAPABILITY_LABELS]}</h2>
                       <p>{value.reason}</p>
                     </article>
                   ))}

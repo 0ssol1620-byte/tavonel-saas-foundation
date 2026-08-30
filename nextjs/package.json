@@ -10,11 +10,17 @@
     "start": "next start",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "qa:launch": "playwright test --project=launch-chromium --project=launch-firefox --project=launch-webkit",
+    "qa:launch:chromium": "playwright test --project=launch-chromium",
+    "qa:launch:firefox": "playwright test --project=launch-firefox",
+    "qa:launch:webkit": "playwright test --project=launch-webkit",
+    "qa:lighthouse": "node scripts/launch-qa/lighthouse-budgets.mjs",
     "check": "tsc --noEmit && eslint app components lib",
     "lint": "eslint app components lib",
     "proof:live-ocr": "node scripts/foundation-live-ocr-proof.mjs",
     "ops:smoke": "node scripts/operations-smoke.mjs",
-    "verify:export": "node scripts/verify-signed-export.mjs"
+    "verify:export": "node scripts/verify-signed-export.mjs",
+    "verify:developer-clean": "node scripts/verify-developer-clean-install.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.4",

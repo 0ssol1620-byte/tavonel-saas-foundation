@@ -14,7 +14,7 @@ export function GET(request: Request) {
     openapi: "3.1.0",
     info: {
       title: "TAVONEL Knowledge Compiler API",
-      version: "2026-08-30",
+      version: "2026-08-30.1",
       description: "Tenant-scoped access to immutable documents, candidate knowledge packages, active worlds, grounded retrieval and durable connector cursors. Promotion and rollback remain human-session-only.",
     },
     servers: [{ url: `${origin}/api/v1` }],
@@ -89,12 +89,64 @@ export function GET(request: Request) {
           responses: { "200": { description: "Cursor transition applied or idempotently replayed" }, "400": errorResponse, "409": errorResponse, "423": errorResponse },
         },
       },
+      "/oauth-connectors": {
+        get: {
+          operationId: "listOAuthConnectors",
+          "x-tavonel-auth": "browser-session",
+          security: [{ TavonelUserSession: [] }],
+          description: "Lists configured provider readiness and tenant OAuth connections. Provider credentials are never returned.",
+          responses: { "200": { description: "OAuth provider readiness and connections" }, "401": errorResponse, "503": errorResponse },
+        },
+      },
+      "/oauth-connectors/authorize": {
+        post: {
+          operationId: "startOAuthConnectorAuthorization",
+          "x-tavonel-auth": "browser-session",
+          security: [{ TavonelUserSession: [] }],
+          description: "Creates a single-use PKCE authorization. Fails closed unless the provider client and managed secret broker are configured.",
+          requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/OAuthConnectorAuthorizationInput" } } } },
+          responses: { "200": { description: "Short-lived provider authorization URL" }, "400": errorResponse, "401": errorResponse, "503": errorResponse },
+        },
+      },
+      "/oauth-connectors/connections/{id}": {
+        delete: {
+          operationId: "revokeOAuthConnector",
+          "x-tavonel-auth": "browser-session",
+          security: [{ TavonelUserSession: [] }],
+          parameters: [{ $ref: "#/components/parameters/OAuthConnectionId" }],
+          responses: { "204": { description: "Refresh secret deleted and connection revoked" }, "401": errorResponse, "404": errorResponse, "503": errorResponse },
+        },
+      },
+      "/developer/keys/{id}/rotate": {
+        post: {
+          operationId: "rotateDeveloperApiKey",
+          "x-tavonel-auth": "browser-session",
+          security: [{ TavonelUserSession: [] }],
+          description: "Atomically creates a replacement key, revokes the source key and writes an audit event. Plaintext is returned once.",
+          parameters: [{ $ref: "#/components/parameters/DeveloperKeyId" }],
+          responses: { "201": { description: "One-time replacement credential" }, "400": errorResponse, "401": errorResponse, "404": errorResponse },
+        },
+      },
+      "/developer/audit": {
+        get: {
+          operationId: "listDeveloperAuditEvents",
+          "x-tavonel-auth": "browser-session",
+          security: [{ TavonelUserSession: [] }],
+          description: "Reads the tenant-scoped developer and connector audit trail.",
+          responses: { "200": { description: "Bounded audit event list" }, "401": errorResponse, "503": errorResponse },
+        },
+      },
     },
     components: {
-      securitySchemes: { TavonelApiKey: { type: "http", scheme: "bearer", bearerFormat: "tvnl_live_<prefix>_<secret>", description: "Create in Workspace > Developers. The plaintext is shown once." } },
+      securitySchemes: {
+        TavonelApiKey: { type: "http", scheme: "bearer", bearerFormat: "tvnl_live_<prefix>_<secret>", description: "Create in Workspace > Developers. The plaintext is shown once." },
+        TavonelUserSession: { type: "http", scheme: "bearer", bearerFormat: "Supabase access JWT", description: "Interactive user session. Developer API keys cannot call management or OAuth routes." },
+      },
       parameters: {
         CollectionId: { name: "id", in: "path", required: true, schema: { type: "string", pattern: "^collection-[a-f0-9]{32}$" } },
         ConnectionId: { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        OAuthConnectionId: { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        DeveloperKeyId: { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
       },
       schemas: {
         Error: { type: "object", required: ["code"], properties: { code: { type: "string" } }, additionalProperties: true },
@@ -111,6 +163,15 @@ export function GET(request: Request) {
               additionalProperties: true,
             },
             secretReference: { type: "null", description: "Local agents use workload credentials; secrets are never sent to TAVONEL." },
+          },
+          additionalProperties: false,
+        },
+        OAuthConnectorAuthorizationInput: {
+          type: "object",
+          required: ["provider", "displayName"],
+          properties: {
+            provider: { enum: ["google_drive", "dropbox", "microsoft_graph"] },
+            displayName: { type: "string", minLength: 1, maxLength: 100 },
           },
           additionalProperties: false,
         },
@@ -144,6 +205,9 @@ export function GET(request: Request) {
       },
     },
     "x-tavonel-scopes": DEVELOPER_SCOPES,
+    "x-tavonel-api-version": 1,
+    "x-tavonel-version-policy": { pathMajor: "/api/v1", responseHeader: "X-TAVONEL-API-Version", clientMediaType: "application/vnd.tavonel.v1+json" },
+    "x-tavonel-browser-session-paths": ["/oauth-connectors", "/oauth-connectors/authorize", "/oauth-connectors/connections/{id}", "/developer/keys/{id}/rotate", "/developer/audit"],
     "x-tavonel-decision-gates": { promotion: "browser-session-only", rollback: "browser-session-only", mcp: "read-only" },
   }, { headers: { "Cache-Control": "public, max-age=300", "X-Content-Type-Options": "nosniff" } });
 }

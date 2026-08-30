@@ -19,8 +19,26 @@ describe("developer distribution", () => {
     expect(document.paths["/connections"]).toBeTruthy();
     expect(document.paths["/connections/{id}"]).toBeTruthy();
     expect(document.paths["/connections/{id}/sync"]).toBeTruthy();
+    expect(document.paths["/oauth-connectors/authorize"]).toBeTruthy();
+    expect(document.paths["/developer/keys/{id}/rotate"]).toBeTruthy();
+    expect(document["x-tavonel-api-version"]).toBe(1);
     expect(Object.keys(document.paths).some((path) => path.includes("promote") || path.includes("rollback"))).toBe(false);
     expect(document["x-tavonel-decision-gates"]).toEqual({ promotion: "browser-session-only", rollback: "browser-session-only", mcp: "read-only" });
+  });
+
+  it("publishes one version across CLI, MCP, and the update channel", () => {
+    const channel = JSON.parse(readFileSync(developerAsset("channel.json"), "utf8")) as { version: string; apiVersion: number; assets: Record<string, { sha256: string }> };
+    const cli = readFileSync(developerAsset("tavonel-cli.mjs"), "utf8");
+    const mcp = readFileSync(developerAsset("tavonel-mcp.mjs"), "utf8");
+    expect(channel.version).toBe("2026.8.30.1");
+    expect(channel.apiVersion).toBe(1);
+    expect(cli).toContain(`DISTRIBUTION_VERSION = "${channel.version}"`);
+    expect(mcp).toContain(`DISTRIBUTION_VERSION = "${channel.version}"`);
+    const assetFiles = { cli: "tavonel-cli.mjs", mcp: "tavonel-mcp.mjs", sourceAgent: "tavonel-source-agent.py" } as const;
+    for (const [key, filename] of Object.entries(assetFiles)) {
+      const digest = `sha256:${createHash("sha256").update(readFileSync(developerAsset(filename))).digest("hex")}`;
+      expect(channel.assets[key].sha256).toBe(digest);
+    }
   });
 
   it("completes a real MCP initialize and exposes read-only tools only", () => {

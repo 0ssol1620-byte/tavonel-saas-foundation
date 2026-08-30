@@ -23,17 +23,27 @@ export default defineConfig({
   projects: [
     ...widths.map(width => ({
       name: `${width}`,
+      testIgnore: /launch-qa.*\.spec\.ts/,
       use: { viewport: { width, height: width <= 390 ? 844 : 900 } },
     })),
     {
       name: "reduced-motion",
+      testIgnore: /launch-qa.*\.spec\.ts/,
       use: {
         viewport: { width: 1440, height: 900 },
         reducedMotion: "reduce" as const,
       },
     },
+    ...(["chromium", "firefox", "webkit"] as const).map(browserName => ({
+      name: `launch-${browserName}`,
+      testMatch: /launch-qa.*\.spec\.ts/,
+      use: {
+        browserName,
+        viewport: { width: 1440, height: 900 },
+      },
+    })),
   ],
-  webServer: {
+  webServer: process.env.PLAYWRIGHT_EXTERNAL_SERVER === "1" ? undefined : {
     // Exercise the production CSP. Next's development React Refresh runtime
     // requires eval, which the shipped policy intentionally forbids.
     command: "pnpm build && pnpm start --hostname 127.0.0.1 --port 3117",

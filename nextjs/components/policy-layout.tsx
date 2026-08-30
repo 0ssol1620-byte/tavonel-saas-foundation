@@ -19,10 +19,10 @@ export default function PolicyLayout({
         <nav aria-label="Policy navigation"><Link href="/status">Service status</Link><Link href="/contact">Contact</Link></nav>
         <Link className="btn small" href="/login">Sign in</Link>
       </header>
-      <main id="main">
+      <main id="main" tabIndex={-1}>
         <section className="scene doc policy-page">
           <div className="shell"><div className="body">
-            <div className="stack"><p className="slate"><b>PUBLIC RECORD</b><span />{label}</p><h2>{title}</h2></div>
+            <div className="stack"><p className="slate"><b>PUBLIC RECORD</b><span />{label}</p><h1 className="document-title">{title}</h1></div>
             <div className="stack"><p className="lede">{intro}</p><div className="policy-copy">{children}</div></div>
           </div></div>
         </section>

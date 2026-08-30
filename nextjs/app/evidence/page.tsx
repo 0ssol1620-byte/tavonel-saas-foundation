@@ -36,7 +36,7 @@ export default function EvidencePage() {
         <Link className="btn small" href="/login">Sign in</Link>
       </header>
 
-      <main id="main">
+      <main id="main" tabIndex={-1}>
         <section className="scene doc">
           <div className="shell">
             <div className="body">

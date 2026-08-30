@@ -37,7 +37,16 @@ const nextConfig = {
   typedRoutes: true,
   outputFileTracingRoot: packageRoot,
   async headers() {
-    return [{ source: "/(.*)", headers: securityHeaders }];
+    return [
+      {
+        source: "/api/v1/:path*",
+        headers: [
+          { key: "X-TAVONEL-API-Version", value: "1" },
+          { key: "Vary", value: "Accept" },
+        ],
+      },
+      { source: "/(.*)", headers: securityHeaders },
+    ];
   },
 };
 export default nextConfig;

@@ -962,7 +962,7 @@ export default function WorkspacePage() {
     // No shell, no tabs, no numbers. Anything drawn here would be describing a workspace this
     // visitor has not been shown to own.
     return (
-      <main id="main" className="auth">
+      <main id="main" className="auth" tabIndex={-1}>
         <header>
           <Link href="/" className="wordmark"><Logomark /><b>TAVONEL</b></Link>
           <span className="mode"><i aria-hidden="true" />PRIVATE PILOT</span>
@@ -989,7 +989,7 @@ export default function WorkspacePage() {
   }
 
   return (
-    <main id="main" className="workspace">
+    <main id="main" className="workspace" tabIndex={-1}>
       <aside className="side">
         <Link href="/" className="brand"><Logomark size={22} />TAVONEL</Link>
         <p className="eyebrow">WORKSPACE</p>

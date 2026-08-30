@@ -167,6 +167,94 @@ export async function revokeDeveloperApiKey(workspaceKey: string, userId: string
   }
 }
 
+export async function rotateDeveloperApiKey(input: {
+  workspaceKey: string;
+  userId: string;
+  oldKeyId: string;
+  name: string;
+  scopes: DeveloperScope[];
+  expiresAt: string | null;
+}) {
+  const config = readSupabaseAdminConfig();
+  if (!config) return { ok: false as const, code: "DEVELOPER_STORE_NOT_CONFIGURED" };
+  const prefix = bytesToBase64Url(crypto.getRandomValues(new Uint8Array(9)));
+  const secret = bytesToBase64Url(crypto.getRandomValues(new Uint8Array(32)));
+  const token = `tvnl_live_${prefix}_${secret}`;
+  try {
+    const response = await supabaseAdminRequest(config, "/rest/v1/rpc/rotate_foundation_api_key", {
+      method: "POST",
+      body: JSON.stringify({
+        p_workspace_key: input.workspaceKey,
+        p_old_key_id: input.oldKeyId,
+        p_new_name: input.name,
+        p_new_prefix: prefix,
+        p_new_token_sha256: await tokenSha256(token),
+        p_new_scopes: input.scopes,
+        p_new_expires_at: input.expiresAt,
+        p_actor_user_id: input.userId,
+      }),
+    });
+    const row = await response.json().catch(() => ({})) as Record<string, unknown>;
+    if (!response.ok) {
+      const message = typeof row.message === "string" ? row.message : "";
+      return { ok: false as const, code: message.includes("api_key_rotation_source_invalid") ? "API_KEY_NOT_FOUND" : "API_KEY_ROTATE_FAILED" };
+    }
+    if (typeof row.keyId !== "string" || typeof row.keyPrefix !== "string" || typeof row.name !== "string" || !Array.isArray(row.scopes) || typeof row.createdAt !== "string") {
+      return { ok: false as const, code: "DEVELOPER_STORE_BINDING_INVALID" };
+    }
+    return {
+      ok: true as const,
+      token,
+      replacedKeyId: input.oldKeyId,
+      key: {
+        keyId: row.keyId,
+        name: row.name,
+        prefix: row.keyPrefix,
+        scopes: row.scopes as DeveloperScope[],
+        createdAt: row.createdAt,
+        expiresAt: typeof row.expiresAt === "string" ? row.expiresAt : null,
+        lastUsedAt: null,
+        revokedAt: null,
+      } satisfies DeveloperApiKey,
+    };
+  } catch {
+    return { ok: false as const, code: "API_KEY_ROTATE_FAILED" };
+  }
+}
+
+export async function listDeveloperAuditEvents(workspaceKey: string, limit = 100) {
+  const config = readSupabaseAdminConfig();
+  if (!config) return { ok: false as const, code: "DEVELOPER_STORE_NOT_CONFIGURED" };
+  const query = new URLSearchParams({
+    select: "event_id,action,target_id,actor_user_id,actor_key_id,details,created_at",
+    workspace_key: `eq.${workspaceKey}`,
+    order: "created_at.desc",
+    limit: String(Math.max(1, Math.min(limit, 200))),
+  });
+  try {
+    const response = await supabaseAdminRequest(config, `/rest/v1/foundation_developer_audit_events?${query}`);
+    if (!response.ok) return { ok: false as const, code: "DEVELOPER_AUDIT_READ_FAILED" };
+    const rows = await response.json() as Array<Record<string, unknown>>;
+    if (rows.some((row) => typeof row.event_id !== "string" || typeof row.action !== "string" || typeof row.target_id !== "string" || typeof row.created_at !== "string")) {
+      return { ok: false as const, code: "DEVELOPER_STORE_BINDING_INVALID" };
+    }
+    return {
+      ok: true as const,
+      events: rows.map((row) => ({
+        eventId: row.event_id,
+        action: row.action,
+        targetId: row.target_id,
+        actorUserId: typeof row.actor_user_id === "string" ? row.actor_user_id : null,
+        actorKeyId: typeof row.actor_key_id === "string" ? row.actor_key_id : null,
+        details: row.details && typeof row.details === "object" ? row.details as Record<string, unknown> : {},
+        createdAt: row.created_at,
+      })),
+    };
+  } catch {
+    return { ok: false as const, code: "DEVELOPER_AUDIT_READ_FAILED" };
+  }
+}
+
 export async function authenticateDeveloperApiKey(token: string) {
   const match = API_KEY_PATTERN.exec(token);
   const config = readSupabaseAdminConfig();

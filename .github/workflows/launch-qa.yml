@@ -1,0 +1,92 @@
+name: Launch QA
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: launch-qa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser-qa:
+    name: Browser QA (${{ matrix.browser }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    defaults:
+      run:
+        working-directory: nextjs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.34.4 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: nextjs/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: Install ${{ matrix.browser }} runtime
+        run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
+      - name: Run launch QA
+        run: pnpm exec playwright test --project=launch-${{ matrix.browser }}
+      - name: Preserve browser failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: launch-qa-${{ matrix.browser }}
+          path: |
+            nextjs/playwright-report
+            nextjs/test-results
+          if-no-files-found: ignore
+          retention-days: 14
+
+  lighthouse:
+    name: Lighthouse budgets
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: nextjs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.34.4 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: nextjs/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: Install Chromium runtime
+        run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm build
+      - name: Start production app
+        run: pnpm start --hostname 127.0.0.1 --port 3117 > /tmp/tavonel-next.log 2>&1 &
+      - name: Wait for health
+        run: node scripts/launch-qa/wait-for-health.mjs
+      - name: Enforce Lighthouse budgets
+        run: CHROME_PATH=$(node -e "const { chromium } = require('@playwright/test'); process.stdout.write(chromium.executablePath())") pnpm qa:lighthouse
+      - name: Show server log on failure
+        if: failure()
+        run: cat /tmp/tavonel-next.log
+
+  launch-gate:
+    name: Launch gate
+    if: always()
+    needs: [browser-qa, lighthouse]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every launch check
+        run: |
+          test "${{ needs.browser-qa.result }}" = "success"
+          test "${{ needs.lighthouse.result }}" = "success"

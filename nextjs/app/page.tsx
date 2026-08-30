@@ -321,7 +321,7 @@ export default function HomePage() {
   })();
 
   return (
-    <div className="page">
+    <div className="page landing-page">
       <WorldField mode={fieldMode} />
 
       <header className="nav" data-stuck={progress > 0.005 ? 1 : 0}>
@@ -370,14 +370,14 @@ export default function HomePage() {
         ))}
       </div>
 
-      <main id="main">
+      <main id="main" tabIndex={-1}>
         {/* ═══════════════════════════════════════════════════ 01 · the mess */}
         <section className="scene hero" id="s1" data-scene="1" data-band="scatter">
           <div className="shell">
-            <p className="slate rv"><b>TAVONEL</b><span /> KNOWLEDGE COMPILER</p>
+            <p className="slate"><b>TAVONEL</b><span /> KNOWLEDGE COMPILER</p>
             <h1>
-              <span className="line"><i>{revealWords("Your knowledge is everywhere.")}</i></span>
-              <span className="line dim"><i>{revealWords("Compile it.", 4)}</i></span>
+              <span className="line"><i>Your knowledge is everywhere.</i></span>
+              <span className="line dim"><i>Compile it.</i></span>
             </h1>
             {/*
               One sentence, and it no longer lists what the chips underneath already show.
@@ -386,7 +386,7 @@ export default function HomePage() {
               paragraph on a phone and stops the page saying the same thing three times before
               it has shown anything.
             */}
-            <p className="lede rv">
+            <p className="lede">
               TAVONEL turns everything your company has already written into structured,
               <b> AI-ready knowledge</b> &mdash; and keeps it correct as the sources change.
             </p>
@@ -397,7 +397,7 @@ export default function HomePage() {
               is told, in the second, that they can stop reading. The disqualifier is not modesty;
               it is the fastest way to be believed by the people who do recognise it.
             */}
-            <p className="who rv">
+            <p className="who">
               For teams whose answers live in documents that keep changing.
               <b> If your files never change, you do not need this.</b>
             </p>
@@ -408,7 +408,7 @@ export default function HomePage() {
               watching, so the fold now asks for exactly that, and sign-in stays as the quiet
               control for people who already have a workspace.
             */}
-            <div className="actions rv">
+            <div className="actions">
               <button className="btn" type="button" onClick={cta("hero_primary", () => jump(2))}>Watch it compile</button>
             </div>
             {/*
@@ -421,7 +421,7 @@ export default function HomePage() {
               the index rather than from a random draw, so the server and the client render the
               same page and the disorder is the same disorder every time.
             */}
-            <div className="debris rv">
+            <div className="debris">
               {DEBRIS.map((name, index) => (
                 <span
                   className="frag"
@@ -432,7 +432,7 @@ export default function HomePage() {
                 </span>
               ))}
             </div>
-            <div className="chaos rv">
+            <div className="chaos">
               <Cell value={n(SOURCE_CENSUS.files)} label="Files" />
               <Cell value={SOURCE_CENSUS.bytes} label={`Across ${SOURCE_CENSUS.systems} systems`} />
               <Cell value={n(SOURCE_CENSUS.nearDuplicates)} label="Near-duplicates" warn />
@@ -440,7 +440,7 @@ export default function HomePage() {
               <Cell value={n(SOURCE_CENSUS.scansWithoutTextLayer)} label="Scans with no text layer" warn />
               <Cell value="&mdash;" label="Relationships between any of it" warn />
             </div>
-            <p className="fine rv">
+            <p className="fine">
               This is what a company actually looks like before anyone tries to put an AI on top
               of it. {DISCLOSURE.fixture}
             </p>

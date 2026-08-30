@@ -3,6 +3,7 @@ import {
   authenticateDeveloperApiKey,
   consumeDeveloperApiRateLimit,
   createDeveloperApiKey,
+  rotateDeveloperApiKey,
 } from "./developer-store";
 
 const workspaceKey = "pilot-1234567890abcdef";
@@ -124,5 +125,39 @@ describe("developer credential store", () => {
       scope: "documents:read",
       limit: 120,
     })).resolves.toEqual({ ok: true });
+  });
+
+  it("returns a replacement token only after the atomic rotation RPC succeeds", async () => {
+    configure();
+    const requestBodies: Record<string, unknown>[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      expect(String(input)).toContain("rotate_foundation_api_key");
+      const requestBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      requestBodies.push(requestBody);
+      return Response.json({
+        keyId: "39d42924-a3cc-4a09-b92d-9c86b58901a1",
+        name: "Rotated agent",
+        keyPrefix: requestBody.p_new_prefix,
+        scopes: ["documents:read"],
+        createdAt: "2026-08-30T01:00:00Z",
+        expiresAt: null,
+        replacedKeyId: keyId,
+      });
+    }));
+    const result = await rotateDeveloperApiKey({
+      workspaceKey,
+      userId,
+      oldKeyId: keyId,
+      name: "Rotated agent",
+      scopes: ["documents:read"],
+      expiresAt: null,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const requestBody = requestBodies[0];
+    expect(result.token).toMatch(/^tvnl_live_[A-Za-z0-9_-]{12}_[A-Za-z0-9_-]{43}$/);
+    expect(requestBody).not.toHaveProperty("p_new_token");
+    expect(requestBody?.p_new_token_sha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(JSON.stringify(requestBody)).not.toContain(result.token);
   });
 });

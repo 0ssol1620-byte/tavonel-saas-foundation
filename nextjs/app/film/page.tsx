@@ -35,7 +35,7 @@ export default function FilmPage() {
         </nav>
       </header>
 
-      <main id="main">
+      <main id="main" tabIndex={-1}>
         <OpeningFilm />
       </main>
     </div>

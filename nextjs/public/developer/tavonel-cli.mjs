@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+const DISTRIBUTION_VERSION = "2026.8.30.1";
+const API_VERSION = "1";
 const baseUrl = (process.env.TAVONEL_BASE_URL || "https://tavonel.com").replace(/\/$/, "");
 const apiKey = process.env.TAVONEL_API_KEY || "";
 const [command = "help", ...args] = process.argv.slice(2);
@@ -9,6 +11,7 @@ function usage() {
 
 Usage:
   node tavonel-cli.mjs status
+  node tavonel-cli.mjs update-check
   node tavonel-cli.mjs documents
   node tavonel-cli.mjs collection <collection-id>
   node tavonel-cli.mjs world <collection-id>
@@ -21,7 +24,9 @@ Usage:
 
 Environment:
   TAVONEL_API_KEY   Scoped tvnl_live_... token (required except status)
-  TAVONEL_BASE_URL  Defaults to https://tavonel.com`;
+  TAVONEL_BASE_URL  Defaults to https://tavonel.com
+
+Version: ${DISTRIBUTION_VERSION} (API v${API_VERSION})`;
 }
 
 function requireKey() {
@@ -32,18 +37,39 @@ async function request(path, options = {}) {
   requireKey();
   const response = await fetch(`${baseUrl}${path}`, {
     ...options,
-    headers: { authorization: `Bearer ${apiKey}`, ...(options.body ? { "content-type": "application/json" } : {}), ...options.headers },
+    headers: { authorization: `Bearer ${apiKey}`, accept: "application/vnd.tavonel.v1+json", ...(options.body ? { "content-type": "application/json" } : {}), ...options.headers },
     signal: AbortSignal.timeout(60_000),
   });
   if (!response.ok) {
     const body = await response.text();
     throw new Error(`${response.status} ${body.slice(0, 500)}`);
   }
+  const responseVersion = response.headers.get("x-tavonel-api-version");
+  if (responseVersion && responseVersion !== API_VERSION) throw new Error(`Unsupported API version ${responseVersion}; this CLI requires v${API_VERSION}.`);
   return response;
 }
 
+function newerThan(candidate, current) {
+  const left = candidate.split(".").map(Number);
+  const right = current.split(".").map(Number);
+  for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
+    const difference = (left[index] || 0) - (right[index] || 0);
+    if (difference !== 0) return difference > 0;
+  }
+  return false;
+}
+
+async function checkForUpdate() {
+  const response = await fetch(`${baseUrl}/developer/channel.json`, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(10_000) });
+  const channel = await response.json();
+  if (!response.ok || typeof channel.version !== "string" || channel.apiVersion !== Number(API_VERSION)) throw new Error("Distribution channel contract is unavailable or incompatible.");
+  return { current: DISTRIBUTION_VERSION, latest: channel.version, updateAvailable: newerThan(channel.version, DISTRIBUTION_VERSION), assets: channel.assets };
+}
+
 async function main() {
+  if (command === "--version" || command === "version") return console.log(`tavonel-cli ${DISTRIBUTION_VERSION} (api v${API_VERSION})`);
   if (command === "help" || command === "--help" || command === "-h") return console.log(usage());
+  if (command === "update-check") return console.log(JSON.stringify(await checkForUpdate(), null, 2));
   if (command === "status") {
     const response = await fetch(`${baseUrl}/api/status`, { signal: AbortSignal.timeout(10_000) });
     console.log(JSON.stringify(await response.json(), null, 2));

@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+const DISTRIBUTION_VERSION = "2026.8.30.1";
+const API_VERSION = "1";
 const baseUrl = (process.env.TAVONEL_BASE_URL || "https://tavonel.com").replace(/\/$/, "");
 const apiKey = process.env.TAVONEL_API_KEY || "";
 const encoder = new TextEncoder();
@@ -15,11 +17,13 @@ async function api(path, options = {}) {
   if (!apiKey.startsWith("tvnl_live_")) throw new Error("TAVONEL_API_KEY is missing or invalid");
   const response = await fetch(`${baseUrl}${path}`, {
     ...options,
-    headers: { authorization: `Bearer ${apiKey}`, ...(options.body ? { "content-type": "application/json" } : {}) },
+    headers: { authorization: `Bearer ${apiKey}`, accept: "application/vnd.tavonel.v1+json", ...(options.body ? { "content-type": "application/json" } : {}) },
     signal: AbortSignal.timeout(60_000),
   });
   const text = await response.text();
   if (!response.ok) throw new Error(`TAVONEL ${response.status}: ${text.slice(0, 500)}`);
+  const responseVersion = response.headers.get("x-tavonel-api-version");
+  if (responseVersion && responseVersion !== API_VERSION) throw new Error(`Unsupported API version ${responseVersion}`);
   return JSON.parse(text);
 }
 
@@ -38,7 +42,7 @@ async function callTool(name, args) {
 
 async function handle(message) {
   if (message.method === "notifications/initialized") return null;
-  if (message.method === "initialize") return { jsonrpc: "2.0", id: message.id, result: { protocolVersion: "2025-06-18", capabilities: { tools: { listChanged: false } }, serverInfo: { name: "tavonel-readonly", version: "2026.8.30" }, instructions: "Read-only access to source-bound TAVONEL knowledge. No tool can upload, compile, promote, roll back, change billing, or mutate connectors." } };
+  if (message.method === "initialize") return { jsonrpc: "2.0", id: message.id, result: { protocolVersion: "2025-06-18", capabilities: { tools: { listChanged: false } }, serverInfo: { name: "tavonel-readonly", version: DISTRIBUTION_VERSION }, instructions: `Read-only access to source-bound TAVONEL knowledge over API v${API_VERSION}. No tool can upload, compile, promote, roll back, change billing, or mutate connectors.` } };
   if (message.method === "ping") return { jsonrpc: "2.0", id: message.id, result: {} };
   if (message.method === "tools/list") return { jsonrpc: "2.0", id: message.id, result: { tools } };
   if (message.method === "tools/call") {
@@ -50,6 +54,11 @@ async function handle(message) {
   }
   if (message.id === undefined) return null;
   return { jsonrpc: "2.0", id: message.id, error: { code: -32601, message: "Method not found" } };
+}
+
+if (process.argv.includes("--version")) {
+  process.stdout.write(`tavonel-mcp ${DISTRIBUTION_VERSION} (api v${API_VERSION})\n`);
+  process.exit(0);
 }
 
 let pending = "";

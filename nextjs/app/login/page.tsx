@@ -89,7 +89,7 @@ export default function LoginPage() {
   };
 
   return (
-    <main id="main" className="auth">
+    <main id="main" className="auth" tabIndex={-1}>
       <header>
         <Link href="/" className="wordmark"><Logomark /><b>TAVONEL</b></Link>
         <span className="mode"><i aria-hidden="true" />PRIVATE PILOT</span>

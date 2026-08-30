@@ -24,13 +24,13 @@ export default function ContactPage() {
         <Link className="btn small" href="/login">Sign in</Link>
       </header>
 
-      <main id="main">
+      <main id="main" tabIndex={-1}>
         <section className="scene doc contact-page">
           <div className="shell">
             <div className="body">
               <div className="stack">
                 <p className="slate"><b>DIRECT LINE</b><span />INQUIRY</p>
-                <h2>Tell us what your knowledge needs to become.</h2>
+                <h1 className="document-title">Tell us what your knowledge needs to become.</h1>
                 <div className="contact-address">
                   <span>General inquiries</span>
                   <a href="mailto:hello@tavonel.com">hello@tavonel.com</a>

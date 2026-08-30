@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: "Not found — TAVONEL" };
 
 export default function NotFound() {
   return (
-    <main id="main" className="auth">
+    <main id="main" className="auth" tabIndex={-1}>
       <header>
         <Link href="/" className="wordmark"><Logomark /><b>TAVONEL</b></Link>
         <span className="mode"><i aria-hidden="true" />PRIVATE PILOT</span>
