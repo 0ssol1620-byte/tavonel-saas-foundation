@@ -16,7 +16,7 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://tavonel-saas-foundation.vercel.app"),
+  metadataBase: new URL("https://tavonel.com"),
   title: "TAVONEL — The Knowledge Compiler",
   description:
     "Watch scattered files become one current world. TAVONEL compiles sources into knowledge that stays current, and returns every answer to its evidence.",
