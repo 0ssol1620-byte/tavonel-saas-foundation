@@ -24,7 +24,7 @@ type Form = "contract" | "scan" | "manual" | "handbook" | "sheet";
 type Line = { kind: Kind; text: string; ocr?: boolean };
 type Doc = { file: string; form: Form; md: string; lines: Line[] };
 
-const PERIOD = 2.15;
+const PERIOD = 3.2;
 const ORIG_LAG = 0;
 const EXT_LAG = 1.7;
 
@@ -58,17 +58,24 @@ const DOCS: Doc[] = [
     file: CHANGE.document,
     form: "contract",
     md: `# Services Agreement
-source: §3.2 · p.7
+source: §3.2 · p.7 · lines 14–16
 
-| Item | Qty | Amount |
+## Payment
+Invoices are due 45 days after receipt of a valid invoice.
+
+| Description | Basis | Amount |
 | --- | --- | --- |
-| Survey | 1 | £4,200 |
-| Line 4 OT | 12 | £1,860 |
+| Warehouse B survey | two days | £4,200.00 |
+| Line 4 overtime | 12 hours | £1,860.00 |
+| Change order 3 | 4 March | £25,000.00 |
+| Retention 5% | snagging | £1,553.00 |
+| Total certified | this period | £32,613.00 |
 
-![Fig. 2 Bay layout](attachment)
+![Fig. 2 Bay layout — Line 4](attachment)
 
-invoices_due: 45 days
-change_order: $50,000`,
+## Change orders
+Work above $50,000 needs a signed change order before any additional cost.
+Late amounts accrue 1.5% per month.`,
     lines: [
       { kind: "letter", text: "ACME HOLDINGS  ·  CONFIDENTIAL" },
       { kind: "title", text: "Services Agreement" },
@@ -89,11 +96,16 @@ change_order: $50,000`,
     md: `# Site visit notes
 path: ocr
 no_text_layer: true
+page: scan_0140
+
+Warehouse B closed after 18:00. Gate staff had no revised schedule.
+Line 4 safety sign-off outstanding. Supervisor will not run overtime.
 
 ![Photo pack — 14 files, unfiled](scan_0140)
 
-warehouse_b: closed 18:00
-line_4: safety sign-off outstanding`,
+Asked for the 30-day invoice clock in writing.
+Bay 2 lighting failed at 17:40. Logged against Operations Manual 4.3.
+Names in the margin: Park, Singh, unnamed contractor.`,
     lines: [
       { kind: "letter", text: "SCAN 0140  ·  NO TEXT LAYER" },
       { kind: "title", text: "Site visit notes" },
@@ -110,8 +122,14 @@ line_4: safety sign-off outstanding`,
     file: "Operations Manual.docx",
     form: "manual",
     md: `# Operations Manual
-po_policy: cite live payment terms
-archived_45_day: do not use
+controlled copy · rev 9
+
+## 4.1 Purchase orders
+POs above policy must cite the live payment terms, not the archived 45-day schedule.
+A change order is required before the supplier starts work above the threshold.
+
+## 4.3 Handoffs
+Finance and Legal both sign. Silence is not approval.
 
 > Figure omitted. Caption only: “Handoff between Finance and Legal.”`,
     lines: [
@@ -129,10 +147,15 @@ archived_45_day: do not use
     file: "Employee Handbook 2026.pdf",
     form: "handbook",
     md: `# Employee Handbook 2026
-notice: 30 days
-confidentiality: 3 years
+effective: 1 January 2026
 
-Where handbook and agreement disagree, the agreement wins.`,
+## 12. Notice
+Either party may end employment with thirty (30) days’ written notice.
+Confidentiality survives for three years after the last day of employment.
+
+## 14. Conflicts
+Where this handbook and a services agreement disagree, the agreement wins.
+Do not paste a number from a forecast sheet into a policy.`,
     lines: [
       { kind: "letter", text: "PEOPLE  ·  POLICY" },
       { kind: "title", text: "Employee Handbook 2026" },
@@ -149,14 +172,18 @@ Where handbook and agreement disagree, the agreement wins.`,
     form: "sheet",
     md: `# Q3 forecast
 kind: spreadsheet
+owner: Finance
+reviewer: Legal
 
-| Cell | Meaning |
-| --- | --- |
-| yellow | threshold |
-| green | actual |
-| grey | commentary |
+| Cell | Jan | Feb | Mar | Q3 |
+| --- | --- | --- | --- | --- |
+| Cash | 1.2 | 1.1 | 0.9 | 3.2 |
+| Invoices | 0.8 | 1.4 | 1.1 | 3.3 |
+| Threshold | 25k | 25k | 25k | 25k |
+| Actual | 22k | 31k | 28k | 81k |
 
-Do not hard-code $50,000.`,
+Yellow cells are thresholds. Green cells are actuals.
+Do not hard-code $50,000. The model is not a source of truth.`,
     lines: [
       { kind: "letter", text: "FINANCE  ·  MODEL" },
       { kind: "title", text: "Q3 forecast" },
@@ -369,33 +396,58 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
       });
     };
 
-    const drawTable = (x: number, y: number, w: number, alpha: number, scale: number) => {
-      const rows = [
-        ["Item", "Qty", "Unit", "Amount"],
-        ["On-site survey", "1", "ls", "£4,200"],
-        ["Line 4 overtime", "12", "hr", "£1,860"],
-        ["Change order 3", "1", "ls", "£25,000"],
-      ];
-      const colW = [w * 0.42, w * 0.14, w * 0.16, w * 0.28];
-      const rowH = 14 * scale;
+    const TABLES: Record<Form, string[][]> = {
+      contract: [
+        ["Description", "Basis", "Amount"],
+        ["Warehouse B survey", "two days on site", "£4,200.00"],
+        ["Line 4 overtime", "12 hours at £155", "£1,860.00"],
+        ["Change order 3", "signed 4 March", "£25,000.00"],
+        ["Retention held", "5% until snagging", "£1,553.00"],
+        ["Total certified", "this period", "£32,613.00"],
+      ],
+      manual: [
+        ["Role", "Action", "Required"],
+        ["Finance", "sign the PO", "live terms"],
+        ["Legal", "countersign", "before work"],
+        ["Supplier", "do not start", "written CO"],
+        ["Ops", "cite §4.1", "controlled copy"],
+      ],
+      handbook: [
+        ["Clause", "Rule", "Term"],
+        ["12 Notice", "thirty days written", "2026"],
+        ["Confidentiality", "survives exit", "3 years"],
+        ["14 Conflicts", "agreement wins", "always"],
+        ["Forecasts", "not a source", "do not paste"],
+      ],
+      scan: [],
+      sheet: [],
+    };
+
+    const drawTable = (x: number, y: number, w: number, alpha: number, scale: number, rows: string[][]) => {
+      const colW = [w * 0.42, w * 0.32, w * 0.26];
+      const rowH = 13 * scale;
+      const fs = Math.max(6.5, 8 * scale);
       context.globalAlpha = alpha;
-      context.strokeStyle = "#8a8174";
-      context.fillStyle = "#ebe4d4";
-      context.fillRect(x, y, w, rowH * rows.length);
       let yy = y;
       rows.forEach((row, r) => {
         let xx = x;
         row.forEach((cell, c) => {
+          context.fillStyle = r === 0 ? "#e4dcc8" : r === rows.length - 1 ? "#ece6d6" : "#f3eee2";
+          context.fillRect(xx, yy, colW[c], rowH);
+          context.strokeStyle = "#8a8174";
           context.strokeRect(xx, yy, colW[c], rowH);
-          context.fillStyle = r === 0 ? "#1a1612" : "#322e28";
-          context.font = `${r === 0 ? "600" : "400"} ${8.5 * scale}px ui-monospace, Menlo, monospace`;
-          context.fillText(cell, xx + 4 * scale, yy + 10 * scale);
+          context.fillStyle = "#1a1612";
+          context.font = `${r === 0 || r === rows.length - 1 ? "600" : "400"} ${fs}px ui-monospace, Menlo, monospace`;
+          const max = colW[c] - 6 * scale;
+          let shown = cell;
+          while (context.measureText(shown).width > max && shown.length > 1) shown = `${shown.slice(0, -2)}…`;
+          context.fillText(shown, xx + 3 * scale, yy + rowH * 0.72);
           xx += colW[c];
         });
         yy += rowH;
       });
       context.globalAlpha = 1;
-      return yy + 10 * scale;
+      return yy + 8 * scale;
     };
 
     const drawFigure = (x: number, y: number, w: number, alpha: number, scale: number) => {
@@ -426,26 +478,35 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
     };
 
     const drawSheet = (x: number, y: number, w: number, alpha: number, scale: number) => {
-      const cols = 4;
-      const rows = 5;
+      const head = ["", "Jan", "Feb", "Mar", "Q3"];
+      const body = [
+        ["Cash", "1.2", "1.1", "0.9", "3.2"],
+        ["Invoices", "0.8", "1.4", "1.1", "3.3"],
+        ["Threshold", "25k", "25k", "25k", "25k"],
+        ["Actual", "22k", "31k", "28k", "81k"],
+        ["Note", "live", "live", "held", "rev"],
+      ];
+      const cols = head.length;
       const cw = w / cols;
-      const rh = 13 * scale;
+      const rh = 12 * scale;
       context.globalAlpha = alpha;
-      for (let r = 0; r < rows; r += 1) {
-        for (let c = 0; c < cols; c += 1) {
-          const xx = x + c * cw;
-          const yy = y + r * rh;
-          context.fillStyle = r === 0 ? "#c5ddd0" : c === 2 && r === 3 ? "#e8d48a" : "#eef3ea";
-          context.fillRect(xx, yy, cw, rh);
-          context.strokeStyle = "#9aa89a";
-          context.strokeRect(xx, yy, cw, rh);
-        }
-      }
-      context.fillStyle = "#1a1612";
-      context.font = `500 ${7.5 * scale}px ui-monospace, Menlo, monospace`;
-      context.fillText("Q3", x + 4, y + 10 * scale);
+      const write = (r: number, c: number, text: string, hi: boolean) => {
+        const xx = x + c * cw;
+        const yy = y + r * rh;
+        context.fillStyle = r === 0 ? "#d5e4d8" : hi ? "#e8d48a" : "#eef3ea";
+        context.fillRect(xx, yy, cw, rh);
+        context.strokeStyle = "#9aa89a";
+        context.strokeRect(xx, yy, cw, rh);
+        context.fillStyle = "#1a1612";
+        context.font = `${r === 0 || c === 0 ? "600" : "400"} ${7.2 * scale}px ui-monospace, Menlo, monospace`;
+        context.fillText(text, xx + 3, yy + rh * 0.72);
+      };
+      head.forEach((cell, c) => write(0, c, cell || "Line", false));
+      body.forEach((row, r) => {
+        row.forEach((cell, c) => write(r + 1, c, cell, row[0] === "Threshold" && c > 0));
+      });
       context.globalAlpha = 1;
-      return y + rows * rh + 10 * scale;
+      return y + (body.length + 1) * rh + 8 * scale;
     };
 
     const drawScanPhoto = (x: number, y: number, w: number, alpha: number, scale: number) => {
@@ -522,7 +583,7 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
             context.globalAlpha = 1;
             ty += size * 1.28;
           });
-          if (matter && form === "contract" && lineIndex === 2) ty = drawTable(mx, ty, maxW, alpha, scale);
+          if (matter && TABLES[form].length && lineIndex === 2) ty = drawTable(mx, ty, maxW, alpha, scale, TABLES[form]);
           if (matter && form === "contract" && lineIndex === 4) ty = drawFigure(mx, ty, maxW, alpha, scale);
           if (matter && form === "scan" && lineIndex === 1) ty = drawScanPhoto(mx, ty, maxW, alpha, scale);
           if (matter && form === "sheet" && lineIndex === 2) ty = drawSheet(mx, ty, maxW, alpha, scale);
@@ -564,15 +625,28 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
     const drawMd = (x: number, y: number, w: number, h: number, md: string, local: number) => {
       context.fillStyle = "#0b0d0e";
       context.fillRect(x, y, w, h);
-      const count = Math.floor(local * md.length);
-      const caret = local < 0.98 && Math.floor(local * 20) % 2 === 0 ? "▌" : "";
       context.fillStyle = "rgba(123,224,190,0.85)";
       context.font = "500 8px ui-monospace, Menlo, monospace";
       context.fillText("WORKING COPY.md", x + 8, y + 12);
-      context.font = "400 10px ui-monospace, Menlo, monospace";
-      (md.slice(0, count) + caret).split("\n").forEach((row, i) => {
-        context.fillStyle = row.startsWith("#") ? "#edeae4" : row.startsWith("source") ? "#7d878d" : "#c8ced2";
-        context.fillText(row, x + 8, y + 28 + i * 13);
+      const count = Math.max(1, Math.floor(local * md.length));
+      const caret = local < 0.98 && Math.floor(local * 20) % 2 === 0 ? "▌" : "";
+      context.font = "400 9px ui-monospace, Menlo, monospace";
+      const maxW = w - 16;
+      const lines: string[] = [];
+      (md.slice(0, count) + caret).split("\n").forEach((row) => {
+        wrap(context, row.length ? row : " ", maxW).forEach((part) => lines.push(part));
+      });
+      const rowH = 12;
+      const maxRows = Math.max(4, Math.floor((h - 22) / rowH));
+      lines.slice(0, maxRows).forEach((row, i) => {
+        context.fillStyle = row.startsWith("#")
+          ? "#edeae4"
+          : row.startsWith("|") || row.startsWith("!")
+            ? "#7be0be"
+            : row.startsWith(">") || row.startsWith("source")
+              ? "#7d878d"
+              : "#c8ced2";
+        context.fillText(row, x + 8, y + 26 + i * rowH);
       });
     };
 
@@ -635,9 +709,9 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
     const draw = (t: number) => {
       studio();
       const bw = width * 0.94;
-      const bh = height * 0.72;
+      const bh = height * 0.64;
       const bx = (width - bw) / 2;
-      const by = height * 0.07;
+      const by = height * 0.05;
       const gap = 10;
       const colY = by + 38;
       const colH = bh - 42;
@@ -681,9 +755,9 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
       context.restore();
 
       pane(xs[2], colY, colW, colH, "EXTRACT", `SCAN ${extI + 1}/${DOCS.length}`);
-      const topH = colH * 0.62;
+      const topH = colH * 0.4;
       drawPage(xs[2] + 8, colY + 30, colW - 16, topH - 8, ext.lines, local, false, 0.92, inkE, ext.form, false);
-      drawMd(xs[2] + 8, colY + 26 + topH, colW - 16, colH - topH - 34, ext.md, local);
+      drawMd(xs[2] + 8, colY + 26 + topH, colW - 16, colH - topH - 34, ext.md, Math.min(1, local * 1.7));
 
       pane(xs[3], colY, colW, colH, "WORLD", "linking");
       drawWorld(xs[3] + 6, colY + 30, colW - 12, colH - 38, t);

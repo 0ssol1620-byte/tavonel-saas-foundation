@@ -18,6 +18,13 @@ describe("opening film copy", () => {
     expect(text).toContain(n(KEPT));
   });
 
+  it("keeps captions inside a lower band, not a poster title", () => {
+    for (const caption of FILM_CAPTIONS) {
+      expect(caption.line.length).toBeLessThan(56);
+      expect((caption.sub ?? "").length).toBeLessThan(90);
+    }
+  });
+
   it("ends on the compile, not the category name", () => {
     const last = FILM_CAPTIONS[FILM_CAPTIONS.length - 1];
     expect(last?.line.toLowerCase()).toContain("compiled");

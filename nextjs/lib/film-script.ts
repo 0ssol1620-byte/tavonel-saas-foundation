@@ -1,5 +1,5 @@
 /**
- * Spoken track. 16s shareable cut. Only the end card is on screen.
+ * Spoken track. Locked four-up. Caption stays in the lower band, never a poster title.
  */
 import { CHANGE, KEPT, REBUILT, WORLD, n } from "./demo-world";
 
@@ -25,21 +25,21 @@ export const FILM_CAPTIONS: FilmCaption[] = [
     until: FILM_ACT.ocr,
     kicker: "EXAMPLE",
     line: "This is the mess.",
-    sub: "Drive, original, extract, world — four rooms, already working.",
+    sub: "Four rooms already at work. The files do not leave the drive.",
   },
   {
     at: FILM_ACT.ocr,
     until: FILM_ACT.markdown,
     kicker: "EXAMPLE",
-    line: "Originals keep changing form.",
-    sub: "Contract. Scan. Sheet. Handbook. Not one page on a loop.",
+    line: "A contract is not a spreadsheet.",
+    sub: "Originals keep their shape: table, figure, stamp, sheet.",
   },
   {
     at: FILM_ACT.markdown,
     until: FILM_ACT.world,
     kicker: "EXAMPLE",
-    line: "Scan reveals. Markdown cites.",
-    sub: "A table becomes rows. A figure becomes a caption. The picture does not copy.",
+    line: "Scan writes a line. Markdown names it.",
+    sub: "A table becomes rows. A figure becomes a caption.",
   },
   {
     at: FILM_ACT.world,
@@ -51,8 +51,8 @@ export const FILM_CAPTIONS: FilmCaption[] = [
   {
     at: FILM_ACT.end,
     until: Number.POSITIVE_INFINITY,
-    kicker: "TAVONEL",
+    kicker: "EXAMPLE",
     line: "The files stayed. The world compiled.",
-    sub: "One world. Every AI.",
+    sub: "Declared fixture data. Not a customer run.",
   },
 ];
