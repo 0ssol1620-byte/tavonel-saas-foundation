@@ -74,4 +74,28 @@ describe("R2 document listing prefix", () => {
     });
     expect(fetchMock).toHaveBeenCalledOnce();
   });
+
+  it("keeps large materialized candidates bounded independently from OCR JSON", async () => {
+    const env = {
+      accountId: "acct",
+      bucket: FOUNDATION_R2_BUCKET,
+      accessKeyId: "AKIAEXAMPLE",
+      secretAccessKey: "secret",
+    };
+    const key = `immutable/${WS}/${WS}/collections/collection-${"ab".repeat(16)}/${"cd".repeat(32)}/candidate-world.json`;
+    const fetchMock = vi.fn(async () => new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const materializedCandidate = { content: "x".repeat(4 * 1024 * 1024) };
+    const accepted = await putWorkspaceCollectionCandidate(env, WS, key, materializedCandidate);
+    expect(accepted).toMatchObject({ ok: true, status: "written" });
+    expect(fetchMock).toHaveBeenCalledOnce();
+
+    const oversizedCandidate = { content: "x".repeat(16 * 1024 * 1024) };
+    await expect(putWorkspaceCollectionCandidate(env, WS, key, oversizedCandidate)).resolves.toEqual({
+      ok: false,
+      code: "JSON_TOO_LARGE",
+    });
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
 });
