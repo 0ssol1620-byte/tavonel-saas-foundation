@@ -1,8 +1,9 @@
 "use client";
 
 /**
- * 45s. Four live columns. Camera fits one column at a time (no crop).
- * Each column keeps flipping to the next document — throughput, not one page.
+ * LOCKED cut `1f876a3` / public/film/compile-cut.mp4 — site header later.
+ * 18s, four-up, camera off. EXTRACT scan 56% / markdown 44% is a fixed split.
+ * Do not retune layout unless the user unlocks the cut.
  */
 
 import Link from "next/link";
