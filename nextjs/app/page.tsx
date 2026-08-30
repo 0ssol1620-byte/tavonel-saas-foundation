@@ -46,16 +46,43 @@ import { useScrollProgress, useScrollScenes } from "@/lib/use-scroll-scenes";
 
 /* ------------------------------------------------------------------ scene definitions */
 
+/**
+ * B1 -- five scenes, seven states of the world.
+ *
+ * There were eight numbered scenes, and a first-time reader had to agree to eight full-viewport
+ * stops before reaching anything they could buy. Two pairs argued the same point twice -- the
+ * compile and what it produced, the change and the rebuild that answers it -- so each pair is
+ * now one scene. The eighth, our own evidence record, is a page of its own at /evidence: it is
+ * the most convincing thing we have and the least useful thing to put in front of someone who
+ * has not yet decided what this is.
+ *
+ * What the merge must not cost is the field behind the page, which has a distinct state for
+ * every step of the argument. So the two are separated: a scene is what the rail and the
+ * eyebrow count, a band is what the world does. A merged scene contains two bands and moves
+ * the world twice while the reader counts one.
+ */
 const SCENES = [
-  { id: 1, label: "THE MESS", mode: "scatter", state: "SCATTERED", version: "v0", facts: null },
-  { id: 2, label: "COMPILE", mode: "structure", state: "COMPILING", version: "v0", facts: null },
-  { id: 3, label: "COMPILED WORLD", mode: "current", state: "COMPILED", version: `v${WORLD.versionBefore}`, facts: WORLD.facts },
-  { id: 4, label: "SOMETHING CHANGES", mode: "change", state: "CHANGED", version: `v${WORLD.versionBefore}`, facts: WORLD.facts },
-  { id: 5, label: "REBUILD & VERIFY", mode: "recompile", state: "VERIFIED", version: `v${WORLD.versionAfter}`, facts: WORLD.facts },
-  { id: 6, label: "THE ANSWER", mode: "answer", state: "CURRENT", version: `v${WORLD.versionAfter}`, facts: WORLD.facts },
-  { id: 7, label: "EVIDENCE & BOUNDARY", mode: "current", state: "CURRENT", version: `v${WORLD.versionAfter}`, facts: WORLD.facts },
-  { id: 8, label: "ACCESS", mode: "current", state: "CURRENT", version: `v${WORLD.versionAfter}`, facts: WORLD.facts },
+  { id: 1, label: "THE MESS" },
+  { id: 2, label: "COMPILE" },
+  { id: 3, label: "KEEPING IT TRUE" },
+  { id: 4, label: "THE ANSWER" },
+  { id: 5, label: "ACCESS" },
 ] as const;
+
+type BandName = "scatter" | "structure" | "world" | "change" | "rebuild" | "answer" | "access";
+
+const BANDS: Record<BandName, { mode: WorldMode; state: string; version: string; facts: number | null }> = {
+  scatter: { mode: "scatter", state: "SCATTERED", version: "v0", facts: null },
+  structure: { mode: "structure", state: "COMPILING", version: "v0", facts: null },
+  world: { mode: "current", state: "COMPILED", version: `v${WORLD.versionBefore}`, facts: WORLD.facts },
+  change: { mode: "change", state: "CHANGED", version: `v${WORLD.versionBefore}`, facts: WORLD.facts },
+  rebuild: { mode: "recompile", state: "VERIFIED", version: `v${WORLD.versionAfter}`, facts: WORLD.facts },
+  answer: { mode: "answer", state: "CURRENT", version: `v${WORLD.versionAfter}`, facts: WORLD.facts },
+  access: { mode: "current", state: "CURRENT", version: `v${WORLD.versionAfter}`, facts: WORLD.facts },
+};
+
+/** Reading order, so "have we reached the change yet" is one comparison rather than a set. */
+const BAND_ORDER: BandName[] = ["scatter", "structure", "world", "change", "rebuild", "answer", "access"];
 
 /** Filenames as a visitor's own drive would show them: dated, versioned, and not tidy. */
 const DEBRIS = [
@@ -81,26 +108,6 @@ const STOPS = [
   "Wiring citations back to sources", "Re-running all of it next quarter",
 ];
 
-/**
- * Scene 07 -- real. The document boundary this deployment enforces. Deliberately carries no
- * state pill: whether each control is open right now is the status grid's job, one scene down,
- * and having both say it was the clearest duplication on the old page.
- */
-const BOUNDARY = [
-  ["01", "Quarantine", "Browser-direct, tenant-scoped intake. Document bytes never pass through the application or the database."],
-  ["02", "Sanitize", "Antivirus and mandatory content disarm, with the sanitization proof kept as evidence."],
-  ["03", "Understand", "Only sanitized artifacts reach analysis. A parser gets no tools, no broad credentials, no outbound network."],
-  ["04", "Review", "A person decides before anything is promoted. Automated analysis produces a candidate, never a world."],
-] as const;
-
-/** Scene 07 -- real. What has been measured, and what has only been built. */
-const EVIDENCE = [
-  ["measured", "Recovery changes the outcome", "On a public benchmark with an unmodified scoring path, the recovery runtime moved a document extraction score substantially. Our own measurement, published with its confidence interval, and never placed beside a competitor's number as if reproduced."],
-  ["measured", "Compilation refuses more than it emits, sometimes", "Of a thousand documents offered in one campaign, four hundred and four were refused, every one for a link the compiler could not resolve. A vault with a broken link is not emitted, by design."],
-  ["unsupported", "Blind quality detection failed", "We tested whether prediction-only signals could pick the worst documents without ground truth. They could not beat ranking by length alone. Published as unsupported, and not shipped as a feature."],
-  ["unproven", "Most thresholds are uncalibrated", "Tests show the code does what its author intended. They do not show a threshold is right. Nothing here presents an uncalibrated threshold as a measured result."],
-] as const;
-
 const PLANS = [
   ["Observer", "$29", "A considered first step.", "observer_access"],
   ["Studio", "$99", "For teams building a governed corpus.", "studio_access"],
@@ -122,9 +129,11 @@ export default function HomePage() {
   const [statusFailed, setStatusFailed] = useState(false);
   const { start: startCheckout, busy: billingBusy } = useCheckout(setNotice);
 
-  const scene = useScrollScenes(SCENES.length);
+  const { scene, band } = useScrollScenes(SCENES.length);
   const progress = useScrollProgress();
   const active = SCENES.find((s) => s.id === scene) ?? SCENES[0];
+  const world = BANDS[(band as BandName) in BANDS ? (band as BandName) : "scatter"];
+  const reachedChange = BAND_ORDER.indexOf(band as BandName) >= BAND_ORDER.indexOf("change");
   const capabilities = useMemo(() => readCapabilities(status, statusFailed), [status, statusFailed]);
   /**
    * Gates the grid does not report as open. Direction rows are excluded on purpose: they are not
@@ -213,15 +222,14 @@ export default function HomePage() {
 
   /**
    * What the bar offers, by where the reader is. The page argues in order -- mess, compile,
-   * world, change, rebuild, answer, evidence, access -- so the useful control is the next link in
-   * that argument, not the last one.
+   * keeping it true, answer, access -- so the useful control is the next link in that argument,
+   * not the last one.
    */
   const nextStep = ((): { label: string; run: () => void } => {
-    if (scene <= 2) return { label: "SEE THE COMPILED WORLD", run: () => jump(3) };
-    if (scene <= 4) return { label: "SEE IT REBUILD", run: () => jump(5) };
-    if (scene === 5) return { label: "SEE THE ANSWER", run: () => jump(6) };
-    if (scene === 6) return { label: "SEE THE EVIDENCE", run: () => jump(7) };
-    if (scene === 7) return { label: "GET ACCESS", run: () => jump(8) };
+    if (scene <= 1) return { label: "WATCH IT COMPILE", run: () => jump(2) };
+    if (scene === 2) return { label: "SEE IT KEEP UP", run: () => jump(3) };
+    if (scene === 3) return { label: "SEE THE ANSWER", run: () => jump(4) };
+    if (scene === 4) return { label: "GET ACCESS", run: () => jump(5) };
     return signedIn
       ? { label: "OPEN WORKSPACE", run: () => window.location.assign("/workspace") }
       : { label: "SIGN IN", run: () => window.location.assign("/login") };
@@ -229,7 +237,7 @@ export default function HomePage() {
 
   return (
     <div className="page">
-      <WorldField mode={active.mode as WorldMode} />
+      <WorldField mode={world.mode} />
 
       <header className="nav" data-stuck={progress > 0.005 ? 1 : 0}>
         <Link href="/" className="wordmark" aria-label="TAVONEL home">
@@ -242,9 +250,9 @@ export default function HomePage() {
         </span>
         <nav aria-label="Sections">
           <button type="button" onClick={() => jump(2)}>Compile</button>
-          <button type="button" onClick={() => jump(5)}>Keep current</button>
-          <button type="button" onClick={() => jump(7)}>Evidence</button>
-          <button type="button" onClick={() => jump(8)}>Access</button>
+          <button type="button" onClick={() => jump(3)}>Keep current</button>
+          <Link href="/evidence">Evidence</Link>
+          <button type="button" onClick={() => jump(5)}>Access</button>
         </nav>
         {/*
           R4 -- the nav carried one verb, and it was the wrong one for most visitors. "Sign in" is
@@ -271,7 +279,7 @@ export default function HomePage() {
 
       <main>
         {/* ═══════════════════════════════════════════════════ 01 · the mess */}
-        <section className="scene hero" id="s1" data-scene="1">
+        <section className="scene hero" id="s1" data-scene="1" data-band="scatter">
           <div className="shell">
             <p className="slate rv"><b>TAVONEL</b><span /> KNOWLEDGE COMPILER</p>
             <h1>
@@ -332,13 +340,14 @@ export default function HomePage() {
             <span className="creed-k">THE RULE</span>
             <p>
               No customer logos. No certifications. No benchmark numbers. <b>A brand rule bars them
-              without registered evidence</b> — so rather than borrow anyone else’s credibility, this
-              page publishes our own record further down, including the part of it that did not work.
+              without registered evidence</b> — so rather than borrow anyone else’s credibility, we
+              publish <Link href="/evidence">our own record</Link>, including the part of it that
+              did not work.
             </p>
           </div>
         </div>
         {/* ═══════════════════════ 02 · compile (was connect + compile + work that stops) */}
-        <Scene id={2} eyebrow="COMPILE" title={<>Six passes turn {n(SOURCE_CENSUS.files)} files into a world.</>}>
+        <Scene id={2} band="structure" eyebrow="COMPILE" title={<>Six passes turn {n(SOURCE_CENSUS.files)} files into a world.</>}>
           <p className="lede rv">
             You point at the systems your work already lives in and leave them exactly as they
             are &mdash; no export, no restructuring, no tidying the drive first. Reading them is the
@@ -364,8 +373,8 @@ export default function HomePage() {
           </div>
         </Scene>
 
-        {/* ═══════════════════════════════════════════════════ 03 · the compiled world */}
-        <Scene id={3} eyebrow="COMPILED WORLD" title={<>Not searchable files.<br />An organization an&nbsp;AI can reason about.</>}>
+        {/* ──────────────── 02b · what the compile produced (was scene 03) */}
+        <SceneMore id={2} band="world" eyebrow="COMPILED WORLD" title={<>Not searchable files.<br />An organization an&nbsp;AI can reason about.</>}>
           <p className="lede rv">
             TAVONEL works out how your knowledge fits together &mdash; what the things are, what area
             they belong to, what supports them and what they affect. <b>This returns a structure.</b>
@@ -394,12 +403,12 @@ export default function HomePage() {
             </div>
           </div>
           <p className="fine rv">{DISCLOSURE.ontology}</p>
-        </Scene>
+        </SceneMore>
 
         <ChangeLattice />
 
         {/* ═══════════════════════════════════════════════════ 04 · something changes */}
-        <Scene id={4} eyebrow="SOMETHING CHANGES" title="A compile that only ever runs once is worthless.">
+        <Scene id={3} band="change" eyebrow="KEEPING IT TRUE" title="A compile that only ever runs once is worthless.">
           <p className="lede rv">
             Contracts get amended. Specs move. Policies are revised, code lands, prices change,
             people leave. Compiling your knowledge is the first half of the job.
@@ -427,14 +436,14 @@ export default function HomePage() {
         </Scene>
 
         {/* ═══════════════════════════ 05 · rebuild & verify (was rebuild + verify) */}
-        <Scene id={5} eyebrow="REBUILD & VERIFY" title={<>Rebuild {REBUILT}.<br />Keep {n(KEPT)}.</>}>
+        <SceneMore id={3} band="rebuild" eyebrow="REBUILD & VERIFY" title={<>Rebuild {REBUILT}.<br />Keep {n(KEPT)}.</>}>
           <p className="lede rv">
             Three lines moved in one contract. A system that re-indexes on a schedule would read
             all {n(WORLD.facts)} facts again to find them. TAVONEL follows the dependency graph,
             rebuilds the {REBUILT} facts the change actually reached, carries the rest forward
             untouched &mdash; and then <b>nothing goes live until it passes.</b>
           </p>
-          <RebuildConsole active={scene >= 5} />
+          <RebuildConsole active={scene >= 3} />
           <div className="checks rv">
             {[
               "Every fact still points at real text",
@@ -453,10 +462,10 @@ export default function HomePage() {
             not a live world, and the record of what produced it is kept &mdash; so any answer your AI
             gives can be traced back to the exact version it came from.
           </p>
-        </Scene>
+        </SceneMore>
 
         {/* ═══════════════════════════════════════════════════ 06 · the answer */}
-        <Scene id={6} eyebrow="THE ANSWER" title={<>The same question,<br />asked of two worlds.</>}>
+        <Scene id={4} band="answer" eyebrow="THE ANSWER" title={<>The same question,<br />asked of two worlds.</>}>
           <p className="lede rv">
             On the left is the world as it stood before the contract changed &mdash; the one a system
             that re-indexes on a schedule would still be answering from. On the right, the world
@@ -465,41 +474,8 @@ export default function HomePage() {
           <AnswerSwitch />
         </Scene>
 
-        {/* ═══════════════════ 07 · evidence & boundary (was source boundary + evidence) */}
-        <Scene id={7} eyebrow="EVIDENCE & BOUNDARY" title={<>What we enforce,<br />and what we actually measured.</>}>
-          <p className="lede rv">
-            Everything above this line is a demonstration. Everything below it is not. There are no
-            customer logos on this page and no certifications &mdash; a brand rule bars them without
-            registered evidence &mdash; so what follows is our own record instead, <b>including the
-            part of it that did not work.</b>
-          </p>
-          <div className="chain rv">
-            {BOUNDARY.map(([num, name, text]) => (
-              <article className="link" key={num}>
-                <span className="st">{num}</span>
-                <h3>{name}</h3>
-                <p>{text}</p>
-              </article>
-            ))}
-          </div>
-          <div className="tiles rv">
-            {EVIDENCE.map(([state, title, body]) => (
-              <article className="tile" key={title} data-state={state}>
-                <span className="n">{state === "measured" ? "MEASURED" : state === "unsupported" ? "NOT SUPPORTED" : "BUILT, NOT PROVEN"}</span>
-                <h3>{title}</h3>
-                <p>{body}</p>
-              </article>
-            ))}
-          </div>
-          <p className="fine rv">
-            Designed to fail closed: each control opens only after the one before it is qualified,
-            and document bytes never pass through the application or the database. Whether each
-            control is open in this deployment right now is the grid below.
-          </p>
-        </Scene>
-
         {/* ═══════════════════════════════════════════════════ 08 · access */}
-        <Scene id={8} eyebrow="ACCESS" title={<>Stop preparing<br />data for AI.</>}>
+        <Scene id={5} band="access" eyebrow="ACCESS" title={<>Stop preparing<br />data for AI.</>}>
           <p className="lede rv">
             TAVONEL compiles everything you know into a structured, AI-ready world &mdash; and keeps
             that world correct as reality changes.
@@ -599,10 +575,10 @@ export default function HomePage() {
 
       <div className="bar" role="status" aria-live="off">
         <span className="scroll" style={{ width: `${progress * 100}%` }} />
-        <span className="bc"><span className="bk">WORLD</span><span className="bv">{active.version}</span></span>
-        <span className="bc"><span className="bk">STATE</span><span className="bv state" data-s={active.state.toLowerCase()}>{active.state}</span></span>
-        <span className="bc opt"><span className="bk">FACTS</span><span className="bv">{active.facts ? n(active.facts) : "—"}</span></span>
-        <span className="bc opt"><span className="bk">NEEDS REVIEW</span><span className="bv">{scene >= 4 ? CHANGE.held : 0}</span></span>
+        <span className="bc"><span className="bk">WORLD</span><span className="bv">{world.version}</span></span>
+        <span className="bc"><span className="bk">STATE</span><span className="bv state" data-s={world.state.toLowerCase()}>{world.state}</span></span>
+        <span className="bc opt"><span className="bk">FACTS</span><span className="bv">{world.facts ? n(world.facts) : "—"}</span></span>
+        <span className="bc opt"><span className="bk">NEEDS REVIEW</span><span className="bv">{reachedChange ? CHANGE.held : 0}</span></span>
         {/*
           R5 -- the scene rail is hidden below 900px, which left a phone with no way to move
           through an eight-scene page except by scrolling all of it. The ticks come back here,
@@ -653,22 +629,60 @@ function Cell({ value, label, warn }: { value: string; label: string; warn?: boo
 
 function Scene({
   id,
+  band,
   eyebrow,
   title,
   children,
 }: {
   id: number;
+  band: BandName;
   eyebrow: string;
   title: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <section className="scene" id={`s${id}`} data-scene={id}>
+    <section className="scene" id={`s${id}`} data-scene={id} data-band={band}>
       <div className="shell">
         <div className="body">
           <div className="stack">
             <p className="slate rv"><b>SCENE {String(id).padStart(2, "0")}</b><span />{eyebrow}</p>
             <h2 className="rv">{title}</h2>
+          </div>
+          <div className="stack">{children}</div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * The second half of a merged scene: the same scene number, the next state of the world.
+ *
+ * It reports the scene it continues, so the rail and the instrument bar do not count it, and it
+ * carries its own band, so the field moves under it. No number in the margin, a lighter heading
+ * and no viewport floor -- the reader should experience one scene that develops, not two scenes
+ * where one forgot its number.
+ */
+function SceneMore({
+  id,
+  band,
+  eyebrow,
+  title,
+  children,
+}: {
+  id: number;
+  band: BandName;
+  eyebrow: string;
+  title: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="scene cont" data-scene={id} data-band={band}>
+      <div className="shell">
+        <div className="body">
+          <div className="stack">
+            <p className="slate rv"><span />{eyebrow}</p>
+            <h3 className="rv sub">{title}</h3>
           </div>
           <div className="stack">{children}</div>
         </div>

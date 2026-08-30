@@ -18,8 +18,18 @@
 
 import { useEffect, useState } from "react";
 
+/**
+ * B1 -- what a reader counts and what the world behind them does are two different rhythms.
+ *
+ * They used to be one. Every numbered scene owned exactly one state of the canvas, so shortening
+ * the page by merging two scenes would have thrown away one of the six states the field can be
+ * in -- which is the page's best asset, not its packaging. Splitting the two lets a single
+ * numbered scene move the world twice: `data-scene` is what the rail, the eyebrow and the
+ * instrument bar count, `data-band` is what the field, the state pill and the version read.
+ */
 export function useScrollScenes(sceneCount: number) {
   const [scene, setScene] = useState(1);
+  const [band, setBand] = useState("scatter");
 
   useEffect(() => {
     document.documentElement.classList.add("js");
@@ -33,19 +43,30 @@ export function useScrollScenes(sceneCount: number) {
       return;
     }
 
+    /** Whichever element of a kind owns the middle band of the viewport wins. */
+    const pick = (entries: IntersectionObserverEntry[]) => {
+      let best: IntersectionObserverEntry | null = null;
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        if (!best || entry.intersectionRatio > best.intersectionRatio) best = entry;
+      }
+      return best;
+    };
+    const middleBand = { rootMargin: "-42% 0px -42% 0px", threshold: [0, 0.01, 0.5, 1] };
+
     const sections = Array.from(document.querySelectorAll<HTMLElement>("[data-scene]"));
-    const sceneObserver = new IntersectionObserver(
-      (entries) => {
-        let best: IntersectionObserverEntry | null = null;
-        for (const entry of entries) {
-          if (!entry.isIntersecting) continue;
-          if (!best || entry.intersectionRatio > best.intersectionRatio) best = entry;
-        }
-        if (best) setScene(Number(best.target.getAttribute("data-scene")));
-      },
-      { rootMargin: "-42% 0px -42% 0px", threshold: [0, 0.01, 0.5, 1] },
-    );
+    const sceneObserver = new IntersectionObserver((entries) => {
+      const best = pick(entries);
+      if (best) setScene(Number(best.target.getAttribute("data-scene")));
+    }, middleBand);
     for (const section of sections) sceneObserver.observe(section);
+
+    const bandObserver = new IntersectionObserver((entries) => {
+      const best = pick(entries);
+      const name = best?.target.getAttribute("data-band");
+      if (name) setBand(name);
+    }, middleBand);
+    for (const element of document.querySelectorAll("[data-band]")) bandObserver.observe(element);
 
     const revealObserver = new IntersectionObserver(
       (entries) => {
@@ -70,11 +91,12 @@ export function useScrollScenes(sceneCount: number) {
     return () => {
       window.clearTimeout(check);
       sceneObserver.disconnect();
+      bandObserver.disconnect();
       revealObserver.disconnect();
     };
   }, [sceneCount]);
 
-  return scene;
+  return { scene, band };
 }
 
 /** Scroll progress 0..1, for the meter along the top of the instrument bar. */

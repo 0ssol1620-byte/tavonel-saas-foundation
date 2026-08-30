@@ -91,12 +91,27 @@ test("nothing on the page is wider than the thing that holds it", async ({ page 
   await testInfo.attach("landing", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
 });
 
-test("draws all eight scenes and the interlude, with the lattice filling its frame", async ({ page }) => {
+test("draws five scenes over seven states of the world, and the interlude", async ({ page }) => {
   await page.goto("/");
   await settle(page);
 
-  await expect(page.locator("section.scene")).toHaveCount(8);
+  /*
+   * Five numbered scenes, seven sections: two of the five are merged scenes that carry a second
+   * section continuing the same number. The rail counts scenes, the field reads bands, and the
+   * two counts are deliberately different -- shortening the page must not have cost the world
+   * any of the states it moves through.
+   */
+  await expect(page.locator("section.scene")).toHaveCount(7);
+  await expect(page.locator("section.scene.cont")).toHaveCount(2);
   await expect(page.locator(".interlude")).toHaveCount(1);
+
+  const scenes = await page.evaluate(() =>
+    Array.from(document.querySelectorAll("[data-scene]")).map((el) => el.getAttribute("data-scene")));
+  expect(new Set(scenes).size).toBe(5);
+
+  const bands = await page.evaluate(() =>
+    Array.from(document.querySelectorAll("[data-band]")).map((el) => el.getAttribute("data-band")));
+  expect(bands).toEqual(["scatter", "structure", "world", "change", "rebuild", "answer", "access"]);
 
   /*
    * The lattice is a canvas, and a canvas is a replaced element: with a definite height and
