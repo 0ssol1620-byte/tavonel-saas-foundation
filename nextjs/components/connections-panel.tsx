@@ -59,7 +59,7 @@ export default function ConnectionsPanel() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("Reading tenant-scoped connections.");
 
-  const load = async () => {
+  const load = async (successNotice?: string) => {
     const token = await sessionToken();
     if (!token) {
       setNotice("Session expired. Sign in again before reading connections.");
@@ -81,7 +81,7 @@ export default function ConnectionsPanel() {
     setOAuthProviders(oauthJson.providers);
     setOAuthConnections(oauthJson.connections);
     const total = json.connections.length + oauthJson.connections.length;
-    setNotice(total > 0 ? `${total} durable connection(s) loaded.` : "No source system is connected yet.");
+    setNotice(successNotice ?? (total > 0 ? `${total} durable connection(s) loaded.` : "No source system is connected yet."));
   };
 
   useEffect(() => { void load(); }, []);
@@ -221,13 +221,20 @@ export default function ConnectionsPanel() {
         headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
         body: JSON.stringify({ maxImports }),
       });
-      const json = await response.json().catch(() => ({})) as { code?: string; scanned?: number; imported?: Array<{ documentId: string }> };
+      const json = await response.json().catch(() => ({})) as {
+        code?: string;
+        scanned?: number;
+        imported?: Array<{ documentId: string }>;
+        skipped?: Array<{ code: string }>;
+      };
       if (!response.ok || typeof json.scanned !== "number" || !Array.isArray(json.imported)) {
         setNotice(`Source scan failed (${json.code ?? response.status}).`);
         return;
       }
-      setNotice(`${connection.displayName}: ${json.scanned} item(s) scanned, ${json.imported.length} qualified file(s) placed in quarantine.`);
-      await load();
+      const documentIds = json.imported.map((item) => item.documentId).join(", ");
+      const skippedCodes = [...new Set((json.skipped ?? []).map((item) => item.code))].join(", ");
+      const completionNotice = `${connection.displayName}: ${json.scanned} item(s) scanned, ${json.imported.length} qualified file(s) placed in quarantine${documentIds ? ` (${documentIds})` : ""}${skippedCodes ? `; skipped: ${skippedCodes}` : ""}.`;
+      await load(completionNotice);
     } finally {
       setBusy(false);
     }
