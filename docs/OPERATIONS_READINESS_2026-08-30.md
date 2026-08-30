@@ -19,13 +19,14 @@ This record is the implementation and external-gate ledger for the ten P0 operat
 
 ## Verified external state, 2026-08-30 KST
 
-- Cloudflare DNSSEC was enabled and is pending automatic DS registration at the registrar. Public DS validation must pass before this item is closed.
+- Cloudflare DNSSEC is active. A public `DS` query through `1.1.1.1` returned key tag `2371`, algorithm `13` and digest type `2`.
 - DMARC was changed from monitoring-only to staged enforcement: `p=quarantine; pct=25`, with aggregate reports routed to `security@tavonel.com`. The new TXT value was confirmed through the `1.1.1.1` public resolver.
-- Resend reports `tavonel.com` verified in Tokyo, with DKIM, SPF and sending enabled. Receiving remains off to avoid conflicting with Cloudflare Email Routing.
-- Paddle sandbox reports all four integration stages complete: catalog, pricing/checkout, fulfillment/provisioning and end-to-end testing. Paddle Live is a separate account session and remains gated by live login and account review.
+- Resend reports `tavonel.com` verified in Tokyo, with DKIM, SPF and sending enabled. Receiving remains off to avoid conflicting with Cloudflare Email Routing. A domain-scoped sending key was created for Gmail SMTP; the Gmail send-as verification remains open.
+- Paddle sandbox reports all four integration stages complete: catalog, pricing/checkout, fulfillment/provisioning and end-to-end testing. Paddle Live login is verified, but setup is `0/3`: the existing `commoditynode.com` submission is declined and `tavonel.com` still requires a separate domain approval submission, account verification, live catalog, credentials, webhook and payout setup.
 - RunPod endpoint `cohlugjzf0dk9i` reported zero active workers, maximum workers `1`, idle timeout `5 seconds`, zero current spend rate and one completed recent request. Account MFA remains an external security gate.
 - Supabase project `tfcorhjkqcuisqhsjemz` is on the Free plan. The dashboard explicitly reports no project backups. Pro starts at `$25/month` and includes daily backups retained for seven days. Spend cap is enabled, so usage cannot silently create overage charges.
-- Vercel preview deployment `dpl_Hk9vTi8LVJ529DqGzvPnPZKSCMd4` reached READY. Public legal pages, sitemap and liveness returned HTTP 200; readiness correctly returned 503 because production-only signer/compiler secrets are not copied to Preview.
+- Vercel production deployment `dpl_37ohffzsxVdEJVVmequdiRSvwmX3` reached READY and was aliased to `https://tavonel.com`. Home, legal pages, sitemap, liveness and readiness returned HTTP 200; readiness reported auth, storage, signed export and compiler operational while billing remained sandbox-only.
+- The public OpenAPI contract and downloadable CLI, read-only MCP server and source agent returned HTTP 200 from `tavonel.com`. An unauthenticated `/api/v1/connections` request returned HTTP 401 rather than exposing tenant data.
 
 ## Backup and restore runbook
 
