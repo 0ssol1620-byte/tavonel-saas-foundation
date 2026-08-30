@@ -91,4 +91,18 @@ describe("R2 document listing prefix", () => {
 
     await expect(getWorkspaceCollectionCandidate(env, WS, key)).resolves.toEqual({ ok: false, code });
   });
+
+  it("allows bounded collection candidates larger than the OCR JSON limit", async () => {
+    const env = {
+      accountId: "acct",
+      bucket: FOUNDATION_R2_BUCKET,
+      accessKeyId: "AKIAEXAMPLE",
+      secretAccessKey: "secret",
+    };
+    const key = `immutable/${WS}/${WS}/collections/collection-${"ab".repeat(16)}/${"cd".repeat(32)}/candidate-world.json`;
+    const artifact = { payload: "x".repeat(4 * 1024 * 1024) };
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json(artifact)));
+
+    await expect(getWorkspaceCollectionCandidate(env, WS, key)).resolves.toEqual({ ok: true, json: artifact });
+  });
 });

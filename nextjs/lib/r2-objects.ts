@@ -10,6 +10,7 @@ import {
 } from "./immutable-keys";
 
 const MAX_DERIVED_JSON_BYTES = 4 * 1024 * 1024;
+const MAX_COLLECTION_JSON_BYTES = 32 * 1024 * 1024;
 
 function hmac(key: Buffer | string, data: string) {
   return createHmac("sha256", key).update(data, "utf8").digest();
@@ -225,7 +226,7 @@ export async function putWorkspaceCollectionCandidate(
   if (env.bucket !== FOUNDATION_R2_BUCKET) return { ok: false, code: "BUCKET_NOT_FOUNDATION" };
   if (!isCollectionCandidateKey(workspaceId, key)) return { ok: false, code: "COLLECTION_JSON_PREFIX_REQUIRED" };
   const bytes = Buffer.from(`${JSON.stringify(value)}\n`, "utf8");
-  if (bytes.length === 0 || bytes.length > MAX_DERIVED_JSON_BYTES) return { ok: false, code: "JSON_TOO_LARGE" };
+  if (bytes.length === 0 || bytes.length > MAX_COLLECTION_JSON_BYTES) return { ok: false, code: "JSON_TOO_LARGE" };
   const response = await signedS3PutJson(env, key, bytes, now);
   if (response.status === 409 || response.status === 412) return { ok: true, status: "exists", bytes: bytes.length };
   if (!response.ok) return { ok: false, code: "PUT_FAILED" };
@@ -247,7 +248,7 @@ export async function getWorkspaceCollectionCandidate(
   if (response.status === 599) return { ok: false, code: "GET_TIMEOUT" };
   if (!response.ok) return { ok: false, code: `GET_FAILED_${response.status}` };
   const bytes = Buffer.from(await response.arrayBuffer());
-  if (bytes.length > MAX_DERIVED_JSON_BYTES) return { ok: false, code: "JSON_TOO_LARGE" };
+  if (bytes.length > MAX_COLLECTION_JSON_BYTES) return { ok: false, code: "JSON_TOO_LARGE" };
   try {
     return { ok: true, json: JSON.parse(bytes.toString("utf8")) };
   } catch {
