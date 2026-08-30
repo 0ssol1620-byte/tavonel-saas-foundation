@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { GET as openApi } from "../app/api/openapi/route";
 
@@ -29,5 +30,16 @@ describe("developer distribution", () => {
     expect(child.status).toBe(0);
     expect(child.stdout).toContain("node tavonel-cli.mjs documents");
     expect(child.stdout).toContain("node tavonel-cli.mjs connections");
+  });
+
+  it("ships a source agent with environment-only secrets and durable cursor ordering", () => {
+    const source = readFileSync("public/developer/tavonel-source-agent.py", "utf8");
+    expect(source).toContain('os.environ.get("TAVONEL_API_KEY", "")');
+    expect(source).not.toContain('add_argument("--api-key"');
+    expect(source).toContain("/api/v1/uploads/capability");
+    expect(source).toContain("/sync");
+    expect(source.indexOf("result = client.post(")).toBeLessThan(source.indexOf("write_state(args.state"));
+    expect(source).toContain("os.replace(temp_name, path)");
+    expect(source).toContain('parsed.hostname in {"localhost", "127.0.0.1", "::1"}');
   });
 });

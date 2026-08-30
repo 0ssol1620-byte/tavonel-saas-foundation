@@ -157,7 +157,7 @@ export default function ConnectionsPanel() {
               <small className="field-help">The local agent uses your existing AWS profile, workload role, or provider environment. Credential values never enter TAVONEL.</small>
             </>
           ) : (
-            <p className="field-help">Mount the share with Windows, macOS, Linux, or an SFTP filesystem. The local agent reads that mount; TAVONEL never receives the mount password.</p>
+            <p className="field-help">Mount the share with Windows, macOS, Linux, or an SFTP filesystem. The local agent reads that mount; TAVONEL never receives the mount password. <a href="/developer/tavonel-source-agent.py" download>Download source agent</a>.</p>
           )}
           <button type="submit" disabled={busy || !displayName.trim() || (provider !== "file_server" && !bucket.trim())}>
             {busy ? "Writing durable record..." : "Create connection"}
@@ -172,6 +172,7 @@ export default function ConnectionsPanel() {
               <div>
                 <div className="connection-title"><strong>{connection.displayName}</strong><span data-status={connection.status}>{connection.status}</span></div>
                 <p>{providerLabel(connection.provider)} · {connection.mode === "local_agent" ? "local agent" : "managed cloud pull"}</p>
+                <small><code>{connection.connectionId}</code></small>
                 <small>{connection.lastSyncAt ? `Last durable sync ${new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(connection.lastSyncAt))}` : "Awaiting first signed cursor batch"}</small>
                 <small>{connection.cursorSha256 ?? "No cursor committed"}</small>
                 {connection.lastErrorCode ? <small className="connection-error">{connection.lastErrorCode}</small> : null}

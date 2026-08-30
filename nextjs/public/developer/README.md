@@ -42,12 +42,30 @@ promotion, rollback, billing, or key-management tool.
 
 ## Connector agent
 
+Download `tavonel-source-agent.py`. It requires Python 3.12 or newer. Create a
+key scoped to `connections:sync` and `documents:intake`; add
+`connections:read` only when the same key also needs inventory access. The key
+is read from `TAVONEL_API_KEY` only and never from a command argument.
+
 Mounted SMB, NFS, and SFTP filesystems use the local agent and operating-system
 credentials. S3, R2, and MinIO use the same agent with an existing AWS profile,
 workload role, or provider environment. Credential values are rejected by the
 API and database. The schema reserves external secret references for a future
 managed worker, but the production UI does not expose that path until a worker
 is deployed and qualified.
+
+```powershell
+$env:TAVONEL_API_KEY = "tvnl_live_..."
+python .\tavonel-source-agent.py `
+  --root "Z:\Research" `
+  --connection-id "00000000-0000-0000-0000-000000000000" `
+  --state "$env:LOCALAPPDATA\TAVONEL\research-share.json"
+```
+
+S3-compatible mode additionally requires `boto3`. Use `--s3-bucket`,
+`--s3-prefix`, `--s3-region`, and, for R2 or MinIO, an HTTPS
+`--s3-endpoint-url`. The agent uses the normal AWS credential provider chain;
+do not place cloud keys in TAVONEL connection configuration.
 
 Every sync sends a bounded metadata-only event manifest, its canonical SHA-256,
 and an expected previous cursor digest. Cursor conflicts fail closed with HTTP

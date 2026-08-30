@@ -148,6 +148,7 @@ export default function DeveloperPanel() {
           <div className="developer-tools">
             <article><b>CLI</b><code>node tavonel-cli.mjs status</code><a href="/developer/tavonel-cli.mjs" download>Download zero-dependency CLI</a></article>
             <article><b>MCP</b><code>node tavonel-mcp.mjs</code><a href="/developer/tavonel-mcp.mjs" download>Download read-only MCP bridge</a></article>
+            <article><b>Source agent</b><code>python tavonel-source-agent.py --help</code><a href="/developer/tavonel-source-agent.py" download>Download local connector agent</a></article>
             <article><b>SDK contract</b><code>Authorization: Bearer tvnl_live_...</code><a href="/developer/README.md" target="_blank" rel="noreferrer">Read setup and safety contract</a></article>
           </div>
           <div className="api-key-list" aria-live="polite">
