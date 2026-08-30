@@ -4,8 +4,11 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { GET as openApi } from "../app/api/openapi/route";
+
+const developerAsset = (name: string) => fileURLToPath(new URL(`../public/developer/${name}`, import.meta.url));
 
 describe("developer distribution", () => {
   it("publishes a bounded API contract without decision endpoints", async () => {
@@ -22,7 +25,7 @@ describe("developer distribution", () => {
 
   it("completes a real MCP initialize and exposes read-only tools only", () => {
     const message = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "1" } } });
-    const child = spawnSync(process.execPath, ["public/developer/tavonel-mcp.mjs"], { input: `${message}\n`, encoding: "utf8", timeout: 5_000 });
+    const child = spawnSync(process.execPath, [developerAsset("tavonel-mcp.mjs")], { input: `${message}\n`, encoding: "utf8", timeout: 5_000 });
     expect(child.status).toBe(0);
     const response = JSON.parse(child.stdout.trim()) as { result: { serverInfo: { name: string }; instructions: string } };
     expect(response.result.serverInfo.name).toBe("tavonel-readonly");
@@ -30,7 +33,7 @@ describe("developer distribution", () => {
   });
 
   it("ships a CLI that can render help without credentials", () => {
-    const child = spawnSync(process.execPath, ["public/developer/tavonel-cli.mjs", "help"], { encoding: "utf8", timeout: 5_000 });
+    const child = spawnSync(process.execPath, [developerAsset("tavonel-cli.mjs"), "help"], { encoding: "utf8", timeout: 5_000 });
     expect(child.status).toBe(0);
     expect(child.stdout).toContain("node tavonel-cli.mjs documents");
     expect(child.stdout).toContain("node tavonel-cli.mjs connections");
@@ -58,7 +61,7 @@ describe("developer distribution", () => {
     const directory = mkdtempSync(join(tmpdir(), "tavonel-cli-"));
     const output = join(directory, "candidate.zip");
     try {
-      const child = spawn(process.execPath, ["public/developer/tavonel-cli.mjs", "download", "collection-test", output], {
+      const child = spawn(process.execPath, [developerAsset("tavonel-cli.mjs"), "download", "collection-test", output], {
         env: { ...process.env, TAVONEL_API_KEY: "tvnl_live_test", TAVONEL_BASE_URL: `http://127.0.0.1:${address.port}` },
         stdio: ["ignore", "pipe", "pipe"],
       });
@@ -81,7 +84,7 @@ describe("developer distribution", () => {
   });
 
   it("ships a source agent with environment-only secrets and durable cursor ordering", () => {
-    const source = readFileSync("public/developer/tavonel-source-agent.py", "utf8");
+    const source = readFileSync(developerAsset("tavonel-source-agent.py"), "utf8");
     expect(source).toContain('os.environ.get("TAVONEL_API_KEY", "")');
     expect(source).not.toContain('add_argument("--api-key"');
     expect(source).toContain("/api/v1/uploads/capability");

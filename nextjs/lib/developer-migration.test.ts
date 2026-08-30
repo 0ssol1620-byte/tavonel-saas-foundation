@@ -1,8 +1,9 @@
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-const sql = readFileSync(resolve(process.cwd(), "../supabase/migrations/0012_foundation_connections_and_api_keys.sql"), "utf8");
+const migration = fileURLToPath(new URL("../../supabase/migrations/0012_foundation_connections_and_api_keys.sql", import.meta.url));
+const sql = readFileSync(migration, "utf8");
 
 describe("developer control-plane migration", () => {
   it("stores only digests and external secret references", () => {
