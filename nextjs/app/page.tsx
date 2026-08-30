@@ -59,7 +59,7 @@ const SCENES = [
 
 /** Filenames as a visitor's own drive would show them: dated, versioned, and not tidy. */
 const DEBRIS = [
-  "Services_Agreement_FINAL.pdf", "Services_Agreement_FINAL_v2.pdf", "scan_0140.pdf",
+  "Agreement_FINAL.pdf", "Agreement_FINAL_v2.pdf", "scan_0140.pdf",
   "Q3 forecast.xlsx", "acme/product-docs", "Untitled folder (3)",
   "Customer Research 2026.zip", "Operations Manual.docx", "pricing_OLD.csv",
   "support.acme.com", "Board deck.pptx", "Employee Handbook 2026.pdf",
@@ -256,10 +256,7 @@ export default function HomePage() {
         {signedIn ? (
           <Link className="btn small" href="/workspace">Open workspace</Link>
         ) : (
-          <>
-            <button className="btn small ghost" type="button" onClick={cta("nav_access", () => jump(8))}>Get access</button>
-            <Link className="btn small" href="/login">Sign in</Link>
-          </>
+          <Link className="btn small" href="/login">Sign in</Link>
         )}
       </header>
 
@@ -285,11 +282,26 @@ export default function HomePage() {
               TAVONEL turns scattered files, documents, cloud drives and repositories into
               structured, <b>AI-ready knowledge</b> &mdash; and keeps it correct as your sources change.
             </p>
+            {/*
+              C1 -- who this is for, said as a situation rather than an industry.
+              Naming a vertical would exclude everyone outside it and convince nobody inside it.
+              A situation does the opposite: a reader either recognises it in the first clause or
+              is told, in the second, that they can stop reading. The disqualifier is not modesty;
+              it is the fastest way to be believed by the people who do recognise it.
+            */}
+            <p className="who rv">
+              For teams whose answers live in documents that keep changing — agreements, specs,
+              policies, price lists, procedures. <b>If your files never change, you do not need this.</b>
+            </p>
+            {/*
+              A4 -- one verb above the fold. There were four controls in the first screen: two in
+              the nav and two here, offering three different next steps to a reader who had been
+              given one sentence to decide on. The page's own argument is that it is worth
+              watching, so the fold now asks for exactly that, and sign-in stays as the quiet
+              control for people who already have a workspace.
+            */}
             <div className="actions rv">
               <button className="btn" type="button" onClick={cta("hero_primary", () => jump(2))}>Watch it compile</button>
-              {/* "Request access" pointed at /login, which is a sign-in and not a request. The hero now
-                  uses the same verb as the nav and sends people to the section that can answer it. */}
-              <button className="btn ghost" type="button" onClick={cta("hero_secondary", () => jump(8))}>Get access</button>
             </div>
             <div className="debris rv">
               {DEBRIS.map((name) => <span className="frag" key={name}>{name}</span>)}
@@ -309,6 +321,22 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/*
+          C2 -- the rule this page is built on, moved up from the footer.
+          It was true before and legible only to whoever read the small print at the very bottom.
+          Stated here, it is a claim the rest of the page can be checked against rather than a
+          disclaimer filed after the argument is over.
+        */}
+        <div className="creed">
+          <div className="shell">
+            <span className="creed-k">THE RULE</span>
+            <p>
+              No customer logos. No certifications. No benchmark numbers. <b>A brand rule bars them
+              without registered evidence</b> — so rather than borrow anyone else’s credibility, this
+              page publishes our own record further down, including the part of it that did not work.
+            </p>
+          </div>
+        </div>
         {/* ═══════════════════════ 02 · compile (was connect + compile + work that stops) */}
         <Scene id={2} eyebrow="COMPILE" title={<>Six passes turn {n(SOURCE_CENSUS.files)} files into a world.</>}>
           <p className="lede rv">

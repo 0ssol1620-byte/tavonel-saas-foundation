@@ -58,8 +58,14 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           CSP above admits it without a single directive being widened, and no third party is
           contacted. It sets no cookie, which is why this page still has no consent banner to
           apologise for.
+
+          Rendered only on Vercel. `/_vercel/insights/script.js` exists only on the deployment
+          that serves it, so anywhere else -- a local `next start`, a preview harness, the e2e
+          run -- the tag produced a 404 and a console error on every page load. A collector that
+          cannot collect should not be on the page at all, and a console that is quiet by default
+          is what makes the e2e error assertion worth anything.
         */}
-        <Analytics />
+        {process.env.VERCEL ? <Analytics /> : null}
       </body>
     </html>
   );

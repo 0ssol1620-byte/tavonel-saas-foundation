@@ -426,8 +426,65 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 /* ============================================================ hero (01) */
 
 .scene.hero { min-height: 100vh; justify-content: center; padding-top: 104px; }
-.scene.hero .shell { display: flex; flex-direction: column; gap: 22px; }
+.scene.hero .shell { display: flex; flex-direction: column; gap: 18px; }
 .scene.hero h1 { margin: 4px 0 2px; }
+
+/*
+  C1 -- the qualifying line, set between the lede and the single control.
+  It is deliberately quieter than the lede and louder than .fine: a reader skimming the hero
+  should be able to skip it, and a reader deciding whether this page is about them should find
+  it exactly where that decision happens. The disqualifier is the only thing in it set at full
+  contrast, because that clause is the one doing the work.
+*/
+.who {
+  margin: -4px 0 0;
+  max-width: 68ch;
+  font-size: clamp(13px, 0.95vw, 14.5px);
+  line-height: 1.6;
+  color: var(--text-lo);
+}
+.who b { color: var(--text-hi); font-weight: 500; }
+
+/*
+  C2 -- the rule, as a band rather than a paragraph.
+  Hairlines above and below stop the page for one sentence. It sits at the seam between the
+  hero and the first demonstration, so the claim is made before any of the evidence for it.
+*/
+.creed {
+  position: relative;
+  z-index: 5;
+  border-top: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+  /* The rail inset every scene carries, so this band starts on the same vertical as the rest. */
+  padding: clamp(22px, 3.4vh, 34px) 0 clamp(22px, 3.4vh, 34px) var(--rail);
+}
+.creed .shell {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: clamp(16px, 2.4vw, 34px);
+  align-items: start;
+}
+.creed-k {
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.2em;
+  color: var(--verified);
+  padding-top: 4px;
+  white-space: nowrap;
+}
+.creed p {
+  margin: 0;
+  max-width: 74ch;
+  font-size: clamp(13.5px, 1.02vw, 15px);
+  line-height: 1.66;
+  color: var(--text-lo);
+}
+.creed p b { color: var(--text-hi); font-weight: 500; }
+
+@media (max-width: 700px) {
+  .creed .shell { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .creed-k { padding-top: 0; }
+}
 
 .debris { display: flex; flex-wrap: wrap; gap: 7px; max-width: 900px; }
 .frag {
