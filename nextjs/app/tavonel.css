@@ -591,6 +591,17 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 /* A page that is a document rather than a scene: no viewport floor, no choreography. */
 .scene.doc { min-height: 0; padding-top: 132px; padding-bottom: 96px; }
 .scene.doc .stack > .slate { margin-top: 14px; }
+.policy-copy { display: flex; flex-direction: column; gap: 14px; }
+.policy-copy h3 { margin: 20px 0 0; font-size: 18px; letter-spacing: -0.01em; }
+.policy-copy p { margin: 0; color: var(--text-lo); line-height: 1.72; }
+.policy-copy a { color: var(--text-hi); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.processor-list, .status-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; margin: 8px 0 18px; background: var(--hairline); border: 1px solid var(--hairline); }
+.processor-list article, .status-list article { padding: 20px; background: var(--ground); }
+.processor-list h3, .status-list h3 { margin: 0 0 8px; text-transform: capitalize; }
+.processor-list p, .status-list p { margin: 4px 0; }
+.status-list article > span { display: inline-block; margin-bottom: 18px; font: 600 10px/1 var(--f-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--verified); }
+.status-list article[data-state="test_only"] > span, .status-list article[data-state="restricted"] > span { color: var(--changed); }
+.status-list article[data-state="not_configured"] > span { color: var(--text-xlo); }
 .offlist { margin: 0; padding: 0; list-style: none; display: grid; gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 4px; overflow: hidden; }
 .offlist li {
   background: var(--g1);
@@ -1696,6 +1707,7 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
   .interlude, footer.site { margin-left: 0; padding-left: 0; }
   .chaos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .twoworlds, .chain, .tiles { grid-template-columns: minmax(0, 1fr); }
+  .processor-list, .status-list { grid-template-columns: minmax(0, 1fr); }
   .bc.opt { display: none; }
   .bar-ticks { display: flex; }
   .workspace { grid-template-columns: minmax(0, 1fr); }

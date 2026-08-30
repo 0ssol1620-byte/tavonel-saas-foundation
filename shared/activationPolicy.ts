@@ -1,15 +1,15 @@
 export const activationPolicy = {
   customerIntake: {
     enabled: false,
-    reason: "Customer intake remains disabled pending synthetic qualification and explicit approval.",
+    reason: "The legacy root runtime is not a production intake path. Production intake is owned by the separately deployed Next.js policy.",
   },
   cdr: {
     enabled: false,
-    reason: "CDR invocation remains disabled pending independently authenticated runtime qualification.",
+    reason: "The legacy root runtime has no CDR authority. Production CDR is owned by the separately deployed Next.js policy.",
   },
   ocrGpu: {
     enabled: false,
-    reason: "OCR and GPU candidate processing remain disabled pending sanitized-only qualification.",
+    reason: "The legacy root runtime has no GPU dispatch authority. Production OCR is owned by the separately deployed Next.js policy.",
   },
   candidatePromotion: {
     enabled: false,
