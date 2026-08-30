@@ -129,6 +129,25 @@ body {
 
 :focus-visible { outline: 2px solid var(--verified); outline-offset: 2px; border-radius: 2px; }
 
+/* A6 -- off-screen until focused, then a real control at the top left of the viewport. */
+.skip {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 200;
+  transform: translateY(-160%);
+  padding: 10px 16px;
+  border: 1px solid var(--verified-dim);
+  border-radius: 3px;
+  background: var(--g2);
+  color: var(--text-hi);
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  transition: transform 160ms var(--ease);
+}
+.skip:focus, .skip:focus-visible { transform: translateY(0); }
+
 button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
 a { color: inherit; text-decoration: none; }
 
@@ -449,6 +468,19 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 /* A page that is a document rather than a scene: no viewport floor, no choreography. */
 .scene.doc { min-height: 0; padding-top: 132px; padding-bottom: 96px; }
 .scene.doc .stack > .slate { margin-top: 14px; }
+.offlist { margin: 0; padding: 0; list-style: none; display: grid; gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 4px; overflow: hidden; }
+.offlist li {
+  background: var(--g1);
+  padding: 12px 18px;
+  font-family: var(--f-mono);
+  font-size: 12px;
+  color: var(--text-lo);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+/* A crossed circle: this is a capability that is closed, not one that is coming. */
+.offlist li::before { content: ""; width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--text-xlo); flex: none; }
 .scene.hero .shell { display: flex; flex-direction: column; gap: 18px; }
 .scene.hero h1 { margin: 4px 0 2px; }
 
@@ -832,6 +864,17 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 
 /* ============================================================ footer + notice */
 
+.site-links { display: flex; flex-wrap: wrap; gap: 20px; margin: 4px 0 12px; }
+.site-links a {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--text-lo);
+  border-bottom: 1px solid var(--hairline-hi);
+  padding-bottom: 2px;
+  transition: color 200ms ease, border-color 200ms ease;
+}
+.site-links a:hover { color: var(--text-hi); border-color: var(--verified-dim); }
 footer.site { position: relative; z-index: 10; border-top: 1px solid var(--hairline); padding: 40px 0 calc(var(--bar) + 40px) var(--rail); background: var(--ground); }
 footer.site .shell { display: flex; flex-direction: column; gap: 14px; }
 
@@ -1023,7 +1066,10 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
 
 .board { gap: 14px; }
 .board-zone { display: grid; gap: 8px; }
-.board-zone-k { color: var(--decor); }
+/* A5 -- these two are read, not decoration. --decor is 2.65:1 on the panel ground and belongs
+   to marks nobody has to read; a zone heading and a page/line marker are both labels a person
+   uses to find their place, so both take the faintest tone that still passes AA. */
+.board-zone-k { color: var(--text-xlo); }
 /* Finished and stopped panels are four short cells; they pack tighter and do not need the width
    a page and a column of text do. */
 .board-rows[data-zone="rest"] { grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr)); }
@@ -1230,7 +1276,7 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
   padding: 4px 13px;
   animation: rl-in 260ms var(--ease) both;
 }
-.rl-m { font-family: var(--f-mono); font-size: 9px; color: var(--decor); font-variant-numeric: tabular-nums; }
+.rl-m { font-family: var(--f-mono); font-size: 9px; color: var(--text-xlo); font-variant-numeric: tabular-nums; }
 /* The line the reader found is the evidence, so it is set in the reading face. */
 .rl-t { font-family: var(--f-sans); font-size: 13px; line-height: 1.45; color: var(--text-hi); overflow-wrap: anywhere; }
 .rl-t.none { font-family: var(--f-mono); font-size: 10px; color: var(--text-xlo); letter-spacing: 0.08em; }

@@ -277,7 +277,7 @@ export default function HomePage() {
         ))}
       </div>
 
-      <main>
+      <main id="main">
         {/* ═══════════════════════════════════════════════════ 01 · the mess */}
         <section className="scene hero" id="s1" data-scene="1" data-band="scatter">
           <div className="shell">
@@ -565,6 +565,15 @@ export default function HomePage() {
       <footer className="site">
         <div className="shell">
           <span className="wordmark"><Logomark /><b>TAVONEL</b></span>
+          {/*
+            The two pages that carry the claims this one makes. They are in the footer rather
+            than the nav because that is where someone goes looking for them -- after the
+            argument, not during it -- and the rule band already links the record from the top.
+          */}
+          <nav className="site-links" aria-label="More">
+            <Link href="/evidence">What we measured</Link>
+            <Link href="/security">Where your documents go</Link>
+          </nav>
           <p className="fine">
             {DISCLOSURE.staged} Paddle checkout is sandbox-only; signed webhooks persist access and
             prepaid credits, while GPU capacity remains separately gated. No customer,

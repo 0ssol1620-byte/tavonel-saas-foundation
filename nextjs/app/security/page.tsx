@@ -1,0 +1,132 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import Logomark from "@/components/logomark";
+import { BOUNDARY } from "@/lib/evidence-record";
+
+export const metadata: Metadata = {
+  title: "Where your documents go — TAVONEL",
+  description:
+    "The path a document takes through TAVONEL, what holds its bytes, what never sees them, and which capabilities are switched off in this deployment.",
+};
+
+/**
+ * D2 -- the question a buyer asks second, answered in one place.
+ *
+ * The first question is "what does it do", and the front page answers it. The second is "where
+ * do my documents go", and before this page the answer was four sentences inside a marketing
+ * scene. That is not enough for the person who has to sign off on it, and it is too much for the
+ * person still deciding whether to read on -- which is exactly why the two now live apart.
+ *
+ * Everything here is written from `docs/SECURITY_BOUNDARIES.md`. Nothing on this page is a
+ * certification, an audit result or a compliance claim: this deployment holds none, and saying
+ * otherwise is barred. What it can honestly say is what the architecture does and does not do,
+ * and which capabilities are switched off right now.
+ */
+
+/** What this deployment deliberately does not do yet. Stated as flatly as it is enforced. */
+const INACTIVE = [
+  "Accept customer document bytes",
+  "Call antivirus, content-disarm, OCR or GPU providers",
+  "Dispatch GPU work",
+  "Promote a candidate knowledge graph into a live world",
+] as const;
+
+const PATH = [
+  ["The browser", "Holds a short-lived, narrowly scoped upload capability, issued only after the server has checked who you are, what you are entitled to, and what quota is left. It never holds a service key, a webhook secret, storage credentials or a signing credential."],
+  ["Object storage", "Tenant-scoped quarantine holds the bytes. This is the only place a document body exists."],
+  ["The application", "Coordinates contracts and never proxies a document body. A large file does not pass through a request handler."],
+  ["The database", "Stores metadata and immutable proof references. It never stores document bytes."],
+] as const;
+
+export default function SecurityPage() {
+  return (
+    <div className="page">
+      <header className="nav" data-stuck={1}>
+        <Link href="/" className="wordmark" aria-label="TAVONEL home">
+          <Logomark />
+          <b>TAVONEL</b>
+        </Link>
+        <nav aria-label="Sections">
+          <Link href="/">Back to the compiler</Link>
+          <Link href="/evidence">Evidence</Link>
+        </nav>
+        <Link className="btn small" href="/login">Sign in</Link>
+      </header>
+
+      <main id="main">
+        <section className="scene doc">
+          <div className="shell">
+            <div className="body">
+              <div className="stack">
+                <p className="slate"><b>RECORD</b><span />SECURITY &amp; DATA PATH</p>
+                <h2>Where your documents go,<br />and what never sees them.</h2>
+              </div>
+              <div className="stack">
+                <p className="lede">
+                  This page holds no certification and claims none. What it can tell you is the
+                  path a document takes, which component is allowed to hold it, and what this
+                  deployment is not permitted to do at all. <b>Every external operation fails
+                  closed</b> &mdash; a control opens only after the one before it is qualified.
+                </p>
+
+                <p className="slate"><span />THE BOUNDARY, IN THE ORDER IT IS ENFORCED</p>
+                <div className="chain">
+                  {BOUNDARY.map(([num, name, text]) => (
+                    <article className="link" key={num}>
+                      <span className="st">{num}</span>
+                      <h3>{name}</h3>
+                      <p>{text}</p>
+                    </article>
+                  ))}
+                </div>
+
+                <p className="slate"><span />WHAT HOLDS WHAT</p>
+                <div className="chain">
+                  {PATH.map(([name, text]) => (
+                    <article className="link" key={name}>
+                      <h3>{name}</h3>
+                      <p>{text}</p>
+                    </article>
+                  ))}
+                </div>
+                <p className="fine">
+                  Tenant identity is derived server-side from an authenticated session, never from
+                  an identifier the browser supplies. Provider credentials &mdash; authentication,
+                  billing, storage, content disarm &mdash; are managed server-side secrets; the
+                  browser may hold a provider&rsquo;s own publishable token and nothing else.
+                </p>
+
+                <p className="slate"><span />SWITCHED OFF IN THIS DEPLOYMENT</p>
+                <ul className="offlist">
+                  {INACTIVE.map((item) => <li key={item}>{item}</li>)}
+                </ul>
+                <p className="fine">
+                  These are not missing features we forgot to mention. Each one stays closed until
+                  its provider is qualified in a sandbox and separately approved, and the access
+                  section of the front page reports live which controls are open right now rather
+                  than repeating this list from memory.
+                </p>
+
+                <div className="actions">
+                  <Link className="btn" href="/evidence">What we measured</Link>
+                  <Link className="btn ghost" href="/#s5">See what access is open</Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer className="site">
+        <div className="shell">
+          <span className="wordmark"><Logomark /><b>TAVONEL</b></span>
+          <p className="fine">
+            Nothing on this page is a demonstration, an audit result or a compliance claim. It
+            describes the architecture this deployment enforces and the capabilities it keeps
+            closed.
+          </p>
+        </div>
+      </footer>
+    </div>
+  );
+}

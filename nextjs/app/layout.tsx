@@ -48,12 +48,19 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           href="/fonts/WantedSansVariable.split.90.woff2"
           crossOrigin="anonymous"
         />
+        {/*
+          A6 -- the first thing in the tab order, on every page.
+          The landing page opens with a nav, a mode badge, four section links and a scene rail
+          before it reaches a sentence, and a keyboard or screen-reader visitor had to walk all
+          of it on every page. Visually hidden until focused, and then a real, visible control.
+        */}
+        <a className="skip" href="#main">Skip to content</a>
         {children}
         {/*
           Measurement, on the same terms as everything else here.
 
           Nothing in this product could be judged before this: the page argues for a sequence of
-          eight scenes and nobody knew how far down anyone got. It is Vercel's own analytics for
+          scenes and nobody knew how far down anyone got. It is Vercel's own analytics for
           one specific reason -- it loads from `/_vercel/insights` on this origin, so the strict
           CSP above admits it without a single directive being widened, and no third party is
           contacted. It sets no cookie, which is why this page still has no consent banner to

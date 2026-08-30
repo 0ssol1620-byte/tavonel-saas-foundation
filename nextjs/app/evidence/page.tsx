@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Logomark from "@/components/logomark";
-import { BOUNDARY, EVIDENCE, EVIDENCE_STATE } from "@/lib/evidence-record";
+import { EVIDENCE, EVIDENCE_STATE } from "@/lib/evidence-record";
 
 export const metadata: Metadata = {
   title: "What we measured — TAVONEL",
@@ -36,7 +36,7 @@ export default function EvidencePage() {
         <Link className="btn small" href="/login">Sign in</Link>
       </header>
 
-      <main>
+      <main id="main">
         <section className="scene doc">
           <div className="shell">
             <div className="body">
@@ -50,23 +50,6 @@ export default function EvidencePage() {
                   customer logos anywhere on this site and no certifications &mdash; a brand rule
                   bars them without registered evidence &mdash; so this is our own record instead,
                   <b> including the part of it that did not work.</b>
-                </p>
-
-                <p className="slate"><span />THE BOUNDARY WE ENFORCE</p>
-                <div className="chain">
-                  {BOUNDARY.map(([num, name, text]) => (
-                    <article className="link" key={num}>
-                      <span className="st">{num}</span>
-                      <h3>{name}</h3>
-                      <p>{text}</p>
-                    </article>
-                  ))}
-                </div>
-                <p className="fine">
-                  Designed to fail closed: each control opens only after the one before it is
-                  qualified, and document bytes never pass through the application or the
-                  database. Whether each control is open in this deployment right now is reported
-                  live in the access section of the front page.
                 </p>
 
                 <p className="slate"><span />WHAT WE MEASURED, AND WHAT WE DID NOT</p>
@@ -87,7 +70,8 @@ export default function EvidencePage() {
                 </p>
 
                 <div className="actions">
-                  <Link className="btn" href="/#s5">See what access is open</Link>
+                  <Link className="btn" href="/security">Where your documents go</Link>
+                  <Link className="btn ghost" href="/#s5">See what access is open</Link>
                 </div>
               </div>
             </div>

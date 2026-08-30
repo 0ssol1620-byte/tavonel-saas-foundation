@@ -47,7 +47,7 @@ export default function AuthCallbackPage() {
   }, []);
 
   return (
-    <main className="auth">
+    <main id="main" className="auth">
       <header>
         <Link href="/" className="wordmark"><Logomark /><b>TAVONEL</b></Link>
         <span className="mode"><i aria-hidden="true" />FOUNDATION MODE</span>
