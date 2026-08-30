@@ -30,7 +30,15 @@ const mono = IBM_Plex_Mono({
  * found that can be got right before the index is opened.
  */
 export const metadata: Metadata = {
-  metadataBase: new URL("https://tavonel-saas-foundation.vercel.app"),
+  /*
+    D6 -- the site has a domain, so it has one name.
+    Until this line changed, every canonical link, every og:url and the OG image itself named
+    tavonel-saas-foundation.vercel.app while the site answered on tavonel.com. That is one
+    product living at two hostnames: a shared link previews from the wrong origin, and the page
+    tells a crawler to prefer an address nobody was given. The apex is the canonical one --
+    www.tavonel.com already 308s to it.
+  */
+  metadataBase: new URL("https://tavonel.com"),
   title: "When a document changes, what else is now wrong? — TAVONEL",
   description:
     "TAVONEL compiles your files into structured, AI-ready knowledge and keeps it correct as the sources change: it rebuilds only what a change actually reached, holds what has two readings, and returns every answer to the line it came from.",
