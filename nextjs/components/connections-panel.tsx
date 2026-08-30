@@ -1,6 +1,6 @@
 "use client";
 
-import { Cloud, Server, Trash2 } from "lucide-react";
+import { Cloud, Link2, Server, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
@@ -17,6 +17,21 @@ type Connection = {
   lastErrorCode: string | null;
 };
 
+type OAuthProvider = "google_drive" | "dropbox" | "microsoft_graph";
+
+type OAuthConnection = {
+  oauthConnectionId: string;
+  provider: OAuthProvider;
+  displayName: string;
+  providerAccountLabel: string | null;
+  status: "active" | "reauthorization_required" | "paused" | "error" | "revoked";
+  cursorSha256: string | null;
+  lastSyncAt: string | null;
+  lastErrorCode: string | null;
+};
+
+type OAuthProviderState = { provider: OAuthProvider; configured: boolean };
+
 async function sessionToken() {
   const client = getSupabaseBrowserClient();
   const { data } = client ? await client.auth.getSession() : { data: { session: null } };
@@ -27,8 +42,15 @@ function providerLabel(provider: Connection["provider"]) {
   return provider === "file_server" ? "Mounted file server" : provider === "r2" ? "Cloudflare R2" : provider === "minio" ? "MinIO" : "Amazon S3";
 }
 
+function oauthProviderLabel(provider: OAuthProvider) {
+  return provider === "google_drive" ? "Google Drive" : provider === "dropbox" ? "Dropbox" : "OneDrive / SharePoint";
+}
+
 export default function ConnectionsPanel() {
   const [connections, setConnections] = useState<Connection[] | null>(null);
+  const [oauthConnections, setOAuthConnections] = useState<OAuthConnection[] | null>(null);
+  const [oauthProviders, setOAuthProviders] = useState<OAuthProviderState[]>([]);
+  const [oauthDisplayName, setOAuthDisplayName] = useState("Research Drive");
   const [provider, setProvider] = useState<Connection["provider"]>("file_server");
   const [displayName, setDisplayName] = useState("");
   const [bucket, setBucket] = useState("");
@@ -50,7 +72,16 @@ export default function ConnectionsPanel() {
       return;
     }
     setConnections(json.connections);
-    setNotice(json.connections.length > 0 ? `${json.connections.length} durable connection(s) loaded.` : "No source system is connected yet.");
+    const oauthResponse = await fetch("/api/v1/oauth-connectors", { headers: { authorization: `Bearer ${token}` } });
+    const oauthJson = await oauthResponse.json() as { code?: string; providers?: OAuthProviderState[]; connections?: OAuthConnection[] };
+    if (!oauthResponse.ok || !Array.isArray(oauthJson.providers) || !Array.isArray(oauthJson.connections)) {
+      setNotice(`Storage connections loaded, but OAuth sources could not be read (${oauthJson.code ?? oauthResponse.status}).`);
+      return;
+    }
+    setOAuthProviders(oauthJson.providers);
+    setOAuthConnections(oauthJson.connections);
+    const total = json.connections.length + oauthJson.connections.length;
+    setNotice(total > 0 ? `${total} durable connection(s) loaded.` : "No source system is connected yet.");
   };
 
   useEffect(() => { void load(); }, []);
@@ -122,6 +153,60 @@ export default function ConnectionsPanel() {
     }
   };
 
+  const connectOAuth = async (provider: OAuthProvider) => {
+    const name = oauthDisplayName.trim();
+    if (!name) {
+      setNotice("Give the OAuth source a connection name before continuing.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const token = await sessionToken();
+      if (!token) {
+        setNotice("Session expired. Sign in again before connecting a source.");
+        return;
+      }
+      const response = await fetch("/api/v1/oauth-connectors/authorize", {
+        method: "POST",
+        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+        body: JSON.stringify({ provider, displayName: name }),
+      });
+      const json = await response.json() as { code?: string; authorizationUrl?: string };
+      if (!response.ok || typeof json.authorizationUrl !== "string") {
+        setNotice(`OAuth connection could not start (${json.code ?? response.status}).`);
+        return;
+      }
+      window.location.assign(json.authorizationUrl);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const revokeOAuth = async (connection: OAuthConnection) => {
+    if (!window.confirm(`Revoke ${connection.displayName}? Existing immutable documents and worlds are retained.`)) return;
+    setBusy(true);
+    try {
+      const token = await sessionToken();
+      if (!token) {
+        setNotice("Session expired. Sign in again before revoking a connection.");
+        return;
+      }
+      const response = await fetch(`/api/v1/oauth-connectors/connections/${connection.oauthConnectionId}`, {
+        method: "DELETE",
+        headers: { authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) {
+        const json = await response.json().catch(() => ({})) as { code?: string };
+        setNotice(`OAuth connection was not revoked (${json.code ?? response.status}).`);
+        return;
+      }
+      setOAuthConnections((current) => (current ?? []).filter((item) => item.oauthConnectionId !== connection.oauthConnectionId));
+      setNotice(`${connection.displayName} was revoked. Existing immutable outputs were not deleted.`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <section className="connection-studio" aria-labelledby="connections-title">
       <header className="studio-heading">
@@ -132,6 +217,17 @@ export default function ConnectionsPanel() {
         <button type="button" disabled={busy} onClick={() => void load()}>Refresh state</button>
       </header>
       <p className="connection-notice" role="status">{notice}</p>
+      <div className="connection-form">
+        <label htmlFor="oauth-connection-name">Cloud connection name</label>
+        <input id="oauth-connection-name" required maxLength={100} value={oauthDisplayName} onChange={(event) => setOAuthDisplayName(event.target.value)} placeholder="Research Drive" />
+        <p className="field-help">TAVONEL requests read-only access and stores refresh credentials only in the encrypted secret broker. Disconnecting removes the broker credential.</p>
+        {oauthProviders.map((item) => (
+          <button key={item.provider} type="button" disabled={busy || !item.configured || !oauthDisplayName.trim()} onClick={() => void connectOAuth(item.provider)}>
+            {item.configured ? `Connect ${oauthProviderLabel(item.provider)}` : `${oauthProviderLabel(item.provider)} not configured`}
+          </button>
+        ))}
+        {oauthProviders.length === 0 ? <p className="field-help">Reading OAuth provider availability.</p> : null}
+      </div>
       <div className="connection-layout">
         <form className="connection-form" onSubmit={create}>
           <label htmlFor="connection-name">Connection name</label>
@@ -164,8 +260,22 @@ export default function ConnectionsPanel() {
           </button>
         </form>
         <div className="connection-list" aria-live="polite">
-          {connections === null ? <p className="world-empty">Connection state has not been read yet.</p> : null}
-          {connections?.length === 0 ? <p className="world-empty">Create a connection, then use a scoped sync key with the local source agent.</p> : null}
+          {connections === null || oauthConnections === null ? <p className="world-empty">Connection state has not been read yet.</p> : null}
+          {connections?.length === 0 && oauthConnections?.length === 0 ? <p className="world-empty">Create a connection, then use OAuth or a scoped sync key with the local source agent.</p> : null}
+          {oauthConnections?.map((connection) => (
+            <article key={connection.oauthConnectionId}>
+              <span className="connection-icon" aria-hidden="true"><Link2 size={18} /></span>
+              <div>
+                <div className="connection-title"><strong>{connection.displayName}</strong><span data-status={connection.status}>{connection.status}</span></div>
+                <p>{oauthProviderLabel(connection.provider)} · encrypted OAuth</p>
+                <small>{connection.providerAccountLabel ?? "Provider account connected"}</small>
+                <small>{connection.lastSyncAt ? `Last durable sync ${new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(connection.lastSyncAt))}` : "Connected; awaiting first source scan"}</small>
+                <small>{connection.cursorSha256 ?? "No cursor committed"}</small>
+                {connection.lastErrorCode ? <small className="connection-error">{connection.lastErrorCode}</small> : null}
+              </div>
+              <button type="button" className="icon-action" disabled={busy} onClick={() => void revokeOAuth(connection)} aria-label={`Revoke ${connection.displayName}`}><Trash2 size={15} /></button>
+            </article>
+          ))}
           {connections?.map((connection) => (
             <article key={connection.connectionId}>
               <span className="connection-icon" aria-hidden="true">{connection.provider === "file_server" ? <Server size={18} /> : <Cloud size={18} />}</span>
