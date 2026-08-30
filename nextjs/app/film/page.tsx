@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import CanvasTransitionLink from "@/components/canvas-transition-link";
 import Logomark from "@/components/logomark";
 import OpeningFilm from "@/components/opening-film";
 
@@ -30,7 +31,7 @@ export default function FilmPage() {
           <b>TAVONEL</b>
         </Link>
         <nav aria-label="Sections">
-          <Link href="/">Back to the compiler</Link>
+          <CanvasTransitionLink href="/">Back to the compiler</CanvasTransitionLink>
         </nav>
       </header>
 

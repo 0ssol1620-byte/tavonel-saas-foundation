@@ -193,6 +193,21 @@ export default function WorkspacePage() {
   }, []);
   const [busy, setBusy] = useState(false);
   const [documents, setDocuments] = useState<DocumentListItem[] | null>(null);
+  /**
+   * D9 -- the tab keeps counting after you look away.
+   *
+   * Only a real, already-fetched count goes here -- never a placeholder, never an animation
+   * pretending a number is still climbing. That is the same "no manufactured statistic" rule
+   * the landing page's fine print states outright; a tab title is not exempt from it just
+   * because nobody screenshots it. Restored on unmount so a signed-out tab does not keep a
+   * previous session's count.
+   */
+  useEffect(() => {
+    if (!documents) return;
+    const previous = document.title;
+    document.title = `${documents.length} document${documents.length === 1 ? "" : "s"} — TAVONEL`;
+    return () => { document.title = previous; };
+  }, [documents]);
   const [proofMode, setProofMode] = useState(false);
   const [collectionResult, setCollectionResult] = useState<CollectionResult | null>(null);
   const [downloading, setDownloading] = useState(false);

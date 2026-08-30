@@ -30,8 +30,9 @@
 
 import Link from "next/link";
 import type { Route } from "next";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, cloneElement, isValidElement, useEffect, useMemo, useRef, useState } from "react";
 import AnswerSwitch from "@/components/answer-switch";
+import CanvasTransitionLink from "@/components/canvas-transition-link";
 import ChangeLattice from "@/components/change-lattice";
 import CompilePipeline from "@/components/compile-pipeline";
 import ReadingDemo from "@/components/reading-demo";
@@ -169,6 +170,52 @@ export default function HomePage() {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const timer = window.setTimeout(() => setOpened(true), 900);
     return () => window.clearTimeout(timer);
+  }, []);
+
+  /**
+   * D9 -- one button gets to lean toward the reader.
+   *
+   * The instrument bar's control is where every scene's argument funnels to, so it is the one
+   * place a magnetic pull earns its keep. Applied to more than one control it would read as a
+   * page-wide tic rather than an emphasis, which is why this ref points at exactly one button.
+   *
+   * Written through `--mx`/`--my` rather than a bare inline `transform` so `.bar-next:active` in
+   * CSS can still win the property outright on click -- a press should settle the button, not
+   * keep it leaning toward wherever the pointer last was.
+   */
+  const barNextRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    const button = barNextRef.current;
+    if (!button) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (!window.matchMedia("(pointer: fine)").matches) return;
+    const RANGE = 70;
+    const PULL = 0.32;
+    let raf = 0;
+    const reset = () => { button.style.removeProperty("--mx"); button.style.removeProperty("--my"); };
+    const onMove = (event: PointerEvent) => {
+      if (raf) return;
+      raf = window.requestAnimationFrame(() => {
+        raf = 0;
+        const box = button.getBoundingClientRect();
+        const dx = event.clientX - (box.left + box.width / 2);
+        const dy = event.clientY - (box.top + box.height / 2);
+        const dist = Math.hypot(dx, dy);
+        if (dist < RANGE) {
+          const pull = (1 - dist / RANGE) * PULL;
+          button.style.setProperty("--mx", `${dx * pull}px`);
+          button.style.setProperty("--my", `${dy * pull}px`);
+        } else {
+          reset();
+        }
+      });
+    };
+    window.addEventListener("pointermove", onMove, { passive: true });
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      if (raf) window.cancelAnimationFrame(raf);
+      reset();
+    };
   }, []);
   const fieldMode: WorldMode = band === "scatter" && opened ? "ingest" : world.mode;
   const reachedChange = BAND_ORDER.indexOf(band as BandName) >= BAND_ORDER.indexOf("change");
@@ -329,8 +376,8 @@ export default function HomePage() {
           <div className="shell">
             <p className="slate rv"><b>TAVONEL</b><span /> KNOWLEDGE COMPILER</p>
             <h1>
-              <span className="line"><i>Your knowledge is everywhere.</i></span>
-              <span className="line dim"><i>Compile it.</i></span>
+              <span className="line"><i>{revealWords("Your knowledge is everywhere.")}</i></span>
+              <span className="line dim"><i>{revealWords("Compile it.", 4)}</i></span>
             </h1>
             {/*
               One sentence, and it no longer lists what the chips underneath already show.
@@ -679,7 +726,7 @@ export default function HomePage() {
             argument, not during it -- and the rule band already links the record from the top.
           */}
           <nav className="site-links" aria-label="More">
-            <Link href="/film">Watch the sixteen-second version</Link>
+            <CanvasTransitionLink href="/film">Watch the sixteen-second version</CanvasTransitionLink>
             <Link href="/evidence">What we measured</Link>
             <Link href="/security">Where your documents go</Link>
             <Link href={"/contact" as Route}>Talk to us</Link>
@@ -722,7 +769,7 @@ export default function HomePage() {
           the scene, so it is always the next thing rather than a fixed CTA following them down
           the page.
         */}
-        <button className="bar-next" type="button" onClick={cta("instrument_bar", nextStep.run)}>{nextStep.label}</button>
+        <button ref={barNextRef} className="bar-next" type="button" onClick={cta("instrument_bar", nextStep.run)}>{nextStep.label}</button>
       </div>
 
       {notice ? (
@@ -793,6 +840,46 @@ function Cell({ value, label, warn }: { value: string; label: string; warn?: boo
   );
 }
 
+/**
+ * D9 -- a headline arrives one word at a time, not as a block.
+ *
+ * Walks whatever a title actually is -- a plain string, or one of the JSX fragments a few
+ * scenes pass (a `<br />`, an interpolated count from `n(...)`) -- and wraps each word of text
+ * in its own `.rv.word` span, leaving everything that is not text untouched. `<br />` stays a
+ * `<br />`; a number interpolation becomes one word rather than being torn apart mid-digit.
+ *
+ * This does not introduce a second reveal mechanism. `.rv.word` is still `.rv`, so the single
+ * IntersectionObserver in use-scroll-scenes.ts fires these exactly the way it fires every other
+ * reveal element already on the page.
+ */
+function revealWords(node: React.ReactNode, startAt = 0): React.ReactNode {
+  const at = { current: startAt };
+  const walk = (child: React.ReactNode): React.ReactNode => {
+    if (typeof child === "string" || typeof child === "number") {
+      const text = String(child);
+      return text.split(/(\s+)/).map((part, i) => {
+        if (part === "" || /^\s+$/.test(part)) return part;
+        const index = at.current++;
+        return (
+          <span key={`w${index}-${i}`} className="rv word" style={{ "--i": index } as React.CSSProperties}>
+            {part}
+          </span>
+        );
+      });
+    }
+    if (Array.isArray(child)) {
+      return child.map((c, i) => <Fragment key={i}>{walk(c)}</Fragment>);
+    }
+    if (isValidElement(child)) {
+      if (child.type === "br") return child;
+      const props = child.props as { children?: React.ReactNode };
+      return cloneElement(child, undefined, walk(props.children));
+    }
+    return child;
+  };
+  return walk(node);
+}
+
 function Scene({
   id,
   band,
@@ -812,7 +899,7 @@ function Scene({
         <div className="body">
           <div className="stack">
             <p className="slate rv"><b>SCENE {String(id).padStart(2, "0")}</b><span />{eyebrow}</p>
-            <h2 className="rv">{title}</h2>
+            <h2>{revealWords(title)}</h2>
           </div>
           <div className="stack">{children}</div>
         </div>
@@ -848,7 +935,7 @@ function SceneMore({
         <div className="body">
           <div className="stack">
             <p className="slate rv"><span />{eyebrow}</p>
-            <h3 className="rv sub">{title}</h3>
+            <h3 className="sub">{revealWords(title)}</h3>
           </div>
           <div className="stack">{children}</div>
         </div>

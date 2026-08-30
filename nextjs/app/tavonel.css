@@ -127,7 +127,32 @@ body {
 ::-webkit-scrollbar-thumb { background: var(--hairline); border: 3px solid var(--ground); border-radius: 6px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--hairline-hi); }
 
-:focus-visible { outline: 2px solid var(--verified); outline-offset: 2px; border-radius: 2px; }
+/*
+  D9 -- a focus ring that reads as a rangefinder, not a browser default.
+  The plain outline still carries the accessibility contract by itself (2px solid, always
+  present) so nothing regresses if the pseudo-element below fails to paint for any reason --
+  an inline element wrapping across two lines, a browser without background-image layering.
+  The four corner marks are additive polish on top of a ring that already works alone.
+*/
+:focus-visible { outline: 2px solid var(--verified); outline-offset: 2px; border-radius: 2px; position: relative; }
+:focus-visible::after {
+  content: "";
+  position: absolute;
+  inset: -7px;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-size: 9px 9px;
+  background-position: top left, top right, bottom right, bottom left;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M1 9V1H9' fill='none' stroke='%237be0be' stroke-width='1.6' stroke-linecap='square'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M1 1H9V9' fill='none' stroke='%237be0be' stroke-width='1.6' stroke-linecap='square'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M9 1V9H1' fill='none' stroke='%237be0be' stroke-width='1.6' stroke-linecap='square'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M9 9H1V1' fill='none' stroke='%237be0be' stroke-width='1.6' stroke-linecap='square'/%3E%3C/svg%3E");
+}
+@media (prefers-reduced-motion: no-preference) {
+  :focus-visible::after { animation: bracket-in 180ms var(--ease); }
+  @keyframes bracket-in { from { inset: -2px; opacity: 0; } to { inset: -7px; opacity: 1; } }
+}
 
 /* A6 -- off-screen until focused, then a real control at the top left of the viewport. */
 .skip {
@@ -147,6 +172,76 @@ body {
   transition: transform 160ms var(--ease);
 }
 .skip:focus, .skip:focus-visible { transform: translateY(0); }
+
+/*
+  D9 -- a stamp, not a spinner. See components/route-boot.tsx: this never gates the page, it
+  only confirms a route change already happened, in the bar's own instrument voice.
+*/
+.route-boot {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 150;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  background: var(--g2);
+  border: 1px solid var(--hairline-hi);
+  border-radius: 3px;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--text-lo);
+  text-transform: uppercase;
+  pointer-events: none;
+  animation: boot-flash 260ms ease both;
+}
+.route-boot-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--verified); flex: none; }
+@keyframes boot-flash {
+  0% { opacity: 0; transform: translateY(-4px); }
+  18% { opacity: 1; transform: translateY(0); }
+  78% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@media (max-width: 620px) {
+  .route-boot { top: auto; bottom: calc(var(--bar) + 12px); right: 12px; font-size: 9px; padding: 5px 10px; }
+}
+
+/*
+  D9 -- grain, so the flattest surface on the page is not a vector fill.
+  A near-black ground rendered in flat colour reads as a UI mockup; the same ground with a
+  trace of texture on it reads as a material. This is achromatic static, not a tint (rule 1
+  intact) and not a gradient or glow (rule 2 intact) -- it never moves, so it reports nothing
+  and rule 3 does not apply to it at all. `mix-blend-mode: overlay` means it does real work only
+  where the ground already has some luminance variation; over flat #08090a it stays close to
+  invisible, which is correct -- the point is a material's texture, not a visible effect.
+*/
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  pointer-events: none;
+  opacity: 0.035;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/*
+  D9 -- a detent, not a hover.
+  Nothing on this page has sound, so a click had no confirmation beyond whatever state change
+  followed it -- often a scene away or a second later. This is the switch's own click, standing
+  in: 1px of travel and one step down in ground value, gone the instant the button is released.
+  Luminance and position only, so rule 2 holds, and it fires on real activation (:active covers
+  Enter/Space on a focused button in every evergreen engine) rather than looping on hover.
+*/
+@media (prefers-reduced-motion: no-preference) {
+  button:not(:disabled):active, a.btn:active, .bar-next:active, .bt:active {
+    transform: translateY(1px);
+    filter: brightness(0.92);
+  }
+}
 
 button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
 a { color: inherit; text-decoration: none; }
@@ -171,6 +266,10 @@ a { color: inherit; text-decoration: none; }
     over it is set on the highest-contrast tokens, so it still never competes for the reading.
   */
   opacity: 0.85;
+  /* A1 -- the far end of this morph is .film-canvas in the film's own stylesheet block below;
+     see canvas-transition-link.tsx for why the pairing is honest about what it does and does not
+     carry across. */
+  view-transition-name: world-canvas;
 }
 
 .shell {
@@ -274,6 +373,24 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 .js .rv.in { opacity: 1; transform: none; }
 .js .stack > .rv:nth-child(2) { transition-delay: 60ms; }
 .js .stack > .rv:nth-child(3) { transition-delay: 120ms; }
+
+/*
+  D9 -- the same reveal, read one word at a time.
+  This uses the reveal observer that already exists rather than a second mechanism: a `.rv.word`
+  span is still a `.rv` span, so the one IntersectionObserver in use-scroll-scenes.ts fires it the
+  same way it fires everything else, and the no-JS / failed-bundle fallback (render complete and
+  static) covers these for free. `.rv.word` only overrides what a headline needs beyond the base
+  rule -- inline-block so translateY has something to move, a blur that reads as "still arriving"
+  rather than the block-level fade, and a per-word delay off the same `--i` custom property the
+  debris chips already stagger with.
+*/
+.js .rv.word {
+  display: inline-block;
+  filter: blur(4px);
+  transition: opacity 460ms var(--ease), transform 460ms var(--ease), filter 460ms var(--ease);
+  transition-delay: calc(var(--i, 0) * 55ms);
+}
+.js .rv.word.in { filter: none; }
 
 /* ============================================================ nav */
 
@@ -433,7 +550,13 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
   font-size: 9.5px;
   letter-spacing: 0.12em;
   color: var(--text-mid);
-  transition: color 200ms ease, border-color 200ms ease, background 200ms ease;
+  transition: color 200ms ease, border-color 200ms ease, background 200ms ease, transform 220ms var(--ease);
+  /*
+    D9 -- the lean lives in custom properties, not a bare `transform`, so `:active` below can
+    still win the property outright on click (a press should settle the button, not keep it
+    leaning) instead of the two effects fighting over one declaration.
+  */
+  transform: translate(var(--mx, 0px), var(--my, 0px));
 }
 .bar-next:hover { color: var(--verified); border-color: var(--verified-dim); background: var(--verified-deep); }
 
@@ -1660,11 +1783,21 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
     transition-delay: 0ms !important;
   }
   /* Content is never withheld -- only the transition is removed. */
-  .js .rv { opacity: 1; transform: none; }
+  .js .rv { opacity: 1; transform: none; filter: none; }
   .tree-root { opacity: 1; transform: none; }
   /* Regions and lines still appear as they are found; only the fade is removed. */
   .rb, .rl { animation: none; }
   .js .rv.in .stop span::after { right: 0; }
+  /*
+    A1 -- belt and suspenders. canvas-transition-link.tsx already checks reduced-motion before
+    it ever calls startViewTransition, so this rule should never have anything to do; it exists
+    for the one case that check cannot cover -- the setting changing mid-session, after the page
+    already read it once.
+  */
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
 }
 
 /* ============================================================ the film (/film) */
@@ -1687,7 +1820,14 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
 .film-nav nav a:hover { color: var(--text-hi); }
 
 .film { position: relative; width: 100%; height: 100vh; overflow: hidden; }
-.film-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.film-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; view-transition-name: world-canvas; }
+
+/* A1 -- one crossfade, timed to the site's own ease rather than the UA default 250ms linear-ish
+   curve. Everything else on the page that has no name of its own falls into the implicit root
+   group and gets the browser's default crossfade, which is intentionally left alone -- naming
+   more elements would turn one clear "same world" cue into a page-wide special effect. */
+::view-transition-group(world-canvas) { animation-duration: 560ms; animation-timing-function: var(--ease); }
+::view-transition-old(world-canvas), ::view-transition-new(world-canvas) { animation-duration: 560ms; animation-timing-function: var(--ease); }
 
 /*
   The lower third, and a floor under it.

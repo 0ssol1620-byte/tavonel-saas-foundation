@@ -11,6 +11,12 @@
  * Motion law (SPEC 7.1): it moves only when reality, understanding or control changes. There is
  * no idle drift and no ambient loop; between mode changes the field is completely still, and
  * under `prefers-reduced-motion` it paints each mode once with no transition at all.
+ *
+ * D9 -- attention is a real state, so the field is allowed to report it.
+ * Nobody being at the keyboard is not "nothing changing" -- it is a fact about the world exactly
+ * like the mode is, so when the tab is hidden or the pointer has not moved in a while the whole
+ * field settles to a lower luminance and holds there. This is one eased transition into a state
+ * and one back out, not a loop: it does not breathe, pulse or drift once it arrives.
  */
 
 import { useEffect, useRef } from "react";
@@ -66,7 +72,17 @@ export default function WorldField({ mode }: { mode: WorldMode }) {
     let frame = 0;
     // Every animated quantity is eased toward its target rather than set, so a mode change
     // that lands mid-transition resolves smoothly instead of snapping.
-    const current = { form: 0, edges: 0, labels: 0, reveal: 0 };
+    const current = { form: 0, edges: 0, labels: 0, reveal: 0, idle: 1 };
+
+    /* D9 -- idle is attention, not a timer for its own sake: hidden is instant, unattended
+       pointer/scroll/keys takes IDLE_MS before the field agrees nobody is watching. */
+    const IDLE_MS = 45_000;
+    const IDLE_DIM = 0.42;
+    let lastActive = performance.now();
+    const markActive = () => { lastActive = performance.now(); };
+    const activityEvents: (keyof WindowEventMap)[] = ["pointermove", "pointerdown", "keydown", "wheel", "touchstart"];
+    activityEvents.forEach((name) => window.addEventListener(name, markActive, { passive: true }));
+    window.addEventListener("scroll", markActive, { passive: true, capture: true });
 
     const layout = () => {
       const ratio = Math.min(window.devicePixelRatio || 1, 2);
@@ -94,6 +110,9 @@ export default function WorldField({ mode }: { mode: WorldMode }) {
         current[key] += (target[key] - current[key]) * ease;
       }
 
+      const idleTarget = document.hidden || performance.now() - lastActive > IDLE_MS ? IDLE_DIM : 1;
+      current.idle += (idleTarget - current.idle) * (reduced ? 1 : 0.02);
+
       context.clearRect(0, 0, width, height);
       const at = (index: number) => {
         const node = graph!.nodes[index];
@@ -110,8 +129,8 @@ export default function WorldField({ mode }: { mode: WorldMode }) {
           const lit =
             graph.nodes[a].depth >= 0 && graph.nodes[b].depth >= 0 ? current.reveal : 0;
           context.strokeStyle = lit > 0.05
-            ? `${INK.affected}${(0.14 * lit).toFixed(3)})`
-            : `${INK.edge}${(0.55 * current.edges).toFixed(3)})`;
+            ? `${INK.affected}${(0.14 * lit * current.idle).toFixed(3)})`
+            : `${INK.edge}${(0.55 * current.edges * current.idle).toFixed(3)})`;
           context.beginPath();
           context.moveTo(pa.x, pa.y);
           context.lineTo(pb.x, pb.y);
@@ -124,9 +143,9 @@ export default function WorldField({ mode }: { mode: WorldMode }) {
         const point = at(i);
         const revealed = node.depth >= 0 || node.state === "held";
         const ink = revealed && current.reveal > 0.05 ? INK[node.state] : INK.kept;
-        const alpha = revealed && current.reveal > 0.05
+        const alpha = (revealed && current.reveal > 0.05
           ? 0.30 + 0.55 * current.reveal
-          : 0.16 + 0.20 * current.form;
+          : 0.16 + 0.20 * current.form) * current.idle;
         context.fillStyle = `${ink}${alpha.toFixed(3)})`;
         context.beginPath();
         context.arc(point.x, point.y, node.radius * (revealed ? 1.5 : 1), 0, Math.PI * 2);
@@ -135,7 +154,7 @@ export default function WorldField({ mode }: { mode: WorldMode }) {
 
       if (current.labels > 0.03) {
         context.font = '9px var(--f-mono), ui-monospace, monospace';
-        context.fillStyle = `${INK.label}${(0.9 * current.labels).toFixed(3)})`;
+        context.fillStyle = `${INK.label}${(0.9 * current.labels * current.idle).toFixed(3)})`;
         context.textAlign = "center";
         graph.byArea.forEach((members, area) => {
           if (!members.length) return;
@@ -172,6 +191,8 @@ export default function WorldField({ mode }: { mode: WorldMode }) {
     window.addEventListener("resize", onResize);
     return () => {
       window.removeEventListener("resize", onResize);
+      activityEvents.forEach((name) => window.removeEventListener(name, markActive));
+      window.removeEventListener("scroll", markActive, true);
       if (frame) window.cancelAnimationFrame(frame);
     };
   }, []);

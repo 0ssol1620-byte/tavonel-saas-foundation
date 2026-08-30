@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { IBM_Plex_Mono } from "next/font/google";
+import RouteBoot from "@/components/route-boot";
 import "./globals.css";
 
 /**
@@ -76,6 +77,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           of it on every page. Visually hidden until focused, and then a real, visible control.
         */}
         <a className="skip" href="#main">Skip to content</a>
+        <RouteBoot />
         {children}
         {/*
           Measurement, on the same terms as everything else here.
