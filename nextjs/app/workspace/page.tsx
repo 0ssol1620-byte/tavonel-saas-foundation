@@ -159,6 +159,7 @@ export default function WorkspacePage() {
   }, []);
   const [busy, setBusy] = useState(false);
   const [documents, setDocuments] = useState<DocumentListItem[] | null>(null);
+  const [selectedCompilationDocumentIds, setSelectedCompilationDocumentIds] = useState<string[]>([]);
   const [proofMode, setProofMode] = useState(false);
   const [collectionResult, setCollectionResult] = useState<CollectionResult | null>(null);
   const [downloading, setDownloading] = useState(false);
@@ -620,6 +621,54 @@ export default function WorkspacePage() {
     }
   };
 
+  const compileSelectedDocuments = async () => {
+    const readyDocumentIds = new Set(
+      (documents ?? [])
+        .filter((document) => document.hasOcrJson && document.ocrJsonKey && document.sanitizedKey)
+        .map((document) => document.documentId),
+    );
+    const documentIds = selectedCompilationDocumentIds.filter((documentId) => readyDocumentIds.has(documentId));
+    if (documentIds.length < 2 || documentIds.length > 12) {
+      setNotice("Select between 2 and 12 OCR-ready documents before compiling.");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const client = getSupabaseBrowserClient();
+      const { data } = client ? await client.auth.getSession() : { data: { session: null } };
+      const token = data.session?.access_token;
+      if (!token) {
+        setNotice("Sign in with Google before compiling completed documents.");
+        return;
+      }
+      setNotice(`Compiling ${documentIds.length} selected immutable OCR documents with Python Core v2...`);
+      const response = await fetch("/api/collections/compile", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({ documentIds }),
+      });
+      const json = await response.json() as CollectionResult & { code?: string };
+      if (!response.ok || !json.collectionId) {
+        setNotice(`Selected collection compilation failed (${json.code ?? response.status}). The existing world is unchanged.`);
+        return;
+      }
+      setCollectionResult(json);
+      await loadWorldState(json.collectionId, token);
+      const url = new URL(window.location.href);
+      url.searchParams.set("collection", json.collectionId);
+      window.history.replaceState(null, "", url);
+      setSelectedCompilationDocumentIds([]);
+      setNotice(
+        json.lifecycle === "review_required"
+          ? `Selected collection ${json.collectionId} produced a review-required package. Download and inspect it; promotion remains blocked.`
+          : `Selected collection ${json.collectionId} compiled ${json.validation.counts.documents} documents into ${json.validation.counts.packageFiles} package files. candidatePromotion=false.`,
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const downloadCollection = async () => {
     if (!collectionResult) return;
     setDownloading(true);
@@ -878,6 +927,14 @@ export default function WorkspacePage() {
     }
   };
 
+  const compilationCandidates = [
+    ...new Map(
+      (documents ?? [])
+        .filter((document) => document.hasOcrJson && document.ocrJsonKey && document.sanitizedKey)
+        .map((document) => [document.documentId, document]),
+    ).values(),
+  ];
+
   if (session !== "signed-in") {
     // No shell, no tabs, no numbers. Anything drawn here would be describing a workspace this
     // visitor has not been shown to own.
@@ -1037,6 +1094,48 @@ export default function WorkspacePage() {
                 collection={collectionResult}
                 onUpload={activationPolicy.customerIntake.enabled ? () => fileRef.current?.click() : undefined}
               />
+              <section className="card compile-studio" aria-labelledby="compile-studio-title">
+                <p className="eyebrow">COLLECTION COMPILER</p>
+                <h2 id="compile-studio-title">Compile completed documents</h2>
+                <p>
+                  Select 2–12 immutable OCR results. Compilation creates a candidate package only;
+                  it does not retry OCR, spend OCR credits, or move the active world pointer.
+                </p>
+                {compilationCandidates.length >= 2 ? (
+                  <fieldset className="compile-selection">
+                    <legend>{selectedCompilationDocumentIds.length} selected · {compilationCandidates.length} ready</legend>
+                    {compilationCandidates.map((document) => (
+                      <label key={`${document.documentId}-${document.versionKey}`}>
+                        <input
+                          type="checkbox"
+                          checked={selectedCompilationDocumentIds.includes(document.documentId)}
+                          disabled={busy || (!selectedCompilationDocumentIds.includes(document.documentId) && selectedCompilationDocumentIds.length >= 12)}
+                          onChange={(event) => setSelectedCompilationDocumentIds((current) => (
+                            event.target.checked
+                              ? [...current, document.documentId]
+                              : current.filter((documentId) => documentId !== document.documentId)
+                          ))}
+                        />
+                        <span>
+                          <b>{document.documentId}</b>
+                          <small>{document.versionKey} · ocr.json {formatCount(document.ocrJsonSize ?? 0)} bytes</small>
+                        </span>
+                      </label>
+                    ))}
+                  </fieldset>
+                ) : (
+                  <p className="world-empty">At least two OCR-ready documents are required.</p>
+                )}
+                <div className="billing-actions">
+                  <button
+                    type="button"
+                    disabled={busy || selectedCompilationDocumentIds.length < 2 || selectedCompilationDocumentIds.length > 12}
+                    onClick={() => void compileSelectedDocuments()}
+                  >
+                    {busy ? "Compiling..." : `Compile selected documents (${selectedCompilationDocumentIds.length})`}
+                  </button>
+                </div>
+              </section>
               {/*
                 This control was lost when the sidebar buttons became tabs: the handler survived
                 the refactor and its button did not, so OCR candidate verification silently left
