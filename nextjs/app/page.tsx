@@ -29,6 +29,7 @@
  */
 
 import Link from "next/link";
+import type { Route } from "next";
 import { useEffect, useMemo, useRef, useState } from "react";
 import AnswerSwitch from "@/components/answer-switch";
 import ChangeLattice from "@/components/change-lattice";
@@ -681,6 +682,7 @@ export default function HomePage() {
             <Link href="/film">Watch the sixteen-second version</Link>
             <Link href="/evidence">What we measured</Link>
             <Link href="/security">Where your documents go</Link>
+            <Link href={"/contact" as Route}>Talk to us</Link>
           </nav>
           <p className="fine">
             {DISCLOSURE.staged} Paddle checkout is sandbox-only; signed webhooks persist access and
