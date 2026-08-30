@@ -2,7 +2,7 @@
 
 Effective: 2026-08-30  
 Currency: USD, excluding applicable taxes  
-Operator: CommodityNode, operating the TAVONEL brand and TAVONEL Foundation service
+Operator brand: TAVONEL (business registration pending; live paid sales not open)
 
 ## Standard access
 

@@ -46,7 +46,7 @@ def footer(canvas, doc):
     canvas.line(20 * mm, 15 * mm, 190 * mm, 15 * mm)
     canvas.setFillColor(MOSS)
     canvas.setFont("Helvetica", 7.5)
-    canvas.drawString(20 * mm, 10 * mm, "CommodityNode operates the TAVONEL brand and TAVONEL Foundation service.")
+    canvas.drawString(20 * mm, 10 * mm, "TAVONEL operator brand - business registration pending; live paid sales not open.")
     canvas.drawRightString(190 * mm, 10 * mm, f"{doc.page}")
     canvas.restoreState()
 
@@ -61,7 +61,7 @@ def build():
     body = ParagraphStyle("Body", parent=styles["BodyText"], fontName="Helvetica", fontSize=8.5, leading=12, textColor=MOSS, spaceAfter=6)
     meta = ParagraphStyle("Meta", parent=body, alignment=TA_RIGHT, fontSize=7.5, leading=10)
 
-    doc = SimpleDocTemplate(str(OUTPUT), pagesize=A4, rightMargin=20 * mm, leftMargin=20 * mm, topMargin=18 * mm, bottomMargin=22 * mm, title="TAVONEL Enterprise Pricing Guidelines", author="CommodityNode")
+    doc = SimpleDocTemplate(str(OUTPUT), pagesize=A4, rightMargin=20 * mm, leftMargin=20 * mm, topMargin=18 * mm, bottomMargin=22 * mm, title="TAVONEL Enterprise Pricing Guidelines", author="TAVONEL")
     story = [
         Table([[Paragraph("ENTERPRISE PRICING", eyebrow), Paragraph("Effective 2026-08-30<br/>USD, taxes excluded", meta)]], colWidths=[110 * mm, 60 * mm], style=TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0)])),
         Paragraph("TAVONEL", title),
