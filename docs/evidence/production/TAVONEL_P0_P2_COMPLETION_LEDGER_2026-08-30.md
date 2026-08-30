@@ -6,6 +6,8 @@ Recorded: 2026-08-30 KST
 
 - Release source: GitHub `main`; canonical production alias verified after each
   source-linked deployment
+- Enterprise runtime repair deployment: `dpl_6MTjvxgTNYEaPNwCb1DLea9vAvZP`
+  (`READY`, canonical aliases assigned)
 - Canonical URL: `https://tavonel.com`
 - Vercel state: `READY`, production alias assigned
 - Supabase migrations: `0013_connector_oauth.sql`,
@@ -56,6 +58,12 @@ Recorded: 2026-08-30 KST
   policies
 - Usage, GPU cost, revenue and job-failure dashboard contracts
 - SLA, DPA and security-questionnaire package templates
+- Authenticated production browser proof: the bound `TAVONEL` organization,
+  owner role and workspace loaded without fallback data; the default APAC,
+  retention, recovery and signed-export policy loaded from Supabase
+- A real 30-day JSONL audit export downloaded successfully with one immutable
+  `organization.bootstrapped` event, all required audit fields and no detected
+  password, private-key or access-token field
 
 ### Quality and runtime
 
