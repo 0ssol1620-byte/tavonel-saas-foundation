@@ -55,7 +55,10 @@ export default function FilmBand({
   priority?: boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [reduced, setReduced] = useState(false);
+  // SSR cannot read the motion preference. Start with the safe still so a
+  // reduced-motion visitor never receives a late video-to-image replacement
+  // that resets LCP; motion-enabled clients opt into video after hydration.
+  const [reduced, setReduced] = useState(true);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
