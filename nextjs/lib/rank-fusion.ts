@@ -36,3 +36,11 @@ export function reciprocalRankFusion(inputs: FusionInput, k: number): FusedUnit[
     .sort((left, right) => right.fusedScore - left.fusedScore || left.id.localeCompare(right.id))
     .map((item, index) => ({ ...item, fusedRank: index + 1 }));
 }
+
+// Converts a source's own already-ordered result (best match first, e.g. ts_rank_cd desc
+// or cosine-distance ascending) into the 1-based {id, rank} shape reciprocalRankFusion
+// expects for that source's list. The source's native score is deliberately dropped here --
+// only its position survives, which is what keeps lexical/dense/structure comparable.
+export function toRankedList(orderedIds: string[]): RankedList {
+  return orderedIds.map((id, index) => ({ id, rank: index + 1 }));
+}

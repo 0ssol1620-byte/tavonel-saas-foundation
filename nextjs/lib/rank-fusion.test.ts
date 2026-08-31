@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { reciprocalRankFusion } from "./rank-fusion";
+import { reciprocalRankFusion, toRankedList } from "./rank-fusion";
 
 describe("reciprocalRankFusion", () => {
   it("ranks an id appearing near the top of two lists above an id appearing in only one", () => {
@@ -53,5 +53,19 @@ describe("reciprocalRankFusion", () => {
   it("rejects a non-positive or non-integer k", () => {
     expect(() => reciprocalRankFusion({ l: [{ id: "a", rank: 1 }] }, 0)).toThrow();
     expect(() => reciprocalRankFusion({ l: [{ id: "a", rank: 1 }] }, 1.5)).toThrow();
+  });
+});
+
+describe("toRankedList", () => {
+  it("assigns 1-based ranks in the order given, dropping the source's native score", () => {
+    expect(toRankedList(["c", "a", "b"])).toEqual([
+      { id: "c", rank: 1 },
+      { id: "a", rank: 2 },
+      { id: "b", rank: 3 },
+    ]);
+  });
+
+  it("returns an empty list for no results", () => {
+    expect(toRankedList([])).toEqual([]);
   });
 });
