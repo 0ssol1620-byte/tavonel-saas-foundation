@@ -58,6 +58,19 @@ export default function DevelopersPage() {
                 <p className="fine">
                   Live capability is fail-closed. See <Link href="/status">/status</Link>. Do not treat this page as a promise that every surface is open in this deployment.
                 </p>
+                <div className="stack">
+                  <p className="slate"><b>PUBLIC TOOLING</b><span />VERSIONED FILES</p>
+                  <h3>Start with the contract, then a scoped key.</h3>
+                  <pre><code>{`curl -H "Authorization: Bearer $TAVONEL_API_KEY" \\
+  https://tavonel.com/api/v1/documents`}</code></pre>
+                  <div className="tiles">
+                    <article className="tile"><h3>OpenAPI</h3><p>Machine-readable v1 HTTP contract.</p><a href="/api/openapi">Open schema</a></article>
+                    <article className="tile"><h3>CLI</h3><p>Node.js 20+ client with immutable version and update check.</p><a href="/developer/tavonel-cli.mjs" download>Download CLI</a></article>
+                    <article className="tile"><h3>MCP</h3><p>Read-only stdio tools for document, World and grounded Ask access.</p><a href="/developer/tavonel-mcp.mjs" download>Download MCP server</a></article>
+                    <article className="tile"><h3>Source agent</h3><p>Local-first SMB, NFS, SFTP and S3-compatible connector agent.</p><a href="/developer/tavonel-source-agent.py" download>Download source agent</a></article>
+                  </div>
+                  <p className="fine">Verify versions and SHA-256 values against <a href="/developer/channel.json">the public distribution channel</a>. The <a href="/developer/README.md">setup and safety contract</a> documents scopes, secret handling and fail-closed behavior.</p>
+                </div>
               </div>
             </div>
           </div>

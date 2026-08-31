@@ -41,7 +41,7 @@ evidence gate are also complete.
 
 | Blueprint requirement | Implementation target | Completion proof |
 | --- | --- | --- |
-| Preflight | Sources/Compile | file boundary, estimated/reserved/max cost before dispatch |
+| Preflight | Sources/Compile | observed source/OCR/review boundary; cost stays unquoted until the server issues a reservation |
 | Run theater | `/workspace/runs/:runId` | actual event state only; batch and focused views |
 | World Studio lenses | Map/Table/Evidence/History/Files | real read model and explicit read/not-yet states |
 | Review Studio | `/workspace/review` | attention order, evidence, impact preview, receipt |
@@ -61,7 +61,7 @@ evidence gate are also complete.
 | Reproducibility portal | public receipt/manifest explanation and verified samples | qualified reproducibility corpus |
 | Benchmark registry | registry surface that rejects unqualified records | approved public benchmark receipts |
 | Failed experiment archive | research status surface | release-approved experiment receipts |
-| Downloadable sample worlds | signed deterministic sample package | independent signature/fingerprint verification |
+| Downloadable sample worlds | deterministic JSON sample with SHA-256 `Content-Digest` | independent signature verification remains an external gate |
 | Category content | Knowledge Compiler explainer routes | legal/claim review before promotion |
 | Public SDK/examples | versioned examples and clean-install proof | published package/release channel |
 | Trust Center | capability, processor, incident, retention states | operational owners and external audit evidence |
@@ -79,3 +79,17 @@ evidence gate are also complete.
 - Lighthouse budgets
 - deployed public route and authenticated workflow evidence
 - founder visual review remains a human gate
+
+## Current verification evidence
+
+Recorded on 2026-09-01 KST against the production build in this repository:
+
+- `pnpm check`: TypeScript and ESLint passed.
+- `pnpm test`: 101 files and 695 tests passed.
+- `pnpm build`: 44 static pages generated; all new public, workspace, and API routes compiled.
+- Playwright: 60 passed and 12 intentional non-mobile skips across 1920, 1440, 1280, 1024, 768, 390, 360, and reduced-motion projects.
+- Public proof routes, deterministic downloads, mobile Runs SSE state, Activity audit rows, keyboard command palette, and full-page captures were exercised.
+- Lighthouse uses direct DevTools throttling with unchanged budgets because Lighthouse 12.8 Lantern re-times the already-painted RSC hero image at hydration completion under the installed Chrome.
+- Detailed visual evidence and the remaining human gate are recorded in `VISUAL_QA_REPORT.md`.
+
+External customer consent, qualified benchmark records, approved failed-experiment receipts, published package-channel proof, independent sample signature verification, and external audit evidence are not fabricated. Their public surfaces fail closed until those records exist.

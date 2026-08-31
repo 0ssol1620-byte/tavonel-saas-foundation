@@ -147,6 +147,19 @@ export default function TrustPage() {
             <Link href="/status"><span>03</span><b>Incidents</b><small>Current state and incident contact</small></Link>
           </nav>
         </section>
+
+        <section className={styles.vocabulary} aria-labelledby="maturity-title">
+          <div className={styles.sectionHeading}>
+            <p className={styles.eyebrow}>CONTROL MATURITY</p>
+            <h2 id="maturity-title">Evidence grows in named stages.</h2>
+          </div>
+          <dl>
+            <div data-state="demonstrated"><dt>CONFIGURED</dt><dd>A dependency or control is present in this deployment. Configuration alone does not establish continuous effectiveness.</dd></div>
+            <div data-state="demonstrated"><dt>DEMONSTRATED</dt><dd>A bounded self-check or operational receipt observed the control performing its stated action.</dd></div>
+            <div data-state="human-gate"><dt>QUALIFIED</dt><dd>Repeatable evidence, declared scope and a human approval record are all required. This page does not infer the state.</dd></div>
+            <div data-state="human-gate"><dt>INDEPENDENTLY AUDITED</dt><dd>No external audit or certification is represented until the report, scope, period and issuing body are registered.</dd></div>
+          </dl>
+        </section>
       </main>
 
       <footer className={styles.footer}>

@@ -50,18 +50,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en" className={mono.variable}>
       <body>
-        {/* The statement is the LCP element and it is set in Wanted Sans, so the Latin subset is
-            requested with the document rather than after the stylesheet resolves. React hoists
-            this into <head>; writing a literal <head> here displaces the one Next.js builds and
-            the stylesheet link goes with it. Only the [90] subset is preloaded — it is the one
-            an English page actually uses. */}
-        <link
-          rel="preload"
-          as="font"
-          type="font/woff2"
-          href="/fonts/WantedSansVariable.split.90.woff2"
-          crossOrigin="anonymous"
-        />
+        {/* Wanted Sans is font-display: optional. Constrained clients keep the system fallback
+            instead of competing with the verified hero proof frame for initial bandwidth. */}
         {/*
           A6 -- the first thing in the tab order, on every page.
           The landing page opens with a nav, a mode badge, four section links and a scene rail

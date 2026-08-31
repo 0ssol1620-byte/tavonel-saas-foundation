@@ -53,7 +53,7 @@ const ARTIFACTS = [
   ["provenance/", "Every fact back to a file, a section and a line. An answer that cannot be traced does not ship."],
 ] as const;
 
-export default function HomePage() {
+export default function HomePageClient({ heroProof }: { heroProof: React.ReactNode }) {
   const [signedIn, setSignedIn] = useState(false);
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [statusFailed, setStatusFailed] = useState(false);
@@ -62,13 +62,6 @@ export default function HomePage() {
   const progress = useScrollProgress();
   const active = SCENES.find((s) => s.id === scene) ?? SCENES[0];
   const world = BANDS[(band as BandName) in BANDS ? (band as BandName) : "scatter"];
-  const [opened, setOpened] = useState(false);
-  useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const timer = window.setTimeout(() => setOpened(true), 900);
-    return () => window.clearTimeout(timer);
-  }, []);
-
   const barNextRef = useRef<HTMLButtonElement | null>(null);
   useEffect(() => {
     const button = barNextRef.current;
@@ -103,7 +96,6 @@ export default function HomePage() {
       reset();
     };
   }, []);
-  const fieldMode: WorldMode = band === "scatter" && opened ? "ingest" : world.mode;
   const reachedChange = BAND_ORDER.indexOf(band as BandName) >= BAND_ORDER.indexOf("change");
   const capabilities = useMemo(() => readCapabilities(status, statusFailed), [status, statusFailed]);
   const heldRows = useMemo(
@@ -182,7 +174,7 @@ export default function HomePage() {
         type="video/mp4"
         fetchPriority="high"
       />
-      <WorldField mode={fieldMode} />
+      <OpeningWorldField band={band} mode={world.mode} />
 
       <header className="nav" data-stuck={progress > 0.005 ? 1 : 0}>
         <Link href="/" className="wordmark" aria-label="TAVONEL home">
@@ -196,6 +188,7 @@ export default function HomePage() {
         <nav aria-label="Sections">
           <button type="button" onClick={() => jump(2)}>Structure</button>
           <Link href="/product">Product</Link>
+          <Link href={"/knowledge-compiler" as Route}>Category</Link>
           <Link href="/research">Research</Link>
           <Link href="/developers">Developers</Link>
           <Link href="/evidence">Evidence</Link>
@@ -232,12 +225,7 @@ export default function HomePage() {
               <Link className="btn ghost" href="/evidence">Evidence</Link>
             </div>
           </div>
-          <FilmBand
-            src="/film/compile-cut.mp4"
-            poster="/film/poster-1.webp"
-            label="Cut 1 — a drive compiles into a world"
-            priority
-          />
+          {heroProof}
           <p className="fine film-note">{DISCLOSURE.fixture}</p>
         </section>
 
@@ -360,6 +348,8 @@ export default function HomePage() {
           <nav className="site-links" aria-label="More">
             <CanvasTransitionLink href="/film">Watch it compile</CanvasTransitionLink>
             <Link href="/research">Research</Link>
+            <Link href={"/benchmarks" as Route}>Benchmark registry</Link>
+            <Link href={"/reproducibility" as Route}>Reproducibility</Link>
             <Link href="/developers">Developers</Link>
             <Link href="/pricing">Pricing</Link>
             <Link href="/evidence">What we measured</Link>
@@ -399,6 +389,18 @@ export default function HomePage() {
       </div>
     </div>
   );
+}
+
+function OpeningWorldField({ band, mode }: { band: string; mode: WorldMode }) {
+  const [opened, setOpened] = useState(false);
+
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const timer = window.setTimeout(() => setOpened(true), 900);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  return <WorldField mode={band === "scatter" && opened ? "ingest" : mode} />;
 }
 
 function revealWords(node: React.ReactNode, startAt = 0): React.ReactNode {

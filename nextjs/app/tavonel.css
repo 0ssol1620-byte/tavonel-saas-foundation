@@ -614,6 +614,13 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
   .scene.hero { min-height: 100svh; }
   .scene.hero .film-band,
   .scene.hero .film-band-video { max-height: calc(100svh - 330px); }
+  .scene.hero h1 {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  .scene.hero .slate,
+  .scene.hero .btn {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
   .js .scene.hero .rv {
     opacity: 1;
     transform: none;

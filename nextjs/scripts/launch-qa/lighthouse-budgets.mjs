@@ -36,6 +36,9 @@ try {
         "dlx", "lighthouse@12.8.2", `${baseUrl}${route}`,
         "--quiet", "--output=json", `--output-path=${reportPath}`,
         "--only-categories=performance,accessibility,best-practices,seo",
+        // Use the browser's throttled trace directly. Lantern 12.8 can re-time an already
+        // painted RSC image at hydration completion under current Chrome and inflate LCP.
+        "--throttling-method=devtools",
         "--chrome-flags=--headless --no-sandbox --disable-gpu",
       ], {
         encoding: "utf8",

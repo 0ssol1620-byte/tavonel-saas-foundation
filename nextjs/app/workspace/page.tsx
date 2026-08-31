@@ -23,6 +23,7 @@ import ConnectionsPanel from "@/components/connections-panel";
 import DeveloperPanel from "@/components/developer-panel";
 import WorkspaceUltimateShell, { type WorkspaceSurface } from "@/components/workspace-ultimate-shell";
 import WorldStudioUltimate from "@/components/world-studio-ultimate";
+import OperationsUltimate from "@/components/operations-ultimate";
 import type { WorldReadModel } from "@/lib/world-read-model";
 
 /** What this panel prints when it has no value. Not "0", and not a spinner that never resolves. */
@@ -1155,7 +1156,7 @@ export default function WorkspacePage() {
     >
           {notice ? <p className="notice static" role="status"><strong>Activity.</strong> {notice}</p> : null}
 
-          {tab === "overview" ? (
+          {tab === "overview" && surface !== "runs" && surface !== "activity" ? (
           <>
           {/*
             The compile, drawn.
@@ -1169,6 +1170,7 @@ export default function WorkspacePage() {
           {pipelineRows.length > 0 ? (
             <CompileStage rows={pipelineRows} reading={reading} names={names} />
           ) : null}
+
           <div id="workspace-runs">
             <PipelineBoard
               rows={pipelineRows}
@@ -1260,6 +1262,25 @@ export default function WorkspacePage() {
             </section>
           </div>
           </>
+          ) : null}
+
+          {surface === "runs" ? (
+            <OperationsUltimate
+              mode="runs"
+              rows={pipelineRows}
+              documents={documents}
+              names={names}
+              onRefresh={() => void loadDocuments()}
+              gates={[
+                { label: "Intake", qualified: activationPolicy.customerIntake.enabled, detail: activationPolicy.customerIntake.reason },
+                { label: "CDR", qualified: activationPolicy.cdr.enabled, detail: activationPolicy.cdr.reason },
+                { label: "OCR", qualified: activationPolicy.ocrGpu.enabled, detail: activationPolicy.ocrGpu.reason },
+              ]}
+            />
+          ) : null}
+
+          {surface === "activity" ? (
+            <OperationsUltimate mode="activity" rows={pipelineRows} documents={documents} names={names} gates={[]} />
           ) : null}
 
           {tab === "knowledge" ? (
