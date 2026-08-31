@@ -157,13 +157,11 @@ export function parseContextPacket(value: unknown): ContextPacket | null {
 // (or referenced stale/filtered-out evidence), and the caller must reject the answer
 // rather than surface a fabricated citation.
 //
-// STATUS: implemented, not yet called by any production path. There is no LLM-based
-// GeneratorAdapter in this repo yet (today's answerGroundedQuestion in grounded-ask.ts
-// builds citations directly from evidence, so it cannot hallucinate one) — this guard has
-// nothing to protect until that generator exists. Wiring this in is a required part of
-// building the Grounded Answer generator, not an optional hardening step: see
-// nextjs/lib/grounded-ask.ts and the "Grounded Answer layer" step in the retrieval
-// architecture. Do not ship an LLM-based generator without calling this first.
+// Enforced by generateGroundedAnswer in generator-adapter.ts, the only call site an
+// LLM-based GeneratorAdapter is allowed to reach a caller through. The pre-existing
+// excerpt-concatenation path in grounded-ask.ts builds citations directly from evidence
+// and cannot hallucinate one, so it does not call this — it is a separate, still-supported
+// fallback, not a caller of this guard.
 export function verifyGroundedCitations(citedEvidenceIds: string[], packet: ContextPacket): { valid: true } | { valid: false; unknownEvidenceIds: string[] } {
   const known = new Set(packet.items.flatMap((item) => item.evidenceIds));
   const unknown = [...new Set(citedEvidenceIds)].filter((id) => !known.has(id));
