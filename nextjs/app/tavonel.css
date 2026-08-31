@@ -626,15 +626,15 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
   is always a column or the bottom of one. `contain` is the only honest fit for a film whose
   entire claim is that four things are visible at once.
 
-  The ratio is the masters' own 1280x800, not the 1440x900 they were recorded at — declaring a
-  ratio the file does not have reserves a box of the wrong height and letterboxes every band.
+  The ratio is the masters' own 1440x900 — declaring a ratio the files do not have reserves a
+  box of the wrong height and letterboxes every band.
 */
 .film-band-video {
   display: block;
   width: 100%;
   max-width: 100%;
   height: auto;
-  aspect-ratio: 1280 / 800;
+  aspect-ratio: 1440 / 900;
   object-fit: contain;
   pointer-events: none;
 }

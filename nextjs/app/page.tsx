@@ -167,13 +167,21 @@ export default function HomePage() {
   return (
     <div className="page landing-page">
       {/*
-        The hero proof frame is above the fold, so it is fetched with the document.
+        The hero film is above the fold, so it is fetched with the document, at high priority.
 
         Without this the browser does not learn the cut exists until React has hydrated and the
-        media element is in the DOM. React hoists this into <head>. The later motion cuts
-        remain deferred so they cannot compete for the LCP image.
+        <video> is in the DOM, which on a cold visit is a second of poster before anything
+        moves. React hoists this into <head>. Only cut 1 is preloaded — the other three are
+        deliberately deferred so they cannot compete for the connection, and `fetchPriority`
+        keeps the hero ahead of the fonts and the stylesheet's own images.
       */}
-      <link rel="preload" as="image" href="/film/poster-1.webp" type="image/webp" />
+      <link
+        rel="preload"
+        as="video"
+        href="/film/compile-cut.mp4"
+        type="video/mp4"
+        fetchPriority="high"
+      />
       <WorldField mode={fieldMode} />
 
       <header className="nav" data-stuck={progress > 0.005 ? 1 : 0}>
@@ -246,7 +254,7 @@ export default function HomePage() {
         <Scene id={2} film band="structure" eyebrow="STRUCTURE" title="What things are, and how they connect — compiled, not retrieved.">
           <FilmBand
             src="/film/compile-cut-2.mp4"
-            poster="/film/poster-2.jpg"
+            poster="/film/poster-2.webp"
             label="Cut 2 — an ontology and its edges"
           />
         </Scene>
@@ -254,7 +262,7 @@ export default function HomePage() {
         <Scene id={3} film band="change" eyebrow="KEEP TRUE" title="A source changes. Only that slice recompiles. Trace it back.">
           <FilmBand
             src="/film/compile-cut-3.mp4"
-            poster="/film/poster-3.jpg"
+            poster="/film/poster-3.webp"
             label="Cut 3 — a delta recompiles and traces back"
           />
         </Scene>
@@ -274,7 +282,7 @@ export default function HomePage() {
           */}
           <FilmBand
             src="/film/compile-cut-4.mp4"
-            poster="/film/poster-4.jpg"
+            poster="/film/poster-4.webp"
             label="Cut 4 — an assistant, an editor and a terminal reach the same world"
           />
           <div className="band-head rv"><span className="kicker">WHAT YOU GET</span><h3>Files, not a lock-in.</h3></div>
