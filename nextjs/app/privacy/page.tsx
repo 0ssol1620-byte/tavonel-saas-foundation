@@ -2,7 +2,11 @@ import type { Metadata } from "next";
 import PolicyLayout from "@/components/policy-layout";
 import { LEGAL_EFFECTIVE_DATE } from "@/lib/operations";
 
-export const metadata: Metadata = { title: "Privacy notice - TAVONEL", description: "How TAVONEL handles account, document, billing and inquiry data." };
+export const metadata: Metadata = {
+  // Each page declares its own address. Without this every route inherited the root
+  // canonical ("/"), so a crawler was told 22 distinct pages were all the homepage.
+  alternates: { canonical: "/privacy" },
+  openGraph: { url: "/privacy" }, title: "Privacy notice - TAVONEL", description: "How TAVONEL handles account, document, billing and inquiry data." };
 
 export default function PrivacyPage() {
   return <PolicyLayout label="PRIVACY" title="Your documents are inputs, not training material." intro={<>This notice explains the actual Foundation private-pilot data path. Effective {LEGAL_EFFECTIVE_DATE}. TAVONEL does not sell personal data or use customer document contents to train shared models.</>}>

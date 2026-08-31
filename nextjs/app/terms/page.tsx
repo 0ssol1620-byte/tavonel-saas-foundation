@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import PolicyLayout from "@/components/policy-layout";
 import { LEGAL_EFFECTIVE_DATE } from "@/lib/operations";
-export const metadata: Metadata = { title: "Terms of service - TAVONEL" };
+export const metadata: Metadata = {
+  // Each page declares its own address. Without this every route inherited the root
+  // canonical ("/"), so a crawler was told 22 distinct pages were all the homepage.
+  alternates: { canonical: "/terms" },
+  openGraph: { url: "/terms" }, title: "Terms of service - TAVONEL" };
 export default function TermsPage() { return <PolicyLayout label="TERMS" title="Terms written for the service that exists today." intro={<>Effective {LEGAL_EFFECTIVE_DATE}. These terms govern the controlled TAVONEL Foundation private pilot. Live paid sales are not open.</>}>
   <h2>Service operator</h2><p>TAVONEL is the operating brand for the TAVONEL Foundation service described on this site. TAVONEL Foundation is a service name, not a separate incorporated entity. The service is currently offered as a private pilot by an individual operator. Paddle is the merchant of record for any future checkout it processes. Live paid sales will not open until required business registration is complete and the operator details and service address are published.</p>
   <h2>Service</h2><p>TAVONEL accepts supported files, creates sanitized and OCR-derived candidates, compiles source-linked knowledge artifacts and provides signed exports. Candidate promotion remains an explicit human decision. Features described as test, sandbox or preview are not production commitments.</p>

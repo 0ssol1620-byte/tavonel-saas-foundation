@@ -5,6 +5,10 @@ import { BOUNDARY } from "@/lib/evidence-record";
 import { activationPolicy } from "@/lib/activation-policy";
 
 export const metadata: Metadata = {
+  // Each page declares its own address. Without this every route inherited the root
+  // canonical ("/"), so a crawler was told 22 distinct pages were all the homepage.
+  alternates: { canonical: "/security" },
+  openGraph: { url: "/security" },
   title: "Where your documents go — TAVONEL",
   description:
     "The path a document takes through TAVONEL, what holds its bytes, what never sees them, and the current capability controls.",

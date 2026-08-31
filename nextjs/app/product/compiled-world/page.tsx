@@ -3,6 +3,10 @@ import Link from "next/link";
 import Logomark from "@/components/logomark";
 
 export const metadata: Metadata = {
+  // Each page declares its own address. Without this every route inherited the root
+  // canonical ("/"), so a crawler was told 22 distinct pages were all the homepage.
+  alternates: { canonical: "/product/compiled-world" },
+  openGraph: { url: "/product/compiled-world" },
   title: "Compiled World — TAVONEL",
   description:
     "The output of a TAVONEL compile: structured knowledge with provenance and reusable retrieval artifacts.",

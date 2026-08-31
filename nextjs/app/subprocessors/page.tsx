@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import PolicyLayout from "@/components/policy-layout";
 import { LEGAL_EFFECTIVE_DATE } from "@/lib/operations";
-export const metadata: Metadata = { title: "Subprocessors - TAVONEL" };
+export const metadata: Metadata = {
+  // Each page declares its own address. Without this every route inherited the root
+  // canonical ("/"), so a crawler was told 22 distinct pages were all the homepage.
+  alternates: { canonical: "/subprocessors" },
+  openGraph: { url: "/subprocessors" }, title: "Subprocessors - TAVONEL" };
 const PROCESSORS = [
   ["Supabase", "Authentication, Seoul database and authorization metadata", "Account, tenant, entitlement and proof metadata"],
   ["Vercel", "Website and serverless application hosting", "Requests, operational logs and application metadata"],

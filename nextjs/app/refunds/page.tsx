@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import PolicyLayout from "@/components/policy-layout";
 import { LEGAL_EFFECTIVE_DATE } from "@/lib/operations";
-export const metadata: Metadata = { title: "Cancellation and refunds - TAVONEL" };
+export const metadata: Metadata = {
+  // Each page declares its own address. Without this every route inherited the root
+  // canonical ("/"), so a crawler was told 22 distinct pages were all the homepage.
+  alternates: { canonical: "/refunds" },
+  openGraph: { url: "/refunds" }, title: "Cancellation and refunds - TAVONEL" };
 export default function RefundsPage() { return <PolicyLayout label="CANCELLATION AND REFUNDS" title="No real payment is taken in the current pilot." intro={<>Effective {LEGAL_EFFECTIVE_DATE}. Checkout currently uses Paddle sandbox. Sandbox transactions have no monetary value and cannot be refunded as real payments.</>}>
   <h3>Current private pilot</h3><p>You may request cancellation of pilot access at any time through support@tavonel.com. A scheduled sandbox cancellation preserves test access until the displayed period end, solely to qualify subscription behavior.</p>
   <h3>14-day refund window</h3><p>For any future live Paddle transaction, you may request a full refund within 14 calendar days of a one-time purchase or within 14 calendar days of the latest subscription renewal. Submit the request through support@tavonel.com or Paddle buyer support with the transaction email and order reference. Paddle, as merchant of record, processes approved refunds to the original payment method.</p>
