@@ -14,6 +14,10 @@ const pilotQuotaMigration = readFileSync(
   resolve(import.meta.dirname, "../../supabase/migrations/0030_foundation_intake_pilot_quota.sql"),
   "utf8",
 ).toLowerCase();
+const qualificationQuotaMigration = readFileSync(
+  resolve(import.meta.dirname, "../../supabase/migrations/0031_foundation_intake_qualification_quota.sql"),
+  "utf8",
+).toLowerCase();
 
 describe("Foundation intake admission migration contract", () => {
   it("serializes tenant reservations before evaluating both quota windows", () => {
@@ -50,5 +54,13 @@ describe("Foundation intake admission migration contract", () => {
     expect(pilotQuotaMigration).toContain("minute_count >= 5");
     expect(pilotQuotaMigration).toContain("minute_bytes + p_requested_bytes > 26214400");
     expect(pilotQuotaMigration).toContain("p_requested_bytes > 5242880");
+  });
+
+  it("adds bounded qualification retries without widening byte or minute limits", () => {
+    expect(qualificationQuotaMigration).toContain("day_count >= 30");
+    expect(qualificationQuotaMigration).toContain("day_bytes + p_requested_bytes > 104857600");
+    expect(qualificationQuotaMigration).toContain("minute_count >= 5");
+    expect(qualificationQuotaMigration).toContain("minute_bytes + p_requested_bytes > 26214400");
+    expect(qualificationQuotaMigration).toContain("p_requested_bytes > 5242880");
   });
 });

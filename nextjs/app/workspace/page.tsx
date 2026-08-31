@@ -628,6 +628,18 @@ export default function WorkspacePage() {
         const reason = result.reason === "http"
           ? `quarantine PUT failed (${result.status})`
           : result.reason === "aborted" ? "transfer cancelled" : "network did not complete the transfer";
+        if (json.documentId) {
+          const client = getSupabaseBrowserClient();
+          const { data } = client ? await client.auth.getSession() : { data: { session: null } };
+          const token = data.session?.access_token;
+          if (token) {
+            await fetch("/api/uploads/release", {
+              method: "POST",
+              headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+              body: JSON.stringify({ documentId: json.documentId }),
+            }).catch(() => undefined);
+          }
+        }
         patchUpload(localId, { phase: "failed", reason });
         setNotice(`${reason}. The file never entered the app server.`);
         return null;

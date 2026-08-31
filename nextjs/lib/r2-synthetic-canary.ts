@@ -43,6 +43,13 @@ export function assertFoundationSyntheticKey(bucket: string, key: string) {
   return null;
 }
 
+export function assertFoundationQuarantineKey(bucket: string, workspaceKey: string, documentId: string, key: string) {
+  if (bucket !== FOUNDATION_R2_BUCKET) return "BUCKET_NOT_FOUNDATION";
+  const expected = `quarantine/${workspaceKey}/${documentId}/source`;
+  if (key !== expected || key.includes("..") || key.includes("//")) return "QUARANTINE_OBJECT_KEY_REQUIRED";
+  return null;
+}
+
 export function authorizeSyntheticCanary(headerValue: string | null, token: string | undefined) {
   if (!token) return false;
   if (!headerValue?.startsWith("Bearer ")) return false;
@@ -111,6 +118,21 @@ async function signedS3(
   } catch {
     return 599;
   }
+}
+
+export async function headFoundationQuarantineObject(
+  env: R2SignerEnv,
+  workspaceKey: string,
+  documentId: string,
+  now = new Date(),
+) {
+  const key = `quarantine/${workspaceKey}/${documentId}/source`;
+  const blocked = assertFoundationQuarantineKey(env.bucket, workspaceKey, documentId, key);
+  if (blocked) return { ok: false as const, code: blocked };
+  const status = await signedS3(env, "HEAD", key, undefined, now);
+  if (status === 200) return { ok: true as const, exists: true as const };
+  if (status === 404) return { ok: true as const, exists: false as const };
+  return { ok: false as const, code: "HEAD_FAILED", status };
 }
 
 export async function runSyntheticR2Canary(env: R2SignerEnv, now = new Date()): Promise<SyntheticCanaryResult> {
