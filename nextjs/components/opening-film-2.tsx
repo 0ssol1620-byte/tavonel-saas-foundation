@@ -16,7 +16,7 @@ import { buildWorldGraph, nodeBudget, type WorldGraph } from "@/lib/world-graph"
 const PERIOD = 0.62;
 const LAG_ONTO = 0.1;
 const ONTO_SPLIT = 0.56;
-const GROW_UNTIL = 16.6;
+const GROW_UNTIL = 10.8;
 
 const AREA_RGB: [number, number, number][] = [
   [242, 166, 90],
@@ -51,19 +51,21 @@ Late amounts accrue 1.5% per month.
 | Line 4 overtime | 12 hours | £1,860.00 |
 ![Fig. 2 Bay layout — Line 4](attachment)
 Work above $50,000 needs a signed change order.`,
-    onto: `entity: PaymentTerms
-class: ContractClause
-source: §3.2
-status: accepted
-relations:
-  - constrains: Invoice
-  - cited_by: PurchaseOrder
-  - triggers: ChangeOrder
-  - governed_by: ServicesAgreement
-properties:
-  due: P45D
-  late_rate: 0.015 / month
-  threshold: USD 50000`,
+    onto: `@prefix : <https://tavonel.example/world/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+:PaymentTerms a owl:Class ;
+  rdfs:subClassOf :ContractClause ;
+  :due "P45D"^^xsd:duration ;
+  :lateRate 0.015 ;
+  :threshold "50000"^^xsd:decimal .
+:Invoice a owl:Class .
+:PurchaseOrder a owl:Class .
+:ChangeOrder a owl:Class .
+:constrains a owl:ObjectProperty ;
+  rdfs:domain :PaymentTerms ; rdfs:range :Invoice .`,
     links: [
       { id: "Invoice", rel: "constrains" },
       { id: "PurchaseOrder", rel: "cited_by" },
@@ -81,17 +83,18 @@ Line 4 safety sign-off outstanding.
 ![Photo pack — 14 files](scan_0140)
 Asked for the 30-day invoice clock in writing.
 Bay 2 lighting failed at 17:40.`,
-    onto: `entity: WarehouseB
-class: Site
-source: scan_0140
-status: accepted
-relations:
-  - hosts: Line4
-  - observed_in: SiteVisit
-  - constrains: InvoiceClock
-properties:
-  closed_after: 18:00
-  lighting: failed 17:40`,
+    onto: `@prefix : <https://tavonel.example/world/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+:WarehouseB a owl:Class ;
+  rdfs:subClassOf :Site ;
+  :closedAfter "18:00"^^xsd:time ;
+  :lighting "failed" .
+:Line4 a owl:Class .
+:SiteVisit a owl:Class .
+:hosts a owl:ObjectProperty ;
+  rdfs:domain :WarehouseB ; rdfs:range :Line4 .`,
     links: [
       { id: "Line4", rel: "hosts" },
       { id: "SiteVisit", rel: "observed_in" },
@@ -109,18 +112,18 @@ POs above policy must cite the live payment terms, not the archived 45-day sched
 A change order is required before the supplier starts work above the threshold.
 ## 4.3 Handoffs
 Finance and Legal both sign. Silence is not approval.`,
-    onto: `entity: PurchaseOrder
-class: Control
-source: OpsManual §4.1
-status: accepted
-relations:
-  - must_cite: PaymentTerms
-  - requires: ChangeOrder
-  - signed_by: Finance
-  - signed_by: Legal
-properties:
-  archived_45_day: forbidden
-  silence: not_approval`,
+    onto: `@prefix : <https://tavonel.example/world/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+:PurchaseOrder a owl:Class ;
+  rdfs:subClassOf :Control ;
+  :archived45Day false ;
+  :silence "not_approval" .
+:must_cite a owl:ObjectProperty ;
+  rdfs:domain :PurchaseOrder ; rdfs:range :PaymentTerms .
+:requires a owl:ObjectProperty ;
+  rdfs:domain :PurchaseOrder ; rdfs:range :ChangeOrder .`,
     links: [
       { id: "PaymentTerms", rel: "must_cite" },
       { id: "ChangeOrder", rel: "requires" },
@@ -137,16 +140,16 @@ Either party may end employment with thirty (30) days’ written notice.
 Confidentiality survives for three years.
 ## 14. Conflicts
 Where this handbook and a services agreement disagree, the agreement wins.`,
-    onto: `entity: NoticePeriod
-class: PolicyRule
-source: Handbook §12
-status: accepted
-relations:
-  - overridden_by: ServicesAgreement
-  - survives_as: Confidentiality
-properties:
-  notice: P30D
-  confidentiality: P3Y`,
+    onto: `@prefix : <https://tavonel.example/world/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+:NoticePeriod a owl:Class ;
+  rdfs:subClassOf :PolicyRule ;
+  :notice "P30D"^^xsd:duration ;
+  :confidentiality "P3Y"^^xsd:duration .
+:overridden_by a owl:ObjectProperty ;
+  rdfs:domain :NoticePeriod ; rdfs:range :ServicesAgreement .`,
     links: [
       { id: "ServicesAgreement", rel: "overridden_by" },
       { id: "Confidentiality", rel: "survives_as" },
@@ -164,17 +167,17 @@ kind: spreadsheet · owner: Finance
 | Cash | 1.2 | 1.1 | 0.9 | 3.2 |
 | Threshold | 25k | 25k | 25k | 25k |
 Do not hard-code $50,000. The model is not a source of truth.`,
-    onto: `entity: Q3Forecast
-class: Model
-source: Q3 forecast.xlsx
-status: not_authority
-relations:
-  - reads: PaymentTerms
-  - owned_by: Finance
-  - reviewed_by: Legal
-properties:
-  threshold: live
-  hard_code: forbidden`,
+    onto: `@prefix : <https://tavonel.example/world/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+:Q3Forecast a owl:Class ;
+  rdfs:subClassOf :Model ;
+  rdfs:comment "Not a source of truth." ;
+  :threshold "live" ;
+  :hardCode false .
+:reads a owl:ObjectProperty ;
+  rdfs:domain :Q3Forecast ; rdfs:range :PaymentTerms .`,
     links: [
       { id: "PaymentTerms", rel: "reads" },
       { id: "Finance", rel: "owned_by" },
@@ -190,6 +193,26 @@ const ALL_CORR = FOCI.flatMap((f) =>
   f.links.map((link) => ({ from: f.label, to: link.id, rel: link.rel, area: f.area })),
 );
 const CORR_IDS = Array.from(new Set(ALL_CORR.flatMap((e) => [e.from, e.to])));
+
+const CLASS_ATTRS: Record<string, string[][]> = {
+  PaymentTerms: [["due", "duration 1"], ["lateRate", "decimal 1"], ["threshold", "decimal 1"]],
+  Invoice: [["amount", "decimal 1"], ["clock", "duration 1"]],
+  PurchaseOrder: [["citeLive", "boolean 1"], ["silence", "string 1"]],
+  ChangeOrder: [["signed", "boolean 1"], ["threshold", "decimal 1"]],
+  ServicesAgreement: [["version", "integer 1"], ["pages", "integer 1"]],
+  WarehouseB: [["closedAfter", "time 1"], ["lighting", "string 0..1"]],
+  Line4: [["signOff", "boolean 1"]],
+  SiteVisit: [["date", "date 1"]],
+  InvoiceClock: [["days", "integer 1"]],
+  OperationsManual: [["rev", "integer 1"]],
+  Finance: [["role", "string 1"]],
+  Legal: [["role", "string 1"]],
+  NoticePeriod: [["notice", "duration 1"], ["confidentiality", "duration 1"]],
+  Confidentiality: [["years", "integer 1"]],
+  Employment: [["status", "string 1"]],
+  Handbook: [["year", "integer 1"]],
+  Q3Forecast: [["threshold", "string 1"], ["hardCode", "boolean 1"]],
+};
 
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -355,71 +378,99 @@ export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
         context.font = "400 8px ui-monospace, Menlo, monospace";
         context.fillText(String((start + i) % 99 + 1), x + 4, y + 24 + i * rowH);
         if (!row) continue;
-        context.fillStyle = row.startsWith("#") || row.startsWith("entity")
+        context.fillStyle = row.startsWith("@prefix") || row.startsWith(":")
           ? "#edeae4"
-          : row.startsWith("|") || row.startsWith("!") || row.startsWith("class") || row.startsWith("  -")
+          : row.includes("owl:") || row.includes("rdfs:")
             ? accent
-            : row.startsWith("source") || row.startsWith("status") || row.startsWith("properties") || row.startsWith("relations")
-              ? "#7d878d"
-              : "#c8ced2";
+            : row.startsWith("#") || row.startsWith("entity")
+              ? "#edeae4"
+              : row.startsWith("|") || row.startsWith("!")
+                ? accent
+                : "#c8ced2";
         context.font = "400 8px ui-monospace, Menlo, monospace";
         context.fillText(row, x + gutter + 6, y + 24 + i * rowH);
       }
     };
 
     const drawCorr = (x: number, y: number, w: number, h: number, t: number, current: string) => {
-      context.fillStyle = "#0e1114";
+      context.fillStyle = "#14161a";
       context.fillRect(x, y, w, h);
       context.fillStyle = "rgba(123,224,190,0.85)";
       context.font = "500 8px ui-monospace, Menlo, monospace";
       const grown = Math.min(ALL_CORR.length, Math.floor(1 + clamp01(t / GROW_UNTIL) * ALL_CORR.length));
-      context.fillText(`CORRELATION  ${grown}/${ALL_CORR.length}`, x + 8, y + 12);
-      const cx = x + w / 2;
-      const cy = y + h * 0.52;
-      const pos = new Map<string, { x: number; y: number; area: number }>();
-      CORR_IDS.forEach((id, i) => {
-        const inner = FOCI.some((f) => f.label === id);
-        const ring = inner ? Math.min(w, h) * 0.18 : Math.min(w, h) * 0.38;
-        const ang = -Math.PI / 2 + (i / CORR_IDS.length) * Math.PI * 2;
-        const area = FOCI.find((f) => f.label === id)?.area ?? (i % 8);
-        pos.set(id, {
-          x: cx + Math.cos(ang) * ring,
-          y: cy + Math.sin(ang) * ring * 0.72,
-          area,
+      context.fillText(`OWL  ·  class diagram  ${grown}/${ALL_CORR.length}`, x + 8, y + 12);
+      const live = new Set<string>();
+      ALL_CORR.slice(0, grown).forEach((edge) => { live.add(edge.from); live.add(edge.to); });
+      const ids = CORR_IDS.filter((id) => live.has(id));
+      const cols = 3;
+      const rows = Math.max(1, Math.ceil(ids.length / cols));
+      const padX = 8;
+      const padY = 18;
+      const cardW = (w - padX * 2 - 6) / cols - 4;
+      const cardH = Math.min(58, (h - padY - 8) / Math.max(rows, 2) - 6);
+      const box = new Map<string, { x: number; y: number; w: number; h: number }>();
+      ids.forEach((id, i) => {
+        const c = i % cols;
+        const r = Math.floor(i / cols);
+        box.set(id, {
+          x: x + padX + c * (cardW + 8),
+          y: y + padY + r * (cardH + 8),
+          w: cardW,
+          h: cardH,
         });
       });
-      const live = new Set<string>();
       ALL_CORR.slice(0, grown).forEach((edge, i) => {
-        const a = pos.get(edge.from);
-        const b = pos.get(edge.to);
+        const a = box.get(edge.from);
+        const b = box.get(edge.to);
         if (!a || !b) return;
-        live.add(edge.from);
-        live.add(edge.to);
-        const rgb = AREA_RGB[edge.area % AREA_RGB.length];
+        const ax = a.x + a.w / 2;
+        const ay = a.y + a.h / 2;
+        const bx = b.x + b.w / 2;
+        const by = b.y + b.h / 2;
         const last = i === grown - 1;
         const grow = last ? clamp01(((t / GROW_UNTIL) * ALL_CORR.length) % 1) : 1;
-        context.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${0.35 + grow * 0.5})`;
-        context.lineWidth = last ? 1.6 : 1.05;
+        const mx = lerp(ax, bx, grow);
+        const my = lerp(ay, by, grow);
+        context.strokeStyle = last ? "rgba(224,122,95,0.95)" : "rgba(160,160,160,0.55)";
+        context.lineWidth = last ? 1.4 : 1;
         context.beginPath();
-        context.moveTo(a.x, a.y);
-        context.lineTo(lerp(a.x, b.x, grow), lerp(a.y, b.y, grow));
+        context.moveTo(ax, ay);
+        context.lineTo(mx, my);
         context.stroke();
+        if (grow > 0.55) {
+          context.fillStyle = "#b8b8b8";
+          context.font = "500 7px ui-monospace, Menlo, monospace";
+          context.textAlign = "center";
+          context.fillText(`${edge.rel}  1`, (ax + mx) / 2, (ay + my) / 2 - 3);
+          context.textAlign = "left";
+        }
       });
-      CORR_IDS.forEach((id) => {
-        if (!live.has(id)) return;
-        const p = pos.get(id);
-        if (!p) return;
-        const rgb = AREA_RGB[p.area % AREA_RGB.length];
+      ids.forEach((id) => {
+        const b = box.get(id);
+        if (!b) return;
         const hot = id === current;
-        context.fillStyle = hot ? `rgb(${rgb[0]},${rgb[1]},${rgb[2]})` : `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.85)`;
-        context.beginPath();
-        context.arc(p.x, p.y, hot ? 5 : 3.1, 0, Math.PI * 2);
+        const attrs = CLASS_ATTRS[id] ?? [["iri", "string 1"]];
+        context.fillStyle = "#f4f1ea";
+        roundRect(context, b.x, b.y, b.w, b.h, 2);
         context.fill();
-        context.fillStyle = hot ? "#edeae4" : "#9aa3a8";
-        context.font = `${hot ? "600" : "500"} 7px ui-monospace, Menlo, monospace`;
-        context.textAlign = "center";
-        context.fillText(id, p.x, p.y - (hot ? 9 : 7));
-        context.textAlign = "left";
+        context.fillStyle = hot ? "#e07a5f" : "#d4a574";
+        context.fillRect(b.x, b.y, 3, b.h);
+        if (hot) {
+          context.strokeStyle = "#e07a5f";
+          context.lineWidth = 1.4;
+          roundRect(context, b.x, b.y, b.w, b.h, 2);
+          context.stroke();
+        }
+        context.fillStyle = "#1a1612";
+        context.font = "600 8px Wanted Sans Variable, system-ui, sans-serif";
+        context.fillText(id.length > 16 ? `${id.slice(0, 14)}…` : id, b.x + 8, b.y + 12);
+        context.fillStyle = "#8a8174";
+        context.font = "500 7px ui-monospace, Menlo, monospace";
+        context.fillText("Class", b.x + 8, b.y + 22);
+        context.fillStyle = "#2a6f97";
+        attrs.slice(0, 2).forEach((attr, k) => {
+          context.fillText(`${attr[0]}  ${attr[1]}`, b.x + 8, b.y + 34 + k * 10);
+        });
       });
     };
 
@@ -440,7 +491,7 @@ export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
       const gh = h - 16;
       const linked = new Set<number>();
       if (withEdges) {
-        const cap = Math.min(g.edges.length, 180);
+        const cap = g.edges.length;
         const grown = Math.floor(clamp01(t / GROW_UNTIL) * cap);
         const frac = (clamp01(t / GROW_UNTIL) * cap) % 1;
         g.edges.slice(0, Math.max(1, grown)).forEach(([ia, ib], i) => {
@@ -516,7 +567,7 @@ export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
       const bodyW = colW - 16;
       const bodyH = colH - 38;
       const topH = Math.round(bodyH * ONTO_SPLIT);
-      typeLines(bodyX, bodyY, bodyW, topH, "ontology.yaml", ALL_ONTO, t, `rgb(${rgb2[0]},${rgb2[1]},${rgb2[2]})`);
+      typeLines(bodyX, bodyY, bodyW, topH, "ontology.ttl", ALL_ONTO, t, `rgb(${rgb2[0]},${rgb2[1]},${rgb2[2]})`);
       drawCorr(bodyX, bodyY + topH + 4, bodyW, bodyH - topH - 4, t, f2.label);
 
       pane(xs[3], colY, colW, colH, "WORLD", "linking");
