@@ -1,14 +1,14 @@
 "use client";
 
 /**
- * LOCKED cut `1f876a3` / public/film/compile-cut.mp4 — site header later.
- * 18s, four-up, camera off. EXTRACT scan 56% / markdown 44% is a fixed split.
- * Do not retune layout unless the user unlocks the cut.
+ * Cut 1 — public/film/compile-cut.mp4 — site header.
+ * 18s, four-up, camera off. EXTRACT scan 56 / markdown 44.
+ * Tone matches cuts 2–3: dark instrument, no Pause/Skip, no nav.
+ * WORLD: nodes only. Do not retune cut 2 or 3.
  */
 
-import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { CHANGE, SOURCE_CENSUS, WORLD, n } from "@/lib/demo-world";
+import { useEffect, useRef } from "react";
+import { CHANGE } from "@/lib/demo-world";
 import { FILM_ACT as ACT } from "@/lib/film-script";
 import { buildWorldGraph, nodeBudget, type WorldGraph } from "@/lib/world-graph";
 
@@ -285,48 +285,12 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, maxW: number): string
   return out;
 }
 
-export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
+export default function OpeningFilm(_props: { onEnded?: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [time, setTime] = useState(0);
-  const [playing, setPlaying] = useState(true);
-  const [runId, setRunId] = useState(0);
   const playingRef = useRef(true);
   const startRef = useRef(0);
   const elapsedRef = useRef(0);
   const reducedRef = useRef(false);
-  const endedRef = useRef(false);
-
-  const replay = useCallback(() => {
-    startRef.current = 0;
-    elapsedRef.current = 0;
-    endedRef.current = false;
-    playingRef.current = true;
-    setTime(0);
-    setPlaying(true);
-    setRunId((id) => id + 1);
-  }, []);
-  const toggle = useCallback(() => {
-    if (elapsedRef.current >= ACT.stop - 0.05) { replay(); return; }
-    playingRef.current = !playingRef.current;
-    startRef.current = 0;
-    setPlaying(playingRef.current);
-  }, [replay]);
-  const skipToEnd = useCallback(() => {
-    elapsedRef.current = ACT.end;
-    startRef.current = 0;
-    playingRef.current = false;
-    setTime(ACT.end);
-    setPlaying(false);
-  }, []);
-
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.code === "Space") { event.preventDefault(); toggle(); }
-      if (event.key === "Escape") skipToEnd();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [toggle, skipToEnd]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -384,12 +348,12 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
       const listTop = y + 42;
       const maxRows = Math.max(8, Math.floor((h - 52) / rowH));
       const live = Math.min(DRIVE_FILES.length, 6 + Math.floor(t / 0.14));
-      pane(x, y, w, h, "DRIVE  ·  Acme", `${live} files`, true);
+      pane(x, y, w, h, "SOURCES", `${live} files`);
       const rail = 64;
-      context.fillStyle = "#ddd8ce";
+      context.fillStyle = "#121416";
       context.fillRect(x, y + 26, rail, h - 26);
       ["Work", "Scan", "Notes"].forEach((label, i) => {
-        context.fillStyle = i === 0 ? "#2a2622" : "#6a645c";
+        context.fillStyle = i === 0 ? "#edeae4" : "#7d878d";
         context.font = "500 10px Wanted Sans Variable, system-ui, sans-serif";
         context.fillText(label, x + 8, y + 46 + i * 18);
       });
@@ -399,13 +363,13 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
         const name = DRIVE_FILES[i % DRIVE_FILES.length];
         const iy = listTop + vis * rowH;
         if (name === active) {
-          context.fillStyle = "rgba(40,140,110,0.16)";
+          context.fillStyle = "rgba(123,224,190,0.12)";
           context.fillRect(x + rail, iy - 12, w - rail, 18);
         }
-        context.fillStyle = "#c45c2a";
+        context.fillStyle = name === active ? "#7be0be" : "#8a9399";
         roundRect(context, x + rail + 8, iy - 8, 7, 9, 1.5);
         context.fill();
-        context.fillStyle = "#2a2622";
+        context.fillStyle = name === active ? "#edeae4" : "#c8ced2";
         context.font = "500 11px Wanted Sans Variable, system-ui, sans-serif";
         context.fillText(name.length > 22 ? `${name.slice(0, 20)}…` : name, x + rail + 20, iy);
       }
@@ -713,10 +677,10 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
 
     const draw = (t: number) => {
       studio();
-      const bw = width * 0.96;
-      const bh = height * 0.88;
+      const bw = width * 0.97;
+      const bh = height * 0.93;
       const bx = (width - bw) / 2;
-      const by = height * 0.04;
+      const by = height * 0.03;
       const gap = 10;
       const colY = by + 38;
       const colH = bh - 42;
@@ -738,9 +702,6 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
       context.fillStyle = "#edeae4";
       context.font = "500 12px Wanted Sans Variable, system-ui, sans-serif";
       context.fillText("TAVONEL  ·  Compile", bx + 26, by + 20);
-      context.fillStyle = "#7d878d";
-      context.font = "500 10px ui-monospace, Menlo, monospace";
-      context.fillText(`${n(SOURCE_CENSUS.files)} → ${n(WORLD.facts)}`, bx + bw - 148, by + 20);
 
       const origI = docIndex(t, ORIG_LAG);
       const extI = docIndex(t, EXT_LAG);
@@ -752,10 +713,10 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
 
       drawDrive(xs[0], colY, colW, colH, t, orig.file);
 
-      pane(xs[1], colY, colW, colH, "ORIGINAL", `${origI + 1}/${DOCS.length}`);
+      pane(xs[1], colY, colW, colH, "ORIGINAL", orig.file);
       drawPage(xs[1] + 8, colY + 30, colW - 16, colH - 38, orig.lines, 1, true, 1.02, inkO, orig.form, true);
 
-      pane(xs[2], colY, colW, colH, "EXTRACT", `SCAN ${extI + 1}/${DOCS.length}`);
+      pane(xs[2], colY, colW, colH, "EXTRACT", "scan");
       const ex = xs[2] + 8;
       const ey = colY + 30;
       const ew = colW - 16;
@@ -776,9 +737,6 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
       layout();
       if (reduced) {
         draw(ACT.stop - 0.2);
-        setTime(ACT.end);
-        playingRef.current = false;
-        setPlaying(false);
         const onResize = () => { layout(); draw(ACT.stop - 0.2); };
         window.addEventListener("resize", onResize);
         return () => window.removeEventListener("resize", onResize);
@@ -788,16 +746,10 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
         if (!startRef.current) startRef.current = now;
         if (playingRef.current) elapsedRef.current += (now - startRef.current) / 1000;
         startRef.current = now;
-        const current = Math.min(elapsedRef.current, ACT.stop);
+        if (elapsedRef.current >= ACT.stop) elapsedRef.current = 0;
+        const current = elapsedRef.current;
         draw(current);
-        setTime(current);
-        if (current < ACT.stop) frame = window.requestAnimationFrame(tick);
-        else if (!endedRef.current) {
-          endedRef.current = true;
-          playingRef.current = false;
-          setPlaying(false);
-          onEnded?.();
-        }
+        frame = window.requestAnimationFrame(tick);
       };
       frame = window.requestAnimationFrame(tick);
       const onResize = () => layout();
@@ -813,26 +765,11 @@ export default function OpeningFilm({ onEnded }: { onEnded?: () => void }) {
       .then(([p, pl]) => { if (cancelled) return; paper = p; plaster = pl; stop = startLoop(); })
       .catch(() => { if (!cancelled) stop = startLoop(); });
     return () => { cancelled = true; stop?.(); };
-  }, [onEnded, runId]);
-
-  const atEnd = time >= ACT.end - 0.05;
+  }, []);
 
   return (
     <div className="film">
       <canvas ref={canvasRef} className="film-canvas" aria-hidden="true" />
-      <div className="film-bar">
-        <span className="film-meter" aria-hidden="true">
-          <i style={{ width: `${Math.min(100, (time / ACT.stop) * 100)}%` }} />
-        </span>
-        <button type="button" className="film-btn" onClick={toggle}>
-          {playing ? "Pause" : atEnd ? "Replay" : "Play"}
-        </button>
-        {!atEnd ? (
-          <button type="button" className="film-btn" onClick={skipToEnd}>Skip</button>
-        ) : (
-          <Link href="/" className="film-btn film-btn-hi">Open the compiler</Link>
-        )}
-      </div>
     </div>
   );
 }
