@@ -34,8 +34,7 @@ type Delta = {
   plus: string;
   mdKeep: string[];
   ttlHead: string;
-  ttlOld: string;
-  ttlNew: string;
+  ttlEdits: { old: string; new: string }[];
   affected: string[];
 };
 
@@ -108,8 +107,12 @@ const DELTAS: Delta[] = [
 :triggers a owl:ObjectProperty ;
   rdfs:domain :PaymentTerms ;
   rdfs:range :ChangeOrder .`,
-    ttlOld: `  :due "P45D"^^xsd:duration ;`,
-    ttlNew: `  :due "P30D"^^xsd:duration ;`,
+    ttlEdits: [
+      { old: `  :due "P45D"^^xsd:duration ;`, new: `  :due "P30D"^^xsd:duration ;` },
+      { old: `:Invoice :clock "P45D" .`, new: `:Invoice :clock "P30D" .` },
+      { old: `:PurchaseOrder :citeLive false .`, new: `:PurchaseOrder :citeLive true .` },
+      { old: `:Q3Forecast rdfs:comment "hard-coded 45" .`, new: `:Q3Forecast rdfs:comment "read live terms" .` },
+    ],
     affected: ["PaymentTerms", "Invoice", "PurchaseOrder", "ChangeOrder", "Q3Forecast", "Finance", "ServicesAgreement", "Legal"],
   },
   {
@@ -153,8 +156,12 @@ const DELTAS: Delta[] = [
   rdfs:range :Finance .
 :archived45Day a owl:DatatypeProperty ;
   rdfs:range xsd:boolean .`,
-    ttlOld: `  :archived45Day true ;`,
-    ttlNew: `  :archived45Day false ;`,
+    ttlEdits: [
+      { old: `  :archived45Day true ;`, new: `  :archived45Day false ;` },
+      { old: `:must_cite rdfs:comment "archived schedule" .`, new: `:must_cite rdfs:comment "live payment terms" .` },
+      { old: `:Finance :signOff "pending" .`, new: `:Finance :signOff "required" .` },
+      { old: `:Legal :gate "archived-45" .`, new: `:Legal :gate "live-terms" .` },
+    ],
     affected: ["PurchaseOrder", "PaymentTerms", "ChangeOrder", "Finance", "Legal", "Q3Forecast", "Invoice", "OperationsManual"],
   },
   {
@@ -196,8 +203,12 @@ const DELTAS: Delta[] = [
   rdfs:range xsd:time .
 :lighting a owl:DatatypeProperty ;
   rdfs:range xsd:string .`,
-    ttlOld: `  :closedAfter "18:00"^^xsd:time ;`,
-    ttlNew: `  :closedAfter "17:00"^^xsd:time ;`,
+    ttlEdits: [
+      { old: `  :closedAfter "18:00"^^xsd:time ;`, new: `  :closedAfter "17:00"^^xsd:time ;` },
+      { old: `:Line4 :signOff false .`, new: `:Line4 :signOff true .` },
+      { old: `:InvoiceClock :days 45 .`, new: `:InvoiceClock :days 30 .` },
+      { old: `:SiteVisit :logged "18:00 close" .`, new: `:SiteVisit :logged "17:00 close" .` },
+    ],
     affected: ["WarehouseB", "Line4", "SiteVisit", "InvoiceClock", "OperationsManual", "Invoice", "PaymentTerms", "ChangeOrder"],
   },
   {
@@ -240,8 +251,12 @@ const DELTAS: Delta[] = [
   rdfs:range xsd:duration .
 :confidentiality a owl:DatatypeProperty ;
   rdfs:range xsd:duration .`,
-    ttlOld: `  :notice "P30D"^^xsd:duration ;`,
-    ttlNew: `  :notice "P14D"^^xsd:duration ;`,
+    ttlEdits: [
+      { old: `  :notice "P30D"^^xsd:duration ;`, new: `  :notice "P14D"^^xsd:duration ;` },
+      { old: `:Employment :noticeDays 30 .`, new: `:Employment :noticeDays 14 .` },
+      { old: `:Handbook :rev "2026.1" .`, new: `:Handbook :rev "2026.2" .` },
+      { old: `:Legal :rider "30-day notice" .`, new: `:Legal :rider "14-day notice" .` },
+    ],
     affected: ["NoticePeriod", "Confidentiality", "Employment", "Handbook", "ServicesAgreement", "Legal", "Finance", "PurchaseOrder"],
   },
 ];
@@ -267,7 +282,6 @@ const CLASS_ATTRS: Record<string, string[][]> = {
 };
 
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
-const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   const radius = Math.min(r, w / 2, h / 2);
@@ -486,7 +500,12 @@ export default function OpeningFilm3(_props: { onEnded?: () => void }) {
       const gutter = 22;
       context.fillStyle = "#121416";
       context.fillRect(x, y + 16, gutter, h - 16);
-      const body = `${d.ttlHead}\n${d.ttlOld}\n${d.ttlNew}\n:constrains a owl:ObjectProperty .`;
+      const editLines: string[] = [];
+      d.ttlEdits.forEach((edit) => {
+        editLines.push(edit.old);
+        editLines.push(edit.new);
+      });
+      const body = `${d.ttlHead}\n${editLines.join("\n")}`;
       const packed: string[] = [];
       body.split("\n").forEach((row) => {
         wrap(context, row.length ? row : " ", w - gutter - 10).forEach((part) => packed.push(part));
@@ -498,12 +517,12 @@ export default function OpeningFilm3(_props: { onEnded?: () => void }) {
         context.fillStyle = "#3a4248";
         context.font = "400 8px ui-monospace, Menlo, monospace";
         context.fillText(String(i + 1), x + 4, y + 24 + i * rowH);
-        const oldBit = d.ttlOld.trim().slice(2, 20);
-        const newBit = d.ttlNew.trim().slice(2, 20);
+        const isOld = d.ttlEdits.some((e) => row.includes(e.old.trim().slice(0, 22)));
+        const isNew = d.ttlEdits.some((e) => row.includes(e.new.trim().slice(0, 22)));
         context.font = "400 8px ui-monospace, Menlo, monospace";
-        if (oldBit && row.includes(oldBit)) {
-          context.fillStyle = local < 0.5 ? "#e07a5f" : "#3a4248";
-        } else if (newBit && row.includes(newBit)) {
+        if (isOld) {
+          context.fillStyle = local < 0.45 ? "#e07a5f" : "#3a4248";
+        } else if (isNew) {
           context.fillStyle = accent;
         } else if (row.startsWith("@prefix") || row.startsWith(":")) {
           context.fillStyle = "#edeae4";
@@ -571,7 +590,7 @@ export default function OpeningFilm3(_props: { onEnded?: () => void }) {
 
     const drawWorld = (
       x: number, y: number, w: number, h: number,
-      t: number, d: Delta, local: number, selected: number,
+      t: number, d: Delta, selected: number,
     ) => {
       if (!graph) return;
       const g = graph;
@@ -590,40 +609,52 @@ export default function OpeningFilm3(_props: { onEnded?: () => void }) {
         context.lineTo(ox + nb.x * gw, oy + nb.y * gh);
         context.stroke();
       });
-      const pool = (g.byArea[d.area] && g.byArea[d.area].length)
-        ? g.byArea[d.area]
-        : (g.byArea[0] ?? []);
-      const origin = selected ?? pool[0];
-      if (origin === undefined) return;
-      const related: number[] = [];
-      g.edges.forEach(([ia, ib]) => {
-        if (related.length >= 12) return;
-        if (ia === origin && !related.includes(ib)) related.push(ib);
-        else if (ib === origin && !related.includes(ia)) related.push(ia);
+      const live = new Set<number>();
+      const drawn: [number, number][] = [];
+      const seen = new Set<string>();
+      DELTAS.forEach((delta, di) => {
+        const startT = di * PERIOD;
+        if (t < startT) return;
+        const loc = Math.min(1, (t - startT) / PERIOD);
+        const pl = (g.byArea[delta.area] && g.byArea[delta.area].length)
+          ? g.byArea[delta.area]
+          : (g.byArea[0] ?? []);
+        const originI = pl[0];
+        if (originI === undefined) return;
+        live.add(originI);
+        const rel: number[] = [];
+        g.edges.forEach(([ia, ib]) => {
+          if (rel.length >= 12) return;
+          if (ia === originI && !rel.includes(ib)) rel.push(ib);
+          else if (ib === originI && !rel.includes(ia)) rel.push(ia);
+        });
+        pl.forEach((idx) => {
+          if (idx !== originI && rel.length < 14) rel.push(idx);
+        });
+        const nShow = Math.min(rel.length, 6 + Math.floor(loc * 10));
+        rel.slice(0, nShow).forEach((ib) => {
+          live.add(ib);
+          const key = originI < ib ? `${originI}-${ib}` : `${ib}-${originI}`;
+          if (seen.has(key)) return;
+          seen.add(key);
+          drawn.push([originI, ib]);
+        });
       });
-      pool.forEach((idx) => {
-        if (idx !== origin && related.length < 14) related.push(idx);
-      });
-      const nShow = Math.min(related.length, 6 + Math.floor(local * 10));
-      const live = new Set<number>([origin]);
-      related.slice(0, nShow).forEach((ib, i) => {
-        const na = g.nodes[origin];
+      drawn.forEach(([ia, ib]) => {
+        const na = g.nodes[ia];
         const nb = g.nodes[ib];
         if (!na || !nb) return;
-        live.add(ib);
-        const last = i === nShow - 1;
-        const grow = last ? Math.max(0.2, (local * related.length) % 1 || 1) : 1;
         const rgb = AREA_RGB[na.area % AREA_RGB.length];
-        context.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${0.55 + grow * 0.4})`;
-        context.lineWidth = last ? 1.7 : 1.2;
+        context.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.88)`;
+        context.lineWidth = 1.3;
         context.beginPath();
         context.moveTo(ox + na.x * gw, oy + na.y * gh);
-        context.lineTo(ox + lerp(na.x, nb.x, grow) * gw, oy + lerp(na.y, nb.y, grow) * gh);
+        context.lineTo(ox + nb.x * gw, oy + nb.y * gh);
         context.stroke();
       });
       g.nodes.forEach((node, i) => {
         const rgb = AREA_RGB[node.area % AREA_RGB.length];
-        const isSel = i === origin;
+        const isSel = i === selected;
         const isA = live.has(i);
         const r = (isSel ? 4.2 : isA ? 2.6 : 1.5) * node.radius;
         context.fillStyle = isSel
@@ -689,7 +720,7 @@ export default function OpeningFilm3(_props: { onEnded?: () => void }) {
       drawCards(bodyX, bodyY + topH + 4, bodyW, bodyH - topH - 4, d);
 
       pane(xs[3], colY, colW, colH, "WORLD", "trace");
-      drawWorld(xs[3] + 6, colY + 30, colW - 12, colH - 38, t, d, local, selected);
+      drawWorld(xs[3] + 6, colY + 30, colW - 12, colH - 38, t, d, selected);
       } catch (err) {
         console.error(err);
       }
