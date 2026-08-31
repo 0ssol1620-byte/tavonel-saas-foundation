@@ -8,7 +8,7 @@ import {
   readRetrievalRuntimeEnv,
 } from "./retrieval-runtime-config";
 
-const ENV_KEYS = ["RETRIEVAL_RUNPOD_EMBEDDER_URL", "RETRIEVAL_RUNPOD_RERANKER_URL", "RUNPOD_API_KEY"] as const;
+const ENV_KEYS = ["TAVONEL_RETRIEVAL_EMBEDDER_URL", "TAVONEL_RETRIEVAL_RERANKER_URL", "TAVONEL_RUNPOD_API_KEY"] as const;
 
 function clearEnv() {
   for (const key of ENV_KEYS) delete process.env[key];
@@ -20,16 +20,16 @@ describe("readRetrievalRuntimeEnv", () => {
   it("returns null when any of the three variables is missing", () => {
     clearEnv();
     expect(readRetrievalRuntimeEnv()).toBeNull();
-    process.env.RETRIEVAL_RUNPOD_EMBEDDER_URL = "https://embed.api.runpod.ai";
+    process.env.TAVONEL_RETRIEVAL_EMBEDDER_URL = "https://embed.api.runpod.ai";
     expect(readRetrievalRuntimeEnv()).toBeNull();
-    process.env.RETRIEVAL_RUNPOD_RERANKER_URL = "https://rerank.api.runpod.ai";
+    process.env.TAVONEL_RETRIEVAL_RERANKER_URL = "https://rerank.api.runpod.ai";
     expect(readRetrievalRuntimeEnv()).toBeNull();
   });
 
   it("returns the trimmed config once all three are set", () => {
-    process.env.RETRIEVAL_RUNPOD_EMBEDDER_URL = " https://embed.api.runpod.ai ";
-    process.env.RETRIEVAL_RUNPOD_RERANKER_URL = "https://rerank.api.runpod.ai";
-    process.env.RUNPOD_API_KEY = "test-key";
+    process.env.TAVONEL_RETRIEVAL_EMBEDDER_URL = " https://embed.api.runpod.ai ";
+    process.env.TAVONEL_RETRIEVAL_RERANKER_URL = "https://rerank.api.runpod.ai";
+    process.env.TAVONEL_RUNPOD_API_KEY = "test-key";
     expect(readRetrievalRuntimeEnv()).toEqual({
       embedderUrl: "https://embed.api.runpod.ai",
       rerankerUrl: "https://rerank.api.runpod.ai",
@@ -38,9 +38,9 @@ describe("readRetrievalRuntimeEnv", () => {
   });
 
   it("rejects a non-URL value rather than passing it through", () => {
-    process.env.RETRIEVAL_RUNPOD_EMBEDDER_URL = "not-a-url";
-    process.env.RETRIEVAL_RUNPOD_RERANKER_URL = "https://rerank.api.runpod.ai";
-    process.env.RUNPOD_API_KEY = "test-key";
+    process.env.TAVONEL_RETRIEVAL_EMBEDDER_URL = "not-a-url";
+    process.env.TAVONEL_RETRIEVAL_RERANKER_URL = "https://rerank.api.runpod.ai";
+    process.env.TAVONEL_RUNPOD_API_KEY = "test-key";
     expect(readRetrievalRuntimeEnv()).toBeNull();
   });
 });

@@ -33,10 +33,17 @@ export type RetrievalRuntimeEnv = {
 // Fail-closed, matching readProductCoreV2Env's pattern (core-runtime-v2.ts): a caller gets
 // null and must refuse to proceed, never a partially-configured adapter that looks live
 // but silently can't reach anything.
+//
+// Names follow this project's existing TAVONEL_-prefixed convention (TAVONEL_R2_*,
+// TAVONEL_SESSION_SECRET, ...) rather than the bare RUNPOD_API_KEY this module used
+// before anyone had actually looked at what was already configured in Vercel --
+// TAVONEL_RUNPOD_API_KEY already existed there (Production-only; add Preview scope to
+// exercise this from a branch deployment). The two URL vars are new since the TEI
+// endpoints they point at were only just deployed.
 export function readRetrievalRuntimeEnv(): RetrievalRuntimeEnv | null {
-  const embedderUrl = process.env.RETRIEVAL_RUNPOD_EMBEDDER_URL?.trim() ?? "";
-  const rerankerUrl = process.env.RETRIEVAL_RUNPOD_RERANKER_URL?.trim() ?? "";
-  const apiKey = process.env.RUNPOD_API_KEY?.trim() ?? "";
+  const embedderUrl = process.env.TAVONEL_RETRIEVAL_EMBEDDER_URL?.trim() ?? "";
+  const rerankerUrl = process.env.TAVONEL_RETRIEVAL_RERANKER_URL?.trim() ?? "";
+  const apiKey = process.env.TAVONEL_RUNPOD_API_KEY?.trim() ?? "";
   if (!/^https?:\/\//.test(embedderUrl) || !/^https?:\/\//.test(rerankerUrl) || apiKey.length === 0) return null;
   return { embedderUrl, rerankerUrl, apiKey };
 }
