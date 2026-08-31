@@ -33,6 +33,8 @@ type Delta = {
   minus: string;
   plus: string;
   mdKeep: string[];
+  touch: string[];
+  sat: { name: string; minus: string; plus: string }[];
   ttlHead: string;
   ttlEdits: { old: string; new: string }[];
   affected: string[];
@@ -82,6 +84,11 @@ const DELTAS: Delta[] = [
       "POs must cite the live schedule, not the archive.",
       "Finance countersigns before Legal files the executed copy.",
       "Silence is not approval.",
+    ],
+    touch: ["q3-forecast.xlsx", "po-4417.xml", "change-order-12.pdf"],
+    sat: [
+      { name: "Q3Forecast.md", minus: "Do not hard-code 45 days.", plus: "Read live PaymentTerms." },
+      { name: "PO-4417.md", minus: "cite the archived 45-day schedule", plus: "cite the live payment terms" },
     ],
     ttlHead: `@prefix : <https://tavonel.example/world/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
@@ -136,6 +143,11 @@ const DELTAS: Delta[] = [
       "| Threshold | Legal | signed CO |",
       "![Fig. 4 PO routing](ops-manual)",
     ],
+    touch: ["MSA_v4.pdf", "finance-signoff.pdf", "change-order-12.pdf"],
+    sat: [
+      { name: "MSA.md", minus: "PO may cite archived terms", plus: "PO must cite live PaymentTerms" },
+      { name: "Finance.md", minus: "sign-off optional", plus: "sign-off required with Legal" },
+    ],
     ttlHead: `@prefix : <https://tavonel.example/world/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
@@ -185,6 +197,11 @@ const DELTAS: Delta[] = [
       "| 2 | lighting failed | 17:40 |",
       "Stamp: visited · 14 Jun",
     ],
+    touch: ["invoice-clock.md", "line-4-signoff.pdf", "warehouse-b-lease.pdf"],
+    sat: [
+      { name: "InvoiceClock.md", minus: "clock starts 18:00 close", plus: "clock starts 17:00 close" },
+      { name: "Line4.md", minus: "sign-off outstanding", plus: "sign-off required tonight" },
+    ],
     ttlHead: `@prefix : <https://tavonel.example/world/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
@@ -231,6 +248,11 @@ const DELTAS: Delta[] = [
       "| Confidentiality | 3 years | yes |",
       "![Fig. 12 notice template](handbook)",
       "Controlled copy · rev 2026.2",
+    ],
+    touch: ["confidentiality-rider.pdf", "legal-review.txt", "MSA_v4.pdf"],
+    sat: [
+      { name: "Employment.md", minus: "notice: 30 days written", plus: "notice: 14 days written" },
+      { name: "Legal.md", minus: "rider quotes 30-day notice", plus: "rider quotes 14-day notice" },
     ],
     ttlHead: `@prefix : <https://tavonel.example/world/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
@@ -395,18 +417,22 @@ export default function OpeningFilm3(_props: { onEnded?: () => void }) {
       visible.forEach((name, i) => {
         const yy = y + 6 + i * rowH;
         const on = name === d.file;
+        const touched = d.touch.includes(name);
         if (on) {
           context.fillStyle = "#1a2220";
           context.fillRect(x + 4, yy - 2, w - 8, rowH);
+        } else if (touched) {
+          context.fillStyle = "#1a1814";
+          context.fillRect(x + 4, yy - 2, w - 8, rowH);
         }
-        context.fillStyle = on ? "#7be0be" : "#8a9399";
-        context.font = `${on ? "600" : "400"} 10px ui-monospace, Menlo, monospace`;
+        context.fillStyle = on ? "#7be0be" : touched ? "#e0c07a" : "#8a9399";
+        context.font = `${on || touched ? "600" : "400"} 10px ui-monospace, Menlo, monospace`;
         context.fillText(name, x + 10, yy + 11);
-        if (on) {
-          context.fillStyle = "#7be0be";
+        if (on || touched) {
+          context.fillStyle = on ? "#7be0be" : "#e0c07a";
           context.font = "600 8px ui-monospace, Menlo, monospace";
           context.textAlign = "right";
-          context.fillText("CHANGED", x + w - 10, yy + 11);
+          context.fillText(on ? "CHANGED" : "TOUCHED", x + w - 10, yy + 11);
           context.textAlign = "left";
         }
       });
@@ -428,7 +454,13 @@ export default function OpeningFilm3(_props: { onEnded?: () => void }) {
       diffRows.push({ color: "#e07a5f", text: `- ${d.minus}` });
       diffRows.push({ color: "#7be0be", text: `+ ${d.plus.slice(0, plusN)}` });
       d.mdKeep.slice(4).forEach((line) => diffRows.push({ color: "#9aa3a8", text: `  ${line}` }));
-      d.affected.forEach((id) => diffRows.push({ color: "#5a656b", text: `  # ${id}` }));
+      if (local > 0.35) {
+        d.sat.forEach((s) => {
+          diffRows.push({ color: "#8fb4c9", text: `@@ ${s.name} @@` });
+          diffRows.push({ color: "#e07a5f", text: `- ${s.minus}` });
+          diffRows.push({ color: "#7be0be", text: `+ ${s.plus}` });
+        });
+      }
       diffRows.slice(0, maxDiff).forEach((row, i) => {
         context.fillStyle = row.color;
         context.font = i === 0 ? "500 8px ui-monospace, Menlo, monospace" : "400 8px ui-monospace, Menlo, monospace";
@@ -454,12 +486,13 @@ export default function OpeningFilm3(_props: { onEnded?: () => void }) {
       lines.push({ text: d.minus, kind: "del" });
       lines.push({ text: d.plus, kind: "add" });
       d.mdKeep.slice(3).forEach((row) => lines.push({ text: row, kind: "keep" }));
-      d.affected.forEach((id) => lines.push({ text: `related · ${id}`, kind: "keep" }));
-      lines.push({ text: `<!-- ${d.file} ${d.clause} -->`, kind: "keep" });
-      lines.push({ text: "recompile: this slice only", kind: "keep" });
-      FILES.forEach((name) => {
-        if (name !== d.file) lines.push({ text: `held · ${name}`, kind: "keep" });
-      });
+      if (local > 0.35) {
+        d.sat.forEach((s) => {
+          lines.push({ text: `## ${s.name}`, kind: "keep" });
+          lines.push({ text: s.minus, kind: "del" });
+          lines.push({ text: s.plus, kind: "add" });
+        });
+      }
       const maxRows = Math.max(8, Math.floor((h - 22) / rowH));
       const packed: { text: string; kind: "keep" | "del" | "add" }[] = [];
       lines.forEach((row) => {
@@ -656,7 +689,7 @@ export default function OpeningFilm3(_props: { onEnded?: () => void }) {
         const rgb = AREA_RGB[node.area % AREA_RGB.length];
         const isSel = i === selected;
         const isA = live.has(i);
-        const r = (isSel ? 5.2 : isA ? 3.2 : 1.7) * node.radius;
+        const r = (isSel ? 4.2 : isA ? 2.6 : 1.5) * node.radius;
         context.fillStyle = isSel
           ? `rgb(${Math.min(255, rgb[0] + 50)},${rgb[1]},${rgb[2]})`
           : isA
