@@ -5,6 +5,7 @@ import {
   dispatchOcrAfterSanitize,
   isForbiddenOcrUrl,
   looksLikeFoundationOcrUrl,
+  OCR_REQUEST_TIMEOUT_MS,
   qualifyOcrResult,
   shouldDispatchOcr,
   type OcrDispatchEnv,
@@ -91,6 +92,11 @@ describe("Foundation OCR URL guards", () => {
 });
 
 describe("dispatchOcrAfterSanitize", () => {
+  it("allows a cold start while staying below the approved execution ceiling", () => {
+    assert.equal(OCR_REQUEST_TIMEOUT_MS, 85_000);
+    assert.ok(OCR_REQUEST_TIMEOUT_MS < 90_000);
+  });
+
   it("skips OCR when FOUNDATION_OCR_URL is unset and does not PUT ocr.json", async () => {
     const r2 = new FakeR2({ [IMMUTABLE]: PDF_BYTES });
     let fetched = 0;
