@@ -13,10 +13,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { FILM_ACT as ACT } from "@/lib/film-script";
 import { buildWorldGraph, nodeBudget, type WorldGraph } from "@/lib/world-graph";
 
-const PERIOD = 0.62;
-const LAG_ONTO = 0.1;
 const ONTO_SPLIT = 0.56;
-const TBOX_UNTIL = 3.6;
 const WORLD_UNTIL = 17.2;
 
 const AREA_RGB: [number, number, number][] = [
@@ -252,9 +249,16 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-function focusIndex(t: number, lag: number) {
-  return Math.floor(Math.max(0, t - lag) / PERIOD) % FOCI.length;
+function uniqueIds(): string[] {
+  const ids: string[] = [];
+  ALL_CORR.forEach((edge) => {
+    if (!ids.includes(edge.from)) ids.push(edge.from);
+    if (!ids.includes(edge.to)) ids.push(edge.to);
+  });
+  return ids;
 }
+
+const CLASS_IDS = uniqueIds();
 
 export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -395,16 +399,10 @@ export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
     const drawCorr = (x: number, y: number, w: number, h: number, t: number, current: string) => {
       context.fillStyle = "#0b0d0e";
       context.fillRect(x, y, w, h);
-      const grown = Math.min(ALL_CORR.length, Math.floor(1 + clamp01(t / TBOX_UNTIL) * ALL_CORR.length));
       context.fillStyle = "rgba(123,224,190,0.85)";
       context.font = "500 8px ui-monospace, Menlo, monospace";
       context.fillText("TBox  ·  owl:Class", x + 8, y + 12);
 
-      const ids: string[] = [];
-      ALL_CORR.slice(0, grown).forEach((edge) => {
-        if (!ids.includes(edge.from)) ids.push(edge.from);
-        if (!ids.includes(edge.to)) ids.push(edge.to);
-      });
       const cols = 2;
       const gap = 5;
       const innerX = x + 6;
@@ -415,25 +413,29 @@ export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
       const cardW = (innerW - gap) / cols;
       const cardH = (innerH - gap * (rowsFit - 1)) / rowsFit;
       const slots = rowsFit * cols;
-      const start = Math.max(0, ids.length - slots);
-      const visible = ids.slice(start, start + slots);
+      const n = CLASS_IDS.length;
+      const step = Math.floor(t * 2.8);
+      const start = n > 0 ? step % n : 0;
+      const visible: string[] = [];
+      for (let i = 0; i < slots; i += 1) visible.push(CLASS_IDS[(start + i) % n]);
+      const hot = visible.includes(current) ? current : visible[visible.length - 1];
 
       visible.forEach((id, i) => {
         const c = i % cols;
         const r = Math.floor(i / cols);
         const bx = innerX + c * (cardW + gap);
         const by = innerY + r * (cardH + gap);
-        const hot = id === current;
+        const on = id === hot;
         const attrs = CLASS_ATTRS[id] ?? [["iri", "xsd:anyURI 1"]];
         const rels = ALL_CORR.filter((e) => e.from === id).slice(0, 2);
-        context.fillStyle = hot ? "#1a2220" : "#16191c";
+        context.fillStyle = on ? "#1a2220" : "#16191c";
         roundRect(context, bx, by, cardW, cardH, 2);
         context.fill();
-        context.strokeStyle = hot ? "rgba(123,224,190,0.8)" : "#2e353b";
-        context.lineWidth = hot ? 1.2 : 1;
+        context.strokeStyle = on ? "rgba(123,224,190,0.8)" : "#2e353b";
+        context.lineWidth = on ? 1.2 : 1;
         roundRect(context, bx, by, cardW, cardH, 2);
         context.stroke();
-        context.fillStyle = hot ? "#7be0be" : "#3d4a46";
+        context.fillStyle = on ? "#7be0be" : "#3d4a46";
         context.fillRect(bx, by, 3, cardH);
         context.fillStyle = "#edeae4";
         context.font = "600 8px Wanted Sans Variable, system-ui, sans-serif";
@@ -454,11 +456,6 @@ export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
       });
     };
 
-    const pickNode = (g: WorldGraph, area: number, cycle: number) => {
-      const pool = g.byArea[area] ?? g.byArea[0];
-      return pool[cycle % pool.length];
-    };
-
     const drawNodes = (
       x: number, y: number, w: number, h: number,
       t: number, selected: number, withEdges: boolean,
@@ -470,10 +467,10 @@ export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
       const gw = w - 12;
       const gh = h - 16;
       const linked = new Set<number>();
+      const cap = g.edges.length;
+      const grown = Math.floor(clamp01(t / WORLD_UNTIL) * cap);
+      const frac = (clamp01(t / WORLD_UNTIL) * cap) % 1;
       if (withEdges) {
-        const cap = g.edges.length;
-        const grown = Math.floor(clamp01(t / WORLD_UNTIL) * cap);
-        const frac = (clamp01(t / WORLD_UNTIL) * cap) % 1;
         g.edges.slice(0, Math.max(1, grown)).forEach(([ia, ib], i) => {
           const na = g.nodes[ia];
           const nb = g.nodes[ib];
@@ -483,7 +480,7 @@ export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
           linked.add(ia);
           linked.add(ib);
           context.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${0.28 + grow * 0.45})`;
-          context.lineWidth = 1.05;
+          context.lineWidth = last ? 1.6 : 1.05;
           context.beginPath();
           context.moveTo(ox + na.x * gw, oy + na.y * gh);
           context.lineTo(ox + lerp(na.x, nb.x, grow) * gw, oy + lerp(na.y, nb.y, grow) * gh);
@@ -494,7 +491,7 @@ export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
         const rgb = AREA_RGB[node.area % AREA_RGB.length];
         const isSel = i === selected;
         const isN = linked.has(i);
-        const r = (isSel ? 4.2 : isN && withEdges ? 2.4 : 1.7) * node.radius;
+        const r = (isSel ? 5.4 : isN && withEdges ? 2.4 : 1.7) * node.radius;
         context.fillStyle = isSel
           ? `rgb(${Math.min(255, rgb[0] + 50)},${rgb[1]},${rgb[2]})`
           : isN && withEdges
@@ -503,6 +500,13 @@ export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
         context.beginPath();
         context.arc(ox + node.x * gw, oy + node.y * gh, r, 0, Math.PI * 2);
         context.fill();
+        if (isSel) {
+          context.strokeStyle = "rgba(237,234,228,0.9)";
+          context.lineWidth = 1.4;
+          context.beginPath();
+          context.arc(ox + node.x * gw, oy + node.y * gh, r + 3.5, 0, Math.PI * 2);
+          context.stroke();
+        }
       });
     };
 
@@ -528,30 +532,32 @@ export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
       context.font = "500 12px Wanted Sans Variable, system-ui, sans-serif";
       context.fillText("TAVONEL  ·  Compile links", bx + 26, by + 20);
 
-      const i0 = focusIndex(t, 0);
-      const f0 = FOCI[i0];
-      const f2 = FOCI[focusIndex(t, LAG_ONTO)];
-      const sel0 = graph ? pickNode(graph, f0.area, i0) : 0;
-      const sel3 = graph ? pickNode(graph, f2.area, i0) : 0;
-      const rgb2 = AREA_RGB[f2.area % AREA_RGB.length];
+      const cap = graph ? graph.edges.length : 1;
+      const edgeI = Math.min(cap - 1, Math.max(0, Math.floor(clamp01(t / WORLD_UNTIL) * cap)));
+      const selected = graph ? graph.edges[edgeI][0] : 0;
+      const area = graph ? graph.nodes[selected].area : 0;
+      const fI = Math.floor(edgeI / 8) % FOCI.length;
+      const byArea = FOCI.findIndex((f) => f.area === area);
+      const f0 = FOCI[byArea >= 0 ? byArea : fI];
+      const rgb2 = AREA_RGB[f0.area % AREA_RGB.length];
 
-      pane(xs[0], colY, colW, colH, "NODES", `${f0.label} · ${i0 + 1}/${FOCI.length}`);
-      drawNodes(xs[0] + 6, colY + 30, colW - 12, colH - 38, t, sel0, false);
+      pane(xs[0], colY, colW, colH, "NODES", f0.label);
+      drawNodes(xs[0] + 6, colY + 30, colW - 12, colH - 38, t, selected, false);
 
       pane(xs[1], colY, colW, colH, "MARKDOWN", f0.label);
       typeLines(xs[1] + 8, colY + 30, colW - 16, colH - 38, "NODE.md", ALL_MD, t, "#7be0be");
 
-      pane(xs[2], colY, colW, colH, "ONTOLOGY", `SPEC ${focusIndex(t, LAG_ONTO) + 1}/${FOCI.length}`);
+      pane(xs[2], colY, colW, colH, "ONTOLOGY", f0.label);
       const bodyX = xs[2] + 8;
       const bodyY = colY + 30;
       const bodyW = colW - 16;
       const bodyH = colH - 38;
       const topH = Math.round(bodyH * ONTO_SPLIT);
       typeLines(bodyX, bodyY, bodyW, topH, "ontology.ttl", ALL_ONTO, t, `rgb(${rgb2[0]},${rgb2[1]},${rgb2[2]})`);
-      drawCorr(bodyX, bodyY + topH + 4, bodyW, bodyH - topH - 4, t, f2.label);
+      drawCorr(bodyX, bodyY + topH + 4, bodyW, bodyH - topH - 4, t, f0.label);
 
       pane(xs[3], colY, colW, colH, "WORLD", "linking");
-      drawNodes(xs[3] + 6, colY + 30, colW - 12, colH - 38, t, sel3, true);
+      drawNodes(xs[3] + 6, colY + 30, colW - 12, colH - 38, t, selected, true);
     };
 
     const startLoop = () => {
