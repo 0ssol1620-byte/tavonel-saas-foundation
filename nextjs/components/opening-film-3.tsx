@@ -5,13 +5,12 @@
  * 18s four-up, camera off. Does not retune cut 1 or cut 2.
  */
 
-import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { FILM_ACT as ACT } from "@/lib/film-script";
 import { buildWorldGraph, nodeBudget, type WorldGraph } from "@/lib/world-graph";
 
 const ONTO_SPLIT = 0.50;
-const SOURCE_SPLIT = 0.58;
+const SOURCE_SPLIT = 0.50;
 const PERIOD = 4.4;
 const WORLD_UNTIL = 17.2;
 
@@ -310,48 +309,12 @@ function deltaAt(t: number): { d: Delta; local: number } {
   return { d: DELTAS[i], local: Math.min(1, (t - i * PERIOD) / PERIOD) };
 }
 
-export default function OpeningFilm3({ onEnded }: { onEnded?: () => void }) {
+export default function OpeningFilm3(_props: { onEnded?: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [time, setTime] = useState(0);
-  const [playing, setPlaying] = useState(true);
-  const [runId, setRunId] = useState(0);
   const playingRef = useRef(true);
   const startRef = useRef(0);
   const elapsedRef = useRef(0);
   const reducedRef = useRef(false);
-  const endedRef = useRef(false);
-
-  const replay = useCallback(() => {
-    startRef.current = 0;
-    elapsedRef.current = 0;
-    endedRef.current = false;
-    playingRef.current = true;
-    setTime(0);
-    setPlaying(true);
-    setRunId((id) => id + 1);
-  }, []);
-  const toggle = useCallback(() => {
-    if (elapsedRef.current >= ACT.stop - 0.05) { replay(); return; }
-    playingRef.current = !playingRef.current;
-    startRef.current = 0;
-    setPlaying(playingRef.current);
-  }, [replay]);
-  const skipToEnd = useCallback(() => {
-    elapsedRef.current = ACT.stop;
-    startRef.current = 0;
-    playingRef.current = false;
-    setTime(ACT.end);
-    setPlaying(false);
-  }, []);
-
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.code === "Space") { event.preventDefault(); toggle(); }
-      if (event.key === "Escape") skipToEnd();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [toggle, skipToEnd]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -438,18 +401,25 @@ export default function OpeningFilm3({ onEnded }: { onEnded?: () => void }) {
       const dh = h - listH - 4;
       context.fillStyle = "#0e1114";
       context.fillRect(dx, dy, w, dh);
-      context.fillStyle = "rgba(123,224,190,0.85)";
-      context.font = "500 8px ui-monospace, Menlo, monospace";
-      context.fillText(`diff  ${d.file}  ${d.clause}`, dx + 8, dy + 14);
-      context.font = "400 9px ui-monospace, Menlo, monospace";
-      context.fillStyle = "#e07a5f";
-      context.fillText(`-  ${d.minus}`, dx + 8, dy + 32);
-      const plusW = Math.floor(d.plus.length * clamp01(0.15 + local * 1.2));
-      context.fillStyle = "#7be0be";
-      context.fillText(`+  ${d.plus.slice(0, Math.max(1, plusW))}`, dx + 8, dy + 48);
-      context.fillStyle = "#7d878d";
-      context.font = "500 8px ui-monospace, Menlo, monospace";
-      context.fillText("slice only  ·  rest of corpus held", dx + 8, dy + 66);
+      const dRow = 11;
+      const maxDiff = Math.max(8, Math.floor((dh - 6) / dRow));
+      const plusN = Math.max(1, Math.floor(d.plus.length * clamp01(0.2 + local * 1.5)));
+      const diffRows: { color: string; text: string }[] = [
+        { color: "rgba(123,224,190,0.85)", text: `diff  ${d.file}  ${d.clause}` },
+        { color: "#7d878d", text: `--- a/${d.file}` },
+        { color: "#7d878d", text: `+++ b/${d.file}` },
+        { color: "#8fb4c9", text: `@@ ${d.clause} @@` },
+      ];
+      d.mdKeep.slice(0, 4).forEach((line) => diffRows.push({ color: "#9aa3a8", text: `  ${line}` }));
+      diffRows.push({ color: "#e07a5f", text: `- ${d.minus}` });
+      diffRows.push({ color: "#7be0be", text: `+ ${d.plus.slice(0, plusN)}` });
+      d.mdKeep.slice(4).forEach((line) => diffRows.push({ color: "#9aa3a8", text: `  ${line}` }));
+      d.affected.forEach((id) => diffRows.push({ color: "#5a656b", text: `  # ${id}` }));
+      diffRows.slice(0, maxDiff).forEach((row, i) => {
+        context.fillStyle = row.color;
+        context.font = i === 0 ? "500 8px ui-monospace, Menlo, monospace" : "400 8px ui-monospace, Menlo, monospace";
+        context.fillText(row.text.slice(0, 48), dx + 8, dy + 12 + i * dRow);
+      });
     };
 
     const drawMd = (
@@ -461,7 +431,7 @@ export default function OpeningFilm3({ onEnded }: { onEnded?: () => void }) {
       context.fillStyle = "rgba(123,224,190,0.85)";
       context.font = "500 8px ui-monospace, Menlo, monospace";
       context.fillText("NODE.md", x + 8, y + 12);
-      const rowH = 11;
+      const rowH = 10;
       const gutter = 22;
       context.fillStyle = "#121416";
       context.fillRect(x, y + 16, gutter, h - 16);
@@ -470,6 +440,12 @@ export default function OpeningFilm3({ onEnded }: { onEnded?: () => void }) {
       lines.push({ text: d.minus, kind: "del" });
       lines.push({ text: d.plus, kind: "add" });
       d.mdKeep.slice(3).forEach((row) => lines.push({ text: row, kind: "keep" }));
+      d.affected.forEach((id) => lines.push({ text: `related · ${id}`, kind: "keep" }));
+      lines.push({ text: `<!-- ${d.file} ${d.clause} -->`, kind: "keep" });
+      lines.push({ text: "recompile: this slice only", kind: "keep" });
+      FILES.forEach((name) => {
+        if (name !== d.file) lines.push({ text: `held · ${name}`, kind: "keep" });
+      });
       const maxRows = Math.max(8, Math.floor((h - 22) / rowH));
       const packed: { text: string; kind: "keep" | "del" | "add" }[] = [];
       lines.forEach((row) => {
@@ -625,7 +601,10 @@ export default function OpeningFilm3({ onEnded }: { onEnded?: () => void }) {
         if (ia === origin && !related.includes(ib)) related.push(ib);
         else if (ib === origin && !related.includes(ia)) related.push(ia);
       });
-      const nShow = Math.max(1, Math.ceil(local * Math.max(related.length, 1)));
+      pool.forEach((idx) => {
+        if (idx !== origin && related.length < 14) related.push(idx);
+      });
+      const nShow = Math.min(related.length, 6 + Math.floor(local * 10));
       const live = new Set<number>([origin]);
       related.slice(0, nShow).forEach((ib, i) => {
         const na = g.nodes[origin];
@@ -666,10 +645,10 @@ export default function OpeningFilm3({ onEnded }: { onEnded?: () => void }) {
     const draw = (t: number) => {
       try {
       studio();
-      const bw = width * 0.96;
-      const bh = height * 0.88;
+      const bw = width * 0.97;
+      const bh = height * 0.93;
       const bx = (width - bw) / 2;
-      const by = height * 0.04;
+      const by = height * 0.03;
       const gap = 10;
       const colY = by + 38;
       const colH = bh - 42;
@@ -721,9 +700,6 @@ export default function OpeningFilm3({ onEnded }: { onEnded?: () => void }) {
       layout();
       if (reduced) {
         draw(ACT.stop - 0.2);
-        setTime(ACT.end);
-        playingRef.current = false;
-        setPlaying(false);
         const onResize = () => { layout(); draw(ACT.stop - 0.2); };
         window.addEventListener("resize", onResize);
         return () => window.removeEventListener("resize", onResize);
@@ -733,16 +709,10 @@ export default function OpeningFilm3({ onEnded }: { onEnded?: () => void }) {
         if (!startRef.current) startRef.current = now;
         if (playingRef.current) elapsedRef.current += (now - startRef.current) / 1000;
         startRef.current = now;
-        const current = Math.min(elapsedRef.current, ACT.stop);
+        if (elapsedRef.current >= ACT.stop) elapsedRef.current = 0;
+        const current = elapsedRef.current;
         draw(current);
-        setTime(current);
-        if (current < ACT.stop) frame = window.requestAnimationFrame(tick);
-        else if (!endedRef.current) {
-          endedRef.current = true;
-          playingRef.current = false;
-          setPlaying(false);
-          onEnded?.();
-        }
+        frame = window.requestAnimationFrame(tick);
       };
       frame = window.requestAnimationFrame(tick);
       const onResize = () => layout();
@@ -758,26 +728,11 @@ export default function OpeningFilm3({ onEnded }: { onEnded?: () => void }) {
       .then((pl) => { if (cancelled) return; plaster = pl; stop = startLoop(); })
       .catch(() => { if (!cancelled) stop = startLoop(); });
     return () => { cancelled = true; stop?.(); };
-  }, [onEnded, runId]);
-
-  const atEnd = time >= ACT.stop - 0.05;
+  }, []);
 
   return (
     <div className="film">
       <canvas ref={canvasRef} className="film-canvas" aria-hidden="true" />
-      <div className="film-bar">
-        <span className="film-meter" aria-hidden="true">
-          <i style={{ width: `${Math.min(100, (time / ACT.stop) * 100)}%` }} />
-        </span>
-        <button type="button" className="film-btn" onClick={toggle}>
-          {playing ? "Pause" : atEnd ? "Replay" : "Play"}
-        </button>
-        {!atEnd ? (
-          <button type="button" className="film-btn" onClick={skipToEnd}>Skip</button>
-        ) : (
-          <Link href="/" className="film-btn film-btn-hi">Open the compiler</Link>
-        )}
-      </div>
     </div>
   );
 }
