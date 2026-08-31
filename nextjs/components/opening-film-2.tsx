@@ -1,13 +1,13 @@
 "use client";
 
 /**
- * LOCKED cut — public/film/compile-cut-2.mp4 — site midsection later.
+ * LOCKED cut — public/film/compile-cut-2.mp4 — site midsection.
  * 18s, four-up, camera off. TBox cards, no lines, no N/N, no node halo.
+ * Chrome matches cuts 1 and 3: no Pause/Skip, no nav, loops.
  * Do not retune layout unless the user unlocks cut 2.
  */
 
-import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { FILM_ACT as ACT } from "@/lib/film-script";
 import { buildWorldGraph, nodeBudget, type WorldGraph } from "@/lib/world-graph";
 
@@ -258,48 +258,12 @@ function uniqueIds(): string[] {
 
 const CLASS_IDS = uniqueIds();
 
-export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
+export default function OpeningFilm2(_props: { onEnded?: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [time, setTime] = useState(0);
-  const [playing, setPlaying] = useState(true);
-  const [runId, setRunId] = useState(0);
   const playingRef = useRef(true);
   const startRef = useRef(0);
   const elapsedRef = useRef(0);
   const reducedRef = useRef(false);
-  const endedRef = useRef(false);
-
-  const replay = useCallback(() => {
-    startRef.current = 0;
-    elapsedRef.current = 0;
-    endedRef.current = false;
-    playingRef.current = true;
-    setTime(0);
-    setPlaying(true);
-    setRunId((id) => id + 1);
-  }, []);
-  const toggle = useCallback(() => {
-    if (elapsedRef.current >= ACT.stop - 0.05) { replay(); return; }
-    playingRef.current = !playingRef.current;
-    startRef.current = 0;
-    setPlaying(playingRef.current);
-  }, [replay]);
-  const skipToEnd = useCallback(() => {
-    elapsedRef.current = ACT.stop;
-    startRef.current = 0;
-    playingRef.current = false;
-    setTime(ACT.end);
-    setPlaying(false);
-  }, []);
-
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.code === "Space") { event.preventDefault(); toggle(); }
-      if (event.key === "Escape") skipToEnd();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [toggle, skipToEnd]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -557,9 +521,6 @@ export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
       layout();
       if (reduced) {
         draw(ACT.stop - 0.2);
-        setTime(ACT.end);
-        playingRef.current = false;
-        setPlaying(false);
         const onResize = () => { layout(); draw(ACT.stop - 0.2); };
         window.addEventListener("resize", onResize);
         return () => window.removeEventListener("resize", onResize);
@@ -569,16 +530,9 @@ export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
         if (!startRef.current) startRef.current = now;
         if (playingRef.current) elapsedRef.current += (now - startRef.current) / 1000;
         startRef.current = now;
-        const current = Math.min(elapsedRef.current, ACT.stop);
-        draw(current);
-        setTime(current);
-        if (current < ACT.stop) frame = window.requestAnimationFrame(tick);
-        else if (!endedRef.current) {
-          endedRef.current = true;
-          playingRef.current = false;
-          setPlaying(false);
-          onEnded?.();
-        }
+        if (elapsedRef.current >= ACT.stop) elapsedRef.current = 0;
+        draw(elapsedRef.current);
+        frame = window.requestAnimationFrame(tick);
       };
       frame = window.requestAnimationFrame(tick);
       const onResize = () => layout();
@@ -594,26 +548,11 @@ export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
       .then((pl) => { if (cancelled) return; plaster = pl; stop = startLoop(); })
       .catch(() => { if (!cancelled) stop = startLoop(); });
     return () => { cancelled = true; stop?.(); };
-  }, [onEnded, runId]);
-
-  const atEnd = time >= ACT.stop - 0.05;
+  }, []);
 
   return (
     <div className="film">
       <canvas ref={canvasRef} className="film-canvas" aria-hidden="true" />
-      <div className="film-bar">
-        <span className="film-meter" aria-hidden="true">
-          <i style={{ width: `${Math.min(100, (time / ACT.stop) * 100)}%` }} />
-        </span>
-        <button type="button" className="film-btn" onClick={toggle}>
-          {playing ? "Pause" : atEnd ? "Replay" : "Play"}
-        </button>
-        {!atEnd ? (
-          <button type="button" className="film-btn" onClick={skipToEnd}>Skip</button>
-        ) : (
-          <Link href="/" className="film-btn film-btn-hi">Open the compiler</Link>
-        )}
-      </div>
     </div>
   );
 }

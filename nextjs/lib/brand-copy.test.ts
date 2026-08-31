@@ -138,6 +138,13 @@ describe("public copy", () => {
     expect(page).toContain("/film/compile-cut-3.mp4");
   });
 
+  it("does not wrap the films in a clickable link", () => {
+    const band = read("components/film-band.tsx");
+    expect(band).not.toContain("href");
+    expect(band).not.toContain("CanvasTransitionLink");
+    expect(read("app/page.tsx")).not.toMatch(/FilmBand[\s\S]{0,200}href=/);
+  });
+
   it("does not restage widgets the films already show", () => {
     const page = read("app/page.tsx");
     expect(page).not.toContain("ReadingDemo");

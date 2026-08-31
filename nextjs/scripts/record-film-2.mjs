@@ -28,10 +28,9 @@ await page.waitForFunction(() => {
   const c = document.querySelector("canvas.film-canvas");
   return c instanceof HTMLCanvasElement && c.width > 800;
 }, { timeout: 20_000 });
-const skip = page.getByRole("button", { name: "Skip" });
-if (await skip.count()) await skip.click();
-await page.getByRole("button", { name: "Replay" }).click();
-await page.waitForTimeout(120);
+// The cut has no Pause/Skip/Replay controls any more — it loops from mount, so the recording
+// simply starts as soon as the canvas has been laid out.
+await page.waitForTimeout(180);
 const filmStart = Date.now();
 writeFileSync(join(outDir, "offset-ms.txt"), String(filmStart - recStart));
 await page.screenshot({ path: `${frameDir}/cinematic-start.png` });

@@ -584,12 +584,13 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
   right trade: the argument of cut 1 is that four things happen at once, and that reads from the
   top of the columns.
 */
-.scene.hero .film-band { margin-top: 18px; }
+.scene.hero .film-band { margin-top: 18px; width: min(100%, 1440px); }
 .scene.hero .film-band-video {
   aspect-ratio: auto;
-  height: min(46vh, 430px);
+  height: min(48vh, 460px);
   object-fit: cover;
   object-position: top center;
+  pointer-events: none;
 }
 .film-note { max-width: 72rem; margin: 12px auto 0; padding: 0 24px; }
 .film-band {
@@ -617,7 +618,18 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
   height: auto;
   aspect-ratio: 1440 / 900;
   object-fit: cover;
+  pointer-events: none;
 }
+/*
+  The film scene is one column, and the frame gets the whole shell.
+
+  `.body` is a 380px title beside the content, which is the right shape for prose and the wrong
+  one for a four-up — it left each cut roughly half the page wide and the columns inside it
+  illegible. Here the heading sits above at its natural measure and the frame runs the full
+  width, which is the only size at which "four things at once" is actually readable.
+*/
+.body.film-body { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+.body.film-body > .stack:first-child { position: static; max-width: 46rem; }
 .film-scene { width: 100%; }
 .artifacts {
   display: grid;

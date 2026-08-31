@@ -222,8 +222,7 @@ export default function HomePage() {
           <FilmBand
             src="/film/compile-cut.mp4"
             poster="/film/poster-1.png"
-            href={"/film" as Route}
-            label="cut 1"
+            label="Cut 1 — a drive compiles into a world"
           />
           <p className="fine film-note">{DISCLOSURE.fixture}</p>
         </section>
@@ -238,21 +237,19 @@ export default function HomePage() {
           </div>
         </div>
 
-        <Scene id={2} band="structure" eyebrow="STRUCTURE" title="What things are, and how they connect — compiled, not retrieved.">
+        <Scene id={2} film band="structure" eyebrow="STRUCTURE" title="What things are, and how they connect — compiled, not retrieved.">
           <FilmBand
             src="/film/compile-cut-2.mp4"
             poster="/film/poster-2.png"
-            href={"/film-2" as Route}
-            label="cut 2"
+            label="Cut 2 — an ontology and its edges"
           />
         </Scene>
 
-        <Scene id={3} band="change" eyebrow="KEEP TRUE" title="A source changes. Only that slice recompiles. Trace it back.">
+        <Scene id={3} film band="change" eyebrow="KEEP TRUE" title="A source changes. Only that slice recompiles. Trace it back.">
           <FilmBand
             src="/film/compile-cut-3.mp4"
             poster="/film/poster-3.png"
-            href={"/film-3" as Route}
-            label="cut 3"
+            label="Cut 3 — a delta recompiles and traces back"
           />
         </Scene>
 
@@ -413,18 +410,28 @@ function Scene({
   band,
   eyebrow,
   title,
+  film,
   children,
 }: {
   id: number;
   band: BandName;
   eyebrow: string;
   title: React.ReactNode;
+  /*
+    A film scene stacks instead of splitting.
+
+    The two-column body puts a 380px title beside the content, which is right for prose and
+    wrong for a four-up: it left the cut about half the page wide, and at that size the columns
+    it is made of stop being readable — the exact failure the wide fixed frame was chosen to
+    avoid. So a film scene puts the heading above and gives the frame the full measure.
+  */
+  film?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <section className="scene" id={`s${id}`} data-scene={id} data-band={band}>
       <div className="shell">
-        <div className="body">
+        <div className={film ? "body film-body" : "body"}>
           <div className="stack">
             <p className="slate rv"><b>SCENE {String(id).padStart(2, "0")}</b><span />{eyebrow}</p>
             <h2>{revealWords(title)}</h2>
