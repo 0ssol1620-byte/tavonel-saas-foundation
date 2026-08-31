@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 const read = (path: string) => readFileSync(resolve(import.meta.dirname, "../..", path), "utf8");
 const schema = read("supabase/migrations/0024_foundation_jobs.sql");
 const rpc = read("supabase/migrations/0025_foundation_job_rpc.sql");
+const progressRequeue = read("supabase/migrations/0027_foundation_job_progress_requeue.sql");
 
 // The durable job layer exists to remove a bound that is currently real: the connector sync
 // route runs with maxDuration = 60 and hard-refuses maxImports > 3, because that is what one
@@ -117,6 +118,19 @@ describe("foundation job RPCs", () => {
   it("distinguishes a transient retry from a permanent failure", () => {
     expect(rpc).toMatch(/p_outcome not in \('progress', 'succeeded', 'retry', 'failed'\)/);
     expect(rpc).toContain("foundation_job_error_code_required");
+  });
+
+  it("requeues a completed progress batch for the next cron invocation", () => {
+    const progress = progressRequeue.slice(
+      progressRequeue.indexOf("if p_outcome = 'progress' then"),
+      progressRequeue.indexOf("if p_outcome = 'succeeded' then"),
+    );
+    expect(progress).toContain("set state = 'queued'");
+    expect(progress).toContain("leased_by = null");
+    expect(progress).toContain("lease_expires_at = null");
+    expect(progress).toContain("available_at = now()");
+    expect(progress).toContain("cursor_token = coalesce(p_cursor_token, cursor_token)");
+    expect(progress).toContain("'state', 'queued'");
   });
 
   it("returns the existing job id on a duplicate enqueue rather than failing", () => {
