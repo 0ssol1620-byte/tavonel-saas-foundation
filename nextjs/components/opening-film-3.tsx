@@ -39,25 +39,25 @@ type Delta = {
 };
 
 const FILES = [
-  "MSA_v4.pdf",
-  "ops-manual-r9.pdf",
-  "scan_0140.jpg",
-  "handbook-2026.pdf",
-  "q3-forecast.xlsx",
-  "change-order-12.pdf",
-  "invoice-clock.md",
-  "line-4-signoff.pdf",
   "legal-review.txt",
-  "finance-signoff.pdf",
-  "warehouse-b-lease.pdf",
-  "po-4417.xml",
-  "site-visit-140.pdf",
-  "bay-2-lighting.jpg",
-  "confidentiality-rider.pdf",
-  "board-minutes-jun.pdf",
-  "insurance-cert-2026.pdf",
+  "q3-forecast.xlsx",
+  "MSA_v4.pdf",
   "supplier-sla.pdf",
+  "board-minutes-jun.pdf",
+  "invoice-clock.md",
+  "finance-signoff.pdf",
+  "scan_0140.jpg",
   "capex-request-8.xlsx",
+  "po-4417.xml",
+  "insurance-cert-2026.pdf",
+  "bay-2-lighting.jpg",
+  "ops-manual-r9.pdf",
+  "confidentiality-rider.pdf",
+  "warehouse-b-lease.pdf",
+  "handbook-2026.pdf",
+  "line-4-signoff.pdf",
+  "site-visit-140.pdf",
+  "change-order-12.pdf",
   "access-log-140.csv",
 ];
 
@@ -390,7 +390,7 @@ export default function OpeningFilm3(_props: { onEnded?: () => void }) {
       const rowH = 17;
       const slots = Math.max(8, Math.floor((listH - 8) / rowH));
       const active = Math.max(0, FILES.indexOf(d.file));
-      const start = Math.min(Math.max(0, active - 1), Math.max(0, FILES.length - slots));
+      const start = Math.min(Math.max(0, active - 2), Math.max(0, FILES.length - slots));
       const visible = FILES.slice(start, start + slots);
       visible.forEach((name, i) => {
         const yy = y + 6 + i * rowH;
@@ -400,7 +400,7 @@ export default function OpeningFilm3(_props: { onEnded?: () => void }) {
           context.fillRect(x + 4, yy - 2, w - 8, rowH);
         }
         context.fillStyle = on ? "#7be0be" : "#8a9399";
-        context.font = `${on ? "600" : "400"} 9px ui-monospace, Menlo, monospace`;
+        context.font = `${on ? "600" : "400"} 10px ui-monospace, Menlo, monospace`;
         context.fillText(name, x + 10, yy + 11);
         if (on) {
           context.fillStyle = "#7be0be";
@@ -656,7 +656,7 @@ export default function OpeningFilm3(_props: { onEnded?: () => void }) {
         const rgb = AREA_RGB[node.area % AREA_RGB.length];
         const isSel = i === selected;
         const isA = live.has(i);
-        const r = (isSel ? 4.2 : isA ? 2.6 : 1.5) * node.radius;
+        const r = (isSel ? 5.2 : isA ? 3.2 : 1.7) * node.radius;
         context.fillStyle = isSel
           ? `rgb(${Math.min(255, rgb[0] + 50)},${rgb[1]},${rgb[2]})`
           : isA
