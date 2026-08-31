@@ -6,6 +6,10 @@ const migration = readFileSync(
   resolve(import.meta.dirname, "../../supabase/migrations/0008_foundation_intake_admission.sql"),
   "utf8",
 ).toLowerCase();
+const replayMigration = readFileSync(
+  resolve(import.meta.dirname, "../../supabase/migrations/0026_foundation_intake_replay.sql"),
+  "utf8",
+).toLowerCase();
 
 describe("Foundation intake admission migration contract", () => {
   it("serializes tenant reservations before evaluating both quota windows", () => {
@@ -24,5 +28,15 @@ describe("Foundation intake admission migration contract", () => {
     expect(migration).toContain("revoke all on public.foundation_intake_admissions from anon, authenticated");
     expect(migration).toContain("grant execute on function public.reserve_foundation_intake_admission");
     expect(migration).toContain("to service_role");
+  });
+
+  it("accepts byte-variant native export replays without weakening identity or MIME", () => {
+    const replayGuard = replayMigration.slice(replayMigration.indexOf("if found then"), replayMigration.indexOf("return jsonb_build_object", replayMigration.indexOf("if found then")));
+    expect(replayGuard).toContain("existing.user_id <> p_user_id");
+    expect(replayGuard).toContain("existing.object_key <> p_object_key");
+    expect(replayGuard).toContain("existing.declared_mime_type <> p_declared_mime_type");
+    expect(replayGuard).not.toContain("existing.requested_bytes <> p_requested_bytes");
+    expect(replayMigration).toContain("'idempotentreplay', true");
+    expect(replayMigration).toContain("to service_role");
   });
 });

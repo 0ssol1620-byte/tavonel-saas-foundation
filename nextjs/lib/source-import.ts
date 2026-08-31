@@ -115,6 +115,11 @@ export async function importSourceObject(context: ImportContext, item: OAuthSour
     declaredMimeType: descriptor.mimeType,
   });
   if (!admission.ok) return { ok: false, nativeId: item.nativeId, code: admission.code };
+  // A deterministic source revision that already reached intake is complete for this sync
+  // turn. Never reserve compute again or overwrite its create-once quarantine source.
+  if (admission.result.idempotentReplay === true) {
+    return { ok: true, nativeId: item.nativeId, documentId, filename: descriptor.filename };
+  }
 
   const compute = await reserveFoundationCompute({
     workspaceKey: context.workspaceKey,
