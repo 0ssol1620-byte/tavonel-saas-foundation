@@ -574,8 +574,24 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 
 /* ============================================================ hero (01) */
 
-.scene.hero { min-height: 0; justify-content: flex-start; padding-top: 104px; padding-bottom: 28px; }
-.scene.hero .film-band { margin-top: 22px; }
+.scene.hero { min-height: 0; justify-content: flex-start; padding-top: 92px; padding-bottom: 28px; }
+/*
+  The hero band must finish inside the first viewport.
+
+  A 1440x900 frame with the headline, the lede and the controls above it leaves roughly 430px,
+  and a 16:10 film at full column width wants 900. Capping the height (rather than the width)
+  keeps the four columns edge to edge and simply shows less of their vertical run, which is the
+  right trade: the argument of cut 1 is that four things happen at once, and that reads from the
+  top of the columns.
+*/
+.scene.hero .film-band { margin-top: 18px; }
+.scene.hero .film-band-video,
+.scene.hero .film-band img {
+  aspect-ratio: auto;
+  height: min(46vh, 430px);
+  object-fit: cover;
+  object-position: top center;
+}
 .film-note { max-width: 72rem; margin: 12px auto 0; padding: 0 24px; }
 .film-band {
   position: relative;
@@ -609,9 +625,49 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 .film-band-phone { display: none; position: relative; }
 .film-scene { width: 100%; }
 .film-scene .film-band { width: calc(100% + 0px); }
+.artifacts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin-top: 12px;
+  background: var(--hairline);
+  border: 1px solid var(--hairline);
+}
+.artifact { padding: 18px 20px; background: var(--g1); }
+.artifact code {
+  display: block;
+  margin-bottom: 8px;
+  font-family: var(--f-mono);
+  font-size: 13px;
+  color: var(--verified);
+}
+.artifact p { margin: 0; font-size: 13px; line-height: 1.62; color: var(--text-lo); }
+.compile-stage {
+  width: 100%;
+  aspect-ratio: 1440 / 620;
+  background: #08090a;
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.compile-stage-canvas { display: block; width: 100%; height: 100%; }
 @media (max-width: 900px) {
   .film-band-desk { display: none; }
   .film-band-phone { display: block; }
+  /*
+    A four-up at 390px is 90px per column, so the phone gets the whole frame as a still and
+    opens the cut full screen instead. `cover` here would crop two of the four columns off the
+    sides, which is the one thing the still exists to prevent.
+  */
+  .scene.hero .film-band-video,
+  .scene.hero .film-band img,
+  .film-band-phone img {
+    height: auto;
+    aspect-ratio: 1440 / 900;
+    object-fit: contain;
+  }
+  .artifacts { grid-template-columns: minmax(0, 1fr); }
+  .compile-stage { aspect-ratio: 4 / 5; }
 }
 
 /*

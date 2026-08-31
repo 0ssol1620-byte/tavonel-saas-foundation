@@ -29,16 +29,18 @@ export default function FilmBand({
   useEffect(() => {
     const video = videoRef.current;
     if (!video || reduced) return;
+    // rootMargin pulls the load forward: a band that starts fetching only once it is half on
+    // screen shows a poster for the first second of the thing it is supposed to be proving.
     const io = new IntersectionObserver(
       ([entry]) => {
         if (!entry) return;
-        if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+        if (entry.isIntersecting) {
           void video.play().catch(() => undefined);
         } else {
           video.pause();
         }
       },
-      { threshold: [0, 0.5, 1] },
+      { threshold: 0.25, rootMargin: "300px 0px" },
     );
     io.observe(video);
     return () => io.disconnect();
@@ -62,7 +64,7 @@ export default function FilmBand({
               loop
               playsInline
               autoPlay
-              preload="metadata"
+              preload="auto"
               poster={poster}
               aria-label={label}
             >

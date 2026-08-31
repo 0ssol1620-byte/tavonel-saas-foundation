@@ -46,6 +46,7 @@ const COPY_SURFACES = [
   "lib/film-script.ts",
   "components/opening-film.tsx",
   "components/film-band.tsx",
+  "components/compile-stage.tsx",
   "app/film/page.tsx",
   "app/research/page.tsx",
   "app/developers/page.tsx",
@@ -144,5 +145,24 @@ describe("public copy", () => {
     expect(page).not.toContain("RebuildConsole");
     expect(page).not.toContain("ChangeLattice");
     expect(page).not.toContain("IdentityResolve");
+  });
+
+  it("names the artifacts that leave the compiler", () => {
+    // The films show the compile. What a buyer cannot see in a loop is what they receive,
+    // and that is the difference between this and a retrieval index.
+    const page = read("app/page.tsx");
+    expect(page).toContain("ontology.ttl");
+    expect(page).toContain("graph.csv");
+    expect(page).toContain("provenance");
+  });
+
+  it("stages a customer's own upload in the workspace, not a fixture world", () => {
+    const stage = read("components/compile-stage.tsx");
+    expect(stage).toContain("SOURCES");
+    expect(stage).toContain("WORLD");
+    // The landing fixture must never be pasted into the authenticated surface: no import of
+    // the demo world, and no census figure. (The file may name them in prose to say so.)
+    expect(stage).not.toMatch(/from ["']@\/lib\/demo-world["']/);
+    expect(stage).not.toContain("SOURCE_CENSUS");
   });
 });

@@ -16,6 +16,7 @@ import { runBounded } from "@/lib/concurrent";
 import { buildPipeline, type LocalUpload } from "@/lib/pipeline";
 import { qualifyProgress, type OcrProgress } from "@/lib/ocr-progress";
 import PipelineBoard from "@/components/pipeline-board";
+import CompileStage from "@/components/compile-stage";
 import { displayName, elideKey, recallDocumentNames, rememberDocumentName, type DocumentNames } from "@/lib/document-names";
 import { trackFunnel } from "@/lib/funnel-events";
 import ConnectionsPanel from "@/components/connections-panel";
@@ -1037,10 +1038,17 @@ export default function WorkspacePage() {
           {tab === "overview" ? (
           <>
           {/*
-            The board goes above everything, including the headline. While documents are moving it
-            is the only thing on this page anyone is looking at, and when nothing is moving it
-            renders nothing at all.
+            The compile, drawn.
+
+            The board below reports state per document and is the thing to read when something
+            stops. This canvas is the thing to *watch*: the same four columns the public cuts
+            use — sources, the page under the reader, the lines coming out of it, and the world
+            their own documents are building. It is fed entirely from this visitor's own uploads,
+            pipeline rows and streamed OCR progress. No fixture ever reaches it.
           */}
+          {pipelineRows.length > 0 ? (
+            <CompileStage rows={pipelineRows} reading={reading} names={names} />
+          ) : null}
           <PipelineBoard
             rows={pipelineRows}
             reading={reading}

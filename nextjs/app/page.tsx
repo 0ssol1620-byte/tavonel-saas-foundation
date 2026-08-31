@@ -42,10 +42,18 @@ const BAND_ORDER: BandName[] = ["scatter", "structure", "world", "change", "rebu
 
 const DESTINATIONS = ["Retrieval", "Agents", "MCP", "API", "Search", "Your applications"];
 
-const TAKEAWAY = [
-  ["The package", "A directory of files, not a database dump: the ontology, the graph, the retrieval corpus and the provenance, each one hash-verified on the way out."],
-  ["The signature", "Signed with Ed25519 over the payload digest. A package that has been altered stops verifying."],
-  ["The public key", "Published, so the signature can be checked by a third party who has no account here and no reason to trust us."],
+/**
+ * What the compile hands back. The films show the work; this is the receipt.
+ *
+ * Every line is a file the workspace already writes into the signed package, which is why the
+ * ontology is named by its real extension rather than described as "a knowledge layer". A buyer
+ * comparing this against a retrieval product is comparing artifacts, not adjectives.
+ */
+const ARTIFACTS = [
+  ["ontology.ttl", "OWL classes and object properties — the shape of your domain, in a standard a triple store reads."],
+  ["graph.csv", "Entities and the relations between them, resolved across versions and spellings."],
+  ["corpus/", "Retrieval documents rebuilt from current facts, so an index is downstream of the world, not a copy of your drive."],
+  ["provenance/", "Every fact back to a file, a section and a line. An answer that cannot be traced does not ship."],
 ] as const;
 
 export default function HomePage() {
@@ -248,21 +256,24 @@ export default function HomePage() {
 
         <Scene id={4} band="answer" eyebrow="USE THE WORLD" title={<>One compiled world.<br />Every AI.</>}>
           <p className="lede rv">
-            Use the same grounded knowledge across retrieval, agents, MCP, APIs and your own applications.
-            <b> The model can change. Your knowledge should remain traceable.</b>
+            The model can change. Your knowledge stays traceable.
           </p>
           <div className="sources rv">
             {DESTINATIONS.map((name) => <span className="src" key={name}>{name}</span>)}
           </div>
           <AnswerSwitch />
+          <div className="band-head rv"><span className="kicker">WHAT YOU GET</span><h3>Files, not a lock-in.</h3></div>
+          <div className="artifacts rv">
+            {ARTIFACTS.map(([name, text]) => (
+              <article className="artifact" key={name}>
+                <code>{name}</code>
+                <p>{text}</p>
+              </article>
+            ))}
+          </div>
         </Scene>
 
         <Scene id={5} band="access" eyebrow="PROOF & ACCESS" title={<>Stop rebuilding knowledge<br />for every AI project.</>}>
-          <p className="lede rv">
-            TAVONEL compiles everything you know into a structured, AI-ready world &mdash; and is
-            designed to keep that world aligned as sources change.
-          </p>
-
           <div className="band-head rv"><span className="kicker">STATUS</span><h3>What exists in this deployment, right now.</h3></div>
           <div className="caps rv">
             {capabilities.map((cap) => (
@@ -275,27 +286,20 @@ export default function HomePage() {
           <p className="fine rv">
             Read live from this deployment when the page loads, not written by hand. A row this
             page cannot confirm reads <b>Unknown</b> &mdash; it never defaults to available.
+            {heldRows.length > 0 ? (
+              <>
+                {" "}Buying access opens none of them &mdash; each opens only when the control
+                behind it is qualified.
+              </>
+            ) : null}
           </p>
 
-          {heldRows.length > 0 ? (
-            <p className="fine rv held">
-              {heldRows.length} of the {capabilities.length} controls above {heldRows.length === 1 ? "is" : "are"} not
-              open in this deployment. Buying access does not open any of them &mdash; each opens
-              only when the control behind it is qualified.
-            </p>
-          ) : null}
+          <p className="lede rv" style={{ marginTop: 26 }}>
+            The package is signed with Ed25519 and its public key is published, so a third party
+            with no account here can verify it.
+          </p>
 
-          <div className="band-head rv"><span className="kicker">NO LOCK-IN</span><h3>What you can take with you.</h3></div>
-          <div className="caps rv">
-            {TAKEAWAY.map(([name, text]) => (
-              <article className="cap" key={name}>
-                <h3>{name}</h3>
-                <p>{text}</p>
-              </article>
-            ))}
-          </div>
-
-          <div className="actions rv" style={{ marginTop: 30 }}>
+          <div className="actions rv" style={{ marginTop: 24 }}>
             <Link className="btn" href={signedIn ? "/workspace" : "/login"}>
               {signedIn ? "Open workspace" : "Compile sample data"}
             </Link>
