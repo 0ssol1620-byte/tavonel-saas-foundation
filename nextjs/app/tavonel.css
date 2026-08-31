@@ -574,25 +574,46 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 
 /* ============================================================ hero (01) */
 
-.scene.hero { min-height: 0; justify-content: flex-start; padding-top: 92px; padding-bottom: 28px; }
+.scene.hero { min-height: 0; justify-content: flex-start; padding-top: 76px; padding-bottom: 16px; }
 /*
-  The hero film is shown whole.
+  The hero film fits the space that is left, without being cropped.
 
-  This capped the element's height and let `object-fit: cover` crop the rest, on the theory that
-  cut 1's argument reads from the top of its columns. Measured, that was cutting 395px off an
-  827px frame — the bottom half of every column, including the WORLD graph the cut ends on. A
-  four-up that a visitor sees half of is not a shorter cut, it is a broken one.
+  Two wrong answers came before this one. Capping the height and letting `object-fit: cover`
+  crop the overflow cut 395px off an 827px frame — half of every column. Removing the cap
+  entirely made the frame 829px tall starting 362px down the page, so on a 900px screen it ran
+  291px past the bottom and the hero looked like it had lost its film.
 
-  The frame now keeps its aspect ratio and is sized by width like the other bands. It runs past
-  the fold, which is correct: the fold is not a wall, and the scroll that follows lands on cut 2.
+  The standard fix is to bound both axes and let the smaller one win: `aspect-ratio` keeps the
+  frame's shape while `max-height` stops it exceeding the viewport minus the copy above it.
+  `100dvh` rather than `100vh` so a mobile browser's collapsing toolbar does not reintroduce the
+  overflow. Nothing is cropped — a narrow window simply gets a smaller whole frame.
 */
-.scene.hero .film-band { margin-top: 18px; width: min(100%, 1440px); }
-.scene.hero .film-band-video { pointer-events: none; }
+.scene.hero .film-band {
+  margin-top: 18px;
+  width: min(100%, 1440px);
+  max-height: calc(100dvh - 350px);
+  display: flex;
+  justify-content: center;
+}
+.scene.hero .film-band-video {
+  pointer-events: none;
+  max-height: calc(100dvh - 350px);
+  width: auto;
+  max-width: 100%;
+}
 @media (max-width: 640px) {
+  /*
+    The phone keeps the film.
+
+    An earlier pass hid the hero band, the lede and the note here to protect LCP on a small
+    screen. That trades the only demonstration of the product for a metric: a phone visitor
+    arrived at a headline, two buttons, and no evidence that anything compiles. The band is
+    bounded by the same `max-height` rule as the desktop, so it costs a fraction of a screen
+    rather than a screenful, and the deferred cuts below still load nothing until approached.
+  */
   .scene.hero { min-height: 100svh; }
   .scene.hero .film-band,
-  .scene.hero .film-note,
-  .scene.hero .lede { display: none; }
+  .scene.hero .film-band-video { max-height: calc(100svh - 330px); }
   .js .scene.hero .rv {
     opacity: 1;
     transform: none;
