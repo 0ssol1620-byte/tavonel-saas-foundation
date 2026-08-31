@@ -167,14 +167,13 @@ export default function HomePage() {
   return (
     <div className="page landing-page">
       {/*
-        The hero film is above the fold, so it is fetched with the document.
+        The hero proof frame is above the fold, so it is fetched with the document.
 
         Without this the browser does not learn the cut exists until React has hydrated and the
-        <video> is in the DOM, which on a cold visit is a second of poster before anything
-        moves. React hoists this into <head>. Only cut 1 is preloaded — the other two are
-        deliberately deferred so they cannot compete for the connection.
+        media element is in the DOM. React hoists this into <head>. The later motion cuts
+        remain deferred so they cannot compete for the LCP image.
       */}
-      <link rel="preload" as="video" href="/film/compile-cut.mp4" type="video/mp4" />
+      <link rel="preload" as="image" href="/film/poster-1.jpg" type="image/jpeg" />
       <WorldField mode={fieldMode} />
 
       <header className="nav" data-stuck={progress > 0.005 ? 1 : 0}>
