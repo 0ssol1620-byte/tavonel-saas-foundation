@@ -162,6 +162,9 @@ async function mockWorkspace(page: Page, reviewRequired = false) {
       },
     })
   );
+  await page.route(`**/api/v1/world/${collectionId}`, route =>
+    route.fulfill({ json: { model: null } })
+  );
   await page.route(`**/api/collections/${collectionId}/ask`, route =>
     route.fulfill({
       json: {
@@ -282,14 +285,10 @@ test("keeps review-required packages downloadable and promotion-closed", async (
   await expect(page.getByText("Core requires review", { exact: false })).toBeVisible();
   await expect(page.getByText("CONTRADICTION_CANDIDATE:claim-a:claim-b", { exact: false })).toBeVisible();
   await expect(page.getByRole("button", { name: "Download signed knowledge package" })).toBeEnabled();
-  // The signed download sits with the collection result on overview; the review record sits with
-  // the review studio on knowledge. Crossing the two tabs is the point of this test -- a package
-  // held back for review must stay downloadable on one and unpromotable on the other.
-  await page.getByRole("button", { name: "Knowledge", exact: true }).click();
-  // The signed download sits with the collection result on overview; the review record sits with
-  // the review studio on knowledge. Crossing the two tabs is the point of this test -- a package
-  // held back for review must stay downloadable on one and unpromotable on the other.
-  await page.getByRole("button", { name: "Knowledge", exact: true }).click();
+  // The signed download sits with the collection result on Home; the review record now has a
+  // dedicated Review surface. Crossing those surfaces proves that review-required packages stay
+  // downloadable while promotion remains closed.
+  await page.locator('[data-rail-item][title^="Review"]').click();
   const promote = page.getByRole("button", { name: "Promote reviewed candidate" });
   await page.getByLabel("Human review record").fill("Reviewed contradiction evidence and retained the gate.");
   await expect(promote).toBeDisabled();

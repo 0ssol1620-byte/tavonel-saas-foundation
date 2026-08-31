@@ -91,19 +91,18 @@ test("nothing on the page is wider than the thing that holds it", async ({ page 
   await testInfo.attach("landing", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
 });
 
-test("draws five scenes over seven states of the world, and the interlude", async ({ page }) => {
+test("draws five scenes over the opening world field", async ({ page }) => {
   await page.goto("/");
   await settle(page);
 
   /*
-   * Five numbered scenes, seven sections: two of the five are merged scenes that carry a second
-   * section continuing the same number. The rail counts scenes, the field reads bands, and the
-   * two counts are deliberately different -- shortening the page must not have cost the world
-   * any of the states it moves through.
+   * The current film is five numbered scenes. Each scene owns one evidence band; the earlier
+   * continuation sections were folded into the authored cuts rather than left as duplicate
+   * scroll stops. A single fixed WorldField carries the state transition behind those scenes.
    */
-  await expect(page.locator("section.scene")).toHaveCount(7);
-  await expect(page.locator("section.scene.cont")).toHaveCount(2);
-  await expect(page.locator(".interlude")).toHaveCount(1);
+  await expect(page.locator("section.scene")).toHaveCount(5);
+  await expect(page.locator("section.scene.cont")).toHaveCount(0);
+  await expect(page.locator(".world-field")).toHaveCount(1);
 
   const scenes = await page.evaluate(() =>
     Array.from(document.querySelectorAll("[data-scene]")).map((el) => el.getAttribute("data-scene")));
@@ -111,18 +110,10 @@ test("draws five scenes over seven states of the world, and the interlude", asyn
 
   const bands = await page.evaluate(() =>
     Array.from(document.querySelectorAll("[data-band]")).map((el) => el.getAttribute("data-band")));
-  expect(bands).toEqual(["scatter", "structure", "world", "change", "rebuild", "answer", "access"]);
+  expect(bands).toEqual(["scatter", "structure", "change", "answer", "access"]);
 
-  /*
-   * The lattice is a canvas, and a canvas is a replaced element: with a definite height and
-   * `width: auto` its used width comes from the backing store's ratio and the `right` inset is
-   * discarded, which left the field 244px short on one side and symmetric on neither. The
-   * assertion is the one a person made by eye -- the gap on the left equals the gap on the right.
-   */
-  const gaps = await page.evaluate(() => {
-    const frame = document.querySelector(".interlude")!.getBoundingClientRect();
-    const lattice = document.querySelector(".lattice")!.getBoundingClientRect();
-    return { left: Math.round(lattice.left - frame.left), right: Math.round(frame.right - lattice.right) };
-  });
-  expect(Math.abs(gaps.left - gaps.right)).toBeLessThanOrEqual(1);
+  const field = await page.locator(".world-field").boundingBox();
+  const viewport = await page.evaluate(() => ({ width: window.innerWidth, height: window.innerHeight }));
+  expect(field?.width).toBe(viewport.width);
+  expect(field?.height).toBe(viewport.height);
 });

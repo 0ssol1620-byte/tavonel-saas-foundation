@@ -6,7 +6,7 @@ Run date: 2026-09-01 KST
 
 ## Automated coverage
 
-The Playwright matrix exercised 1920, 1440, 1280, 1024, 768, 390, 360, and reduced-motion projects. The focused Ultimate Blueprint suites completed with 60 passes, 12 intentional non-mobile skips, and no failures.
+The Playwright matrix exercised 1920, 1440, 1280, 1024, 768, 390, 360, and reduced-motion projects. The full product matrix completed with 180 passes, 12 intentional non-mobile skips, and no failures.
 
 Full-page captures were produced for:
 
@@ -31,9 +31,9 @@ The hero LCP is a verified T0 product proof frame. Its intrinsic geometry is pre
 
 | Route | Performance | Accessibility | Best practices | SEO | LCP | CLS | TBT |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `/` | 0.94 | 0.96 | 0.96 | 1.00 | 2747 ms | 0.00023 | 63 ms |
-| `/privacy` | 0.98 | 1.00 | 1.00 | 1.00 | 1901 ms | 0.00033 | 59 ms |
-| `/security` | 0.98 | 1.00 | 0.96 | 1.00 | 1986 ms | 0.00024 | 64 ms |
+| `/` | 0.94 | 0.96 | 0.96 | 1.00 | 2649 ms | 0.00023 | 81 ms |
+| `/privacy` | 0.98 | 1.00 | 1.00 | 1.00 | 1878 ms | 0.00033 | 62 ms |
+| `/security` | 0.97 | 1.00 | 0.96 | 1.00 | 2023 ms | 0.00024 | 38 ms |
 
 ## Truth boundary
 
