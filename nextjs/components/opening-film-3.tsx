@@ -623,7 +623,7 @@ export default function OpeningFilm3(_props: { onEnded?: () => void }) {
 
     const drawWorld = (
       x: number, y: number, w: number, h: number,
-      t: number, d: Delta, selected: number,
+      t: number, d: Delta, local: number, selected: number,
     ) => {
       if (!graph) return;
       const g = graph;
@@ -642,49 +642,34 @@ export default function OpeningFilm3(_props: { onEnded?: () => void }) {
         context.lineTo(ox + nb.x * gw, oy + nb.y * gh);
         context.stroke();
       });
-      const live = new Set<number>();
-      const drawn: [number, number][] = [];
-      const seen = new Set<string>();
-      DELTAS.forEach((delta, di) => {
-        const startT = di * PERIOD;
-        if (t < startT) return;
-        const loc = Math.min(1, (t - startT) / PERIOD);
-        const pl = (g.byArea[delta.area] && g.byArea[delta.area].length)
-          ? g.byArea[delta.area]
-          : (g.byArea[0] ?? []);
-        const originI = pl[0];
-        if (originI === undefined) return;
-        live.add(originI);
-        const rel: number[] = [];
-        g.edges.forEach(([ia, ib]) => {
-          if (rel.length >= 12) return;
-          if (ia === originI && !rel.includes(ib)) rel.push(ib);
-          else if (ib === originI && !rel.includes(ia)) rel.push(ia);
-        });
-        pl.forEach((idx) => {
-          if (idx !== originI && rel.length < 14) rel.push(idx);
-        });
-        const nShow = Math.min(rel.length, 6 + Math.floor(loc * 10));
-        rel.slice(0, nShow).forEach((ib) => {
-          live.add(ib);
-          const key = originI < ib ? `${originI}-${ib}` : `${ib}-${originI}`;
-          if (seen.has(key)) return;
-          seen.add(key);
-          drawn.push([originI, ib]);
-        });
+      const origin = selected;
+      const related: number[] = [];
+      g.edges.forEach(([ia, ib]) => {
+        if (related.length >= 3) return;
+        if (ia === origin && !related.includes(ib)) related.push(ib);
+        else if (ib === origin && !related.includes(ia)) related.push(ia);
       });
-      drawn.forEach(([ia, ib]) => {
-        const na = g.nodes[ia];
-        const nb = g.nodes[ib];
-        if (!na || !nb) return;
-        const rgb = AREA_RGB[na.area % AREA_RGB.length];
-        context.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.88)`;
-        context.lineWidth = 1.3;
-        context.beginPath();
-        context.moveTo(ox + na.x * gw, oy + na.y * gh);
-        context.lineTo(ox + nb.x * gw, oy + nb.y * gh);
-        context.stroke();
-      });
+      for (let step = 1; step < 8 && related.length < 3; step += 1) {
+        const pool = g.byArea[(d.area + step) % g.byArea.length] ?? [];
+        const cand = pool[0];
+        if (cand !== undefined && cand !== origin && !related.includes(cand)) related.push(cand);
+      }
+      const spokes = related.slice(0, 3);
+      const live = new Set<number>([origin, ...spokes]);
+      if (local > 0.08) {
+        spokes.forEach((ib) => {
+          const na = g.nodes[origin];
+          const nb = g.nodes[ib];
+          if (!na || !nb) return;
+          const rgb = AREA_RGB[na.area % AREA_RGB.length];
+          context.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.92)`;
+          context.lineWidth = 1.45;
+          context.beginPath();
+          context.moveTo(ox + na.x * gw, oy + na.y * gh);
+          context.lineTo(ox + nb.x * gw, oy + nb.y * gh);
+          context.stroke();
+        });
+      }
       g.nodes.forEach((node, i) => {
         const rgb = AREA_RGB[node.area % AREA_RGB.length];
         const isSel = i === selected;
@@ -753,7 +738,7 @@ export default function OpeningFilm3(_props: { onEnded?: () => void }) {
       drawCards(bodyX, bodyY + topH + 4, bodyW, bodyH - topH - 4, d);
 
       pane(xs[3], colY, colW, colH, "WORLD", "trace");
-      drawWorld(xs[3] + 6, colY + 30, colW - 12, colH - 38, t, d, selected);
+      drawWorld(xs[3] + 6, colY + 30, colW - 12, colH - 38, t, d, local, selected);
       } catch (err) {
         console.error(err);
       }
