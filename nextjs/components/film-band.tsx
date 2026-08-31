@@ -126,6 +126,16 @@ export default function FilmBand({
     };
   }, [reduced, src]);
 
+  if (priority) {
+    return (
+      <div className="film-band">
+        {/* The hero is the LCP proof frame; motion continues in the later cuts. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={poster} alt={label} className="film-band-video" fetchPriority="high" />
+      </div>
+    );
+  }
+
   return (
     <div className="film-band">
       {/*
