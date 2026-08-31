@@ -31,9 +31,9 @@ The hero LCP is a verified T0 product proof frame. Its intrinsic geometry is pre
 
 | Route | Performance | Accessibility | Best practices | SEO | LCP | CLS | TBT |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `/` | 0.95 | 0.96 | 0.96 | 1.00 | 2249 ms | 0.00025 | 125 ms |
-| `/privacy` | 0.97 | 1.00 | 1.00 | 1.00 | 1968 ms | 0.00033 | 95 ms |
-| `/security` | 0.97 | 1.00 | 0.96 | 1.00 | 2072 ms | 0.00024 | 0 ms |
+| `/` | 0.94 | 0.96 | 0.96 | 1.00 | 2747 ms | 0.00023 | 63 ms |
+| `/privacy` | 0.98 | 1.00 | 1.00 | 1.00 | 1901 ms | 0.00033 | 59 ms |
+| `/security` | 0.98 | 1.00 | 0.96 | 1.00 | 1986 ms | 0.00024 | 64 ms |
 
 ## Truth boundary
 
