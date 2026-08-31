@@ -589,6 +589,7 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 .scene.hero .film-band { margin-top: 18px; width: min(100%, 1440px); }
 .scene.hero .film-band-video { pointer-events: none; }
 @media (max-width: 640px) {
+  .scene.hero { min-height: 100svh; }
   .scene.hero .film-band,
   .scene.hero .film-note { display: none; }
   .js .scene.hero .rv.word {
