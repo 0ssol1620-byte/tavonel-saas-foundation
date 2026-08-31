@@ -1,11 +1,9 @@
 "use client";
 
 /**
- * Cut 2. Four-up, camera off, parallel sync.
- * 1 nodes from cut 1, one selected
- * 2 markdown in that node
- * 3 fixed split: ontology rewrite / correlation diagram
- * 4 related nodes grow edges
+ * LOCKED cut — public/film/compile-cut-2.mp4 — site midsection later.
+ * 18s, four-up, camera off. TBox cards, no lines, no N/N, no node halo.
+ * Do not retune layout unless the user unlocks cut 2.
  */
 
 import Link from "next/link";
