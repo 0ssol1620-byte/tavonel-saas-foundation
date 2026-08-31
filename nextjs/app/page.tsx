@@ -169,6 +169,15 @@ export default function HomePage() {
 
   return (
     <div className="page landing-page">
+      {/*
+        The hero film is above the fold, so it is fetched with the document.
+
+        Without this the browser does not learn the cut exists until React has hydrated and the
+        <video> is in the DOM, which on a cold visit is a second of poster before anything
+        moves. React hoists this into <head>. Only cut 1 is preloaded — the other two are
+        deliberately deferred so they cannot compete for the connection.
+      */}
+      <link rel="preload" as="video" href="/film/compile-cut.mp4" type="video/mp4" />
       <WorldField mode={fieldMode} />
 
       <header className="nav" data-stuck={progress > 0.005 ? 1 : 0}>
@@ -221,8 +230,9 @@ export default function HomePage() {
           </div>
           <FilmBand
             src="/film/compile-cut.mp4"
-            poster="/film/poster-1.png"
+            poster="/film/poster-1.jpg"
             label="Cut 1 — a drive compiles into a world"
+            priority
           />
           <p className="fine film-note">{DISCLOSURE.fixture}</p>
         </section>
@@ -240,7 +250,6 @@ export default function HomePage() {
         <Scene id={2} film band="structure" eyebrow="STRUCTURE" title="What things are, and how they connect — compiled, not retrieved.">
           <FilmBand
             src="/film/compile-cut-2.mp4"
-            poster="/film/poster-2.png"
             label="Cut 2 — an ontology and its edges"
           />
         </Scene>
@@ -248,7 +257,6 @@ export default function HomePage() {
         <Scene id={3} film band="change" eyebrow="KEEP TRUE" title="A source changes. Only that slice recompiles. Trace it back.">
           <FilmBand
             src="/film/compile-cut-3.mp4"
-            poster="/film/poster-3.png"
             label="Cut 3 — a delta recompiles and traces back"
           />
         </Scene>

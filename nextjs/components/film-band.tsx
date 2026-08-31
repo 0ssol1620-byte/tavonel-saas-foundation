@@ -29,10 +29,29 @@ export default function FilmBand({
   src,
   poster,
   label,
+  priority = false,
 }: {
   src: string;
-  poster: string;
+  /*
+    Only the hero band has one.
+
+    A poster is a full-size still, and the two below the fold were fetched immediately — 348KB
+    competing with the hero film for the same connection while sitting behind a screenful of
+    page. The bands have a solid backdrop, so a deferred cut shows the panel colour for the
+    moment before it plays rather than a hole.
+  */
+  poster?: string;
   label: string;
+  /*
+    The hero band is the one a visitor is already looking at.
+
+    All three bands used `preload="auto"`, so a first visit opened three parallel downloads and
+    the browser divided the connection between them — the top film, the only one on screen,
+    finished last. Marking one band priority gives it `auto` and leaves the others on
+    `metadata` until the observer's 400px margin brings them near, which is early enough that
+    they are running before they are read.
+  */
+  priority?: boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [reduced, setReduced] = useState(false);
@@ -68,8 +87,16 @@ export default function FilmBand({
       ([entry]) => {
         if (!entry) return;
         wanted = entry.isIntersecting;
-        if (wanted) resume();
-        else video.pause();
+        if (wanted) {
+          // A non-priority band holds at `metadata` until it is nearly on screen. Promoting it
+          // here is what actually starts the download, and `load()` makes the element act on
+          // the new value instead of waiting for the next navigation.
+          if (video.preload !== "auto") {
+            video.preload = "auto";
+            video.load();
+          }
+          resume();
+        } else video.pause();
       },
       { threshold: 0.15, rootMargin: "400px 0px" },
     );
@@ -107,7 +134,7 @@ export default function FilmBand({
         loop
         playsInline
         autoPlay
-        preload="auto"
+        preload={priority ? "auto" : "metadata"}
         poster={poster}
         aria-label={label}
       >
