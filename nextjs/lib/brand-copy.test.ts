@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -143,6 +143,28 @@ describe("public copy", () => {
     expect(band).not.toContain("href");
     expect(band).not.toContain("CanvasTransitionLink");
     expect(read("app/page.tsx")).not.toMatch(/FilmBand[\s\S]{0,200}href=/);
+  });
+
+  /*
+    A poster that does not exist renders a broken-image icon and the alt text.
+
+    Cuts 2-4 shipped for one deploy with their posters deleted as a bandwidth saving, which the
+    reduced-motion branch turned into `<img src={undefined}>` — a visitor with that setting saw
+    a broken image where the film should be. Both halves are asserted: every band names a
+    poster, and every poster it names is a file in the repo.
+  */
+  it("gives every film band a poster file that actually exists", () => {
+    const page = read("app/page.tsx");
+    const bands = page.match(/<FilmBand[\s\S]*?\/>/g) ?? [];
+    expect(bands.length).toBeGreaterThanOrEqual(4);
+    for (const band of bands) {
+      const poster = /poster="([^"]+)"/.exec(band)?.[1];
+      expect(poster, `every FilmBand needs a poster: ${band.slice(0, 80)}`).toBeTruthy();
+      expect(
+        existsSync(join(root, "public", poster!)),
+        `${poster} is referenced but missing from public/`,
+      ).toBe(true);
+    }
   });
 
   it("does not restage widgets the films already show", () => {

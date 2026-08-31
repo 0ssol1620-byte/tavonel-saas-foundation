@@ -247,6 +247,7 @@ export default function HomePage() {
         <Scene id={2} film band="structure" eyebrow="STRUCTURE" title="What things are, and how they connect — compiled, not retrieved.">
           <FilmBand
             src="/film/compile-cut-2.mp4"
+            poster="/film/poster-2.jpg"
             label="Cut 2 — an ontology and its edges"
           />
         </Scene>
@@ -254,6 +255,7 @@ export default function HomePage() {
         <Scene id={3} film band="change" eyebrow="KEEP TRUE" title="A source changes. Only that slice recompiles. Trace it back.">
           <FilmBand
             src="/film/compile-cut-3.mp4"
+            poster="/film/poster-3.jpg"
             label="Cut 3 — a delta recompiles and traces back"
           />
         </Scene>
@@ -273,6 +275,7 @@ export default function HomePage() {
           */}
           <FilmBand
             src="/film/compile-cut-4.mp4"
+            poster="/film/poster-4.jpg"
             label="Cut 4 — an assistant, an editor and a terminal reach the same world"
           />
           <div className="band-head rv"><span className="kicker">WHAT YOU GET</span><h3>Files, not a lock-in.</h3></div>

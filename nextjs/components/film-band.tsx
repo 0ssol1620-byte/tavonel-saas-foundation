@@ -33,14 +33,15 @@ export default function FilmBand({
 }: {
   src: string;
   /*
-    Only the hero band has one.
+    Required, because it is the entire cut for some visitors.
 
-    A poster is a full-size still, and the two below the fold were fetched immediately — 348KB
-    competing with the hero film for the same connection while sitting behind a screenful of
-    page. The bands have a solid backdrop, so a deferred cut shows the panel colour for the
-    moment before it plays rather than a hole.
+    Dropping the posters from cuts 2–4 to save 348KB of first-load bandwidth left the
+    reduced-motion branch rendering `<img src={undefined}>` — a broken-image icon and an alt
+    string where the film should be. The saving was real but it was taken from the wrong place:
+    the cost of a poster is only paid when it is actually shown, so the fix is to keep every
+    poster and hang it off the `<video>` for the hero alone.
   */
-  poster?: string;
+  poster: string;
   label: string;
   /*
     The hero band is the one a visitor is already looking at.
@@ -133,6 +134,12 @@ export default function FilmBand({
 
   return (
     <div className="film-band">
+      {/*
+        The poster attribute is the hero's alone. A `poster` on a deferred band is fetched
+        immediately even though the band is a screen away, which is the 348KB that was competing
+        with the film above it. Those cuts still have posters — the reduced-motion branch needs
+        them — they just are not requested before they are visible.
+      */}
       <video
         ref={videoRef}
         className="film-band-video"
@@ -141,7 +148,7 @@ export default function FilmBand({
         playsInline
         autoPlay
         preload={priority ? "auto" : "metadata"}
-        poster={poster}
+        poster={priority ? poster : undefined}
         aria-label={label}
       >
         <source src={src} type="video/mp4" />
