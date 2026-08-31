@@ -13,11 +13,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { FILM_ACT as ACT } from "@/lib/film-script";
 import { buildWorldGraph, nodeBudget, type WorldGraph } from "@/lib/world-graph";
 
-const PERIOD = 1.05;
-const LAG_MD = 0.08;
-const LAG_ONTO = 0.16;
-const LAG_EDGE = 0.22;
+const PERIOD = 0.62;
+const LAG_ONTO = 0.1;
 const ONTO_SPLIT = 0.56;
+const GROW_UNTIL = 16.6;
 
 const AREA_RGB: [number, number, number][] = [
   [242, 166, 90],
@@ -185,6 +184,13 @@ properties:
   },
 ];
 
+const ALL_MD = FOCI.map((f) => f.md).join("\n");
+const ALL_ONTO = FOCI.map((f) => f.onto).join("\n");
+const ALL_CORR = FOCI.flatMap((f) =>
+  f.links.map((link) => ({ from: f.label, to: link.id, rel: link.rel, area: f.area })),
+);
+const CORR_IDS = Array.from(new Set(ALL_CORR.flatMap((e) => [e.from, e.to])));
+
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
@@ -227,10 +233,6 @@ function focusIndex(t: number, lag: number) {
   return Math.floor(Math.max(0, t - lag) / PERIOD) % FOCI.length;
 }
 
-function localOf(t: number, lag: number) {
-  return (Math.max(0, t - lag) % PERIOD) / PERIOD;
-}
-
 export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [time, setTime] = useState(0);
@@ -258,7 +260,7 @@ export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
     setPlaying(playingRef.current);
   }, [replay]);
   const skipToEnd = useCallback(() => {
-    elapsedRef.current = ACT.end;
+    elapsedRef.current = ACT.stop;
     startRef.current = 0;
     playingRef.current = false;
     setTime(ACT.end);
@@ -326,35 +328,33 @@ export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
 
     const typeLines = (
       x: number, y: number, w: number, h: number,
-      title: string, body: string, local: number, accent: string,
+      title: string, body: string, t: number, accent: string,
     ) => {
       context.fillStyle = "#0b0d0e";
       context.fillRect(x, y, w, h);
       context.fillStyle = "rgba(123,224,190,0.85)";
       context.font = "500 8px ui-monospace, Menlo, monospace";
       context.fillText(title, x + 8, y + 12);
-      const rowH = 11;
+      const rowH = 10;
       const gutter = 22;
-      const maxRows = Math.max(4, Math.floor((h - 20) / rowH));
+      const maxRows = Math.max(6, Math.floor((h - 18) / rowH));
       context.fillStyle = "#121416";
       context.fillRect(x, y + 16, gutter, h - 16);
+      context.font = "400 8px ui-monospace, Menlo, monospace";
+      const maxW = w - gutter - 10;
+      const packed: string[] = [];
+      body.split("\n").forEach((row) => {
+        wrap(context, row.length ? row : " ", maxW).forEach((part) => packed.push(part));
+      });
+      const start = Math.floor(t * 9) % Math.max(1, packed.length);
       for (let i = 0; i < maxRows; i += 1) {
+        const row = packed[(start + i) % packed.length];
         context.fillStyle = "#1a1e22";
         context.fillRect(x + gutter, y + 16 + i * rowH, w - gutter, 1);
         context.fillStyle = "#3a4248";
         context.font = "400 8px ui-monospace, Menlo, monospace";
-        context.fillText(String(i + 1), x + 4, y + 24 + i * rowH);
-      }
-      const count = Math.floor(clamp01(local) * body.length);
-      if (count <= 0) return;
-      const caret = local < 0.98 && Math.floor(local * 24) % 2 === 0 ? "▌" : "";
-      context.font = "400 9px ui-monospace, Menlo, monospace";
-      const maxW = w - gutter - 10;
-      const lines: string[] = [];
-      (body.slice(0, count) + caret).split("\n").forEach((row) => {
-        wrap(context, row.length ? row : " ", maxW).forEach((part) => lines.push(part));
-      });
-      lines.slice(0, maxRows).forEach((row, i) => {
+        context.fillText(String((start + i) % 99 + 1), x + 4, y + 24 + i * rowH);
+        if (!row) continue;
         context.fillStyle = row.startsWith("#") || row.startsWith("entity")
           ? "#edeae4"
           : row.startsWith("|") || row.startsWith("!") || row.startsWith("class") || row.startsWith("  -")
@@ -362,57 +362,65 @@ export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
             : row.startsWith("source") || row.startsWith("status") || row.startsWith("properties") || row.startsWith("relations")
               ? "#7d878d"
               : "#c8ced2";
+        context.font = "400 8px ui-monospace, Menlo, monospace";
         context.fillText(row, x + gutter + 6, y + 24 + i * rowH);
-      });
+      }
     };
 
-    const drawCorr = (
-      x: number, y: number, w: number, h: number,
-      focus: Focus, local: number, rgb: [number, number, number],
-    ) => {
+    const drawCorr = (x: number, y: number, w: number, h: number, t: number, current: string) => {
       context.fillStyle = "#0e1114";
       context.fillRect(x, y, w, h);
       context.fillStyle = "rgba(123,224,190,0.85)";
       context.font = "500 8px ui-monospace, Menlo, monospace";
-      context.fillText("CORRELATION", x + 8, y + 12);
+      const grown = Math.min(ALL_CORR.length, Math.floor(1 + clamp01(t / GROW_UNTIL) * ALL_CORR.length));
+      context.fillText(`CORRELATION  ${grown}/${ALL_CORR.length}`, x + 8, y + 12);
       const cx = x + w / 2;
-      const cy = y + h * 0.55;
-      const n = focus.links.length;
-      const shown = Math.max(1, Math.ceil(local * n));
-      focus.links.slice(0, shown).forEach((link, i) => {
-        const grow = clamp01((local * n - i) / 0.7);
-        const ang = -Math.PI / 2 + (i / n) * Math.PI * 2;
-        const rad = Math.min(w, h) * 0.32;
-        const lx = cx + Math.cos(ang) * rad;
-        const ly = cy + Math.sin(ang) * rad * 0.78;
-        context.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${0.25 + grow * 0.55})`;
-        context.lineWidth = 1.2;
+      const cy = y + h * 0.52;
+      const pos = new Map<string, { x: number; y: number; area: number }>();
+      CORR_IDS.forEach((id, i) => {
+        const inner = FOCI.some((f) => f.label === id);
+        const ring = inner ? Math.min(w, h) * 0.18 : Math.min(w, h) * 0.38;
+        const ang = -Math.PI / 2 + (i / CORR_IDS.length) * Math.PI * 2;
+        const area = FOCI.find((f) => f.label === id)?.area ?? (i % 8);
+        pos.set(id, {
+          x: cx + Math.cos(ang) * ring,
+          y: cy + Math.sin(ang) * ring * 0.72,
+          area,
+        });
+      });
+      const live = new Set<string>();
+      ALL_CORR.slice(0, grown).forEach((edge, i) => {
+        const a = pos.get(edge.from);
+        const b = pos.get(edge.to);
+        if (!a || !b) return;
+        live.add(edge.from);
+        live.add(edge.to);
+        const rgb = AREA_RGB[edge.area % AREA_RGB.length];
+        const last = i === grown - 1;
+        const grow = last ? clamp01(((t / GROW_UNTIL) * ALL_CORR.length) % 1) : 1;
+        context.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${0.35 + grow * 0.5})`;
+        context.lineWidth = last ? 1.6 : 1.05;
         context.beginPath();
-        context.moveTo(cx, cy);
-        context.lineTo(lerp(cx, lx, grow), lerp(cy, ly, grow));
+        context.moveTo(a.x, a.y);
+        context.lineTo(lerp(a.x, b.x, grow), lerp(a.y, b.y, grow));
         context.stroke();
-        context.fillStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${0.4 + grow * 0.6})`;
+      });
+      CORR_IDS.forEach((id) => {
+        if (!live.has(id)) return;
+        const p = pos.get(id);
+        if (!p) return;
+        const rgb = AREA_RGB[p.area % AREA_RGB.length];
+        const hot = id === current;
+        context.fillStyle = hot ? `rgb(${rgb[0]},${rgb[1]},${rgb[2]})` : `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.85)`;
         context.beginPath();
-        context.arc(lx, ly, 3.2, 0, Math.PI * 2);
+        context.arc(p.x, p.y, hot ? 5 : 3.1, 0, Math.PI * 2);
         context.fill();
-        context.fillStyle = "#c8ced2";
-        context.font = "500 8px ui-monospace, Menlo, monospace";
+        context.fillStyle = hot ? "#edeae4" : "#9aa3a8";
+        context.font = `${hot ? "600" : "500"} 7px ui-monospace, Menlo, monospace`;
         context.textAlign = "center";
-        context.fillText(link.id, lx, ly - 8);
-        context.fillStyle = "#7d878d";
-        context.font = "400 7px ui-monospace, Menlo, monospace";
-        context.fillText(link.rel, lx, ly + 12);
+        context.fillText(id, p.x, p.y - (hot ? 9 : 7));
         context.textAlign = "left";
       });
-      context.fillStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
-      context.beginPath();
-      context.arc(cx, cy, 5.5, 0, Math.PI * 2);
-      context.fill();
-      context.fillStyle = "#edeae4";
-      context.font = "600 9px ui-monospace, Menlo, monospace";
-      context.textAlign = "center";
-      context.fillText(focus.label, cx, cy + 18);
-      context.textAlign = "left";
     };
 
     const pickNode = (g: WorldGraph, area: number, cycle: number) => {
@@ -420,18 +428,9 @@ export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
       return pool[cycle % pool.length];
     };
 
-    const neighbors = (g: WorldGraph, index: number) => {
-      const out: number[] = [];
-      g.edges.forEach(([a, b]) => {
-        if (a === index && !out.includes(b)) out.push(b);
-        if (b === index && !out.includes(a)) out.push(a);
-      });
-      return out;
-    };
-
     const drawNodes = (
       x: number, y: number, w: number, h: number,
-      t: number, selected: number, linkLocal: number, withEdges: boolean,
+      t: number, selected: number, withEdges: boolean,
     ) => {
       if (!graph) return;
       const g = graph;
@@ -439,34 +438,36 @@ export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
       const oy = y + 8;
       const gw = w - 12;
       const gh = h - 16;
-      const neigh = neighbors(g, selected);
+      const linked = new Set<number>();
       if (withEdges) {
-        const budget = Math.max(1, Math.ceil(linkLocal * Math.min(14, neigh.length)));
-        neigh.slice(0, budget).forEach((nb, i) => {
-          const grow = clamp01((linkLocal * Math.min(14, neigh.length) - i) / 0.65);
-          const na = g.nodes[selected];
-          const nbN = g.nodes[nb];
+        const cap = Math.min(g.edges.length, 180);
+        const grown = Math.floor(clamp01(t / GROW_UNTIL) * cap);
+        const frac = (clamp01(t / GROW_UNTIL) * cap) % 1;
+        g.edges.slice(0, Math.max(1, grown)).forEach(([ia, ib], i) => {
+          const na = g.nodes[ia];
+          const nb = g.nodes[ib];
           const rgb = AREA_RGB[na.area % AREA_RGB.length];
-          context.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${0.3 + grow * 0.55})`;
-          context.lineWidth = 1.15;
+          const last = i === grown - 1;
+          const grow = last ? Math.max(0.15, frac) : 1;
+          linked.add(ia);
+          linked.add(ib);
+          context.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${0.28 + grow * 0.45})`;
+          context.lineWidth = 1.05;
           context.beginPath();
           context.moveTo(ox + na.x * gw, oy + na.y * gh);
-          context.lineTo(
-            ox + lerp(na.x, nbN.x, grow) * gw,
-            oy + lerp(na.y, nbN.y, grow) * gh,
-          );
+          context.lineTo(ox + lerp(na.x, nb.x, grow) * gw, oy + lerp(na.y, nb.y, grow) * gh);
           context.stroke();
         });
       }
       g.nodes.forEach((node, i) => {
         const rgb = AREA_RGB[node.area % AREA_RGB.length];
         const isSel = i === selected;
-        const isN = neigh.includes(i);
-        const r = (isSel ? 4.2 : isN && withEdges ? 2.6 : 1.7) * node.radius;
+        const isN = linked.has(i);
+        const r = (isSel ? 4.2 : isN && withEdges ? 2.4 : 1.7) * node.radius;
         context.fillStyle = isSel
           ? `rgb(${Math.min(255, rgb[0] + 50)},${rgb[1]},${rgb[2]})`
           : isN && withEdges
-            ? `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.95)`
+            ? `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.9)`
             : `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.45)`;
         context.beginPath();
         context.arc(ox + node.x * gw, oy + node.y * gh, r, 0, Math.PI * 2);
@@ -497,37 +498,29 @@ export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
       context.fillText("TAVONEL  ·  Compile links", bx + 26, by + 20);
 
       const i0 = focusIndex(t, 0);
-      const i1 = focusIndex(t, LAG_MD);
-      const i2 = focusIndex(t, LAG_ONTO);
-      const i3 = focusIndex(t, LAG_EDGE);
       const f0 = FOCI[i0];
-      const f1 = FOCI[i1];
-      const f2 = FOCI[i2];
-      const f3 = FOCI[i3];
-      const loc1 = localOf(t, LAG_MD);
-      const loc2 = localOf(t, LAG_ONTO);
-      const loc3 = localOf(t, LAG_EDGE);
-      const rgb2 = AREA_RGB[f2.area % AREA_RGB.length];
+      const f2 = FOCI[focusIndex(t, LAG_ONTO)];
       const sel0 = graph ? pickNode(graph, f0.area, i0) : 0;
-      const sel3 = graph ? pickNode(graph, f3.area, i3) : 0;
+      const sel3 = graph ? pickNode(graph, f2.area, i0) : 0;
+      const rgb2 = AREA_RGB[f2.area % AREA_RGB.length];
 
       pane(xs[0], colY, colW, colH, "NODES", `${f0.label} · ${i0 + 1}/${FOCI.length}`);
-      drawNodes(xs[0] + 6, colY + 30, colW - 12, colH - 38, t, sel0, 0, false);
+      drawNodes(xs[0] + 6, colY + 30, colW - 12, colH - 38, t, sel0, false);
 
-      pane(xs[1], colY, colW, colH, "MARKDOWN", f1.label);
-      typeLines(xs[1] + 8, colY + 30, colW - 16, colH - 38, "NODE.md", f1.md, loc1, "#7be0be");
+      pane(xs[1], colY, colW, colH, "MARKDOWN", f0.label);
+      typeLines(xs[1] + 8, colY + 30, colW - 16, colH - 38, "NODE.md", ALL_MD, t, "#7be0be");
 
-      pane(xs[2], colY, colW, colH, "ONTOLOGY", `SPEC ${i2 + 1}/${FOCI.length}`);
+      pane(xs[2], colY, colW, colH, "ONTOLOGY", `SPEC ${focusIndex(t, LAG_ONTO) + 1}/${FOCI.length}`);
       const bodyX = xs[2] + 8;
       const bodyY = colY + 30;
       const bodyW = colW - 16;
       const bodyH = colH - 38;
       const topH = Math.round(bodyH * ONTO_SPLIT);
-      typeLines(bodyX, bodyY, bodyW, topH, "ontology.yaml", f2.onto, loc2, `rgb(${rgb2[0]},${rgb2[1]},${rgb2[2]})`);
-      drawCorr(bodyX, bodyY + topH + 4, bodyW, bodyH - topH - 4, f2, loc2, rgb2);
+      typeLines(bodyX, bodyY, bodyW, topH, "ontology.yaml", ALL_ONTO, t, `rgb(${rgb2[0]},${rgb2[1]},${rgb2[2]})`);
+      drawCorr(bodyX, bodyY + topH + 4, bodyW, bodyH - topH - 4, t, f2.label);
 
       pane(xs[3], colY, colW, colH, "WORLD", "linking");
-      drawNodes(xs[3] + 6, colY + 30, colW - 12, colH - 38, t, sel3, loc3, true);
+      drawNodes(xs[3] + 6, colY + 30, colW - 12, colH - 38, t, sel3, true);
     };
 
     const startLoop = () => {
@@ -574,7 +567,7 @@ export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
     return () => { cancelled = true; stop?.(); };
   }, [onEnded, runId]);
 
-  const atEnd = time >= ACT.end - 0.05;
+  const atEnd = time >= ACT.stop - 0.05;
 
   return (
     <div className="film">
