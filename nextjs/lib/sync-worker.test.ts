@@ -22,7 +22,7 @@ const readR2SignerEnv = vi.fn<(...args: any[]) => any>(() => ({ accountId: "a", 
 
 vi.mock("./job-store", () => ({ completeJobBatch }));
 vi.mock("./connector-oauth-store", () => ({ getOAuthConnectionSecretReference }));
-vi.mock("./connector-oauth-adapters", () => ({ listOAuthSourcePage }));
+vi.mock("./connector-oauth-adapters", () => ({ listOAuthSourcePage, OAUTH_SOURCE_PAGE_SIZE: 5 }));
 vi.mock("./source-import", () => ({ importSourceObject }));
 vi.mock("./connector-oauth", () => ({ refreshOAuthAccessToken, readOAuthProviderRuntime }));
 vi.mock("./connector-oauth-secrets", () => ({ readOAuthSecret, readOAuthSecretBrokerConfig }));
@@ -84,23 +84,54 @@ describe("cursor safety", () => {
     expect(order).toEqual(["import:a", "import:b", "commit:page-2"]);
   });
 
-  it("does not advance the cursor when the page held more items than one batch", async () => {
-    // The next turn re-reads the same page; deterministic document ids make the already
-    // imported prefix a no-op. A re-read costs time, a skip loses a customer's document.
+  it("checkpoints an offset when the page held more items than one batch", async () => {
     const items = Array.from({ length: SYNC_BATCH_SIZE + 5 }, (_unused, index) => sourceItem(`n${index}`));
     listOAuthSourcePage.mockResolvedValue({ items, cursor: "page-2", complete: false });
 
     await runSourceImportBatch({ ...JOB, cursorToken: "page-1" }, "worker-1");
 
     const batch = completeJobBatch.mock.calls[0][3] as { cursorToken?: string | null; outcome: string };
-    expect(batch.cursorToken).toBe("page-1");
+    expect(batch.cursorToken).toBe(`tavonel-sync-v1:${SYNC_BATCH_SIZE}:page-1`);
     expect(batch.outcome).toBe("progress");
+  });
+
+  it("resumes after the imported prefix and then advances the provider cursor", async () => {
+    const items = Array.from({ length: SYNC_BATCH_SIZE + 5 }, (_unused, index) => sourceItem(`n${index}`));
+    listOAuthSourcePage.mockResolvedValue({ items, cursor: "page-2", complete: false });
+
+    await runSourceImportBatch(
+      { ...JOB, cursorToken: `tavonel-sync-v1:${SYNC_BATCH_SIZE}:page-1` },
+      "worker-1",
+    );
+
+    expect(listOAuthSourcePage.mock.calls[0][0]).toMatchObject({ cursor: "page-1" });
+    expect(importSourceObject).toHaveBeenCalledTimes(5);
+    expect(importSourceObject.mock.calls[0][1]).toMatchObject({ nativeId: `n${SYNC_BATCH_SIZE}` });
+    expect(completeJobBatch.mock.calls[0][3]).toMatchObject({
+      outcome: "progress",
+      itemsSeen: 5,
+      cursorToken: "page-2",
+    });
   });
 
   it("resumes from the job's committed cursor rather than restarting", async () => {
     listOAuthSourcePage.mockResolvedValue({ items: [], cursor: null, complete: true });
     await runSourceImportBatch({ ...JOB, cursorToken: "page-7" }, "worker-1");
     expect(listOAuthSourcePage.mock.calls[0][0]).toMatchObject({ cursor: "page-7" });
+  });
+
+  it("fails closed when an in-page cursor points beyond the returned page", async () => {
+    listOAuthSourcePage.mockResolvedValue({ items: [sourceItem("a")], cursor: null, complete: true });
+    const result = await runSourceImportBatch(
+      { ...JOB, cursorToken: "tavonel-sync-v1:25:page-1" },
+      "worker-1",
+    );
+    expect(result).toEqual({ ok: false, code: "SOURCE_CURSOR_STALE" });
+    expect(importSourceObject).not.toHaveBeenCalled();
+    expect(completeJobBatch.mock.calls[0][3]).toMatchObject({
+      outcome: "failed",
+      errorCode: "SOURCE_CURSOR_STALE",
+    });
   });
 
   it("reports succeeded only when the provider says the listing is exhausted", async () => {
@@ -136,6 +167,24 @@ describe("batching", () => {
     expect(result.ok && result.value.imported).toBe(1);
     expect(result.ok && result.value.skipped).toEqual([{ nativeId: "bad", code: "SOURCE_TOO_LARGE" }]);
     expect((completeJobBatch.mock.calls[0][3] as { outcome: string }).outcome).toBe("succeeded");
+  });
+
+  it("does not advance past a transient import failure", async () => {
+    const items = [sourceItem("good"), sourceItem("limited"), sourceItem("later")];
+    importSourceObject.mockImplementation(async (_ctx: unknown, item: { nativeId: string }) =>
+      item.nativeId === "limited"
+        ? { ok: false, nativeId: "limited", code: "INTAKE_RATE_LIMITED" }
+        : { ok: true, nativeId: item.nativeId, documentId: "doc", filename: "f.pdf" });
+    listOAuthSourcePage.mockResolvedValue({ items, cursor: "next", complete: false });
+
+    const result = await runSourceImportBatch({ ...JOB, cursorToken: "current" }, "worker-1");
+
+    expect(result).toEqual({ ok: false, code: "INTAKE_RATE_LIMITED" });
+    expect(importSourceObject).toHaveBeenCalledTimes(2);
+    expect(completeJobBatch.mock.calls[0][3]).toEqual({
+      outcome: "retry",
+      errorCode: "INTAKE_RATE_LIMITED",
+    });
   });
 });
 

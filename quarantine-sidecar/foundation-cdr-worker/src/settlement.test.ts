@@ -34,4 +34,33 @@ describe("compute settlement callback", () => {
     assert.equal(new Headers(call.init.headers).has("authorization"), false);
     assert.match(String(new Headers(call.init.headers).get("x-tavonel-billing-signature")), /^[A-Za-z0-9_-]{43}$/u);
   });
+
+  it("surfaces only a bounded settlement status code", async () => {
+    const env = {
+      FOUNDATION_BILLING_SETTLEMENT_URL: "https://tavonel-saas-foundation.vercel.app/api/internal/billing/settle",
+      FOUNDATION_BILLING_SETTLEMENT_HMAC: "s".repeat(40),
+    };
+    const args = [
+      env,
+      "quarantine/pilot-test/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/source",
+      "settled",
+      2,
+      "OCR_COMPLETED",
+    ] as const;
+
+    await assert.rejects(
+      () => dispatchComputeSettlement(
+        ...args,
+        async () => Response.json({ code: "COMPUTE_RESERVATION_NOT_FOUND" }, { status: 503 }),
+      ),
+      /HTTP 503 \(COMPUTE_RESERVATION_NOT_FOUND\)/,
+    );
+    await assert.rejects(
+      () => dispatchComputeSettlement(
+        ...args,
+        async () => Response.json({ code: "customer-specific detail" }, { status: 503 }),
+      ),
+      /^RetryableError: compute settlement returned HTTP 503$/,
+    );
+  });
 });

@@ -17,7 +17,15 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 os.environ.setdefault("TAVONEL_CDR_HMAC", "fixture-cdr-hmac-secret-that-is-long-enough-123")
 
-from app import app, cdr_request_signature  # noqa: E402
+from app import (  # noqa: E402
+    MAX_RENDER_PIXELS_PER_PAGE,
+    MAX_RENDER_PIXELS_TOTAL,
+    MIN_RENDER_SCALE,
+    RENDER_SCALE,
+    app,
+    cdr_request_signature,
+    qualified_render_scale,
+)
 
 
 class PdfRasterCdrTest(unittest.TestCase):
@@ -88,6 +96,18 @@ class PdfRasterCdrTest(unittest.TestCase):
             self.assertGreaterEqual(len(sanitized[0].get_images(full=True)), 1)
         finally:
             sanitized.close()
+
+    def test_large_qualified_document_adapts_scale_without_relaxing_pixel_caps(self) -> None:
+        pages = [fitz.Rect(0, 0, 1_000, 1_000) for _ in range(40)]
+        scale = qualified_render_scale(pages)
+        self.assertGreaterEqual(scale, MIN_RENDER_SCALE)
+        self.assertLess(scale, RENDER_SCALE)
+        self.assertLessEqual(max(rect.width * rect.height * scale * scale for rect in pages), MAX_RENDER_PIXELS_PER_PAGE)
+        self.assertLessEqual(sum(rect.width * rect.height * scale * scale for rect in pages), MAX_RENDER_PIXELS_TOTAL)
+
+    def test_document_requiring_subminimum_scale_is_rejected(self) -> None:
+        with self.assertRaisesRegex(Exception, "rendering budget is not qualified"):
+            qualified_render_scale([fitz.Rect(0, 0, 20_000, 20_000)])
 
     def test_replayed_authenticated_request_is_rejected_before_second_render(self) -> None:
         source = self.pdf_fixture()

@@ -11,6 +11,7 @@ import {
   ocrSiblingKey,
   ocrReviewSiblingKey,
   parseQuarantineSourceKey,
+  sourcePartFromR2Object,
   versionKeyFromOutputSha256,
 } from "./keys";
 
@@ -93,5 +94,25 @@ describe("R2 event notification key extraction", () => {
       extractObjectKey(JSON.stringify({ object: { key: "quarantine/ws/doc/source" } })),
       "quarantine/ws/doc/source",
     );
+  });
+});
+
+describe("R2 source filename recovery", () => {
+  it("derives a safe extension from MIME when older objects have no filename metadata", () => {
+    assert.deepEqual(sourcePartFromR2Object({
+      httpMetadata: { contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
+    }), {
+      filename: "source.xlsx",
+      contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+  });
+
+  it("keeps an explicit UTF-8 content-disposition filename", () => {
+    assert.deepEqual(sourcePartFromR2Object({
+      httpMetadata: {
+        contentType: "application/pdf",
+        contentDisposition: "attachment;filename*=UTF-8''research%20notes.pdf",
+      },
+    }), { filename: "research notes.pdf", contentType: "application/pdf" });
   });
 });

@@ -1,4 +1,4 @@
-import { listOAuthSourcePage, type OAuthSourceItem, type OAuthSourceTarget } from "./connector-oauth-adapters";
+import { listOAuthSourcePage, OAUTH_SOURCE_PAGE_SIZE, type OAuthSourceItem, type OAuthSourceTarget } from "./connector-oauth-adapters";
 import { readOAuthProviderRuntime, refreshOAuthAccessToken } from "./connector-oauth";
 import { readOAuthSecret, readOAuthSecretBrokerConfig } from "./connector-oauth-secrets";
 import { getOAuthConnectionSecretReference } from "./connector-oauth-store";
@@ -15,11 +15,9 @@ import { importSourceObject } from "./source-import";
 //
 // Two bounds, both deliberate:
 //
-//   * Items per batch. Each import is a download plus an upload, so a batch of 25 is sized
-//     to finish comfortably inside a 60-second invocation with room for the provider being
-//     slow. Exceeding the lease is not a correctness problem -- another worker reclaims and
-//     re-reads the page, and deterministic document ids make that a no-op -- but it is
-//     wasted work.
+//   * Items per batch. Each import is a download plus an upload. Five items matches the
+//     production intake admission window, so one cron turn never consumes the sixth request
+//     and silently skips it as rate-limited.
 //
 //   * Cursor commit. The cursor advances ONLY in the same call that records the batch's
 //     progress, and only after every import in the batch has been durably admitted. A worker
@@ -27,7 +25,9 @@ import { importSourceObject } from "./source-import";
 //     is re-read. The opposite order -- commit cursor, then import -- is the lost-update bug
 //     that makes a sync report success while silently skipping files.
 
-export const SYNC_BATCH_SIZE = 25;
+export const SYNC_BATCH_SIZE = OAUTH_SOURCE_PAGE_SIZE;
+const SYNC_CURSOR_PREFIX = "tavonel-sync-v1:";
+const MAX_SYNC_CURSOR_CHARS = 4096;
 
 export type SyncBatchResult = {
   state: string;
@@ -46,6 +46,36 @@ function targetFromPayload(payload: Record<string, unknown>): OAuthSourceTarget 
     if (typeof raw[key] === "string") target[key] = raw[key];
   }
   return target;
+}
+
+type SyncCursor = { providerCursor: string | null; pageOffset: number };
+const PERMANENT_SOURCE_SKIPS = new Set([
+  "SOURCE_NOT_QUALIFIED",
+  "SOURCE_TOO_LARGE",
+  "SOURCE_NATIVE_TYPE_UNSUPPORTED",
+  "SOURCE_SIZE_UNQUALIFIED",
+]);
+
+function decodeSyncCursor(cursorToken: string | null): SyncCursor | null {
+  if (!cursorToken) return { providerCursor: null, pageOffset: 0 };
+  if (!cursorToken.startsWith(SYNC_CURSOR_PREFIX)) {
+    return { providerCursor: cursorToken, pageOffset: 0 };
+  }
+
+  const separator = cursorToken.indexOf(":", SYNC_CURSOR_PREFIX.length);
+  if (separator < 0) return null;
+  const rawOffset = cursorToken.slice(SYNC_CURSOR_PREFIX.length, separator);
+  const pageOffset = Number(rawOffset);
+  if (!Number.isSafeInteger(pageOffset) || pageOffset <= 0) return null;
+
+  const providerCursor = cursorToken.slice(separator + 1) || null;
+  return { providerCursor, pageOffset };
+}
+
+function encodeSyncCursor(providerCursor: string | null, pageOffset: number): string | null {
+  if (pageOffset === 0) return providerCursor;
+  const encoded = `${SYNC_CURSOR_PREFIX}${pageOffset}:${providerCursor ?? ""}`;
+  return encoded.length <= MAX_SYNC_CURSOR_CHARS ? encoded : null;
 }
 
 // Runs one batch for a claimed source_import job and reports the outcome through the queue.
@@ -113,13 +143,23 @@ export async function runSourceImportBatch(
 
   const target = targetFromPayload(job.payload);
 
-  // Resume exactly where the last committed batch left off.
+  // Resume exactly where the last committed batch left off. Legacy jobs store only the
+  // provider cursor; newer jobs can also checkpoint an offset inside a large provider page.
+  const resume = decodeSyncCursor(job.cursorToken);
+  if (!resume) {
+    await completeJobBatch(job.workspaceKey, job.jobId, workerId, {
+      outcome: "failed",
+      errorCode: "JOB_CURSOR_INVALID",
+    });
+    return { ok: false, code: "JOB_CURSOR_INVALID" };
+  }
+
   let page: { items: OAuthSourceItem[]; cursor: string | null; complete: boolean };
   try {
     page = await listOAuthSourcePage({
       provider: binding.provider,
       accessToken,
-      cursor: job.cursorToken,
+      cursor: resume.providerCursor,
       target,
     });
   } catch {
@@ -130,7 +170,15 @@ export async function runSourceImportBatch(
     return { ok: false, code: "SOURCE_LIST_FAILED" };
   }
 
-  const batch = page.items.slice(0, SYNC_BATCH_SIZE);
+  if (resume.pageOffset >= page.items.length && resume.pageOffset > 0) {
+    await completeJobBatch(job.workspaceKey, job.jobId, workerId, {
+      outcome: "failed",
+      errorCode: "SOURCE_CURSOR_STALE",
+    });
+    return { ok: false, code: "SOURCE_CURSOR_STALE" };
+  }
+
+  const batch = page.items.slice(resume.pageOffset, resume.pageOffset + SYNC_BATCH_SIZE);
   const skipped: Array<{ nativeId: string; code: string }> = [];
   let imported = 0;
 
@@ -148,17 +196,36 @@ export async function runSourceImportBatch(
       },
       item,
     );
-    if (outcome.ok) imported += 1;
-    else skipped.push({ nativeId: outcome.nativeId, code: outcome.code });
+    if (outcome.ok) {
+      imported += 1;
+      continue;
+    }
+    skipped.push({ nativeId: outcome.nativeId, code: outcome.code });
+    if (!PERMANENT_SOURCE_SKIPS.has(outcome.code)) {
+      const reported = await completeJobBatch(job.workspaceKey, job.jobId, workerId, {
+        outcome: "retry",
+        errorCode: outcome.code,
+      });
+      return { ok: false, code: reported.ok ? outcome.code : reported.code };
+    }
   }
 
-  // Only now, with the batch durably admitted, does the cursor move. If the page held more
-  // items than one batch, the cursor deliberately does NOT advance -- the next turn re-reads
-  // the same page and the deterministic document ids make the already-imported prefix a
-  // no-op. Correctness over efficiency: never skip, even at the cost of a re-read.
-  const consumedWholePage = batch.length === page.items.length;
+  // Only now, with the batch durably admitted, does the checkpoint move. A large page keeps
+  // the provider cursor fixed and advances its in-page offset; the provider cursor advances
+  // only after the final item in that page has been admitted.
+  const nextPageOffset = resume.pageOffset + batch.length;
+  const consumedWholePage = nextPageOffset === page.items.length;
   const complete = page.complete && consumedWholePage;
-  const nextCursor = consumedWholePage ? page.cursor : job.cursorToken;
+  const nextCursor = consumedWholePage
+    ? page.cursor
+    : encodeSyncCursor(resume.providerCursor, nextPageOffset);
+  if (!consumedWholePage && !nextCursor) {
+    await completeJobBatch(job.workspaceKey, job.jobId, workerId, {
+      outcome: "failed",
+      errorCode: "SOURCE_CURSOR_TOO_LARGE",
+    });
+    return { ok: false, code: "SOURCE_CURSOR_TOO_LARGE" };
+  }
 
   const reported = await completeJobBatch(
     job.workspaceKey,

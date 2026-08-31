@@ -3,6 +3,20 @@ import { PermanentReject } from "./errors";
 export const SOURCE_KEY_PATTERN = /^quarantine\/([^/]+)\/([^/]+)\/source$/;
 export const MAX_SOURCE_BYTES = 5 * 1024 * 1024;
 
+const MIME_FALLBACK_EXTENSION: Record<string, string> = {
+  "application/pdf": ".pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation": ".pptx",
+  "application/vnd.oasis.opendocument.text": ".odt",
+  "application/vnd.oasis.opendocument.spreadsheet": ".ods",
+  "application/vnd.oasis.opendocument.presentation": ".odp",
+  "image/jpeg": ".jpg",
+  "image/png": ".png",
+  "image/tiff": ".tiff",
+  "image/gif": ".gif",
+};
+
 export type SourceKeyParts = {
   workspaceId: string;
   documentId: string;
@@ -134,7 +148,10 @@ export function sourcePartFromR2Object(object: {
     ? decodeURIComponent(filenameStar[1])
     : filenameQuoted?.[1] || filenameBare?.[1]?.trim();
   const fromCustom = object.customMetadata?.filename || object.customMetadata?.originalFilename;
-  const rawName = fromDisposition || fromCustom || "source.pdf";
+  // Managed connectors and older browser uploads may not carry filename metadata. Never
+  // mislabel a qualified Office/image object as PDF: the CDR validates filename and MIME
+  // together, so that old fallback silently turned a successful intake into a permanent reject.
+  const rawName = fromDisposition || fromCustom || `source${MIME_FALLBACK_EXTENSION[contentType] ?? ".bin"}`;
   const filename = rawName.replaceAll("\\", "/").split("/").pop() || "source.pdf";
   return { filename, contentType };
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { listOAuthSourcePage, oauthSourceDownloadRequest } from "./connector-oauth-adapters";
+import { listOAuthSourcePage, OAUTH_SOURCE_PAGE_SIZE, oauthSourceDownloadRequest } from "./connector-oauth-adapters";
 
 describe("OAuth source adapters", () => {
   it("normalizes Google Drive files and preserves bounded pagination", async () => {
@@ -12,6 +12,20 @@ describe("OAuth source adapters", () => {
       cursor: "next-google-page",
       complete: false,
     });
+    const requestUrl = new URL(String((fetcher as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0]));
+    expect(requestUrl.searchParams.get("pageSize")).toBe(String(OAUTH_SOURCE_PAGE_SIZE));
+  });
+
+  it("bounds first-page Dropbox and Microsoft listings to the worker admission rate", async () => {
+    const dropboxFetcher = vi.fn(async () => Response.json({ entries: [], cursor: "dropbox-cursor", has_more: false })) as unknown as typeof fetch;
+    await listOAuthSourcePage({ provider: "dropbox", accessToken: "access", cursor: null, fetcher: dropboxFetcher });
+    const dropboxBody = JSON.parse(String((dropboxFetcher as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1]?.body));
+    expect(dropboxBody.limit).toBe(OAUTH_SOURCE_PAGE_SIZE);
+
+    const graphFetcher = vi.fn(async () => Response.json({ value: [] })) as unknown as typeof fetch;
+    await listOAuthSourcePage({ provider: "microsoft_graph", accessToken: "access", cursor: null, fetcher: graphFetcher });
+    const graphUrl = new URL(String((graphFetcher as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0]));
+    expect(graphUrl.searchParams.get("$top")).toBe(String(OAUTH_SOURCE_PAGE_SIZE));
   });
 
   it("uses Dropbox continuation cursors without accepting credentials in target config", async () => {

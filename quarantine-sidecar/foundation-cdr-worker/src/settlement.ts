@@ -21,6 +21,19 @@ export function isFoundationSettlementUrl(value: string | undefined) {
   }
 }
 
+async function safeSettlementErrorCode(response: Response): Promise<string | null> {
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    return null;
+  }
+  const code = body && typeof body === "object" && "code" in body
+    ? (body as { code?: unknown }).code
+    : null;
+  return typeof code === "string" && /^[A-Z][A-Z0-9_]{2,79}$/.test(code) ? code : null;
+}
+
 export async function dispatchComputeSettlement(
   env: SettlementEnv,
   sourceKey: string,
@@ -66,5 +79,8 @@ export async function dispatchComputeSettlement(
   } catch {
     throw new RetryableError("compute settlement request failed");
   }
-  if (!response.ok) throw new RetryableError(`compute settlement returned HTTP ${response.status}`);
+  if (!response.ok) {
+    const code = await safeSettlementErrorCode(response);
+    throw new RetryableError(`compute settlement returned HTTP ${response.status}${code ? ` (${code})` : ""}`);
+  }
 }

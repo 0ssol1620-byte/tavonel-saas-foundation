@@ -53,6 +53,25 @@ export type SanitizeEnv = {
 };
 
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{16,160}$/;
+const SAFE_CDR_DETAIL_PATTERN = /^CDR [A-Za-z0-9 ._()-]{1,156}$/;
+
+async function safeCdrRejectDetail(response: Response): Promise<string | null> {
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    return null;
+  }
+  if (!body || typeof body !== "object" || !("detail" in body)) {
+    return null;
+  }
+  const detail = (body as { detail?: unknown }).detail;
+  if (typeof detail !== "string") {
+    return null;
+  }
+  const normalized = detail.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 160);
+  return SAFE_CDR_DETAIL_PATTERN.test(normalized) ? normalized : null;
+}
 
 async function putCreateOnceJson(
   bucket: R2BucketLike,
@@ -133,7 +152,9 @@ export async function sanitizeObject(
     throw new RetryableError("synthetic CDR returned a server error");
   }
   if (response.status !== 200) {
-    throw new PermanentReject("synthetic CDR rejected the source");
+    const detail = await safeCdrRejectDetail(response);
+    const suffix = detail ? `: ${detail}` : "";
+    throw new PermanentReject(`synthetic CDR rejected the source (${response.status})${suffix}`);
   }
 
   const cdrStatus = response.headers.get("x-tavonel-cdr-status");

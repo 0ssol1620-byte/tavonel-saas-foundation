@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import math
 import os
 import re
 import shutil
@@ -25,6 +26,7 @@ MAX_INPUT_BYTES: Final = 5 * 1024 * 1024
 MAX_OUTPUT_BYTES: Final = 18 * 1024 * 1024
 MAX_PAGES: Final = 80
 RENDER_SCALE: Final = 1.5
+MIN_RENDER_SCALE: Final = 1.0
 MAX_RENDER_PIXELS_PER_PAGE: Final = 30_000_000
 MAX_RENDER_PIXELS_TOTAL: Final = 80_000_000
 MAX_OFFICE_PACKAGE_MEMBERS: Final = 500
@@ -222,6 +224,21 @@ def convert_to_pdf(source: Path, source_mime: str, work_dir: Path) -> Path:
     return converted
 
 
+def qualified_render_scale(page_rects: list[fitz.Rect]) -> float:
+    areas = [rect.width * rect.height for rect in page_rects]
+    if not areas or any(not math.isfinite(area) or area <= 0 for area in areas):
+        raise HTTPException(422, "CDR source rendering budget is not qualified")
+    scale = min(
+        RENDER_SCALE,
+        math.sqrt(MAX_RENDER_PIXELS_PER_PAGE / max(areas)),
+        math.sqrt(MAX_RENDER_PIXELS_TOTAL / sum(areas)),
+    )
+    if scale < MIN_RENDER_SCALE:
+        raise HTTPException(422, "CDR source rendering budget is not qualified")
+    # Stay below the hard pixel ceilings after integer conversion and floating-point rounding.
+    return scale if scale == RENDER_SCALE else scale * 0.999999
+
+
 def rasterize_to_pdf(source: Path, target: Path) -> int:
     try:
         source_doc = fitz.open(source)
@@ -233,16 +250,17 @@ def rasterize_to_pdf(source: Path, target: Path) -> int:
             raise HTTPException(422, "CDR password-protected PDF is not qualified")
         if source_doc.page_count < 1 or source_doc.page_count > MAX_PAGES:
             raise HTTPException(422, "CDR source page count is not qualified")
+        page_rects = [page.rect for page in source_doc]
+        render_scale = qualified_render_scale(page_rects)
         rendered_pixels = 0
-        for page in source_doc:
-            page_rect = page.rect
-            width = int(page_rect.width * RENDER_SCALE)
-            height = int(page_rect.height * RENDER_SCALE)
+        for page, page_rect in zip(source_doc, page_rects, strict=True):
+            width = int(page_rect.width * render_scale)
+            height = int(page_rect.height * render_scale)
             pixel_count = width * height
             if width < 1 or height < 1 or pixel_count > MAX_RENDER_PIXELS_PER_PAGE or rendered_pixels + pixel_count > MAX_RENDER_PIXELS_TOTAL:
                 raise HTTPException(422, "CDR source rendering budget is not qualified")
             rendered_pixels += pixel_count
-            pix = page.get_pixmap(matrix=fitz.Matrix(RENDER_SCALE, RENDER_SCALE), colorspace=fitz.csRGB, alpha=False)
+            pix = page.get_pixmap(matrix=fitz.Matrix(render_scale, render_scale), colorspace=fitz.csRGB, alpha=False)
             output_page = output_doc.new_page(width=page_rect.width, height=page_rect.height)
             output_page.insert_image(output_page.rect, stream=pix.tobytes("png"))
         # This is a newly created document containing only rendered page images; source PDF metadata is never copied.

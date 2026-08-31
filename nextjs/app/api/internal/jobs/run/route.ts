@@ -22,26 +22,26 @@ const HEADERS = { "Cache-Control": "no-store" };
 // a customer's credentials. When the secret is unset the endpoint is closed entirely rather
 // than open -- an unauthenticated cross-tenant executor is the worst possible default.
 function authorized(request: Request): boolean {
-  const configured = process.env.FOUNDATION_WORKER_SECRET?.trim() ?? "";
-  // A short secret is treated as absent: it would be guessable, and a guessable worker
-  // endpoint lets an attacker drive other tenants' jobs.
-  if (configured.length < 32) return false;
-
   const presented = request.headers.get("authorization")?.trim() ?? "";
   if (!presented.startsWith("Bearer ")) return false;
   const token = presented.slice("Bearer ".length);
 
-  // Constant-time comparison: a length-varying or short-circuiting compare leaks the secret
-  // byte by byte to anything that can time this endpoint.
-  if (token.length !== configured.length) return false;
-  let difference = 0;
-  for (let index = 0; index < token.length; index += 1) {
-    difference |= token.charCodeAt(index) ^ configured.charCodeAt(index);
-  }
-  return difference === 0;
+  // Vercel Cron sends CRON_SECRET as a Bearer token. Keep a separately rotatable manual
+  // worker secret as well, and treat short values as absent rather than guessable gates.
+  const configured = [process.env.FOUNDATION_WORKER_SECRET, process.env.CRON_SECRET]
+    .map((value) => value?.trim() ?? "")
+    .filter((value) => value.length >= 32);
+  return configured.some((candidate) => {
+    if (token.length !== candidate.length) return false;
+    let difference = 0;
+    for (let index = 0; index < token.length; index += 1) {
+      difference |= token.charCodeAt(index) ^ candidate.charCodeAt(index);
+    }
+    return difference === 0;
+  });
 }
 
-export async function POST(request: Request) {
+async function runOneBatch(request: Request) {
   if (!authorized(request)) {
     return NextResponse.json({ code: "WORKER_NOT_AUTHORIZED" }, { status: 401, headers: HEADERS });
   }
@@ -71,3 +71,6 @@ export async function POST(request: Request) {
     outcome: result.ok ? result.value : { error: result.code },
   }, { headers: HEADERS });
 }
+
+export const GET = runOneBatch;
+export const POST = runOneBatch;

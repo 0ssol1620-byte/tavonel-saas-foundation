@@ -1,5 +1,6 @@
 {
   "framework": "nextjs",
   "regions": ["icn1"],
+  "crons": [{ "path": "/api/internal/jobs/run", "schedule": "* * * * *" }],
   "headers": [{ "source": "/api/:path*", "headers": [{ "key": "Cache-Control", "value": "no-store" }] }]
 }

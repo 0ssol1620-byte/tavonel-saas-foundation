@@ -7,7 +7,7 @@ const runSourceImportBatch = vi.fn<(...args: any[]) => any>();
 vi.mock("@/lib/job-store", () => ({ claimJob }));
 vi.mock("@/lib/sync-worker", () => ({ runSourceImportBatch }));
 
-const { POST } = await import("../app/api/internal/jobs/run/route");
+const { GET, POST } = await import("../app/api/internal/jobs/run/route");
 
 // The worker endpoint is the one route in this product that acts ACROSS tenants: it claims
 // whichever job is due, regardless of whose workspace it belongs to. That makes its
@@ -31,6 +31,7 @@ function requestWith(token?: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubEnv("CRON_SECRET", "");
   claimJob.mockResolvedValue({ ok: true, value: null });
 });
 
@@ -78,10 +79,22 @@ describe("worker authorization", () => {
     expect(claimJob).toHaveBeenCalledTimes(1);
   });
 
+  it("accepts Vercel Cron GET requests with the dedicated cron secret", async () => {
+    vi.stubEnv("FOUNDATION_WORKER_SECRET", "");
+    vi.stubEnv("CRON_SECRET", SECRET);
+    const response = await GET(new Request("https://tavonel.com/api/internal/jobs/run", {
+      method: "GET",
+      headers: { authorization: `Bearer ${SECRET}` },
+    }));
+    expect(response.status).toBe(200);
+    expect(claimJob).toHaveBeenCalledTimes(1);
+  });
+
   it("reads the secret from the environment rather than the source", async () => {
     const source = new URL("../app/api/internal/jobs/run/route.ts", import.meta.url);
     const text = await import("node:fs").then((fs) => fs.readFileSync(source, "utf8"));
     expect(text).toContain("process.env.FOUNDATION_WORKER_SECRET");
+    expect(text).toContain("process.env.CRON_SECRET");
     expect(text).not.toMatch(/["'`][A-Za-z0-9+/=_-]{32,}["'`]/);
   });
 });

@@ -23,6 +23,7 @@ export type OAuthSourcePage = {
 };
 
 const GRAPH_ORIGIN = "https://graph.microsoft.com";
+export const OAUTH_SOURCE_PAGE_SIZE = 5;
 
 function boundedString(value: unknown, maximum: number) {
   return typeof value === "string" && value.length > 0 && value.length <= maximum ? value : null;
@@ -62,7 +63,7 @@ async function jsonRequest(url: string, accessToken: string, init: RequestInit, 
 
 async function listGoogleDrive(accessToken: string, cursor: string | null, fetcher: typeof fetch): Promise<OAuthSourcePage> {
   const url = new URL("https://www.googleapis.com/drive/v3/files");
-  url.searchParams.set("pageSize", "200");
+  url.searchParams.set("pageSize", String(OAUTH_SOURCE_PAGE_SIZE));
   url.searchParams.set("q", "trashed = false");
   url.searchParams.set("fields", "nextPageToken,files(id,name,mimeType,size,modifiedTime,version,md5Checksum)");
   if (cursor) url.searchParams.set("pageToken", cursor);
@@ -85,7 +86,9 @@ async function listGoogleDrive(accessToken: string, cursor: string | null, fetch
 async function listDropbox(accessToken: string, cursor: string | null, target: OAuthSourceTarget, fetcher: typeof fetch): Promise<OAuthSourcePage> {
   const continuation = cursor !== null;
   const url = continuation ? "https://api.dropboxapi.com/2/files/list_folder/continue" : "https://api.dropboxapi.com/2/files/list_folder";
-  const body = continuation ? { cursor } : { path: target.rootPath ?? "", recursive: true, include_deleted: true, limit: 200 };
+  const body = continuation
+    ? { cursor }
+    : { path: target.rootPath ?? "", recursive: true, include_deleted: true, limit: OAUTH_SOURCE_PAGE_SIZE };
   const payload = await jsonRequest(url, accessToken, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }, fetcher);
   const rows = Array.isArray(payload.entries) ? payload.entries as Array<Record<string, unknown>> : [];
   const items = rows.map((row): OAuthSourceItem | null => {
@@ -110,6 +113,9 @@ async function listMicrosoftGraph(accessToken: string, cursor: string | null, ta
     if (target.driveId) url = `${GRAPH_ORIGIN}/v1.0/drives/${encodeURIComponent(target.driveId)}/root/delta`;
     else if (target.siteId) url = `${GRAPH_ORIGIN}/v1.0/sites/${encodeURIComponent(target.siteId)}/drive/root/delta`;
     else url = `${GRAPH_ORIGIN}/v1.0/me/drive/root/delta`;
+    const firstPage = new URL(url);
+    firstPage.searchParams.set("$top", String(OAUTH_SOURCE_PAGE_SIZE));
+    url = firstPage.toString();
   }
   const payload = await jsonRequest(url, accessToken, {}, fetcher);
   const rows = Array.isArray(payload.value) ? payload.value as Array<Record<string, unknown>> : [];

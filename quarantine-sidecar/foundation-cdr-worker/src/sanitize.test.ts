@@ -291,6 +291,29 @@ describe("sanitizeObject", () => {
     assert.equal(fetched, 0);
   });
 
+  it("surfaces only a bounded static CDR rejection detail", async () => {
+    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
+    await assert.rejects(
+      () => sanitizeObject(
+        envFor(r2),
+        SOURCE_KEY,
+        async () => Response.json({ detail: "CDR Office package is invalid or encrypted" }, { status: 422 }),
+      ),
+      (error: unknown) => error instanceof PermanentReject
+        && error.message === "synthetic CDR rejected the source (422): CDR Office package is invalid or encrypted",
+    );
+
+    await assert.rejects(
+      () => sanitizeObject(
+        envFor(r2),
+        SOURCE_KEY,
+        async () => Response.json({ detail: "customer filename and arbitrary provider output" }, { status: 422 }),
+      ),
+      (error: unknown) => error instanceof PermanentReject
+        && error.message === "synthetic CDR rejected the source (422)",
+    );
+  });
+
   it("retries on CDR 5xx", async () => {
     const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
     await assert.rejects(
