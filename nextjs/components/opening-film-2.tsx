@@ -16,7 +16,8 @@ import { buildWorldGraph, nodeBudget, type WorldGraph } from "@/lib/world-graph"
 const PERIOD = 0.62;
 const LAG_ONTO = 0.1;
 const ONTO_SPLIT = 0.56;
-const GROW_UNTIL = 10.8;
+const TBOX_UNTIL = 3.6;
+const WORLD_UNTIL = 17.2;
 
 const AREA_RGB: [number, number, number][] = [
   [242, 166, 90],
@@ -394,7 +395,7 @@ export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
     const drawCorr = (x: number, y: number, w: number, h: number, t: number, current: string) => {
       context.fillStyle = "#0b0d0e";
       context.fillRect(x, y, w, h);
-      const grown = Math.min(ALL_CORR.length, Math.floor(1 + clamp01(t / GROW_UNTIL) * ALL_CORR.length));
+      const grown = Math.min(ALL_CORR.length, Math.floor(1 + clamp01(t / TBOX_UNTIL) * ALL_CORR.length));
       context.fillStyle = "rgba(123,224,190,0.85)";
       context.font = "500 8px ui-monospace, Menlo, monospace";
       context.fillText("TBox  ·  owl:Class", x + 8, y + 12);
@@ -406,13 +407,13 @@ export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
       });
       const cols = 2;
       const gap = 5;
-      const cardH = 54;
       const innerX = x + 6;
       const innerY = y + 18;
       const innerW = w - 12;
       const innerH = h - 24;
+      const rowsFit = 4;
       const cardW = (innerW - gap) / cols;
-      const rowsFit = Math.max(2, Math.floor((innerH + gap) / (cardH + gap)));
+      const cardH = (innerH - gap * (rowsFit - 1)) / rowsFit;
       const slots = rowsFit * cols;
       const start = Math.max(0, ids.length - slots);
       const visible = ids.slice(start, start + slots);
@@ -471,8 +472,8 @@ export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
       const linked = new Set<number>();
       if (withEdges) {
         const cap = g.edges.length;
-        const grown = Math.floor(clamp01(t / GROW_UNTIL) * cap);
-        const frac = (clamp01(t / GROW_UNTIL) * cap) % 1;
+        const grown = Math.floor(clamp01(t / WORLD_UNTIL) * cap);
+        const frac = (clamp01(t / WORLD_UNTIL) * cap) % 1;
         g.edges.slice(0, Math.max(1, grown)).forEach(([ia, ib], i) => {
           const na = g.nodes[ia];
           const nb = g.nodes[ib];
