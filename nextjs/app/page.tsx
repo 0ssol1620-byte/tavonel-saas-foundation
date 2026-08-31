@@ -213,13 +213,13 @@ export default function HomePage() {
           <div className="shell">
             <p className="slate"><b>TAVONEL</b><span /> KNOWLEDGE COMPILER</p>
             <h1>
-              <span className="line"><i>{revealWords("Compile your knowledge")}</i></span>
-              <span className="line dim"><i>{revealWords("into a world AI can reason about.", 4)}</i></span>
+              <span className="line"><i>Compile your knowledge</i></span>
+              <span className="line dim"><i>into a world AI can reason about.</i></span>
             </h1>
-            <p className="lede rv">
+            <p className="lede">
               Files go in. A world an AI can cite comes out.
             </p>
-            <div className="actions rv">
+            <div className="actions">
               <Link className="btn" href={"/explore" as Route}>Explore a Compiled World</Link>
               <Link className="btn ghost" href="/evidence">Evidence</Link>
             </div>
