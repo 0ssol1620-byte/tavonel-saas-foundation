@@ -1,6 +1,6 @@
 -- Run with Supabase CLI db test after 0021_retrieval_compile_run_active_world_guard.sql.
 begin;
-select plan(4);
+select plan(5);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,

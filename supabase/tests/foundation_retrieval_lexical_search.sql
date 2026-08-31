@@ -1,6 +1,6 @@
 -- Run with Supabase CLI db test after 0022_retrieval_lexical_search.sql.
 begin;
-select plan(7);
+select plan(6);
 
 select has_column('public', 'foundation_retrieval_units', 'search_tokens', 'search_tokens column exists');
 select has_column('public', 'foundation_retrieval_units', 'search_vector', 'search_vector column exists');

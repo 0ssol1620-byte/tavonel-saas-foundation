@@ -2,7 +2,7 @@
 -- has been applied to the dedicated foundation test project. This test never belongs
 -- in production and every inserted fixture is rolled back.
 begin;
-select plan(24);
+select plan(20);
 
 -- Test identities are inserted as an owner role only for fixture seeding. Client checks
 -- below always run as `authenticated` with a distinct JWT subject for each tenant.
