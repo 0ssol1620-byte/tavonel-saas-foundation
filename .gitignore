@@ -50,6 +50,9 @@ pids
 __pycache__/
 *.py[cod]
 
+# runpod-flash local build/log state (retrieval-runtime/)
+.flash/
+
 # Coverage directory used by tools like istanbul
 coverage/
 *.lcov

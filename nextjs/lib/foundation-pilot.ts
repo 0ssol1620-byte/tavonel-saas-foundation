@@ -19,13 +19,65 @@ export function readFoundationPilotUserIds(
   return new Set(values.map((value) => value.toLowerCase()));
 }
 
+// How this deployment decides who may use the product.
+//
+//   pilot        - only the user IDs in FOUNDATION_PILOT_USER_IDS. The original behaviour,
+//                  and still correct for a private deployment.
+//   self_service - any authenticated user gets their own workspace on first request.
+//
+// The allowlist was the single gate in front of every authenticated surface
+// (billing, promote, rollback, documents, developer API, enterprise), so a signed-in
+// customer who was not hand-added to an environment variable could authenticate and then do
+// nothing at all. That is correct for a private pilot and fatal for self-service signup.
+//
+// Default is `pilot`. A deployment opts into public signup explicitly by setting
+// ACCESS_MODE=self_service -- forgetting to configure something must never silently open a
+// deployment to the world, so the fail-closed direction is the default.
+export type AccessMode = "pilot" | "self_service";
+
+export function readAccessMode(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): AccessMode {
+  return env.ACCESS_MODE?.trim().toLowerCase() === "self_service" ? "self_service" : "pilot";
+}
+
+// The entitlement a brand-new self-service workspace starts with.
+//
+// Deliberately the same shape and the same bounded limits the pilot grant uses: signing up
+// must not hand someone a larger allowance than a hand-vetted pilot user, and a workspace
+// that has not paid yet must still be bounded. Status is `trialing`, not `active` -- a real
+// entitlement change only ever comes from a verified Paddle webhook (see
+// app/api/paddle/webhook), never from the act of signing in.
+function selfServiceEntitlement(workspaceId: string): WorkspaceEntitlement {
+  return {
+    workspaceId,
+    status: "trialing",
+    uploadBytesLimit: FOUNDATION_INTAKE_MAX_BYTES * 20,
+    uploadBytesUsed: 0,
+    documentLimit: 20,
+    documentCount: 0,
+    validUntil: null,
+  };
+}
+
 export function foundationPilotAccess(
   userId: string,
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): { membership: WorkspaceMembership; entitlement: WorkspaceEntitlement } | null {
-  const allowed = readFoundationPilotUserIds(env);
-  if (!USER_ID.test(userId) || !allowed?.has(userId.toLowerCase())) return null;
+  // A malformed user ID is refused in every mode: the workspace key is derived from it, so
+  // an unvalidated value would produce an unaddressable or colliding tenant.
+  if (!USER_ID.test(userId)) return null;
   const workspaceId = foundationWorkspaceId(userId);
+
+  if (readAccessMode(env) === "self_service") {
+    // First-party onboarding: the authenticated user owns their own workspace. Tenant
+    // isolation is unchanged -- the workspace key is still derived from the user ID, so this
+    // widens WHO may hold a workspace, never what one workspace can reach.
+    return { membership: { workspaceId, userId, role: "owner" }, entitlement: selfServiceEntitlement(workspaceId) };
+  }
+
+  const allowed = readFoundationPilotUserIds(env);
+  if (!allowed?.has(userId.toLowerCase())) return null;
   return {
     membership: { workspaceId, userId, role: "owner" },
     entitlement: {

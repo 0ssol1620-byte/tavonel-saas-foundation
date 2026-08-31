@@ -1,7 +1,19 @@
 import { NextResponse } from "next/server";
 import { DEVELOPER_SCOPES } from "../../../lib/developer-contracts";
+import { resolveOpenApiOrigin } from "../../../lib/openapi-origin";
 
-export const dynamic = "force-static";
+// The published server URL must be the origin the caller actually reached, and this route
+// used to be force-static: Next.js evaluated the handler once at build time, so
+// `new URL(request.url).origin` froze to whatever the builder saw -- http://localhost:3000 --
+// and every production consumer of /api/openapi was handed a spec pointing at the developer's
+// own machine. An SDK generated from it would target localhost.
+//
+// force-dynamic makes the origin the request's own, so the spec is correct behind the apex,
+// a preview deployment, or a custom domain alike, with no origin baked into the build. The
+// document is small and cheap to serve, and the Cache-Control header below still lets it be
+// cached at the edge per-origin. The origin rule itself lives in lib/openapi-origin.ts -- a
+// route module may not export anything but handlers and config.
+export const dynamic = "force-dynamic";
 
 const errorResponse = {
   description: "Bounded error with a stable machine code",
@@ -9,7 +21,7 @@ const errorResponse = {
 };
 
 export function GET(request: Request) {
-  const origin = new URL(request.url).origin;
+  const origin = resolveOpenApiOrigin(request.url);
   return NextResponse.json({
     openapi: "3.1.0",
     info: {
@@ -55,7 +67,20 @@ export function GET(request: Request) {
           "x-tavonel-scope": "ask:read",
           parameters: [{ $ref: "#/components/parameters/CollectionId" }],
           requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["question"], properties: { question: { type: "string", minLength: 3, maxLength: 500 } } } } } },
-          responses: { "200": { description: "Grounded answer with exact page and bbox citations, or an explicit abstention" }, "409": errorResponse },
+          responses: { "200": { description: "Grounded answer with exact page and bbox citations, or an explicit abstention. `retrievalPath` names which runtime answered: `compiled-retrieval-v1` (lexical + dense + structure, RRF-fused, reranked and World Gate filtered) or `excerpt-concatenation-fallback` when no compiled retrieval index exists for the active world yet" }, "409": errorResponse },
+        },
+      },
+      // Kept separate from /ask deliberately: search returns evidence-rich candidates for a
+      // caller to reason over, ask returns a grounded answer. A consumer that only needs the
+      // facts should not have to pay for generation or parse prose to recover them.
+      "/collections/{id}/search": {
+        post: {
+          operationId: "searchActiveWorld",
+          "x-tavonel-scope": "ask:read",
+          description: "Retrieval-only search over the active world's compiled retrieval index. Returns the ContextPacket (the same runtime contract /ask, MCP and the CLI share) plus per-source retrieval telemetry, without generating an answer.",
+          parameters: [{ $ref: "#/components/parameters/CollectionId" }],
+          requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["query"], properties: { query: { type: "string", minLength: 3, maxLength: 500 }, limit: { type: "integer", minimum: 1, maximum: 25, default: 10 } } } } } },
+          responses: { "200": { description: "ContextPacket of evidence-bound retrieval units with lexical/dense/structure ranks, reranker score and World Gate decisions" }, "400": errorResponse, "409": errorResponse, "503": errorResponse },
         },
       },
       "/connections": {

@@ -8,15 +8,15 @@
   "assets": {
     "cli": {
       "url": "https://tavonel.com/developer/tavonel-cli.mjs",
-      "sha256": "sha256:32b5333102f87fda3108b655f5798da0194b639265782309e4db20817dda0677"
+      "sha256": "sha256:251b1d56102b613cbf1179dbdede255aba4eb09fdaadfeebb6b9ac8688c7b1d1"
     },
     "mcp": {
       "url": "https://tavonel.com/developer/tavonel-mcp.mjs",
-      "sha256": "sha256:8879e0474dd3bb90121d65119e13b9c6fea2395bbc8187340243da09d4d11599"
+      "sha256": "sha256:4d05d29358a11075782e75c5cfdcea43e4a9aeea252781e8aba5f72d0f99cf7d"
     },
     "sourceAgent": {
       "url": "https://tavonel.com/developer/tavonel-source-agent.py",
-      "sha256": "sha256:75348f29b33c2a6133d66fde6523c844607ff19973aff714d44bd69f0a323f9a"
+      "sha256": "sha256:f8d4bbd8fa622d65812f31a8359ede04bac6d886d5dead3fa46e89d18b9fc7c4"
     }
   }
 }

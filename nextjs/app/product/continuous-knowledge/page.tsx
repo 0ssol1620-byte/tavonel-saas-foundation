@@ -3,6 +3,10 @@ import Link from "next/link";
 import Logomark from "@/components/logomark";
 
 export const metadata: Metadata = {
+  // Each page declares its own address. Without this every route inherited the root
+  // canonical ("/"), so a crawler was told 22 distinct pages were all the homepage.
+  alternates: { canonical: "/product/continuous-knowledge" },
+  openGraph: { url: "/product/continuous-knowledge" },
   title: "Continuous knowledge — TAVONEL",
   description:
     "When a document changes, what else is now wrong? Selective recompilation is a research direction, not a shipped claim.",

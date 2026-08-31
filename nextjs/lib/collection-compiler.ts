@@ -119,7 +119,7 @@ export type CollectionCandidateArtifact = {
   reviewReasons?: string[];
 };
 
-function canonicalize(value: unknown): string {
+export function canonicalize(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(canonicalize).join(",")}]`;
   return `{${Object.entries(value as Record<string, unknown>)
@@ -127,11 +127,11 @@ function canonicalize(value: unknown): string {
     .map(([key, item]) => `${JSON.stringify(key)}:${canonicalize(item)}`)
     .join(",")}}`;
 }
-function sha256(value: string) {
+export function sha256(value: string) {
   return createHash("sha256").update(value, "utf8").digest("hex");
 }
 
-function stableId(prefix: string, ...parts: string[]) {
+export function stableId(prefix: string, ...parts: string[]) {
   return `${prefix}-${sha256(parts.join("\0")).slice(0, 32)}`;
 }
 
@@ -176,6 +176,10 @@ function claimsFor(text: string) {
 
 function csvCell(value: string) {
   return `"${value.replaceAll('"', '""')}"`;
+}
+
+function normalizeForMatch(value: string) {
+  return value.normalize("NFKC").replace(/\s+/g, " ").trim();
 }
 
 function mediaType(path: string) {
@@ -293,6 +297,20 @@ export function compileCollectionCandidate(inputs: CollectionOcrInput[]): Collec
   const topicIds = new Map<string, string>();
   const entityIds = new Map<string, string>();
   const sourceMarkdown: Array<{ documentId: string; title: string; text: string }> = [];
+  const groundedChunks: Array<{
+    chunkId: string;
+    logicalId: string;
+    text: string;
+    sourceId: string;
+    sourceVersionId: string;
+    evidenceId: string;
+    pageNumber1: number;
+    bbox1000: [number, number, number, number];
+    authority: string;
+    claimIds: string[];
+    entityIds: string[];
+    entityNames: string[];
+  }> = [];
 
   for (const input of sorted) {
     const text = normalizeText(input.text);
@@ -326,6 +344,7 @@ export function compileCollectionCandidate(inputs: CollectionOcrInput[]): Collec
       });
     }
 
+    const documentEntities: Array<{ id: string; text: string }> = [];
     for (const entity of entitiesFor(text)) {
       const entityId = entityIds.get(entity) ?? stableId("entity", entity.toLowerCase());
       if (!entityIds.has(entity)) {
@@ -340,8 +359,10 @@ export function compileCollectionCandidate(inputs: CollectionOcrInput[]): Collec
         to: entityId,
         evidenceIds: [evidenceId],
       });
+      documentEntities.push({ id: entityId, text: entity });
     }
 
+    const documentClaims: Array<{ id: string; text: string }> = [];
     for (const claim of claimsFor(text)) {
       const claimId = stableId("claim", input.documentId, claim);
       nodes.push({ id: claimId, kind: "Claim", label: claim, documentId: input.documentId, evidenceIds: [evidenceId] });
@@ -352,6 +373,31 @@ export function compileCollectionCandidate(inputs: CollectionOcrInput[]): Collec
         from: claimId,
         to: evidenceId,
         evidenceIds: [evidenceId],
+      });
+      documentClaims.push({ id: claimId, text: claim });
+    }
+
+    // Grounded retrieval requires page/bbox evidence per chunk (see GroundedChunk in
+    // grounded-ask.ts). Only OCR v2 regions carry that evidence, so a document compiled
+    // without regions produces zero rag chunks (honest abstention) rather than a
+    // fabricated page/bbox.
+    for (const region of input.regions ?? []) {
+      const regionText = normalizeForMatch(region.text);
+      const regionClaimIds = documentClaims.filter((claim) => regionText.includes(normalizeForMatch(claim.text))).map((claim) => claim.id);
+      const regionEntities = documentEntities.filter((entity) => regionText.includes(normalizeForMatch(entity.text)));
+      groundedChunks.push({
+        chunkId: stableId("chunk", input.documentId, input.versionKey, region.regionId),
+        logicalId: stableId("chunk-logical", input.documentId, region.regionId),
+        text: region.text,
+        sourceId: input.documentId,
+        sourceVersionId: input.versionKey,
+        evidenceId,
+        pageNumber1: region.pageNumber1,
+        bbox1000: region.bbox1000,
+        authority: region.authority,
+        claimIds: regionClaimIds,
+        entityIds: regionEntities.map((entity) => entity.id),
+        entityNames: regionEntities.map((entity) => entity.text),
       });
     }
   }
@@ -388,7 +434,7 @@ export function compileCollectionCandidate(inputs: CollectionOcrInput[]): Collec
   const nodeCsv = ["id,label,name,document_id", ...nodes.map((node) => [node.id, node.kind, node.label, node.documentId ?? ""].map(csvCell).join(","))].join("\n") + "\n";
   const edgeCsv = ["id,subject_id,predicate,object_id,evidence_ids", ...edges.map((edge) => [edge.id, edge.from, edge.type, edge.to, edge.evidenceIds.join("|")].map(csvCell).join(","))].join("\n") + "\n";
   const ragDocuments = sourceMarkdown.map((item) => JSON.stringify({ documentId: item.documentId, title: item.title })).join("\n") + "\n";
-  const ragChunks = sourceMarkdown.map((item) => JSON.stringify({ chunkId: stableId("chunk", item.documentId), documentId: item.documentId, text: item.text })).join("\n") + "\n";
+  const ragChunks = groundedChunks.map((chunk) => JSON.stringify(chunk)).join("\n") + (groundedChunks.length > 0 ? "\n" : "");
   const evidenceEvents = sorted.map((item, index) => JSON.stringify({ sequence: index + 1, type: "document.ocr.verified", documentId: item.documentId, ocrJsonKey: item.ocrJsonKey, inputSha256: item.inputSha256 })).join("\n") + "\n";
 
   const files = [

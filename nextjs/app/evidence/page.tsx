@@ -4,6 +4,10 @@ import Logomark from "@/components/logomark";
 import { EVIDENCE, EVIDENCE_STATE } from "@/lib/evidence-record";
 
 export const metadata: Metadata = {
+  // Each page declares its own address. Without this every route inherited the root
+  // canonical ("/"), so a crawler was told 22 distinct pages were all the homepage.
+  alternates: { canonical: "/evidence" },
+  openGraph: { url: "/evidence" },
   title: "What we measured — TAVONEL",
   description:
     "The document boundary this deployment enforces, and our own record of what has been measured, what failed, and what has only been built.",
