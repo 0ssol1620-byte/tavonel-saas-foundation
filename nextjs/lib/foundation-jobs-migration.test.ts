@@ -7,6 +7,7 @@ const schema = read("supabase/migrations/0024_foundation_jobs.sql");
 const rpc = read("supabase/migrations/0025_foundation_job_rpc.sql");
 const progressRequeue = read("supabase/migrations/0027_foundation_job_progress_requeue.sql");
 const attemptReset = read("supabase/migrations/0028_foundation_job_attempt_reset.sql");
+const quotaDeferral = read("supabase/migrations/0029_foundation_job_quota_deferral.sql");
 
 // The durable job layer exists to remove a bound that is currently real: the connector sync
 // route runs with maxDuration = 60 and hard-refuses maxImports > 3, because that is what one
@@ -119,6 +120,18 @@ describe("foundation job RPCs", () => {
   it("distinguishes a transient retry from a permanent failure", () => {
     expect(rpc).toMatch(/p_outcome not in \('progress', 'succeeded', 'retry', 'failed'\)/);
     expect(rpc).toContain("foundation_job_error_code_required");
+  });
+
+  it("defers quota-bound work without exhausting the failure budget", () => {
+    expect(quotaDeferral).toMatch(/p_outcome not in \('progress', 'succeeded', 'deferred', 'retry', 'failed'\)/);
+    const deferred = quotaDeferral.slice(
+      quotaDeferral.indexOf("if p_outcome = 'deferred' then"),
+      quotaDeferral.indexOf("if p_outcome = 'succeeded' then"),
+    );
+    expect(deferred).toContain("attempt = 0");
+    expect(deferred).toContain("state = 'queued'");
+    expect(deferred).toContain("make_interval(secs => v_defer_seconds)");
+    expect(deferred).not.toContain("cursor_token =");
   });
 
   it("requeues a completed progress batch for the next cron invocation", () => {

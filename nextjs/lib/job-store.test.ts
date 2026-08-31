@@ -171,6 +171,19 @@ describe("batch completion", () => {
     expect(calls[0].body).toMatchObject({ p_outcome: "failed", p_error_code: "SOURCE_REVOKED" });
   });
 
+  it("bounds a deferred pause and sends it through the scheduling parameter", async () => {
+    await completeJobBatch(WORKSPACE, JOB_ID, "worker-1", {
+      outcome: "deferred",
+      errorCode: "INTAKE_DAILY_QUOTA_EXCEEDED",
+      retryAfterSeconds: 3_600,
+    });
+    expect(calls[0].body).toMatchObject({
+      p_outcome: "deferred",
+      p_error_code: "INTAKE_DAILY_QUOTA_EXCEEDED",
+      p_lease_seconds: 3_600,
+    });
+  });
+
   it("never sends a cursor for a permanent failure", async () => {
     // Nothing was earned, so nothing may advance.
     await completeJobBatch(WORKSPACE, JOB_ID, "worker-1", { outcome: "failed", errorCode: "SOURCE_REVOKED" });

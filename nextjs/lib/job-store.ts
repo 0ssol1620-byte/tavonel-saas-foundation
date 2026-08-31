@@ -140,6 +140,7 @@ export async function claimJob(
 export type BatchOutcome =
   | { outcome: "progress"; itemsSeen: number; itemsDone: number; cursorToken?: string | null }
   | { outcome: "succeeded"; itemsSeen: number; itemsDone: number; cursorToken?: string | null }
+  | { outcome: "deferred"; errorCode: string; retryAfterSeconds: number; errorDetail?: string }
   | { outcome: "retry"; errorCode: string; errorDetail?: string; itemsSeen?: number; itemsDone?: number; cursorToken?: string | null }
   | { outcome: "failed"; errorCode: string; errorDetail?: string };
 
@@ -163,7 +164,11 @@ export async function completeJobBatch(
     p_items_seen_delta: "itemsSeen" in batch ? (batch.itemsSeen ?? 0) : 0,
     p_items_done_delta: "itemsDone" in batch ? (batch.itemsDone ?? 0) : 0,
     p_cursor_token: "cursorToken" in batch ? (batch.cursorToken ?? null) : null,
-    p_lease_seconds: leaseSeconds,
+    // The RPC keeps one bounded scheduling parameter. For a deferred outcome it is the
+    // requested pause; for every other outcome it remains the lease duration.
+    p_lease_seconds: "retryAfterSeconds" in batch
+      ? Math.min(Math.max(Math.trunc(batch.retryAfterSeconds), 60), 86_400)
+      : leaseSeconds,
     p_error_code: "errorCode" in batch ? batch.errorCode : null,
     p_error_detail: "errorDetail" in batch ? (batch.errorDetail ?? null) : null,
   });

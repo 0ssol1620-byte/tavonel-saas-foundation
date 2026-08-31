@@ -203,6 +203,24 @@ describe("batching", () => {
       errorCode: "INTAKE_RATE_LIMITED",
     });
   });
+
+  it("defers a daily quota stop without consuming the job retry budget", async () => {
+    importSourceObject.mockResolvedValue({
+      ok: false,
+      nativeId: "daily-limited",
+      code: "INTAKE_DAILY_QUOTA_EXCEEDED",
+    });
+    listOAuthSourcePage.mockResolvedValue({ items: [sourceItem("daily-limited")], cursor: "next", complete: false });
+
+    const result = await runSourceImportBatch({ ...JOB, cursorToken: "current" }, "worker-1");
+
+    expect(result).toEqual({ ok: false, code: "INTAKE_DAILY_QUOTA_EXCEEDED" });
+    expect(completeJobBatch.mock.calls[0][3]).toEqual({
+      outcome: "deferred",
+      errorCode: "INTAKE_DAILY_QUOTA_EXCEEDED",
+      retryAfterSeconds: 3_600,
+    });
+  });
 });
 
 describe("failure classification", () => {
