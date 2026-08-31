@@ -15,9 +15,9 @@ import { importSourceObject } from "./source-import";
 //
 // Two bounds, both deliberate:
 //
-//   * Items per batch. Each import is a download plus an upload. Five items matches the
-//     production intake admission window, so one cron turn never consumes the sixth request
-//     and silently skips it as rate-limited.
+//   * Items per batch. One provider page can inspect 25 entries, while at most five admitted
+//     sources move bytes in a turn. Unsupported entries are cheap to skip and must not make a
+//     sparse Drive take hours to scan.
 //
 //   * Cursor commit. The cursor advances ONLY in the same call that records the batch's
 //     progress, and only after every import in the batch has been durably admitted. A worker
@@ -26,6 +26,7 @@ import { importSourceObject } from "./source-import";
 //     that makes a sync report success while silently skipping files.
 
 export const SYNC_BATCH_SIZE = OAUTH_SOURCE_PAGE_SIZE;
+export const SYNC_IMPORT_LIMIT = 5;
 const SYNC_CURSOR_PREFIX = "tavonel-sync-v1:";
 const MAX_SYNC_CURSOR_CHARS = 4096;
 
@@ -181,6 +182,7 @@ export async function runSourceImportBatch(
   const batch = page.items.slice(resume.pageOffset, resume.pageOffset + SYNC_BATCH_SIZE);
   const skipped: Array<{ nativeId: string; code: string }> = [];
   let imported = 0;
+  let processed = 0;
 
   for (const item of batch) {
     const outcome = await importSourceObject(
@@ -196,8 +198,10 @@ export async function runSourceImportBatch(
       },
       item,
     );
+    processed += 1;
     if (outcome.ok) {
       imported += 1;
+      if (imported >= SYNC_IMPORT_LIMIT) break;
       continue;
     }
     skipped.push({ nativeId: outcome.nativeId, code: outcome.code });
@@ -213,7 +217,7 @@ export async function runSourceImportBatch(
   // Only now, with the batch durably admitted, does the checkpoint move. A large page keeps
   // the provider cursor fixed and advances its in-page offset; the provider cursor advances
   // only after the final item in that page has been admitted.
-  const nextPageOffset = resume.pageOffset + batch.length;
+  const nextPageOffset = resume.pageOffset + processed;
   const consumedWholePage = nextPageOffset === page.items.length;
   const complete = page.complete && consumedWholePage;
   const nextCursor = consumedWholePage
@@ -232,8 +236,8 @@ export async function runSourceImportBatch(
     job.jobId,
     workerId,
     complete
-      ? { outcome: "succeeded", itemsSeen: batch.length, itemsDone: imported, cursorToken: nextCursor }
-      : { outcome: "progress", itemsSeen: batch.length, itemsDone: imported, cursorToken: nextCursor },
+      ? { outcome: "succeeded", itemsSeen: processed, itemsDone: imported, cursorToken: nextCursor }
+      : { outcome: "progress", itemsSeen: processed, itemsDone: imported, cursorToken: nextCursor },
   );
   if (!reported.ok) return { ok: false, code: reported.code };
 
@@ -241,7 +245,7 @@ export async function runSourceImportBatch(
     ok: true,
     value: {
       state: reported.value.state,
-      scanned: batch.length,
+      scanned: processed,
       imported,
       skipped: skipped.slice(0, 20),
       complete,

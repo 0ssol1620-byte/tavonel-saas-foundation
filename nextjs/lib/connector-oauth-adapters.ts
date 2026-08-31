@@ -23,7 +23,7 @@ export type OAuthSourcePage = {
 };
 
 const GRAPH_ORIGIN = "https://graph.microsoft.com";
-export const OAUTH_SOURCE_PAGE_SIZE = 5;
+export const OAUTH_SOURCE_PAGE_SIZE = 25;
 
 function boundedString(value: unknown, maximum: number) {
   return typeof value === "string" && value.length > 0 && value.length <= maximum ? value : null;

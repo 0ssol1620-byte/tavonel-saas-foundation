@@ -22,13 +22,13 @@ const readR2SignerEnv = vi.fn<(...args: any[]) => any>(() => ({ accountId: "a", 
 
 vi.mock("./job-store", () => ({ completeJobBatch }));
 vi.mock("./connector-oauth-store", () => ({ getOAuthConnectionSecretReference }));
-vi.mock("./connector-oauth-adapters", () => ({ listOAuthSourcePage, OAUTH_SOURCE_PAGE_SIZE: 5 }));
+vi.mock("./connector-oauth-adapters", () => ({ listOAuthSourcePage, OAUTH_SOURCE_PAGE_SIZE: 25 }));
 vi.mock("./source-import", () => ({ importSourceObject }));
 vi.mock("./connector-oauth", () => ({ refreshOAuthAccessToken, readOAuthProviderRuntime }));
 vi.mock("./connector-oauth-secrets", () => ({ readOAuthSecret, readOAuthSecretBrokerConfig }));
 vi.mock("./r2-synthetic-canary", () => ({ readR2SignerEnv }));
 
-const { runSourceImportBatch, SYNC_BATCH_SIZE } = await import("./sync-worker");
+const { runSourceImportBatch, SYNC_BATCH_SIZE, SYNC_IMPORT_LIMIT } = await import("./sync-worker");
 
 const JOB = {
   jobId: "job-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -91,11 +91,11 @@ describe("cursor safety", () => {
     await runSourceImportBatch({ ...JOB, cursorToken: "page-1" }, "worker-1");
 
     const batch = completeJobBatch.mock.calls[0][3] as { cursorToken?: string | null; outcome: string };
-    expect(batch.cursorToken).toBe(`tavonel-sync-v1:${SYNC_BATCH_SIZE}:page-1`);
+    expect(batch.cursorToken).toBe(`tavonel-sync-v1:${SYNC_IMPORT_LIMIT}:page-1`);
     expect(batch.outcome).toBe("progress");
   });
 
-  it("resumes after the imported prefix and then advances the provider cursor", async () => {
+  it("resumes after the imported prefix and advances after the last five items", async () => {
     const items = Array.from({ length: SYNC_BATCH_SIZE + 5 }, (_unused, index) => sourceItem(`n${index}`));
     listOAuthSourcePage.mockResolvedValue({ items, cursor: "page-2", complete: false });
 
@@ -105,11 +105,11 @@ describe("cursor safety", () => {
     );
 
     expect(listOAuthSourcePage.mock.calls[0][0]).toMatchObject({ cursor: "page-1" });
-    expect(importSourceObject).toHaveBeenCalledTimes(5);
+    expect(importSourceObject).toHaveBeenCalledTimes(SYNC_IMPORT_LIMIT);
     expect(importSourceObject.mock.calls[0][1]).toMatchObject({ nativeId: `n${SYNC_BATCH_SIZE}` });
     expect(completeJobBatch.mock.calls[0][3]).toMatchObject({
       outcome: "progress",
-      itemsSeen: 5,
+      itemsSeen: SYNC_IMPORT_LIMIT,
       cursorToken: "page-2",
     });
   });
@@ -142,16 +142,33 @@ describe("cursor safety", () => {
 });
 
 describe("batching", () => {
-  it("imports at most one batch per turn regardless of page size", async () => {
+  it("admits at most five sources per turn regardless of page size", async () => {
     const items = Array.from({ length: 500 }, (_unused, index) => sourceItem(`n${index}`));
     listOAuthSourcePage.mockResolvedValue({ items, cursor: "next", complete: false });
 
     await runSourceImportBatch(JOB, "worker-1");
 
-    // The old route processed everything in one request and therefore refused more than 3
-    // imports. The bound is now per-turn, not per-corpus.
+    expect(importSourceObject).toHaveBeenCalledTimes(SYNC_IMPORT_LIMIT);
+    expect((completeJobBatch.mock.calls[0][3] as { itemsSeen: number }).itemsSeen).toBe(SYNC_IMPORT_LIMIT);
+  });
+
+  it("scans a full page when every entry is permanently unqualified", async () => {
+    const items = Array.from({ length: SYNC_BATCH_SIZE }, (_unused, index) => sourceItem(`n${index}`));
+    importSourceObject.mockImplementation(async (_ctx: unknown, item: { nativeId: string }) => ({
+      ok: false,
+      nativeId: item.nativeId,
+      code: "SOURCE_NOT_QUALIFIED",
+    }));
+    listOAuthSourcePage.mockResolvedValue({ items, cursor: "next", complete: false });
+
+    await runSourceImportBatch(JOB, "worker-1");
+
     expect(importSourceObject).toHaveBeenCalledTimes(SYNC_BATCH_SIZE);
-    expect((completeJobBatch.mock.calls[0][3] as { itemsSeen: number }).itemsSeen).toBe(SYNC_BATCH_SIZE);
+    expect(completeJobBatch.mock.calls[0][3]).toMatchObject({
+      itemsSeen: SYNC_BATCH_SIZE,
+      itemsDone: 0,
+      cursorToken: "next",
+    });
   });
 
   it("counts a skipped object without failing the batch", async () => {
