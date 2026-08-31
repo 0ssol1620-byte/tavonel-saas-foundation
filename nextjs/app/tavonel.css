@@ -588,6 +588,9 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 */
 .scene.hero .film-band { margin-top: 18px; width: min(100%, 1440px); }
 .scene.hero .film-band-video { pointer-events: none; }
+@media (max-width: 640px) {
+  .scene.hero .film-band { width: min(88%, 330px); }
+}
 .film-note { max-width: 72rem; margin: 12px auto 0; padding: 0 24px; }
 .film-band {
   position: relative;
