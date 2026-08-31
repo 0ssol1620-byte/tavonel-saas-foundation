@@ -173,7 +173,7 @@ export default function HomePage() {
         media element is in the DOM. React hoists this into <head>. The later motion cuts
         remain deferred so they cannot compete for the LCP image.
       */}
-      <link rel="preload" as="image" href="/film/poster-1.jpg" type="image/jpeg" />
+      <link rel="preload" as="image" href="/film/poster-1.webp" type="image/webp" />
       <WorldField mode={fieldMode} />
 
       <header className="nav" data-stuck={progress > 0.005 ? 1 : 0}>
@@ -226,7 +226,7 @@ export default function HomePage() {
           </div>
           <FilmBand
             src="/film/compile-cut.mp4"
-            poster="/film/poster-1.jpg"
+            poster="/film/poster-1.webp"
             label="Cut 1 — a drive compiles into a world"
             priority
           />
