@@ -1,7 +1,19 @@
 import { NextResponse } from "next/server";
 import { DEVELOPER_SCOPES } from "../../../lib/developer-contracts";
+import { resolveOpenApiOrigin } from "../../../lib/openapi-origin";
 
-export const dynamic = "force-static";
+// The published server URL must be the origin the caller actually reached, and this route
+// used to be force-static: Next.js evaluated the handler once at build time, so
+// `new URL(request.url).origin` froze to whatever the builder saw -- http://localhost:3000 --
+// and every production consumer of /api/openapi was handed a spec pointing at the developer's
+// own machine. An SDK generated from it would target localhost.
+//
+// force-dynamic makes the origin the request's own, so the spec is correct behind the apex,
+// a preview deployment, or a custom domain alike, with no origin baked into the build. The
+// document is small and cheap to serve, and the Cache-Control header below still lets it be
+// cached at the edge per-origin. The origin rule itself lives in lib/openapi-origin.ts -- a
+// route module may not export anything but handlers and config.
+export const dynamic = "force-dynamic";
 
 const errorResponse = {
   description: "Bounded error with a stable machine code",
@@ -9,7 +21,7 @@ const errorResponse = {
 };
 
 export function GET(request: Request) {
-  const origin = new URL(request.url).origin;
+  const origin = resolveOpenApiOrigin(request.url);
   return NextResponse.json({
     openapi: "3.1.0",
     info: {
