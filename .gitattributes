@@ -1,0 +1,25 @@
+# Line-ending policy.
+#
+# The developer distribution assets under nextjs/public/developer/ are served
+# byte-for-byte from tavonel.com and are pinned by sha256 in channel.json, which
+# lib/developer-distribution.test.ts verifies. Without an explicit policy those
+# files are checked out through core.autocrlf, so their bytes -- and therefore
+# their digests -- differ between a Windows working tree and a Linux CI runner.
+# That is exactly how channel.json came to hold digests that matched no committed
+# state: they were computed from a CRLF checkout, so the assertion passed locally
+# on Windows and failed on ubuntu-latest.
+#
+# Pinning eol=lf makes the working tree, the committed blob, the CI checkout and
+# the bytes a customer downloads identical on every platform. Any file whose
+# content is hashed, signed, or served verbatim belongs here.
+* text=auto
+
+nextjs/public/developer/*.mjs text eol=lf
+nextjs/public/developer/*.py text eol=lf
+nextjs/public/developer/*.json text eol=lf
+nextjs/public/developer/*.md text eol=lf
+
+# SQL migrations are applied by digest-sensitive tooling and read by tests that
+# assert on exact text; keep them stable across platforms for the same reason.
+supabase/migrations/*.sql text eol=lf
+supabase/tests/*.sql text eol=lf
