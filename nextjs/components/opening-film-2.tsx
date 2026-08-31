@@ -393,12 +393,12 @@ export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
     };
 
     const drawCorr = (x: number, y: number, w: number, h: number, t: number, current: string) => {
-      context.fillStyle = "#14161a";
+      context.fillStyle = "#0b0d0e";
       context.fillRect(x, y, w, h);
       context.fillStyle = "rgba(123,224,190,0.85)";
       context.font = "500 8px ui-monospace, Menlo, monospace";
       const grown = Math.min(ALL_CORR.length, Math.floor(1 + clamp01(t / GROW_UNTIL) * ALL_CORR.length));
-      context.fillText(`OWL  ·  class diagram  ${grown}/${ALL_CORR.length}`, x + 8, y + 12);
+      context.fillText(`TBox  ·  owl:Class  ${grown}/${ALL_CORR.length}`, x + 8, y + 12);
       const live = new Set<string>();
       ALL_CORR.slice(0, grown).forEach((edge) => { live.add(edge.from); live.add(edge.to); });
       const ids = CORR_IDS.filter((id) => live.has(id));
@@ -407,7 +407,7 @@ export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
       const padX = 8;
       const padY = 18;
       const cardW = (w - padX * 2 - 6) / cols - 4;
-      const cardH = Math.min(58, (h - padY - 8) / Math.max(rows, 2) - 6);
+      const cardH = Math.min(62, (h - padY - 8) / Math.max(rows, 2) - 6);
       const box = new Map<string, { x: number; y: number; w: number; h: number }>();
       ids.forEach((id, i) => {
         const c = i % cols;
@@ -431,14 +431,17 @@ export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
         const grow = last ? clamp01(((t / GROW_UNTIL) * ALL_CORR.length) % 1) : 1;
         const mx = lerp(ax, bx, grow);
         const my = lerp(ay, by, grow);
-        context.strokeStyle = last ? "rgba(224,122,95,0.95)" : "rgba(160,160,160,0.55)";
+        const sub = edge.rel === "overridden_by" || edge.rel === "governs";
+        context.strokeStyle = last ? "rgba(123,224,190,0.9)" : "rgba(80,88,94,0.85)";
         context.lineWidth = last ? 1.4 : 1;
+        if (sub) context.setLineDash([3, 3]);
         context.beginPath();
         context.moveTo(ax, ay);
         context.lineTo(mx, my);
         context.stroke();
+        context.setLineDash([]);
         if (grow > 0.55) {
-          context.fillStyle = "#b8b8b8";
+          context.fillStyle = last ? "#7be0be" : "#7d878d";
           context.font = "500 7px ui-monospace, Menlo, monospace";
           context.textAlign = "center";
           context.fillText(`${edge.rel}  1`, (ax + mx) / 2, (ay + my) / 2 - 3);
@@ -449,25 +452,23 @@ export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
         const b = box.get(id);
         if (!b) return;
         const hot = id === current;
-        const attrs = CLASS_ATTRS[id] ?? [["iri", "string 1"]];
-        context.fillStyle = "#f4f1ea";
+        const attrs = CLASS_ATTRS[id] ?? [["iri", "xsd:anyURI 1"]];
+        context.fillStyle = hot ? "#1a2220" : "#16191c";
         roundRect(context, b.x, b.y, b.w, b.h, 2);
         context.fill();
-        context.fillStyle = hot ? "#e07a5f" : "#d4a574";
+        context.strokeStyle = hot ? "rgba(123,224,190,0.85)" : "#2e353b";
+        context.lineWidth = hot ? 1.3 : 1;
+        roundRect(context, b.x, b.y, b.w, b.h, 2);
+        context.stroke();
+        context.fillStyle = hot ? "#7be0be" : "#3d4a46";
         context.fillRect(b.x, b.y, 3, b.h);
-        if (hot) {
-          context.strokeStyle = "#e07a5f";
-          context.lineWidth = 1.4;
-          roundRect(context, b.x, b.y, b.w, b.h, 2);
-          context.stroke();
-        }
-        context.fillStyle = "#1a1612";
+        context.fillStyle = "#edeae4";
         context.font = "600 8px Wanted Sans Variable, system-ui, sans-serif";
         context.fillText(id.length > 16 ? `${id.slice(0, 14)}…` : id, b.x + 8, b.y + 12);
-        context.fillStyle = "#8a8174";
+        context.fillStyle = "#7d878d";
         context.font = "500 7px ui-monospace, Menlo, monospace";
-        context.fillText("Class", b.x + 8, b.y + 22);
-        context.fillStyle = "#2a6f97";
+        context.fillText("owl:Class", b.x + 8, b.y + 22);
+        context.fillStyle = "#8fb4c9";
         attrs.slice(0, 2).forEach((attr, k) => {
           context.fillText(`${attr[0]}  ${attr[1]}`, b.x + 8, b.y + 34 + k * 10);
         });
