@@ -414,11 +414,12 @@ export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
       const cardH = (innerH - gap * (rowsFit - 1)) / rowsFit;
       const slots = rowsFit * cols;
       const n = CLASS_IDS.length;
-      const step = Math.floor(t * 2.8);
-      const start = n > 0 ? step % n : 0;
+      const hotI = n ? (Math.floor(t * 2.6) + Math.max(0, CLASS_IDS.indexOf(current))) % n : 0;
+      const slot = n ? Math.floor(t * 1.85 + hotI * 3) % slots : 0;
+      const start = n ? (hotI - slot + n) % n : 0;
       const visible: string[] = [];
-      for (let i = 0; i < slots; i += 1) visible.push(CLASS_IDS[(start + i) % n]);
-      const hot = visible.includes(current) ? current : visible[visible.length - 1];
+      for (let i = 0; i < slots; i += 1) visible.push(CLASS_IDS[(start + i) % Math.max(n, 1)]);
+      const hot = CLASS_IDS[hotI] ?? visible[0];
 
       visible.forEach((id, i) => {
         const c = i % cols;
