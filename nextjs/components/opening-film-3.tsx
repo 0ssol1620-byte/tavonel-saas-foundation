@@ -1,8 +1,10 @@
 "use client";
 
 /**
- * Cut 3. Delta compile + reverse-trace.
- * 18s four-up, camera off. Does not retune cut 1 or cut 2.
+ * LOCKED cut — public/film/compile-cut-3.mp4 — below cut 2 later.
+ * 18s, four-up, camera off. CHANGED 1 + TOUCHED 3 = 4 WORLD nodes.
+ * Next scene kills that set. No Pause/Skip, no nav.
+ * Do not retune layout unless the user unlocks cut 3.
  */
 
 import { useEffect, useRef } from "react";

@@ -1,12 +1,13 @@
-# Cut 3 — delta compile + reverse-trace
+# Locked compile cut 3
 
-Does not replace cut 1 or cut 2. Those stay locked.
+`compile-cut-3.mp4` is the frozen **18.00s** four-up. It sits **below cut 2** when we wire the site. Cut 1 (`compile-cut.mp4`) stays the header. Cut 2 (`compile-cut-2.mp4`) stays the middle.
 
-18s four-up, camera off, no caption band.
+- Camera: off, wide
+- No bottom caption, no Pause/Skip, no Cut 1/2 nav
+- Col 1 SOURCES: unique files. One `CHANGED` + three `TOUCHED` per scene. Diff of that slice. Escalator, no `N/N`
+- Col 2 MARKDOWN: that node's `+/-` plus two satellite patches. No held-file filler
+- Col 3 top: Turtle/OWL (`ontology.ttl`). Related triples rewrite together. Not yaml. Not `N/N`
+- Col 3 bottom: dark TBox `owl:Class` cards, **no connector lines**, 4×2, affected only
+- Col 4 WORLD: graph stays. **Exactly 4 lit nodes** (CHANGED + 3 TOUCHED) and 3 spokes. Next scene **kills** that set. Highlight does not accumulate
 
-1. **SOURCES** — one file changes (unified diff). The rest of the list stays. Escalator, no `N/N`.
-2. **MARKDOWN** — only the changed slice rewrites. The rest of the node is still.
-3. **ONTOLOGY** — fixed split. Top Turtle/OWL property rewrite. Bottom dark `owl:Class` cards for the **affected** classes only. No connector lines. No yaml. No `N/N`.
-4. **WORLD** — the graph is already linked. Only the affected subgraph re-draws. A reverse-trace path lights from the new edge back toward the source node.
-
-Site placement later: below cut 2.
+Do not retune `opening-film-3.tsx` layout against this file unless the lock is lifted.
