@@ -126,15 +126,6 @@ export default function FilmBand({
     };
   }, [reduced, src]);
 
-  if (reduced) {
-    return (
-      <div className="film-band">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={poster} alt={label} className="film-band-video" />
-      </div>
-    );
-  }
-
   return (
     <div className="film-band">
       {/*
@@ -149,9 +140,9 @@ export default function FilmBand({
         muted
         loop
         playsInline
-        autoPlay
+        autoPlay={!reduced}
         preload={priority ? "auto" : "metadata"}
-        poster={priority ? poster : undefined}
+        poster={priority || reduced ? poster : undefined}
         aria-label={label}
       >
         <source src={src} type="video/mp4" />
