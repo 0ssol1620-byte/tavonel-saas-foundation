@@ -81,8 +81,14 @@ export default function FilmBand({
       if (wanted && video.paused) void video.play().catch(() => undefined);
     };
 
-    // rootMargin pulls the load forward: a band that starts fetching only once it is half on
-    // screen shows a poster for the first second of the thing it is supposed to be proving.
+    /*
+      The margin is a screen and a half, not 400px.
+
+      Measured on a 1440x900 desktop, a 400px margin left cut 4 paused at t=0 while the visitor
+      was already reading cut 3 — so the band they scrolled into was a black rectangle for the
+      first moment, which is the "video not showing" report. A band is woken while the one above
+      it is still on screen; by the time it is read it has been running for seconds.
+    */
     const io = new IntersectionObserver(
       ([entry]) => {
         if (!entry) return;
@@ -98,7 +104,7 @@ export default function FilmBand({
           resume();
         } else video.pause();
       },
-      { threshold: 0.15, rootMargin: "400px 0px" },
+      { threshold: 0, rootMargin: "1400px 0px" },
     );
     io.observe(video);
 

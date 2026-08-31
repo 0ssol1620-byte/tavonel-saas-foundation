@@ -198,6 +198,37 @@ export default function OpeningFilm4() {
       return y + row * rowH;
     };
 
+    /*
+      A status line pinned to the bottom of a column.
+
+      Each panel's content types downward and stops wherever the beat left it, which left the
+      lower third of every column empty and made the frame look unfinished. A pinned footer is
+      not filler: it is the one fact about that surface which is true for the whole cut —
+      what it is connected to, what it is authenticated as, what it just wrote. It also gives
+      the four columns a shared baseline, which is what makes them read as one workstation.
+    */
+    const footer = (
+      x: number, y: number, w: number, h: number,
+      left: string, right: string, ink: string = INK.dim,
+    ) => {
+      const fy = y + h - 14;
+      context.strokeStyle = "rgba(46,53,59,0.9)";
+      context.lineWidth = 1;
+      context.beginPath();
+      context.moveTo(x + 12, fy - 16);
+      context.lineTo(x + w - 12, fy - 16);
+      context.stroke();
+      context.fillStyle = ink;
+      context.font = `500 ${BODY - 1}px ui-monospace, Menlo, monospace`;
+      context.fillText(left, x + 14, fy);
+      if (right) {
+        context.fillStyle = INK.faint;
+        context.textAlign = "right";
+        context.fillText(right, x + w - 14, fy);
+        context.textAlign = "left";
+      }
+    };
+
     const drawAssistant = (x: number, y: number, w: number, h: number, t: number) => {
       pane(x, y, w, h, "ASSISTANT · MCP", t > 0.9 ? "connected" : "");
       const ix = x + 14;
@@ -265,6 +296,13 @@ export default function OpeningFilm4() {
         ];
         lines(ix, iy, w, t, rows);
       }
+
+      footer(
+        x, y, w, h,
+        t > 0.7 ? "tavonel-readonly" : "connecting…",
+        t > 0.7 ? "no write tools" : "",
+        t > 0.7 ? INK.green : INK.faint,
+      );
     };
 
     const drawEditor = (x: number, y: number, w: number, h: number, t: number) => {
@@ -314,6 +352,13 @@ export default function OpeningFilm4() {
         ];
         lines(ix, iy, w, t, rows, ROW);
       }
+
+      footer(
+        x, y, w, h,
+        t > ACT.assistant ? "api v1" : "",
+        t > ACT.assistant ? "vnd.tavonel.v1+json" : "",
+        INK.violet,
+      );
     };
 
     const drawTerminal = (x: number, y: number, w: number, h: number, t: number) => {
@@ -354,6 +399,13 @@ export default function OpeningFilm4() {
         ];
         lines(ix, iy, w, t, rows);
       }
+
+      footer(
+        x, y, w, h,
+        t > ACT.abstain + 1.5 ? "world.zip on disk" : "tvnl_live_••••",
+        t > ACT.abstain + 1.5 ? "signed" : "scoped key",
+        t > ACT.abstain + 1.5 ? INK.green : INK.dim,
+      );
     };
 
     /**
@@ -370,7 +422,7 @@ export default function OpeningFilm4() {
       const ox = x + 10;
       const oy = y + 32;
       const gw = w - 20;
-      const gh = h - 52;
+      const gh = h - 96;
 
       g.edges.forEach(([ia, ib]) => {
         const na = g.nodes[ia];
@@ -441,12 +493,19 @@ export default function OpeningFilm4() {
         context.fillText(
           `cited  ${CITED_DOC} · p.${CITED_PAGE} · official`,
           x + 14,
-          y + h - 14,
+          y + h - 38,
         );
       } else if (!grounded && t > ACT.code + 0.2) {
         context.fillStyle = INK.amber;
-        context.fillText("no region-bound evidence — nothing cited", x + 14, y + h - 14);
+        context.fillText("no region-bound evidence — nothing cited", x + 14, y + h - 38);
       }
+
+      footer(
+        x, y, w, h,
+        grounded ? "4 nodes lit" : "0 nodes lit",
+        grounded ? "1 source · 1 page" : "nothing to point at",
+        grounded ? INK.green : INK.amber,
+      );
     };
 
     const draw = (t: number) => {
