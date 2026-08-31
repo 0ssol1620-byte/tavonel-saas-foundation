@@ -207,34 +207,34 @@ export default function ConnectionsPanel() {
     }
   };
 
-  const syncOAuth = async (connection: OAuthConnection, maxImports: 0 | 1) => {
+  // Starts a bulk import and reports progress from the job instead of waiting for the whole
+  // thing in one request. The old pair of buttons ("Scan metadata" / "Scan & import 1 file")
+  // existed because the endpoint physically could not do more inside one invocation -- the
+  // server refused maxImports > 3. Importing a real corpus is now a job, so the browser
+  // starts it and watches it rather than holding a connection open.
+  const startImport = async (connection: OAuthConnection) => {
     setBusy(true);
     try {
       const token = await sessionToken();
       if (!token) {
-        setNotice("Session expired. Sign in again before scanning a source.");
+        setNotice("Session expired. Sign in again before importing a source.");
         return;
       }
-      setNotice(maxImports === 0 ? `Scanning ${connection.displayName} metadata.` : `Scanning ${connection.displayName} and importing one qualified file.`);
       const response = await fetch(`/api/v1/oauth-connectors/connections/${connection.oauthConnectionId}/sync`, {
         method: "POST",
         headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-        body: JSON.stringify({ maxImports }),
+        body: JSON.stringify({}),
       });
-      const json = await response.json().catch(() => ({})) as {
-        code?: string;
-        scanned?: number;
-        imported?: Array<{ documentId: string }>;
-        skipped?: Array<{ code: string }>;
-      };
-      if (!response.ok || typeof json.scanned !== "number" || !Array.isArray(json.imported)) {
-        setNotice(`Source scan failed (${json.code ?? response.status}).`);
+      const json = await response.json().catch(() => ({})) as { code?: string; jobId?: string; started?: boolean };
+      if (!response.ok || typeof json.jobId !== "string") {
+        setNotice(`Import could not be started (${json.code ?? response.status}).`);
         return;
       }
-      const documentIds = json.imported.map((item) => item.documentId).join(", ");
-      const skippedCodes = [...new Set((json.skipped ?? []).map((item) => item.code))].join(", ");
-      const completionNotice = `${connection.displayName}: ${json.scanned} item(s) scanned, ${json.imported.length} qualified file(s) placed in quarantine${documentIds ? ` (${documentIds})` : ""}${skippedCodes ? `; skipped: ${skippedCodes}` : ""}.`;
-      await load(completionNotice);
+      // started === false means an identical import was already in flight and this request
+      // joined it. Saying so beats showing a second "started" message for one job.
+      await load(json.started
+        ? `${connection.displayName}: import queued. It continues in the background, so you can leave this page.`
+        : `${connection.displayName}: an import is already running. Showing its progress.`);
     } finally {
       setBusy(false);
     }
@@ -305,8 +305,7 @@ export default function ConnectionsPanel() {
                 <small>{connection.lastSyncAt ? `Last durable sync ${new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(connection.lastSyncAt))}` : "Connected; awaiting first source scan"}</small>
                 <small>{connection.cursorSha256 ?? "No cursor committed"}</small>
                 {connection.lastErrorCode ? <small className="connection-error">{connection.lastErrorCode}</small> : null}
-                <button type="button" disabled={busy} onClick={() => void syncOAuth(connection, 0)}>Scan metadata</button>
-                <button type="button" disabled={busy} onClick={() => void syncOAuth(connection, 1)}>Scan &amp; import 1 file · 2 GPU credits</button>
+                <button type="button" disabled={busy} onClick={() => void startImport(connection)}>Import this source</button>
               </div>
               <button type="button" className="icon-action" disabled={busy} onClick={() => void revokeOAuth(connection)} aria-label={`Revoke ${connection.displayName}`}><Trash2 size={15} /></button>
             </article>
