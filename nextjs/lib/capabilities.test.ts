@@ -81,4 +81,25 @@ describe("capability grid", () => {
     expect(readCapabilities(HEALTHY, false)).toHaveLength(9);
     expect(readCapabilities(null, true)).toHaveLength(9);
   });
+
+  /*
+    The landing page folds this grid behind a summary line that prints "N of 9 controls are
+    open". That line is a second place the page can misreport availability, so it is held to
+    the same rule as the grid: the count it prints is the affirmative set and nothing else.
+  */
+  it("counts no open controls for the folded summary when the read failed", () => {
+    const summaryCount = (status: StatusResponse | null, failed: boolean) =>
+      readCapabilities(status, failed).filter((c) => c.tone === "open").length;
+    expect(summaryCount(null, true)).toBe(0);
+    expect(summaryCount(HEALTHY, true)).toBe(0);
+    expect(summaryCount({}, false)).toBe(0);
+  });
+
+  it("never lets the folded summary count exceed the open rows in the grid", () => {
+    const rows = readCapabilities(HEALTHY, false);
+    const summaryCount = rows.filter((c) => c.tone === "open").length;
+    const gridOpen = rows.filter((c) => AFFIRMATIVE_TONES.includes(c.tone)).length;
+    expect(summaryCount).toBe(gridOpen);
+    expect(summaryCount).toBeLessThan(rows.length);
+  });
 });

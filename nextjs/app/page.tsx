@@ -113,6 +113,8 @@ export default function HomePage() {
     () => capabilities.filter((cap) => cap.tone !== "open" && cap.tone !== "direction"),
     [capabilities],
   );
+  /** Only a successful, well-formed read can put a row here. Never inferred from a count. */
+  const openRows = useMemo(() => capabilities.filter((cap) => cap.tone === "open"), [capabilities]);
 
   useEffect(() => { trackSceneDepth(scene); }, [scene]);
 
@@ -274,25 +276,44 @@ export default function HomePage() {
         </Scene>
 
         <Scene id={5} band="access" eyebrow="PROOF & ACCESS" title={<>Stop rebuilding knowledge<br />for every AI project.</>}>
-          <div className="band-head rv"><span className="kicker">STATUS</span><h3>What exists in this deployment, right now.</h3></div>
-          <div className="caps rv">
-            {capabilities.map((cap) => (
-              <div className="cap" key={cap.name} data-tone={cap.tone} title={cap.note}>
-                <span className="cap-n">{cap.name}</span>
-                <span className="cap-s">{cap.state}</span>
-              </div>
-            ))}
-          </div>
-          <p className="fine rv">
-            Read live from this deployment when the page loads, not written by hand. A row this
-            page cannot confirm reads <b>Unknown</b> &mdash; it never defaults to available.
+          {/*
+            The grid, folded.
+
+            Nine rows of deployment plumbing — "Content disarm: OPEN", "Quarantine storage:
+            CONFIGURED" — was the last thing a first-time visitor saw, and on a phone it was a
+            full screen of vocabulary that belongs to whoever operates this deployment rather
+            than to whoever is deciding whether to try it. Folding it is not hiding it: the
+            summary below is generated from the same live, fail-closed reading, it names the
+            number that is closed, and the full grid is one click away and also lives at
+            /status. What must never happen is this summary reporting more open than the grid
+            does, which is why both come from `readCapabilities` and neither is written by hand.
+          */}
+          <p className="lede rv">
+            {statusFailed
+              ? "This page could not read its own deployment status just now, so it is not claiming any capability is available."
+              : openRows.length === 0
+                ? "Reading what this deployment can currently do."
+                : `${openRows.length} of ${capabilities.length} controls are open in this deployment.`}
             {heldRows.length > 0 ? (
-              <>
-                {" "}Buying access opens none of them &mdash; each opens only when the control
-                behind it is qualified.
-              </>
+              <> The rest stay closed until each is qualified &mdash; buying access opens none of them.</>
             ) : null}
           </p>
+
+          <details className="status-fold rv">
+            <summary>What exists in this deployment, right now</summary>
+            <div className="caps">
+              {capabilities.map((cap) => (
+                <div className="cap" key={cap.name} data-tone={cap.tone} title={cap.note}>
+                  <span className="cap-n">{cap.name}</span>
+                  <span className="cap-s">{cap.state}</span>
+                </div>
+              ))}
+            </div>
+            <p className="fine">
+              Read live from this deployment when the page loads, not written by hand. A row this
+              page cannot confirm reads <b>Unknown</b> &mdash; it never defaults to available.
+            </p>
+          </details>
 
           <p className="lede rv" style={{ marginTop: 26 }}>
             The package is signed with Ed25519 and its public key is published, so a third party

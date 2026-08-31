@@ -58,11 +58,22 @@ describe("per-route canonical metadata", () => {
     expect(pages.length).toBeGreaterThan(20);
   });
 
+  /*
+    Noindex routes are exempt from the canonical rules below.
+
+    A canonical tag tells a crawler which URL to prefer among indexable duplicates. On a page
+    that is already `index: false` it is not a weaker claim, it is a meaningless one — so
+    requiring it would push the codebase toward writing SEO metadata for surfaces that must
+    never be indexed. The `robots` assertion further down is what actually holds these routes.
+  */
+  const exemptFromCanonical = (route: string) =>
+    route === "/" || route.startsWith("/dev/");
+
   it("declares a canonical on every route other than the root itself", () => {
     const missing: string[] = [];
     for (const page of pages) {
       const route = routeOf(page);
-      if (route === "/") continue;
+      if (exemptFromCanonical(route)) continue;
       // The route's own segment chain, excluding the root layout -- inheriting the root's
       // canonical is exactly the defect being prevented, so it does not count as declaring one.
       const own = metadataSourcesFor(page)
@@ -78,7 +89,7 @@ describe("per-route canonical metadata", () => {
     const wrong: string[] = [];
     for (const page of pages) {
       const route = routeOf(page);
-      if (route === "/") continue;
+      if (exemptFromCanonical(route)) continue;
       const own = metadataSourcesFor(page)
         .filter((path) => path !== join(appDirectory, "layout.tsx"))
         .map((path) => readFileSync(path, "utf8"))
@@ -95,9 +106,9 @@ describe("per-route canonical metadata", () => {
   });
 
   it("excludes authenticated and transient surfaces from indexing", () => {
-    // A sign-in screen, a private workspace and an OAuth redirect target have no business in
-    // a search index, and must not compete with public pages.
-    for (const route of ["login", "workspace", "auth/callback"]) {
+    // A sign-in screen, a private workspace, an OAuth redirect target and an internal render
+    // harness have no business in a search index, and must not compete with public pages.
+    for (const route of ["login", "workspace", "auth/callback", "dev"]) {
       const layout = readFileSync(join(appDirectory, route, "layout.tsx"), "utf8");
       expect(layout, `${route} must be noindex`).toMatch(/robots:\s*\{[^}]*index:\s*false/);
     }
@@ -110,7 +121,7 @@ describe("per-route canonical metadata", () => {
     const mismatched: string[] = [];
     for (const page of pages) {
       const route = routeOf(page);
-      if (route === "/" || noindexRoutes.has(route)) continue;
+      if (route === "/" || noindexRoutes.has(route) || route.startsWith("/dev/")) continue;
       const own = metadataSourcesFor(page)
         .filter((path) => path !== join(appDirectory, "layout.tsx"))
         .map((path) => readFileSync(path, "utf8"))

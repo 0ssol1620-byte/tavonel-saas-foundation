@@ -585,8 +585,7 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
   top of the columns.
 */
 .scene.hero .film-band { margin-top: 18px; }
-.scene.hero .film-band-video,
-.scene.hero .film-band img {
+.scene.hero .film-band-video {
   aspect-ratio: auto;
   height: min(46vh, 430px);
   object-fit: cover;
@@ -600,31 +599,26 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
   background: #08090a;
   border: 1px solid var(--hairline);
 }
-.film-band-video,
-.film-band img {
+/*
+  The link is a block, and the band clips.
+
+  `film-band-link` wrapping the video was an inline anchor, so `width: 100%` on the video
+  resolved against the anchor's shrink-to-fit box rather than the band — and the video took its
+  intrinsic 1440px, pushing a 390px phone into a 1448px horizontal scroll. Both the block
+  display and the `max-width` are load-bearing; `overflow: hidden` on the band is the belt to
+  that braces.
+*/
+.film-band { overflow: hidden; }
+.film-band-link { display: block; width: 100%; }
+.film-band-video {
   display: block;
   width: 100%;
+  max-width: 100%;
   height: auto;
   aspect-ratio: 1440 / 900;
   object-fit: cover;
 }
-.film-band-open,
-.film-band-link span,
-.film-band-phone span {
-  position: static;
-  display: inline-block;
-  margin: 8px 12px 10px;
-  font: 500 10px/1 var(--f-mono);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-xlo);
-}
-.film-band-open:hover,
-.film-band-link span,
-.film-band-phone span { color: var(--verified); }
-.film-band-phone { display: none; position: relative; }
 .film-scene { width: 100%; }
-.film-scene .film-band { width: calc(100% + 0px); }
 .artifacts {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -642,6 +636,35 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
   color: var(--verified);
 }
 .artifact p { margin: 0; font-size: 13px; line-height: 1.62; color: var(--text-lo); }
+/*
+  A disclosure, styled as an instrument control rather than a browser default.
+
+  The marker is replaced because the native triangle is the one piece of unstyled chrome on the
+  page, and its position differs per engine.
+*/
+.status-fold { margin-top: 16px; border-top: 1px solid var(--hairline); }
+.status-fold > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 14px 0;
+  font: 500 11px/1 var(--f-mono);
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--text-lo);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+}
+.status-fold > summary::-webkit-details-marker { display: none; }
+.status-fold > summary::before {
+  content: "+";
+  font-size: 14px;
+  color: var(--verified);
+}
+.status-fold[open] > summary::before { content: "−"; }
+.status-fold > summary:hover { color: var(--text-hi); }
+.status-fold .caps { margin-bottom: 12px; }
 .compile-stage {
   width: 100%;
   aspect-ratio: 1440 / 620;
@@ -652,20 +675,19 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 }
 .compile-stage-canvas { display: block; width: 100%; height: 100%; }
 @media (max-width: 900px) {
-  .film-band-desk { display: none; }
-  .film-band-phone { display: block; }
   /*
-    A four-up at 390px is 90px per column, so the phone gets the whole frame as a still and
-    opens the cut full screen instead. `cover` here would crop two of the four columns off the
-    sides, which is the one thing the still exists to prevent.
+    The phone plays the film too.
+
+    `contain` rather than `cover`: cropping to fill would take two of the four columns off the
+    sides, and "four things at once" is the entire argument of these bands. The hero's height
+    cap is released here for the same reason — at 390px the frame is already short.
   */
-  .scene.hero .film-band-video,
-  .scene.hero .film-band img,
-  .film-band-phone img {
+  .scene.hero .film-band-video {
     height: auto;
     aspect-ratio: 1440 / 900;
     object-fit: contain;
   }
+  .film-band-video { object-fit: contain; }
   .artifacts { grid-template-columns: minmax(0, 1fr); }
   .compile-stage { aspect-ratio: 4 / 5; }
 }
