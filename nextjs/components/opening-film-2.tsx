@@ -192,7 +192,6 @@ const ALL_ONTO = FOCI.map((f) => f.onto).join("\n");
 const ALL_CORR = FOCI.flatMap((f) =>
   f.links.map((link) => ({ from: f.label, to: link.id, rel: link.rel, area: f.area })),
 );
-const CORR_IDS = Array.from(new Set(ALL_CORR.flatMap((e) => [e.from, e.to])));
 
 const CLASS_ATTRS: Record<string, string[][]> = {
   PaymentTerms: [["due", "duration 1"], ["lateRate", "decimal 1"], ["threshold", "decimal 1"]],
@@ -395,83 +394,90 @@ export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
     const drawCorr = (x: number, y: number, w: number, h: number, t: number, current: string) => {
       context.fillStyle = "#0b0d0e";
       context.fillRect(x, y, w, h);
+      const grown = Math.min(ALL_CORR.length, Math.floor(1 + clamp01(t / GROW_UNTIL) * ALL_CORR.length));
       context.fillStyle = "rgba(123,224,190,0.85)";
       context.font = "500 8px ui-monospace, Menlo, monospace";
-      const grown = Math.min(ALL_CORR.length, Math.floor(1 + clamp01(t / GROW_UNTIL) * ALL_CORR.length));
       context.fillText(`TBox  ·  owl:Class  ${grown}/${ALL_CORR.length}`, x + 8, y + 12);
-      const live = new Set<string>();
-      ALL_CORR.slice(0, grown).forEach((edge) => { live.add(edge.from); live.add(edge.to); });
-      const ids = CORR_IDS.filter((id) => live.has(id));
-      const cols = 3;
-      const rows = Math.max(1, Math.ceil(ids.length / cols));
-      const padX = 8;
-      const padY = 18;
-      const cardW = (w - padX * 2 - 6) / cols - 4;
-      const cardH = Math.min(62, (h - padY - 8) / Math.max(rows, 2) - 6);
-      const box = new Map<string, { x: number; y: number; w: number; h: number }>();
-      ids.forEach((id, i) => {
-        const c = i % cols;
-        const r = Math.floor(i / cols);
-        box.set(id, {
-          x: x + padX + c * (cardW + 8),
-          y: y + padY + r * (cardH + 8),
-          w: cardW,
-          h: cardH,
-        });
+
+      const heroH = 72;
+      const hero = { x: x + 8, y: y + 18, w: w - 16, h: heroH };
+      const focus = FOCI.find((f) => f.label === current) ?? FOCI[0];
+      const heroAttrs = CLASS_ATTRS[current] ?? [["iri", "xsd:anyURI 1"]];
+      context.fillStyle = "#16191c";
+      roundRect(context, hero.x, hero.y, hero.w, hero.h, 2);
+      context.fill();
+      context.strokeStyle = "rgba(123,224,190,0.8)";
+      context.lineWidth = 1.2;
+      roundRect(context, hero.x, hero.y, hero.w, hero.h, 2);
+      context.stroke();
+      context.fillStyle = "#7be0be";
+      context.fillRect(hero.x, hero.y, 3, hero.h);
+      context.fillStyle = "#edeae4";
+      context.font = "600 11px Wanted Sans Variable, system-ui, sans-serif";
+      context.fillText(current, hero.x + 10, hero.y + 16);
+      context.fillStyle = "#7d878d";
+      context.font = "500 8px ui-monospace, Menlo, monospace";
+      context.fillText("owl:Class", hero.x + 10, hero.y + 28);
+      context.fillStyle = "#8fb4c9";
+      heroAttrs.slice(0, 3).forEach((attr, k) => {
+        context.fillText(`${attr[0]}   ${attr[1]}`, hero.x + 10, hero.y + 42 + k * 10);
       });
-      ALL_CORR.slice(0, grown).forEach((edge, i) => {
-        const a = box.get(edge.from);
-        const b = box.get(edge.to);
-        if (!a || !b) return;
-        const ax = a.x + a.w / 2;
-        const ay = a.y + a.h / 2;
-        const bx = b.x + b.w / 2;
-        const by = b.y + b.h / 2;
-        const last = i === grown - 1;
-        const grow = last ? clamp01(((t / GROW_UNTIL) * ALL_CORR.length) % 1) : 1;
-        const mx = lerp(ax, bx, grow);
-        const my = lerp(ay, by, grow);
-        const sub = edge.rel === "overridden_by" || edge.rel === "governs";
-        context.strokeStyle = last ? "rgba(123,224,190,0.9)" : "rgba(80,88,94,0.85)";
-        context.lineWidth = last ? 1.4 : 1;
-        if (sub) context.setLineDash([3, 3]);
+
+      const related = focus.links;
+      const nShow = Math.min(related.length, Math.max(1, Math.ceil((grown / ALL_CORR.length) * related.length + 0.01)));
+      const gap = 6;
+      const colW = (w - 16 - gap) / 2;
+      const colH = 48;
+      related.slice(0, nShow).forEach((link, i) => {
+        const c = i % 2;
+        const r = Math.floor(i / 2);
+        const bx = x + 8 + c * (colW + gap);
+        const by = hero.y + hero.h + 22 + r * (colH + 14);
+        const last = i === nShow - 1;
+        const grow = last ? 0.55 + 0.45 * clamp01(((t / GROW_UNTIL) * ALL_CORR.length) % 1) : 1;
+        const fromX = hero.x + hero.w * (0.28 + c * 0.44);
+        const fromY = hero.y + hero.h;
+        const toX = bx + colW / 2;
+        const toY = by;
+        const midY = lerp(fromY, toY, 0.45);
+        context.strokeStyle = last ? "rgba(123,224,190,0.9)" : "rgba(80,88,94,0.9)";
+        context.lineWidth = last ? 1.3 : 1;
         context.beginPath();
-        context.moveTo(ax, ay);
-        context.lineTo(mx, my);
+        context.moveTo(fromX, fromY);
+        context.lineTo(fromX, lerp(fromY, midY, grow));
+        if (grow > 0.4) {
+          context.lineTo(lerp(fromX, toX, (grow - 0.4) / 0.6), lerp(fromY, midY, grow));
+        }
+        if (grow > 0.75) {
+          context.lineTo(toX, lerp(midY, toY, (grow - 0.75) / 0.25));
+        }
         context.stroke();
-        context.setLineDash([]);
-        if (grow > 0.55) {
+        if (grow > 0.5) {
           context.fillStyle = last ? "#7be0be" : "#7d878d";
           context.font = "500 7px ui-monospace, Menlo, monospace";
           context.textAlign = "center";
-          context.fillText(`${edge.rel}  1`, (ax + mx) / 2, (ay + my) / 2 - 3);
+          context.fillText(`${link.rel}  1`, (fromX + toX) / 2, midY - 3);
           context.textAlign = "left";
         }
-      });
-      ids.forEach((id) => {
-        const b = box.get(id);
-        if (!b) return;
-        const hot = id === current;
-        const attrs = CLASS_ATTRS[id] ?? [["iri", "xsd:anyURI 1"]];
-        context.fillStyle = hot ? "#1a2220" : "#16191c";
-        roundRect(context, b.x, b.y, b.w, b.h, 2);
+        context.globalAlpha = Math.min(1, grow + 0.25);
+        context.fillStyle = "#16191c";
+        roundRect(context, bx, by, colW, colH, 2);
         context.fill();
-        context.strokeStyle = hot ? "rgba(123,224,190,0.85)" : "#2e353b";
-        context.lineWidth = hot ? 1.3 : 1;
-        roundRect(context, b.x, b.y, b.w, b.h, 2);
+        context.strokeStyle = "#2e353b";
+        roundRect(context, bx, by, colW, colH, 2);
         context.stroke();
-        context.fillStyle = hot ? "#7be0be" : "#3d4a46";
-        context.fillRect(b.x, b.y, 3, b.h);
+        context.fillStyle = "#3d4a46";
+        context.fillRect(bx, by, 3, colH);
         context.fillStyle = "#edeae4";
         context.font = "600 8px Wanted Sans Variable, system-ui, sans-serif";
-        context.fillText(id.length > 16 ? `${id.slice(0, 14)}…` : id, b.x + 8, b.y + 12);
+        context.fillText(link.id.length > 14 ? `${link.id.slice(0, 12)}…` : link.id, bx + 8, by + 14);
         context.fillStyle = "#7d878d";
         context.font = "500 7px ui-monospace, Menlo, monospace";
-        context.fillText("owl:Class", b.x + 8, b.y + 22);
+        context.fillText("owl:Class", bx + 8, by + 26);
+        const attrs = CLASS_ATTRS[link.id] ?? [["iri", "xsd:anyURI 1"]];
         context.fillStyle = "#8fb4c9";
-        attrs.slice(0, 2).forEach((attr, k) => {
-          context.fillText(`${attr[0]}  ${attr[1]}`, b.x + 8, b.y + 34 + k * 10);
-        });
+        context.fillText(`${attrs[0][0]}  ${attrs[0][1]}`, bx + 8, by + 38);
+        context.globalAlpha = 1;
       });
     };
 
