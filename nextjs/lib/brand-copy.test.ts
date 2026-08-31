@@ -152,6 +152,30 @@ describe("public copy", () => {
   });
 
   /*
+    Every band on the landing page goes through FilmBand.
+
+    The hero was twice rewritten as a hand-written <video> — once for an LCP experiment, once in
+    a server-component split — and both times it lost the playback logic that lives in
+    FilmBand: the observer, the resume on visibility change, the resume on decoder stall. The
+    other cuts hide that failure because scrolling back to them restarts them; the hero is on
+    screen from load, crosses its loop point untouched, and simply freezes.
+
+    It also carried inline `aspectRatio: 1280 / 800` describing a resolution the masters no
+    longer have, which overrode the stylesheet's viewport-fitting rules from an attribute.
+  */
+  it("renders every landing film through FilmBand, never a hand-written video element", () => {
+    for (const file of ["app/page.tsx", "components/home-page-client.tsx"]) {
+      // Comments in these files discuss the <video> element by name, so the check is run
+      // against the source with comments stripped — otherwise it fails on its own rationale.
+      const source = read(file)
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/^\s*\/\/.*$/gm, "");
+      expect(source, `${file} must not hand-roll a <video>`).not.toMatch(/<video[\s>]/);
+      expect(source, `${file} must not inline an aspect ratio`).not.toContain("aspectRatio");
+    }
+  });
+
+  /*
     A poster that does not exist renders a broken-image icon and the alt text.
 
     Cuts 2-4 shipped for one deploy with their posters deleted as a bandwidth saving, which the
