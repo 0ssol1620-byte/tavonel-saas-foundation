@@ -61,6 +61,7 @@ export default function FilmBand({
               muted
               loop
               playsInline
+              autoPlay
               preload="metadata"
               poster={poster}
               aria-label={label}
