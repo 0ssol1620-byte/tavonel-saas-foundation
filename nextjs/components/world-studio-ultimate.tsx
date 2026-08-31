@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, type CSSProperties } from "react";
-import {
-  selectWorldEvidence,
-  type SelectedWorldEvidence,
-  type WorldEvidence,
-  type WorldReadModel,
+import type {
+  SelectedWorldEvidence,
+  WorldEvidence,
+  WorldReadModel,
 } from "@/lib/world-read-model";
 import styles from "./world-studio-ultimate.module.css";
 
@@ -25,6 +24,24 @@ const LENSES: Array<{ id: WorldStudioLens; label: string }> = [
   { id: "history", label: "History" },
   { id: "files", label: "Files" },
 ];
+
+function selectWorldEvidence(
+  model: WorldReadModel | null,
+  evidenceId: string | null,
+): SelectedWorldEvidence | null {
+  if (!model || !evidenceId) return null;
+  const evidence = model.evidence.find((item) => item.id === evidenceId);
+  if (!evidence) return null;
+  return {
+    id: evidence.id,
+    sourceId: evidence.sourceId,
+    sourceVersionId: evidence.sourceVersionId,
+    page: evidence.page,
+    bbox: [...evidence.bbox],
+    blockId: evidence.blockId,
+    digest: evidence.digest,
+  };
+}
 
 function ReadNotYet({ children }: { children: string }) {
   return (
