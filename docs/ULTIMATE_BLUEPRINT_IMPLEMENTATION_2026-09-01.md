@@ -90,6 +90,8 @@ Recorded on 2026-09-01 KST against the production build in this repository:
 - Playwright: 180 passed and 12 intentional non-mobile skips across 1920, 1440, 1280, 1024, 768, 390, 360, and reduced-motion projects.
 - Public proof routes, deterministic downloads, mobile Runs SSE state, Activity audit rows, keyboard command palette, and full-page captures were exercised.
 - Lighthouse uses direct DevTools throttling with unchanged budgets because Lighthouse 12.8 Lantern re-times the already-painted RSC hero image at hydration completion under the installed Chrome.
+- Production deployment `dpl_5Gsq2TCZrCFnhbcTZZAeExVbyd3V` reached Ready on `tavonel.com`; ten public/readiness routes returned 200, reproducibility downloads returned attachment bytes, and the unauthenticated Runs SSE boundary returned 401.
+- Authenticated Workspace journeys use a production build with a test session and intercepted tenant APIs; they are not presented as live customer-session evidence.
 - Detailed visual evidence and the remaining human gate are recorded in `VISUAL_QA_REPORT.md`.
 
 External customer consent, qualified benchmark records, approved failed-experiment receipts, published package-channel proof, independent sample signature verification, and external audit evidence are not fabricated. Their public surfaces fail closed until those records exist.

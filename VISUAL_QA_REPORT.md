@@ -35,6 +35,17 @@ The hero LCP is a verified T0 product proof frame. Its intrinsic geometry is pre
 | `/privacy` | 0.98 | 1.00 | 1.00 | 1.00 | 1878 ms | 0.00033 | 62 ms |
 | `/security` | 0.97 | 1.00 | 0.96 | 1.00 | 2023 ms | 0.00024 | 38 ms |
 
+## Deployment evidence
+
+Production deployment `dpl_5Gsq2TCZrCFnhbcTZZAeExVbyd3V` reached Ready and was aliased to `tavonel.com` and `www.tavonel.com`. Live HTTP checks returned 200 for the homepage, Enterprise, Knowledge Compiler, Reproducibility, Benchmarks, Experiments, Customers, Developers, Trust, and readiness routes. The unauthenticated Runs SSE boundary returned the expected 401.
+
+The live reproducibility downloads returned attachment responses with stable release bytes:
+
+- `tavonel-reproducibility-manifest-v1.json`: SHA-256 `7109ebb0d36a081e1530e644257cf7c36f9988dbdd8d08c5c95bc18631fd8f17`
+- `tavonel-public-sample-world-v1.json`: SHA-256 `c503e05d43dcfb71428e820f5fe3fec28d6214ebf37f7f2d9954855e24a37da9`
+
+Authenticated Workspace journeys were exercised against the production build with a test session and intercepted tenant APIs. This is browser-contract evidence, not a claim that a live customer session or external integration was exercised during this run.
+
 ## Truth boundary
 
 Automated evidence confirms rendering, interaction, accessibility, responsive behavior, and performance gates. It does not establish aesthetic approval, customer consent, benchmark qualification, certification, or deployment-specific enterprise claims.
