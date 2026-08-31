@@ -8,7 +8,6 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { Fragment, cloneElement, isValidElement, useEffect, useMemo, useRef, useState } from "react";
-import AnswerSwitch from "@/components/answer-switch";
 import CanvasTransitionLink from "@/components/canvas-transition-link";
 import FilmBand from "@/components/film-band";
 import Logomark from "@/components/logomark";
@@ -40,12 +39,18 @@ const BANDS: Record<BandName, { mode: WorldMode; state: string; version: string;
 
 const BAND_ORDER: BandName[] = ["scatter", "structure", "world", "change", "rebuild", "answer", "access"];
 
-const DESTINATIONS = ["Retrieval", "Agents", "MCP", "API", "Search", "Your applications"];
-
-const TAKEAWAY = [
-  ["The package", "A directory of files, not a database dump: the ontology, the graph, the retrieval corpus and the provenance, each one hash-verified on the way out."],
-  ["The signature", "Signed with Ed25519 over the payload digest. A package that has been altered stops verifying."],
-  ["The public key", "Published, so the signature can be checked by a third party who has no account here and no reason to trust us."],
+/**
+ * What the compile hands back. The films show the work; this is the receipt.
+ *
+ * Every line is a file the workspace already writes into the signed package, which is why the
+ * ontology is named by its real extension rather than described as "a knowledge layer". A buyer
+ * comparing this against a retrieval product is comparing artifacts, not adjectives.
+ */
+const ARTIFACTS = [
+  ["ontology.ttl", "OWL classes and object properties — the shape of your domain, in a standard a triple store reads."],
+  ["graph.csv", "Entities and the relations between them, resolved across versions and spellings."],
+  ["corpus/", "Retrieval documents rebuilt from current facts, so an index is downstream of the world, not a copy of your drive."],
+  ["provenance/", "Every fact back to a file, a section and a line. An answer that cannot be traced does not ship."],
 ] as const;
 
 export default function HomePage() {
@@ -105,6 +110,8 @@ export default function HomePage() {
     () => capabilities.filter((cap) => cap.tone !== "open" && cap.tone !== "direction"),
     [capabilities],
   );
+  /** Only a successful, well-formed read can put a row here. Never inferred from a count. */
+  const openRows = useMemo(() => capabilities.filter((cap) => cap.tone === "open"), [capabilities]);
 
   useEffect(() => { trackSceneDepth(scene); }, [scene]);
 
@@ -159,6 +166,15 @@ export default function HomePage() {
 
   return (
     <div className="page landing-page">
+      {/*
+        The hero film is above the fold, so it is fetched with the document.
+
+        Without this the browser does not learn the cut exists until React has hydrated and the
+        <video> is in the DOM, which on a cold visit is a second of poster before anything
+        moves. React hoists this into <head>. Only cut 1 is preloaded — the other two are
+        deliberately deferred so they cannot compete for the connection.
+      */}
+      <link rel="preload" as="video" href="/film/compile-cut.mp4" type="video/mp4" />
       <WorldField mode={fieldMode} />
 
       <header className="nav" data-stuck={progress > 0.005 ? 1 : 0}>
@@ -211,9 +227,9 @@ export default function HomePage() {
           </div>
           <FilmBand
             src="/film/compile-cut.mp4"
-            poster="/film/poster-1.png"
-            href={"/film" as Route}
-            label="cut 1"
+            poster="/film/poster-1.jpg"
+            label="Cut 1 — a drive compiles into a world"
+            priority
           />
           <p className="fine film-note">{DISCLOSURE.fixture}</p>
         </section>
@@ -228,74 +244,97 @@ export default function HomePage() {
           </div>
         </div>
 
-        <Scene id={2} band="structure" eyebrow="STRUCTURE" title="What things are, and how they connect — compiled, not retrieved.">
+        <Scene id={2} film band="structure" eyebrow="STRUCTURE" title="What things are, and how they connect — compiled, not retrieved.">
           <FilmBand
             src="/film/compile-cut-2.mp4"
-            poster="/film/poster-2.png"
-            href={"/film-2" as Route}
-            label="cut 2"
+            poster="/film/poster-2.jpg"
+            label="Cut 2 — an ontology and its edges"
           />
         </Scene>
 
-        <Scene id={3} band="change" eyebrow="KEEP TRUE" title="A source changes. Only that slice recompiles. Trace it back.">
+        <Scene id={3} film band="change" eyebrow="KEEP TRUE" title="A source changes. Only that slice recompiles. Trace it back.">
           <FilmBand
             src="/film/compile-cut-3.mp4"
-            poster="/film/poster-3.png"
-            href={"/film-3" as Route}
-            label="cut 3"
+            poster="/film/poster-3.jpg"
+            label="Cut 3 — a delta recompiles and traces back"
           />
         </Scene>
 
-        <Scene id={4} band="answer" eyebrow="USE THE WORLD" title={<>One compiled world.<br />Every AI.</>}>
+        <Scene id={4} film band="answer" eyebrow="USE THE WORLD" title={<>One compiled world.<br />Every AI.</>}>
           <p className="lede rv">
-            Use the same grounded knowledge across retrieval, agents, MCP, APIs and your own applications.
-            <b> The model can change. Your knowledge should remain traceable.</b>
+            The model can change. Your knowledge stays traceable.
           </p>
-          <div className="sources rv">
-            {DESTINATIONS.map((name) => <span className="src" key={name}>{name}</span>)}
-          </div>
-          <AnswerSwitch />
-        </Scene>
+          {/*
+            The chips are gone.
 
-        <Scene id={5} band="access" eyebrow="PROOF & ACCESS" title={<>Stop rebuilding knowledge<br />for every AI project.</>}>
-          <p className="lede rv">
-            TAVONEL compiles everything you know into a structured, AI-ready world &mdash; and is
-            designed to keep that world aligned as sources change.
-          </p>
-
-          <div className="band-head rv"><span className="kicker">STATUS</span><h3>What exists in this deployment, right now.</h3></div>
-          <div className="caps rv">
-            {capabilities.map((cap) => (
-              <div className="cap" key={cap.name} data-tone={cap.tone} title={cap.note}>
-                <span className="cap-n">{cap.name}</span>
-                <span className="cap-s">{cap.state}</span>
-              </div>
-            ))}
-          </div>
-          <p className="fine rv">
-            Read live from this deployment when the page loads, not written by hand. A row this
-            page cannot confirm reads <b>Unknown</b> &mdash; it never defaults to available.
-          </p>
-
-          {heldRows.length > 0 ? (
-            <p className="fine rv held">
-              {heldRows.length} of the {capabilities.length} controls above {heldRows.length === 1 ? "is" : "are"} not
-              open in this deployment. Buying access does not open any of them &mdash; each opens
-              only when the control behind it is qualified.
-            </p>
-          ) : null}
-
-          <div className="band-head rv"><span className="kicker">NO LOCK-IN</span><h3>What you can take with you.</h3></div>
-          <div className="caps rv">
-            {TAKEAWAY.map(([name, text]) => (
-              <article className="cap" key={name}>
-                <h3>{name}</h3>
+            `Retrieval · Agents · MCP · API · Search` was six words in boxes asserting
+            integrations, next to an `AnswerSwitch` widget that mimed asking a question. A film
+            of the real clients answering — with the citation each one returns — makes both
+            redundant, and a mock sitting beside the real thing only makes the real thing look
+            staged.
+          */}
+          <FilmBand
+            src="/film/compile-cut-4.mp4"
+            poster="/film/poster-4.jpg"
+            label="Cut 4 — an assistant, an editor and a terminal reach the same world"
+          />
+          <div className="band-head rv"><span className="kicker">WHAT YOU GET</span><h3>Files, not a lock-in.</h3></div>
+          <div className="artifacts rv">
+            {ARTIFACTS.map(([name, text]) => (
+              <article className="artifact" key={name}>
+                <code>{name}</code>
                 <p>{text}</p>
               </article>
             ))}
           </div>
+        </Scene>
 
-          <div className="actions rv" style={{ marginTop: 30 }}>
+        <Scene id={5} band="access" eyebrow="PROOF & ACCESS" title={<>Stop rebuilding knowledge<br />for every AI project.</>}>
+          {/*
+            The grid, folded.
+
+            Nine rows of deployment plumbing — "Content disarm: OPEN", "Quarantine storage:
+            CONFIGURED" — was the last thing a first-time visitor saw, and on a phone it was a
+            full screen of vocabulary that belongs to whoever operates this deployment rather
+            than to whoever is deciding whether to try it. Folding it is not hiding it: the
+            summary below is generated from the same live, fail-closed reading, it names the
+            number that is closed, and the full grid is one click away and also lives at
+            /status. What must never happen is this summary reporting more open than the grid
+            does, which is why both come from `readCapabilities` and neither is written by hand.
+          */}
+          <p className="lede rv">
+            {statusFailed
+              ? "This page could not read its own deployment status just now, so it is not claiming any capability is available."
+              : openRows.length === 0
+                ? "Reading what this deployment can currently do."
+                : `${openRows.length} of ${capabilities.length} controls are open in this deployment.`}
+            {heldRows.length > 0 ? (
+              <> The rest stay closed until each is qualified &mdash; buying access opens none of them.</>
+            ) : null}
+          </p>
+
+          <details className="status-fold rv">
+            <summary>What exists in this deployment, right now</summary>
+            <div className="caps">
+              {capabilities.map((cap) => (
+                <div className="cap" key={cap.name} data-tone={cap.tone} title={cap.note}>
+                  <span className="cap-n">{cap.name}</span>
+                  <span className="cap-s">{cap.state}</span>
+                </div>
+              ))}
+            </div>
+            <p className="fine">
+              Read live from this deployment when the page loads, not written by hand. A row this
+              page cannot confirm reads <b>Unknown</b> &mdash; it never defaults to available.
+            </p>
+          </details>
+
+          <p className="lede rv" style={{ marginTop: 26 }}>
+            The package is signed with Ed25519 and its public key is published, so a third party
+            with no account here can verify it.
+          </p>
+
+          <div className="actions rv" style={{ marginTop: 24 }}>
             <Link className="btn" href={signedIn ? "/workspace" : "/login"}>
               {signedIn ? "Open workspace" : "Start in a private workspace"}
             </Link>
@@ -388,18 +427,28 @@ function Scene({
   band,
   eyebrow,
   title,
+  film,
   children,
 }: {
   id: number;
   band: BandName;
   eyebrow: string;
   title: React.ReactNode;
+  /*
+    A film scene stacks instead of splitting.
+
+    The two-column body puts a 380px title beside the content, which is right for prose and
+    wrong for a four-up: it left the cut about half the page wide, and at that size the columns
+    it is made of stop being readable — the exact failure the wide fixed frame was chosen to
+    avoid. So a film scene puts the heading above and gives the frame the full measure.
+  */
+  film?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <section className="scene" id={`s${id}`} data-scene={id} data-band={band}>
       <div className="shell">
-        <div className="body">
+        <div className={film ? "body film-body" : "body"}>
           <div className="stack">
             <p className="slate rv"><b>SCENE {String(id).padStart(2, "0")}</b><span />{eyebrow}</p>
             <h2>{revealWords(title)}</h2>

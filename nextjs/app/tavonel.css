@@ -574,8 +574,20 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 
 /* ============================================================ hero (01) */
 
-.scene.hero { min-height: 0; justify-content: flex-start; padding-top: 104px; padding-bottom: 28px; }
-.scene.hero .film-band { margin-top: 22px; }
+.scene.hero { min-height: 0; justify-content: flex-start; padding-top: 92px; padding-bottom: 28px; }
+/*
+  The hero film is shown whole.
+
+  This capped the element's height and let `object-fit: cover` crop the rest, on the theory that
+  cut 1's argument reads from the top of its columns. Measured, that was cutting 395px off an
+  827px frame — the bottom half of every column, including the WORLD graph the cut ends on. A
+  four-up that a visitor sees half of is not a shorter cut, it is a broken one.
+
+  The frame now keeps its aspect ratio and is sized by width like the other bands. It runs past
+  the fold, which is correct: the fold is not a wall, and the scroll that follows lands on cut 2.
+*/
+.scene.hero .film-band { margin-top: 18px; width: min(100%, 1440px); }
+.scene.hero .film-band-video { pointer-events: none; }
 .film-note { max-width: 72rem; margin: 12px auto 0; padding: 0 24px; }
 .film-band {
   position: relative;
@@ -584,34 +596,105 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
   background: #08090a;
   border: 1px solid var(--hairline);
 }
-.film-band-video,
-.film-band img {
+/*
+  The link is a block, and the band clips.
+
+  `film-band-link` wrapping the video was an inline anchor, so `width: 100%` on the video
+  resolved against the anchor's shrink-to-fit box rather than the band — and the video took its
+  intrinsic 1440px, pushing a 390px phone into a 1448px horizontal scroll. Both the block
+  display and the `max-width` are load-bearing; `overflow: hidden` on the band is the belt to
+  that braces.
+*/
+.film-band { overflow: hidden; }
+.film-band-link { display: block; width: 100%; }
+/*
+  Never crop a four-up.
+
+  `cover` fills the box by cutting whatever does not fit, and what does not fit in these frames
+  is always a column or the bottom of one. `contain` is the only honest fit for a film whose
+  entire claim is that four things are visible at once.
+
+  The ratio is the masters' own 1280x800, not the 1440x900 they were recorded at — declaring a
+  ratio the file does not have reserves a box of the wrong height and letterboxes every band.
+*/
+.film-band-video {
   display: block;
   width: 100%;
+  max-width: 100%;
   height: auto;
-  aspect-ratio: 1440 / 900;
-  object-fit: cover;
+  aspect-ratio: 1280 / 800;
+  object-fit: contain;
+  pointer-events: none;
 }
-.film-band-open,
-.film-band-link span,
-.film-band-phone span {
-  position: static;
-  display: inline-block;
-  margin: 8px 12px 10px;
-  font: 500 10px/1 var(--f-mono);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-xlo);
-}
-.film-band-open:hover,
-.film-band-link span,
-.film-band-phone span { color: var(--verified); }
-.film-band-phone { display: none; position: relative; }
+/*
+  The film scene is one column, and the frame gets the whole shell.
+
+  `.body` is a 380px title beside the content, which is the right shape for prose and the wrong
+  one for a four-up — it left each cut roughly half the page wide and the columns inside it
+  illegible. Here the heading sits above at its natural measure and the frame runs the full
+  width, which is the only size at which "four things at once" is actually readable.
+*/
+.body.film-body { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+.body.film-body > .stack:first-child { position: static; max-width: 46rem; }
 .film-scene { width: 100%; }
-.film-scene .film-band { width: calc(100% + 0px); }
+.artifacts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin-top: 12px;
+  background: var(--hairline);
+  border: 1px solid var(--hairline);
+}
+.artifact { padding: 18px 20px; background: var(--g1); }
+.artifact code {
+  display: block;
+  margin-bottom: 8px;
+  font-family: var(--f-mono);
+  font-size: 13px;
+  color: var(--verified);
+}
+.artifact p { margin: 0; font-size: 13px; line-height: 1.62; color: var(--text-lo); }
+/*
+  A disclosure, styled as an instrument control rather than a browser default.
+
+  The marker is replaced because the native triangle is the one piece of unstyled chrome on the
+  page, and its position differs per engine.
+*/
+.status-fold { margin-top: 16px; border-top: 1px solid var(--hairline); }
+.status-fold > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 14px 0;
+  font: 500 11px/1 var(--f-mono);
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--text-lo);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+}
+.status-fold > summary::-webkit-details-marker { display: none; }
+.status-fold > summary::before {
+  content: "+";
+  font-size: 14px;
+  color: var(--verified);
+}
+.status-fold[open] > summary::before { content: "−"; }
+.status-fold > summary:hover { color: var(--text-hi); }
+.status-fold .caps { margin-bottom: 12px; }
+.compile-stage {
+  width: 100%;
+  aspect-ratio: 1440 / 620;
+  background: #08090a;
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.compile-stage-canvas { display: block; width: 100%; height: 100%; }
 @media (max-width: 900px) {
-  .film-band-desk { display: none; }
-  .film-band-phone { display: block; }
+  .artifacts { grid-template-columns: minmax(0, 1fr); }
+  .compile-stage { aspect-ratio: 4 / 5; }
 }
 
 /*

@@ -45,6 +45,20 @@ const nextConfig = {
           { key: "Vary", value: "Accept" },
         ],
       },
+      /*
+        The compile cuts are immutable content served on a mutable path.
+
+        Vercel's default for anything under /public is `max-age=0, must-revalidate`, so every
+        visit re-fetched several megabytes of film that had not changed — a returning visitor
+        paid the same wait as a first-time one. These files are only ever replaced by a
+        redeploy, which changes the deployment and therefore the edge cache, so a year of
+        immutable caching is safe and is the difference between "loads again" and "already
+        there".
+      */
+      {
+        source: "/film/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
       { source: "/(.*)", headers: securityHeaders },
     ];
   },

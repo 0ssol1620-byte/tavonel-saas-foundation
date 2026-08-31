@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -46,6 +46,7 @@ const COPY_SURFACES = [
   "lib/film-script.ts",
   "components/opening-film.tsx",
   "components/film-band.tsx",
+  "components/compile-stage.tsx",
   "app/film/page.tsx",
   "app/research/page.tsx",
   "app/developers/page.tsx",
@@ -137,6 +138,35 @@ describe("public copy", () => {
     expect(page).toContain("/film/compile-cut-3.mp4");
   });
 
+  it("does not wrap the films in a clickable link", () => {
+    const band = read("components/film-band.tsx");
+    expect(band).not.toContain("href");
+    expect(band).not.toContain("CanvasTransitionLink");
+    expect(read("app/page.tsx")).not.toMatch(/FilmBand[\s\S]{0,200}href=/);
+  });
+
+  /*
+    A poster that does not exist renders a broken-image icon and the alt text.
+
+    Cuts 2-4 shipped for one deploy with their posters deleted as a bandwidth saving, which the
+    reduced-motion branch turned into `<img src={undefined}>` — a visitor with that setting saw
+    a broken image where the film should be. Both halves are asserted: every band names a
+    poster, and every poster it names is a file in the repo.
+  */
+  it("gives every film band a poster file that actually exists", () => {
+    const page = read("app/page.tsx");
+    const bands = page.match(/<FilmBand[\s\S]*?\/>/g) ?? [];
+    expect(bands.length).toBeGreaterThanOrEqual(4);
+    for (const band of bands) {
+      const poster = /poster="([^"]+)"/.exec(band)?.[1];
+      expect(poster, `every FilmBand needs a poster: ${band.slice(0, 80)}`).toBeTruthy();
+      expect(
+        existsSync(join(root, "public", poster!)),
+        `${poster} is referenced but missing from public/`,
+      ).toBe(true);
+    }
+  });
+
   it("does not restage widgets the films already show", () => {
     const page = read("app/page.tsx");
     expect(page).not.toContain("ReadingDemo");
@@ -144,5 +174,24 @@ describe("public copy", () => {
     expect(page).not.toContain("RebuildConsole");
     expect(page).not.toContain("ChangeLattice");
     expect(page).not.toContain("IdentityResolve");
+  });
+
+  it("names the artifacts that leave the compiler", () => {
+    // The films show the compile. What a buyer cannot see in a loop is what they receive,
+    // and that is the difference between this and a retrieval index.
+    const page = read("app/page.tsx");
+    expect(page).toContain("ontology.ttl");
+    expect(page).toContain("graph.csv");
+    expect(page).toContain("provenance");
+  });
+
+  it("stages a customer's own upload in the workspace, not a fixture world", () => {
+    const stage = read("components/compile-stage.tsx");
+    expect(stage).toContain("SOURCES");
+    expect(stage).toContain("WORLD");
+    // The landing fixture must never be pasted into the authenticated surface: no import of
+    // the demo world, and no census figure. (The file may name them in prose to say so.)
+    expect(stage).not.toMatch(/from ["']@\/lib\/demo-world["']/);
+    expect(stage).not.toContain("SOURCE_CENSUS");
   });
 });
