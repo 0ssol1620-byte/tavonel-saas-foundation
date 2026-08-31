@@ -147,14 +147,16 @@ async def rerank(data: dict):
         _RERANK_MODEL = FlagReranker(local_path, use_fp16=True)  # type: ignore[name-defined]
         model = _RERANK_MODEL  # type: ignore[name-defined]
 
+    # Always score and return every candidate sent, regardless of any topK hint --
+    # rerankWithFallback (nextjs/lib/reranker-adapter.ts) treats a response missing any
+    # candidate id as an incomplete/failed rerank and degrades to the RRF-fused order. If
+    # this route truncated its own response, a correctly-topK'd response would be
+    # indistinguishable from a broken one. topK truncation is the TS caller's job, applied
+    # after it confirms every candidate got a score.
     pairs = [[query, candidate["text"]] for candidate in candidates]
     scores = model.compute_score(pairs, normalize=True)
     if not isinstance(scores, list):
         scores = [scores]
     ranked = [{"id": candidate["id"], "score": float(score)} for candidate, score in zip(candidates, scores)]
-
-    top_k = data.get("topK") if isinstance(data, dict) else None
-    if isinstance(top_k, int) and top_k > 0:
-        ranked = sorted(ranked, key=lambda item: item["score"], reverse=True)[:top_k]
 
     return {"schemaVersion": "tavonel.rerank_result.v1", "status": "ok", "ranked": ranked}

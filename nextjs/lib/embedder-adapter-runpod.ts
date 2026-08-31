@@ -88,11 +88,17 @@ async function callEmbeddingRoute(
     instruction: options?.instruction,
   };
 
+  // Computed before the allowlist check (auditor-sol Wave 2 finding #5) so an allowlist
+  // rejection still carries a real digest of what was attempted -- otherwise every
+  // rejected request produced an identical, empty inputDigest, making the receipt useless
+  // for telling two different rejected calls apart or reproducing either one.
+  const inputDigest = `sha256:${await sha256Hex(JSON.stringify(texts))}`;
+
   if (!looksLikeRunPodEmbeddingUrl(config.url)) {
     return {
       status: "error",
       reason: "RunPod embedding URL failed the allowlist check",
-      receipt: { ...receiptBase, inputDigest: "", outputDigest: null, durationMs: 0, timedOut: false },
+      receipt: { ...receiptBase, inputDigest, outputDigest: null, durationMs: 0, timedOut: false },
     };
   }
 
@@ -100,7 +106,6 @@ async function callEmbeddingRoute(
   const apiKey = (config.apiKey || "").trim();
   if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
 
-  const inputDigest = `sha256:${await sha256Hex(JSON.stringify(texts))}`;
   let response: Response;
   try {
     response = await fetcher(`${config.url.replace(/\/$/, "")}/${route}`, {

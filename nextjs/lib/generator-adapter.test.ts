@@ -81,6 +81,20 @@ describe("generateGroundedAnswer", () => {
     }
   });
 
+  it("rejects an answer that has real content but zero citations, rather than treating an empty citation list as vacuously valid (Wave 2 auditor-sol finding)", async () => {
+    const adapter: GeneratorAdapter = {
+      identity: () => ({ provider: "openai", model: "gpt-5.6", revision: "rev-1" }),
+      generate: async () => ({
+        status: "ok",
+        candidate: { answer: "Payment is due in 45 days.", citations: [] },
+        receipt: receipt(),
+      }),
+    };
+    const outcome = await generateGroundedAnswer(adapter, packet());
+    expect(outcome.status).toBe("abstained");
+    if (outcome.status === "abstained") expect(outcome.reason).toBe("NO_CITATIONS_PROVIDED");
+  });
+
   it("rejects the whole answer if even one of several citations is fabricated", async () => {
     const adapter: GeneratorAdapter = {
       identity: () => ({ provider: "openai", model: "gpt-5.6", revision: "rev-1" }),

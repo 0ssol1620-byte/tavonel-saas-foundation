@@ -40,6 +40,20 @@ describe("createRunPodRerankerAdapter", () => {
     expect(url).toBe("https://api.runpod.ai/v2/fake-endpoint/rerank");
   });
 
+  it("never forwards options.topK to the worker (auditor-sol Wave 2 finding #3: a server-truncated response looks identical to a broken one to rerankWithFallback)", async () => {
+    const fetcher = vi.fn(async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(init.body as string);
+      expect(body.data.topK).toBeUndefined();
+      return jsonResponse({
+        schemaVersion: "tavonel.rerank_result.v1",
+        status: "ok",
+        ranked: [{ id: "a", score: 0.9 }, { id: "b", score: 0.4 }],
+      });
+    });
+    const adapter = createRunPodRerankerAdapter(identity, config, fetcher as unknown as typeof fetch);
+    await adapter.rerank("payment terms", candidates, { topK: 1 });
+  });
+
   it("fails closed on a URL that does not pass the allowlist, without ever calling fetch", async () => {
     const fetcher = vi.fn();
     const adapter = createRunPodRerankerAdapter(identity, { url: "https://evil.example.com" }, fetcher as unknown as typeof fetch);

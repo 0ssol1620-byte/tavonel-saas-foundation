@@ -96,6 +96,14 @@ describe("createRunPodEmbedderAdapter", () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 
+  it("still records a real, distinguishing inputDigest on an allowlist rejection (auditor-sol Wave 2 finding #5)", async () => {
+    const adapter = createRunPodEmbedderAdapter(identity, { url: "https://evil.example.com" }, vi.fn() as unknown as typeof fetch);
+    const resultA = await adapter.embedDocuments(["document A"]);
+    const resultB = await adapter.embedDocuments(["a completely different document B"]);
+    expect(resultA.receipt.inputDigest).not.toBe("");
+    expect(resultA.receipt.inputDigest).not.toBe(resultB.receipt.inputDigest);
+  });
+
   it("reports a non-ok HTTP status as a provider error", async () => {
     const fetcher = vi.fn(async () => new Response("", { status: 500 }));
     const adapter = createRunPodEmbedderAdapter(identity, config, fetcher as unknown as typeof fetch);

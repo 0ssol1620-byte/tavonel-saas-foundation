@@ -6,6 +6,16 @@ import { verifyGroundedCitations } from "./context-packet";
 // grounded until generateGroundedAnswer verifies every citation against that same packet
 // (see the STATUS note this replaces in context-packet.ts). A generator that invents an
 // evidence ID not present in the packet must never reach the caller as a grounded answer.
+//
+// STATUS (Wave 2): this is the enforcement contract, not yet an implementation or a
+// production call site. No concrete GeneratorAdapter (an actual LLM provider integration)
+// exists anywhere in this repo yet, and no API route calls generateGroundedAnswer --
+// nextjs/app/api/collections/[id]/ask/route.ts still calls the pre-existing
+// excerpt-concatenation path (answerGroundedQuestion in grounded-ask.ts) unchanged, since
+// it builds citations directly from evidence and cannot hallucinate one. Choosing and
+// wiring a real LLM provider is a product decision (which model, which prompt, cost/latency
+// tradeoffs) explicitly out of Wave 2's scope; ship no LLM-based generator without routing
+// it through generateGroundedAnswer when that decision is made.
 export type GeneratorModelIdentity = {
   provider: string;
   model: string;
@@ -81,6 +91,13 @@ export async function generateGroundedAnswer(
   const result = await adapter.generate(packet, options);
   if (result.status === "error") {
     return { status: "abstained", reason: `GENERATOR_PROVIDER_ERROR: ${result.reason}`, receipt: result.receipt };
+  }
+
+  if (result.candidate.citations.length === 0) {
+    // verifyGroundedCitations([], packet) is vacuously valid -- there are no unknown ids
+    // among zero cited ids -- which would let an answer with real content but no evidence
+    // behind it sail through as "grounded". A grounded answer must cite something.
+    return { status: "abstained", reason: "NO_CITATIONS_PROVIDED", receipt: result.receipt };
   }
 
   const citedEvidenceIds = result.candidate.citations.map((citation) => citation.evidenceId);

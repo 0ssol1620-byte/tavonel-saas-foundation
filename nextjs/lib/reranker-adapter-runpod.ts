@@ -90,7 +90,13 @@ async function callRerankRoute(
     response = await fetcher(`${config.url.replace(/\/$/, "")}/rerank`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ data: { query, candidates, topK: options?.topK } }),
+      // Deliberately never forwards options.topK to the worker: rerankWithFallback
+      // (reranker-adapter.ts) treats any candidate id missing from the response as an
+      // incomplete/failed rerank and degrades to the RRF-fused order -- if the worker
+      // truncated its own response to topK, a correctly-topK'd response would be
+      // indistinguishable from a broken one. The adapter must always score every
+      // candidate it was given; rerankWithFallback applies topK itself after that.
+      body: JSON.stringify({ data: { query, candidates } }),
       signal: AbortSignal.timeout(options?.timeoutMs ?? config.timeoutMs ?? RUNPOD_RERANKER_REQUEST_TIMEOUT_MS),
     });
   } catch (error) {

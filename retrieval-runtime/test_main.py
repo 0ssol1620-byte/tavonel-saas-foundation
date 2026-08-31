@@ -132,15 +132,20 @@ async def run():
     check("rerank returns a score per candidate", len(reranked["ranked"]) == 2)
     check("rerank preserves candidate ids", {r["id"] for r in reranked["ranked"]} == {"a", "b"})
 
-    top1 = await main.rerank(
+    # A topK field in the request must NOT truncate the server's own response: TS's
+    # rerankWithFallback (nextjs/lib/reranker-adapter.ts) treats a response missing any
+    # candidate id as an incomplete/failed rerank and degrades to the RRF-fused order.
+    # topK truncation is applied client-side, after every candidate has a score
+    # (auditor-sol Wave 2 finding #3 -- a correctly-topK'd server response used to be
+    # indistinguishable from a broken one).
+    ignored_top_k = await main.rerank(
         {
             "query": "q",
             "candidates": [{"id": "a", "text": "short"}, {"id": "b", "text": "a much longer candidate text"}],
             "topK": 1,
         }
     )
-    check("rerank respects topK truncation", len(top1["ranked"]) == 1)
-    check("rerank topK keeps the highest-scoring candidate", top1["ranked"][0]["id"] == "b")
+    check("rerank ignores a topK field and still scores every candidate", len(ignored_top_k["ranked"]) == 2)
 
 
 asyncio.run(run())

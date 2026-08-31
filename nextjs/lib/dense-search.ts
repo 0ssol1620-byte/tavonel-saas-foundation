@@ -3,8 +3,11 @@
 // its bind parameters -- executing it and turning rows into a RankedList (via
 // toRankedList in rank-fusion.ts) is the caller's job, mirroring lexical-search.ts. The
 // query embedding must already have passed embedDocumentsForProfile's compatibility guard
-// (embedder-adapter.ts) before it reaches here; this module does not re-check compatibility,
-// only that the vector it was given is well-formed.
+// (embedder-adapter.ts) before it reaches here; expectedDimension is checked again anyway
+// (auditor-sol Wave 2 finding #4) as defense in depth, the same posture applyWorldGate
+// takes on tenant isolation -- a query embedding that reached this function without going
+// through the embedder guard must still fail closed here rather than querying an
+// incompatible embedding space.
 export type DenseMetric = "cosine" | "l2" | "inner_product";
 
 export type DenseSearchParams = {
@@ -12,6 +15,7 @@ export type DenseSearchParams = {
   compileRunId: string;
   retrievalProfileId: string;
   queryEmbedding: number[];
+  expectedDimension: number;
   metric: DenseMetric;
   limit: number;
 };
@@ -31,8 +35,13 @@ const DISTANCE_OPERATOR: Record<DenseMetric, string> = {
 };
 
 export function buildDenseSearchQuery(params: DenseSearchParams): DenseSearchQuery {
-  if (params.queryEmbedding.length < 1 || params.queryEmbedding.length > 8192) {
-    throw new Error("buildDenseSearchQuery requires a 1-8192 dimensional embedding");
+  if (!Number.isInteger(params.expectedDimension) || params.expectedDimension < 1 || params.expectedDimension > 8192) {
+    throw new Error("buildDenseSearchQuery requires expectedDimension to be an integer between 1 and 8192");
+  }
+  if (params.queryEmbedding.length !== params.expectedDimension) {
+    throw new Error(
+      `buildDenseSearchQuery: query embedding is ${params.queryEmbedding.length}D but the profile expects ${params.expectedDimension}D`,
+    );
   }
   if (!params.queryEmbedding.every((value) => Number.isFinite(value))) {
     throw new Error("buildDenseSearchQuery requires every embedding component to be a finite number");

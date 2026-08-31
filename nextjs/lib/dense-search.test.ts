@@ -6,6 +6,7 @@ const base: Omit<Parameters<typeof buildDenseSearchQuery>[0], "metric"> = {
   compileRunId: "retrieval-run-" + "a".repeat(32),
   retrievalProfileId: "bge-m3-v1",
   queryEmbedding: [0.1, 0.2, 0.3],
+  expectedDimension: 3,
   limit: 20,
 };
 
@@ -40,9 +41,16 @@ describe("buildDenseSearchQuery", () => {
     expect(query.sql).toMatch(/order by distance asc/);
   });
 
-  it("rejects an out-of-range embedding dimension", () => {
-    expect(() => buildDenseSearchQuery({ ...base, metric: "cosine", queryEmbedding: [] })).toThrow();
-    expect(() => buildDenseSearchQuery({ ...base, metric: "cosine", queryEmbedding: new Array(8193).fill(0.1) })).toThrow();
+  it("rejects an out-of-range expectedDimension", () => {
+    expect(() => buildDenseSearchQuery({ ...base, metric: "cosine", expectedDimension: 0 })).toThrow();
+    expect(() => buildDenseSearchQuery({ ...base, metric: "cosine", expectedDimension: 8193 })).toThrow();
+  });
+
+  it("rejects a query embedding whose length disagrees with expectedDimension, rather than trusting it silently (auditor-sol Wave 2 finding #4)", () => {
+    expect(() => buildDenseSearchQuery({ ...base, metric: "cosine", queryEmbedding: [0.1], expectedDimension: 1024 })).toThrow(
+      /is 1D but the profile expects 1024D/,
+    );
+    expect(() => buildDenseSearchQuery({ ...base, metric: "cosine", queryEmbedding: [], expectedDimension: 3 })).toThrow();
   });
 
   it("rejects a non-finite embedding component", () => {
