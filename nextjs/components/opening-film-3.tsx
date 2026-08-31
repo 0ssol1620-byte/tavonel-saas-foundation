@@ -10,9 +10,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { FILM_ACT as ACT } from "@/lib/film-script";
 import { buildWorldGraph, nodeBudget, type WorldGraph } from "@/lib/world-graph";
 
-const ONTO_SPLIT = 0.56;
-const SOURCE_SPLIT = 0.56;
-const PERIOD = 5.5;
+const ONTO_SPLIT = 0.50;
+const SOURCE_SPLIT = 0.58;
+const REWRITE_UNTIL = 3.4;
 const WORLD_UNTIL = 17.2;
 
 const AREA_RGB: [number, number, number][] = [
@@ -49,83 +49,54 @@ const FILES = [
   "change-order-12.pdf",
   "invoice-clock.md",
   "line-4-signoff.pdf",
-  "site-visit-140.pdf",
   "legal-review.txt",
   "finance-signoff.pdf",
-  "bay-2-lighting.jpg",
 ];
 
-const DELTAS: Delta[] = [
-  {
-    file: "MSA_v4.pdf",
-    clause: "§3.2",
-    label: "PaymentTerms",
-    area: 0,
-    minus: "due 45 days after receipt",
-    plus: "due 30 days after receipt",
-    mdKeep: [
-      "# Payment terms",
-      "source: §3.2 · p.7 · lines 14–16",
-      "| Description | Basis | Amount |",
-      "| --- | --- | --- |",
-      "| Warehouse B survey | two days | £4,200.00 |",
-      "![Fig. 2 Bay layout](attachment)",
-      "Work above $50,000 needs a signed change order.",
-    ],
-    ttlHead: `@prefix : <https://tavonel.example/world/> .
+const CHANGE: Delta = {
+  file: "MSA_v4.pdf",
+  clause: "§3.2",
+  label: "PaymentTerms",
+  area: 0,
+  minus: "due 45 days after receipt",
+  plus: "due 30 days after receipt",
+  mdKeep: [
+    "# Payment terms",
+    "source: §3.2 · p.7 · lines 14–16",
+    "Late amounts accrue 1.5% per month.",
+    "| Description | Basis | Amount |",
+    "| --- | --- | --- |",
+    "| Warehouse B survey | two days | £4,200.00 |",
+    "| Line 4 overtime | 12 hours | £1,860.00 |",
+    "![Fig. 2 Bay layout — Line 4](attachment)",
+    "Work above $50,000 needs a signed change order.",
+    "POs must cite the live schedule, not the archive.",
+  ],
+  ttlHead: `@prefix : <https://tavonel.example/world/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 :PaymentTerms a owl:Class ;
-  rdfs:subClassOf :ContractClause ;`,
-    ttlOld: `  :due "P45D"^^xsd:duration ;`,
-    ttlNew: `  :due "P30D"^^xsd:duration ;`,
-    affected: ["PaymentTerms", "Invoice", "PurchaseOrder", "Q3Forecast", "ChangeOrder", "Finance"],
-  },
-  {
-    file: "scan_0140.jpg",
-    clause: "scan_0140",
-    label: "WarehouseB",
-    area: 2,
-    minus: "closed after 18:00",
-    plus: "closed after 17:00",
-    mdKeep: [
-      "# Site visit notes",
-      "path: ocr · scan_0140",
-      "Line 4 safety sign-off outstanding.",
-      "![Photo pack — 14 files](scan_0140)",
-      "Bay 2 lighting failed at 17:40.",
-    ],
-    ttlHead: `@prefix : <https://tavonel.example/world/> .
-@prefix owl: <http://www.w3.org/2002/07/owl#> .
-:WarehouseB a owl:Class ;
-  rdfs:subClassOf :Site ;`,
-    ttlOld: `  :closedAfter "18:00"^^xsd:time ;`,
-    ttlNew: `  :closedAfter "17:00"^^xsd:time ;`,
-    affected: ["WarehouseB", "Line4", "SiteVisit", "InvoiceClock", "OperationsManual"],
-  },
-  {
-    file: "handbook-2026.pdf",
-    clause: "§12",
-    label: "NoticePeriod",
-    area: 3,
-    minus: "thirty (30) days’ written notice",
-    plus: "fourteen (14) days’ written notice",
-    mdKeep: [
-      "# Employee Handbook 2026",
-      "## 12. Notice",
-      "Confidentiality survives for three years.",
-      "## 14. Conflicts",
-      "Where this handbook and a services agreement disagree, the agreement wins.",
-    ],
-    ttlHead: `@prefix : <https://tavonel.example/world/> .
-@prefix owl: <http://www.w3.org/2002/07/owl#> .
-:NoticePeriod a owl:Class ;
-  rdfs:subClassOf :PolicyRule ;`,
-    ttlOld: `  :notice "P30D"^^xsd:duration ;`,
-    ttlNew: `  :notice "P14D"^^xsd:duration ;`,
-    affected: ["NoticePeriod", "Confidentiality", "Employment", "Handbook", "ServicesAgreement", "Legal"],
-  },
-];
+  rdfs:subClassOf :ContractClause ;
+  rdfs:comment "Live terms. The model is not authority." .
+:Invoice a owl:Class .
+:PurchaseOrder a owl:Class .
+:ChangeOrder a owl:Class .
+:Q3Forecast a owl:Class .
+:Finance a owl:Class .
+:due a owl:DatatypeProperty ;
+  rdfs:domain :PaymentTerms ;
+  rdfs:range xsd:duration .
+:constrains a owl:ObjectProperty ;
+  rdfs:domain :PaymentTerms ;
+  rdfs:range :Invoice .
+:must_cite a owl:ObjectProperty ;
+  rdfs:domain :PurchaseOrder ;
+  rdfs:range :PaymentTerms .`,
+  ttlOld: `  :due "P45D"^^xsd:duration ;`,
+  ttlNew: `  :due "P30D"^^xsd:duration ;`,
+  affected: ["PaymentTerms", "Invoice", "PurchaseOrder", "Q3Forecast", "ChangeOrder", "Finance", "ServicesAgreement", "Legal"],
+};
 
 const CLASS_ATTRS: Record<string, string[][]> = {
   PaymentTerms: [["due", "duration 1"], ["lateRate", "decimal 1"]],
@@ -184,9 +155,8 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-function deltaAt(t: number): { d: Delta; local: number; i: number } {
-  const i = Math.floor(t / PERIOD) % DELTAS.length;
-  return { d: DELTAS[i], local: (t % PERIOD) / PERIOD, i };
+function rewriteLocal(t: number) {
+  return clamp01(t / REWRITE_UNTIL);
 }
 
 export default function OpeningFilm3({ onEnded }: { onEnded?: () => void }) {
@@ -289,13 +259,8 @@ export default function OpeningFilm3({ onEnded }: { onEnded?: () => void }) {
       const listH = Math.round(h * SOURCE_SPLIT);
       context.fillStyle = "#0b0d0e";
       context.fillRect(x, y, w, h);
-      const rowH = 18;
-      const slots = Math.max(8, Math.floor((listH - 8) / rowH));
-      const active = Math.max(0, FILES.indexOf(d.file));
-      const start = Math.max(0, active - (slots - 2));
-      const visible: string[] = [];
-      for (let i = 0; i < slots; i += 1) visible.push(FILES[(start + i) % FILES.length]);
-      visible.forEach((name, i) => {
+      const rowH = (listH - 8) / FILES.length;
+      FILES.forEach((name, i) => {
         const yy = y + 6 + i * rowH;
         const on = name === d.file;
         if (on) {
@@ -401,6 +366,15 @@ export default function OpeningFilm3({ onEnded }: { onEnded?: () => void }) {
         wrap(context, row.length ? row : " ", w - gutter - 10).forEach((part) => packed.push(part));
       });
       const maxRows = Math.max(6, Math.floor((h - 18) / rowH));
+      const extra = [
+        ":reads a owl:ObjectProperty ;",
+        "  rdfs:domain :Q3Forecast ;",
+        "  rdfs:range :PaymentTerms .",
+        ":signed_by a owl:ObjectProperty ;",
+        "  rdfs:domain :PurchaseOrder ;",
+        "  rdfs:range :Finance .",
+      ];
+      extra.forEach((row) => wrap(context, row, w - gutter - 10).forEach((part) => packed.push(part)));
       packed.slice(0, maxRows).forEach((row, i) => {
         context.fillStyle = "#1a1e22";
         context.fillRect(x + gutter, y + 16 + i * rowH, w - gutter, 1);
@@ -427,7 +401,7 @@ export default function OpeningFilm3({ onEnded }: { onEnded?: () => void }) {
 
     const drawCards = (
       x: number, y: number, w: number, h: number,
-      d: Delta, local: number,
+      d: Delta,
     ) => {
       context.fillStyle = "#0b0d0e";
       context.fillRect(x, y, w, h);
@@ -444,20 +418,17 @@ export default function OpeningFilm3({ onEnded }: { onEnded?: () => void }) {
       const cardW = (innerW - gap) / cols;
       const cardH = (innerH - gap * (rowsFit - 1)) / rowsFit;
       const slots = rowsFit * cols;
-      const ids = d.affected.filter(Boolean);
+      const ids = d.affected.filter(Boolean).slice(0, slots);
       const n = ids.length;
       if (!n) return;
-      const hotI = Math.floor(local * n * 1.8) % n;
-      const slot = (hotI * 3 + Math.floor(local * 7)) % slots;
-      const start = (hotI - slot + n) % n;
-      for (let i = 0; i < slots; i += 1) {
-        const id = ids[(start + i) % n];
+      for (let i = 0; i < n; i += 1) {
+        const id = ids[i];
         if (!id) continue;
         const c = i % cols;
         const r = Math.floor(i / cols);
         const bx = innerX + c * (cardW + gap);
         const by = innerY + r * (cardH + gap);
-        const on = i === slot || id === d.label;
+        const on = id === d.label;
         const attrs = CLASS_ATTRS[id] ?? [["iri", "xsd:anyURI 1"]];
         context.fillStyle = on ? "#1a2220" : "#16191c";
         roundRect(context, bx, by, cardW, cardH, 2);
@@ -483,7 +454,7 @@ export default function OpeningFilm3({ onEnded }: { onEnded?: () => void }) {
 
     const drawWorld = (
       x: number, y: number, w: number, h: number,
-      t: number, d: Delta, local: number, selected: number,
+      t: number, d: Delta, selected: number,
     ) => {
       if (!graph) return;
       const g = graph;
@@ -506,7 +477,7 @@ export default function OpeningFilm3({ onEnded }: { onEnded?: () => void }) {
         const nb = g.nodes[ib];
         const hit = affected.has(ia) && affected.has(ib);
         context.strokeStyle = hit
-          ? `rgba(123,224,190,${0.12 + local * 0.55})`
+          ? "rgba(123,224,190,0.42)"
           : "rgba(80,88,94,0.18)";
         context.lineWidth = hit ? 1.15 : 0.7;
         context.beginPath();
@@ -525,7 +496,7 @@ export default function OpeningFilm3({ onEnded }: { onEnded?: () => void }) {
         if (ia === last && !hops.includes(ib)) hops.push(ib);
         else if (ib === last && !hops.includes(ia)) hops.push(ia);
       });
-      const lit = Math.max(1, Math.floor(local * hops.length));
+      const lit = Math.max(1, Math.floor(clamp01(t / WORLD_UNTIL) * hops.length));
       for (let i = 0; i < Math.min(lit, hops.length - 1); i += 1) {
         const na = g.nodes[hops[i]];
         const nb = g.nodes[hops[i + 1]];
@@ -581,11 +552,12 @@ export default function OpeningFilm3({ onEnded }: { onEnded?: () => void }) {
       context.font = "500 12px Wanted Sans Variable, system-ui, sans-serif";
       context.fillText("TAVONEL  ·  Recompile the slice", bx + 26, by + 20);
 
-      const { d, local } = deltaAt(t);
+      const d = CHANGE;
+      const local = rewriteLocal(t);
       const pool = graph
         ? ((graph.byArea[d.area] && graph.byArea[d.area].length) ? graph.byArea[d.area] : (graph.byArea[0] ?? [0]))
         : [0];
-      const selected = pool.length ? pool[Math.floor(local * pool.length) % pool.length] : 0;
+      const selected = pool[0] ?? 0;
       const rgb = AREA_RGB[d.area % AREA_RGB.length];
       const accent = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
 
@@ -602,10 +574,10 @@ export default function OpeningFilm3({ onEnded }: { onEnded?: () => void }) {
       const bodyH = colH - 38;
       const topH = Math.round(bodyH * ONTO_SPLIT);
       drawTtl(bodyX, bodyY, bodyW, topH, d, local, accent);
-      drawCards(bodyX, bodyY + topH + 4, bodyW, bodyH - topH - 4, d, local);
+      drawCards(bodyX, bodyY + topH + 4, bodyW, bodyH - topH - 4, d);
 
       pane(xs[3], colY, colW, colH, "WORLD", "trace");
-      drawWorld(xs[3] + 6, colY + 30, colW - 12, colH - 38, t, d, local, selected);
+      drawWorld(xs[3] + 6, colY + 30, colW - 12, colH - 38, t, d, selected);
       } catch (err) {
         console.error(err);
       }
