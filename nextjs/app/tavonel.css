@@ -591,6 +591,12 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 @media (max-width: 640px) {
   .scene.hero .film-band,
   .scene.hero .film-note { display: none; }
+  .js .scene.hero .rv.word {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    transition: none;
+  }
 }
 .film-note { max-width: 72rem; margin: 12px auto 0; padding: 0 24px; }
 .film-band {
