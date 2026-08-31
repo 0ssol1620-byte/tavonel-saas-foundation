@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { ArrowLeft, Download, Fingerprint, Gauge, Globe2, LockKeyhole, RefreshCw, ShieldCheck } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
@@ -86,7 +87,7 @@ export default function EnterpriseConsole() {
   return (
     <main id="main" className="enterprise-page" tabIndex={-1}>
       <header className="enterprise-header">
-        <a href="/workspace"><ArrowLeft size={15} /> Workspace</a>
+        <Link href="/workspace"><ArrowLeft size={15} /> Workspace</Link>
         <span>TAVONEL / ENTERPRISE CONTROL PLANE</span>
         <button onClick={() => void load()} disabled={busy}><RefreshCw size={14} /> Refresh</button>
       </header>

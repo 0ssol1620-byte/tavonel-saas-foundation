@@ -205,7 +205,7 @@ export default function HomePage() {
               Files go in. A world an AI can cite comes out.
             </p>
             <div className="actions rv">
-              <Link className="btn" href={signedIn ? "/workspace" : "/login"}>Compile sample data</Link>
+              <Link className="btn" href={"/explore" as Route}>Explore a Compiled World</Link>
               <Link className="btn ghost" href="/evidence">Evidence</Link>
             </div>
           </div>
@@ -297,7 +297,7 @@ export default function HomePage() {
 
           <div className="actions rv" style={{ marginTop: 30 }}>
             <Link className="btn" href={signedIn ? "/workspace" : "/login"}>
-              {signedIn ? "Open workspace" : "Compile sample data"}
+              {signedIn ? "Open workspace" : "Start in a private workspace"}
             </Link>
             <Link className="btn ghost" href="/evidence">Inspect evidence</Link>
             <Link className="btn ghost" href={"/contact" as Route}>Talk to us</Link>

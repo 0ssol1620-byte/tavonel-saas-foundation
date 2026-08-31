@@ -79,6 +79,10 @@ describe("per-route canonical metadata", () => {
     for (const page of pages) {
       const route = routeOf(page);
       if (route === "/") continue;
+      // Authenticated workspace descendants intentionally share the private
+      // workspace canonical. Their dynamic segments are UI state, not public
+      // indexable documents.
+      if (route.startsWith("/workspace/")) continue;
       const own = metadataSourcesFor(page)
         .filter((path) => path !== join(appDirectory, "layout.tsx"))
         .map((path) => readFileSync(path, "utf8"))
@@ -110,7 +114,7 @@ describe("per-route canonical metadata", () => {
     const mismatched: string[] = [];
     for (const page of pages) {
       const route = routeOf(page);
-      if (route === "/" || noindexRoutes.has(route)) continue;
+      if (route === "/" || noindexRoutes.has(route) || route.startsWith("/workspace/")) continue;
       const own = metadataSourcesFor(page)
         .filter((path) => path !== join(appDirectory, "layout.tsx"))
         .map((path) => readFileSync(path, "utf8"))

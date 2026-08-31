@@ -4,7 +4,7 @@ import Link from "next/link";
 import Logomark from "@/components/logomark";
 import WorldExplorer from "@/components/world-explorer";
 import { Download, FileText, LockKeyhole, ShieldCheck, UploadCloud } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { activationPolicy } from "@/lib/activation-policy";
 import type { DocumentListItem } from "@/lib/immutable-keys";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
@@ -20,6 +20,9 @@ import { displayName, elideKey, recallDocumentNames, rememberDocumentName, type 
 import { trackFunnel } from "@/lib/funnel-events";
 import ConnectionsPanel from "@/components/connections-panel";
 import DeveloperPanel from "@/components/developer-panel";
+import WorkspaceUltimateShell, { type WorkspaceSurface } from "@/components/workspace-ultimate-shell";
+import WorldStudioUltimate from "@/components/world-studio-ultimate";
+import type { WorldReadModel } from "@/lib/world-read-model";
 
 /** What this panel prints when it has no value. Not "0", and not a spinner that never resolves. */
 const UNKNOWN = "not read yet";
@@ -150,6 +153,40 @@ const TABS: { id: WorkspaceTab; label: string }[] = [
   { id: "integrity", label: "Processing integrity" },
 ];
 
+const SURFACE_TO_TAB: Record<WorkspaceSurface, WorkspaceTab> = {
+  home: "overview",
+  sources: "overview",
+  runs: "overview",
+  review: "knowledge",
+  world: "knowledge",
+  ask: "knowledge",
+  connections: "connections",
+  developer: "developers",
+  activity: "overview",
+  settings: "billing",
+};
+
+const LEGACY_TAB_TO_SURFACE: Record<WorkspaceTab, WorkspaceSurface> = {
+  overview: "home",
+  knowledge: "world",
+  connections: "connections",
+  developers: "developer",
+  billing: "settings",
+  integrity: "settings",
+};
+
+function readWorkspaceLocation(): { surface: WorkspaceSurface; tab: WorkspaceTab } {
+  const segment = window.location.pathname.split("/").filter(Boolean)[1];
+  const knownSurface = Object.hasOwn(SURFACE_TO_TAB, segment ?? "") ? segment as WorkspaceSurface : null;
+  if (knownSurface) {
+    const detail = window.location.pathname.split("/").filter(Boolean)[2];
+    return { surface: knownSurface, tab: knownSurface === "settings" && detail === "trust" ? "integrity" : SURFACE_TO_TAB[knownSurface] };
+  }
+  const requested = new URLSearchParams(window.location.search).get("tab");
+  const legacy = TABS.some((item) => item.id === requested) ? requested as WorkspaceTab : "overview";
+  return { surface: LEGACY_TAB_TO_SURFACE[legacy], tab: legacy };
+}
+
 /**
  * One immutable key, drawn short and copied whole.
  *
@@ -191,9 +228,16 @@ export default function WorkspacePage() {
   const { start: buy, busy: buying } = useCheckout(setNotice);
   // Read from the URL on mount so a linked or reloaded workspace opens on the same view.
   const [tab, setTab] = useState<WorkspaceTab>("overview");
+  const [surface, setSurface] = useState<WorkspaceSurface>("home");
   useEffect(() => {
-    const requested = new URLSearchParams(window.location.search).get("tab");
-    if (TABS.some((t) => t.id === requested)) setTab(requested as WorkspaceTab);
+    const applyLocation = () => {
+      const location = readWorkspaceLocation();
+      setTab(location.tab);
+      setSurface(location.surface);
+    };
+    applyLocation();
+    window.addEventListener("popstate", applyLocation);
+    return () => window.removeEventListener("popstate", applyLocation);
   }, []);
   const [busy, setBusy] = useState(false);
   const [documents, setDocuments] = useState<DocumentListItem[] | null>(null);
@@ -214,6 +258,26 @@ export default function WorkspacePage() {
   }, [documents]);
   const [proofMode, setProofMode] = useState(false);
   const [collectionResult, setCollectionResult] = useState<CollectionResult | null>(null);
+  const [worldReadModel, setWorldReadModel] = useState<WorldReadModel | null>(null);
+  useEffect(() => {
+    const collectionId = collectionResult?.collectionId;
+    if (!collectionId) {
+      setWorldReadModel(null);
+      return;
+    }
+    const controller = new AbortController();
+    void fetch(`/api/v1/world/${encodeURIComponent(collectionId)}`, {
+      cache: "no-store",
+      credentials: "same-origin",
+      signal: controller.signal,
+    })
+      .then(async (response) => response.ok ? await response.json() as { model?: WorldReadModel } : null)
+      .then((body) => setWorldReadModel(body?.model ?? null))
+      .catch((error: unknown) => {
+        if (!(error instanceof DOMException && error.name === "AbortError")) setWorldReadModel(null);
+      });
+    return () => controller.abort();
+  }, [collectionResult?.collectionId]);
   const [downloading, setDownloading] = useState(false);
   const [billingAccount, setBillingAccount] = useState<BillingAccount | null>(null);
   const [billingBusy, setBillingBusy] = useState(false);
@@ -840,17 +904,32 @@ export default function WorkspacePage() {
     );
   };
 
-  /**
-   * The sidebar used to be four buttons that called a loader or popped a toast: nothing switched
-   * view, so every panel was stacked on one page and "Activity" did nothing at all. These are
-   * real tabs now, and the choice is mirrored into the URL so a workspace view can be linked,
-   * reloaded and navigated back to.
-   */
-  const setTabAndUrl = (next: WorkspaceTab) => {
-    setTab(next);
+  const navigateSurface = useCallback((next: WorkspaceSurface) => {
+    setSurface(next);
+    setTab(SURFACE_TO_TAB[next]);
     const url = new URL(window.location.href);
-    url.searchParams.set("tab", next);
-    window.history.replaceState(null, "", url.toString());
+    url.pathname = next === "home" ? "/workspace" : `/workspace/${next}`;
+    url.searchParams.delete("tab");
+    window.history.pushState(null, "", url.toString());
+    const anchor = ({
+      sources: "workspace-sources",
+      runs: "workspace-runs",
+      review: "workspace-review",
+      world: "workspace-world",
+      ask: "workspace-ask",
+      activity: "workspace-runs",
+    } as Partial<Record<WorkspaceSurface, string>>)[next];
+    if (anchor) window.requestAnimationFrame(() => document.getElementById(anchor)?.scrollIntoView({ block: "start" }));
+    else window.scrollTo({ top: 0 });
+  }, []);
+
+  const navigateSettings = (panel: "usage" | "trust") => {
+    setSurface("settings");
+    setTab(panel === "trust" ? "integrity" : "billing");
+    const url = new URL(window.location.href);
+    url.pathname = `/workspace/settings/${panel}`;
+    url.searchParams.delete("tab");
+    window.history.pushState(null, "", url.toString());
   };
 
   const promoteCandidate = async () => {
@@ -988,51 +1067,80 @@ export default function WorkspacePage() {
     );
   }
 
+  const activePipelineCount = pipelineRows.filter((row) => row.stages.some((stage) => stage.state === "active")).length;
+  const activityCount = activePipelineCount || (busy ? 1 : 0);
+  const reviewCount = collectionResult?.reviewReasons?.length ?? 0;
+  const candidateReady = Boolean(collectionResult?.coreExecution);
+  const candidateNeedsDecision = Boolean(
+    collectionResult?.coreExecution && activeWorld?.manifestDigest !== collectionResult.manifestDigest,
+  );
+  const documentCount = documents?.length ?? 0;
+  const stateTitle = activityCount > 0
+    ? `${activityCount} ${activityCount === 1 ? "source is" : "sources are"} becoming a world.`
+    : candidateNeedsDecision
+      ? "Candidate World ready for review."
+      : activeWorld
+        ? `World v${activeWorld.revision} is active and source-grounded.`
+        : documentCount >= 2
+          ? `${documentCount} sources are ready to compile.`
+          : "Build your first Compiled World.";
+  const stateDescription = activityCount > 0
+    ? "Follow only observed pipeline transitions. TAVONEL does not estimate progress between receipts."
+    : candidateNeedsDecision
+      ? "Inspect the immutable candidate, evidence bindings, and review gates before any active-pointer decision."
+      : activeWorld
+        ? "Ask with exact citations, inspect retained versions, or download the signed portable package."
+        : "Add at least two sources, confirm the processing boundary, and follow the guided compile path.";
+  const nextAction: { label: string; surface?: WorkspaceSurface; run?: () => void } = activityCount > 0
+    ? { label: "Inspect current run", surface: "runs" }
+    : candidateNeedsDecision
+      ? { label: "Review candidate", surface: "review" }
+      : activeWorld
+        ? { label: "Ask active World", surface: "ask" }
+        : documentCount >= 2
+          ? { label: "Start compile", surface: "runs" }
+          : { label: "Choose sources", run: () => fileRef.current?.click() };
+
   return (
-    <main id="main" className="workspace" tabIndex={-1}>
-      <aside className="side">
-        <Link href="/" className="brand"><Logomark size={22} />TAVONEL</Link>
-        <p className="eyebrow">WORKSPACE</p>
-        <div className="workspace-name"><strong>Private pilot</strong><small>Foundation environment</small></div>
-        <nav aria-label="Workspace sections">
-          {TABS.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              aria-current={tab === item.id ? "page" : undefined}
-              className={tab === item.id ? "on" : undefined}
-              onClick={() => setTabAndUrl(item.id)}
-            >
-              {item.label}
-            </button>
-          ))}
-        </nav>
-        <div className="side-foot">
-          <button type="button" onClick={() => void loadDocuments()}>Refresh documents</button>
-          <button type="button" onClick={() => void signOut()}>Sign out</button>
-        </div>
-      </aside>
-      <section className="workspace-body">
-        <header>
-          <span><strong>Private pilot</strong> · {TABS.find((t) => t.id === tab)?.label}<br /><small>Your governed knowledge space</small></span>
-          {activationPolicy.customerIntake.enabled ? (
-            <>
-              <input ref={fileRef} type="file" multiple hidden onChange={(event) => { const files = [...(event.target.files ?? [])]; if (files.length > 0) void uploadDocuments(files); }} />
-              {proofMode ? (
-                <div className="proof-actions">
-                  <button disabled={busy} onClick={() => void uploadPublicProof()}><UploadCloud size={16} /> {busy ? "Running proof…" : "Run single PDF proof"}</button>
-                  <button disabled={busy} onClick={() => void uploadPublicCollectionProof()}><UploadCloud size={16} /> {busy ? "Compiling…" : "Run public 3-document proof"}</button>
-                </div>
-              ) : (
-                <button disabled={busy} onClick={() => fileRef.current?.click()}><UploadCloud size={16} /> {busy ? "Processing…" : "Upload files"}</button>
-              )}
-            </>
-          ) : (
-            <button onClick={() => setNotice("Upload remains locked until synthetic R2 qualification.")}><UploadCloud size={16} /> Upload document <LockKeyhole size={14} /></button>
-          )}
-        </header>
-        <div className="workspace-content">
-          <p className="notice static"><strong>Guardrail active.</strong> {notice}</p>
+    <WorkspaceUltimateShell
+      surface={surface}
+      activeRevision={activeWorld?.revision ?? null}
+      candidateReady={candidateReady}
+      reviewCount={candidateReady ? reviewCount : null}
+      activityCount={activityCount}
+      credits={billingAccount?.creditBalance ?? null}
+      truthGates={[
+        { label: "Intake", qualified: activationPolicy.customerIntake.enabled, detail: activationPolicy.customerIntake.reason },
+        { label: "CDR", qualified: activationPolicy.cdr.enabled, detail: activationPolicy.cdr.reason },
+        { label: "OCR", qualified: activationPolicy.ocrGpu.enabled, detail: activationPolicy.ocrGpu.reason },
+        { label: "Promotion", qualified: activationPolicy.candidatePromotion.enabled, detail: activationPolicy.candidatePromotion.reason },
+      ]}
+      stateTitle={stateTitle}
+      stateDescription={stateDescription}
+      nextAction={nextAction}
+      onNavigate={navigateSurface}
+      onUpload={() => activationPolicy.customerIntake.enabled ? fileRef.current?.click() : setNotice("Upload remains locked by the current intake policy.")}
+      onRefresh={() => void loadDocuments()}
+      onSignOut={() => void signOut()}
+      headerAction={
+        activationPolicy.customerIntake.enabled ? (
+          <>
+            <input ref={fileRef} type="file" multiple hidden onChange={(event) => { const files = [...(event.target.files ?? [])]; if (files.length > 0) void uploadDocuments(files); }} />
+            {proofMode ? (
+              <div className="proof-actions">
+                <button disabled={busy} onClick={() => void uploadPublicProof()}><UploadCloud size={16} /> {busy ? "Running proof…" : "Single proof"}</button>
+                <button disabled={busy} onClick={() => void uploadPublicCollectionProof()}><UploadCloud size={16} /> {busy ? "Compiling…" : "3-document proof"}</button>
+              </div>
+            ) : (
+              <button disabled={busy} onClick={() => fileRef.current?.click()}><UploadCloud size={16} /> {busy ? "Processing…" : "Upload"}</button>
+            )}
+          </>
+        ) : (
+          <button onClick={() => setNotice("Upload remains locked by the current intake policy.")}><UploadCloud size={16} /> Upload <LockKeyhole size={14} /></button>
+        )
+      }
+    >
+          {notice ? <p className="notice static" role="status"><strong>Activity.</strong> {notice}</p> : null}
 
           {tab === "overview" ? (
           <>
@@ -1041,17 +1149,18 @@ export default function WorkspacePage() {
             is the only thing on this page anyone is looking at, and when nothing is moving it
             renders nothing at all.
           */}
-          <PipelineBoard
-            rows={pipelineRows}
-            reading={reading}
-            names={names}
-            onDismiss={uploads.length > 0 ? () => { setUploads([]); setReading({}); } : undefined}
-          />
-          <p className="eyebrow">● FOUNDATION · SAFE MODE</p>
-          <h1>A quieter place to think.</h1>
+          <div id="workspace-runs">
+            <PipelineBoard
+              rows={pipelineRows}
+              reading={reading}
+              names={names}
+              onDismiss={uploads.length > 0 ? () => { setUploads([]); setReading({}); } : undefined}
+            />
+          </div>
+          <p className="eyebrow">FOUNDATION · QUALIFIED INTAKE</p>
           <p className="lead">Build a traceable body of knowledge from documents that have passed the full safety chain. Quarantine is browser-direct; the application server never carries file bytes.</p>
           <div className="workspace-grid">
-            <section className="card document-card">
+            <section id="workspace-sources" className="card document-card">
               {/* Status moved to the board above. What is left here is the part the board does
                   not carry: the immutable keys every receipt refers to. */}
               <p className="eyebrow">IMMUTABLE KEYS</p>
@@ -1121,7 +1230,12 @@ export default function WorkspacePage() {
                     <button disabled={busy} onClick={() => void recompileWithCore()}>{busy ? "Running Core..." : "Recompile with separate Core"}</button>
                   )}
                 </div>
-              ) : <div className="nodes"><i /><i /><i /><i /><i /></div>}
+              ) : (
+                <div className="collection-result" role="status">
+                  <strong>Compiled World not read yet</strong>
+                  <small>Upload qualified sources, then inspect the resulting candidate. No topology is drawn before real objects exist.</small>
+                </div>
+              )}
               <p>Sanitized inputs can produce a reviewable directory, ontology, graph, RAG and provenance package. No candidate is promoted to a world without a separate human decision. Promotion to a live world stays closed.</p>
             </section>
           </div>
@@ -1130,10 +1244,13 @@ export default function WorkspacePage() {
 
           {tab === "knowledge" ? (
             <>
-              <WorldExplorer
-                collection={collectionResult}
-                onUpload={activationPolicy.customerIntake.enabled ? () => fileRef.current?.click() : undefined}
-              />
+              <div id="workspace-world">
+                <WorldStudioUltimate model={worldReadModel} />
+                <WorldExplorer
+                  collection={collectionResult}
+                  onUpload={activationPolicy.customerIntake.enabled ? () => fileRef.current?.click() : undefined}
+                />
+              </div>
               {/*
                 This control was lost when the sidebar buttons became tabs: the handler survived
                 the refactor and its button did not, so OCR candidate verification silently left
@@ -1154,7 +1271,7 @@ export default function WorkspacePage() {
                   </button>
                 </div>
               </section>
-              <section className="card world-studio" aria-labelledby="world-studio-title">
+              <section id="workspace-review" className="card world-studio" aria-labelledby="world-studio-title">
                 <div className="world-heading">
                   <div>
                     <p className="eyebrow">REVIEW STUDIO · WORLD LIFECYCLE</p>
@@ -1233,7 +1350,7 @@ export default function WorkspacePage() {
                   </div>
                 )}
               </section>
-              <section className="card ask-studio" aria-labelledby="ask-title">
+              <section id="workspace-ask" className="card ask-studio" aria-labelledby="ask-title">
                 <div>
                   <p className="eyebrow">GROUNDED ASK</p>
                   <h2 id="ask-title">Answers return to exact source regions.</h2>
@@ -1281,6 +1398,13 @@ export default function WorkspacePage() {
                 ) : null}
               </section>
             </>
+          ) : null}
+
+          {tab === "billing" || tab === "integrity" ? (
+            <nav aria-label="Workspace settings" className="billing-actions">
+              <button type="button" aria-current={tab === "billing" ? "page" : undefined} onClick={() => navigateSettings("usage")}>Usage &amp; billing</button>
+              <button type="button" aria-current={tab === "integrity" ? "page" : undefined} onClick={() => navigateSettings("trust")}>Trust &amp; integrity</button>
+            </nav>
           ) : null}
 
           {tab === "billing" ? (
@@ -1378,8 +1502,6 @@ export default function WorkspacePage() {
             <p className="fine"><ShieldCheck size={15} /> All capability issuance is server-authorized and tenant-scoped.</p>
           </section>
           ) : null}
-        </div>
-      </section>
-    </main>
+    </WorkspaceUltimateShell>
   );
 }

@@ -7,6 +7,8 @@ const { defineConfig } =
     : playwrightModule.default;
 
 const widths = [1920, 1440, 1280, 1024, 768, 390, 360] as const;
+const testPort = Number(process.env.PLAYWRIGHT_PORT ?? "3117");
+const testBaseUrl = `http://127.0.0.1:${testPort}`;
 
 export default defineConfig({
   testDir: "./e2e",
@@ -16,7 +18,7 @@ export default defineConfig({
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
     browserName: "chromium",
-    baseURL: "http://127.0.0.1:3117",
+    baseURL: testBaseUrl,
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
   },
@@ -46,8 +48,8 @@ export default defineConfig({
   webServer: process.env.PLAYWRIGHT_EXTERNAL_SERVER === "1" ? undefined : {
     // Exercise the production CSP. Next's development React Refresh runtime
     // requires eval, which the shipped policy intentionally forbids.
-    command: "pnpm build && pnpm start --hostname 127.0.0.1 --port 3117",
-    url: "http://127.0.0.1:3117/workspace",
+    command: `pnpm build && pnpm start --hostname 127.0.0.1 --port ${testPort}`,
+    url: `${testBaseUrl}/workspace`,
     reuseExistingServer: false,
     timeout: 120_000,
     env: {
