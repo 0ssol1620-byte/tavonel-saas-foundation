@@ -125,11 +125,12 @@ After each revert the suite returned to green.
 
 ## Boundaries — what this does NOT establish
 
-- **The 0023 RPC bodies have not been executed against real rows.** Their text
-  is asserted by `retrieval-search-rpc-migration.test.ts` and their semantics
-  mirror the two builders (which have their own tests), but running them
-  requires `supabase db test` with a local Postgres, which is unavailable in
-  this environment. A pgTAP fixture is the remaining gate.
+- **The 0023 RPC bodies have not been executed against real rows.** A pgTAP
+  fixture now exists (`supabase/tests/foundation_retrieval_search_rpc.sql`, 20
+  assertions) and its consistency with the migration and schema is verified on
+  every test run by `retrieval-search-rpc-fixture.test.ts`, but running it
+  requires `supabase db test` against a real Postgres. See "Execution attempt"
+  below for what was tried and why it failed here.
 - **The orchestrator tests stub `fetch`**, the PostgREST network boundary.
   Everything above that line is production code; nothing below it is proven.
 - **No end-to-end run against a live tenant.** No compile run has been executed
@@ -142,6 +143,33 @@ After each revert the suite returned to green.
   faking a pass/fail. `heldConflicts` is `[]` for the same reason.
 - **TableView still compiles to zero units** — the Reader layer has no table
   detection. Reported through `skippedViews`, not silently dropped.
+
+## Execution attempt for the pgTAP gate [CURRENT EVIDENCE]
+
+Running the fixture was attempted on this machine and did not succeed. Recorded
+here rather than omitted, so the next person does not repeat it:
+
+| Route | Result |
+|---|---|
+| `supabase db test` | CLI present (2.116.0) but requires Docker |
+| Docker / Podman | Not installed (`docker`, `podman` both absent) |
+| WSL Ubuntu-24.04 | Present but its ext4.vhdx fails to mount: `Wsl/Service/CreateInstance/MountDisk/HCS/ERROR_PATH_NOT_FOUND` |
+| Local PostgreSQL 17.2 | Server running on 5432, but password auth and no `vector`/`pgtap` extensions installed |
+| Temporary trust-auth instance via `initdb` (ports 55432, 55433, both from bash and from `cmd.exe`) | `initdb` succeeded, postmaster started, then every backend died with `0xC0000142` (DLL initialization failure) on first connection |
+
+The `0xC0000142` crash is environmental, not a defect in the fixture, and did
+not change between shells. Both temporary instances were stopped and their data
+directories deleted; the user's own 5432 instance was never modified and is
+still accepting connections.
+
+**The fixture therefore remains unexecuted.** What is verified statically:
+the plan count matches the assertion count (pgTAP fails the whole file
+otherwise), every expected error string exists in the migration, every inserted
+column exists in the schema, every workspace key and repeated-character id
+satisfies its CHECK, and both `promote_foundation_candidate` calls satisfy the
+lifecycle RPC's candidate-key binding rule. Those checks were themselves
+mutation-tested: drifting the plan count, expecting a non-existent error string,
+and breaking a candidate key each fail the suite.
 
 ## Audit §45 P0 status after this commit
 
@@ -189,7 +217,10 @@ old pins fail against those same bytes.
 
 ## Next gates
 
-1. Run `supabase db test` against the 0023 RPCs with a pgTAP fixture.
+1. Execute `supabase db test` against `foundation_retrieval_search_rpc.sql` on a
+   machine with Docker (or a Postgres with `vector` + `pgtap` installed). The
+   fixture is written and statically consistent; it has never been run. Until it
+   is, the two RPC bodies are unexecuted code.
 2. Execute one real compile run against a promoted world; record unit and
    embedding counts.
 3. Populate the §40 R0-R6 ablation with measured numbers before any retrieval
