@@ -397,7 +397,7 @@ export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
       const grown = Math.min(ALL_CORR.length, Math.floor(1 + clamp01(t / GROW_UNTIL) * ALL_CORR.length));
       context.fillStyle = "rgba(123,224,190,0.85)";
       context.font = "500 8px ui-monospace, Menlo, monospace";
-      context.fillText(`TBox  ·  owl:Class  ${grown}/${ALL_CORR.length}`, x + 8, y + 12);
+      context.fillText("TBox  ·  owl:Class", x + 8, y + 12);
 
       const ids: string[] = [];
       ALL_CORR.slice(0, grown).forEach((edge) => {
@@ -406,15 +406,18 @@ export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
       });
       const cols = 2;
       const gap = 5;
+      const cardH = 54;
       const innerX = x + 6;
       const innerY = y + 18;
       const innerW = w - 12;
       const innerH = h - 24;
-      const rows = Math.max(2, Math.ceil(ids.length / cols));
       const cardW = (innerW - gap) / cols;
-      const cardH = (innerH - gap * (rows - 1)) / rows;
+      const rowsFit = Math.max(2, Math.floor((innerH + gap) / (cardH + gap)));
+      const slots = rowsFit * cols;
+      const start = Math.max(0, ids.length - slots);
+      const visible = ids.slice(start, start + slots);
 
-      ids.forEach((id, i) => {
+      visible.forEach((id, i) => {
         const c = i % cols;
         const r = Math.floor(i / cols);
         const bx = innerX + c * (cardW + gap);
@@ -443,7 +446,7 @@ export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
         });
         context.fillStyle = "#7be0be";
         rels.forEach((edge, k) => {
-          const ty = by + 34 + Math.min(attrs.length, 2) * 10 + 4 + k * 10;
+          const ty = by + 34 + 20 + k * 10;
           if (ty > by + cardH - 6) return;
           context.fillText(`${edge.rel} → ${edge.to}`, bx + 8, ty);
         });
