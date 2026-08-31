@@ -57,7 +57,7 @@ for (const surface of surfaces) {
   console.log("ON_LOAD", JSON.stringify(await state()));
   await page.screenshot({ path: `${dest}/${surface.shot}` });
 
-  for (const id of ["s2", "s3"]) {
+  for (const id of ["s2", "s3", "s4"]) {
     await page.evaluate((target) => document.getElementById(target)?.scrollIntoView(), id);
     await page.waitForTimeout(1500);
     console.log(`AT_${id}`, JSON.stringify(await state()));

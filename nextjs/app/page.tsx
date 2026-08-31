@@ -8,7 +8,6 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { Fragment, cloneElement, isValidElement, useEffect, useMemo, useRef, useState } from "react";
-import AnswerSwitch from "@/components/answer-switch";
 import CanvasTransitionLink from "@/components/canvas-transition-link";
 import FilmBand from "@/components/film-band";
 import Logomark from "@/components/logomark";
@@ -39,8 +38,6 @@ const BANDS: Record<BandName, { mode: WorldMode; state: string; version: string;
 };
 
 const BAND_ORDER: BandName[] = ["scatter", "structure", "world", "change", "rebuild", "answer", "access"];
-
-const DESTINATIONS = ["Retrieval", "Agents", "MCP", "API", "Search", "Your applications"];
 
 /**
  * What the compile hands back. The films show the work; this is the receipt.
@@ -261,14 +258,23 @@ export default function HomePage() {
           />
         </Scene>
 
-        <Scene id={4} band="answer" eyebrow="USE THE WORLD" title={<>One compiled world.<br />Every AI.</>}>
+        <Scene id={4} film band="answer" eyebrow="USE THE WORLD" title={<>One compiled world.<br />Every AI.</>}>
           <p className="lede rv">
             The model can change. Your knowledge stays traceable.
           </p>
-          <div className="sources rv">
-            {DESTINATIONS.map((name) => <span className="src" key={name}>{name}</span>)}
-          </div>
-          <AnswerSwitch />
+          {/*
+            The chips are gone.
+
+            `Retrieval · Agents · MCP · API · Search` was six words in boxes asserting
+            integrations, next to an `AnswerSwitch` widget that mimed asking a question. A film
+            of the real clients answering — with the citation each one returns — makes both
+            redundant, and a mock sitting beside the real thing only makes the real thing look
+            staged.
+          */}
+          <FilmBand
+            src="/film/compile-cut-4.mp4"
+            label="Cut 4 — an assistant, an editor and a terminal reach the same world"
+          />
           <div className="band-head rv"><span className="kicker">WHAT YOU GET</span><h3>Files, not a lock-in.</h3></div>
           <div className="artifacts rv">
             {ARTIFACTS.map(([name, text]) => (
