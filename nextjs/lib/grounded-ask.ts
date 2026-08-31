@@ -51,7 +51,7 @@ type AskArtifact = {
   package?: { files?: PackageFile[] };
 };
 
-type GroundedChunk = {
+export type GroundedChunk = {
   chunkId: string;
   logicalId: string;
   text: string;
@@ -224,7 +224,7 @@ function parseChunk(value: unknown): GroundedChunk | null {
   };
 }
 
-function parseChunks(artifact: AskArtifact) {
+export function parseChunks(artifact: AskArtifact) {
   const file = artifact.package?.files?.find(
     item => item.path === "rag/chunks.jsonl"
   );

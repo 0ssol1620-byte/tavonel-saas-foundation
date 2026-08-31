@@ -119,7 +119,7 @@ export type CollectionCandidateArtifact = {
   reviewReasons?: string[];
 };
 
-function canonicalize(value: unknown): string {
+export function canonicalize(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(canonicalize).join(",")}]`;
   return `{${Object.entries(value as Record<string, unknown>)
@@ -127,11 +127,11 @@ function canonicalize(value: unknown): string {
     .map(([key, item]) => `${JSON.stringify(key)}:${canonicalize(item)}`)
     .join(",")}}`;
 }
-function sha256(value: string) {
+export function sha256(value: string) {
   return createHash("sha256").update(value, "utf8").digest("hex");
 }
 
-function stableId(prefix: string, ...parts: string[]) {
+export function stableId(prefix: string, ...parts: string[]) {
   return `${prefix}-${sha256(parts.join("\0")).slice(0, 32)}`;
 }
 
