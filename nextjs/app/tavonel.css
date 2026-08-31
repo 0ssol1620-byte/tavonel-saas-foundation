@@ -574,7 +574,45 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 
 /* ============================================================ hero (01) */
 
-.scene.hero { min-height: 100vh; justify-content: center; padding-top: 104px; }
+.scene.hero { min-height: 0; justify-content: flex-start; padding-top: 104px; padding-bottom: 28px; }
+.scene.hero .film-band { margin-top: 22px; }
+.film-note { max-width: 72rem; margin: 12px auto 0; padding: 0 24px; }
+.film-band {
+  position: relative;
+  width: min(100%, 1440px);
+  margin: 18px auto 0;
+  background: #08090a;
+  border: 1px solid var(--hairline);
+}
+.film-band-video,
+.film-band img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1440 / 900;
+  object-fit: cover;
+}
+.film-band-open,
+.film-band-link span,
+.film-band-phone span {
+  position: static;
+  display: inline-block;
+  margin: 8px 12px 10px;
+  font: 500 10px/1 var(--f-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-xlo);
+}
+.film-band-open:hover,
+.film-band-link span,
+.film-band-phone span { color: var(--verified); }
+.film-band-phone { display: none; position: relative; }
+.film-scene { width: 100%; }
+.film-scene .film-band { width: calc(100% + 0px); }
+@media (max-width: 900px) {
+  .film-band-desk { display: none; }
+  .film-band-phone { display: block; }
+}
 
 /*
   B1 -- the second half of a merged scene.

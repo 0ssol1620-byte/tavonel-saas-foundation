@@ -45,6 +45,7 @@ const COPY_SURFACES = [
   "lib/demo-world.ts",
   "lib/film-script.ts",
   "components/opening-film.tsx",
+  "components/film-band.tsx",
   "app/film/page.tsx",
   "app/research/page.tsx",
   "app/developers/page.tsx",
@@ -112,17 +113,36 @@ describe("public copy", () => {
   });
 
   it("names each scene the same way in the eyebrow and the instrument bar", () => {
-    // Two scenes used a headline where the others used the scene name, so the bar and the page
-    // called the same scene different things. The rule is now: the eyebrow names the scene, the
-    // bar reads its state, and the name is one string.
     const page = read("app/page.tsx");
     const barLabels = [...page.matchAll(/\{ id: \d+, label: "([^"]+)"/g)].map((m) => m[1]);
     const eyebrows = [...page.matchAll(/eyebrow="([^"]+)"/g)].map((m) => m[1]);
 
     expect(barLabels.length).toBeGreaterThan(1);
-    // Scene 01 is the hero and carries no eyebrow of its own.
     for (const label of barLabels.slice(1)) {
       expect(eyebrows, `scene "${label}" must use its bar label as its eyebrow`).toContain(label);
     }
+  });
+
+  it("keeps the locked hero line and a one-line lede", () => {
+    const page = read("app/page.tsx");
+    expect(page).toContain("Compile your knowledge");
+    expect(page).toContain("into a world AI can reason about.");
+    expect(page).toContain("Files go in. A world an AI can cite comes out.");
+  });
+
+  it("puts the three locked compile cuts on the landing page", () => {
+    const page = read("app/page.tsx");
+    expect(page).toContain("/film/compile-cut.mp4");
+    expect(page).toContain("/film/compile-cut-2.mp4");
+    expect(page).toContain("/film/compile-cut-3.mp4");
+  });
+
+  it("does not restage widgets the films already show", () => {
+    const page = read("app/page.tsx");
+    expect(page).not.toContain("ReadingDemo");
+    expect(page).not.toContain("CompilePipeline");
+    expect(page).not.toContain("RebuildConsole");
+    expect(page).not.toContain("ChangeLattice");
+    expect(page).not.toContain("IdentityResolve");
   });
 });
