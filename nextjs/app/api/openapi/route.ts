@@ -55,7 +55,20 @@ export function GET(request: Request) {
           "x-tavonel-scope": "ask:read",
           parameters: [{ $ref: "#/components/parameters/CollectionId" }],
           requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["question"], properties: { question: { type: "string", minLength: 3, maxLength: 500 } } } } } },
-          responses: { "200": { description: "Grounded answer with exact page and bbox citations, or an explicit abstention" }, "409": errorResponse },
+          responses: { "200": { description: "Grounded answer with exact page and bbox citations, or an explicit abstention. `retrievalPath` names which runtime answered: `compiled-retrieval-v1` (lexical + dense + structure, RRF-fused, reranked and World Gate filtered) or `excerpt-concatenation-fallback` when no compiled retrieval index exists for the active world yet" }, "409": errorResponse },
+        },
+      },
+      // Kept separate from /ask deliberately: search returns evidence-rich candidates for a
+      // caller to reason over, ask returns a grounded answer. A consumer that only needs the
+      // facts should not have to pay for generation or parse prose to recover them.
+      "/collections/{id}/search": {
+        post: {
+          operationId: "searchActiveWorld",
+          "x-tavonel-scope": "ask:read",
+          description: "Retrieval-only search over the active world's compiled retrieval index. Returns the ContextPacket (the same runtime contract /ask, MCP and the CLI share) plus per-source retrieval telemetry, without generating an answer.",
+          parameters: [{ $ref: "#/components/parameters/CollectionId" }],
+          requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["query"], properties: { query: { type: "string", minLength: 3, maxLength: 500 }, limit: { type: "integer", minimum: 1, maximum: 25, default: 10 } } } } } },
+          responses: { "200": { description: "ContextPacket of evidence-bound retrieval units with lexical/dense/structure ranks, reranker score and World Gate decisions" }, "400": errorResponse, "409": errorResponse, "503": errorResponse },
         },
       },
       "/connections": {

@@ -5,11 +5,35 @@ import { answerGroundedQuestion } from "@/lib/grounded-ask";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
 import { getWorkspaceCollectionCandidate } from "@/lib/r2-objects";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
+import { runRetrievalPipeline } from "@/lib/retrieval-pipeline";
+import {
+  buildProductionRetrievalProfile,
+  createProductionEmbedderAdapter,
+  createProductionRerankerAdapter,
+  readRetrievalRuntimeEnv,
+} from "@/lib/retrieval-runtime-config";
 import { getFoundationActiveWorld } from "@/lib/world-store";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 const NO_STORE = { "Cache-Control": "no-store" };
+
+// /ask now prefers the compiled Retrieval Compiler pipeline (lexical + dense + structure ->
+// RRF -> reranker -> World Gate -> ContextPacket) and falls back to the original
+// excerpt-concatenation path in grounded-ask.ts when no compiled retrieval index exists for
+// the active world.
+//
+// The fallback is kept deliberately, not left behind out of caution: a tenant whose world was
+// promoted before any retrieval compile run -- or whose run failed -- must still be able to
+// ask a question and get a real, evidence-bound answer. That path is qualified, tested, and
+// cannot hallucinate a citation (it builds citations directly from evidence). What it is NOT
+// is the full pipeline, so the response says which path answered rather than presenting both
+// as the same thing.
+//
+// Only a genuinely missing index falls back. A database outage, an invalid question, or any
+// other pipeline failure is returned as an error: silently answering from a weaker path when
+// the real one is broken would hide exactly the failure an operator needs to see.
+const FALLBACK_CODES = new Set(["RETRIEVAL_RUN_NOT_FOUND", "RETRIEVAL_PROFILE_NOT_FOUND"]);
 
 export async function POST(
   request: Request,
@@ -61,6 +85,52 @@ export async function POST(
       }
     );
   }
+
+  const activeWorld = {
+    manifestDigest: active.world.manifestDigest,
+    revision: active.world.revision,
+    worldStateId: active.world.worldStateId,
+  };
+
+  // --- Preferred path: the compiled retrieval pipeline ----------------------------------
+  const runtimeEnv = readRetrievalRuntimeEnv();
+  const pipeline = await runRetrievalPipeline({
+    workspaceKey: auth.principal.workspaceKey,
+    collectionId: id,
+    worldManifestDigest: active.world.manifestDigest,
+    worldStateId: active.world.worldStateId,
+    question,
+    profile: buildProductionRetrievalProfile(auth.principal.workspaceKey),
+    embedder: runtimeEnv ? createProductionEmbedderAdapter(runtimeEnv) : null,
+    reranker: runtimeEnv ? createProductionRerankerAdapter(runtimeEnv) : null,
+  });
+
+  if (pipeline.ok) {
+    return NextResponse.json(
+      {
+        code: pipeline.packet.items.length > 0 ? "GROUNDED_ANSWER" : "ANSWER_ABSTAINED",
+        retrievalPath: "compiled-retrieval-v1",
+        activeWorld,
+        contextPacket: pipeline.packet,
+        retrieval: {
+          compileRunId: pipeline.diagnostics.compileRunId,
+          retrievalProfile: pipeline.diagnostics.retrievalProfileId,
+          rerankerApplied: pipeline.diagnostics.rerankerApplied,
+          gateRejections: pipeline.diagnostics.gateRejections,
+          degradations: pipeline.diagnostics.degradations,
+        },
+      },
+      { headers: NO_STORE }
+    );
+  }
+  if (!FALLBACK_CODES.has(pipeline.code)) {
+    return NextResponse.json(
+      { code: pipeline.code },
+      { status: pipeline.code === "RETRIEVAL_QUESTION_INVALID" ? 400 : 503, headers: NO_STORE }
+    );
+  }
+
+  // --- Fallback: excerpt concatenation over the promoted artifact ------------------------
   const signer = readR2SignerEnv();
   if (!signer)
     return NextResponse.json(
@@ -98,11 +168,11 @@ export async function POST(
     {
       code:
         answer.status === "grounded" ? "GROUNDED_ANSWER" : "ANSWER_ABSTAINED",
-      activeWorld: {
-        manifestDigest: active.world.manifestDigest,
-        revision: active.world.revision,
-        worldStateId: active.world.worldStateId,
-      },
+      // Named explicitly so a caller can never mistake a fallback answer for a full-pipeline
+      // one; `retrievalNotice` says why this path was taken.
+      retrievalPath: "excerpt-concatenation-fallback",
+      retrievalNotice: "no compiled retrieval index exists for this active world yet",
+      activeWorld,
       ...answer,
     },
     { headers: NO_STORE }
