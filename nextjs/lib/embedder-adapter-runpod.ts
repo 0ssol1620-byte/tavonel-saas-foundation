@@ -1,39 +1,37 @@
 import type { EmbedderAdapter, EmbedderInvokeOptions, EmbedderModelIdentity, EmbedderResult } from "./embedder-adapter";
 
-// RunPod backend for EmbedderAdapter. Follows the same conventions as the existing OCR
-// dispatch (quarantine-sidecar/foundation-cdr-worker/src/ocr.ts): Bearer auth via an
-// API key never logged or embedded in a receipt, AbortSignal-based timeouts, a URL
-// allowlist, and strict typed response validation against an exact schemaVersion --
-// a malformed or unexpected response is a provider_error, never trusted output.
+// RunPod backend for EmbedderAdapter, calling an official Hugging Face Text Embeddings
+// Inference (TEI) container deployed as a RunPod Load Balancer Serverless endpoint --
+// ghcr.io/huggingface/text-embeddings-inference, not a custom worker image (see
+// retrieval-runtime-config.ts for why: the official image needs no Dockerfile, no
+// registry credential, and no custom handler). The request/response shapes below are
+// TEI's own wire contract (POST /embed: {"inputs": [...]} -> bare number[][]), confirmed
+// against TEI's published OpenAPI schema -- not invented, since a wrong guess here would
+// silently corrupt every embedding this adapter produces.
+//
+// Auth follows the same conventions as the existing OCR dispatch
+// (quarantine-sidecar/foundation-cdr-worker/src/ocr.ts): Bearer auth via an API key never
+// logged or embedded in a receipt, AbortSignal-based timeouts, a URL allowlist, and strict
+// typed response validation -- a malformed or unexpected response is a provider_error,
+// never trusted output.
 //
 // identity() is a STATIC claim baked in at construction time (this adapter instance was
 // configured to point at a worker pinned to `identity`), not a live query against the
 // deployed worker -- embedDocumentsForProfile (embedder-adapter.ts) checks that claim
 // against the RetrievalProfile before ever calling embedDocuments/embedQuery. Confirming
-// the deployed worker actually matches `identity` is an operational check against the
-// Flash service's /model-info route, done when the endpoint is deployed, not on every
-// request.
+// the deployed worker actually matches `identity` is an operational check (MODEL_ID/
+// REVISION env vars passed at create-endpoint time), not something re-verified per request.
 export type RunPodConnectionConfig = {
   url: string;
   apiKey?: string;
   timeoutMs?: number;
 };
 
-const EMBEDDING_RESULT_SCHEMA = "tavonel.embedding_result.v1";
 export const RUNPOD_EMBEDDER_REQUEST_TIMEOUT_MS = 30_000;
 
-type EmbeddingResultPayload = {
-  schemaVersion: typeof EMBEDDING_RESULT_SCHEMA;
-  status: "ok";
-  vectors: number[][];
-  dimension: number;
-};
-
 // Mirrors ocr.ts's looksLikeFoundationOcrUrl / isForbiddenOcrUrl: https (or localhost for
-// local dev against `flash dev`) and a host that is actually RunPod's, not an
-// attacker-controlled URL that happened to end up in configuration. Verify this against
-// the real `requestUrls` a `flash deploy` / create-endpoint call reports once the service
-// is deployed -- this is the intended shape, not yet confirmed against a live endpoint.
+// local dev against a TEI container run with `docker run`) and a host that is actually
+// RunPod's, not an attacker-controlled URL that happened to end up in configuration.
 export function looksLikeRunPodEmbeddingUrl(url: string): boolean {
   let parsed: URL;
   try {
@@ -47,32 +45,29 @@ export function looksLikeRunPodEmbeddingUrl(url: string): boolean {
   return local || host === "api.runpod.ai" || host.endsWith(".api.runpod.ai");
 }
 
-function qualifyEmbeddingResult(payload: unknown, expectedDimension: number): EmbeddingResultPayload | null {
-  if (!payload || typeof payload !== "object") return null;
-  const result = payload as Partial<EmbeddingResultPayload>;
-  if (
-    result.schemaVersion !== EMBEDDING_RESULT_SCHEMA ||
-    result.status !== "ok" ||
-    typeof result.dimension !== "number" ||
-    result.dimension !== expectedDimension ||
-    !Array.isArray(result.vectors) ||
-    result.vectors.length < 1 ||
-    result.vectors.length > 10_000
-  ) return null;
-  for (const vector of result.vectors) {
+// TEI's POST /embed response is a bare array of vectors, in input order, with no wrapper
+// object, no schemaVersion, and no declared dimension field -- the shape itself is the
+// only signal, so every element's length is checked against what the profile expects.
+function qualifyEmbeddingResponse(payload: unknown, expectedDimension: number, expectedCount: number): number[][] | null {
+  if (!Array.isArray(payload) || payload.length !== expectedCount) return null;
+  for (const vector of payload) {
     if (
       !Array.isArray(vector) ||
       vector.length !== expectedDimension ||
       !vector.every((component) => typeof component === "number" && Number.isFinite(component))
     ) return null;
   }
-  return result as EmbeddingResultPayload;
+  return payload as number[][];
+}
+
+async function sha256Hex(value: string): Promise<string> {
+  const { createHash } = await import("node:crypto");
+  return createHash("sha256").update(value, "utf8").digest("hex");
 }
 
 async function callEmbeddingRoute(
   config: RunPodConnectionConfig,
   identity: EmbedderModelIdentity,
-  route: "embed/documents" | "embed/query",
   texts: string[],
   options: EmbedderInvokeOptions | undefined,
   fetcher: typeof fetch,
@@ -106,12 +101,19 @@ async function callEmbeddingRoute(
   const apiKey = (config.apiKey || "").trim();
   if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
 
+  // TEI has no request-level "instruction" field (only a "prompt_name" referencing a
+  // preset baked into the model's config, which BGE-M3 does not define) -- an instruction
+  // the caller asked for must actually take effect, not silently vanish, so it is
+  // prepended to each input text, matching the standard way instruction-tuned embedding
+  // models are served through instruction-agnostic backends like TEI.
+  const inputs = options?.instruction ? texts.map((text) => `${options.instruction} ${text}`) : texts;
+
   let response: Response;
   try {
-    response = await fetcher(`${config.url.replace(/\/$/, "")}/${route}`, {
+    response = await fetcher(`${config.url.replace(/\/$/, "")}/embed`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ data: { texts, instruction: options?.instruction } }),
+      body: JSON.stringify({ inputs, normalize: identity.normalize }),
       signal: AbortSignal.timeout(options?.timeoutMs ?? config.timeoutMs ?? RUNPOD_EMBEDDER_REQUEST_TIMEOUT_MS),
     });
   } catch (error) {
@@ -140,33 +142,21 @@ async function callEmbeddingRoute(
       receipt: { ...receiptBase, inputDigest, outputDigest: null, durationMs: Date.now() - startedAt, timedOut: false },
     };
   }
-  const qualified = qualifyEmbeddingResult(payload, identity.dimension);
-  if (!qualified) {
+  const vectors = qualifyEmbeddingResponse(payload, identity.dimension, texts.length);
+  if (!vectors) {
     return {
       status: "error",
       reason: "RunPod embedding response failed schema validation",
       receipt: { ...receiptBase, inputDigest, outputDigest: null, durationMs: Date.now() - startedAt, timedOut: false },
     };
   }
-  if (qualified.vectors.length !== texts.length) {
-    return {
-      status: "error",
-      reason: `RunPod embedding endpoint returned ${qualified.vectors.length} vectors for ${texts.length} inputs`,
-      receipt: { ...receiptBase, inputDigest, outputDigest: null, durationMs: Date.now() - startedAt, timedOut: false },
-    };
-  }
 
-  const outputDigest = `sha256:${await sha256Hex(JSON.stringify(qualified.vectors))}`;
+  const outputDigest = `sha256:${await sha256Hex(JSON.stringify(vectors))}`;
   return {
     status: "ok",
-    vectors: qualified.vectors,
+    vectors,
     receipt: { ...receiptBase, inputDigest, outputDigest, durationMs: Date.now() - startedAt, timedOut: false },
   };
-}
-
-async function sha256Hex(value: string): Promise<string> {
-  const { createHash } = await import("node:crypto");
-  return createHash("sha256").update(value, "utf8").digest("hex");
 }
 
 export function createRunPodEmbedderAdapter(
@@ -176,7 +166,7 @@ export function createRunPodEmbedderAdapter(
 ): EmbedderAdapter {
   return {
     identity: () => identity,
-    embedDocuments: (texts, options) => callEmbeddingRoute(config, identity, "embed/documents", texts, options, fetcher),
-    embedQuery: (text, options) => callEmbeddingRoute(config, identity, "embed/query", [text], options, fetcher),
+    embedDocuments: (texts, options) => callEmbeddingRoute(config, identity, texts, options, fetcher),
+    embedQuery: (text, options) => callEmbeddingRoute(config, identity, [text], options, fetcher),
   };
 }

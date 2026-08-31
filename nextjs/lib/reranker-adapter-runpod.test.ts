@@ -20,14 +20,12 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 describe("createRunPodRerankerAdapter", () => {
-  it("returns ranked candidates and a receipt on success", async () => {
+  it("returns ranked candidates and a receipt on success, mapping TEI's index-based response back to candidate ids", async () => {
     const fetcher = vi.fn(async (_url: string, init: RequestInit) => {
       expect((init.headers as Record<string, string>).Authorization).toBe("Bearer test-key");
-      return jsonResponse({
-        schemaVersion: "tavonel.rerank_result.v1",
-        status: "ok",
-        ranked: [{ id: "a", score: 0.9 }, { id: "b", score: 0.4 }],
-      });
+      const body = JSON.parse(init.body as string);
+      expect(body).toEqual({ query: "payment terms", texts: ["Payment terms are net 30 days.", "The Board approved the policy."], raw_scores: false });
+      return jsonResponse([{ index: 0, score: 0.9 }, { index: 1, score: 0.4 }]);
     });
     const adapter = createRunPodRerankerAdapter(identity, config, fetcher as unknown as typeof fetch);
     const result = await adapter.rerank("payment terms", candidates);
@@ -40,15 +38,12 @@ describe("createRunPodRerankerAdapter", () => {
     expect(url).toBe("https://api.runpod.ai/v2/fake-endpoint/rerank");
   });
 
-  it("never forwards options.topK to the worker (auditor-sol Wave 2 finding #3: a server-truncated response looks identical to a broken one to rerankWithFallback)", async () => {
+  it("never sends a topK-shaped field to the worker (auditor-sol Wave 2 finding #3: a server-truncated response looks identical to a broken one to rerankWithFallback)", async () => {
     const fetcher = vi.fn(async (_url: string, init: RequestInit) => {
       const body = JSON.parse(init.body as string);
-      expect(body.data.topK).toBeUndefined();
-      return jsonResponse({
-        schemaVersion: "tavonel.rerank_result.v1",
-        status: "ok",
-        ranked: [{ id: "a", score: 0.9 }, { id: "b", score: 0.4 }],
-      });
+      expect(body.topK).toBeUndefined();
+      expect(body.top_k).toBeUndefined();
+      return jsonResponse([{ index: 0, score: 0.9 }, { index: 1, score: 0.4 }]);
     });
     const adapter = createRunPodRerankerAdapter(identity, config, fetcher as unknown as typeof fetch);
     await adapter.rerank("payment terms", candidates, { topK: 1 });
@@ -71,47 +66,38 @@ describe("createRunPodRerankerAdapter", () => {
     if (result.status === "error") expect(result.reason).toContain("HTTP 503");
   });
 
-  it("rejects a response containing an id that was never in the candidate set", async () => {
-    const fetcher = vi.fn(async () =>
-      jsonResponse({
-        schemaVersion: "tavonel.rerank_result.v1",
-        status: "ok",
-        ranked: [{ id: "a", score: 0.9 }, { id: "invented-by-worker", score: 0.4 }],
-      }),
-    );
+  it("rejects a response with an out-of-range index", async () => {
+    const fetcher = vi.fn(async () => jsonResponse([{ index: 0, score: 0.9 }, { index: 5, score: 0.4 }]));
     const adapter = createRunPodRerankerAdapter(identity, config, fetcher as unknown as typeof fetch);
     const result = await adapter.rerank("q", candidates);
     expect(result.status).toBe("error");
     if (result.status === "error") expect(result.reason).toMatch(/schema validation/);
   });
 
-  it("rejects a response with a duplicate id", async () => {
-    const fetcher = vi.fn(async () =>
-      jsonResponse({
-        schemaVersion: "tavonel.rerank_result.v1",
-        status: "ok",
-        ranked: [{ id: "a", score: 0.9 }, { id: "a", score: 0.4 }],
-      }),
-    );
+  it("rejects a response with a duplicate index", async () => {
+    const fetcher = vi.fn(async () => jsonResponse([{ index: 0, score: 0.9 }, { index: 0, score: 0.4 }]));
     const adapter = createRunPodRerankerAdapter(identity, config, fetcher as unknown as typeof fetch);
     const result = await adapter.rerank("q", candidates);
     expect(result.status).toBe("error");
   });
 
   it("accepts a response that omits some candidates as status ok -- rerankWithFallback decides what to do with an incomplete set", async () => {
-    const fetcher = vi.fn(async () =>
-      jsonResponse({ schemaVersion: "tavonel.rerank_result.v1", status: "ok", ranked: [{ id: "a", score: 0.9 }] }),
-    );
+    const fetcher = vi.fn(async () => jsonResponse([{ index: 0, score: 0.9 }]));
     const adapter = createRunPodRerankerAdapter(identity, config, fetcher as unknown as typeof fetch);
     const result = await adapter.rerank("q", candidates);
     expect(result.status).toBe("ok");
     if (result.status === "ok") expect(result.ranked).toEqual([{ id: "a", score: 0.9 }]);
   });
 
-  it("rejects the wrong schemaVersion", async () => {
-    const fetcher = vi.fn(async () =>
-      jsonResponse({ schemaVersion: "tavonel.rerank_result.v0", status: "ok", ranked: [{ id: "a", score: 0.9 }] }),
-    );
+  it("rejects a response that is not an array", async () => {
+    const fetcher = vi.fn(async () => jsonResponse({ ranked: [{ index: 0, score: 0.9 }] }));
+    const adapter = createRunPodRerankerAdapter(identity, config, fetcher as unknown as typeof fetch);
+    const result = await adapter.rerank("q", candidates);
+    expect(result.status).toBe("error");
+  });
+
+  it("rejects a non-finite score", async () => {
+    const fetcher = vi.fn(async () => jsonResponse([{ index: 0, score: Number.NaN }, { index: 1, score: 0.4 }]));
     const adapter = createRunPodRerankerAdapter(identity, config, fetcher as unknown as typeof fetch);
     const result = await adapter.rerank("q", candidates);
     expect(result.status).toBe("error");

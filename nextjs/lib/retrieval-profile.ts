@@ -62,7 +62,16 @@ export const BGE_M3_BASELINE_PROFILE_ID = "bge-m3-v1";
 // go through this profile (or a stored, tenant-selected one) so a challenger profile
 // (Qwen3, a Korean-specific control, a customer's own embedding model) is a data change,
 // not a code change.
-export function buildBgeM3BaselineProfile(workspaceKey: string, revision = "unpinned"): RetrievalProfile {
+//
+// embeddingRevision and rerankerRevision are independent HF git revisions on two different
+// repos -- rerankerRevision defaults to embeddingRevision only so existing single-revision
+// call sites (tests, the pre-GPU-deployment placeholder) keep building the same profile;
+// a real deployment (see retrieval-runtime-config.ts) always passes both explicitly.
+export function buildBgeM3BaselineProfile(
+  workspaceKey: string,
+  embeddingRevision = "unpinned",
+  rerankerRevision: string = embeddingRevision,
+): RetrievalProfile {
   const withoutDigest: Omit<RetrievalProfile, "profileDigest"> = {
     id: BGE_M3_BASELINE_PROFILE_ID,
     workspaceKey,
@@ -70,13 +79,13 @@ export function buildBgeM3BaselineProfile(workspaceKey: string, revision = "unpi
     embedding: {
       provider: "huggingface",
       model: "BAAI/bge-m3",
-      revision,
+      revision: embeddingRevision,
       dimension: 1024,
       normalize: true,
     },
     lexical: { backend: "postgres_fts" },
     fusion: { algorithm: "rrf", k: 60 },
-    reranker: { provider: "huggingface", model: "BAAI/bge-reranker-v2-m3", revision },
+    reranker: { provider: "huggingface", model: "BAAI/bge-reranker-v2-m3", revision: rerankerRevision },
     indexBackend: "pgvector",
     indexMetric: "cosine",
   };

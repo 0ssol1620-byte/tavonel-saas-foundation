@@ -1,42 +1,37 @@
 import type { RerankerAdapter, RerankerCandidate, RerankerInvokeOptions, RerankerModelIdentity, RerankerResult } from "./reranker-adapter";
 import { looksLikeRunPodEmbeddingUrl, type RunPodConnectionConfig } from "./embedder-adapter-runpod";
 
-// RunPod backend for RerankerAdapter, mirroring embedder-adapter-runpod.ts: Bearer auth,
-// AbortSignal timeouts, a URL allowlist, and strict response validation. A malformed or
-// unexpected response here becomes a provider_error that rerankWithFallback
-// (reranker-adapter.ts) degrades to the RRF-fused order for -- never a trusted rerank.
+// RunPod backend for RerankerAdapter, calling an official Hugging Face Text Embeddings
+// Inference (TEI) container (see embedder-adapter-runpod.ts for why TEI over a custom
+// image). TEI's POST /rerank takes {"query", "texts"} and returns a bare array of
+// {"index", "score"} pairs referencing position in the `texts` array it was given -- TEI
+// has no concept of a caller-supplied candidate id, so `index` is mapped back to
+// `candidates[index].id` here. Confirmed against TEI's published OpenAPI schema.
 export const RUNPOD_RERANKER_REQUEST_TIMEOUT_MS = 30_000;
-const RERANK_RESULT_SCHEMA = "tavonel.rerank_result.v1";
 
-type RerankResultPayload = {
-  schemaVersion: typeof RERANK_RESULT_SCHEMA;
-  status: "ok";
-  ranked: Array<{ id: string; score: number }>;
-};
+type RerankRank = { index: number; score: number };
 
-function qualifyRerankResult(payload: unknown, expectedIds: Set<string>): RerankResultPayload | null {
-  if (!payload || typeof payload !== "object") return null;
-  const result = payload as Partial<RerankResultPayload>;
-  if (
-    result.schemaVersion !== RERANK_RESULT_SCHEMA ||
-    result.status !== "ok" ||
-    !Array.isArray(result.ranked) ||
-    result.ranked.length < 1 ||
-    result.ranked.length > 10_000
-  ) return null;
-  const seen = new Set<string>();
-  for (const entry of result.ranked) {
+// Validates the response is well-formed (every index in range, no duplicates, finite
+// scores) before trusting it enough to map back to candidate ids -- a candidate missing
+// from the response is not an error here, it is rerankWithFallback's job (reranker-
+// adapter.ts) to notice a partial response and degrade to the RRF-fused order.
+function qualifyRerankResponse(payload: unknown, candidateCount: number): RerankRank[] | null {
+  if (!Array.isArray(payload) || payload.length < 1 || payload.length > candidateCount) return null;
+  const seen = new Set<number>();
+  for (const entry of payload) {
     if (
       !entry || typeof entry !== "object" ||
-      typeof (entry as Record<string, unknown>).id !== "string" ||
-      !expectedIds.has((entry as { id: string }).id) ||
-      seen.has((entry as { id: string }).id) ||
+      typeof (entry as Record<string, unknown>).index !== "number" ||
+      !Number.isInteger((entry as { index: number }).index) ||
+      (entry as { index: number }).index < 0 ||
+      (entry as { index: number }).index >= candidateCount ||
+      seen.has((entry as { index: number }).index) ||
       typeof (entry as Record<string, unknown>).score !== "number" ||
       !Number.isFinite((entry as { score: number }).score)
     ) return null;
-    seen.add((entry as { id: string }).id);
+    seen.add((entry as { index: number }).index);
   }
-  return result as RerankResultPayload;
+  return payload as RerankRank[];
 }
 
 async function sha256Hex(value: string): Promise<string> {
@@ -90,13 +85,15 @@ async function callRerankRoute(
     response = await fetcher(`${config.url.replace(/\/$/, "")}/rerank`, {
       method: "POST",
       headers,
-      // Deliberately never forwards options.topK to the worker: rerankWithFallback
-      // (reranker-adapter.ts) treats any candidate id missing from the response as an
-      // incomplete/failed rerank and degrades to the RRF-fused order -- if the worker
-      // truncated its own response to topK, a correctly-topK'd response would be
-      // indistinguishable from a broken one. The adapter must always score every
-      // candidate it was given; rerankWithFallback applies topK itself after that.
-      body: JSON.stringify({ data: { query, candidates } }),
+      body: JSON.stringify({
+        query,
+        texts: candidates.map((candidate) => candidate.text),
+        // Deliberately never truncates via a topK-shaped request field: rerankWithFallback
+        // (reranker-adapter.ts) treats any candidate id missing from the response as an
+        // incomplete/failed rerank and degrades to the RRF-fused order -- the adapter must
+        // always score every candidate it was given; rerankWithFallback applies topK itself.
+        raw_scores: false,
+      }),
       signal: AbortSignal.timeout(options?.timeoutMs ?? config.timeoutMs ?? RUNPOD_RERANKER_REQUEST_TIMEOUT_MS),
     });
   } catch (error) {
@@ -125,8 +122,7 @@ async function callRerankRoute(
       receipt: { ...receiptBase, inputDigest, outputDigest: null, durationMs: Date.now() - startedAt, timedOut: false },
     };
   }
-  const expectedIds = new Set(candidates.map((candidate) => candidate.id));
-  const qualified = qualifyRerankResult(payload, expectedIds);
+  const qualified = qualifyRerankResponse(payload, candidates.length);
   if (!qualified) {
     return {
       status: "error",
@@ -135,10 +131,11 @@ async function callRerankRoute(
     };
   }
 
-  const outputDigest = `sha256:${await sha256Hex(JSON.stringify(qualified.ranked))}`;
+  const ranked = qualified.map((rank) => ({ id: candidates[rank.index].id, score: rank.score }));
+  const outputDigest = `sha256:${await sha256Hex(JSON.stringify(ranked))}`;
   return {
     status: "ok",
-    ranked: qualified.ranked,
+    ranked,
     receipt: { ...receiptBase, inputDigest, outputDigest, durationMs: Date.now() - startedAt, timedOut: false },
   };
 }

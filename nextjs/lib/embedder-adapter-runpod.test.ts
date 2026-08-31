@@ -16,13 +16,8 @@ function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 }
 
-function validPayload(vectorCount: number) {
-  return {
-    schemaVersion: "tavonel.embedding_result.v1",
-    status: "ok",
-    dimension: 3,
-    vectors: Array.from({ length: vectorCount }, () => [0.1, 0.2, 0.3]),
-  };
+function vectors(count: number): number[][] {
+  return Array.from({ length: count }, () => [0.1, 0.2, 0.3]);
 }
 
 describe("looksLikeRunPodEmbeddingUrl", () => {
@@ -34,8 +29,8 @@ describe("looksLikeRunPodEmbeddingUrl", () => {
     expect(looksLikeRunPodEmbeddingUrl("https://abc123.api.runpod.ai")).toBe(true);
   });
 
-  it("accepts localhost for local flash dev iteration", () => {
-    expect(looksLikeRunPodEmbeddingUrl("http://localhost:8888/main")).toBe(true);
+  it("accepts localhost for a local TEI container", () => {
+    expect(looksLikeRunPodEmbeddingUrl("http://localhost:8080")).toBe(true);
   });
 
   it("rejects a non-RunPod host even over https", () => {
@@ -52,10 +47,11 @@ describe("looksLikeRunPodEmbeddingUrl", () => {
 });
 
 describe("createRunPodEmbedderAdapter", () => {
-  it("returns vectors and a populated receipt on success, sending a Bearer header", async () => {
+  it("returns vectors and a populated receipt on success, sending a Bearer header and TEI's bare {inputs} request shape", async () => {
     const fetcher = vi.fn(async (_url: string, init: RequestInit) => {
       expect((init.headers as Record<string, string>).Authorization).toBe("Bearer test-key");
-      return jsonResponse(validPayload(2));
+      expect(JSON.parse(init.body as string)).toEqual({ inputs: ["a", "b"], normalize: true });
+      return jsonResponse(vectors(2));
     });
     const adapter = createRunPodEmbedderAdapter(identity, config, fetcher as unknown as typeof fetch);
     const result = await adapter.embedDocuments(["a", "b"]);
@@ -66,22 +62,32 @@ describe("createRunPodEmbedderAdapter", () => {
     }
     expect(fetcher).toHaveBeenCalledTimes(1);
     const [url] = fetcher.mock.calls[0];
-    expect(url).toBe("https://api.runpod.ai/v2/fake-endpoint/embed/documents");
+    expect(url).toBe("https://api.runpod.ai/v2/fake-endpoint/embed");
   });
 
-  it("wraps a single query string into a one-element array and calls the query route", async () => {
-    const fetcher = vi.fn(async (_url: string) => jsonResponse(validPayload(1)));
+  it("wraps a single query string into a one-element array and still calls the single /embed route", async () => {
+    const fetcher = vi.fn(async (_url: string) => jsonResponse(vectors(1)));
     const adapter = createRunPodEmbedderAdapter(identity, config, fetcher as unknown as typeof fetch);
     const result = await adapter.embedQuery("hello");
     expect(result.status).toBe("ok");
     const [url] = fetcher.mock.calls[0];
-    expect(url).toBe("https://api.runpod.ai/v2/fake-endpoint/embed/query");
+    expect(url).toBe("https://api.runpod.ai/v2/fake-endpoint/embed");
+  });
+
+  it("prepends an instruction to each input text, since TEI has no request-level instruction field", async () => {
+    const fetcher = vi.fn(async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(init.body as string);
+      expect(body.inputs).toEqual(["Represent this query: hello"]);
+      return jsonResponse(vectors(1));
+    });
+    const adapter = createRunPodEmbedderAdapter(identity, config, fetcher as unknown as typeof fetch);
+    await adapter.embedQuery("hello", { instruction: "Represent this query:" });
   });
 
   it("omits the Authorization header when no api key is configured", async () => {
     const fetcher = vi.fn(async (_url: string, init: RequestInit) => {
       expect((init.headers as Record<string, string>).Authorization).toBeUndefined();
-      return jsonResponse(validPayload(1));
+      return jsonResponse(vectors(1));
     });
     const adapter = createRunPodEmbedderAdapter(identity, { url: config.url }, fetcher as unknown as typeof fetch);
     await adapter.embedQuery("hello");
@@ -120,27 +126,36 @@ describe("createRunPodEmbedderAdapter", () => {
     if (result.status === "error") expect(result.reason).toMatch(/not JSON/);
   });
 
-  it("rejects a response with the wrong schemaVersion rather than trusting it", async () => {
-    const fetcher = vi.fn(async () => jsonResponse({ ...validPayload(1), schemaVersion: "tavonel.embedding_result.v0" }));
+  it("rejects a response that is not a bare array (TEI never wraps /embed output in an object)", async () => {
+    const fetcher = vi.fn(async () => jsonResponse({ vectors: vectors(1) }));
     const adapter = createRunPodEmbedderAdapter(identity, config, fetcher as unknown as typeof fetch);
     const result = await adapter.embedDocuments(["a"]);
     expect(result.status).toBe("error");
     if (result.status === "error") expect(result.reason).toMatch(/schema validation/);
   });
 
-  it("rejects a response whose declared dimension disagrees with the adapter's identity", async () => {
-    const fetcher = vi.fn(async () => jsonResponse({ ...validPayload(1), dimension: 4, vectors: [[0.1, 0.2, 0.3, 0.4]] }));
+  it("rejects a response whose vector length disagrees with the adapter's identity dimension", async () => {
+    const fetcher = vi.fn(async () => jsonResponse([[0.1, 0.2, 0.3, 0.4]]));
     const adapter = createRunPodEmbedderAdapter(identity, config, fetcher as unknown as typeof fetch);
     const result = await adapter.embedDocuments(["a"]);
     expect(result.status).toBe("error");
   });
 
+  it("rejects a non-finite vector component", () => {
+    return (async () => {
+      const fetcher = vi.fn(async () => jsonResponse([[0.1, Number.NaN, 0.3]]));
+      const adapter = createRunPodEmbedderAdapter(identity, config, fetcher as unknown as typeof fetch);
+      const result = await adapter.embedDocuments(["a"]);
+      expect(result.status).toBe("error");
+    })();
+  });
+
   it("rejects a response that returns fewer vectors than inputs, rather than silently misaligning them", async () => {
-    const fetcher = vi.fn(async () => jsonResponse(validPayload(1)));
+    const fetcher = vi.fn(async () => jsonResponse(vectors(1)));
     const adapter = createRunPodEmbedderAdapter(identity, config, fetcher as unknown as typeof fetch);
     const result = await adapter.embedDocuments(["a", "b", "c"]);
     expect(result.status).toBe("error");
-    if (result.status === "error") expect(result.reason).toContain("1 vectors for 3 inputs");
+    if (result.status === "error") expect(result.reason).toMatch(/schema validation/);
   });
 
   it("surfaces a network failure as a provider error with a receipt, not an unhandled rejection", async () => {

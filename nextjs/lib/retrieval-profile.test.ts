@@ -20,6 +20,12 @@ describe("RetrievalProfile", () => {
     expect(differentRevision.profileDigest).not.toBe(first.profileDigest);
   });
 
+  it("pins the embedder and reranker to independent revisions when both are given", () => {
+    const profile = buildBgeM3BaselineProfile("pilot-proof", "embed-rev", "rerank-rev");
+    expect(profile.embedding.revision).toBe("embed-rev");
+    expect(profile.reranker?.revision).toBe("rerank-rev");
+  });
+
   it("round-trips a valid profile through the fail-closed parser", () => {
     const profile = buildBgeM3BaselineProfile("pilot-proof", "rev-1");
     expect(parseRetrievalProfile(profile)).toEqual(profile);
