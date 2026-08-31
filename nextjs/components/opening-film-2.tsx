@@ -491,7 +491,7 @@ export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
         const rgb = AREA_RGB[node.area % AREA_RGB.length];
         const isSel = i === selected;
         const isN = linked.has(i);
-        const r = (isSel ? 5.4 : isN && withEdges ? 2.4 : 1.7) * node.radius;
+        const r = (isSel ? 4.2 : isN && withEdges ? 2.4 : 1.7) * node.radius;
         context.fillStyle = isSel
           ? `rgb(${Math.min(255, rgb[0] + 50)},${rgb[1]},${rgb[2]})`
           : isN && withEdges
@@ -500,13 +500,6 @@ export default function OpeningFilm2({ onEnded }: { onEnded?: () => void }) {
         context.beginPath();
         context.arc(ox + node.x * gw, oy + node.y * gh, r, 0, Math.PI * 2);
         context.fill();
-        if (isSel) {
-          context.strokeStyle = "rgba(237,234,228,0.9)";
-          context.lineWidth = 1.4;
-          context.beginPath();
-          context.arc(ox + node.x * gw, oy + node.y * gh, r + 3.5, 0, Math.PI * 2);
-          context.stroke();
-        }
       });
     };
 
