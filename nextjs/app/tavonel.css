@@ -591,7 +591,8 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 @media (max-width: 640px) {
   .scene.hero { min-height: 100svh; }
   .scene.hero .film-band,
-  .scene.hero .film-note { display: none; }
+  .scene.hero .film-note,
+  .scene.hero .lede { display: none; }
   .js .scene.hero .rv {
     opacity: 1;
     transform: none;
