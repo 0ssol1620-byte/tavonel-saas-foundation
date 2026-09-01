@@ -127,13 +127,18 @@ const MCP_LINES: Line[] = [
   the one that fills the column.
 */
 const TERM_LINES: Line[] = [
-  { at: 0.2, text: "$ export TAVONEL_API_KEY=tvnl_live_••••", ink: INK.text },
-  { at: 0.9, text: "$ tavonel documents", ink: INK.hi },
-  { at: 1.5, text: "  handbook-2026.pdf        v1  official", ink: INK.text },
-  { at: 1.75, text: "  MSA_v4.pdf               v2  contractual", ink: INK.text },
-  { at: 2.0, text: "  ops-manual-r9.pdf        v1  reviewed", ink: INK.text },
-  { at: 2.25, text: "  scan_0140.jpg           v1  informal", ink: INK.text },
-  { at: 2.55, text: "  4 immutable versions", ink: INK.dim },
+  { at: 0.15, text: "$ export TAVONEL_API_KEY=tvnl_live_••••", ink: INK.text },
+  { at: 0.6, text: "$ tavonel status", ink: INK.hi },
+  { at: 1.0, text: "  collection  " + COLLECTION, ink: INK.text },
+  { at: 1.2, text: "  world       compiled · 4 sources", ink: INK.text },
+  { at: 1.4, text: "  ocr.gpu     enabled", ink: INK.text },
+  { at: 1.6, text: "  promotion   explicit human decision", ink: INK.dim },
+  { at: 1.9, text: "$ tavonel documents", ink: INK.hi },
+  { at: 2.3, text: "  handbook-2026.pdf        v1  official", ink: INK.text },
+  { at: 2.5, text: "  MSA_v4.pdf               v2  contractual", ink: INK.text },
+  { at: 2.7, text: "  ops-manual-r9.pdf        v1  reviewed", ink: INK.text },
+  { at: 2.9, text: "  scan_0140.jpg            v1  informal", ink: INK.text },
+  { at: 3.15, text: "  4 immutable versions", ink: INK.dim },
 ];
 
 export default function OpeningFilm4() {
@@ -293,6 +298,10 @@ export default function OpeningFilm4() {
           { at: at + 2.1, text: `→ get_active_world`, ink: INK.dim },
           { at: at + 2.5, text: `← "promotedAt": "2026-08-31"`, ink: INK.text },
           { at: at + 2.8, text: `  "retainedVersions": 3`, ink: INK.text },
+          { at: at + 3.1, text: ``, ink: INK.text },
+          { at: at + 3.2, text: `→ list_documents`, ink: INK.dim },
+          { at: at + 3.5, text: `← 4 documents · 4 versions`, ink: INK.text },
+          { at: at + 3.8, text: `  every answer names one`, ink: INK.faint },
         ];
         lines(ix, iy, w, t, rows);
       }
@@ -306,15 +315,33 @@ export default function OpeningFilm4() {
     };
 
     const drawEditor = (x: number, y: number, w: number, h: number, t: number) => {
-      pane(x, y, w, h, "EDITOR", t > ACT.assistant ? "agent.ts" : "");
+      pane(x, y, w, h, "EDITOR", "agent.ts");
+      /*
+        The file is open from the first frame, not blank until the third beat.
+
+        `waiting` on its own left this column empty for four seconds of an eighteen second cut,
+        and an empty quarter of the frame reads as poor quality rather than as a pause — the
+        measured ink coverage was 3% against cut 1's 25%. The imports are real: this is what the
+        top of a file that talks to the API looks like before anyone writes the call.
+      */
+      const ix = x + 14;
+      let iy = y + 50;
+      const preamble: Line[] = [
+        { at: 0.3, text: `import { readFileSync } from "node:fs";`, ink: INK.dim },
+        { at: 0.6, text: ``, ink: INK.text },
+        { at: 0.7, text: `const base = process.env.TAVONEL_URL;`, ink: INK.text },
+        { at: 1.0, text: `const key = process.env.TAVONEL_API_KEY;`, ink: INK.text },
+        { at: 1.3, text: `const id = "${COLLECTION}";`, ink: INK.text },
+        { at: 1.7, text: ``, ink: INK.text },
+        { at: 1.8, text: `// one endpoint, one shape, versioned`, ink: INK.faint },
+      ];
+      iy = lines(ix, iy, w, t, preamble, ROW);
       if (t < ACT.assistant - 0.4) {
-        context.fillStyle = INK.faint;
-        context.font = `400 ${BODY}px ui-monospace, Menlo, monospace`;
-        context.fillText("waiting", x + 14, y + 52);
+        footer(x, y, w, h, "agent.ts", "unsaved", INK.faint);
         return;
       }
+      iy += 10;
       const at = ACT.assistant - 0.4;
-      const ix = x + 14;
       const code: Line[] = [
         { at: at, text: `const r = await fetch(`, ink: INK.text },
         { at: at + 0.35, text: `  \`\${base}/api/v1/collections\``, ink: INK.text },
@@ -328,7 +355,6 @@ export default function OpeningFilm4() {
         { at: at + 2.45, text: `  body: JSON.stringify({ question })`, ink: INK.text },
         { at: at + 2.8, text: `});`, ink: INK.text },
       ];
-      let iy = y + 50;
       iy = lines(ix, iy, w, t, code, ROW);
 
       // The same citation the assistant got, reached from code. The agent reads the citation
@@ -349,6 +375,11 @@ export default function OpeningFilm4() {
           { at: at + 2.2, text: `// same citation as the assistant`, ink: INK.faint },
           { at: at + 2.5, text: `// no second integration to keep`, ink: INK.faint },
           { at: at + 2.7, text: `//   in sync`, ink: INK.faint },
+          { at: at + 3.0, text: ``, ink: INK.text },
+          { at: at + 3.1, text: `if (!citations.length) {`, ink: INK.text },
+          { at: at + 3.4, text: `  // abstained — do not paraphrase`, ink: INK.amber },
+          { at: at + 3.7, text: `  return null;`, ink: INK.text },
+          { at: at + 3.95, text: `}`, ink: INK.text },
         ];
         lines(ix, iy, w, t, rows, ROW);
       }
@@ -385,17 +416,21 @@ export default function OpeningFilm4() {
       // Beat 5: they keep the files. The last thing on screen is their own machine holding a
       // signed copy, so the digests have to finish typing before the loop ends — the earlier
       // schedule left `archive=sha25` mid-word on the final frame.
-      if (t > ACT.abstain - 0.6) {
-        const at = ACT.abstain - 0.6;
+      if (t > ACT.abstain - 0.9) {
+        const at = ACT.abstain - 0.9;
         iy += 10;
         const rows: Line[] = [
           { at: at, text: `$ tavonel download ${COLLECTION} \\`, ink: INK.hi },
-          { at: at + 0.35, text: `    world.zip`, ink: INK.hi },
-          { at: at + 0.9, text: `Wrote world.zip`, ink: INK.green },
-          { at: at + 1.2, text: `  archive=sha256:9f4c…`, ink: INK.text },
-          { at: at + 1.5, text: `  manifest=sha256:2b71…`, ink: INK.text },
-          { at: at + 1.9, text: `  ontology.ttl  graph.csv`, ink: INK.dim },
-          { at: at + 2.1, text: `  corpus/  provenance/`, ink: INK.dim },
+          { at: at + 0.3, text: `    world.zip`, ink: INK.hi },
+          { at: at + 0.75, text: `Wrote world.zip`, ink: INK.green },
+          { at: at + 1.0, text: `  archive=sha256:9f4c…`, ink: INK.text },
+          { at: at + 1.25, text: `  manifest=sha256:2b71…`, ink: INK.text },
+          { at: at + 1.55, text: `  ontology.ttl  graph.csv`, ink: INK.dim },
+          { at: at + 1.75, text: `  corpus/  provenance/`, ink: INK.dim },
+          { at: at + 2.05, text: ``, ink: INK.text },
+          { at: at + 2.1, text: `$ unzip -l world.zip`, ink: INK.hi },
+          { at: at + 2.35, text: `  1,284 files`, ink: INK.text },
+          { at: at + 2.55, text: `  yours`, ink: INK.green },
         ];
         lines(ix, iy, w, t, rows);
       }

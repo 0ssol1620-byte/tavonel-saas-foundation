@@ -638,9 +638,21 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
   }
 }
 .film-note { max-width: 72rem; margin: 12px auto 0; padding: 0 24px; }
+/*
+  Every band is the size of the hero band.
+
+  Cuts 2-4 were painted 1230px wide against the hero's 898px, which read as "the lower films
+  look worse". Measured, they are not softer — all four masters are 2880x1800 and the stills are
+  sharp under magnification — they are emptier. Ink coverage: cut 1 24.7%, cut 2 11.5%, cut 3
+  10.8%, cut 4 3.2%. Drawing the sparsest cuts largest spread that little content over the most
+  screen, which looks like blur even though nothing is blurred.
+
+  Matching the hero's cap gives the same pixel density everywhere and makes the lower cuts read
+  as deliberate rather than degraded.
+*/
 .film-band {
   position: relative;
-  width: min(100%, 1440px);
+  width: min(100%, 900px);
   margin: 18px auto 0;
   background: #08090a;
   border: 1px solid var(--hairline);
