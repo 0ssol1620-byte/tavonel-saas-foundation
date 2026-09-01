@@ -652,6 +652,19 @@ export default function WorkspacePage() {
         setNotice(`${reason}. The file never entered the app server.`);
         return null;
       }
+      if (json.documentId) {
+        const confirmed = await fetch("/api/uploads/confirm", {
+          method: "POST",
+          headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+          body: JSON.stringify({ documentId: json.documentId }),
+        });
+        if (!confirmed.ok) {
+          patchUpload(localId, { phase: "failed", reason: "quarantine stored; intake receipt confirmation failed" });
+          setNotice("The file reached quarantine, but its intake receipt needs operator review. No automatic retry was attempted.");
+          await loadDocuments();
+          return json.documentId;
+        }
+      }
       patchUpload(localId, { phase: "stored", loaded: file.size });
 
       setNotice(

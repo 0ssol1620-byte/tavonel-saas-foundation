@@ -1,7 +1,7 @@
 import { reserveFoundationCompute } from "./compute-reservation";
 import { oauthSourceDownloadRequest, type OAuthSourceItem, type OAuthSourceTarget } from "./connector-oauth-adapters";
 import { sha256Hex, type OAuthConnectorProvider } from "./connector-oauth";
-import { reserveFoundationIntake } from "./intake-admission";
+import { confirmFoundationIntake, reserveFoundationIntake } from "./intake-admission";
 import { validateQualifiedDocumentInput } from "./qualified-input";
 import { FOUNDATION_INTAKE_MAX_BYTES, presignFoundationQuarantinePut } from "./r2-presign";
 import { type R2SignerEnv } from "./r2-synthetic-canary";
@@ -148,6 +148,13 @@ export async function importSourceObject(context: ImportContext, item: OAuthSour
     return { ok: false, nativeId: item.nativeId, code: "QUARANTINE_UPLOAD_FAILED" };
   }
   if (!uploaded.ok) return { ok: false, nativeId: item.nativeId, code: "QUARANTINE_UPLOAD_FAILED" };
+
+  const confirmed = await confirmFoundationIntake({
+    workspaceKey: context.workspaceKey,
+    documentId,
+    userId: context.userId,
+  });
+  if (!confirmed.ok) return { ok: false, nativeId: item.nativeId, code: confirmed.code };
 
   return { ok: true, nativeId: item.nativeId, documentId, filename: descriptor.filename };
 }

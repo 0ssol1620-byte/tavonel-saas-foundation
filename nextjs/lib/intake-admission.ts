@@ -12,6 +12,8 @@ export type IntakeAdmission = {
   declaredMimeType: string;
 };
 
+export type IntakeConfirmation = Pick<IntakeAdmission, "workspaceKey" | "documentId" | "userId">;
+
 export function validateIntakeAdmission(value: IntakeAdmission) {
   return WORKSPACE_ID_PATTERN.test(value.workspaceKey) &&
     DOCUMENT_ID_PATTERN.test(value.documentId) &&
@@ -60,7 +62,42 @@ export async function reserveFoundationIntake(value: IntakeAdmission) {
     result.objectKey !== value.objectKey ||
     typeof result.expiresAt !== "string" ||
     !Number.isFinite(Date.parse(result.expiresAt)) ||
-    typeof result.idempotentReplay !== "boolean"
+    typeof result.idempotentReplay !== "boolean" ||
+    typeof result.confirmed !== "boolean"
   ) return { ok: false as const, code: "INTAKE_ADMISSION_RECEIPT_INVALID" };
+  return { ok: true as const, result };
+}
+
+export async function confirmFoundationIntake(value: IntakeConfirmation) {
+  if (
+    !WORKSPACE_ID_PATTERN.test(value.workspaceKey) ||
+    !DOCUMENT_ID_PATTERN.test(value.documentId) ||
+    !USER_ID.test(value.documentId) ||
+    !USER_ID.test(value.userId)
+  ) return { ok: false as const, code: "INTAKE_CONFIRMATION_INVALID" };
+  const config = readSupabaseAdminConfig();
+  if (!config) return { ok: false as const, code: "INTAKE_CONFIRMATION_NOT_CONFIGURED" };
+  let response: Response;
+  try {
+    response = await supabaseAdminRequest(config, "/rest/v1/rpc/confirm_foundation_intake_admission", {
+      method: "POST",
+      body: JSON.stringify({
+        p_workspace_key: value.workspaceKey,
+        p_document_id: value.documentId,
+        p_user_id: value.userId,
+      }),
+    });
+  } catch {
+    return { ok: false as const, code: "INTAKE_CONFIRMATION_FAILED" };
+  }
+  if (!response.ok) return { ok: false as const, code: "INTAKE_CONFIRMATION_FAILED" };
+  const result = await response.json().catch(() => null) as Record<string, unknown> | null;
+  if (
+    !result ||
+    result.documentId !== value.documentId ||
+    result.status !== "confirmed" ||
+    typeof result.confirmedAt !== "string" ||
+    !Number.isFinite(Date.parse(result.confirmedAt))
+  ) return { ok: false as const, code: "INTAKE_CONFIRMATION_RECEIPT_INVALID" };
   return { ok: true as const, result };
 }

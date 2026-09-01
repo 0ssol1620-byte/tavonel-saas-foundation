@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { reserveFoundationIntake, validateIntakeAdmission } from "./intake-admission";
+import { confirmFoundationIntake, reserveFoundationIntake, validateIntakeAdmission } from "./intake-admission";
 
 const admission = {
   workspaceKey: "pilot-4444444444444444",
@@ -40,6 +40,7 @@ describe("Foundation intake admission", () => {
       objectKey: admission.objectKey,
       expiresAt: "2026-08-29T12:00:00.000Z",
       idempotentReplay: false,
+      confirmed: false,
     }), { status: 200, headers: { "content-type": "application/json" } }));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -54,6 +55,21 @@ describe("Foundation intake admission", () => {
       p_user_id: admission.userId,
       p_object_key: admission.objectKey,
     }));
+  });
+
+  it("confirms only a receipt bound to the same tenant, document and user", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://project.supabase.co");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", `sb_secret_${"s".repeat(31)}`);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      status: "confirmed",
+      documentId: admission.documentId,
+      confirmedAt: "2026-09-01T12:00:00.000Z",
+    }), { status: 200, headers: { "content-type": "application/json" } })));
+
+    await expect(confirmFoundationIntake(admission)).resolves.toEqual({
+      ok: true,
+      result: expect.objectContaining({ documentId: admission.documentId, status: "confirmed" }),
+    });
   });
 
   it.each([

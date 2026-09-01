@@ -3,9 +3,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const reserveFoundationIntake = vi.fn<(...args: any[]) => Promise<any>>();
 const reserveFoundationCompute = vi.fn<(...args: any[]) => Promise<any>>();
+const confirmFoundationIntake = vi.fn<(...args: any[]) => Promise<any>>();
 const presignFoundationQuarantinePut = vi.fn<(...args: any[]) => any>();
 
-vi.mock("./intake-admission", () => ({ reserveFoundationIntake }));
+vi.mock("./intake-admission", () => ({ confirmFoundationIntake, reserveFoundationIntake }));
 vi.mock("./compute-reservation", () => ({ reserveFoundationCompute }));
 vi.mock("./r2-presign", () => ({
   FOUNDATION_INTAKE_MAX_BYTES: 5 * 1024 * 1024,
@@ -26,6 +27,7 @@ beforeEach(() => {
     },
   });
   reserveFoundationCompute.mockResolvedValue({ ok: true, result: {} });
+  confirmFoundationIntake.mockResolvedValue({ ok: true, result: {} });
   presignFoundationQuarantinePut.mockReturnValue({ ok: true, uploadUrl: "https://r2.example/upload" });
 });
 
@@ -59,5 +61,47 @@ describe("source import replay safety", () => {
     expect(reserveFoundationCompute).not.toHaveBeenCalled();
     expect(presignFoundationQuarantinePut).not.toHaveBeenCalled();
     expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it("confirms a fresh admission only after the quarantine PUT succeeds", async () => {
+    reserveFoundationIntake.mockResolvedValue({
+      ok: true,
+      result: {
+        documentId: "fresh",
+        objectKey: "fresh",
+        expiresAt: "2026-09-01T00:00:00Z",
+        idempotentReplay: false,
+        confirmed: false,
+      },
+    });
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(new Uint8Array([1, 2, 3]), {
+        status: 200,
+        headers: { "content-type": "application/pdf" },
+      }))
+      .mockResolvedValueOnce(new Response(null, { status: 200 })) as unknown as typeof fetch;
+
+    const outcome = await importSourceObject({
+      workspaceKey: "pilot-acme01",
+      userId: "11111111-1111-4111-8111-111111111111",
+      connectionId: "22222222-2222-4222-8222-222222222222",
+      provider: "google_drive",
+      accessToken: "access",
+      target: {},
+      signer: { accountId: "a", bucket: "b", accessKeyId: "k", secretAccessKey: "s" },
+      fetcher,
+    }, {
+      nativeId: "drive-file",
+      name: "Paper.pdf",
+      revision: "revision-2",
+      mimeType: "application/pdf",
+      sizeBytes: 3,
+      modifiedAt: null,
+      kind: "file",
+    });
+
+    expect(outcome.ok).toBe(true);
+    expect(confirmFoundationIntake).toHaveBeenCalledOnce();
+    expect(fetcher).toHaveBeenCalledTimes(2);
   });
 });

@@ -18,6 +18,10 @@ const qualificationQuotaMigration = readFileSync(
   resolve(import.meta.dirname, "../../supabase/migrations/0031_foundation_intake_qualification_quota.sql"),
   "utf8",
 ).toLowerCase();
+const confirmationMigration = readFileSync(
+  resolve(import.meta.dirname, "../../supabase/migrations/0032_foundation_intake_confirmation.sql"),
+  "utf8",
+).toLowerCase();
 
 describe("Foundation intake admission migration contract", () => {
   it("serializes tenant reservations before evaluating both quota windows", () => {
@@ -62,5 +66,13 @@ describe("Foundation intake admission migration contract", () => {
     expect(qualificationQuotaMigration).toContain("minute_count >= 5");
     expect(qualificationQuotaMigration).toContain("minute_bytes + p_requested_bytes > 26214400");
     expect(qualificationQuotaMigration).toContain("p_requested_bytes > 5242880");
+  });
+
+  it("counts stored uploads and active capabilities while releasing expired transfers", () => {
+    expect(confirmationMigration).toContain("confirmed_at timestamptz");
+    expect(confirmationMigration).toContain("confirmed_at is not null or expires_at > clock_timestamp()");
+    expect(confirmationMigration).toContain("confirm_foundation_intake_admission");
+    expect(confirmationMigration).toContain("grant execute on function public.confirm_foundation_intake_admission");
+    expect(confirmationMigration).toContain("to service_role");
   });
 });
