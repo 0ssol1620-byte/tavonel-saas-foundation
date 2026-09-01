@@ -20,6 +20,7 @@ jobs:
         with:
           output: sarif-results
           upload: never
+          upload-database: false
       - name: Preserve CodeQL SARIF
         uses: actions/upload-artifact@v4
         with:

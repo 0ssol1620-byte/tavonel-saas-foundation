@@ -8,6 +8,8 @@
   // Never put the HMAC in vars, source, committed .dev.vars, or chat.
   // TAVONEL_OCR_HMAC is likewise dashboard-only after the OCR image exists.
   // RUNPOD_API_KEY is dashboard-only. Required for RunPod load-balancer /v1/ocr.
+  // FOUNDATION_MANUAL_TRIGGER_TOKEN is optional and dashboard-only. Without it,
+  // POST /v1/sanitize is disabled; queue processing remains available.
   "r2_buckets": [
     {
       "binding": "FOUNDATION_QUARANTINE",

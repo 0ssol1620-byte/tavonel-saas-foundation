@@ -13,6 +13,7 @@ const SYNTHETIC_HEALTH = "https://tavonel-cdr-synthetic-317850201666.asia-northe
 const PROD_URL = "https://tavonel-pdf-cdr.example.run.app/v1/disarm";
 const FOUNDATION_OCR = "https://tavonel-foundation-ocr.example/v1/ocr";
 const SETTLEMENT_URL = "https://tavonel-saas-foundation.vercel.app/api/internal/billing/settle";
+const MANUAL_TRIGGER_TOKEN = "foundation-manual-trigger-fixture-token";
 const SOURCE_KEY = "quarantine/ws_pilot/doc_1/source";
 const SOURCE_BYTES = new TextEncoder().encode("%PDF-1.4 fixture");
 const SANITIZED_BYTES = new TextEncoder().encode("%PDF-1.4 sanitized-fixture");
@@ -70,6 +71,7 @@ function envFor(r2: FakeR2, overrides: Partial<Env> = {}): Env {
     FOUNDATION_OCR_URL: "",
     FOUNDATION_BILLING_SETTLEMENT_URL: SETTLEMENT_URL,
     FOUNDATION_BILLING_SETTLEMENT_HMAC: "foundation-settlement-hmac-fixture-secret-ok",
+    FOUNDATION_MANUAL_TRIGGER_TOKEN: MANUAL_TRIGGER_TOKEN,
     ...overrides,
   };
 }
@@ -330,7 +332,10 @@ describe("Worker HTTP and queue surface", () => {
     const response = await handleRequest(
       new Request("https://worker.example/v1/sanitize", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          authorization: `Bearer ${MANUAL_TRIGGER_TOKEN}`,
+          "content-type": "application/json",
+        },
         body: JSON.stringify({ objectKey: SOURCE_KEY }),
       }),
       envFor(r2),
@@ -342,6 +347,32 @@ describe("Worker HTTP and queue surface", () => {
     assert.equal(payload.sourceKey, SOURCE_KEY);
     assert.equal(payload.immutableKey, immutableObjectKey("ws_pilot", "doc_1", outputSha256()));
     assert.equal(response.headers.get("content-type")?.includes("application/json"), true);
+  });
+
+  it("keeps the manual sanitize endpoint disabled or authenticated", async () => {
+    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
+    const request = (authorization?: string) => new Request("https://worker.example/v1/sanitize", {
+      method: "POST",
+      headers: {
+        ...(authorization ? { authorization } : {}),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ objectKey: SOURCE_KEY }),
+    });
+
+    const disabled = await handleRequest(
+      request(`Bearer ${MANUAL_TRIGGER_TOKEN}`),
+      envFor(r2, { FOUNDATION_MANUAL_TRIGGER_TOKEN: undefined }),
+      cleanCdrFetch,
+    );
+    assert.equal(disabled.status, 404);
+
+    const missing = await handleRequest(request(), envFor(r2), cleanCdrFetch);
+    assert.equal(missing.status, 401);
+
+    const invalid = await handleRequest(request("Bearer invalid"), envFor(r2), cleanCdrFetch);
+    assert.equal(invalid.status, 401);
+    assert.equal(r2.puts.length, 0);
   });
 
   it("queue skips non-source keys and retries CDR 5xx", async () => {

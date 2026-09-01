@@ -16,6 +16,19 @@ export interface Env {
   RUNPOD_API_KEY?: string;
   FOUNDATION_BILLING_SETTLEMENT_URL?: string;
   FOUNDATION_BILLING_SETTLEMENT_HMAC?: string;
+  FOUNDATION_MANUAL_TRIGGER_TOKEN?: string;
+}
+
+function authorizeManualTrigger(request: Request, token: string | undefined): "ok" | "disabled" | "denied" {
+  if (!token || token.length < 32) return "disabled";
+  const header = request.headers.get("authorization") ?? "";
+  if (!header.startsWith("Bearer ")) return "denied";
+  const provided = new TextEncoder().encode(header.slice("Bearer ".length));
+  const expected = new TextEncoder().encode(token);
+  if (provided.length !== expected.length) return "denied";
+  let difference = 0;
+  for (let index = 0; index < expected.length; index += 1) difference |= provided[index] ^ expected[index];
+  return difference === 0 ? "ok" : "denied";
 }
 
 export function jsonResponse(status: number, body: Record<string, unknown>): Response {
@@ -35,6 +48,9 @@ export async function handleRequest(request: Request, env: Env, fetcher: typeof 
     return jsonResponse(result.httpStatus, result.body);
   }
   if (request.method === "POST" && url.pathname === "/v1/sanitize") {
+    const authorization = authorizeManualTrigger(request, env.FOUNDATION_MANUAL_TRIGGER_TOKEN);
+    if (authorization === "disabled") return jsonResponse(404, { error: "not found" });
+    if (authorization === "denied") return jsonResponse(401, { error: "unauthorized" });
     let objectKey = "";
     try {
       const payload = (await request.json()) as { objectKey?: unknown };
