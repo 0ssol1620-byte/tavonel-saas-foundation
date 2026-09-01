@@ -230,23 +230,22 @@ export default function FilmBand({
         aria-label={label}
       >
         {admitted ? (
-          <>
-            {/*
-              4:4:4 first, 4:2:0 second.
+          /*
+            One source, encoded 4:4:4.
 
-              These frames are coloured mono text on near-black panels, the worst case for
-              chroma subsampling: 4:2:0 quarters the colour plane and the type smears. Measured
-              against the source frames, 4:4:4 cuts mean error from 1.05 to 0.20 at the size a
-              browser actually paints the band.
+            These frames are coloured mono text on near-black panels — the worst case for chroma
+            subsampling, which quarters the colour plane and smears the type. Measured against
+            the source frames, 4:4:4 cuts mean error from 1.05 to 0.20 at the size a browser
+            actually paints the band.
 
-              The `codecs` parameter is what makes the fallback work: without it a client that
-              cannot decode High 4:4:4 Predictive picks the first source anyway and fails. With
-              it, mobile hardware decoders that refuse 4:4:4 skip to the 4:2:0 file instead of
-              showing nothing.
-            */}
-            <source src={src} type='video/mp4; codecs="avc1.f4001f"' />
-            <source src={src.replace(/\.mp4$/, "-420.mp4")} type="video/mp4" />
-          </>
+            A 4:2:0 fallback was shipped alongside for clients whose hardware decoders refuse
+            High 4:4:4 Predictive, but it doubled public/film to 26MB and the deploy stopped
+            landing — the live site kept serving the previous masters while origin/main carried
+            the new ones. Correctness of the deploy beats a fallback for a case we have not
+            actually observed; no `codecs` parameter either, since with a single source it would
+            only give a browser a reason to reject the file before trying.
+          */
+          <source src={src} type="video/mp4" />
         ) : null}
       </video>
     </div>

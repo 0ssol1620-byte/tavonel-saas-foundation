@@ -3,16 +3,14 @@
 #   usage: encode-cut-2x.sh <capture-dir> <output-name>
 #   e.g.   encode-cut-2x.sh film-capture compile-cut
 #
-# Two files, because the two constraints do not have one answer:
+# yuv444p — no chroma subsampling. Measured against the source PNG this cuts mean error from
+# 1.70 to 0.41 on cut 4, and from 1.05 to 0.20 at the size a browser actually paints. These
+# frames are coloured mono text on near-black, the worst case for 4:2:0: the colour plane is
+# quartered and the type smears.
 #
-#   <name>.mp4      yuv444p — no chroma subsampling. Measured against the source PNG, this cuts
-#                   mean error from 1.70 to 0.41 on cut 4, and from 1.05 to 0.20 at the size a
-#                   browser actually paints. These frames are coloured mono text on near-black,
-#                   which is the worst case for 4:2:0: the colour plane is quartered and the
-#                   type smears. Desktop Chrome decodes 4:4:4 in software.
-#   <name>-420.mp4  yuv420p — universally decodable, including by mobile hardware decoders that
-#                   refuse High 4:4:4 Predictive outright. The <video> lists this second, so a
-#                   client that cannot play 4:4:4 falls back rather than showing nothing.
+# A yuv420p fallback was shipped alongside for hardware decoders that refuse High 4:4:4
+# Predictive, but it doubled public/film to 26MB and the deploy stopped landing — the live site
+# served the previous masters while origin/main carried the new ones. One file only.
 #
 # Memory: with other agents on this machine, a single pass over 450 2880x1800 PNGs died with
 # `get_buffer() failed` and left a 261-byte mp4 in public/film. Encoding in halves at one thread
@@ -51,4 +49,3 @@ CRF=20
 [ "$2" = "compile-cut" ] && CRF=23
 
 encode yuv444p "$ROOT/nextjs/public/film/$2.mp4" "$CRF"
-encode yuv420p "$ROOT/nextjs/public/film/$2-420.mp4" "$CRF"
