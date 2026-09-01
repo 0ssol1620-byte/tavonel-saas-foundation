@@ -24,6 +24,7 @@ function HeroProofFrame() {
       src="/film/compile-cut.mp4"
       poster="/film/poster-1.webp"
       label="Cut 1 — a drive compiles into a world"
+      index={0}
       priority
     />
   );

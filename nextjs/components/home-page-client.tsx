@@ -243,6 +243,7 @@ export default function HomePageClient({ heroProof }: { heroProof: React.ReactNo
           <FilmBand
             src="/film/compile-cut-2.mp4"
             poster="/film/poster-2.webp"
+            index={1}
             label="Cut 2 — an ontology and its edges"
           />
         </Scene>
@@ -251,6 +252,7 @@ export default function HomePageClient({ heroProof }: { heroProof: React.ReactNo
           <FilmBand
             src="/film/compile-cut-3.mp4"
             poster="/film/poster-3.webp"
+            index={2}
             label="Cut 3 — a delta recompiles and traces back"
           />
         </Scene>
@@ -271,6 +273,7 @@ export default function HomePageClient({ heroProof }: { heroProof: React.ReactNo
           <FilmBand
             src="/film/compile-cut-4.mp4"
             poster="/film/poster-4.webp"
+            index={3}
             label="Cut 4 — an assistant, an editor and a terminal reach the same world"
           />
           <div className="band-head rv"><span className="kicker">WHAT YOU GET</span><h3>Files, not a lock-in.</h3></div>

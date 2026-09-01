@@ -574,7 +574,7 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 
 /* ============================================================ hero (01) */
 
-.scene.hero { min-height: 0; justify-content: flex-start; padding-top: 76px; padding-bottom: 16px; }
+.scene.hero { min-height: 0; justify-content: flex-start; padding-top: 64px; padding-bottom: 12px; }
 /*
   The hero film fits the space that is left, without being cropped.
 
@@ -590,14 +590,23 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 */
 .scene.hero .film-band {
   margin-top: 18px;
-  width: min(100%, 1440px);
-  max-height: calc(100dvh - 350px);
+  max-height: calc(100dvh - 340px);
   display: flex;
   justify-content: center;
+  /*
+    Shrink the band to the frame, not the column.
+
+    `max-height` makes the video narrower than the content column, and a band that keeps the
+    column's full width then draws its background and border around a letterbox of empty space
+    on both sides. `width: fit-content` pulls the band in to whatever the height cap left.
+  */
+  width: fit-content;
+  max-width: min(100%, 1440px);
+  margin-inline: auto;
 }
 .scene.hero .film-band-video {
   pointer-events: none;
-  max-height: calc(100dvh - 350px);
+  max-height: calc(100dvh - 340px);
   width: auto;
   max-width: 100%;
 }
