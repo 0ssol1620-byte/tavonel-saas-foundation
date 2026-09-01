@@ -196,7 +196,10 @@ describe("public copy", () => {
   */
   it("ships the compile cuts at 2x so HiDPI screens do not upscale them", () => {
     const film = join(root, "public", "film");
-    for (const name of ["compile-cut", "compile-cut-2", "compile-cut-3", "compile-cut-4"]) {
+    const cuts = ["compile-cut", "compile-cut-2", "compile-cut-3", "compile-cut-4"];
+    // Both the 4:4:4 master and its 4:2:0 fallback: a client that cannot decode High 4:4:4
+    // Predictive gets the second file, and it must not be a lower resolution.
+    for (const name of [...cuts, ...cuts.map((c) => `${c}-420`)]) {
       const file = join(film, `${name}.mp4`);
       expect(existsSync(file), `${name}.mp4 is missing`).toBe(true);
       /*

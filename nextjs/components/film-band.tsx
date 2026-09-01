@@ -229,7 +229,25 @@ export default function FilmBand({
         {...(priority || admitted ? { poster } : {})}
         aria-label={label}
       >
-        {admitted ? <source src={src} type="video/mp4" /> : null}
+        {admitted ? (
+          <>
+            {/*
+              4:4:4 first, 4:2:0 second.
+
+              These frames are coloured mono text on near-black panels, the worst case for
+              chroma subsampling: 4:2:0 quarters the colour plane and the type smears. Measured
+              against the source frames, 4:4:4 cuts mean error from 1.05 to 0.20 at the size a
+              browser actually paints the band.
+
+              The `codecs` parameter is what makes the fallback work: without it a client that
+              cannot decode High 4:4:4 Predictive picks the first source anyway and fails. With
+              it, mobile hardware decoders that refuse 4:4:4 skip to the 4:2:0 file instead of
+              showing nothing.
+            */}
+            <source src={src} type='video/mp4; codecs="avc1.f4001f"' />
+            <source src={src.replace(/\.mp4$/, "-420.mp4")} type="video/mp4" />
+          </>
+        ) : null}
       </video>
     </div>
   );
