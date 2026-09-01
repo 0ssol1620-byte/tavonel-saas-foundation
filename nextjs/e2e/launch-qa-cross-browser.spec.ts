@@ -25,7 +25,10 @@ test("renders launch-critical public routes without browser errors", async ({ pa
   }
 
   const localWebKitUpgradeErrors = testInfo.project.name === "launch-webkit"
-    ? errors.filter(message => message === "Failed to load resource: SSL connect error")
+    ? errors.filter(message =>
+      message === "Failed to load resource: SSL connect error" ||
+      message === "Failed to load resource: Error performing TLS handshake: An unexpected TLS packet was received.",
+    )
     : [];
   const localDevCspErrors = process.env.PLAYWRIGHT_EXTERNAL_SERVER === "1"
     ? errors.filter(message => {
