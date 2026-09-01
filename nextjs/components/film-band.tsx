@@ -29,7 +29,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { requestLoad, settle } from "@/lib/film-queue";
+import { registerPlayer, requestLoad, setVisibility, settle } from "@/lib/film-queue";
 
 export default function FilmBand({
   src,
@@ -96,38 +96,87 @@ export default function FilmBand({
     };
 
     /*
+      The coordinator decides which single band runs.
+
+      `wanted` used to mean "this band is near the viewport", which on a phone was true of every
+      band at once. It now means "this band won the visibility contest", so exactly one film
+      holds a decoder at a time.
+    */
+    const unregister = registerPlayer(index, {
+      play: () => { wanted = true; resume(); },
+      pause: () => { wanted = false; video.pause(); },
+    });
+
+    /*
       Near enough to matter, and in order.
 
-      The margin stays generous so a band is running by the time it is scrolled to rather than
-      showing a black rectangle on arrival. But being near is now only permission to *ask*: the
-      queue admits bands in document order and holds each one until the films above it are
-      playing. Measured cold, cuts 3 and 4 used to start downloading 1ms after the hero, from
-      well below the fold, and the hero's first frame arrived at 6.5s.
+      The margin is a fraction of the viewport rather than a fixed 1400px. On a 1440x900 desktop
+      those are similar; on a 390x844 phone, 1400px reaches almost the whole page, so every band
+      was near at once and all four films played simultaneously. Measured on a throttled phone
+      profile that showed as readyState 2 — starved of buffer — on the cut actually being read,
+      which is the intermittent playback people report on mobile.
+
+      Phones also cap how many hardware decoders exist at once, so four concurrent 18s films is
+      a real resource limit and not merely wasteful.
 
       `wanted` is still set the moment the band is near, so playback resumes instantly for a
       band whose bytes have already arrived; only the fetch is sequenced.
     */
+    const margin = Math.round(Math.min(1400, window.innerHeight * 0.75));
     let release: (() => void) | null = null;
     if (priority) release = requestLoad(index, () => { /* already rendered with its source */ });
     const io = new IntersectionObserver(
       ([entry]) => {
         if (!entry) return;
-        wanted = entry.isIntersecting;
-        if (wanted) {
-          if (video.preload === "auto") {
-            resume();
-            return;
-          }
+        if (entry.isIntersecting && !admitted) {
           // Ask the queue rather than loading. It calls back when the bands above are playing.
-          release ??= requestLoad(index, () => {
-            setAdmitted(true);
-            resume();
-          });
-        } else video.pause();
+          release ??= requestLoad(index, () => setAdmitted(true));
+        }
+        /*
+          Rank by real on-screen overlap, not by `intersectionRatio`.
+
+          The observer's ratio is measured against the *expanded* root — this one is grown by
+          `rootMargin` so bands load before they are reached — so a band a whole screen below the
+          fold still reports a high ratio. Ranking on that put a film nobody could see in front
+          of the one filling the viewport: measured as share=1 with paused=true.
+
+          The intersection with the actual viewport is the number a reader would recognise.
+        */
+        const box = entry.boundingClientRect;
+        const overlap = Math.max(0, Math.min(box.bottom, window.innerHeight) - Math.max(box.top, 0));
+        setVisibility(index, box.height > 0 ? overlap / box.height : 0);
       },
-      { threshold: 0, rootMargin: "1400px 0px" },
+      {
+        // A ladder of thresholds so intersectionRatio is meaningful mid-scroll; without it the
+        // observer only fires at the edges and the leader never changes while scrolling.
+        threshold: [0, 0.1, 0.25, 0.4, 0.55, 0.7, 0.85, 1],
+        rootMargin: `${margin}px 0px`,
+      },
     );
     io.observe(video);
+
+    /*
+      Re-rank on scroll, not only on threshold crossings.
+
+      An IntersectionObserver fires when a boundary is crossed. Between crossings the leader can
+      become the wrong band — scrolling from one film to the next passes through positions where
+      neither has crossed a threshold but the share of the screen has clearly changed hands.
+      A cheap rAF-coalesced scroll handler keeps the ranking honest without polling.
+    */
+    let ticking = false;
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      window.requestAnimationFrame(() => {
+        ticking = false;
+        const box = video.getBoundingClientRect();
+        const overlap = Math.max(0, Math.min(box.bottom, window.innerHeight) - Math.max(box.top, 0));
+        setVisibility(index, box.height > 0 ? overlap / box.height : 0);
+      });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll, { passive: true });
+    onScroll();
 
     /*
       First frame releases the next band — and so does failure.
@@ -150,6 +199,9 @@ export default function FilmBand({
     return () => {
       wanted = false;
       io.disconnect();
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      unregister();
       release?.();
       window.clearTimeout(backstop);
       document.removeEventListener("visibilitychange", onVisible);

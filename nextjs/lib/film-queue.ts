@@ -80,3 +80,56 @@ export function settle(index: number) {
   settled.add(index);
   pump();
 }
+
+/*
+  Only one film runs at a time.
+
+  A phone caps how many hardware video decoders exist simultaneously, and four 18s cuts at once
+  starves whichever one the reader is actually looking at — measured on a throttled phone as
+  readyState 2 on the visible band while three off-screen films held decoders. Desktop hid this
+  because it has the headroom to get away with it.
+
+  So visibility is a competition rather than a broadcast: each band reports how much of it is on
+  screen, and only the leader plays. Everything else pauses and holds its position, ready to
+  resume the moment it wins.
+*/
+type Player = { ratio: number; play: () => void; pause: () => void };
+const players = new Map<number, Player>();
+
+export function registerPlayer(index: number, player: Omit<Player, "ratio">) {
+  /*
+    Re-registering keeps the band's last known visibility.
+
+    A band re-registers whenever its effect re-runs — notably the moment the queue admits it and
+    its <source> appears. Resetting `ratio` to 0 there meant a band that filled the screen was
+    ranked as invisible, so the coordinator left a band nobody could see playing and paused the
+    one being read. Measured as share=1 with paused=true.
+  */
+  const previous = players.get(index)?.ratio ?? 0;
+  const entry = { ...player, ratio: previous };
+  players.set(index, entry);
+  // A newly admitted band may already be the most visible one, so settle the contest now
+  // rather than waiting for the next scroll event to arrive.
+  if (previous > 0) setVisibility(index, previous);
+  // Only remove this registration, never a newer one that replaced it: React runs the next
+  // effect's setup before the previous cleanup in some orders, and deleting unconditionally
+  // would drop a live band from the contest entirely.
+  return () => { if (players.get(index) === entry) players.delete(index); };
+}
+
+/** A band's share of the viewport changed; recompute who should be running. */
+export function setVisibility(index: number, ratio: number) {
+  const player = players.get(index);
+  if (!player) return;
+  player.ratio = ratio;
+
+  // The most-visible band wins; ties go to the one higher up the page, which is the one being
+  // read into. Iterating in index order means a later band must strictly beat the leader.
+  let leader: number | null = null;
+  let best = 0;
+  for (const i of [...players.keys()].sort((a, b) => a - b)) {
+    const p = players.get(i);
+    if (p && p.ratio > best) { best = p.ratio; leader = i; }
+  }
+  for (const [i, p] of players) (i === leader ? p.play() : p.pause());
+}
