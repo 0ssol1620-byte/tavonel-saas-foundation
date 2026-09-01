@@ -1,5 +1,6 @@
 import { activationPolicy } from "@/lib/activation-policy";
 import { readConfiguredBillingOffers, readPaddleBrowserConfig } from "@/lib/billing-catalog";
+import { isBillingLaunchApproved } from "@/lib/billing-launch";
 import { readExportSignerEnv } from "@/lib/export-signing";
 import { readPaddleApiConfig } from "@/lib/paddle-api";
 import { readProductCoreV2Env } from "@/lib/core-runtime-v2";
@@ -10,6 +11,7 @@ export const LEGAL_EFFECTIVE_DATE = "2026-08-30";
 
 export function readPublicOperations() {
   const sandbox = process.env.PADDLE_SANDBOX === "true";
+  const billingLaunchApproved = isBillingLaunchApproved();
   const auth = Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL?.trim().startsWith("https://") &&
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim(),
@@ -48,9 +50,15 @@ export function readPublicOperations() {
         state: Object.values(billingChecks).every(Boolean)
           ? sandbox
             ? "test_only"
-            : "operational"
+            : billingLaunchApproved
+              ? "operational"
+              : "restricted"
           : "not_configured",
-        detail: sandbox ? "Paddle sandbox; no real charge" : "Paddle live checkout",
+        detail: sandbox
+          ? "Paddle sandbox; no real charge"
+          : billingLaunchApproved
+            ? "Paddle live checkout"
+            : "Paddle live checkout configured; launch approval pending",
       },
       export: {
         state: readExportSignerEnv() ? "operational" : "not_configured",
@@ -63,7 +71,7 @@ export function readPublicOperations() {
       signedExport: Boolean(readExportSignerEnv()),
       compiler: Boolean(readProductCoreV2Env()),
       billingConfigured: Object.values(billingChecks).every(Boolean),
-      billingLive: !sandbox && Object.values(billingChecks).every(Boolean),
+      billingLive: !sandbox && billingLaunchApproved && Object.values(billingChecks).every(Boolean),
       promotionRequiresHumanApproval: !activationPolicy.candidatePromotion.enabled,
     },
   } as const;

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createCheckoutBinding } from "@/lib/billing-binding";
 import { isBillingOfferCode, readConfiguredBillingOffers, readPaddleBrowserConfig } from "@/lib/billing-catalog";
+import { isBillingLaunchApproved } from "@/lib/billing-launch";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +31,9 @@ export async function POST(request: Request) {
   const secret = process.env.FOUNDATION_BILLING_HMAC?.trim() ?? "";
   if (!paddle || !offer || secret.length < 32) {
     return NextResponse.json({ code: "BILLING_NOT_CONFIGURED" }, { status: 503, headers: NO_STORE });
+  }
+  if (!isBillingLaunchApproved()) {
+    return NextResponse.json({ code: "BILLING_LAUNCH_PENDING" }, { status: 503, headers: NO_STORE });
   }
   const access = foundationPilotAccess(user.id);
   if (!access) return NextResponse.json({ code: "PILOT_ACCESS_REQUIRED" }, { status: 403, headers: NO_STORE });

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { activationPolicy } from "@/lib/activation-policy";
 import { readConfiguredBillingOffers, readPaddleBrowserConfig } from "@/lib/billing-catalog";
+import { isBillingLaunchApproved } from "@/lib/billing-launch";
 import { readExportSignerEnv } from "@/lib/export-signing";
 import { readPaddleApiConfig } from "@/lib/paddle-api";
 import { readProductCoreV2Env } from "@/lib/core-runtime-v2";
@@ -16,6 +17,7 @@ export function GET() {
     ? "google_oauth_configured"
     : "not_configured";
   const sandbox = process.env.PADDLE_SANDBOX === "true";
+  const billingLaunchApproved = isBillingLaunchApproved();
   const billingChecks = {
     webhook: Boolean(process.env.PADDLE_WEBHOOK_SECRET?.trim()),
     checkout: Boolean(readPaddleBrowserConfig()),
@@ -29,7 +31,9 @@ export function GET() {
   const billing = billingConfigured
     ? sandbox
       ? "sandbox_checkout_ready"
-      : "live_checkout_ready"
+      : billingLaunchApproved
+        ? "live_checkout_ready"
+        : "live_launch_pending"
     : sandbox
       ? "sandbox_incomplete"
       : "live_incomplete";
