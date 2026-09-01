@@ -15,8 +15,8 @@ export function GET() {
   const auth = supabaseUrl.startsWith("https://") && supabaseAnon
     ? "google_oauth_configured"
     : "not_configured";
+  const sandbox = process.env.PADDLE_SANDBOX === "true";
   const billingChecks = {
-    sandbox: process.env.PADDLE_SANDBOX === "true",
     webhook: Boolean(process.env.PADDLE_WEBHOOK_SECRET?.trim()),
     checkout: Boolean(readPaddleBrowserConfig()),
     api: Boolean(readPaddleApiConfig()),
@@ -25,9 +25,14 @@ export function GET() {
     settlement: (process.env.FOUNDATION_BILLING_SETTLEMENT_HMAC?.trim().length ?? 0) >= 32,
     catalog: readConfiguredBillingOffers().size === 5,
   };
-  const billing = Object.values(billingChecks).every(Boolean)
-    ? "sandbox_checkout_ready"
-    : "sandbox_incomplete";
+  const billingConfigured = Object.values(billingChecks).every(Boolean);
+  const billing = billingConfigured
+    ? sandbox
+      ? "sandbox_checkout_ready"
+      : "live_checkout_ready"
+    : sandbox
+      ? "sandbox_incomplete"
+      : "live_incomplete";
   const signer = readR2SignerEnv();
   const r2 = signer && signer.bucket === FOUNDATION_R2_BUCKET ? "signer_configured" : "signer_not_configured";
   const signedExport = readExportSignerEnv() ? "signed_export_ready" : "signed_export_not_configured";
