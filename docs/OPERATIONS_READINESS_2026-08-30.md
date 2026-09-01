@@ -2,6 +2,14 @@
 
 Date: 2026-08-30
 
+2026-09-01 addendum: the R2 half of backup/restore is qualified. The active
+lifecycle aborts incomplete multipart uploads after 7 days, expires
+`quarantine/` after 365 days and leaves `immutable/` without an expiry rule.
+An isolated APAC restore drill reproduced a 336-byte immutable `ocr.json` with
+an identical SHA-256, then removed only the drill object, bucket and local
+temporary files. Supabase point-in-time/daily backup and database restore remain
+a separate provider-plan gate.
+
 This record is the implementation and external-gate ledger for the ten P0 operating tracks. A checked code control is not evidence that a provider dashboard setting or paid account review is complete.
 
 | Track | Implemented in repository | External completion gate |

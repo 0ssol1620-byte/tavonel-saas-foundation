@@ -2,6 +2,19 @@
 
 Recorded: 2026-08-30 KST
 
+## 2026-09-01 verified addendum
+
+- R2 lifecycle is active: incomplete multipart uploads abort after 7 days,
+  `quarantine/` objects expire after 365 days, and no expiry rule covers
+  `immutable/`.
+- An existing immutable `ocr.json` was restored into an isolated APAC drill
+  bucket and downloaded again. Source and restored objects were both 336 bytes
+  with SHA-256
+  `c42e55b921ac60bf50bba5d9a23425d2401f821f9732b218b14643fcc08323eb`.
+- The restored JSON retained `status=ok`, one page and its immutable-source
+  reference. The restored object, drill bucket and local temporary files were
+  then removed; the production source object was not changed.
+
 ## Production release
 
 - Release source: GitHub `main`; canonical production alias verified after each
@@ -98,7 +111,6 @@ not evidence that these gates are complete.
 | RunPod MFA | Disabled | Owner enables MFA and stores recovery material |
 | RunPod workload | Full sequences passed for bounded public documents | Fresh mixed, large customer-like corpus quality run after provider and retention gates |
 | Supabase recovery | Free plan reports no backups | Upgrade/enable backups and complete restore drill |
-| R2 retention/recovery | Incomplete multipart cleanup exists; no complete object-retention/restore drill | Apply approved lifecycle and prove restore without losing immutable evidence |
 | Provider alerts | Cloudflare and RunPod alerts exist; Vercel explicit budget notification is not proven | Configure and receive a Vercel alert canary |
 | OAuth provider apps | Contracts and production DB schema are live | Create Google, Dropbox and Entra apps/secrets and run real-account file collection |
 | Enterprise identity/regions | Control plane is live and fail-closed | Connect real IdP, provision target regions/dedicated deployment and run tenant E2E |
@@ -108,6 +120,7 @@ not evidence that these gates are complete.
 ## Evidence references
 
 - `docs/evidence/production/TAVONEL_PRODUCT_SURFACES_FULL_SEQUENCE_2026-08-30.json`
+- `docs/evidence/production/TAVONEL_R2_RESTORE_DRILL_2026-09-01.json`
 - `docs/evidence/ocr/FOUNDATION_GPU_OCR_FULL_SEQUENCE_2026-08-29.json`
 - `docs/evidence/collections/FOUNDATION_KNOWLEDGE_PACKAGE_QA_2026-08-29.json`
 - `docs/runbooks/P0_OPERATIONS.md`

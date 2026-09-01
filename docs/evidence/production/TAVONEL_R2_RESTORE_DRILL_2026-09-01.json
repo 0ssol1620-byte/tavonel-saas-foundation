@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "status": "qualified",
+  "observedAtKst": "2026-09-01",
+  "scope": "foundation-r2-immutable-derived-object-restore",
+  "source": {
+    "bucket": "tavonel-saas-foundation-quarantine",
+    "key": "immutable/pilot-969dc192daa24119/pilot-969dc192daa24119/7b7d397d-dceb-4736-85a4-bfa491d9ceae/0f7e9338b0eb6adf330d8efd8aed844bd19882b6aaed3e38682ba075efb56d4d/ocr.json",
+    "bytes": 336,
+    "sha256": "c42e55b921ac60bf50bba5d9a23425d2401f821f9732b218b14643fcc08323eb"
+  },
+  "restore": {
+    "bucket": "tavonel-restore-drill-20260901-a1f7c2d9",
+    "locationHint": "apac",
+    "key": "restored/ocr.json",
+    "bytes": 336,
+    "sha256": "c42e55b921ac60bf50bba5d9a23425d2401f821f9732b218b14643fcc08323eb",
+    "hashMatch": true,
+    "jsonContract": {
+      "status": "ok",
+      "pageCount": 1,
+      "sourceImmutableKeyPresent": true
+    }
+  },
+  "lifecycle": {
+    "multipartAbortDays": 7,
+    "quarantineExpiryDays": 365,
+    "immutableExpiryRulePresent": false
+  },
+  "cleanup": {
+    "restoredObjectDeleted": true,
+    "drillBucketDeleted": true,
+    "localTemporaryFilesDeleted": true,
+    "productionSourceChanged": false
+  }
+}
