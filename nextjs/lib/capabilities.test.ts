@@ -53,6 +53,15 @@ describe("capability grid", () => {
     expect(open).toContain("Quarantine storage");
   });
 
+  it("reports live checkout as configured without weakening fail-closed behavior", () => {
+    const rows = readCapabilities({ ...HEALTHY, billing: "live_checkout_ready" }, false);
+    const billing = rows.find((row) => row.name === "Checkout and credits");
+
+    expect(billing?.tone).toBe("open");
+    expect(billing?.note).toMatch(/live checkout/i);
+    expect(billing?.note).toMatch(/verified webhook/i);
+  });
+
   it("keeps a disabled gate closed rather than unknown", () => {
     const promotion = readCapabilities(HEALTHY, false).find((c) => c.name === "Promotion to the live world");
     expect(promotion?.tone).toBe("closed");

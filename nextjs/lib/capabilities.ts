@@ -59,7 +59,15 @@ export function readCapabilities(status: StatusResponse | null, failed: boolean)
     gate("ocrGpu", "OCR on scans", "Qualified GPU OCR is available.", "GPU OCR is gated."),
     gate("candidatePromotion", "Promotion to the live world", "", "Promotion is always an explicit human decision. Closed on purpose, not pending."),
     flag(status?.auth, "Google sign-in", ["google_oauth_configured"], "Sign-in is available to pilot users.", "No auth provider is configured here."),
-    flag(status?.billing, "Checkout and credits", ["sandbox_checkout_ready"], "Paddle sandbox checkout is complete. Live mode is not enabled.", "Sandbox checkout is not fully configured."),
+    flag(
+      status?.billing,
+      "Checkout and credits",
+      ["sandbox_checkout_ready", "live_checkout_ready"],
+      status?.billing === "live_checkout_ready"
+        ? "Paddle live checkout is configured. Entitlements still require a verified webhook."
+        : "Paddle sandbox checkout is complete. Live mode is not enabled.",
+      "Paddle checkout is not fully configured.",
+    ),
     flag(status?.r2, "Quarantine storage", ["signer_configured"], "The scoped upload signer is configured.", "No upload signer is configured here."),
     // Direction, not Concept and not shipped: the page demonstrates both of these in depth while
     // claiming neither is a finished production feature. They are the two rows where an overclaim

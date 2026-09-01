@@ -69,12 +69,13 @@ export function useCheckout(notify: (message: string) => void) {
         }
 
         const { initializePaddleBrowser } = await import("./paddle-browser");
+        const paymentMode = checkout.environment === "production" ? "live" : "sandbox";
         const paddle = await initializePaddleBrowser({
           token: checkout.clientToken,
           environment: checkout.environment,
           eventCallback: (event) => {
             if (event.name === "checkout.completed") {
-              notify("Paddle accepted the sandbox payment. Access and credits remain pending until the signed webhook is persisted.");
+              notify(`Paddle accepted the ${paymentMode} payment. Access and credits remain pending until the signed webhook is persisted.`);
             }
           },
         });
@@ -89,7 +90,7 @@ export function useCheckout(notify: (message: string) => void) {
           customData: checkout.customData,
           settings: { displayMode: "overlay", theme: "dark", locale: "en" },
         });
-        notify(`${checkout.offer.label ?? "Selected offer"} sandbox checkout opened. Only a verified webhook can change entitlements.`);
+        notify(`${checkout.offer.label ?? "Selected offer"} ${paymentMode} checkout opened. Only a verified webhook can change entitlements.`);
       } catch {
         notify("Paddle checkout could not be opened. No entitlement was changed.");
       } finally {

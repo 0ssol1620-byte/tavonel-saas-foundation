@@ -180,4 +180,19 @@ describe("checkout", () => {
     expect(said).not.toMatch(/access (is )?(now |now\b)?(live|active|granted|enabled)/);
     expect(said).not.toMatch(/credits (added|granted|available now)/);
   });
+
+  it("labels production checkout as live without claiming an entitlement", async () => {
+    respondWith({
+      clientToken: "ct", environment: "production",
+      offer: { priceId: "pri_123", label: "Starter" }, customData: { u: "1" },
+    });
+
+    const notices = await runCheckout("credit_starter");
+    const said = notices.join(" ").toLowerCase();
+
+    expect(paddle.opened).toHaveLength(1);
+    expect(said).toMatch(/live checkout opened/);
+    expect(said).toMatch(/webhook/);
+    expect(said).not.toMatch(/sandbox checkout opened/);
+  });
 });
