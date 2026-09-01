@@ -13,6 +13,7 @@ type Page = {
     url: string,
     handler: (route: {
       fulfill: (options: { json: unknown }) => Promise<void>;
+      request: () => { headers: () => Record<string, string> };
     }) => Promise<void>
   ) => Promise<void>;
 };
@@ -162,9 +163,10 @@ async function mockWorkspace(page: Page, reviewRequired = false) {
       },
     })
   );
-  await page.route(`**/api/v1/world/${collectionId}`, route =>
-    route.fulfill({ json: { model: null } })
-  );
+  await page.route(`**/api/v1/world/${collectionId}`, async route => {
+    expect(route.request().headers().authorization).toMatch(/^Bearer \S+$/);
+    await route.fulfill({ json: { model: null } });
+  });
   await page.route(`**/api/collections/${collectionId}/ask`, route =>
     route.fulfill({
       json: {

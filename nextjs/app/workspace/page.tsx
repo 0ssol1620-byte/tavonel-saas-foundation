@@ -268,12 +268,19 @@ export default function WorkspacePage() {
       return;
     }
     const controller = new AbortController();
-    void fetch(`/api/v1/world/${encodeURIComponent(collectionId)}`, {
-      cache: "no-store",
-      credentials: "same-origin",
-      signal: controller.signal,
-    })
-      .then(async (response) => response.ok ? await response.json() as { model?: WorldReadModel } : null)
+    void (async () => {
+      const client = getSupabaseBrowserClient();
+      const { data } = client ? await client.auth.getSession() : { data: { session: null } };
+      const token = data.session?.access_token;
+      if (!token) return null;
+      const response = await fetch(`/api/v1/world/${encodeURIComponent(collectionId)}`, {
+        cache: "no-store",
+        credentials: "same-origin",
+        headers: { authorization: `Bearer ${token}` },
+        signal: controller.signal,
+      });
+      return response.ok ? await response.json() as { model?: WorldReadModel } : null;
+    })()
       .then((body) => setWorldReadModel(body?.model ?? null))
       .catch((error: unknown) => {
         if (!(error instanceof DOMException && error.name === "AbortError")) setWorldReadModel(null);
