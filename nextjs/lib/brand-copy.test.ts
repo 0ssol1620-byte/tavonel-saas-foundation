@@ -183,6 +183,42 @@ describe("public copy", () => {
     a broken image where the film should be. Both halves are asserted: every band names a
     poster, and every poster it names is a file in the repo.
   */
+  /*
+    The masters are 2x, so a HiDPI display has real pixels to paint.
+
+    A 1440-wide master is upscaled ~1.7x on a 2x screen — measured 1440 source pixels stretched
+    into 2460 device pixels — and the small mono type in these cuts is the first thing to smear.
+    That is why a film could look sharp on one monitor and mushy on another.
+
+    This asserts the shipped bytes, not the recording script, because the two have drifted
+    before: `deviceScaleFactor` looks like it should raise the recorded resolution and does not,
+    and a 2880 viewport raises it while silently breaking the composition.
+  */
+  it("ships the compile cuts at 2x so HiDPI screens do not upscale them", () => {
+    const film = join(root, "public", "film");
+    for (const name of ["compile-cut", "compile-cut-2", "compile-cut-3", "compile-cut-4"]) {
+      const file = join(film, `${name}.mp4`);
+      expect(existsSync(file), `${name}.mp4 is missing`).toBe(true);
+      /*
+        Read the dimensions from the file rather than shelling out to ffprobe, which is not on
+        every machine that runs these tests.
+
+        `tkhd` ends with width and height as 16.16 fixed-point, 80 bytes past the type field in
+        a version-0 box — located by searching the box for the known pair rather than counting
+        the spec's fields, after three hand-counted offsets each produced plausible wrong
+        numbers (68 gave "1800x0", 76 the unity matrix's 16384, 84 "1800x0" again). The
+        assertion prints what it read so a future drift is legible rather than a bare false.
+      */
+      const bytes = readFileSync(file);
+      const at = bytes.indexOf(Buffer.from("tkhd"));
+      expect(at, `${name}.mp4 has no tkhd box`).toBeGreaterThan(0);
+      expect(bytes[at + 4], `${name}.mp4 is not a version-0 tkhd`).toBe(0);
+      const width = bytes.readUInt32BE(at + 80) >> 16;
+      const height = bytes.readUInt32BE(at + 84) >> 16;
+      expect(`${name}: ${width}x${height}`).toBe(`${name}: 2880x1800`);
+    }
+  });
+
   it("gives every film band a poster file that actually exists", () => {
     const page = landingSource();
     const posters = [...page.matchAll(/\b(?:poster|src)="(\/film\/poster-[^"]+)"/g)]

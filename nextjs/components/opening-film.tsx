@@ -742,8 +742,34 @@ export default function OpeningFilm(_props: { onEnded?: () => void }) {
         return () => window.removeEventListener("resize", onResize);
       }
       draw(elapsedRef.current);
+      /*
+        A capture hook, so the master can be recorded at 2x.
+
+        The films are soft on HiDPI screens because a 1440-wide master is upscaled ~1.7x there.
+        The canvas already draws at devicePixelRatio, so the detail exists — but Playwright's
+        video recorder works in CSS pixels and throws it away, and recording a 2880-wide viewport
+        instead breaks the composition (type is sized in fixed pixels, so a wider stage shrinks
+        it). Screenshots at deviceScaleFactor 2 keep the 1440 layout and capture the 2880 backing
+        store, which means stepping the clock frame by frame rather than watching it run.
+
+        Inert in a browser: nothing sets these unless a capture script does.
+      */
+      const win = window as unknown as {
+        __filmFreeze?: boolean;
+        __filmSeek?: (t: number) => void;
+      };
+      win.__filmSeek = (t: number) => {
+        elapsedRef.current = t;
+        draw(t);
+      };
       const tick = (now: number) => {
         if (!startRef.current) startRef.current = now;
+        if (win.__filmFreeze) {
+          // A capture is driving the clock; keep the loop alive but do not advance it.
+          startRef.current = now;
+          frame = window.requestAnimationFrame(tick);
+          return;
+        }
         if (playingRef.current) elapsedRef.current += (now - startRef.current) / 1000;
         startRef.current = now;
         if (elapsedRef.current >= ACT.stop) elapsedRef.current = 0;

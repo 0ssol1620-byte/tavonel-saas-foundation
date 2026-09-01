@@ -663,8 +663,9 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
   is always a column or the bottom of one. `contain` is the only honest fit for a film whose
   entire claim is that four things are visible at once.
 
-  The ratio is the masters' own 1440x900 — declaring a ratio the files do not have reserves a
-  box of the wrong height and letterboxes every band.
+  The ratio is the masters' 16:10 stage. The files are 2880x1800 — recorded at 2x so a HiDPI
+  display has real pixels to paint rather than a 1.7x upscale of a 1440 master, which is what
+  made the small mono type look mushy on one monitor and fine on another.
 */
 .film-band-video {
   display: block;

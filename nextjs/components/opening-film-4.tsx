@@ -547,8 +547,25 @@ export default function OpeningFilm4() {
         return () => window.removeEventListener("resize", onResize);
       }
       draw(elapsedRef.current);
+      /*
+        A capture hook, so the master can be recorded at 2x. Inert unless a capture script sets
+        these; see opening-film.tsx for why screenshots rather than recordVideo.
+      */
+      const win = window as unknown as {
+        __filmFreeze?: boolean;
+        __filmSeek?: (t: number) => void;
+      };
+      win.__filmSeek = (t: number) => {
+        elapsedRef.current = t;
+        draw(t);
+      };
       const tick = (now: number) => {
         if (!startRef.current) startRef.current = now;
+        if (win.__filmFreeze) {
+          startRef.current = now;
+          frame = window.requestAnimationFrame(tick);
+          return;
+        }
         if (playingRef.current) elapsedRef.current += (now - startRef.current) / 1000;
         startRef.current = now;
         if (elapsedRef.current >= RUN) elapsedRef.current = 0;

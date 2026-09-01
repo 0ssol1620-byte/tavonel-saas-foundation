@@ -2,7 +2,7 @@ import { chromium } from "@playwright/test";
 import { mkdirSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-const BASE = "http://127.0.0.1:3056";
+const BASE = "http://127.0.0.1:3057";
 const CUT = 18_000;
 const outDir = "C:/Users/yspow/work/tavonel-saas-foundation/docs/audit/film-capture";
 const frameDir = "C:/Users/yspow/work/tavonel-saas-foundation/docs/audit/film-frames";
@@ -14,6 +14,19 @@ for (const name of readdirSync(outDir)) {
 
 const browser = await chromium.launch({ headless: true });
 const context = await browser.newContext({
+  /*
+    Recorded at the composed stage size: 1440x900.
+
+    Do not raise this to chase sharpness. The cuts position everything as a fraction of the
+    canvas but size their type in fixed pixels, so a 2880x1800 viewport keeps 12px text on a
+    stage twice as wide — measured, the SOURCES list repeated three times to fill the column and
+    the document panes became mostly margin. The composition is locked; the stage is part of it.
+
+    Sharpness on HiDPI is handled where it belongs, by rendering the canvas at devicePixelRatio
+    (the components already do, capped at 2) and capturing that — see the deviceScaleFactor note
+    in the film QA skill. Playwright records in CSS pixels, so a 2x capture needs a 2x-aware
+    pipeline rather than a bigger viewport.
+  */
   viewport: { width: 1440, height: 900 },
   recordVideo: { dir: outDir, size: { width: 1440, height: 900 } },
   reducedMotion: "no-preference",
