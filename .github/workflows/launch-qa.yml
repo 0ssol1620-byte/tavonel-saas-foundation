@@ -41,7 +41,7 @@ jobs:
         run: pnpm exec playwright test --project=launch-${{ matrix.browser }}
       - name: Preserve browser failure evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: launch-qa-${{ matrix.browser }}
           path: |
