@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FOUNDATION_R2_BUCKET } from "./r2-synthetic-canary";
-import { assertFoundationListPrefix, getWorkspaceCollectionCandidate, getWorkspaceOcrJson, putWorkspaceCollectionCandidate } from "./r2-objects";
+import { assertFoundationListPrefix, getWorkspaceCollectionCandidate, getWorkspaceOcrJson, listImmutableWorkspaceObjects, putWorkspaceCollectionCandidate } from "./r2-objects";
 
 const WS = "pilot-abc";
 
@@ -48,6 +48,35 @@ describe("R2 document listing prefix", () => {
     const foreign = `immutable/other/other/collections/collection-${"ab".repeat(16)}/${"cd".repeat(32)}/candidate-world.json`;
     await expect(getWorkspaceCollectionCandidate(env, WS, foreign)).resolves.toEqual({ ok: false, code: "COLLECTION_JSON_PREFIX_REQUIRED" });
     await expect(putWorkspaceCollectionCandidate(env, WS, foreign, {})).resolves.toEqual({ ok: false, code: "COLLECTION_JSON_PREFIX_REQUIRED" });
+  });
+
+  it("lists 1,000-key pages and follows a continuation token", async () => {
+    const env = {
+      accountId: "acct",
+      bucket: FOUNDATION_R2_BUCKET,
+      accessKeyId: "AKIAEXAMPLE",
+      secretAccessKey: "secret",
+    };
+    const prefix = `immutable/${WS}/${WS}/`;
+    const firstKey = `${prefix}doc-a/${"ab".repeat(32)}/sanitized.pdf`;
+    const secondKey = `${prefix}doc-b/${"cd".repeat(32)}/ocr.json`;
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(
+        `<ListBucketResult><IsTruncated>true</IsTruncated><NextContinuationToken>next page</NextContinuationToken><Contents><Key>${firstKey}</Key><Size>12</Size></Contents></ListBucketResult>`,
+        { status: 200 },
+      ))
+      .mockResolvedValueOnce(new Response(
+        `<ListBucketResult><IsTruncated>false</IsTruncated><Contents><Key>${secondKey}</Key><Size>34</Size></Contents></ListBucketResult>`,
+        { status: 200 },
+      ));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(listImmutableWorkspaceObjects(env, WS)).resolves.toEqual({
+      ok: true,
+      objects: [{ key: firstKey, size: 12 }, { key: secondKey, size: 34 }],
+    });
+    expect(String(fetchMock.mock.calls[0][0])).toContain("max-keys=1000");
+    expect(String(fetchMock.mock.calls[1][0])).toContain("continuation-token=next%20page");
   });
 
   it("writes a create-once collection candidate with a signed workspace key", async () => {

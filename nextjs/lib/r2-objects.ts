@@ -150,7 +150,9 @@ export async function listImmutableWorkspaceObjects(
   for (let page = 0; page < 8; page += 1) {
     const query: Record<string, string> = {
       "list-type": "2",
-      "max-keys": "200",
+      // ListObjectsV2 permits 1,000 keys. The old 200-key page made a mature
+      // workspace exceed the request budget even though R2 itself was healthy.
+      "max-keys": "1000",
       prefix,
     };
     if (continuation) query["continuation-token"] = continuation;
