@@ -243,6 +243,7 @@ export default function WorkspacePage() {
   }, []);
   const [busy, setBusy] = useState(false);
   const [documents, setDocuments] = useState<DocumentListItem[] | null>(null);
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
   /**
    * D9 -- the tab keeps counting after you look away.
    *
@@ -390,6 +391,9 @@ export default function WorkspacePage() {
     const json = (await response.json()) as { documents?: DocumentListItem[] };
     const next = json.documents ?? [];
     setDocuments(next);
+    setSelectedDocumentIds((current) => current.filter((documentId) =>
+      next.some((item) => item.documentId === documentId && item.hasOcrJson),
+    ));
     return next;
   };
 
@@ -779,6 +783,45 @@ export default function WorkspacePage() {
       setNotice(json.coreExecution.status === "review_required"
         ? `Separate Core produced a review-required package for ${json.collectionId}; ${json.reviewReasons?.join(", ") || "manual review required"}. Signed download is available and promotion remains blocked.`
         : `Separate Core runtime completed ${json.collectionId}; receipt ${json.coreExecution.receipt.requestId}; output ${json.coreExecution.receipt.outputSha256}; candidatePromotion=false.`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const compileSelectedDocuments = async () => {
+    const documentIds = [...new Set(selectedDocumentIds)];
+    if (documentIds.length < 2) {
+      setNotice("Select at least two documents with immutable ocr.json output.");
+      return;
+    }
+    setBusy(true);
+    setCollectionResult(null);
+    clearWorldState();
+    try {
+      const token = await getAuthToken();
+      if (!token) {
+        setNotice("Sign in with Google before compiling a collection.");
+        return;
+      }
+      setNotice(`Compiling ${documentIds.length} selected immutable OCR documents with the separate Core runtime...`);
+      const response = await fetch("/api/collections/compile", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({ documentIds }),
+      });
+      const json = await response.json() as CollectionResult & { code?: string };
+      if (!response.ok || !json.collectionId || (json.coreExecution?.status !== "completed" && json.coreExecution?.status !== "review_required")) {
+        setNotice(`Collection compilation failed (${json.code ?? response.status}). No candidate was promoted.`);
+        return;
+      }
+      setCollectionResult(json);
+      await loadWorldState(json.collectionId, token);
+      const url = new URL(window.location.href);
+      url.searchParams.set("collection", json.collectionId);
+      window.history.replaceState(null, "", url);
+      setNotice(json.lifecycle === "review_required"
+        ? `Selected documents produced a signed review package for ${json.collectionId}. Download and inspect it; promotion remains blocked.`
+        : `Collection ${json.collectionId} compiled from ${json.validation.counts.documents} selected documents with ${json.validation.counts.claims} claims and ${json.validation.counts.relations} evidence-bound relations. candidatePromotion=false.`);
     } finally {
       setBusy(false);
     }
@@ -1208,6 +1251,7 @@ export default function WorkspacePage() {
               <p className="eyebrow">IMMUTABLE KEYS</p>
               <h2>{documents && documents.length > 0 ? "What each document left behind" : "Awaiting a qualified first document"}</h2>
               {documents && documents.length > 0 ? (
+                <>
                 <ul className="document-meta">
                   {documents.map((doc) => (
                     <li key={`${doc.documentId}-${doc.versionKey}`}>
@@ -1217,6 +1261,18 @@ export default function WorkspacePage() {
                       */}
                       <strong>{displayName(doc.documentId, names)}</strong>
                       <small className="doc-id" title={doc.documentId}>{doc.documentId}</small>
+                      {doc.hasOcrJson ? (
+                        <label className="compile-source-choice">
+                          <input
+                            type="checkbox"
+                            checked={selectedDocumentIds.includes(doc.documentId)}
+                            onChange={(event) => setSelectedDocumentIds((current) => event.target.checked
+                              ? [...new Set([...current, doc.documentId])]
+                              : current.filter((documentId) => documentId !== doc.documentId))}
+                          />
+                          Include in the next candidate
+                        </label>
+                      ) : null}
                       {/*
                         A receipt key is 200 characters of bucket, tenant, document, digest and
                         artifact, and it used to be printed whole -- four of them per document,
@@ -1235,6 +1291,13 @@ export default function WorkspacePage() {
                     </li>
                   ))}
                 </ul>
+                <div className="compile-selection-actions">
+                  <small>{selectedDocumentIds.length} OCR-qualified document{selectedDocumentIds.length === 1 ? "" : "s"} selected</small>
+                  <button type="button" disabled={busy || selectedDocumentIds.length < 2} onClick={() => void compileSelectedDocuments()}>
+                    {busy ? "Compiling selected documents..." : "Compile selected documents"}
+                  </button>
+                </div>
+                </>
               ) : (
                 <div className="empty">
                   <FileText size={22} />

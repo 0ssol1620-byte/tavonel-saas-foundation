@@ -1453,6 +1453,32 @@ footer.site .shell { display: flex; flex-direction: column; gap: 14px; }
   margin-top: -1px;
 }
 
+.compile-source-choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-mid);
+  font: 500 10px/1.4 var(--f-mono);
+  letter-spacing: 0.04em;
+}
+
+.compile-source-choice input {
+  accent-color: var(--verified);
+}
+
+.compile-selection-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.compile-selection-actions small {
+  color: var(--text-xlo);
+}
+
 /*
   A receipt key: label, the key itself on one line, and a control that copies it whole.
   `min-width: 0` on the code element is what keeps the elided string from widening the card --
