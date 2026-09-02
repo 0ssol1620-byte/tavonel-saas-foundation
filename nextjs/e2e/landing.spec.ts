@@ -91,26 +91,28 @@ test("nothing on the page is wider than the thing that holds it", async ({ page 
   await testInfo.attach("landing", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
 });
 
-test("draws five scenes over the opening world field", async ({ page }) => {
+test("draws ten scenes over the opening world field", async ({ page }) => {
   await page.goto("/");
   await settle(page);
 
   /*
-   * The current film is five numbered scenes. Each scene owns one evidence band; the earlier
-   * continuation sections were folded into the authored cuts rather than left as duplicate
-   * scroll stops. A single fixed WorldField carries the state transition behind those scenes.
+   * The masterplan expands the authored journey to ten numbered scenes without restoring the
+   * duplicate continuation sections. A single fixed WorldField carries the state transition.
    */
-  await expect(page.locator("section.scene")).toHaveCount(5);
+  await expect(page.locator("section.scene")).toHaveCount(10);
   await expect(page.locator("section.scene.cont")).toHaveCount(0);
   await expect(page.locator(".world-field")).toHaveCount(1);
 
   const scenes = await page.evaluate(() =>
     Array.from(document.querySelectorAll("[data-scene]")).map((el) => el.getAttribute("data-scene")));
-  expect(new Set(scenes).size).toBe(5);
+  expect(new Set(scenes).size).toBe(10);
 
   const bands = await page.evaluate(() =>
     Array.from(document.querySelectorAll("[data-band]")).map((el) => el.getAttribute("data-band")));
-  expect(bands).toEqual(["scatter", "structure", "change", "answer", "access"]);
+  expect(bands).toEqual([
+    "scatter", "structure", "change", "answer", "world",
+    "world", "structure", "world", "access", "access",
+  ]);
 
   const field = await page.locator(".world-field").boundingBox();
   const viewport = await page.evaluate(() => ({ width: window.innerWidth, height: window.innerHeight }));

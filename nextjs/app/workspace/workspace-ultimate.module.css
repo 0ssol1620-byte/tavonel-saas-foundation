@@ -63,7 +63,7 @@
   z-index: 10;
   min-height: 62px;
   display: grid;
-  grid-template-columns: minmax(145px, 1.2fr) repeat(4, minmax(112px, auto)) minmax(170px, .8fr) auto;
+  grid-template-columns: minmax(145px, 1.2fr) repeat(2, minmax(112px, auto)) minmax(170px, .8fr) auto;
   align-items: stretch;
   padding: 0;
   border-bottom: 1px solid var(--hairline);
@@ -87,11 +87,22 @@
 .truthStrip summary::-webkit-details-marker { display: none; }
 .truthStrip summary > span:first-child { color: var(--text-lo); letter-spacing: .13em; }
 .truthStrip summary span { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.truthStrip summary button { margin-left: auto; padding: 4px 8px; border: 1px solid var(--hairline-hi); border-radius: 2px; color: var(--text-lo); font: inherit; letter-spacing: inherit; }
+.truthStrip summary button[aria-pressed="true"] { color: var(--ground); background: var(--verified); border-color: var(--verified); }
 .truthStrip i { width: 6px; height: 6px; border: 1px solid var(--changed); border-radius: 50%; }
 .truthStrip [data-qualified="true"] i { border-color: var(--verified); background: var(--verified); }
 .truthStrip > div { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; border-top: 1px solid var(--hairline); background: var(--hairline); }
 .truthStrip p { display: grid; gap: 4px; margin: 0; padding: 12px 16px; background: var(--ground); color: var(--text-xlo); font-size: 10px; line-height: 1.5; }
 .truthStrip p strong { color: var(--text-hi); font-weight: 500; }
+
+.shell[data-privacy="true"] :global(.document-meta strong),
+.shell[data-privacy="true"] :global(.document-meta code),
+.shell[data-privacy="true"] :global(.ask-result q),
+.shell[data-privacy="true"] :global(.collection-result > strong) {
+  color: transparent !important;
+  text-shadow: 0 0 10px var(--text-hi);
+  user-select: none;
+}
 
 .content { max-width: 1440px; width: 100%; margin: 0 auto; }
 .stateHero { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 24px; padding: 4px 0 22px; border-bottom: 1px solid var(--hairline-hi); }
@@ -115,7 +126,6 @@
 
 @media (max-width: 1180px) {
   .topbar { grid-template-columns: minmax(150px, 1fr) repeat(2, minmax(118px, auto)) minmax(160px, .8fr) auto; }
-  .topStatus:nth-of-type(3), .topStatus:nth-of-type(4) { display: none; }
 }
 
 @media (max-width: 820px) {
@@ -124,9 +134,11 @@
   .brand, .railFooter { display: none; }
   .nav { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; }
   .nav > div { display: none; }
-  .nav > div:nth-child(1), .nav > div:nth-child(2), .nav > div:nth-child(4), .nav > div:nth-child(5), .nav > div:nth-child(10) { display: block; }
+  .nav > div:nth-child(1), .nav > div:nth-child(2), .nav > div:nth-child(4), .nav > div:nth-child(5), .nav > div:nth-child(9) { display: block; }
   .secondaryStart { margin: 0; padding: 0; border: 0; }
   .nav button { min-height: 51px; display: flex; flex-direction: column; justify-content: center; gap: 3px; padding: 4px; text-align: center; font-size: 9px; }
+  .nav span[data-mobile-label] { font-size: 0; }
+  .nav span[data-mobile-label]::after { content: attr(data-mobile-label); font-size: 9px; }
   .nav button b { position: absolute; margin: -25px 0 0 22px; }
   .topbar { grid-template-columns: minmax(140px, 1fr) repeat(2, minmax(106px, auto)) auto; min-height: 56px; }
   .commandButton { width: 48px; justify-content: center; }
@@ -141,7 +153,7 @@
   .topStatus { min-width: 0; padding: 8px 10px; }
   .topStatus b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .truthStrip summary { gap: 12px; padding-inline: 12px; }
-  .truthStrip summary span:nth-of-type(n+4) { display: none; }
+  .truthStrip summary span:nth-of-type(n+3) { display: none; }
   .content { padding: 22px 15px 48px; }
   .stateHero { grid-template-columns: minmax(0, 1fr); align-items: start; }
   .stateHero button { width: 100%; }

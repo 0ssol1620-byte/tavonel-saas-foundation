@@ -94,6 +94,12 @@ describe("per-route canonical metadata", () => {
         .filter((path) => path !== join(appDirectory, "layout.tsx"))
         .map((path) => readFileSync(path, "utf8"))
         .join("\n");
+      if (route.includes("[")) {
+        expect(own, `${route} must generate its route-specific canonical`).toMatch(
+          /generateMetadata[\s\S]*alternates:\s*\{[^}]*canonical:/,
+        );
+        continue;
+      }
       const declared = /canonical:\s*"([^"]+)"/.exec(own)?.[1];
       if (declared !== route) wrong.push(`${route} -> ${declared ?? "(none)"}`);
     }
@@ -126,6 +132,12 @@ describe("per-route canonical metadata", () => {
         .filter((path) => path !== join(appDirectory, "layout.tsx"))
         .map((path) => readFileSync(path, "utf8"))
         .join("\n");
+      if (route.includes("[")) {
+        expect(own, `${route} must generate a route-specific Open Graph URL`).toMatch(
+          /generateMetadata[\s\S]*openGraph:\s*\{[^}]*url:/,
+        );
+        continue;
+      }
       const ogUrl = /openGraph:\s*\{[^}]*url:\s*"([^"]+)"/.exec(own)?.[1];
       if (ogUrl !== route) mismatched.push(`${route} -> ${ogUrl ?? "(none)"}`);
     }

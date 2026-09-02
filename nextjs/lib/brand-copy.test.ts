@@ -129,11 +129,12 @@ describe("public copy", () => {
     }
   });
 
-  it("keeps the locked hero line and a one-line lede", () => {
+  it("keeps the locked source-grounded hero and concise lede", () => {
     const page = landingSource();
-    expect(page).toContain("Compile your knowledge");
-    expect(page).toContain("into a world AI can reason about.");
-    expect(page).toContain("Files go in. A world an AI can cite comes out.");
+    expect(page).toContain("Turn documents and connected systems");
+    expect(page).toContain("into a source-grounded world your AI can use.");
+    expect(page).toContain("TAVONEL reads difficult sources");
+    expect(page).toContain("evidence back to the page.");
   });
 
   it("puts the locked hero proof and three motion cuts on the landing page", () => {

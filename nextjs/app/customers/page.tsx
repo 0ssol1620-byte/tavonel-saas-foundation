@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import PublicProofRegistry from "@/components/public-proof-registry";
 
-export const metadata: Metadata = { title: "Customer Evidence — TAVONEL", description: "Consent-gated customer and design-partner evidence records for TAVONEL.", alternates: { canonical: "/customers" }, openGraph: { url: "/customers" } };
+export const metadata: Metadata = { title: "Customer Evidence — TAVONEL", description: "Consent-gated customer and design-partner evidence records for TAVONEL.", robots: { index: false, follow: false }, alternates: { canonical: "/customers" }, openGraph: { url: "/customers" } };
 
 export default function CustomersPage() {
   return <PublicProofRegistry eyebrow="CUSTOMER EVIDENCE REGISTRY" title="A logo is a claim." state="NO PUBLIC CUSTOMER PROOF REGISTERED" summary="TAVONEL publishes a customer name, logo, quote or outcome only after the organization approves the exact asset, wording, scope and evidence record." sections={[

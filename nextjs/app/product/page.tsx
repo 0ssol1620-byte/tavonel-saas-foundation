@@ -31,12 +31,6 @@ const SURFACES = [
     "Compiled World",
     "Structured knowledge with provenance and reusable retrieval artifacts — not a pile of searchable files.",
   ],
-  [
-    "/product/continuous-knowledge",
-    "DIRECTION",
-    "Continuous knowledge",
-    "When a document changes, what else is now wrong? Selective recompilation is labelled Direction/Research, not a shipped claim.",
-  ],
 ] as const;
 
 export default function ProductPage() {
@@ -76,10 +70,7 @@ export default function ProductPage() {
                     </Link>
                   ))}
                 </div>
-                <p className="fine">
-                  This deployment is a private pilot. Measured claims live on <Link href="/evidence">/evidence</Link>.
-                  Selective recompilation and automated ontology are labelled Direction/Research.
-                </p>
+                <p className="fine">Technical evidence and current deployment state remain available in the <Link href="/evidence">evidence record</Link>.</p>
               </div>
             </div>
           </div>

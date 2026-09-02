@@ -1,4 +1,5 @@
 import { reserveFoundationCompute } from "./compute-reservation";
+import { estimateBillablePages } from "./usage-pricing";
 import { oauthSourceDownloadRequest, type OAuthSourceItem, type OAuthSourceTarget } from "./connector-oauth-adapters";
 import { sha256Hex, type OAuthConnectorProvider } from "./connector-oauth";
 import { confirmFoundationIntake, reserveFoundationIntake } from "./intake-admission";
@@ -125,6 +126,7 @@ export async function importSourceObject(context: ImportContext, item: OAuthSour
     workspaceKey: context.workspaceKey,
     documentId,
     userId: context.userId,
+    estimatedPages: estimateBillablePages({ bytes: bytes.byteLength, mimeType: descriptor.mimeType })?.pages ?? 1,
   });
   if (!compute.ok) return { ok: false, nativeId: item.nativeId, code: compute.code };
 

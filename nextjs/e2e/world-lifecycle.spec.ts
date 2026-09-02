@@ -215,10 +215,9 @@ test("renders governed promotion, retained rollback and region-grounded Ask", as
   page.on("pageerror", error => browserErrors.push(error.message));
   await installSession(page);
   await mockWorkspace(page);
-  // The workspace sidebar became real tabs, and the review studio lives on the knowledge tab
-  // with the rest of the compiled-world surfaces. The tab is addressable, so the test asks for
-  // it directly rather than clicking through the shell.
-  await page.goto(`/workspace?collection=${collectionId}&tab=knowledge`);
+  // Review and Ask are addressable surfaces. Exercise those routes directly so the same
+  // contract is covered on desktop and on the condensed mobile rail.
+  await page.goto(`/workspace/review?collection=${collectionId}`);
 
   await expect(page.getByText("ACTIVE · REVISION 2")).toBeVisible();
   await expect(
@@ -249,6 +248,7 @@ test("renders governed promotion, retained rollback and region-grounded Ask", as
     .fill("Incident review requires the retained world.");
   await expect(rollback).toBeEnabled();
 
+  await page.getByRole("button", { name: "Ask", exact: true }).click();
   await page.getByLabel("Question").fill("분기 매출은 얼마인가요?");
   await page.getByRole("button", { name: "Ask active world" }).click();
   await expect(page.getByText("Grounded answer")).toBeVisible();
@@ -290,7 +290,7 @@ test("keeps review-required packages downloadable and promotion-closed", async (
   // The signed download sits with the collection result on Home; the review record now has a
   // dedicated Review surface. Crossing those surfaces proves that review-required packages stay
   // downloadable while promotion remains closed.
-  await page.locator('[data-rail-item][title^="Review"]').click();
+  await page.getByRole("button", { name: "Review candidate" }).click();
   const promote = page.getByRole("button", { name: "Promote reviewed candidate" });
   await page.getByLabel("Human review record").fill("Reviewed contradiction evidence and retained the gate.");
   await expect(promote).toBeDisabled();

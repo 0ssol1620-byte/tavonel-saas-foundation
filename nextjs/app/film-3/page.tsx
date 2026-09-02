@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import OpeningFilm3 from "@/components/opening-film-3";
 
 export const metadata: Metadata = {
+  robots: { index: false, follow: false },
   // Each page declares its own address. Without this every route inherited the root
   // canonical ("/"), so a crawler was told 22 distinct pages were all the homepage.
   alternates: { canonical: "/film-3" },

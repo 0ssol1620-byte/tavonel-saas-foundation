@@ -1,4 +1,4 @@
-import { isCollectionCandidateKey } from "./immutable-keys";
+import { collectionCandidateKey, isCollectionCandidateKey } from "./immutable-keys";
 import { getWorkspaceCollectionCandidate, listImmutableWorkspaceObjects } from "./r2-objects";
 import type { R2SignerEnv } from "./r2-synthetic-canary";
 
@@ -11,7 +11,23 @@ export async function loadPreferredCollectionCandidate(
   signer: R2SignerEnv,
   workspaceId: string,
   collectionId: string,
+  manifestDigest?: string,
 ): Promise<{ ok: true; value: StoredCollection } | { ok: false; code: string }> {
+  if (manifestDigest) {
+    if (!/^sha256:[a-f0-9]{64}$/.test(manifestDigest)) {
+      return { ok: false, code: "MANIFEST_DIGEST_INVALID" };
+    }
+    const key = collectionCandidateKey(
+      workspaceId,
+      collectionId,
+      manifestDigest.slice("sha256:".length),
+    );
+    if (!key) return { ok: false, code: "COLLECTION_KEY_INVALID" };
+    const exact = await getWorkspaceCollectionCandidate(signer, workspaceId, key);
+    return exact.ok
+      ? { ok: true, value: { key, artifact: exact.json } }
+      : exact;
+  }
   const listed = await listImmutableWorkspaceObjects(signer, workspaceId);
   if (!listed.ok) return listed;
 

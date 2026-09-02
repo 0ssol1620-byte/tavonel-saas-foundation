@@ -142,7 +142,7 @@ export function buildProductCoreV2Request(
   return {
     schemaVersion: PRODUCT_CORE_REQUEST_SCHEMA,
     requestId,
-    idempotencyKey: `compile-${sha256(`${workspaceId}\n${binding}`).slice(0, 40)}`,
+    idempotencyKey: `compile-${sha256(`${workspaceId}\n${binding}\n${requestId}`).slice(0, 40)}`,
     tenantId: workspaceId,
     workspaceId,
     collectionId,

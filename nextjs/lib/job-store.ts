@@ -189,6 +189,57 @@ export type JobStatus = {
   completedAt: string | null;
 };
 
+export type JobEvent = {
+  sequence: number;
+  jobId: string;
+  eventType: "enqueued" | "state_changed" | "progressed" | "attempted" | "failed" | "completed";
+  state: JobState;
+  attempt: number;
+  itemsSeen: number;
+  itemsDone: number;
+  errorCode: string | null;
+  occurredAt: string;
+};
+
+export async function listJobEvents(
+  workspaceKey: string,
+  jobId: string,
+  afterSequence = 0,
+): Promise<JobResult<JobEvent[]>> {
+  if (!WORKSPACE_KEY.test(workspaceKey) || !JOB_ID.test(jobId) || !Number.isSafeInteger(afterSequence) || afterSequence < 0) {
+    return fail("JOB_SCOPE_INVALID");
+  }
+  const config = readSupabaseAdminConfig();
+  if (!config) return fail("JOB_STORE_NOT_CONFIGURED");
+  const query = new URLSearchParams({
+    select: "event_sequence,job_id,event_type,state,attempt,items_seen,items_done,error_code,occurred_at",
+    workspace_key: `eq.${workspaceKey}`,
+    job_id: `eq.${jobId}`,
+    event_sequence: `gt.${afterSequence}`,
+    order: "event_sequence.asc",
+    limit: "500",
+  });
+  try {
+    const response = await supabaseAdminRequest(config, `/rest/v1/foundation_job_events?${query}`);
+    if (!response.ok) return fail("JOB_STORE_READ_FAILED");
+    const rows = await response.json().catch(() => null) as Array<Record<string, unknown>> | null;
+    if (!rows) return fail("JOB_STORE_READ_FAILED");
+    return { ok: true, value: rows.map((row) => ({
+      sequence: Number(row.event_sequence),
+      jobId: String(row.job_id),
+      eventType: String(row.event_type) as JobEvent["eventType"],
+      state: String(row.state) as JobState,
+      attempt: Number(row.attempt),
+      itemsSeen: Number(row.items_seen),
+      itemsDone: Number(row.items_done),
+      errorCode: typeof row.error_code === "string" ? row.error_code : null,
+      occurredAt: String(row.occurred_at),
+    })) };
+  } catch {
+    return fail("JOB_STORE_READ_FAILED");
+  }
+}
+
 // Reads one job's status for the workspace UI. Tenant-scoped by workspace_key on the query,
 // so a caller cannot poll another tenant's job by guessing an id.
 export async function getJobStatus(workspaceKey: string, jobId: string): Promise<JobResult<JobStatus>> {

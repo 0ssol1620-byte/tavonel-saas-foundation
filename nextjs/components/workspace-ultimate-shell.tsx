@@ -10,7 +10,6 @@ import {
   GitCompareArrows,
   Home,
   Network,
-  Play,
   Plug,
   Search,
   Settings,
@@ -39,19 +38,19 @@ type NavItem = {
   icon: typeof Home;
   shortcut?: string;
   secondary?: boolean;
+  mobileLabel?: string;
 };
 
 const NAV_ITEMS: NavItem[] = [
   { surface: "home", label: "Home", icon: Home, shortcut: "G H" },
   { surface: "sources", label: "Sources", icon: FileStack, shortcut: "G S" },
-  { surface: "runs", label: "Runs", icon: Play, shortcut: "C" },
   { surface: "review", label: "Review", icon: GitCompareArrows, shortcut: "G R" },
   { surface: "world", label: "World", icon: Network, shortcut: "G W" },
   { surface: "ask", label: "Ask", icon: CircleHelp, shortcut: "G A" },
   { surface: "connections", label: "Connections", icon: Plug, secondary: true },
   { surface: "developer", label: "Developer", icon: Braces, secondary: true },
   { surface: "activity", label: "Activity", icon: Activity, secondary: true },
-  { surface: "settings", label: "Settings", icon: Settings, secondary: true },
+  { surface: "settings", label: "Settings", mobileLabel: "More", icon: Settings, secondary: true },
 ];
 
 type TruthGate = { label: string; qualified: boolean; detail: string };
@@ -95,6 +94,7 @@ export default function WorkspaceUltimateShell({
 }: Props) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [privacyMode, setPrivacyMode] = useState(false);
   const pendingGo = useRef(false);
   const paletteInput = useRef<HTMLInputElement>(null);
 
@@ -137,7 +137,7 @@ export default function WorkspaceUltimateShell({
         onUpload();
       } else if (key === "c") {
         event.preventDefault();
-        onNavigate("runs");
+        onNavigate("activity");
       } else if (key === "/") {
         event.preventDefault();
         onNavigate("ask");
@@ -154,7 +154,7 @@ export default function WorkspaceUltimateShell({
   };
   const paletteActions = [
     { label: "Upload sources", hint: "U", run: onUpload },
-    { label: "Start or inspect a compile", hint: "C", surface: "runs" as const },
+    { label: "Inspect compile activity", hint: "C", surface: "activity" as const },
     { label: "Open review queue", hint: "G R", surface: "review" as const },
     { label: "Inspect active World", hint: "G W", surface: "world" as const },
     { label: "Ask with grounded citations", hint: "G A", surface: "ask" as const },
@@ -170,7 +170,7 @@ export default function WorkspaceUltimateShell({
   };
 
   return (
-    <main id="main" className={`workspace ${styles.shell}`} tabIndex={-1}>
+    <main id="main" className={`workspace ${styles.shell}`} data-privacy={privacyMode} tabIndex={-1}>
       <aside className={styles.rail} aria-label="Workspace navigation" onKeyDown={moveRailFocus}>
         <Link href="/" className={styles.brand} aria-label="TAVONEL home"><Logomark size={23} /></Link>
         <nav className={styles.nav}>
@@ -188,7 +188,7 @@ export default function WorkspaceUltimateShell({
                   title={item.shortcut ? `${item.label} (${item.shortcut})` : item.label}
                 >
                   <Icon size={17} aria-hidden="true" />
-                  <span>{item.label}</span>
+                  <span data-mobile-label={item.mobileLabel}>{item.label}</span>
                   {item.surface === "review" && reviewCount ? <b>{reviewCount}</b> : null}
                 </button>
               </div>
@@ -215,14 +215,6 @@ export default function WorkspaceUltimateShell({
             <small>CANDIDATE</small>
             <b>{candidateReady ? `READY${reviewCount ? ` · ${reviewCount} REVIEW` : ""}` : "NONE"}</b>
           </button>
-          <button type="button" className={styles.topStatus} onClick={() => onNavigate("activity")}>
-            <small>ACTIVITY</small>
-            <b>{activityCount > 0 ? `${activityCount} RUNNING` : "QUIET"}</b>
-          </button>
-          <button type="button" className={styles.topStatus} onClick={() => onNavigate("settings")}>
-            <small>USAGE</small>
-            <b>{credits === null ? "NOT READ" : `${credits} CREDITS`}</b>
-          </button>
           <button type="button" className={styles.commandButton} onClick={() => setPaletteOpen(true)}>
             <Search size={15} aria-hidden="true" /><span>Search / Command</span><kbd>Ctrl K</kbd>
           </button>
@@ -231,12 +223,15 @@ export default function WorkspaceUltimateShell({
 
         <details className={styles.truthStrip}>
           <summary>
-            <span>TRUTH STRIP</span>
-            {truthGates.map((gate) => (
-              <span key={gate.label} data-qualified={gate.qualified}>
-                <i aria-hidden="true" />{gate.label} {gate.qualified ? "qualified" : "held"}
-              </span>
-            ))}
+            <span>ADVANCED / SYSTEM DETAILS</span>
+            <span data-qualified={truthGates.every((gate) => gate.qualified)}>
+              <i aria-hidden="true" />{truthGates.every((gate) => gate.qualified) ? "ALL GATES QUALIFIED" : "SOME GATES HELD"}
+            </span>
+            <span>ACTIVITY {activityCount > 0 ? `${activityCount} RUNNING` : "QUIET"}</span>
+            <span>INTERNAL UNITS {credits === null ? "NOT READ" : credits}</span>
+            <button type="button" aria-pressed={privacyMode} onClick={(event) => { event.preventDefault(); setPrivacyMode((value) => !value); }}>
+              {privacyMode ? "Show content" : "Hide content"}
+            </button>
           </summary>
           <div>
             {truthGates.map((gate) => <p key={gate.label}><strong>{gate.label}</strong>{gate.detail}</p>)}

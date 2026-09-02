@@ -22,7 +22,13 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const signer = readR2SignerEnv();
   if (!signer) return NextResponse.json({ code: "SIGNER_NOT_CONFIGURED" }, { status: 503, headers: NO_STORE });
 
-  const loaded = await loadPreferredCollectionCandidate(signer, auth.principal.workspaceKey, id);
+  const manifestDigest = new URL(request.url).searchParams.get("manifest") ?? undefined;
+  const loaded = await loadPreferredCollectionCandidate(
+    signer,
+    auth.principal.workspaceKey,
+    id,
+    manifestDigest,
+  );
   if (!loaded.ok) {
     return NextResponse.json(
       { code: loaded.code },

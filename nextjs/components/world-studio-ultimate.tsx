@@ -8,7 +8,7 @@ import type {
 } from "@/lib/world-read-model";
 import styles from "./world-studio-ultimate.module.css";
 
-export type WorldStudioLens = "map" | "table" | "evidence" | "history" | "files";
+export type WorldStudioLens = "graph" | "directory" | "ontology" | "evidence" | "versions" | "files";
 
 type Props = {
   model: WorldReadModel | null;
@@ -18,10 +18,11 @@ type Props = {
 };
 
 const LENSES: Array<{ id: WorldStudioLens; label: string }> = [
-  { id: "map", label: "Map" },
-  { id: "table", label: "Table" },
+  { id: "graph", label: "Graph" },
+  { id: "directory", label: "Directory" },
+  { id: "ontology", label: "Ontology" },
   { id: "evidence", label: "Evidence" },
-  { id: "history", label: "History" },
+  { id: "versions", label: "Versions" },
   { id: "files", label: "Files" },
 ];
 
@@ -75,7 +76,7 @@ function EvidenceCard({ evidence, selected, onSelect }: {
 
 export default function WorldStudioUltimate({
   model,
-  initialLens = "map",
+  initialLens = "graph",
   selectedEvidenceId,
   onEvidenceSelect,
 }: Props) {
@@ -129,7 +130,7 @@ export default function WorldStudioUltimate({
 
       <div className={styles.workspace}>
         <div id={`world-lens-${lens}`} className={styles.lensBody} role="tabpanel">
-          {lens === "map" && (
+          {lens === "graph" && (
             !model || model.objects.length === 0 ? (
               <ReadNotYet>Compile and validate a collection before its object map can be read.</ReadNotYet>
             ) : (
@@ -166,7 +167,7 @@ export default function WorldStudioUltimate({
             )
           )}
 
-          {lens === "table" && (
+          {lens === "directory" && (
             !model || model.objects.length === 0 ? (
               <ReadNotYet>No compiled objects are available for the table lens.</ReadNotYet>
             ) : (
@@ -186,6 +187,36 @@ export default function WorldStudioUltimate({
             )
           )}
 
+          {lens === "ontology" && (
+            !model || model.objects.length === 0 ? (
+              <ReadNotYet>No compiled object types or relation predicates are available.</ReadNotYet>
+            ) : (
+              <div className={styles.mapLens}>
+                <div className={styles.objectGrid}>
+                  {[...new Set(model.objects.map((object) => object.type))].sort().map((type) => (
+                    <article key={type}>
+                      <span>OBJECT TYPE</span>
+                      <strong>{type}</strong>
+                      <small>{model.objects.filter((object) => object.type === type).length} compiled objects</small>
+                    </article>
+                  ))}
+                </div>
+                {model.relations.length === 0 ? (
+                  <ReadNotYet>No compiled relation predicates are present in this World.</ReadNotYet>
+                ) : (
+                  <ol className={styles.relationList} aria-label="Compiled ontology predicates">
+                    {[...new Set(model.relations.map((relation) => relation.predicate))].sort().map((predicate) => (
+                      <li key={predicate}>
+                        <b>{predicate}</b>
+                        <span>{model.relations.filter((relation) => relation.predicate === predicate).length} relations</span>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </div>
+            )
+          )}
+
           {lens === "evidence" && (
             !model || model.evidence.length === 0 ? (
               <ReadNotYet>No page-and-bbox-bound compiled evidence is available.</ReadNotYet>
@@ -198,7 +229,7 @@ export default function WorldStudioUltimate({
             )
           )}
 
-          {lens === "history" && (
+          {lens === "versions" && (
             !model || model.history.length === 0 ? (
               <ReadNotYet>No persisted World history is available.</ReadNotYet>
             ) : (

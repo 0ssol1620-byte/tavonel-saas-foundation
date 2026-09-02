@@ -1,16 +1,18 @@
 export const BILLING_OFFERS = {
   observer_access: {
     kind: "subscription",
-    label: "Observer",
+    label: "Developer",
     priceUsd: 29,
-    credits: 0,
+    credits: 2_000,
+    includedPages: 500,
     priceEnv: "PADDLE_PRICE_OBSERVER_ACCESS",
   },
   studio_access: {
     kind: "subscription",
-    label: "Studio",
+    label: "Team",
     priceUsd: 99,
-    credits: 0,
+    credits: 10_000,
+    includedPages: 2_500,
     priceEnv: "PADDLE_PRICE_STUDIO_ACCESS",
   },
   credit_starter: {
@@ -18,6 +20,7 @@ export const BILLING_OFFERS = {
     label: "Starter",
     priceUsd: 12,
     credits: 100,
+    includedPages: 25,
     priceEnv: "PADDLE_PRICE_CREDIT_STARTER",
   },
   credit_builder: {
@@ -25,6 +28,7 @@ export const BILLING_OFFERS = {
     label: "Builder",
     priceUsd: 30,
     credits: 300,
+    includedPages: 75,
     priceEnv: "PADDLE_PRICE_CREDIT_BUILDER",
   },
   credit_scale: {
@@ -32,6 +36,7 @@ export const BILLING_OFFERS = {
     label: "Scale",
     priceUsd: 75,
     credits: 800,
+    includedPages: 200,
     priceEnv: "PADDLE_PRICE_CREDIT_SCALE",
   },
 } as const;

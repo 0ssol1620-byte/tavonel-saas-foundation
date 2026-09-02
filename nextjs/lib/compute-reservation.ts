@@ -1,5 +1,6 @@
 import { DOCUMENT_ID_PATTERN, WORKSPACE_ID_PATTERN } from "./immutable-keys";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
+import { quoteCompilePages } from "./usage-pricing";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const OUTCOMES = new Set(["settled", "operator_review", "released"]);
@@ -21,9 +22,11 @@ export async function reserveFoundationCompute(value: {
   workspaceKey: string;
   documentId: string;
   userId: string;
+  estimatedPages: number;
 }) {
+  const quote = quoteCompilePages(value.estimatedPages);
   if (!WORKSPACE_ID_PATTERN.test(value.workspaceKey) || !DOCUMENT_ID_PATTERN.test(value.documentId)
-    || !UUID.test(value.documentId) || !UUID.test(value.userId)) {
+    || !UUID.test(value.documentId) || !UUID.test(value.userId) || !quote) {
     return { ok: false as const, code: "COMPUTE_RESERVATION_INVALID" };
   }
   const config = readSupabaseAdminConfig();
@@ -36,7 +39,7 @@ export async function reserveFoundationCompute(value: {
         p_workspace_key: value.workspaceKey,
         p_document_id: value.documentId,
         p_user_id: value.userId,
-        p_reserved_credits: 2,
+        p_reserved_credits: quote.maximumUnits,
       }),
     });
   } catch {
@@ -48,11 +51,22 @@ export async function reserveFoundationCompute(value: {
   }
   const result = await response.json().catch(() => null) as Record<string, unknown> | null;
   if (!result || !UUID.test(String(result.reservationId ?? "")) || result.documentId !== value.documentId
-    || result.state !== "reserved" || result.reservedCredits !== 2
+    || result.state !== "reserved" || result.reservedCredits !== quote.maximumUnits
     || typeof result.expiresAt !== "string" || !Number.isFinite(Date.parse(result.expiresAt))) {
     return { ok: false as const, code: "COMPUTE_RESERVATION_RECEIPT_INVALID" };
   }
-  return { ok: true as const, result };
+  return {
+    ok: true as const,
+    result: {
+      reservationId: String(result.reservationId),
+      documentId: value.documentId,
+      state: "reserved" as const,
+      expiresAt: String(result.expiresAt),
+      reservedCredits: quote.maximumUnits,
+      idempotentReplay: result.idempotentReplay === true,
+      quote,
+    },
+  };
 }
 
 export async function settleFoundationCompute(value: {
@@ -64,7 +78,7 @@ export async function settleFoundationCompute(value: {
 }) {
   if (!WORKSPACE_ID_PATTERN.test(value.workspaceKey) || !UUID.test(value.documentId)
     || !OUTCOMES.has(value.outcome) || !Number.isSafeInteger(value.actualCredits)
-    || value.actualCredits < 0 || value.actualCredits > 2 || !/^[A-Z0-9_]{3,80}$/.test(value.reasonCode)) {
+    || value.actualCredits < 0 || value.actualCredits > 60_000 || !/^[A-Z0-9_]{3,80}$/.test(value.reasonCode)) {
     return { ok: false as const, code: "COMPUTE_SETTLEMENT_INVALID" };
   }
   const config = readSupabaseAdminConfig();

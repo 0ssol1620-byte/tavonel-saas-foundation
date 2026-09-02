@@ -119,6 +119,32 @@ describe("Python Product-Core v2 dispatch", () => {
     expect(request.documents[0]?.regions[0]?.regionId).toContain("ocr-full-document");
   });
 
+  it("uses a new idempotency scope for each explicit compile execution", () => {
+    const first = buildProductCoreV2Request(
+      "pilot",
+      inputs(),
+      new Date("2026-08-29T00:00:00Z"),
+      "request-1",
+    );
+    const second = buildProductCoreV2Request(
+      "pilot",
+      inputs(),
+      new Date("2026-08-29T00:00:01Z"),
+      "request-2",
+    );
+
+    expect(first.collectionId).toBe(second.collectionId);
+    expect(first.idempotencyKey).not.toBe(second.idempotencyKey);
+    expect(first.idempotencyKey).toBe(
+      buildProductCoreV2Request(
+        "pilot",
+        inputs(),
+        new Date("2026-08-29T00:00:00Z"),
+        "request-1",
+      ).idempotencyKey,
+    );
+  });
+
   it("preserves qualified OCR page regions and evidence coordinates", () => {
     const qualified = inputs().map((input) => ({
       ...input,

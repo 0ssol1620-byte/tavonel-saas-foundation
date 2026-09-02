@@ -21,10 +21,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ code: "INTAKE_DISABLED", reason: activationPolicy.customerIntake.reason }, { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "60" } });
   }
 
-  const auth = await authorizeFoundationRequest(request, "documents:intake", "studio");
+  const auth = await authorizeFoundationRequest(request, "documents:intake", "observer");
   if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: { "Cache-Control": "no-store" } });
 
-  let body: { originalFilename?: unknown; declaredMimeType?: unknown; requestedBytes?: unknown };
+  let body: { originalFilename?: unknown; declaredMimeType?: unknown; requestedBytes?: unknown; estimatedPages?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -34,6 +34,7 @@ export async function POST(request: Request) {
   const originalFilename = typeof body.originalFilename === "string" ? body.originalFilename : "";
   const declaredMimeType = typeof body.declaredMimeType === "string" ? body.declaredMimeType : "";
   const requestedBytes = typeof body.requestedBytes === "number" ? body.requestedBytes : Number.NaN;
+  const estimatedPages = typeof body.estimatedPages === "number" ? body.estimatedPages : Number.NaN;
   if (!Number.isSafeInteger(requestedBytes) || requestedBytes <= 0 || requestedBytes > FOUNDATION_INTAKE_MAX_BYTES) {
     return NextResponse.json({ code: "UNQUALIFIED_INPUT" }, { status: 400, headers: { "Cache-Control": "no-store" } });
   }
@@ -83,6 +84,7 @@ export async function POST(request: Request) {
     workspaceKey: workspaceId,
     documentId,
     userId: auth.principal.userId,
+    estimatedPages,
   });
   if (!compute.ok) {
     const paymentRequired = compute.code === "STUDIO_SUBSCRIPTION_REQUIRED" || compute.code === "GPU_CREDITS_REQUIRED";
@@ -118,6 +120,7 @@ export async function POST(request: Request) {
       reservationId: compute.result.reservationId,
       reservedCredits: compute.result.reservedCredits,
       expiresAt: compute.result.expiresAt,
+      quote: compute.result.quote,
     },
   }, { headers: { "Cache-Control": "no-store" } });
 }

@@ -35,10 +35,10 @@ test("mobile sample switches between Source and World rather than squeezing both
   await expect(page.getByText("SEMANTIC OBJECT INSPECTOR")).toBeVisible();
 });
 
-test("Trust Center exposes fail-closed claim vocabulary", async ({ page }) => {
-  await page.goto("/trust");
-  await expect(page.getByRole("heading", { name: /Trust/ })).toBeVisible();
-  await expect(page.getByText("QUALIFIED").first()).toBeVisible();
-  await expect(page.getByText("RESEARCH FRONTIER").first()).toBeVisible();
+test("Security record exposes fail-closed controls without certification claims", async ({ page }) => {
+  await page.goto("/security");
+  await expect(page.getByRole("heading", { name: /Where your documents go/ })).toBeVisible();
+  await expect(page.getByText(/Every external operation fails closed/)).toBeVisible();
+  await expect(page.getByText("CURRENT DEPLOYMENT CONTROLS")).toBeVisible();
   await expect(page.locator("body")).not.toContainText(/SOC 2 certified|ISO 27001 certified/i);
 });

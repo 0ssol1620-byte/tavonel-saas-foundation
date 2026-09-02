@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { findOfferByPriceId, readConfiguredBillingOffers, readPaddleBrowserConfig } from "./billing-catalog";
 
 describe("Foundation billing catalog", () => {
-  it("exposes only configured Paddle price IDs and preserves the frozen economics", () => {
+  it("exposes only configured Paddle price IDs and preserves prepaid economics", () => {
     const env = {
       PADDLE_PRICE_CREDIT_STARTER: `pri_${"a".repeat(26)}`,
       PADDLE_PRICE_CREDIT_BUILDER: "not-a-price",

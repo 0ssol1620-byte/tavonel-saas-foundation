@@ -12,9 +12,11 @@ import { useCheckout } from "@/lib/use-checkout";
 import { formatCount, formatTimestamp } from "@/lib/format";
 import { readOfferParam, takeCheckoutIntent } from "@/lib/checkout-intent";
 import { putWithProgress } from "@/lib/upload-transfer";
+import { estimateBillablePages } from "@/lib/usage-pricing";
 import { runBounded } from "@/lib/concurrent";
 import { buildPipeline, type LocalUpload } from "@/lib/pipeline";
 import { qualifyProgress, type OcrProgress } from "@/lib/ocr-progress";
+import { advanceProgressPoll, type ProgressPollState } from "@/lib/progress-poll";
 import PipelineBoard from "@/components/pipeline-board";
 import CompileStage from "@/components/compile-stage";
 import { displayName, elideKey, recallDocumentNames, rememberDocumentName, type DocumentNames } from "@/lib/document-names";
@@ -243,6 +245,7 @@ export default function WorkspacePage() {
   }, []);
   const [busy, setBusy] = useState(false);
   const [documents, setDocuments] = useState<DocumentListItem[] | null>(null);
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
   /**
    * D9 -- the tab keeps counting after you look away.
    *
@@ -390,6 +393,9 @@ export default function WorkspacePage() {
     const json = (await response.json()) as { documents?: DocumentListItem[] };
     const next = json.documents ?? [];
     setDocuments(next);
+    setSelectedDocumentIds((current) => current.filter((documentId) =>
+      next.some((item) => item.documentId === documentId && item.hasOcrJson),
+    ));
     return next;
   };
 
@@ -404,13 +410,14 @@ export default function WorkspacePage() {
     if (json.account) setBillingAccount(json.account);
   };
 
-  const loadCollectionCandidate = async (collectionId: string) => {
+  const loadCollectionCandidate = async (collectionId: string, manifestDigest?: string) => {
     if (!/^collection-[a-f0-9]{32}$/.test(collectionId)) return;
     const client = getSupabaseBrowserClient();
     const { data } = client ? await client.auth.getSession() : { data: { session: null } };
     const token = data.session?.access_token;
     if (!token) return;
-    const response = await fetch(`/api/collections/${collectionId}`, {
+    const query = manifestDigest ? `?manifest=${encodeURIComponent(manifestDigest)}` : "";
+    const response = await fetch(`/api/collections/${collectionId}${query}`, {
       headers: { authorization: `Bearer ${token}` },
     });
     const json = await response.json() as {
@@ -468,7 +475,7 @@ export default function WorkspacePage() {
       void loadDocuments();
       void loadBilling();
       const collectionId = params.get("collection");
-      if (collectionId) void loadCollectionCandidate(collectionId);
+      if (collectionId) void loadCollectionCandidate(collectionId, params.get("manifest") ?? undefined);
 
       /*
        * R1, last half. Someone who picked a plan before signing in arrives here carrying it --
@@ -501,23 +508,36 @@ export default function WorkspacePage() {
    */
   useEffect(() => {
     if (session !== "signed-in" || !documents) return;
-    const readingNow = documents
+    let readingNow = documents
       .filter((item) => item.sanitizedKey && !item.hasOcrJson && item.processingState !== "operator_review")
       .map((item) => item.documentId);
     if (readingNow.length === 0) return;
 
     let cancelled = false;
+    const pollStates = new Map<string, ProgressPollState>();
     const tick = async () => {
       const client = getSupabaseBrowserClient();
       const { data } = client ? await client.auth.getSession() : { data: { session: null } };
       const token = data.session?.access_token;
       if (!token || cancelled) return;
-      await Promise.all(readingNow.map((documentId) => readProgressFor(documentId, token)));
+      const observed = await Promise.all(readingNow.map((documentId) => readProgressFor(documentId, token)));
+      readingNow = readingNow.filter((documentId, index) => {
+        const decision = advanceProgressPoll(pollStates.get(documentId), observed[index] ?? null);
+        pollStates.set(documentId, decision.state);
+        return decision.continuePolling;
+      });
       if (!cancelled) await loadDocuments();
+      if (readingNow.length === 0) {
+        cancelled = true;
+        window.clearInterval(timer);
+      }
     };
-    void tick();
     const timer = window.setInterval(() => void tick(), 1_500);
-    return () => { cancelled = true; window.clearInterval(timer); };
+    void tick();
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
     // The identity of what is being read is the dependency; the handlers are read, not watched.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, documents?.map((item) => `${item.documentId}:${item.hasOcrJson}:${item.processingState}`).join("|")]);
@@ -554,22 +574,24 @@ export default function WorkspacePage() {
    * at either hop is silent, because progress is a view and losing a frame of it must never
    * surface as an error about the document itself.
    */
-  const readProgressFor = async (documentId: string, token: string) => {
+  const readProgressFor = async (documentId: string, token: string): Promise<OcrProgress | null> => {
     try {
       const issued = await fetch(`/api/documents/${documentId}/progress`, {
         headers: { authorization: `Bearer ${token}` },
         cache: "no-store",
       });
-      if (!issued.ok) return;
+      if (!issued.ok) return null;
       const { readUrl } = await issued.json() as { readUrl?: string };
-      if (!readUrl) return;
+      if (!readUrl) return null;
       const object = await fetch(readUrl, { cache: "no-store" });
-      if (!object.ok) return;
+      if (!object.ok) return null;
       const progress = qualifyProgress(await object.json());
-      if (!progress) return;
+      if (!progress) return null;
       setReading((current) => ({ ...current, [documentId]: progress }));
+      return progress;
     } catch {
       // A dropped frame of a live view is not an error about the document.
+      return null;
     }
   };
 
@@ -606,6 +628,10 @@ export default function WorkspacePage() {
           originalFilename: file.name,
           declaredMimeType: file.type || "application/pdf",
           requestedBytes: file.size,
+          estimatedPages: estimateBillablePages({
+            bytes: file.size,
+            mimeType: file.type || "application/pdf",
+          })?.pages,
         }),
       });
       const json = await capability.json() as { code?: string; documentId?: string; uploadUrl?: string; declaredMimeType?: string };
@@ -784,6 +810,46 @@ export default function WorkspacePage() {
     }
   };
 
+  const compileSelectedDocuments = async () => {
+    const documentIds = [...new Set(selectedDocumentIds)];
+    if (documentIds.length < 2) {
+      setNotice("Select at least two documents with immutable ocr.json output.");
+      return;
+    }
+    setBusy(true);
+    setCollectionResult(null);
+    clearWorldState();
+    try {
+      const token = await getAuthToken();
+      if (!token) {
+        setNotice("Sign in with Google before compiling a collection.");
+        return;
+      }
+      setNotice(`Compiling ${documentIds.length} selected immutable OCR documents with the separate Core runtime...`);
+      const response = await fetch("/api/collections/compile", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({ documentIds }),
+      });
+      const json = await response.json() as CollectionResult & { code?: string };
+      if (!response.ok || !json.collectionId || (json.coreExecution?.status !== "completed" && json.coreExecution?.status !== "review_required")) {
+        setNotice(`Collection compilation failed (${json.code ?? response.status}). No candidate was promoted.`);
+        return;
+      }
+      setCollectionResult(json);
+      await loadWorldState(json.collectionId, token);
+      const url = new URL(window.location.href);
+      url.searchParams.set("collection", json.collectionId);
+      url.searchParams.set("manifest", json.manifestDigest);
+      window.history.replaceState(null, "", url);
+      setNotice(json.lifecycle === "review_required"
+        ? `Selected documents produced a signed review package for ${json.collectionId}. Download and inspect it; promotion remains blocked.`
+        : `Collection ${json.collectionId} compiled from ${json.validation.counts.documents} selected documents with ${json.validation.counts.claims} claims and ${json.validation.counts.relations} evidence-bound relations. candidatePromotion=false.`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const downloadCollection = async () => {
     if (!collectionResult) return;
     setDownloading(true);
@@ -795,9 +861,12 @@ export default function WorkspacePage() {
         setNotice("Sign in with Google before downloading this private collection.");
         return;
       }
-      const response = await fetch(`/api/collections/${collectionResult.collectionId}/download`, {
+      const response = await fetch(
+        `/api/collections/${collectionResult.collectionId}/download?manifest=${encodeURIComponent(collectionResult.manifestDigest)}`,
+        {
         headers: { authorization: `Bearer ${token}` },
-      });
+        },
+      );
       if (!response.ok || response.headers.get("content-type") !== "application/zip") {
         const json = await response.json().catch(() => ({ code: response.status }));
         setNotice(`Signed knowledge package download failed (${json.code ?? response.status}).`);
@@ -1126,13 +1195,13 @@ export default function WorkspacePage() {
         ? "Ask with exact citations, inspect retained versions, or download the signed portable package."
         : "Add at least two sources, confirm the processing boundary, and follow the guided compile path.";
   const nextAction: { label: string; surface?: WorkspaceSurface; run?: () => void } = activityCount > 0
-    ? { label: "Inspect current run", surface: "runs" }
+    ? { label: "Inspect current run", surface: "activity" }
     : candidateNeedsDecision
       ? { label: "Review candidate", surface: "review" }
       : activeWorld
         ? { label: "Ask active World", surface: "ask" }
         : documentCount >= 2
-          ? { label: "Start compile", surface: "runs" }
+          ? { label: "Start compile", surface: "activity" }
           : { label: "Choose sources", run: () => fileRef.current?.click() };
 
   return (
@@ -1188,7 +1257,7 @@ export default function WorkspacePage() {
             pipeline rows and streamed OCR progress. No fixture ever reaches it.
           */}
           {pipelineRows.length > 0 ? (
-            <CompileStage rows={pipelineRows} reading={reading} names={names} />
+            <CompileStage rows={pipelineRows} reading={reading} names={names} world={worldReadModel} />
           ) : null}
 
           <div id="workspace-runs">
@@ -1208,6 +1277,7 @@ export default function WorkspacePage() {
               <p className="eyebrow">IMMUTABLE KEYS</p>
               <h2>{documents && documents.length > 0 ? "What each document left behind" : "Awaiting a qualified first document"}</h2>
               {documents && documents.length > 0 ? (
+                <>
                 <ul className="document-meta">
                   {documents.map((doc) => (
                     <li key={`${doc.documentId}-${doc.versionKey}`}>
@@ -1217,6 +1287,18 @@ export default function WorkspacePage() {
                       */}
                       <strong>{displayName(doc.documentId, names)}</strong>
                       <small className="doc-id" title={doc.documentId}>{doc.documentId}</small>
+                      {doc.hasOcrJson ? (
+                        <label className="compile-source-choice">
+                          <input
+                            type="checkbox"
+                            checked={selectedDocumentIds.includes(doc.documentId)}
+                            onChange={(event) => setSelectedDocumentIds((current) => event.target.checked
+                              ? [...new Set([...current, doc.documentId])]
+                              : current.filter((documentId) => documentId !== doc.documentId))}
+                          />
+                          Include in the next candidate
+                        </label>
+                      ) : null}
                       {/*
                         A receipt key is 200 characters of bucket, tenant, document, digest and
                         artifact, and it used to be printed whole -- four of them per document,
@@ -1235,6 +1317,13 @@ export default function WorkspacePage() {
                     </li>
                   ))}
                 </ul>
+                <div className="compile-selection-actions">
+                  <small>{selectedDocumentIds.length} OCR-qualified document{selectedDocumentIds.length === 1 ? "" : "s"} selected</small>
+                  <button type="button" disabled={busy || selectedDocumentIds.length < 2} onClick={() => void compileSelectedDocuments()}>
+                    {busy ? "Compiling selected documents..." : "Compile selected documents"}
+                  </button>
+                </div>
+                </>
               ) : (
                 <div className="empty">
                   <FileText size={22} />
@@ -1305,6 +1394,7 @@ export default function WorkspacePage() {
 
           {tab === "knowledge" ? (
             <>
+              {surface === "world" ? (
               <div id="workspace-world">
                 <WorldStudioUltimate model={worldReadModel} />
                 <WorldExplorer
@@ -1312,12 +1402,14 @@ export default function WorkspacePage() {
                   onUpload={activationPolicy.customerIntake.enabled ? () => fileRef.current?.click() : undefined}
                 />
               </div>
+              ) : null}
               {/*
                 This control was lost when the sidebar buttons became tabs: the handler survived
                 the refactor and its button did not, so OCR candidate verification silently left
                 the product. It belongs on this tab -- the JSON it checks is the raw material the
                 architecture above is built from.
               */}
+              {surface === "review" ? <>
               <section className="card">
                 <p className="eyebrow">OCR CANDIDATES</p>
                 <h2>Verify the extracted JSON</h2>
@@ -1411,6 +1503,8 @@ export default function WorkspacePage() {
                   </div>
                 )}
               </section>
+              </> : null}
+              {surface === "ask" ? (
               <section id="workspace-ask" className="card ask-studio" aria-labelledby="ask-title">
                 <div>
                   <p className="eyebrow">GROUNDED ASK</p>
@@ -1458,6 +1552,7 @@ export default function WorkspacePage() {
                   </div>
                 ) : null}
               </section>
+              ) : null}
             </>
           ) : null}
 

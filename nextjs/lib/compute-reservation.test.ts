@@ -5,6 +5,7 @@ const base = {
   workspaceKey: "pilot-4444444444444444",
   documentId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
   userId: "44444444-4444-4444-8444-444444444444",
+  estimatedPages: 3,
 };
 
 describe("Foundation compute ledger", () => {
@@ -32,7 +33,7 @@ describe("Foundation compute ledger", () => {
       documentId: base.documentId,
       state: "reserved",
       expiresAt: "2026-08-29T12:10:00Z",
-      reservedCredits: 2,
+      reservedCredits: 18,
       idempotentReplay: false,
     }), { status: 200 })));
     await expect(reserveFoundationCompute(base)).resolves.toMatchObject({ ok: true });
@@ -50,7 +51,7 @@ describe("Foundation compute ledger", () => {
       workspaceKey: base.workspaceKey,
       documentId: base.documentId,
       outcome: "operator_review",
-      actualCredits: 2,
+      actualCredits: 12,
       reasonCode: "OCR_TIMEOUT_OR_NETWORK",
     })).resolves.toMatchObject({ ok: true });
   });

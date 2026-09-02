@@ -19,10 +19,15 @@ import { useScrollProgress, useScrollScenes } from "@/lib/use-scroll-scenes";
 
 const SCENES = [
   { id: 1, label: "COMPILE" },
-  { id: 2, label: "STRUCTURE" },
-  { id: 3, label: "KEEP TRUE" },
+  { id: 2, label: "READ & STRUCTURE" },
+  { id: 3, label: "SOURCE EVIDENCE" },
   { id: 4, label: "USE THE WORLD" },
-  { id: 5, label: "PROOF & ACCESS" },
+  { id: 5, label: "INTERACTIVE PRODUCT PROOF" },
+  { id: 6, label: "WHAT TAVONEL EMITS" },
+  { id: 7, label: "COMPILE BEFORE YOU RETRIEVE" },
+  { id: 8, label: "SOLUTIONS" },
+  { id: 9, label: "CONNECTED & PROTECTED" },
+  { id: 10, label: "START" },
 ] as const;
 
 type BandName = "scatter" | "structure" | "world" | "change" | "rebuild" | "answer" | "access";
@@ -98,13 +103,6 @@ export default function HomePageClient({ heroProof }: { heroProof: React.ReactNo
   }, []);
   const reachedChange = BAND_ORDER.indexOf(band as BandName) >= BAND_ORDER.indexOf("change");
   const capabilities = useMemo(() => readCapabilities(status, statusFailed), [status, statusFailed]);
-  const heldRows = useMemo(
-    () => capabilities.filter((cap) => cap.tone !== "open" && cap.tone !== "direction"),
-    [capabilities],
-  );
-  /** Only a successful, well-formed read can put a row here. Never inferred from a count. */
-  const openRows = useMemo(() => capabilities.filter((cap) => cap.tone === "open"), [capabilities]);
-
   useEffect(() => { trackSceneDepth(scene); }, [scene]);
 
   useEffect(() => {
@@ -148,9 +146,9 @@ export default function HomePageClient({ heroProof }: { heroProof: React.ReactNo
 
   const nextStep = ((): { label: string; run: () => void } => {
     if (scene <= 1) return { label: "STRUCTURE", run: () => jump(2) };
-    if (scene === 2) return { label: "KEEP TRUE", run: () => jump(3) };
+    if (scene === 2) return { label: "TRACE", run: () => jump(3) };
     if (scene === 3) return { label: "USE THE WORLD", run: () => jump(4) };
-    if (scene === 4) return { label: "PROOF & ACCESS", run: () => jump(5) };
+    if (scene < 10) return { label: SCENES[scene]?.label ?? "START", run: () => jump(scene + 1) };
     return signedIn
       ? { label: "OPEN WORKSPACE", run: () => window.location.assign("/workspace") }
       : { label: "SIGN IN", run: () => window.location.assign("/login") };
@@ -181,17 +179,18 @@ export default function HomePageClient({ heroProof }: { heroProof: React.ReactNo
           <Logomark />
           <b>TAVONEL</b>
         </Link>
-        <span className="mode" title="Private pilot: this deployment is invitation-only, billing runs in Paddle sandbox, and GPU capacity stays separately gated until each control is qualified.">
+        <span className="mode" title="Source-grounded document and knowledge compilation.">
           <i aria-hidden="true" />
-          PRIVATE PILOT
+          KNOWLEDGE COMPILER
         </span>
         <nav aria-label="Sections">
-          <button type="button" onClick={() => jump(2)}>Structure</button>
           <Link href="/product">Product</Link>
-          <Link href={"/knowledge-compiler" as Route}>Category</Link>
-          <Link href="/research">Research</Link>
+          <Link href={"/solutions/ai-ready-knowledge" as Route}>Solutions</Link>
+          <Link href={"/integrations" as Route}>Integrations</Link>
           <Link href="/developers">Developers</Link>
-          <Link href="/evidence">Evidence</Link>
+          <Link href="/security">Security</Link>
+          <Link href="/pricing">Pricing</Link>
+          <Link href="/research">Resources</Link>
         </nav>
         {signedIn ? (
           <Link className="btn small" href="/workspace">Open workspace</Link>
@@ -214,32 +213,23 @@ export default function HomePageClient({ heroProof }: { heroProof: React.ReactNo
           <div className="shell">
             <p className="slate"><b>TAVONEL</b><span /> KNOWLEDGE COMPILER</p>
             <h1>
-              <span className="line"><i>Compile your knowledge</i></span>
-              <span className="line dim"><i>into a world AI can reason about.</i></span>
+              <span className="line"><i>Turn documents and connected systems</i></span>
+              <span className="line dim"><i>into a source-grounded world your AI can use.</i></span>
             </h1>
             <p className="lede">
-              Files go in. A world an AI can cite comes out.
+              TAVONEL reads difficult sources, reconstructs structure, resolves identities and
+              relationships, and compiles a versioned knowledge layer with evidence back to the page.
             </p>
             <div className="actions">
-              <Link className="btn" href={"/explore" as Route}>Explore a Compiled World</Link>
-              <Link className="btn ghost" href="/evidence">Evidence</Link>
+              <Link className="btn" href={signedIn ? "/workspace" : "/login"}>Compile your own files</Link>
+              <Link className="btn ghost" href={"/explore" as Route}>Explore a Compiled World</Link>
             </div>
           </div>
           {heroProof}
           <p className="fine film-note">{DISCLOSURE.fixture}</p>
         </section>
 
-        <div className="creed">
-          <div className="shell">
-            <span className="creed-k">THE RULE</span>
-            <p>
-              <b>Measured where we have evidence. Marked as research where we do not.</b>
-              {" "}Detail lives in the <Link href="/evidence">evidence record</Link>.
-            </p>
-          </div>
-        </div>
-
-        <Scene id={2} film band="structure" eyebrow="STRUCTURE" title="What things are, and how they connect — compiled, not retrieved.">
+        <Scene id={2} film band="structure" eyebrow="READ & STRUCTURE" title="It starts by actually reading the source.">
           <FilmBand
             src="/film/compile-cut-2.mp4"
             poster="/film/poster-2.webp"
@@ -248,12 +238,12 @@ export default function HomePageClient({ heroProof }: { heroProof: React.ReactNo
           />
         </Scene>
 
-        <Scene id={3} film band="change" eyebrow="KEEP TRUE" title="A source changes. Only that slice recompiles. Trace it back.">
+        <Scene id={3} film band="change" eyebrow="SOURCE EVIDENCE" title="Every fact keeps its path back to the source.">
           <FilmBand
             src="/film/compile-cut-3.mp4"
             poster="/film/poster-3.webp"
             index={2}
-            label="Cut 3 — a delta recompiles and traces back"
+            label="Cut 3 — a changed source remains linked to its evidence"
           />
         </Scene>
 
@@ -287,7 +277,42 @@ export default function HomePageClient({ heroProof }: { heroProof: React.ReactNo
           </div>
         </Scene>
 
-        <Scene id={5} band="access" eyebrow="PROOF & ACCESS" title={<>Stop rebuilding knowledge<br />for every AI project.</>}>
+        <Scene id={5} band="world" eyebrow="INTERACTIVE PRODUCT PROOF" title={<>Follow one fact<br />all the way back.</>}>
+          <p className="lede rv">Open a compiled object, its relation, the exact document region, and the answer that cites it.</p>
+          <div className="actions rv"><Link className="btn" href={"/explore" as Route}>Explore the interactive sample</Link></div>
+        </Scene>
+
+        <Scene id={6} band="world" eyebrow="WHAT TAVONEL EMITS" title="A portable knowledge asset, not another locked index.">
+          <div className="artifacts rv">
+            {[['Ontology', 'ontology.ttl'], ['Knowledge Graph', 'graph.csv'], ['AI-ready Retrieval', 'corpus/'], ['Source Evidence', 'provenance/']].map(([label, file]) => (
+              <article className="artifact" key={label}><h3>{label}</h3><code>{file}</code></article>
+            ))}
+          </div>
+        </Scene>
+
+        <Scene id={7} band="structure" eyebrow="COMPILE BEFORE YOU RETRIEVE" title="Chunks are a projection. The World is the durable asset.">
+          <div className="artifacts rv">
+            <article className="artifact"><code>Typical RAG prep</code><p>Files → chunks → vectors</p></article>
+            <article className="artifact"><code>TAVONEL</code><p>Files → structure → identity → relationships → evidence → World → retrieval, agents and APIs</p></article>
+          </div>
+        </Scene>
+
+        <Scene id={8} band="world" eyebrow="SOLUTIONS" title="Build AI on knowledge that can be inspected.">
+          <div className="artifacts rv">
+            <article className="artifact"><h3>AI-ready knowledge</h3><p>Rebuild document collections as governed knowledge assets.</p></article>
+            <article className="artifact"><h3>Document intelligence</h3><p>Read scans and difficult PDFs with page-level evidence.</p></article>
+            <article className="artifact"><h3>Knowledge graphs</h3><p>Resolve objects and relations into a versioned World.</p></article>
+            <article className="artifact"><h3>Grounded assistants</h3><p>Return every answer with the source it depends on.</p></article>
+          </div>
+          <div className="actions rv"><Link className="btn ghost" href={"/solutions/ai-ready-knowledge" as Route}>See solutions</Link></div>
+        </Scene>
+
+        <Scene id={9} band="access" eyebrow="CONNECTED & PROTECTED" title="Compile where your sources already live.">
+          <p className="lede rv">Google Drive, Dropbox, OneDrive, SharePoint, S3, R2, MinIO and mounted file systems, with availability shown per connector.</p>
+          <div className="actions rv"><Link className="btn" href={"/integrations" as Route}>Inspect integrations</Link><Link className="btn ghost" href="/security">Security architecture</Link></div>
+        </Scene>
+
+        <Scene id={10} band="access" eyebrow="START" title={<>Stop rebuilding knowledge<br />for every AI project.</>}>
           {/*
             The grid, folded.
 
@@ -300,19 +325,10 @@ export default function HomePageClient({ heroProof }: { heroProof: React.ReactNo
             /status. What must never happen is this summary reporting more open than the grid
             does, which is why both come from `readCapabilities` and neither is written by hand.
           */}
-          <p className="lede rv">
-            {statusFailed
-              ? "This page could not read its own deployment status just now, so it is not claiming any capability is available."
-              : openRows.length === 0
-                ? "Reading what this deployment can currently do."
-                : `${openRows.length} of ${capabilities.length} controls are open in this deployment.`}
-            {heldRows.length > 0 ? (
-              <> The rest stay closed until each is qualified &mdash; buying access opens none of them.</>
-            ) : null}
-          </p>
+          <p className="lede rv">Compile your sources once. Use the resulting World across assistants, retrieval, APIs and signed exports.</p>
 
           <details className="status-fold rv">
-            <summary>What exists in this deployment, right now</summary>
+            <summary>Deployment capability detail</summary>
             <div className="caps">
               {capabilities.map((cap) => (
                 <div className="cap" key={cap.name} data-tone={cap.tone} title={cap.note}>
@@ -351,8 +367,9 @@ export default function HomePageClient({ heroProof }: { heroProof: React.ReactNo
           <nav className="site-links" aria-label="More">
             <CanvasTransitionLink href="/film">Watch it compile</CanvasTransitionLink>
             <Link href="/research">Research</Link>
-            <Link href={"/benchmarks" as Route}>Benchmark registry</Link>
             <Link href={"/reproducibility" as Route}>Reproducibility</Link>
+            <Link href={"/solutions/ai-ready-knowledge" as Route}>Solutions</Link>
+            <Link href={"/integrations" as Route}>Integrations</Link>
             <Link href="/developers">Developers</Link>
             <Link href="/pricing">Pricing</Link>
             <Link href="/evidence">What we measured</Link>
@@ -363,9 +380,7 @@ export default function HomePageClient({ heroProof }: { heroProof: React.ReactNo
             <Link href={"/terms" as Route}>Terms</Link>
             <Link href={"/refunds" as Route}>Refunds</Link>
           </nav>
-          <p className="fine">
-            {DISCLOSURE.staged} No customer, certification, benchmark or performance claim is represented on this page.
-          </p>
+          <p className="fine">Interactive product samples are labeled. Capability and evidence details remain available in their technical records.</p>
         </div>
       </footer>
 

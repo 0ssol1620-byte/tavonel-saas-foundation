@@ -638,15 +638,6 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
   }
 }
 .film-note { max-width: 72rem; margin: 12px auto 0; padding: 0 24px; }
-/*
-  The films are drawn as large as the column allows.
-
-  An earlier pass capped this at 900px to match the hero, on the theory that the lower cuts only
-  looked worse because they were emptier and drawing them larger spread that thinness out. The
-  density numbers were real — cut 1 carries 24.7% ink, cut 4 3.2% — but shrinking the films was
-  the wrong conclusion and made them harder to read. The actual quality gap was measurable and
-  is fixed in the encode, not the layout.
-*/
 .film-band {
   position: relative;
   width: min(100%, 1440px);
@@ -1224,7 +1215,8 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 
 /* ---------------------------------------------------------- 12 access */
 
-.plans, .packs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 4px; overflow: hidden; }
+.plans { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 4px; overflow: hidden; }
+.packs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 4px; overflow: hidden; }
 .plan, .pack { background: var(--g1); padding: 18px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
 .plan[data-featured="1"] { background: var(--g2); }
 .tag { font-family: var(--f-mono); font-size: 9px; letter-spacing: 0.16em; color: var(--verified); }
@@ -1232,6 +1224,26 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 .price { font-size: 30px; color: var(--text-hi); letter-spacing: -0.025em; font-variation-settings: "wght" 560; }
 .price small { font-size: 11px; font-family: var(--f-mono); color: var(--text-xlo); letter-spacing: 0.06em; }
 .plan p { margin: 0; font-size: 12.5px; color: var(--text-lo); flex: 1; }
+.plan ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 7px; color: var(--text-mid); font-size: 11.5px; }
+.plan li { display: grid; grid-template-columns: 10px minmax(0, 1fr); gap: 6px; }
+.plan li::before { content: ""; width: 5px; height: 5px; margin-top: 0.55em; background: var(--verified); border-radius: 50%; }
+.usage-estimator {
+  margin: 32px 0;
+  border-block: 1px solid var(--hairline);
+  padding: clamp(22px, 4vw, 42px) 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.8fr);
+  gap: clamp(28px, 6vw, 80px);
+  align-items: end;
+}
+.usage-estimator h3 { margin: 6px 0 22px; font-size: clamp(25px, 3vw, 42px); font-weight: 500; }
+.usage-estimator label { display: block; margin-bottom: 7px; font-family: var(--f-mono); font-size: 10px; letter-spacing: 0.12em; color: var(--text-xlo); text-transform: uppercase; }
+.usage-estimator input { width: min(100%, 300px); border: 0; border-bottom: 1px solid var(--hairline-hi); background: transparent; color: var(--text-hi); font: 500 34px/1 var(--f-sans); padding: 7px 0 10px; }
+.usage-estimator input:focus-visible { outline: 2px solid var(--verified); outline-offset: 4px; }
+.usage-estimator dl { margin: 0; display: grid; gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); }
+.usage-estimator dl div { display: flex; justify-content: space-between; gap: 20px; align-items: baseline; padding: 12px 14px; background: var(--g1); }
+.usage-estimator dt { font-family: var(--f-mono); font-size: 10px; letter-spacing: 0.08em; color: var(--text-xlo); text-transform: uppercase; }
+.usage-estimator dd { margin: 0; color: var(--text-hi); font-variant-numeric: tabular-nums; }
 /* A plan card is a third of a column, and at 1280 that is about 190px of content box. The
    labels here are full sentences -- "Choose this plan -> sign in" says what happens next, which
    is worth more than the one line it costs -- so the button wraps instead of running past the
@@ -1460,6 +1472,32 @@ footer.site .shell { display: flex; flex-direction: column; gap: 14px; }
   color: var(--text-xlo);
   letter-spacing: 0.02em;
   margin-top: -1px;
+}
+
+.compile-source-choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-mid);
+  font: 500 10px/1.4 var(--f-mono);
+  letter-spacing: 0.04em;
+}
+
+.compile-source-choice input {
+  accent-color: var(--verified);
+}
+
+.compile-selection-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.compile-selection-actions small {
+  color: var(--text-xlo);
 }
 
 /*
@@ -2026,6 +2064,7 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
    through that order for as long as it fits.
 */
 @media (max-width: 760px) {
+  .usage-estimator { grid-template-columns: minmax(0, 1fr); }
   .nav nav { display: none; }
 }
 

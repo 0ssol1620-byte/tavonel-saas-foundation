@@ -6,23 +6,45 @@ import Logomark from "@/components/logomark";
 import { useCheckout } from "@/lib/use-checkout";
 import { loginUrlForOffer } from "@/lib/checkout-intent";
 import type { BillingOfferCode } from "@/lib/billing-catalog";
+import { formatUsd, quoteCompilePages } from "@/lib/usage-pricing";
 
 const PLANS = [
-  ["Developer", "$29", "A considered first step.", "observer_access"],
-  ["Team", "$99", "For teams building a governed corpus.", "studio_access"],
-  ["Enterprise", "Talk to us", "For policy-led knowledge operations.", null],
-] as const;
-
-const PACKS = [
-  ["Starter", "$12", "100 credits", "credit_starter"],
-  ["Builder", "$30", "300 credits", "credit_builder"],
-  ["Scale", "$75", "800 credits", "credit_scale"],
+  {
+    name: "Evaluation",
+    price: "$0",
+    description: "Compile your own sources in an invitation-based evaluation workspace.",
+    features: ["Manual upload", "Compiled World + Ask", "No card to request access"],
+    offerCode: null,
+  },
+  {
+    name: "Developer",
+    price: "$29",
+    description: "For builders shipping source-grounded AI.",
+    features: ["500 standard compile pages", "1 workspace", "API + MCP", "1 connected source"],
+    offerCode: "observer_access",
+  },
+  {
+    name: "Team",
+    price: "$99",
+    description: "For teams reviewing and governing a shared World.",
+    features: ["2,500 standard compile pages", "Up to 5 seats", "Multiple connectors", "Review, versions, budgets"],
+    offerCode: "studio_access",
+  },
+  {
+    name: "Enterprise",
+    price: "Custom",
+    description: "For policy-led knowledge operations and qualified deployment controls.",
+    features: ["SSO / SCIM when qualified", "Custom retention and region", "Audit export", "Dedicated support"],
+    offerCode: null,
+  },
 ] as const;
 
 export default function PricingPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [signedIn, setSignedIn] = useState(false);
+  const [pages, setPages] = useState(348);
   const { start: startCheckout, busy: billingBusy } = useCheckout(setNotice);
+  const quote = quoteCompilePages(pages);
 
   useEffect(() => {
     let cancelled = false;
@@ -64,24 +86,47 @@ export default function PricingPage() {
         <section className="scene doc">
           <div className="shell">
             <p className="slate"><b>PRICING</b><span />MEASURED COMPUTE</p>
-            <h2>Developer, Team, Enterprise.</h2>
+            <h2>Pages and dollars.<br />No credit arithmetic.</h2>
             <p className="lede">
-              Access is steady. GPU work is measured. Hard spend limits stay on even after a purchase.
+              Standard Knowledge Compile is modeled at $0.04 per processed page. Vision escalation
+              is charged only when a page needs it, with a $0.06 per-page hard maximum.
             </p>
+            <section className="usage-estimator rv" aria-labelledby="usage-estimator-title">
+              <div>
+                <p className="slate"><b>RUN ESTIMATE</b><span />BEFORE COMPILE</p>
+                <h3 id="usage-estimator-title">What will this corpus cost?</h3>
+                <label htmlFor="pricing-pages">Processed pages</label>
+                <input
+                  id="pricing-pages"
+                  type="number"
+                  min="1"
+                  max="10000"
+                  step="1"
+                  value={pages}
+                  onChange={(event) => setPages(Number(event.target.value))}
+                />
+              </div>
+              <dl>
+                <div><dt>Standard estimate</dt><dd>{quote ? formatUsd(quote.estimatedUsd) : "—"}</dd></div>
+                <div><dt>Maximum charge</dt><dd>{quote ? formatUsd(quote.maximumUsd) : "—"}</dd></div>
+                <div><dt>Complex-page escalation</dt><dd>Only when required</dd></div>
+              </dl>
+            </section>
             <div className="plans rv">
-              {PLANS.map(([name, price, text, offerCode]) => (
-                <article className="plan" key={name} data-featured={name === "Team" ? 1 : 0}>
-                  <span className="tag">{name === "Team" ? "PRIVATE PILOT CHOICE" : " "}</span>
-                  <h3>{name}</h3>
-                  <span className="price">{price}{price.startsWith("$") ? <small> / month</small> : null}</span>
-                  <p>{text}</p>
+              {PLANS.map((plan) => (
+                <article className="plan" key={plan.name} data-featured={plan.name === "Team" ? 1 : 0}>
+                  <span className="tag">{plan.name === "Team" ? "TEAM WORKFLOW" : " "}</span>
+                  <h3>{plan.name}</h3>
+                  <span className="price">{plan.price}{plan.price !== "$0" && plan.price.startsWith("$") ? <small> / month</small> : null}</span>
+                  <p>{plan.description}</p>
+                  <ul>{plan.features.map((feature) => <li key={feature}>{feature}</li>)}</ul>
                   <button
                     className="btn ghost"
                     type="button"
                     disabled={Boolean(billingBusy)}
-                    onClick={() => (offerCode ? chooseOffer(offerCode) : showNotice())}
+                    onClick={() => (plan.offerCode ? chooseOffer(plan.offerCode) : showNotice())}
                   >
-                    {name === "Enterprise" ? "Start a conversation" : billingBusy === offerCode ? "Opening checkout…" : signedIn ? "Choose this plan" : "Choose this plan → sign in"}
+                    {plan.name === "Enterprise" ? "Start a conversation" : plan.name === "Evaluation" ? "Request evaluation" : billingBusy === plan.offerCode ? "Opening checkout…" : signedIn ? "Choose this plan" : "Choose this plan → sign in"}
                   </button>
                 </article>
               ))}
@@ -90,18 +135,15 @@ export default function PricingPage() {
               Institution and custom engagement guidelines are in the{" "}
               <a href="/legal/TAVONEL_ENTERPRISE_PRICING_2026-08-30.pdf">Enterprise pricing sheet</a>.
             </p>
-            <div className="packs rv">
-              {PACKS.map(([name, price, credits, offerCode]) => (
-                <article className="pack" key={name}>
-                  <span className="tag">PREPAID CAPACITY</span>
-                  <h3>{name}</h3>
-                  <span className="price">{price} <small>{credits}</small></span>
-                  <button className="btn ghost" type="button" disabled={Boolean(billingBusy)} onClick={() => chooseOffer(offerCode)}>
-                    {billingBusy === offerCode ? "Opening checkout…" : signedIn ? "Buy credits" : "Buy credits → sign in"}
-                  </button>
-                </article>
-              ))}
-            </div>
+            <details className="status-fold rv">
+              <summary>How usage is measured</summary>
+              <p>
+                TAVONEL records internal processing units, GPU seconds, OCR routes and model tokens
+                for cost control. Your quote and receipt stay in pages and dollars. A run cannot
+                exceed the maximum charge without a new confirmation.
+              </p>
+              <p className="fine">Launch rates remain subject to measured P95 cost qualification. Checkout stays fail-closed until the live billing gate is open.</p>
+            </details>
             {notice ? <p className="notice" role="status">{notice}</p> : null}
           </div>
         </section>

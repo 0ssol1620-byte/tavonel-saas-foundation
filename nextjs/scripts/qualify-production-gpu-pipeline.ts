@@ -58,7 +58,7 @@ const admission = await reserveFoundationIntake({
 });
 if (!admission.ok) throw new Error(admission.code);
 
-const compute = await reserveFoundationCompute({ workspaceKey, documentId, userId: account.user_id });
+const compute = await reserveFoundationCompute({ workspaceKey, documentId, userId: account.user_id, estimatedPages: 1 });
 if (!compute.ok) throw new Error(compute.code);
 
 const signed = presignFoundationQuarantinePut(signer, {

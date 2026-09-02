@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   if (!Number.isFinite(declaredLength) || declaredLength > 1_024) {
     return NextResponse.json({ code: "UPLOAD_RELEASE_REQUEST_TOO_LARGE" }, { status: 413, headers });
   }
-  const auth = await authorizeFoundationRequest(request, "documents:intake", "studio");
+  const auth = await authorizeFoundationRequest(request, "documents:intake", "observer");
   if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers });
 
   let body: { documentId?: unknown };

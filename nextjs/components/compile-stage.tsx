@@ -10,9 +10,9 @@
  *
  * Four columns, same grammar as the cuts:
  *   SOURCES   the files they dropped, with the one being worked on lit
- *   PAGE      the page the reader is on, region boxes at the confidence it reported
- *   EXTRACT   the lines that came out of those regions
- *   WORLD     one node per compiled document, edges as they bind
+ *   READ      the page the reader is on, region boxes at the confidence it reported
+ *   STRUCTURE the lines that came out of those regions
+ *   WORLD     compiled objects and their actual persisted relations
  *
  * When nothing is in flight the canvas holds its last frame rather than clearing, so a finished
  * compile stays legible instead of blinking back to empty.
@@ -22,6 +22,7 @@ import { useEffect, useRef } from "react";
 import type { PipelineRow } from "@/lib/pipeline";
 import type { OcrProgress } from "@/lib/ocr-progress";
 import { displayName, type DocumentNames } from "@/lib/document-names";
+import type { WorldReadModel } from "@/lib/world-read-model";
 
 const AREA_RGB: [number, number, number][] = [
   [242, 166, 90],
@@ -70,38 +71,20 @@ function place(id: string): { x: number; y: number; area: number } {
   return { x: 0.16 + a * 0.68, y: 0.16 + b * 0.68, area: h % AREA_RGB.length };
 }
 
-/** The facts a compiled document contributes, placed around it. Same id, same constellation. */
-function satellites(id: string): { angle: number; radius: number }[] {
-  let h = 2166136261;
-  for (let i = 0; i < id.length; i += 1) {
-    h ^= id.charCodeAt(i);
-    h = Math.imul(h, 16777619) >>> 0;
-  }
-  const count = 5 + (h % 4);
-  const out: { angle: number; radius: number }[] = [];
-  let state = h;
-  for (let i = 0; i < count; i += 1) {
-    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
-    const angle = ((state % 1000) / 1000) * Math.PI * 2;
-    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
-    const radius = 0.45 + ((state % 1000) / 1000) * 0.75;
-    out.push({ angle, radius });
-  }
-  return out;
-}
-
 export default function CompileStage({
   rows,
   reading = {},
   names = {},
+  world = null,
 }: {
   rows: PipelineRow[];
   reading?: Record<string, OcrProgress>;
   names?: DocumentNames;
+  world?: WorldReadModel | null;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const stateRef = useRef({ rows, reading, names });
-  stateRef.current = { rows, reading, names };
+  const stateRef = useRef({ rows, reading, names, world });
+  stateRef.current = { rows, reading, names, world };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -109,7 +92,6 @@ export default function CompileStage({
     if (!canvas || !context) return;
     let width = 0;
     let height = 0;
-    let frame = 0;
 
     const layout = () => {
       const ratio = Math.min(window.devicePixelRatio || 1, 2);
@@ -192,7 +174,7 @@ export default function CompileStage({
       progress: OcrProgress | undefined,
     ) => {
       const page = progress?.pages[progress.pages.length - 1];
-      pane(x, y, w, h, "PAGE", page ? `p.${page.pageNumber1}/${page.pageCount}` : "—");
+      pane(x, y, w, h, "READ", page ? `p.${page.pageNumber1}/${page.pageCount}` : "—");
       const px = x + 14;
       const py = y + 34;
       const pw = w - 28;
@@ -225,7 +207,7 @@ export default function CompileStage({
       progress: OcrProgress | undefined,
     ) => {
       const found = progress?.regionsFound ?? 0;
-      pane(x, y, w, h, "EXTRACT", found ? `${found} regions` : "—");
+      pane(x, y, w, h, "STRUCTURE", found ? `${found} regions` : "—");
       const rowH = 11;
       const gutter = 20;
       context.fillStyle = "#121416";
@@ -275,36 +257,26 @@ export default function CompileStage({
 
     const drawWorld = (
       x: number, y: number, w: number, h: number,
-      list: PipelineRow[], focus: PipelineRow | null,
+      model: WorldReadModel | null,
     ) => {
-      const compiled = list.filter((row) => row.stages[3].state === "done");
-      pane(x, y, w, h, "WORLD", compiled.length ? `${compiled.length} compiled` : "—");
+      pane(x, y, w, h, "WORLD", model ? `${model.objects.length} objects` : "—");
       const ox = x + 10;
       const oy = y + 32;
       const gw = w - 20;
       const gh = h - 44;
-      if (list.length === 0) {
+      if (!model || model.objects.length === 0) {
         context.fillStyle = "#9aa3a8";
         context.font = "400 10px ui-monospace, Menlo, monospace";
-        context.fillText("your world builds here", ox + 8, oy + 20);
+        context.fillText("building semantic structure…", ox + 8, oy + 20);
         return;
       }
-      /*
-        A document is not one dot.
 
-        Compiling a contract yields facts, and the node this canvas draws for a document is the
-        centre of a small constellation of them. Drawing one dot per file made a finished compile
-        of four documents look like four points floating in a black rectangle — which understates
-        the product exactly where it should be strongest. The satellites are derived from the
-        document id, so they are stable across frames and identical on every device, and they
-        appear only once that document has actually compiled.
-      */
-      const points = list.map((row) => ({ row, at: place(row.id) }));
-      const done = points.filter((p) => p.row.stages[3].state === "done");
-
-      done.forEach((a, i) => {
-        const b = done[(i + 1) % done.length];
-        if (!b || a === b) return;
+      const points = model.objects.map((object) => ({ object, at: place(object.id) }));
+      const pointById = new Map(points.map((point) => [point.object.id, point]));
+      model.relations.forEach((relation) => {
+        const a = pointById.get(relation.subject);
+        const b = pointById.get(relation.object);
+        if (!a || !b) return;
         const rgb = AREA_RGB[a.at.area];
         context.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.45)`;
         context.lineWidth = 1;
@@ -314,44 +286,18 @@ export default function CompileStage({
         context.stroke();
       });
 
-      done.forEach(({ row, at }) => {
+      points.forEach(({ object, at }) => {
         const rgb = AREA_RGB[at.area];
-        const cx = ox + at.x * gw;
-        const cy = oy + at.y * gh;
-        satellites(row.id).forEach((sat) => {
-          const sx = cx + Math.cos(sat.angle) * sat.radius * gw * 0.11;
-          const sy = cy + Math.sin(sat.angle) * sat.radius * gh * 0.14;
-          context.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.28)`;
-          context.lineWidth = 0.7;
-          context.beginPath();
-          context.moveTo(cx, cy);
-          context.lineTo(sx, sy);
-          context.stroke();
-          context.fillStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.7)`;
-          context.beginPath();
-          context.arc(sx, sy, 1.7, 0, Math.PI * 2);
-          context.fill();
-        });
-      });
-
-      points.forEach(({ row, at }) => {
-        const rgb = AREA_RGB[at.area];
-        const isFocus = focus !== null && row.id === focus.id;
-        const isDone = row.stages[3].state === "done";
-        const r = isFocus ? 5 : isDone ? 3.4 : 2;
-        context.fillStyle = row.needsPerson
-          ? "rgb(224,192,122)"
-          : isDone || isFocus
-            ? `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`
-            : `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.35)`;
+        const needsReview = object.status === "candidate" || object.readState === "not_yet";
+        context.fillStyle = needsReview ? "rgb(224,192,122)" : `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
         context.beginPath();
-        context.arc(ox + at.x * gw, oy + at.y * gh, r, 0, Math.PI * 2);
+        context.arc(ox + at.x * gw, oy + at.y * gh, object.type === "Document" ? 4.6 : 3, 0, Math.PI * 2);
         context.fill();
       });
     };
 
     const draw = () => {
-      const { rows: list, reading: read, names: nameMap } = stateRef.current;
+      const { rows: list, reading: read, names: nameMap, world: model } = stateRef.current;
       context.fillStyle = "#08090a";
       context.fillRect(0, 0, width, height);
       const gap = 8;
@@ -364,26 +310,26 @@ export default function CompileStage({
       drawSources(xs[0], pad, colW, colH, list, focus, nameMap);
       drawPage(xs[1], pad, colW, colH, progress);
       drawExtract(xs[2], pad, colW, colH, progress);
-      drawWorld(xs[3], pad, colW, colH, list, focus);
+      drawWorld(xs[3], pad, colW, colH, model);
     };
 
     layout();
-    const tick = () => {
-      draw();
-      frame = window.requestAnimationFrame(tick);
-    };
-    frame = window.requestAnimationFrame(tick);
+    draw();
     const onResize = () => { layout(); draw(); };
     window.addEventListener("resize", onResize);
     return () => {
-      window.cancelAnimationFrame(frame);
       window.removeEventListener("resize", onResize);
     };
-  }, []);
+  }, [names, reading, rows, world]);
 
   return (
     <div className="compile-stage">
       <canvas ref={canvasRef} className="compile-stage-canvas" aria-hidden="true" />
+      <p className="sr-only" role="status">
+        {world
+          ? `${rows.length} sources, ${world.objects.length} compiled objects, and ${world.relations.length} persisted relations.`
+          : `${rows.length} sources. Building semantic structure; no World objects are available yet.`}
+      </p>
     </div>
   );
 }
