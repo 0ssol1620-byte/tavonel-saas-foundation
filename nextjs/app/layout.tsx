@@ -100,13 +100,13 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           contacted. It sets no cookie, which is why this page still has no consent banner to
           apologise for.
 
-          Rendered only on Vercel. `/_vercel/insights/script.js` exists only on the deployment
-          that serves it, so anywhere else -- a local `next start`, a preview harness, the e2e
-          run -- the tag produced a 404 and a console error on every page load. A collector that
-          cannot collect should not be on the page at all, and a console that is quiet by default
-          is what makes the e2e error assertion worth anything.
+          Analytics is fail-closed. Vercel exposes observability build variables even when Web
+          Analytics is not enabled for the project; rendering the component in that state points
+          the browser at a deployment-specific 404. The explicit public flag is set only after the
+          collector is enabled and verified, so local, preview and unconfigured production builds
+          stay quiet and do not imply that measurement is active.
         */}
-        {process.env.VERCEL ? <Analytics /> : null}
+        {process.env.NEXT_PUBLIC_TAVONEL_ANALYTICS_ENABLED === "1" ? <Analytics /> : null}
       </body>
     </html>
   );
