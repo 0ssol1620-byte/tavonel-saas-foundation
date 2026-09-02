@@ -44,7 +44,16 @@ All Lighthouse release budgets passed.
 
 ## Deployment evidence
 
-Production deployment and live-domain verification are recorded here only after the verified commit reaches GitHub `main`, Supabase migrations `0035` through `0037` are applied, and both `tavonel.com` aliases resolve to the new deployment.
+- Runtime commit: `b91796c02559b836ce854cddbcd073c2f7eaf13d` on GitHub `main` and `codex/masterplan-2026-09-02-deploy`.
+- Vercel production deployment: `dpl_EZ1GzRdYJVZbrEvkMbKFvNuEpKdk` (`Ready`, `icn1`).
+- Deployment URL: `https://tavonel-saas-foundation-a1j7aormq-phillips-projects-a8cf32fc.vercel.app`.
+- Production aliases: `https://tavonel.com`, `https://www.tavonel.com`, `https://tavonel-saas-foundation.vercel.app`, and the Git `main` alias all resolve to the deployment. `www` canonicalizes to the apex with `308`.
+- Supabase project `tfcorhjkqcuisqhsjemz`: migrations `0035`, `0036`, and `0037` were applied. Follow-up catalog and function-body queries confirmed the allowance ledger, maximum reservation, overage, review-decision table/RLS, refund floor, pending reversal replay, and zero unresolved allowance reversals.
+- Live HTTP contract: 33 checks passed with no failures. Public IA returned `200`; pending-proof routes returned `404`; source and review writes rejected anonymous access with `401`; `/api/openapi` negotiated to `/api`; raw OpenAPI remained `noindex`; pilot mode, five scenes, exact plan prices, and canonical host behavior matched the release contract.
+- Live Chromium matrix: `1920`, `1440`, `1280`, `1024`, `768`, `390`, `360`, and reduced motion each returned `200`, rendered scene IDs `1,2,3,4,5`, had zero horizontal overflow, and emitted zero console or page errors.
+- Live screenshots: `nextjs/test-results/live-production/` contains the seven full-page width captures, reduced-motion capture, and Scene 01-05 desktop/mobile viewport captures. The images are local QA artifacts and are intentionally ignored by Git.
+
+The first production smoke exposed a Vercel Analytics script `404` because observability build variables were present while the collector was disabled. Commit `b91796c` made analytics explicitly opt-in, and the same eight-condition browser matrix then passed with zero errors. This report-only follow-up changes no runtime code.
 
 ## Truth boundary
 

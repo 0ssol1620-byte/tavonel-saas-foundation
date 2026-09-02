@@ -69,10 +69,10 @@ This document maps the final masterplan to production code and objective verific
 
 ## Release evidence gate
 
-The release is complete only when all of the following are recorded for the same commit:
+Runtime release commit `b91796c02559b836ce854cddbcd073c2f7eaf13d` satisfies the objective gates below. The evidence-document commit that records these results changes no runtime code.
 
-1. TypeScript, ESLint, unit, interaction, E2E, accessibility, production build, and Lighthouse checks pass.
-2. Supabase migrations `0035` through `0037` are applied and queried successfully in project `tfcorhjkqcuisqhsjemz`.
-3. The verified commit is merged to GitHub `main` and deployed to the production Vercel project.
-4. `https://tavonel.com` and `https://www.tavonel.com` resolve to that deployment, with public/private route, SEO, auth-boundary, and responsive visual smoke proof.
-5. `VISUAL_QA_REPORT.md` records the final production evidence and retains `FOUNDER VISUAL REVIEW REQUIRED` until a human approves it.
+1. **Verified:** strict TypeScript, ESLint, 753 unit/contract tests, interaction checks, 219 Playwright passes, accessibility coverage, production build, and three-run Lighthouse budgets passed.
+2. **Verified:** Supabase migrations `0035` through `0037` were applied and queried successfully in project `tfcorhjkqcuisqhsjemz`, including function-body and unresolved-reversal checks.
+3. **Verified:** the runtime commit is on GitHub `main` and Vercel deployment `dpl_EZ1GzRdYJVZbrEvkMbKFvNuEpKdk` is `Ready`.
+4. **Verified:** `https://tavonel.com` and `https://www.tavonel.com` resolve to that deployment. Thirty-three live HTTP checks and the seven-width plus reduced-motion Chromium matrix passed with zero browser errors or horizontal overflow.
+5. **Verified with human gate retained:** `VISUAL_QA_REPORT.md` records the production evidence and retains `FOUNDER VISUAL REVIEW REQUIRED` until the founder approves the visual result.
