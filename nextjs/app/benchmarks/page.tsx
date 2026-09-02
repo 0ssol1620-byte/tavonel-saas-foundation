@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import PublicProofRegistry from "@/components/public-proof-registry";
 
 export const metadata: Metadata = { title: "Benchmark Registry — TAVONEL", description: "The public registry for reproduced, version-bound TAVONEL benchmark evidence.", robots: { index: false, follow: false }, alternates: { canonical: "/benchmarks" }, openGraph: { url: "/benchmarks" } };
 
 export default function BenchmarksPage() {
+  notFound();
   return <PublicProofRegistry eyebrow="BENCHMARK REGISTRY" title="A score arrives last." state="NO EXTERNAL SCORE PUBLISHED" summary="A result enters this registry only with frozen inputs, environment, evaluator, raw output and a reviewable receipt. Product existence is not benchmark evidence." sections={[
     { title: "Admission contract", body: "Every score must bind the model/runtime, dataset revision, preprocessing, evaluator and raw prediction archive.", rows: [
       { key: "INPUT", description: "Dataset license, revision, exclusions and SHA-256 inventory.", state: "REQUIRED" },

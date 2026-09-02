@@ -220,9 +220,9 @@ test("renders governed promotion, retained rollback and region-grounded Ask", as
   await page.goto(`/workspace/review?collection=${collectionId}`);
 
   await expect(page.getByText("ACTIVE · REVISION 2")).toBeVisible();
-  await expect(
-    page.locator(".binding-list span", { hasText: "Candidate manifest" })
-  ).toContainText(candidateManifest);
+  await expect(page.locator(".binding-list span", { hasText: "Sources" })).toContainText("2");
+  await expect(page.locator(".binding-list span", { hasText: "Validation" })).toContainText("Passed");
+  await expect(page.locator("body")).not.toContainText(candidateManifest);
   const promote = page.getByRole("button", {
     name: "Promote reviewed candidate",
   });
@@ -255,9 +255,7 @@ test("renders governed promotion, retained rollback and region-grounded Ask", as
   await expect(
     page.getByText("Page 2 · bbox [100, 200, 900, 300] · official")
   ).toBeVisible();
-  await expect(
-    page.getByText("adaptive-multilingual-region-v2", { exact: false })
-  ).toBeVisible();
+  await expect(page.getByText("Citations verified against the active World revision.")).toBeVisible();
 
   const overflow = await page.evaluate(
     () =>
@@ -284,8 +282,9 @@ test("keeps review-required packages downloadable and promotion-closed", async (
   await mockWorkspace(page, true);
   await page.goto(`/workspace?collection=${collectionId}`);
 
-  await expect(page.getByText("Core requires review", { exact: false })).toBeVisible();
-  await expect(page.getByText("CONTRADICTION_CANDIDATE:claim-a:claim-b", { exact: false })).toBeVisible();
+  await expect(page.getByText("Review required", { exact: true })).toBeVisible();
+  await expect(page.getByText("1 review item needs a decision.")).toBeVisible();
+  await expect(page.locator("body")).not.toContainText("CONTRADICTION_CANDIDATE:claim-a:claim-b");
   await expect(page.getByRole("button", { name: "Download signed knowledge package" })).toBeEnabled();
   // The signed download sits with the collection result on Home; the review record now has a
   // dedicated Review surface. Crossing those surfaces proves that review-required packages stay
@@ -331,9 +330,9 @@ test("surfaces immutable OCR operator-review receipts without offering an automa
   }));
   await page.goto("/workspace");
 
-  await expect(page.getByText("OCR operator review required", { exact: false })).toContainText("OCR_TIMEOUT_OR_NETWORK");
-  await expect(page.getByText("automatic paid retry disabled", { exact: false })).toBeVisible();
-  await expect(page.getByText("ocr-review.json", { exact: false })).toBeVisible();
+  await expect(page.getByText("This source needs review before reading can continue.", { exact: false })).toBeVisible();
+  await expect(page.locator("body")).not.toContainText("OCR_TIMEOUT_OR_NETWORK");
+  await expect(page.locator("body")).not.toContainText("ocr-review.json");
   await expect(page.getByRole("button", { name: /retry/i })).toHaveCount(0);
 
   expect(browserErrors).toEqual([]);

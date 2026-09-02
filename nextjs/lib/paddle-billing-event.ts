@@ -49,6 +49,15 @@ export type PaddleBillingAction =
       subscriptionCancelAt: string | null;
     })
   | (CommonAction & {
+      action: "allowance";
+      userId: string;
+      workspaceId: string;
+      offerCode: BillingOfferCode;
+      transactionId: string;
+      customerId: string;
+      creditDelta: number;
+    })
+  | (CommonAction & {
       action: "reversal";
       transactionId: string;
       adjustmentId: string;
@@ -107,8 +116,20 @@ export function parsePaddleBillingAction(
       return { ...common, action: "ignored", reason: "transaction_contract_invalid" };
     }
     const offer = findOfferByPriceId(prices[0], env);
-    if (!offer || offer.kind !== "prepaid" || offer.code !== binding.tavonel_offer_code) {
-      return { ...common, action: "ignored", reason: "prepaid_price_not_allowed" };
+    if (!offer || offer.code !== binding.tavonel_offer_code) {
+      return { ...common, action: "ignored", reason: "transaction_price_not_allowed" };
+    }
+    if (offer.kind === "subscription") {
+      return {
+        ...common,
+        action: "allowance",
+        userId: binding.tavonel_user_id,
+        workspaceId: binding.tavonel_workspace_id,
+        offerCode: offer.code,
+        transactionId,
+        customerId,
+        creditDelta: offer.credits,
+      };
     }
     return {
       ...common,

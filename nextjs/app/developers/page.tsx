@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 };
 
 const SURFACE = [
-  ["Compile", "Point the compiler at sources. Quarantine, sanitization and processing receipts are part of the job, not optional."],
+  ["Compile", "Upload or connect sources and follow observed run events from input to Compiled World."],
   ["GET World", "Read a compiled world: ontology, graph, retrieval corpus, provenance, validation."],
   ["Ask", "Query against the current world. Answers that cannot show evidence should not pretend to."],
   ["Export", "A signed directory of files, not a vendor lock. Public key at /api/export/trust."],
@@ -29,7 +29,7 @@ export default function DevelopersPage() {
         </Link>
         <nav aria-label="Sections">
           <Link href="/">Back to the compiler</Link>
-          <Link href="/api/openapi">OpenAPI</Link>
+          <a href="/api">API</a>
           <Link href="/evidence">Evidence</Link>
         </nav>
         <Link className="btn small" href="/login">Sign in</Link>
@@ -55,16 +55,14 @@ export default function DevelopersPage() {
                     </article>
                   ))}
                 </div>
-                <p className="fine">
-                  Live capability is fail-closed. See <Link href="/status">/status</Link>. Do not treat this page as a promise that every surface is open in this deployment.
-                </p>
+                <p className="fine">Current API, connector and processing availability is published at <Link href="/status">/status</Link>.</p>
                 <div className="stack">
                   <p className="slate"><b>PUBLIC TOOLING</b><span />VERSIONED FILES</p>
                   <h3>Start with the contract, then a scoped key.</h3>
                   <pre><code>{`curl -H "Authorization: Bearer $TAVONEL_API_KEY" \\
   https://tavonel.com/api/v1/documents`}</code></pre>
                   <div className="tiles">
-                    <article className="tile"><h3>OpenAPI</h3><p>Machine-readable v1 HTTP contract.</p><a href="/api/openapi">Open schema</a></article>
+                    <article className="tile"><h3>OpenAPI</h3><p>Machine-readable v1 HTTP contract.</p><a href="/openapi.json">Open schema</a></article>
                     <article className="tile"><h3>CLI</h3><p>Node.js 20+ client with immutable version and update check.</p><a href="/developer/tavonel-cli.mjs" download>Download CLI</a></article>
                     <article className="tile"><h3>MCP</h3><p>Read-only stdio tools for document, World and grounded Ask access.</p><a href="/developer/tavonel-mcp.mjs" download>Download MCP server</a></article>
                     <article className="tile"><h3>Source agent</h3><p>Local-first SMB, NFS, SFTP and S3-compatible connector agent.</p><a href="/developer/tavonel-source-agent.py" download>Download source agent</a></article>

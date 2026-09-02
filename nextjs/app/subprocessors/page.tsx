@@ -11,7 +11,7 @@ const PROCESSORS = [
   ["Vercel", "Website and serverless application hosting", "Requests, operational logs and application metadata"],
   ["Cloudflare", "DNS, R2 object storage and content-disarm worker", "Uploaded source bytes and sanitized derivatives"],
   ["RunPod", "Scale-to-zero GPU OCR", "Sanitized document candidates and processing telemetry"],
-  ["Paddle", "Sandbox billing; merchant-of-record services if live is approved", "Billing identity, checkout and subscription events"],
+  ["Paddle", "Merchant-of-record billing when commercial mode is enabled", "Billing identity, checkout and subscription events"],
   ["Resend", "Transactional inquiry delivery", "Inquiry name, work email, company and message"],
   ["Google", "OAuth identity provider", "Google account identity and authentication events"],
 ] as const;

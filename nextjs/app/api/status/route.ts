@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { activationPolicy } from "@/lib/activation-policy";
 import { readConfiguredBillingOffers, readPaddleBrowserConfig } from "@/lib/billing-catalog";
 import { isBillingLaunchApproved } from "@/lib/billing-launch";
+import { readCommercialMode } from "@/lib/commercial-mode";
 import { readExportSignerEnv } from "@/lib/export-signing";
 import { readPaddleApiConfig } from "@/lib/paddle-api";
 import { readProductCoreV2Env } from "@/lib/core-runtime-v2";
@@ -25,7 +26,7 @@ export function GET() {
     store: Boolean(readSupabaseAdminConfig()),
     binding: (process.env.FOUNDATION_BILLING_HMAC?.trim().length ?? 0) >= 32,
     settlement: (process.env.FOUNDATION_BILLING_SETTLEMENT_HMAC?.trim().length ?? 0) >= 32,
-    catalog: readConfiguredBillingOffers().size === 5,
+    catalog: readConfiguredBillingOffers().size === 2,
   };
   const billingConfigured = Object.values(billingChecks).every(Boolean);
   const billing = billingConfigured
@@ -42,7 +43,7 @@ export function GET() {
   const signedExport = readExportSignerEnv() ? "signed_export_ready" : "signed_export_not_configured";
   const coreV2 = readProductCoreV2Env() ? "python_core_v2_configured" : "python_core_v2_not_configured";
   return NextResponse.json(
-    { mode: "foundation", activationPolicy, auth, billing, r2, signedExport, coreV2 },
+    { mode: "foundation", commercialMode: readCommercialMode(), activationPolicy, auth, billing, r2, signedExport, coreV2 },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

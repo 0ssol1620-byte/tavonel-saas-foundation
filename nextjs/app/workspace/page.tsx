@@ -12,14 +12,15 @@ import { useCheckout } from "@/lib/use-checkout";
 import { formatCount, formatTimestamp } from "@/lib/format";
 import { readOfferParam, takeCheckoutIntent } from "@/lib/checkout-intent";
 import { putWithProgress } from "@/lib/upload-transfer";
-import { estimateBillablePages } from "@/lib/usage-pricing";
+import { estimateBillablePages, formatUsd, quoteCompilePages } from "@/lib/usage-pricing";
+import { collectDroppedWorkspaceFiles, prepareWorkspaceSelection, type WorkspaceSelection, type WorkspaceUploadFile } from "@/lib/workspace-intake";
 import { runBounded } from "@/lib/concurrent";
 import { buildPipeline, type LocalUpload } from "@/lib/pipeline";
 import { qualifyProgress, type OcrProgress } from "@/lib/ocr-progress";
 import { advanceProgressPoll, type ProgressPollState } from "@/lib/progress-poll";
 import PipelineBoard from "@/components/pipeline-board";
 import CompileStage from "@/components/compile-stage";
-import { displayName, elideKey, recallDocumentNames, rememberDocumentName, type DocumentNames } from "@/lib/document-names";
+import { displayName, recallDocumentNames, rememberDocumentName, type DocumentNames } from "@/lib/document-names";
 import { trackFunnel } from "@/lib/funnel-events";
 import ConnectionsPanel from "@/components/connections-panel";
 import DeveloperPanel from "@/components/developer-panel";
@@ -110,6 +111,16 @@ type GroundedAnswer = {
   receipt: { manifestDigest: string; retrieval: string; outputSha256: string };
 };
 
+const WORKSPACE_SOURCE_CHOICES = [
+  { name: "Google Drive", availability: "Beta" },
+  { name: "Dropbox", availability: "Beta" },
+  { name: "OneDrive", availability: "Beta" },
+  { name: "File Server", availability: "Enterprise" },
+  { name: "Amazon S3", availability: "Enterprise" },
+  { name: "Cloudflare R2", availability: "Enterprise" },
+  { name: "MinIO", availability: "Enterprise" },
+] as const;
+
 type BillingAccount = {
   accessPlan: string | null;
   subscriptionStatus: string;
@@ -124,18 +135,6 @@ type BillingAccount = {
 
 function bytesToHex(bytes: Uint8Array) {
   return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
-function intakeNotice() {
-  if (!activationPolicy.customerIntake.enabled) {
-    return "Private pilot mode. No document bytes are accepted in this environment.";
-  }
-  if (activationPolicy.cdr.enabled) {
-    return activationPolicy.ocrGpu.enabled
-      ? "Private-pilot intake is open for signed-in test users. Files go to Foundation quarantine; CDR writes an immutable sanitized PDF and qualified RunPod OCR writes reviewable JSON. Candidate promotion stays closed."
-      : "Private-pilot intake is open for signed-in test users. Files go to Foundation quarantine; CDR writes an immutable sanitized PDF. GPU OCR and candidate promotion stay closed.";
-  }
-  return "Private-pilot intake is open for signed-in test users. Files go to Foundation quarantine only; CDR and GPU stay closed.";
 }
 
 /** Human labels for the activation-policy keys, so no camelCase reaches the screen. */
@@ -191,45 +190,13 @@ function readWorkspaceLocation(): { surface: WorkspaceSurface; tab: WorkspaceTab
   return { surface: LEGACY_TAB_TO_SURFACE[legacy], tab: legacy };
 }
 
-/**
- * One immutable key, drawn short and copied whole.
- *
- * Every value here is a receipt: a customer has to be able to take it, paste it into a bucket
- * listing or a support thread, and have it match byte for byte. So the string in the DOM is
- * always the complete key -- `elideKey` only decides what is painted, `title` gives it to a
- * hover, and the button puts the untouched value on the clipboard.
- */
-function KeyLine({ label, value, pending }: { label: string; value?: string | null; pending?: string }) {
-  const [copied, setCopied] = useState(false);
-  if (!value) return pending ? <small className="key-line pending">{pending}</small> : null;
-  return (
-    <small className="key-line">
-      <span className="key-k">{label}</span>
-      <code title={value}>{elideKey(value)}</code>
-      <button
-        type="button"
-        className="key-copy"
-        aria-label={`Copy the full ${label.toLowerCase()} key`}
-        onClick={() => {
-          void navigator.clipboard?.writeText(value).then(
-            () => { setCopied(true); window.setTimeout(() => setCopied(false), 1600); },
-            // A refused clipboard leaves the key on screen and in the title; nothing is lost.
-            () => undefined,
-          );
-        }}
-      >
-        {copied ? "COPIED" : "COPY"}
-      </button>
-    </small>
-  );
-}
-
 export default function WorkspacePage() {
   const fileRef = useRef<HTMLInputElement>(null);
+  const folderRef = useRef<HTMLInputElement>(null);
   /** Distinguishes two uploads of the same file in one session. */
   const uploadSeq = useRef(0);
-  const [notice, setNotice] = useState(intakeNotice);
-  const { start: buy, busy: buying } = useCheckout(setNotice);
+  const [notice, setNotice] = useState<string | null>(null);
+  const { start: buy } = useCheckout(setNotice);
   // Read from the URL on mount so a linked or reloaded workspace opens on the same view.
   const [tab, setTab] = useState<WorkspaceTab>("overview");
   const [surface, setSurface] = useState<WorkspaceSurface>("home");
@@ -244,6 +211,8 @@ export default function WorkspacePage() {
     return () => window.removeEventListener("popstate", applyLocation);
   }, []);
   const [busy, setBusy] = useState(false);
+  const [stagedSelection, setStagedSelection] = useState<WorkspaceSelection | null>(null);
+  const [dropActive, setDropActive] = useState(false);
   const [documents, setDocuments] = useState<DocumentListItem[] | null>(null);
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
   /**
@@ -344,10 +313,15 @@ export default function WorkspacePage() {
   const [worldVersions, setWorldVersions] = useState<WorldVersion[]>([]);
   const [worldBusy, setWorldBusy] = useState(false);
   const [reviewReason, setReviewReason] = useState("");
+  const [reviewEvidenceId, setReviewEvidenceId] = useState<string | null>(null);
+  const [evidenceReviewAction, setEvidenceReviewAction] = useState<"edit" | "reject" | null>(null);
+  const [evidenceReviewReason, setEvidenceReviewReason] = useState("");
+  const [evidenceReviewBusy, setEvidenceReviewBusy] = useState(false);
   const [rollbackReason, setRollbackReason] = useState("");
   const [askQuestion, setAskQuestion] = useState("");
   const [askResult, setAskResult] = useState<GroundedAnswer | null>(null);
   const [askBusy, setAskBusy] = useState(false);
+  const [askEvidenceId, setAskEvidenceId] = useState<string | null>(null);
 
   const getAuthToken = async () => {
     const client = getSupabaseBrowserClient();
@@ -359,6 +333,7 @@ export default function WorkspacePage() {
     setActiveWorld(null);
     setWorldVersions([]);
     setAskResult(null);
+    setAskEvidenceId(null);
   };
 
   const loadWorldState = async (collectionId: string, token?: string) => {
@@ -380,6 +355,7 @@ export default function WorkspacePage() {
     setActiveWorld(json.activeWorld);
     setWorldVersions(json.versions);
     setAskResult(null);
+    setAskEvidenceId(null);
   };
 
   const loadDocuments = async (): Promise<DocumentListItem[]> => {
@@ -452,9 +428,7 @@ export default function WorkspacePage() {
     }
     setCollectionResult({ ...artifact, artifactKey: json.artifactKey ?? "" });
     await loadWorldState(collectionId, token);
-    setNotice(
-      `Immutable collection ${collectionId} reloaded from R2 and verified: directory, ontology JSON-LD/Turtle, graph CSV, RAG, provenance and validation roots are present; manifest ${artifact.manifestDigest}; candidatePromotion=false.`,
-    );
+    setNotice(`Compiled World ${collectionId} was restored and its evidence package verified.`);
   };
 
   useEffect(() => {
@@ -599,13 +573,14 @@ export default function WorkspacePage() {
     setUploads((current) => current.map((item) => (item.localId === localId ? { ...item, ...patch } : item)));
 
   const uploadDocument = async (file: File, manageBusy = true): Promise<string | null> => {
+    const sourceLabel = (file as WorkspaceUploadFile).tavonelRelativePath || file.name;
     if (manageBusy) setBusy(true);
     // The id is local until the capability call returns one. The board needs a row immediately,
     // because issuing the capability is itself a wait the visitor should be able to see.
     const localId = `local-${file.name}-${file.size}-${uploadSeq.current++}`;
     setUploads((current) => [
       ...current,
-      { localId, filename: file.name, bytes: file.size, documentId: null, phase: "issuing", loaded: 0 },
+      { localId, filename: sourceLabel, bytes: file.size, documentId: null, phase: "issuing", loaded: 0 },
     ]);
     try {
       const client = getSupabaseBrowserClient();
@@ -650,7 +625,7 @@ export default function WorkspacePage() {
       patchUpload(localId, { documentId: json.documentId ?? null, phase: "sending", loaded: 0 });
       // The one moment both halves exist in the same scope: the id the server just issued, and
       // the name the visitor picked the file by.
-      if (json.documentId) setNames(rememberDocumentName(json.documentId, file.name));
+      if (json.documentId) setNames(rememberDocumentName(json.documentId, sourceLabel));
       const transfer = putWithProgress(
         json.uploadUrl,
         file,
@@ -660,7 +635,7 @@ export default function WorkspacePage() {
       const result = await transfer.done;
       if (!result.ok) {
         const reason = result.reason === "http"
-          ? `quarantine PUT failed (${result.status})`
+          ? `secure upload failed (${result.status})`
           : result.reason === "aborted" ? "transfer cancelled" : "network did not complete the transfer";
         if (json.documentId) {
           const client = getSupabaseBrowserClient();
@@ -685,21 +660,17 @@ export default function WorkspacePage() {
           body: JSON.stringify({ documentId: json.documentId }),
         });
         if (!confirmed.ok) {
-          patchUpload(localId, { phase: "failed", reason: "quarantine stored; intake receipt confirmation failed" });
-          setNotice("The file reached quarantine, but its intake receipt needs operator review. No automatic retry was attempted.");
+          patchUpload(localId, { phase: "failed", reason: "upload stored; source confirmation needs review" });
+          setNotice("The file was stored, but source confirmation needs review. No automatic retry was attempted.");
           await loadDocuments();
           return json.documentId;
         }
       }
       patchUpload(localId, { phase: "stored", loaded: file.size });
 
-      setNotice(
-        activationPolicy.cdr.enabled
-          ? activationPolicy.ocrGpu.enabled
-            ? `${file.name} is in Foundation quarantine. CDR will sanitize it to an immutable PDF, then qualified RunPod OCR will write reviewable JSON. Candidate promotion stays closed.`
-            : `${file.name} is in Foundation quarantine. CDR will sanitize it to an immutable PDF. GPU OCR and candidate promotion stay closed.`
-          : `${file.name} is in Foundation quarantine. CDR sanitization and GPU analysis are still closed.`,
-      );
+      setNotice(activationPolicy.cdr.enabled && activationPolicy.ocrGpu.enabled
+        ? `${file.name} uploaded securely. TAVONEL is preparing and reading the source.`
+        : `${file.name} uploaded securely. This source needs operator review before reading can continue.`);
       await loadDocuments();
       return json.documentId ?? null;
     } finally {
@@ -762,7 +733,7 @@ export default function WorkspacePage() {
         setNotice(
           json.lifecycle === "review_required"
             ? `Collection ${json.collectionId} produced a signed review package with ${json.reviewReasons?.length ?? 0} review reason(s). Download and inspect it; promotion remains blocked.`
-            : `Collection ${json.collectionId} compiled from ${json.validation.counts.documents} documents: ${json.directoryPlan.length} directory entries, ${json.validation.counts.topics} topics, ${json.validation.counts.entities} entities, ${json.validation.counts.claims} claims and ${json.validation.counts.relations} evidence-bound relations. candidatePromotion=false.`,
+            : `Compiled World ready from ${json.validation.counts.documents} documents: ${json.validation.counts.topics} topics, ${json.validation.counts.entities} entities, ${json.validation.counts.claims} claims and ${json.validation.counts.relations} evidence-bound relations.`,
         );
         return;
       }
@@ -789,7 +760,7 @@ export default function WorkspacePage() {
         setNotice("Sign in with Google first.");
         return;
       }
-      setNotice(`Dispatching ${documentIds.length} immutable OCR documents to the separate Core runtime...`);
+      setNotice(`Compiling ${documentIds.length} prepared sources into a reviewable World...`);
       const response = await fetch("/api/collections/compile", {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
@@ -804,7 +775,7 @@ export default function WorkspacePage() {
       await loadWorldState(json.collectionId, token);
       setNotice(json.coreExecution.status === "review_required"
         ? `Separate Core produced a review-required package for ${json.collectionId}; ${json.reviewReasons?.join(", ") || "manual review required"}. Signed download is available and promotion remains blocked.`
-        : `Separate Core runtime completed ${json.collectionId}; receipt ${json.coreExecution.receipt.requestId}; output ${json.coreExecution.receipt.outputSha256}; candidatePromotion=false.`);
+        : `Compiled World ${json.collectionId} is ready for evidence review.`);
     } finally {
       setBusy(false);
     }
@@ -813,7 +784,7 @@ export default function WorkspacePage() {
   const compileSelectedDocuments = async () => {
     const documentIds = [...new Set(selectedDocumentIds)];
     if (documentIds.length < 2) {
-      setNotice("Select at least two documents with immutable ocr.json output.");
+      setNotice("Select at least two sources that are ready to compile.");
       return;
     }
     setBusy(true);
@@ -825,7 +796,7 @@ export default function WorkspacePage() {
         setNotice("Sign in with Google before compiling a collection.");
         return;
       }
-      setNotice(`Compiling ${documentIds.length} selected immutable OCR documents with the separate Core runtime...`);
+      setNotice(`Compiling ${documentIds.length} selected sources into a reviewable World...`);
       const response = await fetch("/api/collections/compile", {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
@@ -844,7 +815,7 @@ export default function WorkspacePage() {
       window.history.replaceState(null, "", url);
       setNotice(json.lifecycle === "review_required"
         ? `Selected documents produced a signed review package for ${json.collectionId}. Download and inspect it; promotion remains blocked.`
-        : `Collection ${json.collectionId} compiled from ${json.validation.counts.documents} selected documents with ${json.validation.counts.claims} claims and ${json.validation.counts.relations} evidence-bound relations. candidatePromotion=false.`);
+        : `Compiled World ready from ${json.validation.counts.documents} selected documents with ${json.validation.counts.claims} claims and ${json.validation.counts.relations} evidence-bound relations.`);
     } finally {
       setBusy(false);
     }
@@ -880,9 +851,7 @@ export default function WorkspacePage() {
       anchor.click();
       anchor.remove();
       URL.revokeObjectURL(url);
-      setNotice(
-        `Downloaded ${collectionResult.validation.counts.packageFiles} hash-verified package files plus the candidate manifest. candidatePromotion=false.`,
-      );
+      setNotice(`Downloaded the verified knowledge package with ${collectionResult.validation.counts.packageFiles} files.`);
     } finally {
       setDownloading(false);
     }
@@ -908,17 +877,50 @@ export default function WorkspacePage() {
     setCollectionResult(null);
     clearWorldState();
     try {
-      setNotice(`Sending ${files.length} file(s) to Foundation quarantine, ${UPLOAD_CEILING} at a time.`);
+      setNotice(`Uploading ${files.length} file(s) securely, ${UPLOAD_CEILING} at a time.`);
       const settled = await runBounded(files, UPLOAD_CEILING, (file) => uploadDocument(file, false));
       const ids = settled.flatMap((result) => (result.ok && result.value ? [result.value] : []));
       const lost = files.length - ids.length;
       if (lost > 0) {
-        setNotice(`${ids.length} of ${files.length} reached quarantine. ${lost} did not, and nothing was retried on their behalf.`);
+        setNotice(`${ids.length} of ${files.length} files uploaded. ${lost} did not, and nothing was retried automatically.`);
       }
       if (ids.length >= 2) await waitForOcrAndCompile(ids);
     } finally {
       setBusy(false);
     }
+  };
+
+  const stageWorkspaceFiles = async (files: File[]) => {
+    if (files.length === 0) return;
+    try {
+      const prepared = await prepareWorkspaceSelection(files);
+      if (prepared.files.length === 0) {
+        setStagedSelection(prepared);
+        setNotice("No supported files were found. Nothing was uploaded or processed.");
+        return;
+      }
+      setStagedSelection(prepared);
+      setNotice(`${prepared.files.length} supported file${prepared.files.length === 1 ? "" : "s"} ready for preflight. Nothing has been uploaded or processed yet.`);
+    } catch (error) {
+      setStagedSelection(null);
+      setNotice(`Preflight blocked this selection (${error instanceof Error ? error.message : "INVALID_SELECTION"}). Nothing was uploaded.`);
+    } finally {
+      if (fileRef.current) fileRef.current.value = "";
+      if (folderRef.current) folderRef.current.value = "";
+    }
+  };
+
+  const stagedPages = stagedSelection?.files.reduce((sum, entry) => sum + (estimateBillablePages({
+    bytes: entry.file.size,
+    mimeType: entry.file.type,
+  })?.pages ?? 0), 0) ?? 0;
+  const stagedQuote = quoteCompilePages(stagedPages);
+
+  const startStagedCompile = async () => {
+    if (!stagedSelection?.files.length) return;
+    const files = stagedSelection.files.map((entry) => entry.file);
+    setStagedSelection(null);
+    await uploadDocuments(files);
   };
 
   const uploadPublicProof = async () => {
@@ -1035,6 +1037,35 @@ export default function WorkspacePage() {
     window.history.pushState(null, "", url.toString());
   };
 
+  const recordEvidenceReview = async (action: "accept" | "edit" | "reject", reason: string) => {
+    const evidence = worldReadModel?.evidence.find((item) => item.id === reviewEvidenceId)
+      ?? worldReadModel?.evidence[0];
+    if (!collectionResult || !evidence || reason.trim().length < 8) return;
+    setEvidenceReviewBusy(true);
+    try {
+      const token = await getAuthToken();
+      if (!token) { setNotice("Sign in before recording a review decision."); return; }
+      const response = await fetch("/api/v1/reviews", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          collectionId: collectionResult.collectionId,
+          manifestDigest: collectionResult.manifestDigest,
+          evidenceId: evidence.id,
+          action,
+          reason: reason.trim(),
+        }),
+      });
+      const body = await response.json().catch(() => ({})) as { code?: string };
+      if (!response.ok) { setNotice(`Review decision could not be recorded (${body.code ?? response.status}).`); return; }
+      setEvidenceReviewAction(null);
+      setEvidenceReviewReason("");
+      setNotice(`${action === "accept" ? "Accepted" : action === "edit" ? "Edit requested" : "Rejected"}. The evidence-bound human decision was recorded.`);
+    } finally {
+      setEvidenceReviewBusy(false);
+    }
+  };
+
   const promoteCandidate = async () => {
     if (!collectionResult || reviewReason.trim().length < 8) return;
     if (
@@ -1072,7 +1103,7 @@ export default function WorkspacePage() {
       }
       await loadWorldState(collectionResult.collectionId, token);
       setReviewReason("");
-      setNotice(`Human review recorded. ${collectionResult.manifestDigest} is now the active world; immutable candidate bytes remain candidatePromotion=false.`);
+      setNotice("Human review recorded. This revision is now the active World.");
     } finally {
       setWorldBusy(false);
     }
@@ -1147,7 +1178,6 @@ export default function WorkspacePage() {
       <main id="main" className="auth" tabIndex={-1}>
         <header>
           <Link href="/" className="wordmark"><Logomark /><b>TAVONEL</b></Link>
-          <span className="mode"><i aria-hidden="true" />PRIVATE PILOT</span>
         </header>
         <div className="auth-body">
           <div className="auth-card">
@@ -1211,13 +1241,7 @@ export default function WorkspacePage() {
       candidateReady={candidateReady}
       reviewCount={candidateReady ? reviewCount : null}
       activityCount={activityCount}
-      credits={billingAccount?.creditBalance ?? null}
-      truthGates={[
-        { label: "Intake", qualified: activationPolicy.customerIntake.enabled, detail: activationPolicy.customerIntake.reason },
-        { label: "CDR", qualified: activationPolicy.cdr.enabled, detail: activationPolicy.cdr.reason },
-        { label: "OCR", qualified: activationPolicy.ocrGpu.enabled, detail: activationPolicy.ocrGpu.reason },
-        { label: "Promotion", qualified: activationPolicy.candidatePromotion.enabled, detail: activationPolicy.candidatePromotion.reason },
-      ]}
+      truthGates={[]}
       stateTitle={stateTitle}
       stateDescription={stateDescription}
       nextAction={nextAction}
@@ -1228,7 +1252,8 @@ export default function WorkspacePage() {
       headerAction={
         activationPolicy.customerIntake.enabled ? (
           <>
-            <input ref={fileRef} type="file" multiple hidden onChange={(event) => { const files = [...(event.target.files ?? [])]; if (files.length > 0) void uploadDocuments(files); }} />
+            <input ref={fileRef} type="file" multiple hidden accept=".pdf,.docx,.pptx,.xlsx,.odt,.ods,.odp,.jpg,.jpeg,.png,.tif,.tiff,.gif,.zip" onChange={(event) => { const files = [...(event.target.files ?? [])]; if (files.length > 0) void stageWorkspaceFiles(files); }} />
+            <input ref={(node) => { folderRef.current = node; node?.setAttribute("webkitdirectory", ""); }} type="file" multiple hidden onChange={(event) => { const files = [...(event.target.files ?? [])]; if (files.length > 0) void stageWorkspaceFiles(files); }} />
             {proofMode ? (
               <div className="proof-actions">
                 <button disabled={busy} onClick={() => void uploadPublicProof()}><UploadCloud size={16} /> {busy ? "Running proof…" : "Single proof"}</button>
@@ -1245,8 +1270,79 @@ export default function WorkspacePage() {
     >
           {notice ? <p className="notice static" role="status"><strong>Activity.</strong> {notice}</p> : null}
 
+          {tab === "overview" && collectionResult ? (
+            <section className="workspace-complete" aria-labelledby="workspace-complete-title">
+              <div>
+                <p className="eyebrow">COMPILE COMPLETE</p>
+                <h2 id="workspace-complete-title">Your Compiled World is ready.</h2>
+                <p>{collectionResult.validation.counts.documents} sources became {collectionResult.validation.counts.entities} entities, {collectionResult.validation.counts.claims} claims, and {collectionResult.validation.counts.relations} evidence-bound relations.</p>
+              </div>
+              <div className="workspace-complete-actions">
+                <button type="button" onClick={() => navigateSurface("world")}>Open World</button>
+                <button type="button" disabled={!activeWorld} title={activeWorld ? undefined : "Review and activate this candidate before asking."} onClick={() => navigateSurface("ask")}>Ask</button>
+                <button type="button" disabled={downloading} onClick={() => void downloadCollection()}>{downloading ? "Preparing…" : "Download"}</button>
+              </div>
+            </section>
+          ) : null}
+
           {tab === "overview" && surface !== "runs" && surface !== "activity" ? (
           <>
+          {!activeWorld && !candidateNeedsDecision ? (
+            <section
+              className="workspace-intake"
+              data-active={dropActive}
+              onDragEnter={(event) => { event.preventDefault(); setDropActive(true); }}
+              onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; }}
+              onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropActive(false); }}
+              onDrop={(event) => {
+                event.preventDefault();
+                setDropActive(false);
+                const items = Array.from(event.dataTransfer.items);
+                void collectDroppedWorkspaceFiles(items).then(stageWorkspaceFiles).catch((error: unknown) => {
+                  setNotice(error instanceof Error ? `Source selection blocked (${error.message}).` : "Source selection could not be read.");
+                });
+              }}
+              aria-labelledby="workspace-intake-title"
+            >
+              <div className="workspace-intake-copy">
+                <p className="eyebrow">BUILD YOUR FIRST COMPILED WORLD</p>
+                <h2 id="workspace-intake-title">Drop files, folders or ZIP here</h2>
+                <p>Upload sources or connect the system where your knowledge already lives.</p>
+                <div className="workspace-intake-actions">
+                  <button type="button" onClick={() => fileRef.current?.click()}>Choose files</button>
+                  <button type="button" onClick={() => folderRef.current?.click()}>Choose folder</button>
+                  <button type="button" onClick={() => navigateSurface("connections")}>Connect a source</button>
+                </div>
+                <small>PDF · DOCX · PPTX · XLSX · ODF · images · ZIP</small>
+                <div className="workspace-source-choices" aria-label="Available source connections">
+                  {WORKSPACE_SOURCE_CHOICES.map((source) => (
+                    <button type="button" key={source.name} onClick={() => navigateSurface("connections")}>
+                      <span>{source.name}</span>
+                      <small>{source.availability}</small>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {stagedSelection ? (
+                <div className="workspace-preflight" role="region" aria-label="Compile preflight">
+                  <p className="eyebrow">PREFLIGHT</p>
+                  <dl>
+                    <div><dt>Files</dt><dd>{stagedSelection.files.length}</dd></div>
+                    <div><dt>Pages</dt><dd>{stagedPages}</dd></div>
+                    <div><dt>Archives</dt><dd>{stagedSelection.archiveCount}</dd></div>
+                    <div><dt>Warnings</dt><dd>{stagedSelection.unsupported.length}</dd></div>
+                    <div><dt>Estimated</dt><dd>{stagedQuote ? formatUsd(stagedQuote.estimatedUsd) : "—"}</dd></div>
+                    <div><dt>Maximum</dt><dd>{stagedQuote ? formatUsd(stagedQuote.maximumUsd) : "—"}</dd></div>
+                  </dl>
+                  {stagedSelection.warnings.map((warning) => <p className="fine" key={warning}>{warning}</p>)}
+                  <div className="workspace-intake-actions">
+                    <button type="button" disabled={busy || !stagedQuote} onClick={() => void startStagedCompile()}>{busy ? "Compiling…" : "Compile"}</button>
+                    <button type="button" onClick={() => setStagedSelection(null)}>Clear</button>
+                  </div>
+                </div>
+              ) : null}
+            </section>
+          ) : null}
           {/*
             The compile, drawn.
 
@@ -1272,10 +1368,8 @@ export default function WorkspacePage() {
           <p className="lead">Build a traceable body of knowledge from documents that have passed the full safety chain. Quarantine is browser-direct; the application server never carries file bytes.</p>
           <div className="workspace-grid">
             <section id="workspace-sources" className="card document-card">
-              {/* Status moved to the board above. What is left here is the part the board does
-                  not carry: the immutable keys every receipt refers to. */}
-              <p className="eyebrow">IMMUTABLE KEYS</p>
-              <h2>{documents && documents.length > 0 ? "What each document left behind" : "Awaiting a qualified first document"}</h2>
+              <p className="eyebrow">SOURCES</p>
+              <h2>{documents && documents.length > 0 ? "Sources ready for your next World" : "Bring your first source"}</h2>
               {documents && documents.length > 0 ? (
                 <>
                 <ul className="document-meta">
@@ -1286,7 +1380,6 @@ export default function WorkspacePage() {
                         id underneath for the receipts to hang off.
                       */}
                       <strong>{displayName(doc.documentId, names)}</strong>
-                      <small className="doc-id" title={doc.documentId}>{doc.documentId}</small>
                       {doc.hasOcrJson ? (
                         <label className="compile-source-choice">
                           <input
@@ -1299,21 +1392,7 @@ export default function WorkspacePage() {
                           Include in the next candidate
                         </label>
                       ) : null}
-                      {/*
-                        A receipt key is 200 characters of bucket, tenant, document, digest and
-                        artifact, and it used to be printed whole -- four of them per document,
-                        wrapping across three lines each, until the panel was a wall of hex with
-                        the one useful word ("sanitized.pdf") buried at the end of it.
-
-                        Only the drawing is shortened. The value is never altered and never
-                        truncated in the DOM: the full key is on the element, so it is what a
-                        copy takes and what a title reveals. A receipt you cannot copy whole is
-                        not a receipt.
-                      */}
-                      <KeyLine label="Sanitized" value={doc.sanitizedKey} pending="sanitized.pdf pending" />
-                      <small>{doc.hasOcrJson ? `ocr.json ${doc.ocrJsonSize ?? 0} bytes` : doc.processingState === "operator_review" ? `OCR operator review required${doc.ocrReviewReasonCode ? ` · ${doc.ocrReviewReasonCode}` : ""} · automatic paid retry disabled` : "ocr.json pending within bounded processing"}</small>
-                      {doc.cdrReceiptKey ? <KeyLine label="CDR receipt" value={doc.cdrReceiptKey} /> : null}
-                      {doc.ocrReviewKey ? <KeyLine label="OCR review" value={doc.ocrReviewKey} /> : null}
+                      <small>{doc.hasOcrJson ? "Ready to compile" : doc.processingState === "operator_review" ? "Needs review" : "Preparing and reading"}</small>
                     </li>
                   ))}
                 </ul>
@@ -1327,8 +1406,8 @@ export default function WorkspacePage() {
               ) : (
                 <div className="empty">
                   <FileText size={22} />
-                  <strong>No document metadata yet</strong>
-                  <p>A short-lived browser-direct quarantine capability is required. The application server and database never carry file bytes. Sign in to load immutable keys after CDR.</p>
+                  <strong>No sources yet</strong>
+                  <p>Upload files, a folder or ZIP archive, or connect the system where your knowledge already lives.</p>
                   {activationPolicy.customerIntake.enabled ? (
                     <div className="billing-actions">
                       <button type="button" onClick={() => fileRef.current?.click()}>Upload your first document</button>
@@ -1338,20 +1417,19 @@ export default function WorkspacePage() {
               )}
             </section>
             <section className="card canvas">
-              <p className="eyebrow">KNOWLEDGE CANVAS</p>
-              <h2>Candidate-only by design</h2>
+              <p className="eyebrow">COMPILED WORLD</p>
+              <h2>{collectionResult ? "Ready for review" : "Waiting for sources"}</h2>
               {collectionResult ? (
                 <div className="collection-result">
-                  <strong>{collectionResult.collectionId}</strong>
+                  <strong>Your compiled result</strong>
                   <p>{collectionResult.validation.counts.documents} documents · {collectionResult.validation.counts.topics} topics · {collectionResult.validation.counts.entities} entities · {collectionResult.validation.counts.claims} claims · {collectionResult.validation.counts.relations} relations</p>
                   <small>{collectionResult.directoryPlan.length} directory entries · {collectionResult.validation.counts.packageFiles} package files</small>
-                  <small>{collectionResult.artifactKey}</small>
-                  <small>{collectionResult.manifestDigest}</small>
                   {collectionResult.coreExecution ? (
                     <>
-                      <small>Core {collectionResult.coreExecution.status === "completed" ? "completed" : "requires review"} · {collectionResult.coreExecution.runtime} · {collectionResult.coreExecution.receipt.requestId}</small>
-                      {collectionResult.coreExecution.worldStateId ? <small>{collectionResult.lifecycle === "candidate" ? "Candidate" : "Review"} world · {collectionResult.coreExecution.worldStateId}</small> : null}
-                      {collectionResult.reviewReasons?.length ? <small>Review gates · {collectionResult.reviewReasons.join(", ")}</small> : null}
+                      <small>{collectionResult.coreExecution.status === "completed" ? "Compilation complete" : "Review required"}</small>
+                      {collectionResult.reviewReasons?.length ? (
+                        <small>{collectionResult.reviewReasons.length} review item{collectionResult.reviewReasons.length === 1 ? "" : "s"} need{collectionResult.reviewReasons.length === 1 ? "s" : ""} a decision.</small>
+                      ) : null}
                       <button className="download-package" disabled={downloading} onClick={() => void downloadCollection()}>
                         <Download size={15} aria-hidden="true" />
                         {downloading ? "Signing verified ZIP..." : "Download signed knowledge package"}
@@ -1363,11 +1441,11 @@ export default function WorkspacePage() {
                 </div>
               ) : (
                 <div className="collection-result" role="status">
-                  <strong>Compiled World not read yet</strong>
-                  <small>Upload qualified sources, then inspect the resulting candidate. No topology is drawn before real objects exist.</small>
+                  <strong>No Compiled World yet</strong>
+                  <small>Compile at least two ready sources. The graph appears only after real objects and relations exist.</small>
                 </div>
               )}
-              <p>Sanitized inputs can produce a reviewable directory, ontology, graph, RAG and provenance package. No candidate is promoted to a world without a separate human decision. Promotion to a live world stays closed.</p>
+              <p>Prepared sources produce a reviewable directory, ontology, graph, retrieval index and provenance package. A human review keeps activation explicit.</p>
             </section>
           </div>
           </>
@@ -1410,6 +1488,32 @@ export default function WorkspacePage() {
                 architecture above is built from.
               */}
               {surface === "review" ? <>
+              <section className="card review-comparison" aria-labelledby="review-comparison-title">
+                <p className="eyebrow">REVIEW</p>
+                <h2 id="review-comparison-title">Compare the compiled result with its source.</h2>
+                {worldReadModel?.evidence.length ? (
+                  <>
+                    <WorldStudioUltimate
+                      model={worldReadModel}
+                      initialLens="evidence"
+                      selectedEvidenceId={reviewEvidenceId ?? worldReadModel.evidence[0].id}
+                      onEvidenceSelect={(selection) => setReviewEvidenceId(selection?.id ?? null)}
+                    />
+                    <div className="review-decision-actions" aria-label="Review decision">
+                      <button type="button" disabled={evidenceReviewBusy} onClick={() => void recordEvidenceReview("accept", "Accepted after comparing the compiled result with its exact source region.")}>Accept</button>
+                      <button type="button" disabled={evidenceReviewBusy} onClick={() => { setEvidenceReviewAction("edit"); setEvidenceReviewReason(""); }}>Edit</button>
+                      <button type="button" disabled={evidenceReviewBusy} onClick={() => { setEvidenceReviewAction("reject"); setEvidenceReviewReason(""); }}>Reject</button>
+                    </div>
+                    {evidenceReviewAction ? (
+                      <form className="review-decision-form" onSubmit={(event) => { event.preventDefault(); void recordEvidenceReview(evidenceReviewAction, evidenceReviewReason); }}>
+                        <label htmlFor="evidence-review-reason">{evidenceReviewAction === "edit" ? "What needs to change?" : "Why does this not match the source?"}</label>
+                        <textarea id="evidence-review-reason" required minLength={8} maxLength={1000} autoFocus value={evidenceReviewReason} onChange={(event) => setEvidenceReviewReason(event.target.value)} />
+                        <button type="submit" disabled={evidenceReviewBusy || evidenceReviewReason.trim().length < 8}>{evidenceReviewBusy ? "Recording…" : evidenceReviewAction === "edit" ? "Record edit" : "Record rejection"}</button>
+                      </form>
+                    ) : null}
+                  </>
+                ) : <p className="world-empty">Compile a collection to review its page-and-bbox-bound evidence.</p>}
+              </section>
               <section className="card">
                 <p className="eyebrow">OCR CANDIDATES</p>
                 <h2>Verify the extracted JSON</h2>
@@ -1427,7 +1531,7 @@ export default function WorkspacePage() {
               <section id="workspace-review" className="card world-studio" aria-labelledby="world-studio-title">
                 <div className="world-heading">
                   <div>
-                    <p className="eyebrow">REVIEW STUDIO · WORLD LIFECYCLE</p>
+                    <p className="eyebrow">ADVANCED REVIEW · WORLD LIFECYCLE</p>
                     <h2 id="world-studio-title">Candidate bytes stay immutable. Humans move the active pointer.</h2>
                   </div>
                   <output className={activeWorld ? "world-status active" : "world-status"}>
@@ -1440,10 +1544,10 @@ export default function WorkspacePage() {
                   <div className="world-layout">
                     <div className="review-panel">
                       <div className="binding-list" aria-label="Candidate bindings">
-                        <span><b>Candidate manifest</b>{collectionResult.manifestDigest}</span>
-                        <span><b>Core output</b>{collectionResult.coreExecution?.receipt.outputSha256 ?? "No separate Core receipt"}</span>
-                        <span><b>World state</b>{collectionResult.coreExecution?.worldStateId ?? "Not bound by Python Core v2"}</span>
-                        <span><b>Current active</b>{activeWorld?.manifestDigest ?? "None"}</span>
+                        <span><b>Sources</b>{collectionResult.validation.counts.documents}</span>
+                        <span><b>Evidence</b>{collectionResult.validation.counts.claims} claims</span>
+                        <span><b>Validation</b>{collectionResult.validation.status === "passed" ? "Passed" : "Needs review"}</span>
+                        <span><b>Current active</b>{activeWorld ? `Revision ${activeWorld.revision}` : "None"}</span>
                       </div>
                       <label htmlFor="review-reason">Human review record</label>
                       <textarea
@@ -1475,7 +1579,7 @@ export default function WorkspacePage() {
                               <div>
                                 <strong>{version.lifecycle_status}</strong>
                                 <small>{version.manifest_digest}</small>
-                                <small>{version.world_state_id} · activated {version.activation_count} time(s)</small>
+                                <small>Activated {version.activation_count} time(s)</small>
                               </div>
                               {activeWorld && version.manifest_digest !== activeWorld.manifestDigest ? (
                                 <button
@@ -1528,9 +1632,9 @@ export default function WorkspacePage() {
                 {askResult ? (
                   <div className={`ask-result ${askResult.status}`} role="status">
                     <strong>{askResult.status === "grounded" ? "Grounded answer" : "Abstained"}</strong>
-                    <p>{askResult.status === "grounded" ? askResult.answer : "No region-bound evidence matched this question."}</p>
+                    <p data-sensitive="content">{askResult.status === "grounded" ? askResult.answer : "No region-bound evidence matched this question."}</p>
                     {askResult.citations.length > 0 ? (
-                      <ol>
+                      <ol data-sensitive="content">
                         {askResult.citations.map((citation) => (
                           <li key={`${citation.evidenceId}-${citation.pageNumber1}`}>
                             <b>{citation.evidenceId}</b>
@@ -1544,12 +1648,24 @@ export default function WorkspacePage() {
                               </span>
                             ) : null}
                             <q>{citation.excerpt}</q>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const evidence = worldReadModel?.evidence.find((item) => item.id === citation.evidenceId)
+                                  ?? worldReadModel?.evidence.find((item) => item.sourceId === citation.sourceId && item.page === citation.pageNumber1);
+                                setAskEvidenceId(evidence?.id ?? null);
+                              }}
+                              disabled={!worldReadModel?.evidence.some((item) => item.id === citation.evidenceId || (item.sourceId === citation.sourceId && item.page === citation.pageNumber1))}
+                            >Open source region</button>
                           </li>
                         ))}
                       </ol>
                     ) : null}
-                    <small>{askResult.receipt.retrieval} · {askResult.receipt.outputSha256}</small>
+                    <small>Citations verified against the active World revision.</small>
                   </div>
+                ) : null}
+                {askEvidenceId ? (
+                  <WorldStudioUltimate model={worldReadModel} initialLens="evidence" selectedEvidenceId={askEvidenceId} onEvidenceSelect={(selection) => setAskEvidenceId(selection?.id ?? null)} />
                 ) : null}
               </section>
               ) : null}
@@ -1568,10 +1684,7 @@ export default function WorkspacePage() {
             <div>
               <p className="eyebrow">BILLING & CAPACITY</p>
               <h2>{billingAccount?.accessPlan ? `${billingAccount.accessPlan.replace("_access", "")} access` : "Private-pilot billing"}</h2>
-              <p>
-                Paddle webhooks, not checkout redirects, own this balance. Purchased GPU credits
-                never remove per-job, daily, timeout, or scale-to-zero controls.
-              </p>
+              <p>Included usage is granted only from a signed subscription transaction and settled from observed processing.</p>
             </div>
             {/*
               Never print a number this panel does not have. Falling back to 0 stated a balance
@@ -1590,33 +1703,15 @@ export default function WorkspacePage() {
                       : billingAccount.subscriptionStatus ?? UNKNOWN}
                 </dd>
               </div>
-              <div><dt>Available credits</dt><dd>{billingAccount ? formatCount(billingAccount.creditBalance) : UNKNOWN}</dd></div>
-              <div><dt>Purchased</dt><dd>{billingAccount ? formatCount(billingAccount.lifetimeCreditsPurchased) : UNKNOWN}</dd></div>
-              <div><dt>Reversed</dt><dd>{billingAccount ? formatCount(billingAccount.lifetimeCreditsReversed) : UNKNOWN}</dd></div>
+              <div><dt>Standard pages remaining</dt><dd>{billingAccount ? formatCount(Math.floor(billingAccount.creditBalance / 4)) : UNKNOWN}</dd></div>
+              <div><dt>Standard processing</dt><dd>$0.04 / page</dd></div>
+              <div><dt>Maximum routed cost</dt><dd>$0.06 / page</dd></div>
             </dl>
             {!billingAccount ? (
               <p className="fine">Billing has not been read yet for this session. These are not zeroes &mdash; they are values this panel does not have.</p>
             ) : null}
-            <div className="packs workspace-packs">
-              {([
-                ["Starter", "$12", "100 credits", "credit_starter"],
-                ["Builder", "$30", "300 credits", "credit_builder"],
-                ["Scale", "$75", "800 credits", "credit_scale"],
-              ] as const).map(([name, price, credits, offerCode]) => (
-                <article className="pack" key={name}>
-                  <span className="tag">PREPAID CAPACITY</span>
-                  <h3>{name}</h3>
-                  <span className="price">{price} <small>{credits}</small></span>
-                  <button type="button" disabled={Boolean(buying)} onClick={() => void buy(offerCode)}>
-                    {buying === offerCode ? "Opening checkout..." : "Buy credits"}
-                  </button>
-                </article>
-              ))}
-            </div>
             <p className="fine">
-              Credits are reserved before a qualified job and settled against observed runtime.
-              A checkout never creates them &mdash; only a signed, idempotently persisted webhook
-              does &mdash; so a balance here can lag a completed payment by a moment.
+              See the estimated and maximum charge before processing. Failed or released work returns its unused reservation automatically.
             </p>
             <div className="billing-actions">
               <button disabled={billingBusy} onClick={() => void loadBilling()}>Refresh billing</button>
@@ -1624,7 +1719,7 @@ export default function WorkspacePage() {
                 {billingBusy ? "Opening..." : "Manage billing"}
               </button>
             </div>
-            {billingAccount?.billingHold ? <p className="billing-hold" role="alert">Billing hold active. Refunded or disputed credits cannot be used.</p> : null}
+            {billingAccount?.billingHold ? <p className="billing-hold" role="alert">Billing hold active. Refunded or disputed usage cannot be processed.</p> : null}
             {billingAccount?.subscriptionCancelAt ? (
               <p className="billing-hold" role="status">
                 Cancellation is scheduled. Access remains active through the current paid period.

@@ -66,6 +66,14 @@
 .tableWrap tbody th { min-width: 230px; color: var(--studio-ink); font-weight: 500; }
 .tableWrap tbody th code { display: block; margin-top: 5px; color: var(--studio-faint); font-size: 8px; font-weight: 400; }
 .tableWrap td { color: var(--studio-muted); font-family: var(--f-mono, monospace); }
+.directoryTree { display: grid; gap: 1px; padding-left: 18px; border-left: 1px solid var(--verified, #9bb8a4); }
+.directoryTree > strong { padding: 9px 12px; color: var(--studio-ink); font-size: 15px; }
+.directoryTree section { display: grid; grid-template-columns: minmax(110px, .3fr) minmax(0, 1fr); gap: 12px; padding: 12px; border-top: 1px solid var(--studio-line); }
+.directoryTree h3 { margin: 0; color: var(--verified, #9bb8a4); font: 9px var(--f-mono, monospace); letter-spacing: .08em; text-transform: uppercase; }
+.directoryTree ul { display: grid; gap: 1px; margin: 0; padding: 0; list-style: none; background: var(--studio-line); }
+.directoryTree li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 9px 11px; background: var(--ground, #11120f); }
+.directoryTree button { color: var(--studio-ink); text-align: left; font-size: 11px; }
+.directoryTree span { color: var(--studio-faint); font: 8px var(--f-mono, monospace); }
 
 .evidenceGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1px; background: var(--studio-line); border: 1px solid var(--studio-line); }
 .evidenceCard { min-height: 170px; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 15px; color: var(--studio-muted); text-align: left; background: var(--ground, #11120f); }
@@ -83,9 +91,8 @@
 .fileList strong { font-size: 10px; font-weight: 500; overflow-wrap: anywhere; }
 .fileList span, .fileList small, .fileList code { color: var(--studio-faint); font: 8px var(--f-mono, monospace); overflow-wrap: anywhere; }
 
-.pagePreview { position: relative; width: min(100%, 220px); aspect-ratio: 3 / 4; margin: 4px auto 0; border: 1px solid var(--studio-line); background: linear-gradient(var(--studio-panel), transparent), var(--ground, #11120f); overflow: hidden; }
+.pagePreview { position: relative; width: min(100%, 360px); min-height: 280px; margin: 4px auto 0; border: 1px solid var(--studio-line); background: linear-gradient(var(--studio-panel), transparent), var(--ground, #11120f); overflow: hidden; }
 .pagePreview > span { position: absolute; top: 8px; left: 9px; color: var(--studio-faint); font: 8px var(--f-mono, monospace); }
-.pagePreview > i { position: absolute; left: var(--bbox-left); top: var(--bbox-top); width: var(--bbox-width); height: var(--bbox-height); border: 1px solid var(--changed, #d0a778); background: color-mix(in srgb, var(--changed, #d0a778) 16%, transparent); }
 
 @media (max-width: 980px) {
   .header { grid-template-columns: minmax(0, 1fr); }
@@ -102,6 +109,7 @@
   .header dl div:nth-child(4) { border-top: 1px solid var(--studio-line); }
   .lensBody, .inspector { padding: 12px; }
   .relationList li, .historyList li, .fileList li { grid-template-columns: minmax(0, 1fr); gap: 7px; }
+  .directoryTree section { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (prefers-reduced-motion: reduce) {

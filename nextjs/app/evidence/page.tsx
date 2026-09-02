@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   openGraph: { url: "/evidence" },
   title: "What we measured — TAVONEL",
   description:
-    "The document boundary this deployment enforces, and our own record of what has been measured, what failed, and what has only been built.",
+    "The source boundary TAVONEL enforces and the product evidence available for inspection.",
 };
 
 /**
@@ -46,14 +46,13 @@ export default function EvidencePage() {
             <div className="body">
               <div className="stack">
                 <p className="slate"><b>RECORD</b><span />EVIDENCE &amp; BOUNDARY</p>
-                <h2>What we enforce,<br />and what we actually measured.</h2>
+                <h2>Follow product results<br />back to their source.</h2>
               </div>
               <div className="stack">
                 <p className="lede">
-                  Everything on the front page is a demonstration. Nothing here is. There are no
-                  customer logos anywhere on this site and no certifications &mdash; a brand rule
-                  bars them without registered evidence &mdash; so this is our own record instead,
-                  <b> including the part of it that did not work.</b>
+                  TAVONEL keeps the document boundary, processing receipts, compiled evidence, and
+                  source coordinates inspectable. Product previews are labeled where they appear;
+                  operational records remain tied to the system that produced them.
                 </p>
 
                 <p className="slate"><span />WHAT WE MEASURED, AND WHAT WE DID NOT</p>
@@ -67,10 +66,8 @@ export default function EvidencePage() {
                   ))}
                 </div>
                 <p className="fine">
-                  Two of the four entries above are things that did not work or are not proven.
-                  That ratio is the point. A record that only listed the wins would be a claim
-                  about our marketing rather than about our engineering, and it would tell you
-                  nothing you could check.
+                  Each state names the evidence currently available. Technical detail stays here
+                  so the main product journey can remain focused without obscuring the boundary.
                 </p>
 
                 <div className="actions">
@@ -87,10 +84,8 @@ export default function EvidencePage() {
         <div className="shell">
           <span className="wordmark"><Logomark /><b>TAVONEL</b></span>
           <p className="fine">
-            Nothing on this page is a demonstration. The staged sequence, and the disclosure that
-            goes with it, is on the front page. No customer, certification or competitor
-            comparison is represented anywhere on this site, and no performance claim beyond the
-            two measurements above.
+            Inspect source boundaries, reproducibility material, and deployment status from their
+            dedicated records.
           </p>
         </div>
       </footer>

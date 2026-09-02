@@ -13,7 +13,7 @@ describe("existing immutable document compilation", () => {
   it("submits only the selected document ids to the existing compile route", () => {
     expect(source).toContain("const documentIds = [...new Set(selectedDocumentIds)]");
     expect(source).toContain('body: JSON.stringify({ documentIds })');
-    expect(source).toContain("candidatePromotion=false");
+    expect(source).toContain("Compiled World ready from");
+    expect(source).not.toContain("candidatePromotion=false");
   });
 });
-

@@ -15,30 +15,6 @@ export const BILLING_OFFERS = {
     includedPages: 2_500,
     priceEnv: "PADDLE_PRICE_STUDIO_ACCESS",
   },
-  credit_starter: {
-    kind: "prepaid",
-    label: "Starter",
-    priceUsd: 12,
-    credits: 100,
-    includedPages: 25,
-    priceEnv: "PADDLE_PRICE_CREDIT_STARTER",
-  },
-  credit_builder: {
-    kind: "prepaid",
-    label: "Builder",
-    priceUsd: 30,
-    credits: 300,
-    includedPages: 75,
-    priceEnv: "PADDLE_PRICE_CREDIT_BUILDER",
-  },
-  credit_scale: {
-    kind: "prepaid",
-    label: "Scale",
-    priceUsd: 75,
-    credits: 800,
-    includedPages: 200,
-    priceEnv: "PADDLE_PRICE_CREDIT_SCALE",
-  },
 } as const;
 
 export type BillingOfferCode = keyof typeof BILLING_OFFERS;

@@ -50,7 +50,6 @@ export default function AuthCallbackPage() {
     <main id="main" className="auth" tabIndex={-1}>
       <header>
         <Link href="/" className="wordmark"><Logomark /><b>TAVONEL</b></Link>
-        <span className="mode"><i aria-hidden="true" />PRIVATE PILOT</span>
       </header>
 
       <div className="auth-body">
@@ -71,7 +70,7 @@ export default function AuthCallbackPage() {
               <p className="lead" role="status">
                 {phase === "unconfigured"
                   ? "No auth provider is configured in this deployment, so the sign-in could not be completed here. Nothing is wrong with your account."
-                  : "Google returned, but no session was established. This pilot admits testing-mode users only, so an account outside that list will stop at exactly this point."}
+                  : "Google returned, but no session was established. Please try again or contact support if the account should have access."}
               </p>
               <div className="auth-actions">
                 <Link className="btn" href="/login">Try again</Link>

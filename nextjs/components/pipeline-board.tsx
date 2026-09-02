@@ -106,7 +106,7 @@ export default function PipelineBoard({
           : null}
       <ol className="board-rows" data-zone={zone.key}>
         {zone.items.map((row) => (
-          <li key={row.id} data-held={row.needsPerson ? 1 : 0}>
+          <li key={row.id} data-document-id={row.id} data-held={row.needsPerson ? 1 : 0}>
             <div className="board-id">
               {/*
                 A name first, and never a bare UUID.
@@ -118,8 +118,7 @@ export default function PipelineBoard({
                 both from a short handle. The full id stays underneath in every case, because it
                 is what the receipts, the keys and the audit lines all refer to.
               */}
-              <strong>{displayName(row.id, names, row.filename)}</strong>
-              <small className="id" title={row.id}>{row.id}</small>
+              <strong data-sensitive="content">{displayName(row.id, names, row.filename)}</strong>
             </div>
 
             {/* One word per panel, so a floor of twenty can be read without reading twenty
@@ -158,9 +157,8 @@ export default function PipelineBoard({
 
       {held > 0 ? (
         <p className="fine board-note">
-          A document stops here on purpose. TAVONEL does not guess at a page it could not read, and
-          it does not spend GPU credits retrying one without you asking. The reason code above is
-          the one written into that document&rsquo;s immutable review receipt.
+          This source needs review before reading can continue. Open Review to inspect the source
+          and choose the next action.
         </p>
       ) : null}
     </section>

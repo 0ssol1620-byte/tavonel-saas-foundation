@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState } from "react";
+import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
+import PdfEvidenceViewer from "@/components/pdf-evidence-viewer";
 import type {
   SelectedWorldEvidence,
   WorldEvidence,
@@ -63,6 +65,7 @@ function EvidenceCard({ evidence, selected, onSelect }: {
     <button
       type="button"
       className={styles.evidenceCard}
+      data-sensitive="content"
       data-selected={selected}
       aria-pressed={selected}
       onClick={() => onSelect(evidence)}
@@ -83,9 +86,32 @@ export default function WorldStudioUltimate({
   const [lens, setLens] = useState<WorldStudioLens>(initialLens);
   const [localEvidenceId, setLocalEvidenceId] = useState<string | null>(null);
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
+  const [sourcePreview, setSourcePreview] = useState<{ url: string; state: "ready" | "loading" | "unavailable" } | null>(null);
   const activeEvidenceId = selectedEvidenceId === undefined ? localEvidenceId : selectedEvidenceId;
   const selection = selectWorldEvidence(model, activeEvidenceId);
   const selectedObject = model?.objects.find((object) => object.id === selectedObjectId) ?? null;
+  const selectedSourceId = selection?.sourceId ?? null;
+  const selectedSourceVersionId = selection?.sourceVersionId ?? null;
+  const selectedSourcePage = selection?.page ?? null;
+
+  useEffect(() => {
+    if (!selectedSourceId || !selectedSourceVersionId || !selectedSourcePage) { setSourcePreview(null); return; }
+    let cancelled = false;
+    setSourcePreview({ url: "", state: "loading" });
+    void (async () => {
+      const client = getSupabaseBrowserClient();
+      const { data } = client ? await client.auth.getSession() : { data: { session: null } };
+      const token = data.session?.access_token;
+      if (!token) { if (!cancelled) setSourcePreview({ url: "", state: "unavailable" }); return; }
+      const response = await fetch(`/api/documents/${selectedSourceId}/source?version=${encodeURIComponent(selectedSourceVersionId)}`, {
+        headers: { authorization: `Bearer ${token}` },
+        cache: "no-store",
+      });
+      const body = await response.json().catch(() => ({})) as { readUrl?: string };
+      if (!cancelled) setSourcePreview(response.ok && body.readUrl ? { url: body.readUrl, state: "ready" } : { url: "", state: "unavailable" });
+    })();
+    return () => { cancelled = true; };
+  }, [selectedSourceId, selectedSourceVersionId, selectedSourcePage]);
 
   const selectEvidence = (evidence: WorldEvidence) => {
     if (selectedEvidenceId === undefined) setLocalEvidenceId(evidence.id);
@@ -135,7 +161,7 @@ export default function WorldStudioUltimate({
               <ReadNotYet>Compile and validate a collection before its object map can be read.</ReadNotYet>
             ) : (
               <div className={styles.mapLens}>
-                <div className={styles.objectGrid}>
+                <div className={styles.objectGrid} data-sensitive="content">
                   {model.objects.map((object) => (
                     <button
                       key={object.id}
@@ -152,7 +178,7 @@ export default function WorldStudioUltimate({
                 {model.relations.length === 0 ? (
                   <ReadNotYet>No compiled relations are present in this World.</ReadNotYet>
                 ) : (
-                  <ol className={styles.relationList} aria-label="Compiled relations">
+                  <ol className={styles.relationList} data-sensitive="content" aria-label="Compiled relations">
                     {model.relations.map((relation) => (
                       <li key={relation.id}>
                         <code>{relation.subject}</code>
@@ -169,20 +195,18 @@ export default function WorldStudioUltimate({
 
           {lens === "directory" && (
             !model || model.objects.length === 0 ? (
-              <ReadNotYet>No compiled objects are available for the table lens.</ReadNotYet>
+              <ReadNotYet>No compiled objects are available for the directory lens.</ReadNotYet>
             ) : (
-              <div className={styles.tableWrap}>
-                <table>
-                  <thead><tr><th>Type</th><th>Object</th><th>Status</th><th>Relations</th><th>Evidence</th><th>Source versions</th></tr></thead>
-                  <tbody>
-                    {model.objects.map((object) => (
-                      <tr key={object.id}>
-                        <td>{object.type}</td><th scope="row">{object.label}<code>{object.id}</code></th>
-                        <td>{object.status}</td><td>{object.relations.length}</td><td>{object.evidenceRefs.length}</td><td>{object.sourceVersions.length}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className={styles.directoryTree} data-sensitive="content" aria-label="Compiled semantic directory">
+                <strong>Knowledge</strong>
+                {[...new Set(model.objects.map((object) => object.type))].sort().map((type) => (
+                  <section key={type}>
+                    <h3>{type}</h3>
+                    <ul>{model.objects.filter((object) => object.type === type).map((object) => (
+                      <li key={object.id}><button type="button" onClick={() => setSelectedObjectId(object.id)}>{object.label}</button><span>{object.evidenceRefs.length} evidence</span></li>
+                    ))}</ul>
+                  </section>
+                ))}
               </div>
             )
           )}
@@ -204,7 +228,7 @@ export default function WorldStudioUltimate({
                 {model.relations.length === 0 ? (
                   <ReadNotYet>No compiled relation predicates are present in this World.</ReadNotYet>
                 ) : (
-                  <ol className={styles.relationList} aria-label="Compiled ontology predicates">
+                  <ol className={styles.relationList} data-sensitive="content" aria-label="Compiled ontology predicates">
                     {[...new Set(model.relations.map((relation) => relation.predicate))].sort().map((predicate) => (
                       <li key={predicate}>
                         <b>{predicate}</b>
@@ -236,7 +260,7 @@ export default function WorldStudioUltimate({
               <ol className={styles.historyList}>
                 {model.history.map((entry) => (
                   <li key={`${entry.version}:${entry.manifestDigest}`}>
-                    <span>{entry.status}</span><strong>{entry.version}</strong><code>{entry.manifestDigest}</code>
+                    <span>{entry.status}</span><strong>{entry.version}</strong>
                     <small>{entry.activatedAt.state === "read" ? entry.activatedAt.value : "ACTIVATION READ_NOT_YET"}</small>
                   </li>
                 ))}
@@ -248,7 +272,7 @@ export default function WorldStudioUltimate({
             !model || model.files.length === 0 ? (
               <ReadNotYet>No compiled package files are available.</ReadNotYet>
             ) : (
-              <ul className={styles.fileList}>
+              <ul className={styles.fileList} data-sensitive="content">
                 {model.files.map((file) => (
                   <li key={file.path}><strong>{file.path}</strong><span>{file.mediaType}</span><small>{file.sizeBytes.toLocaleString()} B</small><code>{file.sha256}</code></li>
                 ))}
@@ -265,24 +289,22 @@ export default function WorldStudioUltimate({
               <dl>
                 <div><dt>PAGE</dt><dd>{selection.page}</dd></div>
                 <div><dt>BBOX</dt><dd>[{selection.bbox.join(", ")}]</dd></div>
-                <div><dt>BLOCK</dt><dd>{selection.blockId}</dd></div>
-                <div><dt>VERSION</dt><dd>{selection.sourceVersionId}</dd></div>
-                <div><dt>DIGEST</dt><dd>{selection.digest}</dd></div>
               </dl>
-              <div className={styles.pagePreview} aria-label={`Page ${selection.page} evidence bounding box`}>
-                <span>p.{selection.page}</span>
-                <i style={{
-                  "--bbox-left": `${selection.bbox[0] / 10}%`,
-                  "--bbox-top": `${selection.bbox[1] / 10}%`,
-                  "--bbox-width": `${(selection.bbox[2] - selection.bbox[0]) / 10}%`,
-                  "--bbox-height": `${(selection.bbox[3] - selection.bbox[1]) / 10}%`,
-                } as CSSProperties} />
+              <div className={styles.pagePreview} aria-label={`Actual source page ${selection.page} with evidence bounding box`}>
+                {sourcePreview?.state === "ready" ? (
+                  <PdfEvidenceViewer
+                    url={sourcePreview.url}
+                    page={selection.page}
+                    bbox={selection.bbox}
+                    label={`Source ${selection.sourceId}, page ${selection.page}, exact evidence region`}
+                  />
+                ) : <span>{sourcePreview?.state === "loading" ? "Opening source page…" : `Source preview unavailable · p.${selection.page}`}</span>}
               </div>
             </>
           ) : selectedObject ? (
             <>
               <div className={styles.inspectorTitle}><span>SELECTED OBJECT</span></div>
-              <strong>{selectedObject.label}</strong><code>{selectedObject.id}</code>
+              <strong data-sensitive="content">{selectedObject.label}</strong>
               <dl>
                 <div><dt>TYPE</dt><dd>{selectedObject.type}</dd></div>
                 <div><dt>STATE</dt><dd>{selectedObject.readState === "read" ? "READ" : "READ_NOT_YET"}</dd></div>

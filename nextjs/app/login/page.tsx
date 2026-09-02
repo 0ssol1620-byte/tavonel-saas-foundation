@@ -26,6 +26,7 @@ export default function LoginPage() {
   const [authState, setAuthState] = useState<AuthState>("checking");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [commercialMode, setCommercialMode] = useState<"pilot" | "live">("pilot");
   /**
    * R1, second half. Someone who arrived by picking a plan is not here to "open a workspace" --
    * they are part-way through a purchase, and the page has to say so or the detour looks like the
@@ -57,8 +58,9 @@ export default function LoginPage() {
       }
       try {
         const response = await fetch("/api/status", { cache: "no-store" });
-        const body = (await response.json()) as { auth?: string };
+        const body = (await response.json()) as { auth?: string; commercialMode?: "pilot" | "live" };
         if (cancelled) return;
+        setCommercialMode(body.commercialMode === "live" ? "live" : "pilot");
         setAuthState(body.auth === "google_oauth_configured" ? "ready" : "unconfigured");
       } catch {
         // Fail closed: if the deployment cannot be asked, do not offer a control that will fail.
@@ -92,7 +94,7 @@ export default function LoginPage() {
     <main id="main" className="auth" tabIndex={-1}>
       <header>
         <Link href="/" className="wordmark"><Logomark /><b>TAVONEL</b></Link>
-        <span className="mode"><i aria-hidden="true" />PRIVATE PILOT</span>
+        {commercialMode === "pilot" ? <span className="mode"><i aria-hidden="true" />PRIVATE PILOT</span> : null}
       </header>
 
       <div className="auth-body">
@@ -100,10 +102,9 @@ export default function LoginPage() {
           <p className="eyebrow">{intent ? "SIGN IN TO CONTINUE" : "SIGN IN"}</p>
           <h1>{intent ? "One step before checkout." : "Open your workspace."}</h1>
           <p className="lead">
-            TAVONEL compiles your documents into a structured world and keeps it correct as they
-            change. Signing in gives you a private, tenant-scoped workspace &mdash; nothing is
-            shared, and no document you upload is ever promoted into a live world without you
-            deciding it.
+            TAVONEL turns your documents and connected sources into a structured, source-grounded
+            World. Your workspace is tenant-scoped and source data is processed under the published
+            data and subprocessor policies.
           </p>
 
           {intent ? (
@@ -133,10 +134,9 @@ export default function LoginPage() {
           {error ? <p className="notice static" role="alert"><strong>Sign-in did not start.</strong> {error}</p> : null}
 
           <ul className="auth-facts">
-            <li><b>Google only.</b> No password is created, and none is stored.</li>
-            <li><b>Private pilot.</b> Access is limited to testing-mode users while the pilot runs.</li>
-            <li><b>Nothing is promoted automatically.</b> Analysis produces a candidate; a person decides.</li>
-            <li><b>Sandbox billing.</b> No live payment is taken, and only a signed webhook can change access.</li>
+            <li><b>Google sign-in.</b> No separate TAVONEL password is created or stored.</li>
+            <li><b>Tenant scoped.</b> Workspace access and source processing remain bound to your account.</li>
+            <li><b>Human review.</b> Review gates remain visible before a candidate World is activated.</li>
           </ul>
         </div>
       </div>

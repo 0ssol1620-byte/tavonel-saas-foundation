@@ -32,11 +32,8 @@ test("public proof routes expose honest registries and a downloadable manifest",
   expect(world.ok()).toBe(true);
   expect(world.headers()["content-digest"]).toMatch(/^sha-256=:/);
   expect((await world.json()).disclosure).toBe("deterministic_product_sample_not_customer_proof");
-  await page.goto("/benchmarks");
-  await expect(page.getByText("NO EXTERNAL SCORE PUBLISHED")).toBeVisible();
-  await expect(page.getByText("NO QUALIFIED RECORDS")).toBeVisible();
-  await page.goto("/research/experiments");
-  await expect(page.getByText("A planned experiment is not rewritten as a failed one")).toBeVisible();
+  expect((await page.request.get("/benchmarks")).status()).toBe(404);
+  expect((await page.request.get("/research/experiments")).status()).toBe(404);
 });
 
 test("mobile Runs is a focused source/run surface without horizontal squeeze", async ({ page }, testInfo) => {
@@ -47,7 +44,8 @@ test("mobile Runs is a focused source/run surface without horizontal squeeze", a
   await expect(page.getByRole("heading", { name: "Every transition requires an object or receipt." })).toBeVisible();
   await expect(page.getByText("SSE LIVE · 2 SOURCES")).toBeVisible();
   await page.getByRole("button", { name: /OPERATOR REVIEW/ }).click();
-  await expect(page.getByText("OCR_LOW_TEXT_YIELD")).toBeVisible();
+  await expect(page.getByText("review required before reading can continue", { exact: false })).toBeVisible();
+  await expect(page.locator("body")).not.toContainText("OCR_LOW_TEXT_YIELD");
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
 });
 

@@ -64,8 +64,8 @@ export type LocalUpload = {
 };
 
 const LABELS: Record<StageKey, string> = {
-  quarantine: "QUARANTINE",
-  sanitize: "SANITIZE",
+  quarantine: "UPLOAD",
+  sanitize: "PREPARE",
   read: "READ",
   compile: "COMPILE",
 };
@@ -140,13 +140,13 @@ function rowFor(
 
 function quarantineStage(upload: LocalUpload | null, server: DocumentListItem | null): Stage {
   if (upload) {
-    if (upload.phase === "failed") return stage("quarantine", "failed", upload.reason ?? "transfer did not complete");
-    if (upload.phase === "issuing") return stage("quarantine", "active", "requesting a short-lived capability");
+    if (upload.phase === "failed") return stage("quarantine", "failed", upload.reason ?? "upload did not complete");
+    if (upload.phase === "issuing") return stage("quarantine", "active", "preparing secure upload");
     if (upload.phase === "sending") {
       const pct = upload.bytes > 0 ? Math.floor((upload.loaded / upload.bytes) * 100) : 0;
       return stage("quarantine", "active", `${bytes(upload.loaded)} / ${bytes(upload.bytes)} · ${pct}%`);
     }
-    return stage("quarantine", "done", `${bytes(upload.bytes)} in quarantine`);
+    return stage("quarantine", "done", `${bytes(upload.bytes)} uploaded`);
   }
   // No local record: the object exists, so the transfer happened in some earlier session.
   return server ? stage("quarantine", "done", "stored") : stage("quarantine", "waiting");
@@ -156,12 +156,12 @@ function sanitizeStage(previous: StageState, server: DocumentListItem | null): S
   if (previous === "failed") return stage("sanitize", "waiting");
   if (!server) {
     return previous === "done"
-      ? stage("sanitize", "active", "CDR has not written an immutable PDF yet")
+      ? stage("sanitize", "active", "preparing a safe source copy")
       : stage("sanitize", "waiting");
   }
-  if (!server.sanitizedKey) return stage("sanitize", "active", "CDR has not written an immutable PDF yet");
+  if (!server.sanitizedKey) return stage("sanitize", "active", "preparing a safe source copy");
   const size = server.sanitizedSize ? ` · ${bytes(server.sanitizedSize)}` : "";
-  return stage("sanitize", "done", server.cdrReceiptKey ? `sanitized.pdf · receipt written${size}` : `sanitized.pdf${size}`);
+  return stage("sanitize", "done", `source ready${size}`);
 }
 
 function readStage(previous: StageState, server: DocumentListItem | null): Stage {
@@ -170,19 +170,17 @@ function readStage(previous: StageState, server: DocumentListItem | null): Stage
     return stage(
       "read",
       "held",
-      server.ocrReviewReasonCode
-        ? `operator review · ${server.ocrReviewReasonCode} · no automatic paid retry`
-        : "operator review required · no automatic paid retry",
+      "review required before reading can continue",
     );
   }
   if (server.hasOcrJson) {
-    return stage("read", "done", server.ocrJsonSize ? `ocr.json · ${bytes(server.ocrJsonSize)}` : "ocr.json written");
+    return stage("read", "done", server.ocrJsonSize ? `source read · ${bytes(server.ocrJsonSize)}` : "source read");
   }
   return stage("read", "active", "reading within bounded processing");
 }
 
 function compileStage(previous: StageState, server: DocumentListItem | null, compiled: Set<string>): Stage {
-  if (server && compiled.has(server.documentId)) return stage("compile", "done", "bound into a collection candidate");
+  if (server && compiled.has(server.documentId)) return stage("compile", "done", "included in Compiled World");
   if (previous !== "done") return stage("compile", "waiting");
   return stage("compile", "active", "ready for compilation");
 }

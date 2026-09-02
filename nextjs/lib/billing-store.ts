@@ -9,6 +9,8 @@ export type FoundationBillingAccount = {
   creditBalance: number;
   lifetimeCreditsPurchased: number;
   lifetimeCreditsReversed: number;
+  overageEnabled: boolean;
+  overageUnits: number;
   billingHold: boolean;
   paddleCustomerId: string | null;
   paddleSubscriptionId: string | null;
@@ -22,6 +24,8 @@ export const EMPTY_BILLING_ACCOUNT: Omit<FoundationBillingAccount, "workspaceKey
   creditBalance: 0,
   lifetimeCreditsPurchased: 0,
   lifetimeCreditsReversed: 0,
+  overageEnabled: false,
+  overageUnits: 0,
   billingHold: false,
   paddleCustomerId: null,
   paddleSubscriptionId: null,
@@ -58,6 +62,8 @@ function normalizeAccount(row: Record<string, unknown>, workspaceKey: string, us
     creditBalance: typeof row.credit_balance === "number" ? row.credit_balance : 0,
     lifetimeCreditsPurchased: typeof row.lifetime_credits_purchased === "number" ? row.lifetime_credits_purchased : 0,
     lifetimeCreditsReversed: typeof row.lifetime_credits_reversed === "number" ? row.lifetime_credits_reversed : 0,
+    overageEnabled: row.overage_enabled === true,
+    overageUnits: typeof row.overage_units === "number" ? row.overage_units : 0,
     billingHold: row.billing_hold === true,
     paddleCustomerId: typeof row.paddle_customer_id === "string" ? row.paddle_customer_id : null,
     paddleSubscriptionId: typeof row.paddle_subscription_id === "string" ? row.paddle_subscription_id : null,
@@ -70,7 +76,7 @@ export async function getFoundationBillingAccount(workspaceKey: string, userId: 
   const config = readSupabaseAdminConfig();
   if (!config) return { ok: false as const, code: "BILLING_STORE_NOT_CONFIGURED" };
   const query = new URLSearchParams({
-    select: "workspace_key,user_id,access_plan,subscription_status,credit_balance,lifetime_credits_purchased,lifetime_credits_reversed,billing_hold,paddle_customer_id,paddle_subscription_id,subscription_cancel_at,updated_at",
+    select: "workspace_key,user_id,access_plan,subscription_status,credit_balance,lifetime_credits_purchased,lifetime_credits_reversed,overage_enabled,overage_units,billing_hold,paddle_customer_id,paddle_subscription_id,subscription_cancel_at,updated_at",
     workspace_key: `eq.${workspaceKey}`,
     user_id: `eq.${userId}`,
     limit: "1",
@@ -97,7 +103,7 @@ export async function applyFoundationBillingAction(action: Exclude<PaddleBilling
   const isReversal = action.action === "reversal";
   let response: Response;
   try {
-    response = await supabaseAdminRequest(config, "/rest/v1/rpc/apply_foundation_billing_event_v3", {
+    response = await supabaseAdminRequest(config, "/rest/v1/rpc/apply_foundation_billing_event_v4", {
       method: "POST",
       body: JSON.stringify({
         p_event_id: action.eventId,
@@ -108,11 +114,11 @@ export async function applyFoundationBillingAction(action: Exclude<PaddleBilling
         p_workspace_key: isReversal ? null : action.workspaceId,
         p_user_id: isReversal ? null : action.userId,
         p_offer_code: isReversal ? null : action.offerCode,
-        p_transaction_id: action.action === "purchase" || isReversal ? action.transactionId : null,
+        p_transaction_id: action.action === "purchase" || action.action === "allowance" || isReversal ? action.transactionId : null,
         p_customer_id: isReversal ? null : action.customerId,
         p_subscription_id: action.action === "subscription" ? action.subscriptionId : null,
         p_subscription_status: action.action === "subscription" ? action.subscriptionStatus : null,
-        p_credit_delta: action.action === "purchase" ? action.creditDelta : 0,
+        p_credit_delta: action.action === "purchase" || action.action === "allowance" ? action.creditDelta : 0,
         p_adjustment_id: isReversal ? action.adjustmentId : null,
       }),
     });

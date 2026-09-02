@@ -3,11 +3,9 @@ import { createCheckoutBinding } from "./billing-binding";
 import { parsePaddleBillingAction } from "./paddle-billing-event";
 
 const SECRET = "billing-test-secret-that-is-at-least-32-characters";
-const STARTER_PRICE = `pri_${"p".repeat(26)}`;
 const OBSERVER_PRICE = `pri_${"o".repeat(26)}`;
 const env = {
   FOUNDATION_BILLING_HMAC: SECRET,
-  PADDLE_PRICE_CREDIT_STARTER: STARTER_PRICE,
   PADDLE_PRICE_OBSERVER_ACCESS: OBSERVER_PRICE,
 };
 const bindingInput = {
@@ -25,38 +23,54 @@ function body(eventType: string, data: Record<string, unknown>, eventCharacter =
 }
 
 describe("Paddle billing event projection", () => {
-  it("issues prepaid credits only for the signed binding and allow-listed price", () => {
-    const binding = createCheckoutBinding({ ...bindingInput, offerCode: "credit_starter" }, SECRET);
+  it("grants recurring allowance only for the signed binding and allow-listed price", () => {
+    const binding = createCheckoutBinding({ ...bindingInput, offerCode: "observer_access" }, SECRET);
     const action = parsePaddleBillingAction(body("transaction.completed", {
       id: `txn_${"t".repeat(26)}`,
       customer_id: `ctm_${"c".repeat(26)}`,
       custom_data: binding,
-      items: [{ quantity: 1, price: { id: STARTER_PRICE } }],
+      items: [{ quantity: 1, price: { id: OBSERVER_PRICE } }],
     }), env);
     expect(action).toMatchObject({
-      action: "purchase",
-      offerCode: "credit_starter",
-      creditDelta: 100,
+      action: "allowance",
+      offerCode: "observer_access",
+      creditDelta: 2_000,
       workspaceId: bindingInput.workspaceId,
     });
 
     const tampered = parsePaddleBillingAction(body("transaction.completed", {
       id: `txn_${"t".repeat(26)}`,
       customer_id: `ctm_${"c".repeat(26)}`,
-      custom_data: { ...binding, tavonel_offer_code: "credit_scale" },
-      items: [{ quantity: 1, price: { id: STARTER_PRICE } }],
+      custom_data: { ...binding, tavonel_offer_code: "studio_access" },
+      items: [{ quantity: 1, price: { id: OBSERVER_PRICE } }],
     }, "f"), env);
     expect(tampered).toMatchObject({ action: "ignored", reason: "binding_invalid" });
   });
 
-  it("does not issue prepaid credits before Paddle completes the transaction", () => {
-    const binding = createCheckoutBinding({ ...bindingInput, offerCode: "credit_starter" }, SECRET);
+  it("does not grant included usage before Paddle completes the transaction", () => {
+    const binding = createCheckoutBinding({ ...bindingInput, offerCode: "observer_access" }, SECRET);
     expect(parsePaddleBillingAction(body("transaction.paid", {
       id: `txn_${"t".repeat(26)}`,
       customer_id: `ctm_${"c".repeat(26)}`,
       custom_data: binding,
-      items: [{ quantity: 1, price: { id: STARTER_PRICE } }],
+      items: [{ quantity: 1, price: { id: OBSERVER_PRICE } }],
     }), env)).toMatchObject({ action: "ignored", reason: "event_not_entitling" });
+  });
+
+  it("grants one included-usage allowance from each completed subscription transaction", () => {
+    const binding = createCheckoutBinding({ ...bindingInput, offerCode: "observer_access" }, SECRET);
+    expect(parsePaddleBillingAction(body("transaction.completed", {
+      id: `txn_${"r".repeat(26)}`,
+      customer_id: `ctm_${"c".repeat(26)}`,
+      subscription_id: `sub_${"s".repeat(26)}`,
+      custom_data: binding,
+      items: [{ quantity: 1, price: { id: OBSERVER_PRICE } }],
+    }), env)).toMatchObject({
+      action: "allowance",
+      offerCode: "observer_access",
+      creditDelta: 2_000,
+      transactionId: `txn_${"r".repeat(26)}`,
+    });
   });
 
   it.each([
@@ -64,7 +78,7 @@ describe("Paddle billing event projection", () => {
     ["subscription.past_due", "past_due"],
     ["subscription.trialing", "trialing"],
     ["subscription.updated", "active"],
-  ])("projects %s without recurring GPU credits", (eventType, status) => {
+  ])("projects %s as access state without duplicating the transaction allowance", (eventType, status) => {
     const binding = createCheckoutBinding({ ...bindingInput, offerCode: "observer_access" }, SECRET);
     expect(parsePaddleBillingAction(body(eventType, {
       id: `sub_${"s".repeat(26)}`,

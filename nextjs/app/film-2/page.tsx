@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import OpeningFilm2 from "@/components/opening-film-2";
 
 export const metadata: Metadata = {
@@ -12,6 +13,7 @@ export const metadata: Metadata = {
 };
 
 export default function FilmTwoPage() {
+  notFound();
   return (
     <div className="page film-page">
       <main id="main" tabIndex={-1}>

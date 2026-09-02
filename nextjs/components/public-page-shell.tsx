@@ -14,6 +14,7 @@ export function PublicPageShell({ children }: { children: React.ReactNode }) {
           <Link href="/developers">Developers</Link>
           <Link href="/security">Security</Link>
           <Link href="/pricing">Pricing</Link>
+          <Link href="/research">Resources</Link>
         </nav>
         <Link className="btn small" href="/login">Try TAVONEL</Link>
       </header>
@@ -22,4 +23,3 @@ export function PublicPageShell({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
-

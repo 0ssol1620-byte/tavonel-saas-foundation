@@ -1,0 +1,40 @@
+.viewer {
+  position: relative;
+  width: 100%;
+  min-height: 280px;
+  overflow: hidden;
+  background: #f5f3ed;
+}
+
+.viewer canvas {
+  display: block;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+.viewer > span {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  color: #62696d;
+  font: 10px var(--f-mono, monospace);
+  text-align: center;
+}
+
+.viewer > i {
+  position: absolute;
+  left: var(--bbox-left);
+  top: var(--bbox-top);
+  width: var(--bbox-width);
+  height: var(--bbox-height);
+  border: 2px solid var(--changed, #b7834f);
+  background: color-mix(in srgb, var(--changed, #b7834f) 20%, transparent);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 70%);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .viewer { scroll-behavior: auto; }
+}

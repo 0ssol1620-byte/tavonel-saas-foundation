@@ -14,7 +14,7 @@ const contentSecurityPolicy = [
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
   "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.paddle.com https://*.r2.cloudflarestorage.com",
-  "frame-src https://*.paddle.com",
+  "frame-src 'self' https://*.paddle.com https://*.r2.cloudflarestorage.com",
   "worker-src 'self' blob:",
   "manifest-src 'self'",
   "upgrade-insecure-requests",

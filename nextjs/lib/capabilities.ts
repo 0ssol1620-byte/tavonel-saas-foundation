@@ -15,6 +15,7 @@ import { DISCLOSURE } from "./demo-world";
 
 export type StatusResponse = {
   mode?: string;
+  commercialMode?: "pilot" | "live";
   activationPolicy?: Record<string, { enabled?: boolean; reason?: string }>;
   auth?: string;
   billing?: string;

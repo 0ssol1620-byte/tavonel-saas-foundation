@@ -7,27 +7,21 @@
 
 import Link from "next/link";
 import type { Route } from "next";
-import { Fragment, cloneElement, isValidElement, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, cloneElement, isValidElement, useEffect, useRef, useState } from "react";
 import CanvasTransitionLink from "@/components/canvas-transition-link";
 import FilmBand from "@/components/film-band";
 import Logomark from "@/components/logomark";
 import WorldField, { type WorldMode } from "@/components/world-field";
-import { CHANGE, DISCLOSURE, WORLD, n } from "@/lib/demo-world";
+import { CHANGE, WORLD, n } from "@/lib/demo-world";
 import { trackFunnel, trackSceneDepth } from "@/lib/funnel-events";
-import { readCapabilities, type StatusResponse } from "@/lib/capabilities";
 import { useScrollProgress, useScrollScenes } from "@/lib/use-scroll-scenes";
 
 const SCENES = [
-  { id: 1, label: "COMPILE" },
-  { id: 2, label: "READ & STRUCTURE" },
-  { id: 3, label: "SOURCE EVIDENCE" },
-  { id: 4, label: "USE THE WORLD" },
-  { id: 5, label: "INTERACTIVE PRODUCT PROOF" },
-  { id: 6, label: "WHAT TAVONEL EMITS" },
-  { id: 7, label: "COMPILE BEFORE YOU RETRIEVE" },
-  { id: 8, label: "SOLUTIONS" },
-  { id: 9, label: "CONNECTED & PROTECTED" },
-  { id: 10, label: "START" },
+  { id: 1, label: "KNOWLEDGE COMPILER" },
+  { id: 2, label: "INPUT" },
+  { id: 3, label: "COMPILE FILM" },
+  { id: 4, label: "EVIDENCE" },
+  { id: 5, label: "START" },
 ] as const;
 
 type BandName = "scatter" | "structure" | "world" | "change" | "rebuild" | "answer" | "access";
@@ -44,24 +38,8 @@ const BANDS: Record<BandName, { mode: WorldMode; state: string; version: string;
 
 const BAND_ORDER: BandName[] = ["scatter", "structure", "world", "change", "rebuild", "answer", "access"];
 
-/**
- * What the compile hands back. The films show the work; this is the receipt.
- *
- * Every line is a file the workspace already writes into the signed package, which is why the
- * ontology is named by its real extension rather than described as "a knowledge layer". A buyer
- * comparing this against a retrieval product is comparing artifacts, not adjectives.
- */
-const ARTIFACTS = [
-  ["ontology.ttl", "OWL classes and object properties — the shape of your domain, in a standard a triple store reads."],
-  ["graph.csv", "Entities and the relations between them, resolved across versions and spellings."],
-  ["corpus/", "Retrieval documents rebuilt from current facts, so an index is downstream of the world, not a copy of your drive."],
-  ["provenance/", "Every fact back to a file, a section and a line. An answer that cannot be traced does not ship."],
-] as const;
-
 export default function HomePageClient({ heroProof }: { heroProof: React.ReactNode }) {
   const [signedIn, setSignedIn] = useState(false);
-  const [status, setStatus] = useState<StatusResponse | null>(null);
-  const [statusFailed, setStatusFailed] = useState(false);
 
   const { scene, band } = useScrollScenes(SCENES.length);
   const progress = useScrollProgress();
@@ -102,23 +80,7 @@ export default function HomePageClient({ heroProof }: { heroProof: React.ReactNo
     };
   }, []);
   const reachedChange = BAND_ORDER.indexOf(band as BandName) >= BAND_ORDER.indexOf("change");
-  const capabilities = useMemo(() => readCapabilities(status, statusFailed), [status, statusFailed]);
   useEffect(() => { trackSceneDepth(scene); }, [scene]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const response = await fetch("/api/status", { cache: "no-store" });
-        if (!response.ok) throw new Error(String(response.status));
-        const body = (await response.json()) as StatusResponse;
-        if (!cancelled) setStatus(body);
-      } catch {
-        if (!cancelled) setStatusFailed(true);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -145,10 +107,10 @@ export default function HomePageClient({ heroProof }: { heroProof: React.ReactNo
   };
 
   const nextStep = ((): { label: string; run: () => void } => {
-    if (scene <= 1) return { label: "STRUCTURE", run: () => jump(2) };
-    if (scene === 2) return { label: "TRACE", run: () => jump(3) };
-    if (scene === 3) return { label: "USE THE WORLD", run: () => jump(4) };
-    if (scene < 10) return { label: SCENES[scene]?.label ?? "START", run: () => jump(scene + 1) };
+    if (scene <= 1) return { label: "BRING YOUR SOURCES", run: () => jump(2) };
+    if (scene === 2) return { label: "WATCH IT COMPILE", run: () => jump(3) };
+    if (scene === 3) return { label: "FOLLOW THE EVIDENCE", run: () => jump(4) };
+    if (scene < 5) return { label: "START", run: () => jump(5) };
     return signedIn
       ? { label: "OPEN WORKSPACE", run: () => window.location.assign("/workspace") }
       : { label: "SIGN IN", run: () => window.location.assign("/login") };
@@ -225,139 +187,47 @@ export default function HomePageClient({ heroProof }: { heroProof: React.ReactNo
               <Link className="btn ghost" href={"/explore" as Route}>Explore a Compiled World</Link>
             </div>
           </div>
-          {heroProof}
-          <p className="fine film-note">{DISCLOSURE.fixture}</p>
         </section>
 
-        <Scene id={2} film band="structure" eyebrow="READ & STRUCTURE" title="It starts by actually reading the source.">
-          <FilmBand
-            src="/film/compile-cut-2.mp4"
-            poster="/film/poster-2.webp"
-            index={1}
-            label="Cut 2 — an ontology and its edges"
-          />
+        <Scene id={2} band="structure" eyebrow="INPUT" title="Bring the knowledge you already have.">
+          <p className="lede rv">Upload files, folders or ZIP archives, or connect the system where your knowledge already lives.</p>
+          <ul className="input-formats rv" aria-label="Supported knowledge sources">
+            {[
+              "PDF", "Office documents", "Images / scans", "Folders", "ZIP archives",
+              "Google Drive", "Dropbox", "OneDrive / SharePoint", "S3 / R2 / MinIO", "SMB / NFS / SFTP",
+            ].map((source) => <li key={source}>{source}</li>)}
+          </ul>
         </Scene>
 
-        <Scene id={3} film band="change" eyebrow="SOURCE EVIDENCE" title="Every fact keeps its path back to the source.">
-          <FilmBand
-            src="/film/compile-cut-3.mp4"
-            poster="/film/poster-3.webp"
-            index={2}
-            label="Cut 3 — a changed source remains linked to its evidence"
-          />
-        </Scene>
-
-        <Scene id={4} film band="answer" eyebrow="USE THE WORLD" title={<>One compiled world.<br />Every AI.</>}>
-          <p className="lede rv">
-            The model can change. Your knowledge stays traceable.
-          </p>
-          {/*
-            The chips are gone.
-
-            `Retrieval · Agents · MCP · API · Search` was six words in boxes asserting
-            integrations, next to an `AnswerSwitch` widget that mimed asking a question. A film
-            of the real clients answering — with the citation each one returns — makes both
-            redundant, and a mock sitting beside the real thing only makes the real thing look
-            staged.
-          */}
-          <FilmBand
-            src="/film/compile-cut-4.mp4"
-            poster="/film/poster-4.webp"
-            index={3}
-            label="Cut 4 — an assistant, an editor and a terminal reach the same world"
-          />
-          <div className="band-head rv"><span className="kicker">WHAT YOU GET</span><h3>Files, not a lock-in.</h3></div>
-          <div className="artifacts rv">
-            {ARTIFACTS.map(([name, text]) => (
-              <article className="artifact" key={name}>
-                <code>{name}</code>
-                <p>{text}</p>
-              </article>
-            ))}
-          </div>
-        </Scene>
-
-        <Scene id={5} band="world" eyebrow="INTERACTIVE PRODUCT PROOF" title={<>Follow one fact<br />all the way back.</>}>
-          <p className="lede rv">Open a compiled object, its relation, the exact document region, and the answer that cites it.</p>
-          <div className="actions rv"><Link className="btn" href={"/explore" as Route}>Explore the interactive sample</Link></div>
-        </Scene>
-
-        <Scene id={6} band="world" eyebrow="WHAT TAVONEL EMITS" title="A portable knowledge asset, not another locked index.">
-          <div className="artifacts rv">
-            {[['Ontology', 'ontology.ttl'], ['Knowledge Graph', 'graph.csv'], ['AI-ready Retrieval', 'corpus/'], ['Source Evidence', 'provenance/']].map(([label, file]) => (
-              <article className="artifact" key={label}><h3>{label}</h3><code>{file}</code></article>
-            ))}
-          </div>
-        </Scene>
-
-        <Scene id={7} band="structure" eyebrow="COMPILE BEFORE YOU RETRIEVE" title="Chunks are a projection. The World is the durable asset.">
-          <div className="artifacts rv">
-            <article className="artifact"><code>Typical RAG prep</code><p>Files → chunks → vectors</p></article>
-            <article className="artifact"><code>TAVONEL</code><p>Files → structure → identity → relationships → evidence → World → retrieval, agents and APIs</p></article>
-          </div>
-        </Scene>
-
-        <Scene id={8} band="world" eyebrow="SOLUTIONS" title="Build AI on knowledge that can be inspected.">
-          <div className="artifacts rv">
-            <article className="artifact"><h3>AI-ready knowledge</h3><p>Rebuild document collections as governed knowledge assets.</p></article>
-            <article className="artifact"><h3>Document intelligence</h3><p>Read scans and difficult PDFs with page-level evidence.</p></article>
-            <article className="artifact"><h3>Knowledge graphs</h3><p>Resolve objects and relations into a versioned World.</p></article>
-            <article className="artifact"><h3>Grounded assistants</h3><p>Return every answer with the source it depends on.</p></article>
-          </div>
-          <div className="actions rv"><Link className="btn ghost" href={"/solutions/ai-ready-knowledge" as Route}>See solutions</Link></div>
-        </Scene>
-
-        <Scene id={9} band="access" eyebrow="CONNECTED & PROTECTED" title="Compile where your sources already live.">
-          <p className="lede rv">Google Drive, Dropbox, OneDrive, SharePoint, S3, R2, MinIO and mounted file systems, with availability shown per connector.</p>
-          <div className="actions rv"><Link className="btn" href={"/integrations" as Route}>Inspect integrations</Link><Link className="btn ghost" href="/security">Security architecture</Link></div>
-        </Scene>
-
-        <Scene id={10} band="access" eyebrow="START" title={<>Stop rebuilding knowledge<br />for every AI project.</>}>
-          {/*
-            The grid, folded.
-
-            Nine rows of deployment plumbing — "Content disarm: OPEN", "Quarantine storage:
-            CONFIGURED" — was the last thing a first-time visitor saw, and on a phone it was a
-            full screen of vocabulary that belongs to whoever operates this deployment rather
-            than to whoever is deciding whether to try it. Folding it is not hiding it: the
-            summary below is generated from the same live, fail-closed reading, it names the
-            number that is closed, and the full grid is one click away and also lives at
-            /status. What must never happen is this summary reporting more open than the grid
-            does, which is why both come from `readCapabilities` and neither is written by hand.
-          */}
-          <p className="lede rv">Compile your sources once. Use the resulting World across assistants, retrieval, APIs and signed exports.</p>
-
-          <details className="status-fold rv">
-            <summary>Deployment capability detail</summary>
-            <div className="caps">
-              {capabilities.map((cap) => (
-                <div className="cap" key={cap.name} data-tone={cap.tone} title={cap.note}>
-                  <span className="cap-n">{cap.name}</span>
-                  <span className="cap-s">{cap.state}</span>
-                </div>
-              ))}
+        <Scene id={3} film band="change" eyebrow="COMPILE FILM" title="Watch knowledge take shape.">
+          <div className="compile-film-sequence rv">
+            <div className="compile-film-stages" aria-label="Compilation stages">
+              {['SOURCES', 'READ', 'STRUCTURE', 'WORLD'].map((stage) => <span key={stage}>{stage}</span>)}
             </div>
-            <p className="fine">
-              Read live from this deployment when the page loads, not written by hand. A row this
-              page cannot confirm reads <b>Unknown</b> &mdash; it never defaults to available.
-            </p>
-          </details>
-
-          <p className="lede rv" style={{ marginTop: 26 }}>
-            The package is signed with Ed25519 and its public key is published, so a third party
-            with no account here can verify it.
-          </p>
-
-          <div className="actions rv" style={{ marginTop: 24 }}>
-            <Link className="btn" href={signedIn ? "/workspace" : "/login"}>
-              {signedIn ? "Open workspace" : "Start in a private workspace"}
-            </Link>
-            <Link className="btn ghost" href="/evidence">Inspect evidence</Link>
-            <Link className="btn ghost" href={"/contact" as Route}>Talk to us</Link>
+            {heroProof}
+            <FilmBand src="/film/compile-cut-2.mp4" poster="/film/poster-2.webp" index={1} label="READ — pages, regions and document structure" />
+            <FilmBand src="/film/compile-cut-3.mp4" poster="/film/poster-3.webp" index={2} label="STRUCTURE — entities, claims, relations and evidence" />
+            <FilmBand src="/film/compile-cut-4.mp4" poster="/film/poster-4.webp" index={3} label="WORLD — compiled knowledge used across AI surfaces" />
           </div>
-          <p className="fine rv">
-            Plans live on <Link href="/pricing">pricing</Link>. Measured compute. Hard spend limits.
-          </p>
+        </Scene>
+
+        <Scene id={4} band="answer" eyebrow="EVIDENCE" title="Follow grounded results back to the source.">
+          <p className="lede rv">Object → relation → evidence → document page → exact bounding box. Ask citations open the same source evidence.</p>
+          <div className="evidence-path rv" aria-label="Evidence path">
+            {['Object', 'Relation', 'Evidence', 'Document page', 'Exact bbox'].map((step, index) => (
+              <Fragment key={step}><span>{step}</span>{index < 4 ? <i aria-hidden="true">→</i> : null}</Fragment>
+            ))}
+          </div>
+          <div className="actions rv"><Link className="btn" href={"/explore" as Route}>Explore a Compiled World</Link></div>
+        </Scene>
+
+        <Scene id={5} band="access" eyebrow="START" title="Compile your own knowledge.">
+          <p className="lede rv">Files go in. Structured, traceable knowledge comes out.</p>
+          <div className="actions rv">
+            <Link className="btn" href={signedIn ? "/workspace" : "/login"}>Start with your files</Link>
+            <Link className="btn ghost" href={signedIn ? "/workspace/connections" : "/login"}>Connect a source</Link>
+            <Link className="btn ghost" href={"/explore" as Route}>Explore sample World</Link>
+          </div>
         </Scene>
       </main>
 

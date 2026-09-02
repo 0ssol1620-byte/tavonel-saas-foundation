@@ -23,7 +23,7 @@ export function readPublicOperations() {
     store: Boolean(readSupabaseAdminConfig()),
     binding: (process.env.FOUNDATION_BILLING_HMAC?.trim().length ?? 0) >= 32,
     settlement: (process.env.FOUNDATION_BILLING_SETTLEMENT_HMAC?.trim().length ?? 0) >= 32,
-    catalog: readConfiguredBillingOffers().size === 5,
+    catalog: readConfiguredBillingOffers().size === 2,
   };
   const signer = readR2SignerEnv();
 

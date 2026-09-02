@@ -18,9 +18,7 @@ export const contentType = "image/png";
 const GROUND = "#08090A";
 const INK = "#EDEAE4";
 const MID = "#9AA3A8";
-const LO = "#7D878D";
 const VERIFIED = "#7BE0BE";
-const HAIRLINE = "#23282A";
 
 function Cell({ lit }: { lit?: boolean }) {
   return <div style={{ width: 22, height: 22, borderRadius: 2, background: lit ? VERIFIED : "#3A4245" }} />;
@@ -48,34 +46,20 @@ export default function OpengraphImage() {
             <Cell /><Cell /><Cell />
           </div>
           <div style={{ display: "flex", fontSize: 30, letterSpacing: 6, color: INK }}>TAVONEL</div>
-          <div
-            style={{
-              display: "flex",
-              marginLeft: 14,
-              fontSize: 16,
-              letterSpacing: 3,
-              color: LO,
-              border: `1px solid ${HAIRLINE}`,
-              borderRadius: 3,
-              padding: "7px 13px",
-            }}
-          >
-            PRIVATE PILOT
-          </div>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 26 }}>
           <div style={{ display: "flex", fontSize: 74, lineHeight: 1.1, color: INK, letterSpacing: -1.5 }}>
-            Your knowledge is everywhere.
+            Turn documents into a
           </div>
           <div style={{ display: "flex", fontSize: 74, lineHeight: 1.1, color: VERIFIED, letterSpacing: -1.5 }}>
-            Compile it.
+            source-grounded World.
           </div>
         </div>
 
         <div style={{ display: "flex", fontSize: 24, lineHeight: 1.5, color: MID, maxWidth: 940 }}>
-          Scattered files become one structured, AI-ready world &mdash; and it stays correct as your
-          sources change.
+          TAVONEL compiles documents and connected systems into structured knowledge with evidence
+          back to the source.
         </div>
       </div>
     ),

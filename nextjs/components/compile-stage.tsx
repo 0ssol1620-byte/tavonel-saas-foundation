@@ -11,7 +11,7 @@
  * Four columns, same grammar as the cuts:
  *   SOURCES   the files they dropped, with the one being worked on lit
  *   READ      the page the reader is on, region boxes at the confidence it reported
- *   STRUCTURE the lines that came out of those regions
+ *   STRUCTURE the observed page regions and extracted lines
  *   WORLD     compiled objects and their actual persisted relations
  *
  * When nothing is in flight the canvas holds its last frame rather than clearing, so a finished
@@ -207,7 +207,7 @@ export default function CompileStage({
       progress: OcrProgress | undefined,
     ) => {
       const found = progress?.regionsFound ?? 0;
-      pane(x, y, w, h, "STRUCTURE", found ? `${found} regions` : "—");
+      pane(x, y, w, h, "STRUCTURE", found ? `${found} source regions` : "—");
       const rowH = 11;
       const gutter = 20;
       context.fillStyle = "#121416";
@@ -267,7 +267,7 @@ export default function CompileStage({
       if (!model || model.objects.length === 0) {
         context.fillStyle = "#9aa3a8";
         context.font = "400 10px ui-monospace, Menlo, monospace";
-        context.fillText("building semantic structure…", ox + 8, oy + 20);
+        context.fillText("waiting for compiled objects…", ox + 8, oy + 20);
         return;
       }
 
@@ -324,11 +324,11 @@ export default function CompileStage({
 
   return (
     <div className="compile-stage">
-      <canvas ref={canvasRef} className="compile-stage-canvas" aria-hidden="true" />
+      <canvas ref={canvasRef} className="compile-stage-canvas" data-sensitive="content" aria-hidden="true" />
       <p className="sr-only" role="status">
         {world
           ? `${rows.length} sources, ${world.objects.length} compiled objects, and ${world.relations.length} persisted relations.`
-          : `${rows.length} sources. Building semantic structure; no World objects are available yet.`}
+          : `${rows.length} sources. Extracting observed regions; no World objects are available yet.`}
       </p>
     </div>
   );

@@ -4,7 +4,7 @@ const { expect, test } = "test" in playwrightModule ? playwrightModule : playwri
 
 test("homepage opens the no-login Compiled World sample", async ({ page }) => {
   await page.goto("/");
-  const cta = page.getByRole("link", { name: "Explore a Compiled World" });
+  const cta = page.getByRole("link", { name: "Explore a Compiled World" }).first();
   await expect(cta).toBeVisible();
   await cta.click();
   await expect(page).toHaveURL(/\/explore$/);

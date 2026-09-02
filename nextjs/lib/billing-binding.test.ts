@@ -7,11 +7,11 @@ describe("Foundation billing checkout binding", () => {
     const binding = createCheckoutBinding({
       userId: "969dc192-daa2-4119-969d-c192daa24119",
       workspaceId: "pilot-969dc192daa24119",
-      offerCode: "credit_builder",
+      offerCode: "observer_access",
     }, secret);
 
     expect(verifyCheckoutBinding(binding, secret)).toEqual(binding);
-    expect(verifyCheckoutBinding({ ...binding, tavonel_offer_code: "credit_scale" }, secret)).toBeNull();
+    expect(verifyCheckoutBinding({ ...binding, tavonel_offer_code: "studio_access" }, secret)).toBeNull();
     expect(verifyCheckoutBinding(binding, "wrong-secret-that-is-still-long-enough-000")).toBeNull();
   });
 });

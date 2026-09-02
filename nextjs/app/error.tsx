@@ -35,7 +35,6 @@ export default function ErrorBoundary({
     <main id="main" className="auth" tabIndex={-1}>
       <header>
         <Link href="/" className="wordmark"><Logomark /><b>TAVONEL</b></Link>
-        <span className="mode"><i aria-hidden="true" />PRIVATE PILOT</span>
       </header>
 
       <div className="auth-body">
@@ -44,7 +43,7 @@ export default function ErrorBoundary({
           <h1>This page stopped rendering.</h1>
           <p className="lead">
             The failure is in the screen, not in your data. Uploaded documents are immutable,
-            credits change only when a signed webhook is persisted, and nothing is promoted into a
+            usage changes only when a signed event is persisted, and nothing is promoted into a
             live world without a person deciding it &mdash; none of which a rendering failure can
             reach.
           </p>

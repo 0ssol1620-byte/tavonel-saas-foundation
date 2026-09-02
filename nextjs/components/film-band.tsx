@@ -210,7 +210,7 @@ export default function FilmBand({
       video.removeEventListener("playing", onPlaying);
       video.removeEventListener("error", onError);
     };
-  }, [src, index, admitted]);
+  }, [src, index, admitted, priority]);
 
   return (
     <div className="film-band">

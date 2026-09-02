@@ -33,10 +33,14 @@ describe("Foundation compute ledger", () => {
       documentId: base.documentId,
       state: "reserved",
       expiresAt: "2026-08-29T12:10:00Z",
-      reservedCredits: 18,
+      reservedCredits: 12,
+      maximumCredits: 18,
       idempotentReplay: false,
     }), { status: 200 })));
     await expect(reserveFoundationCompute(base)).resolves.toMatchObject({ ok: true });
+    expect(fetch).toHaveBeenCalledWith(expect.stringContaining("reserve_foundation_compute_v2"), expect.objectContaining({
+      body: expect.stringContaining('"p_reserved_credits":12,"p_maximum_credits":18'),
+    }));
   });
 
   it("accepts only an idempotent settlement receipt", async () => {

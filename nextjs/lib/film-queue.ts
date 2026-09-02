@@ -131,5 +131,8 @@ export function setVisibility(index: number, ratio: number) {
     const p = players.get(i);
     if (p && p.ratio > best) { best = p.ratio; leader = i; }
   }
-  for (const [i, p] of players) (i === leader ? p.play() : p.pause());
+  for (const [i, p] of players) {
+    if (i === leader) p.play();
+    else p.pause();
+  }
 }

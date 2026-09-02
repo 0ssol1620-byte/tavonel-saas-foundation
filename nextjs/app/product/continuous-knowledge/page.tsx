@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import Logomark from "@/components/logomark";
 
 export const metadata: Metadata = {
@@ -21,6 +22,7 @@ const PARTS = [
 ] as const;
 
 export default function ContinuousKnowledgePage() {
+  notFound();
   return (
     <div className="page">
       <header className="nav" data-stuck={1}>

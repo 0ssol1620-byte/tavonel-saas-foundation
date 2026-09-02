@@ -91,27 +91,26 @@ test("nothing on the page is wider than the thing that holds it", async ({ page 
   await testInfo.attach("landing", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
 });
 
-test("draws ten scenes over the opening world field", async ({ page }) => {
+test("draws the final five-scene journey over the opening world field", async ({ page }) => {
   await page.goto("/");
   await settle(page);
 
   /*
-   * The masterplan expands the authored journey to ten numbered scenes without restoring the
-   * duplicate continuation sections. A single fixed WorldField carries the state transition.
+   * The final masterplan closes the product story in five numbered scenes. A single fixed
+   * WorldField carries the state transition without fake topology.
    */
-  await expect(page.locator("section.scene")).toHaveCount(10);
+  await expect(page.locator("section.scene")).toHaveCount(5);
   await expect(page.locator("section.scene.cont")).toHaveCount(0);
   await expect(page.locator(".world-field")).toHaveCount(1);
 
   const scenes = await page.evaluate(() =>
     Array.from(document.querySelectorAll("[data-scene]")).map((el) => el.getAttribute("data-scene")));
-  expect(new Set(scenes).size).toBe(10);
+  expect(new Set(scenes).size).toBe(5);
 
   const bands = await page.evaluate(() =>
     Array.from(document.querySelectorAll("[data-band]")).map((el) => el.getAttribute("data-band")));
   expect(bands).toEqual([
-    "scatter", "structure", "change", "answer", "world",
-    "world", "structure", "world", "access", "access",
+    "scatter", "structure", "change", "answer", "access",
   ]);
 
   const field = await page.locator(".world-field").boundingBox();

@@ -103,6 +103,12 @@
   text-shadow: 0 0 10px var(--text-hi);
   user-select: none;
 }
+.shell[data-privacy="true"] :global([data-sensitive="content"]) {
+  filter: blur(12px);
+  opacity: .18;
+  pointer-events: none;
+  user-select: none;
+}
 
 .content { max-width: 1440px; width: 100%; margin: 0 auto; }
 .stateHero { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 24px; padding: 4px 0 22px; border-bottom: 1px solid var(--hairline-hi); }

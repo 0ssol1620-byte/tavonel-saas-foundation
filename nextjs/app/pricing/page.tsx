@@ -42,6 +42,7 @@ const PLANS = [
 export default function PricingPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [signedIn, setSignedIn] = useState(false);
+  const [commercialMode, setCommercialMode] = useState<"pilot" | "live">("pilot");
   const [pages, setPages] = useState(348);
   const { start: startCheckout, busy: billingBusy } = useCheckout(setNotice);
   const quote = quoteCompilePages(pages);
@@ -51,17 +52,28 @@ export default function PricingPage() {
     void (async () => {
       const { getSupabaseBrowserClient } = await import("@/lib/supabase-browser");
       const client = getSupabaseBrowserClient();
-      if (!client || cancelled) return;
-      const { data } = await client.auth.getSession();
-      if (!cancelled) setSignedIn(Boolean(data.session));
+      if (client && !cancelled) {
+        const { data } = await client.auth.getSession();
+        if (!cancelled) setSignedIn(Boolean(data.session));
+      }
+      try {
+        const response = await fetch("/api/status", { cache: "no-store" });
+        const status = await response.json() as { commercialMode?: "pilot" | "live" };
+        if (!cancelled) setCommercialMode(status.commercialMode === "live" ? "live" : "pilot");
+      } catch {
+        if (!cancelled) setCommercialMode("pilot");
+      }
     })();
     return () => { cancelled = true; };
   }, []);
 
-  const showNotice = () =>
-    setNotice("This deployment is a private pilot. Provider configuration and sandbox qualification are required before this action is available.");
+  const requestAccess = () => window.location.assign("/contact");
 
   const chooseOffer = (offerCode: BillingOfferCode) => {
+    if (commercialMode !== "live") {
+      window.location.assign("/contact");
+      return;
+    }
     if (signedIn) {
       void startCheckout(offerCode);
       return;
@@ -124,9 +136,9 @@ export default function PricingPage() {
                     className="btn ghost"
                     type="button"
                     disabled={Boolean(billingBusy)}
-                    onClick={() => (plan.offerCode ? chooseOffer(plan.offerCode) : showNotice())}
+                    onClick={() => commercialMode === "pilot" || !plan.offerCode ? requestAccess() : chooseOffer(plan.offerCode)}
                   >
-                    {plan.name === "Enterprise" ? "Start a conversation" : plan.name === "Evaluation" ? "Request evaluation" : billingBusy === plan.offerCode ? "Opening checkout…" : signedIn ? "Choose this plan" : "Choose this plan → sign in"}
+                    {commercialMode === "pilot" ? "Request access" : plan.name === "Enterprise" ? "Start a conversation" : plan.name === "Evaluation" ? "Request evaluation" : billingBusy === plan.offerCode ? "Opening checkout…" : signedIn ? "Choose this plan" : "Choose this plan → sign in"}
                   </button>
                 </article>
               ))}
@@ -138,11 +150,10 @@ export default function PricingPage() {
             <details className="status-fold rv">
               <summary>How usage is measured</summary>
               <p>
-                TAVONEL records internal processing units, GPU seconds, OCR routes and model tokens
-                for cost control. Your quote and receipt stay in pages and dollars. A run cannot
-                exceed the maximum charge without a new confirmation.
+                Usage is measured from processed pages. Every preflight shows the standard estimate
+                and the maximum charge before processing begins.
               </p>
-              <p className="fine">Launch rates remain subject to measured P95 cost qualification. Checkout stays fail-closed until the live billing gate is open.</p>
+              <p className="fine">See the estimated and maximum charge before processing.</p>
             </details>
             {notice ? <p className="notice" role="status">{notice}</p> : null}
           </div>

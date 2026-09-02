@@ -63,7 +63,6 @@ type Props = {
   candidateReady: boolean;
   reviewCount: number | null;
   activityCount: number;
-  credits: number | null;
   truthGates: TruthGate[];
   stateTitle: string;
   stateDescription: string;
@@ -82,7 +81,6 @@ export default function WorkspaceUltimateShell({
   candidateReady,
   reviewCount,
   activityCount,
-  credits,
   truthGates,
   stateTitle,
   stateDescription,
@@ -221,14 +219,13 @@ export default function WorkspaceUltimateShell({
           <div className={styles.headerAction}>{headerAction}</div>
         </header>
 
-        <details className={styles.truthStrip}>
+        {truthGates.length > 0 ? <details className={styles.truthStrip}>
           <summary>
             <span>ADVANCED / SYSTEM DETAILS</span>
             <span data-qualified={truthGates.every((gate) => gate.qualified)}>
               <i aria-hidden="true" />{truthGates.every((gate) => gate.qualified) ? "ALL GATES QUALIFIED" : "SOME GATES HELD"}
             </span>
             <span>ACTIVITY {activityCount > 0 ? `${activityCount} RUNNING` : "QUIET"}</span>
-            <span>INTERNAL UNITS {credits === null ? "NOT READ" : credits}</span>
             <button type="button" aria-pressed={privacyMode} onClick={(event) => { event.preventDefault(); setPrivacyMode((value) => !value); }}>
               {privacyMode ? "Show content" : "Hide content"}
             </button>
@@ -236,7 +233,7 @@ export default function WorkspaceUltimateShell({
           <div>
             {truthGates.map((gate) => <p key={gate.label}><strong>{gate.label}</strong>{gate.detail}</p>)}
           </div>
-        </details>
+        </details> : null}
 
         <div className={`workspace-content ${styles.content}`}>
           <section className={styles.stateHero} aria-labelledby="workspace-state-title">

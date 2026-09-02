@@ -72,7 +72,7 @@ describe("pipeline board", () => {
       [doc({ sanitizedKey: "k/sanitized.pdf", hasOcrJson: true, ocrJsonKey: "k/ocr.json", ocrJsonSize: 4096, processingState: "ocr_ready" })],
     );
     expect(states(rows)).toEqual(["done", "done", "done", "active"]);
-    expect(rows[0].stages[2].detail).toContain("ocr.json");
+    expect(rows[0].stages[2].detail).toContain("source read");
   });
 
   it("holds a document stopped for operator review, and carries the reason", () => {
@@ -81,18 +81,18 @@ describe("pipeline board", () => {
       [doc({ sanitizedKey: "k/sanitized.pdf", processingState: "operator_review", ocrReviewKey: "k/ocr-review.json", ocrReviewReasonCode: "OCR_LOW_TEXT_YIELD" })],
     );
     expect(states(rows)).toEqual(["done", "done", "held", "waiting"]);
-    expect(rows[0].stages[2].detail).toContain("OCR_LOW_TEXT_YIELD");
+    expect(rows[0].stages[2].detail).toContain("review required");
     // A held document is not a failure, and it must never be presented as one.
     expect(rows[0].stages[2].state).not.toBe("failed");
     expect(rows[0].needsPerson).toBe(true);
   });
 
-  it("never offers an automatic retry for a held document", () => {
+  it("uses customer-facing review language for a held document", () => {
     const rows = buildPipeline(
       [upload({ phase: "stored", documentId: "doc-1" })],
       [doc({ sanitizedKey: "k/sanitized.pdf", processingState: "operator_review" })],
     );
-    expect(rows[0].stages[2].detail).toContain("no automatic paid retry");
+    expect(rows[0].stages[2].detail).toBe("review required before reading can continue");
   });
 
   it("marks compile done only for documents actually bound into a candidate", () => {

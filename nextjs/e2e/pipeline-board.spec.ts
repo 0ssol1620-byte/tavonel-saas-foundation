@@ -108,21 +108,22 @@ test("draws every document as four stages, and marks only the held one", async (
   await expect(page.locator(".board-stages").first().locator(".board-stage")).toHaveCount(4);
 
   // The document that finished reading: three done, compile still open.
-  const read = page.locator(".board-rows > li").filter({ hasText: "doc-read" }).first();
+  const read = page.locator('[data-document-id="doc-read"]');
   await expect(read.locator('.board-stage[data-s="done"]')).toHaveCount(3);
   await expect(read.locator('.board-stage[data-s="held"]')).toHaveCount(0);
 
   // The one still being read must not claim a result it does not have.
-  const reading = page.locator(".board-rows > li").filter({ hasText: "doc-reading" }).first();
+  const reading = page.locator('[data-document-id="doc-reading"]');
   await expect(reading.locator('.board-stage[data-s="active"]')).toHaveCount(1);
   await expect(reading).toContainText("reading within bounded processing");
 
-  // The held one carries its reason and refuses an automatic retry, in the changed tone.
+  // The held one explains the customer action without exposing internal reason codes.
   const heldRow = page.locator(".board-rows > li[data-held='1']");
   await expect(heldRow).toHaveCount(1);
-  await expect(heldRow).toContainText("OCR_LOW_TEXT_YIELD");
-  await expect(heldRow).toContainText("no automatic paid retry");
-  await expect(board).toContainText("does not guess at a page it could not read");
+  await expect(heldRow).toContainText("review required before reading can continue");
+  await expect(heldRow).not.toContainText("OCR_LOW_TEXT_YIELD");
+  await expect(board).toContainText("Open Review to inspect the source and choose the next action");
+  await expect(board.getByRole("button", { name: /retry/i })).toHaveCount(0);
 
   // Held is not failure, and nothing anywhere claims a compiled candidate.
   await expect(page.locator('.board-stage[data-s="failed"]')).toHaveCount(0);
@@ -196,7 +197,7 @@ test("draws the regions the reader reported, and only while it is still reading"
 
   await page.goto("/workspace");
 
-  const reading = page.locator(".board-rows > li").filter({ hasText: "doc-reading" }).locator(".reading");
+  const reading = page.locator('[data-document-id="doc-reading"] .reading');
   await expect(reading).toBeVisible();
 
   // One rectangle per reported region, no more and no fewer.
@@ -327,7 +328,7 @@ test("reads several documents at the same time, each with its own page", async (
 
   // Each panel is reporting its own document, not a shared one.
   for (const [id, [pagesRead, , text]] of Object.entries(PAGES)) {
-    const panel = page.locator(".board-rows > li").filter({ hasText: id }).first();
+    const panel = page.locator(`[data-document-id="${id}"]`);
     await expect(panel.locator(".board-now")).toContainText(`READING p.${String(pagesRead).padStart(2, "0")}`);
     await expect(panel.locator(".reading-lines")).toContainText(text);
   }

@@ -99,23 +99,19 @@ describe("public copy", () => {
     }
   });
 
-  it("still says on the landing page that the demonstration is fictional", () => {
-    // The disclosure is the counterweight to nine scenes of invented figures. If it is ever
-    // edited away, the page starts reading as a record of a real run.
+  it("keeps fixture disclosure with the fixture and off the five-scene landing page", () => {
     const disclosure = read("lib/demo-world.ts");
     expect(disclosure).toContain("fictional demonstration data");
     expect(disclosure).toContain("not a recording of a compiler run");
-    expect(landingSource()).toContain("DISCLOSURE.fixture");
+    expect(landingSource()).not.toContain("DISCLOSURE.fixture");
   });
 
-  it("still labels the two unshipped capabilities as directions", () => {
-    // The grid moved from app/page.tsx into lib/capabilities.ts so its fail-closed behaviour could
-    // be tested. This assertion follows it: the rule is about the two labels, not their address.
+  it("keeps unshipped capability records off the public landing sequence", () => {
     const grid = read("lib/capabilities.ts");
     expect(grid).toContain('state: "Direction"');
     expect(grid).toContain("Knowledge architecture");
     expect(grid).toContain("Selective recompilation");
-    expect(landingSource()).toContain("readCapabilities");
+    expect(landingSource()).not.toContain("readCapabilities");
   });
 
   it("names each scene the same way in the eyebrow and the instrument bar", () => {
@@ -242,13 +238,14 @@ describe("public copy", () => {
     expect(page).not.toContain("IdentityResolve");
   });
 
-  it("names the artifacts that leave the compiler", () => {
-    // The films show the compile. What a buyer cannot see in a loop is what they receive,
-    // and that is the difference between this and a retrieval index.
+  it("keeps the landing to five scenes and names the exact evidence path", () => {
     const page = landingSource();
-    expect(page).toContain("ontology.ttl");
-    expect(page).toContain("graph.csv");
-    expect(page).toContain("provenance");
+    expect(page.match(/<Scene id=/g)).toHaveLength(4);
+    expect(page).toContain('id="s1"');
+    expect(page).toContain("Object");
+    expect(page).toContain("Relation");
+    expect(page).toContain("Document page");
+    expect(page).toContain("Exact bbox");
   });
 
   it("stages a customer's own upload in the workspace, not a fixture world", () => {

@@ -7,7 +7,7 @@ const publicRoutes = [
   ["/terms", "Terms written for the service"],
   ["/refunds", "Cancellation and refund terms"],
   ["/subprocessors", "services allowed to touch"],
-  ["/status", "Current deployment state"],
+  ["/status", "TAVONEL service status"],
 ] as const;
 
 test("publishes the operating record without horizontal overflow", async ({ page }) => {

@@ -21,12 +21,15 @@ const errorResponse = {
 };
 
 export function GET(request: Request) {
+  if (request.headers.get("accept")?.includes("text/html")) {
+    return NextResponse.redirect(new URL("/api", request.url), 302);
+  }
   const origin = resolveOpenApiOrigin(request.url);
   return NextResponse.json({
     openapi: "3.1.0",
     info: {
       title: "TAVONEL Knowledge Compiler API",
-      version: "2026-08-30.1",
+      version: "2026-09-02.1",
       description: "Tenant-scoped access to immutable documents, candidate knowledge packages, active worlds, grounded retrieval and durable connector cursors. Promotion and rollback remain human-session-only.",
     },
     servers: [{ url: `${origin}/api/v1` }],
@@ -68,6 +71,28 @@ export function GET(request: Request) {
           parameters: [{ $ref: "#/components/parameters/CollectionId" }],
           requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["question"], properties: { question: { type: "string", minLength: 3, maxLength: 500 } } } } } },
           responses: { "200": { description: "Grounded answer with exact page and bbox citations, or an explicit abstention. `retrievalPath` names which runtime answered: `compiled-retrieval-v1` (lexical + dense + structure, RRF-fused, reranked and World Gate filtered) or `excerpt-concatenation-fallback` when no compiled retrieval index exists for the active world yet" }, "409": errorResponse },
+        },
+      },
+      "/runs/{runId}/events": {
+        get: {
+          operationId: "streamRunEvents",
+          "x-tavonel-scope": "documents:read",
+          description: "Replays append-only observed run events after Last-Event-ID, then streams new events and a bounded heartbeat.",
+          parameters: [
+            { name: "runId", in: "path", required: true, schema: { type: "string" } },
+            { name: "after", in: "query", required: false, schema: { type: "integer", minimum: 0 } },
+          ],
+          responses: { "200": { description: "Persisted run-event stream", content: { "text/event-stream": { schema: { type: "string" } } } }, "404": errorResponse },
+        },
+      },
+      "/reviews": {
+        post: {
+          operationId: "recordEvidenceReview",
+          "x-tavonel-auth": "browser-session",
+          security: [{ TavonelUserSession: [] }],
+          description: "Records an append-only Accept, Edit, or Reject decision after revalidating the evidence against the persisted World.",
+          requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["collectionId", "manifestDigest", "evidenceId", "action", "reason"], properties: { collectionId: { type: "string", pattern: "^collection-[a-f0-9]{32}$" }, manifestDigest: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" }, evidenceId: { type: "string" }, action: { enum: ["accept", "edit", "reject"] }, reason: { type: "string", minLength: 8, maxLength: 1000 } }, additionalProperties: false } } } },
+          responses: { "201": { description: "Evidence-bound human decision receipt" }, "400": errorResponse, "404": errorResponse, "409": errorResponse },
         },
       },
       // Kept separate from /ask deliberately: search returns evidence-rich candidates for a
@@ -234,5 +259,5 @@ export function GET(request: Request) {
     "x-tavonel-version-policy": { pathMajor: "/api/v1", responseHeader: "X-TAVONEL-API-Version", clientMediaType: "application/vnd.tavonel.v1+json" },
     "x-tavonel-browser-session-paths": ["/oauth-connectors", "/oauth-connectors/authorize", "/oauth-connectors/connections/{id}", "/developer/keys/{id}/rotate", "/developer/audit"],
     "x-tavonel-decision-gates": { promotion: "browser-session-only", rollback: "browser-session-only", mcp: "read-only" },
-  }, { headers: { "Cache-Control": "public, max-age=300", "X-Content-Type-Options": "nosniff" } });
+  }, { headers: { "Cache-Control": "public, max-age=300", "X-Content-Type-Options": "nosniff", "X-Robots-Tag": "noindex" } });
 }

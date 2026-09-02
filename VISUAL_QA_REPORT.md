@@ -1,53 +1,53 @@
-# TAVONEL Ultimate Blueprint visual QA report
+# TAVONEL Final Web Product Workspace visual QA report
 
-Authority: `D:\TAVONEL_ULTIMATE_WEB_PRODUCT_DESIGN_BLUEPRINT_2026-09-01.md`
-Repository: `D:\CodexProjects\tavonel-saas-foundation`
-Run date: 2026-09-01 KST
+Authority: `D:\TAVONEL_FINAL_WEB_PRODUCT_WORKSPACE_MASTERPLAN_2026-09-02.md`
+Repository worktree: `D:\CodexProjects\tavonel-saas-foundation-p0p2-integration`
+Run date: 2026-09-02 KST
 
 ## Automated coverage
 
-The Playwright matrix exercised 1920, 1440, 1280, 1024, 768, 390, 360, and reduced-motion projects. The full product matrix completed with 180 passes, 12 intentional non-mobile skips, and no failures.
+The production Playwright matrix exercised `1920`, `1440`, `1280`, `1024`, `768`, `390`, `360`, and reduced-motion projects, followed by launch checks in Chromium, Firefox, and WebKit. The final run completed with **219 passes, 15 intentional project-specific skips, and no failures**.
 
-Full-page captures were produced for:
+The matrix verified:
 
-- `/enterprise`
-- `/knowledge-compiler`
-- `/workspace/runs`
+- the exact five-scene landing journey and horizontal containment at every required width;
+- source-grounded sample navigation without login;
+- file, processing, review, active World, grounded Ask, and signed-download browser contracts;
+- customer-safe held/review states without internal reason-code exposure;
+- persisted run-event and Activity surfaces;
+- mobile source/World switching, command-palette keyboard behavior, and no horizontal squeeze;
+- anonymous and forged-credential API rejection, mutable-contract cache boundaries, and launch security headers;
+- semantic accessibility on `/`, `/privacy`, `/terms`, `/security`, `/contact`, and `/login` across launch browsers;
+- reduced-motion information and interaction parity.
 
-The automated journeys also verified:
+The tests attach full-page evidence for the public architecture and authenticated run surfaces. Authenticated journeys use an in-browser test session with intercepted tenant APIs; they prove the production browser contract, not a live customer account or external connector.
 
-- public proof registries and deterministic sample downloads;
-- mobile Runs state with SSE evidence and reason codes;
-- persistent Activity audit rows;
-- keyboard command-palette navigation;
-- no horizontal overflow in the mobile operations surface;
-- reduced-motion information parity.
+## Build and code gates
+
+- TypeScript: passed with strict project configuration.
+- ESLint: all 376 tracked and newly added `app`, `components`, and `lib` TypeScript files passed.
+- Unit and contract tests: **119 files, 753 tests passed**.
+- Next.js production build: passed; 53 static pages and all dynamic API routes were generated successfully.
+- Playwright: **219 passed, 15 intentional skips, 0 failed**.
 
 ## Performance gate
 
-The production build is measured through Lighthouse 12.8 using direct DevTools throttling. Category and metric budgets remain unchanged: performance 0.80, accessibility 0.95, best practices 0.90, SEO 0.90, LCP 3000 ms, CLS 0.10, and TBT 300 ms.
-
-The hero LCP is a verified T0 product proof frame. Its intrinsic geometry is present in server HTML, mobile hero typography is stable across web-font loading, and the frame is isolated from client interaction state. The three-run median release results were:
+Lighthouse 12.8 measured each route three times with direct DevTools throttling. The release budgets are performance `0.80`, accessibility `0.95`, best practices `0.90`, SEO `0.90`, LCP `3000 ms`, CLS `0.10`, and TBT `300 ms`.
 
 | Route | Performance | Accessibility | Best practices | SEO | LCP | CLS | TBT |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `/` | 0.94 | 0.96 | 0.96 | 1.00 | 2649 ms | 0.00023 | 81 ms |
-| `/privacy` | 0.98 | 1.00 | 1.00 | 1.00 | 1878 ms | 0.00033 | 62 ms |
-| `/security` | 0.97 | 1.00 | 0.96 | 1.00 | 2023 ms | 0.00024 | 38 ms |
+| `/` | 0.97 | 0.96 | 1.00 | 1.00 | 2073 ms | 0.00023 | 73 ms |
+| `/privacy` | 0.98 | 1.00 | 1.00 | 1.00 | 1901 ms | 0.00033 | 63 ms |
+| `/security` | 0.98 | 1.00 | 0.96 | 1.00 | 2001 ms | 0.00024 | 64 ms |
+
+All Lighthouse release budgets passed.
 
 ## Deployment evidence
 
-Production deployment `dpl_5Gsq2TCZrCFnhbcTZZAeExVbyd3V` reached Ready and was aliased to `tavonel.com` and `www.tavonel.com`. Live HTTP checks returned 200 for the homepage, Enterprise, Knowledge Compiler, Reproducibility, Benchmarks, Experiments, Customers, Developers, Trust, and readiness routes. The unauthenticated Runs SSE boundary returned the expected 401.
-
-The live reproducibility downloads returned attachment responses with stable release bytes:
-
-- `tavonel-reproducibility-manifest-v1.json`: SHA-256 `7109ebb0d36a081e1530e644257cf7c36f9988dbdd8d08c5c95bc18631fd8f17`
-- `tavonel-public-sample-world-v1.json`: SHA-256 `c503e05d43dcfb71428e820f5fe3fec28d6214ebf37f7f2d9954855e24a37da9`
-
-Authenticated Workspace journeys were exercised against the production build with a test session and intercepted tenant APIs. This is browser-contract evidence, not a claim that a live customer session or external integration was exercised during this run.
+Production deployment and live-domain verification are recorded here only after the verified commit reaches GitHub `main`, Supabase migrations `0035` through `0037` are applied, and both `tavonel.com` aliases resolve to the new deployment.
 
 ## Truth boundary
 
-Automated evidence confirms rendering, interaction, accessibility, responsive behavior, and performance gates. It does not establish aesthetic approval, customer consent, benchmark qualification, certification, or deployment-specific enterprise claims.
+Automated evidence confirms rendering, interaction, accessibility, responsive behavior, product contracts, and measured performance. It does not establish aesthetic approval, customer consent, benchmark qualification, certification, or a real paid transaction. Customer stories and benchmarks remain private until qualified evidence exists.
 
 **FOUNDER VISUAL REVIEW REQUIRED**
