@@ -16,7 +16,7 @@ create or replace function public.reserve_foundation_compute(
   p_workspace_key text,
   p_document_id uuid,
   p_user_id uuid,
-  p_reserved_credits integer
+  p_reserved_credits integer default 2
 )
 returns jsonb
 language plpgsql
@@ -168,4 +168,3 @@ grant execute on function public.reserve_foundation_compute(text, uuid, uuid, in
 grant execute on function public.settle_foundation_compute(text, uuid, text, integer, text) to service_role;
 
 commit;
-
