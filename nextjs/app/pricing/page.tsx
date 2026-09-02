@@ -86,7 +86,7 @@ export default function PricingPage() {
         <section className="scene doc">
           <div className="shell">
             <p className="slate"><b>PRICING</b><span />MEASURED COMPUTE</p>
-            <h2>Pages and dollars.<br />No credit arithmetic.</h2>
+            <h1 className="document-title">Pages and dollars.<br />No credit arithmetic.</h1>
             <p className="lede">
               Standard Knowledge Compile is modeled at $0.04 per processed page. Vision escalation
               is charged only when a page needs it, with a $0.06 per-page hard maximum.
