@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
-import { CORPUS_ID_PATTERN, corpusIdFor, planCorpusBatches, type CorpusBatch } from "./corpus-batching";
+import { CORPUS_ID_PATTERN, planCorpusBatches, type CorpusBatch } from "./corpus-batching";
+import { corpusIdFor } from "./corpus-id";
 
 /*
   The application's view of durable compile orchestration (migration 0038).

@@ -3,9 +3,9 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { COMPILE_MAX_DOCUMENTS, CORPUS_MAX_DOCUMENTS } from "./compile-limits";
 import { MAX_FILES } from "./archive-expand";
+import { corpusIdFor } from "./corpus-id";
 import {
   CORPUS_ID_PATTERN,
-  corpusIdFor,
   judgeCorpusSet,
   needsCorpusCompile,
   planCorpusBatches,

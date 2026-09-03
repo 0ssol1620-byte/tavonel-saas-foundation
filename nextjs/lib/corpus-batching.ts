@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { COMPILE_MAX_DOCUMENTS, COMPILE_MIN_DOCUMENTS, CORPUS_MAX_DOCUMENTS } from "./compile-limits";
 
 /*
@@ -29,6 +28,16 @@ import { COMPILE_MAX_DOCUMENTS, COMPILE_MIN_DOCUMENTS, CORPUS_MAX_DOCUMENTS } fr
 */
 
 export { CORPUS_MAX_DOCUMENTS };
+
+/*
+  No `node:crypto` in this module, deliberately.
+
+  The workspace imports `judgeCorpusSet` to decide whether the Compile button is enabled, so
+  this file is in the client bundle. A `createHash` import here fails the production build --
+  webpack cannot resolve a `node:` scheme for the browser -- and the dev server does not, which
+  is how it got as far as a build. `corpusIdFor` needs the hash, so it lives in `corpus-id.ts`,
+  which only the server imports.
+*/
 
 export const CORPUS_ID_PATTERN = /^corpus-[a-f0-9]{32}$/;
 
@@ -63,19 +72,6 @@ export function needsCorpusCompile(count: number) {
   return count > COMPILE_MAX_DOCUMENTS;
 }
 
-/**
- * The corpus's identity is its document set, exactly as a job's is.
- *
- * Same rule, same reason: resubmitting the same selection has to converge on the run that is
- * already going rather than start a second one beside it. Deriving the id from the set rather
- * than from a random value is what lets the parts be enqueued one at a time -- a submission
- * interrupted halfway through re-enqueues into the same corpus and the parts that exist are
- * returned unchanged.
- */
-export function corpusIdFor(workspaceKey: string, documentIds: readonly string[]) {
-  const canonical = [...new Set(documentIds)].sort().join("\n");
-  return `corpus-${createHash("sha256").update(`corpus\n${workspaceKey}\n${canonical}`).digest("hex").slice(0, 32)}`;
-}
 
 export type CorpusBatch = {
   index: number;
