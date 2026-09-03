@@ -576,11 +576,22 @@ export type LoadWorldReadModelResult =
   | { ok: true; model: WorldReadModel }
   | { ok: false; code: string; status: number };
 
-export async function loadWorldReadModel(workspaceKey: string, collectionId: string): Promise<LoadWorldReadModelResult> {
+/**
+ * Read one World, optionally a specific version of it.
+ *
+ * The digest is optional because almost every caller wants the current candidate. It exists
+ * because comparing two versions means loading two, and a diff that could only ever read
+ * "whichever one is preferred" would have nothing to compare it with.
+ */
+export async function loadWorldReadModel(
+  workspaceKey: string,
+  collectionId: string,
+  manifestDigest?: string,
+): Promise<LoadWorldReadModelResult> {
   if (!COLLECTION_ID_PATTERN.test(collectionId)) return { ok: false, code: "WORLD_ID_INVALID", status: 400 };
   const signer = readR2SignerEnv();
   if (!signer) return { ok: false, code: "SIGNER_NOT_CONFIGURED", status: 503 };
-  const loaded = await loadPreferredCollectionCandidate(signer, workspaceKey, collectionId);
+  const loaded = await loadPreferredCollectionCandidate(signer, workspaceKey, collectionId, manifestDigest);
   if (!loaded.ok) return { ok: false, code: loaded.code, status: loaded.code === "NOT_FOUND" ? 404 : 503 };
   const active = await getFoundationActiveWorld(workspaceKey, collectionId);
   if (!active.ok && active.code !== "ACTIVE_WORLD_NOT_FOUND") return { ok: false, code: active.code, status: 503 };

@@ -191,6 +191,72 @@ function mediaType(path: string) {
   return "application/json";
 }
 
+export type LabelDerivedInput = {
+  collectionId: string;
+  nodes: readonly KnowledgeNode[];
+  edges: readonly KnowledgeEdge[];
+  inputBinding: ReadonlyArray<{
+    documentId: string;
+    versionKey: string;
+    inputSha256: string;
+    sourceImmutableKey: string;
+  }>;
+};
+
+/*
+  Every package file whose content depends on a node label, produced in one place.
+
+  Four files embed labels: the canonical model, the Turtle and JSON-LD serialisations, and the
+  node CSV. They used to be written inline in the compiler, which was fine while the compiler
+  was the only thing that produced an artifact. A reviewer editing a label produces one too --
+  a new candidate, never a mutation of the old one -- and if that path regenerated three of
+  the four, the artifact would be internally inconsistent while still validating: the graph
+  would say one thing and the RDF another, with a digest over both.
+
+  Note what is *not* here. `rag/chunks.jsonl` and the Obsidian source markdown carry document
+  text, not node labels. An edited claim label does not rewrite what the page said, and it
+  must not: the excerpt is evidence of the source, and the label is the compiled assertion
+  about it. Those are different things and only one of them is a reviewer's to change.
+*/
+export function materializeLabelDerivedFiles(input: LabelDerivedInput) {
+  const { collectionId, nodes, edges, inputBinding } = input;
+  const canonicalModel = {
+    schemaVersion: "akc.canonical-knowledge-model.v1",
+    collectionId,
+    blueprint: GENERIC_MIXED_CORPUS_BLUEPRINT,
+    nodes,
+    edges,
+    inputBinding,
+  };
+  const ttl = [
+    "@prefix tav: <urn:tavonel:> .",
+    "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .",
+    "@prefix prov: <http://www.w3.org/ns/prov#> .",
+    "",
+    ...nodes.map((node) => `<urn:tavonel:${node.id}> a tav:${node.kind} ; rdfs:label ${JSON.stringify(node.label)} .`),
+    ...edges.map((edge) => `<urn:tavonel:${edge.from}> tav:${edge.type} <urn:tavonel:${edge.to}> .`),
+    "",
+  ].join("\n");
+  const jsonld = JSON.stringify({
+    "@context": {
+      "@vocab": "urn:tavonel:",
+      label: "http://www.w3.org/2000/01/rdf-schema#label",
+      evidence: "http://www.w3.org/ns/prov#wasDerivedFrom",
+    },
+    "@graph": nodes.map((node) => ({ "@id": `urn:tavonel:${node.id}`, "@type": node.kind, label: node.label, evidence: node.evidenceIds })),
+  }, null, 2) + "\n";
+  const nodeCsv = ["id,label,name,document_id", ...nodes.map((node) => [node.id, node.kind, node.label, node.documentId ?? ""].map(csvCell).join(","))].join("\n") + "\n";
+  const edgeCsv = ["id,subject_id,predicate,object_id,evidence_ids", ...edges.map((edge) => [edge.id, edge.from, edge.type, edge.to, edge.evidenceIds.join("|")].map(csvCell).join(","))].join("\n") + "\n";
+
+  return {
+    canonicalModel: packageFile("canonical/model.json", JSON.stringify(canonicalModel, null, 2) + "\n"),
+    turtle: packageFile("ontology/knowledge.ttl", ttl),
+    jsonld: packageFile("ontology/knowledge.jsonld", jsonld),
+    nodeCsv: packageFile("graph/nodes.csv", nodeCsv),
+    edgeCsv: packageFile("graph/relationships.csv", edgeCsv),
+  };
+}
+
 function packageFile(path: string, content: string) {
   return {
     path,
@@ -408,47 +474,21 @@ export function compileCollectionCandidate(inputs: CollectionOcrInput[]): Collec
   directoryPlan.push({ path: "MOCs/Home.md", kind: "map-of-content", sourceIds: sorted.map((item) => item.documentId) });
   directoryPlan.push({ path: "Packages/knowledge-package.json", kind: "package", sourceIds: sorted.map((item) => item.documentId) });
 
-  const canonicalModel = {
-    schemaVersion: "akc.canonical-knowledge-model.v1",
-    collectionId,
-    blueprint: GENERIC_MIXED_CORPUS_BLUEPRINT,
-    nodes,
-    edges,
-    inputBinding,
-  };
   const home = `# TAVONEL Candidate Knowledge Package\n\n${sourceMarkdown.map((item) => `- [[Sources/${item.documentId}|${item.title}]]`).join("\n")}\n`;
-  const ttl = [
-    "@prefix tav: <urn:tavonel:> .",
-    "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .",
-    "@prefix prov: <http://www.w3.org/ns/prov#> .",
-    "",
-    ...nodes.map((node) => `<urn:tavonel:${node.id}> a tav:${node.kind} ; rdfs:label ${JSON.stringify(node.label)} .`),
-    ...edges.map((edge) => `<urn:tavonel:${edge.from}> tav:${edge.type} <urn:tavonel:${edge.to}> .`),
-    "",
-  ].join("\n");
-  const jsonld = JSON.stringify({
-    "@context": {
-      "@vocab": "urn:tavonel:",
-      label: "http://www.w3.org/2000/01/rdf-schema#label",
-      evidence: "http://www.w3.org/ns/prov#wasDerivedFrom",
-    },
-    "@graph": nodes.map((node) => ({ "@id": `urn:tavonel:${node.id}`, "@type": node.kind, label: node.label, evidence: node.evidenceIds })),
-  }, null, 2) + "\n";
-  const nodeCsv = ["id,label,name,document_id", ...nodes.map((node) => [node.id, node.kind, node.label, node.documentId ?? ""].map(csvCell).join(","))].join("\n") + "\n";
-  const edgeCsv = ["id,subject_id,predicate,object_id,evidence_ids", ...edges.map((edge) => [edge.id, edge.from, edge.type, edge.to, edge.evidenceIds.join("|")].map(csvCell).join(","))].join("\n") + "\n";
+  const labelDerived = materializeLabelDerivedFiles({ collectionId, nodes, edges, inputBinding });
   const ragDocuments = sourceMarkdown.map((item) => JSON.stringify({ documentId: item.documentId, title: item.title })).join("\n") + "\n";
   const ragChunks = groundedChunks.map((chunk) => JSON.stringify(chunk)).join("\n") + (groundedChunks.length > 0 ? "\n" : "");
   const evidenceEvents = sorted.map((item, index) => JSON.stringify({ sequence: index + 1, type: "document.ocr.verified", documentId: item.documentId, ocrJsonKey: item.ocrJsonKey, inputSha256: item.inputSha256 })).join("\n") + "\n";
 
   const files = [
     packageFile("source/collection-files.json", JSON.stringify(inputBinding, null, 2) + "\n"),
-    packageFile("canonical/model.json", JSON.stringify(canonicalModel, null, 2) + "\n"),
+    labelDerived.canonicalModel,
     packageFile("obsidian/Home.md", home),
     ...sourceMarkdown.map((item) => packageFile(`obsidian/Sources/${item.documentId}.md`, `---\ndocument_id: ${item.documentId}\n---\n\n# ${item.title}\n\n${item.text}\n`)),
-    packageFile("ontology/knowledge.ttl", ttl),
-    packageFile("ontology/knowledge.jsonld", jsonld),
-    packageFile("graph/nodes.csv", nodeCsv),
-    packageFile("graph/relationships.csv", edgeCsv),
+    labelDerived.turtle,
+    labelDerived.jsonld,
+    labelDerived.nodeCsv,
+    labelDerived.edgeCsv,
     packageFile("rag/documents.jsonl", ragDocuments),
     packageFile("rag/chunks.jsonl", ragChunks),
     packageFile("provenance/activities.jsonl", evidenceEvents),

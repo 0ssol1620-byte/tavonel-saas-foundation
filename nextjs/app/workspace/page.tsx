@@ -368,6 +368,15 @@ export default function WorkspacePage() {
   const [reviewEvidenceId, setReviewEvidenceId] = useState<string | null>(null);
   const [evidenceReviewAction, setEvidenceReviewAction] = useState<"accept" | "edit" | "reject" | null>(null);
   const [evidenceReviewReason, setEvidenceReviewReason] = useState("");
+  /*
+    The correction itself, which "Edit" never carried.
+
+    `patchObjectId` is the compiled node being corrected and `patchAfter` is what it should
+    say. Both empty means the reviewer is filing an opinion, which is still a legitimate
+    outcome; both filled means a new candidate artifact comes out the other side.
+  */
+  const [patchObjectId, setPatchObjectId] = useState<string | null>(null);
+  const [patchAfter, setPatchAfter] = useState("");
   const [evidenceReviewBusy, setEvidenceReviewBusy] = useState(false);
   const [rollbackReason, setRollbackReason] = useState("");
   const [askQuestion, setAskQuestion] = useState("");
@@ -1302,7 +1311,27 @@ export default function WorkspacePage() {
   */
   const ACCEPTED_WITHOUT_NOTE = "Accepted in the review interface. No note was given.";
 
-  const recordEvidenceReview = async (action: "accept" | "edit" | "reject", reason: string) => {
+  /*
+    The compiled objects this evidence supports, and which of them a reviewer may correct.
+
+    Bound to the selected evidence rather than to the whole World: a correction is made while
+    looking at the page region that justifies it, which is the only position from which someone
+    can tell whether the compiled label is right.
+  */
+  const reviewEvidence = worldReadModel?.evidence.find((item) => item.id === reviewEvidenceId)
+    ?? worldReadModel?.evidence[0]
+    ?? null;
+  const correctableObjects = (worldReadModel?.objects ?? []).filter((object) =>
+    (object.type === "Topic" || object.type === "Entity" || object.type === "Claim")
+    && reviewEvidence !== null
+    && object.evidenceRefs.includes(reviewEvidence.id));
+  const patchTarget = correctableObjects.find((object) => object.id === patchObjectId) ?? null;
+
+  const recordEvidenceReview = async (
+    action: "accept" | "edit" | "reject",
+    reason: string,
+    patch?: { objectId: string; before: string; after: string },
+  ) => {
     const evidence = worldReadModel?.evidence.find((item) => item.id === reviewEvidenceId)
       ?? worldReadModel?.evidence[0];
     if (!collectionResult || !evidence || reason.trim().length < 8) return;
@@ -1319,12 +1348,36 @@ export default function WorkspacePage() {
           evidenceId: evidence.id,
           action,
           reason: reason.trim(),
+          ...(patch ? { patch } : {}),
         }),
       });
-      const body = await response.json().catch(() => ({})) as { code?: string };
-      if (!response.ok) { setNotice(`Review decision could not be recorded (${body.code ?? response.status}).`); return; }
+      const body = await response.json().catch(() => ({})) as { code?: string; resultingManifestDigest?: string };
+      if (!response.ok) {
+        setNotice(body.code === "PATCH_BEFORE_MISMATCH"
+          ? "That value has already been corrected by someone else. Reload the World and look again."
+          : `Review decision could not be recorded (${body.code ?? response.status}).`);
+        return;
+      }
       setEvidenceReviewAction(null);
       setEvidenceReviewReason("");
+      setPatchObjectId(null);
+      setPatchAfter("");
+      if (body.resultingManifestDigest) {
+        /*
+          A correction produced a new candidate, so move to it.
+
+          The reviewed one is untouched and still readable at its own digest -- object storage
+          is immutable artifact truth, and a patch writes a second artifact rather than
+          replacing the first.
+        */
+        await loadCollectionCandidate(collectionResult.collectionId, body.resultingManifestDigest);
+        const url = new URL(window.location.href);
+        url.searchParams.set("collection", collectionResult.collectionId);
+        url.searchParams.set("manifest", body.resultingManifestDigest);
+        window.history.replaceState(null, "", url);
+        setNotice(`Corrected. A new candidate was compiled at ${body.resultingManifestDigest.slice(0, 19)}… and the change was recorded against the evidence it was reviewed under. The previous candidate is unchanged.`);
+        return;
+      }
       setNotice(`${action === "accept" ? "Accepted" : action === "edit" ? "Change requested" : "Rejected"}. The evidence-bound human decision was recorded.`);
     } finally {
       setEvidenceReviewBusy(false);
@@ -1826,7 +1879,17 @@ export default function WorkspacePage() {
             <>
               {surface === "world" ? (
               <div id="workspace-world">
-                <WorldStudioUltimate model={worldReadModel} />
+                {/*
+                  Rollback is offered from the Versions lens, where the diff sits directly
+                  above the button. A rollback control with only a version number beside it
+                  asks somebody to approve a change they cannot see; the reason box below is
+                  still required and is still what goes into the ledger.
+                */}
+                <WorldStudioUltimate
+                  model={worldReadModel}
+                  onRollback={rollbackReason.trim().length >= 8 ? (digest) => void rollbackWorld(digest) : undefined}
+                  rollbackBusy={worldBusy}
+                />
                 <WorldExplorer
                   collection={collectionResult}
                   onUpload={activationPolicy.customerIntake.enabled ? () => fileRef.current?.click() : undefined}
@@ -1852,23 +1915,86 @@ export default function WorkspacePage() {
                       onEvidenceSelect={(selection) => setReviewEvidenceId(selection?.id ?? null)}
                     />
                     {/*
-                      "Request change", because that is what the button does.
+                      Two different acts, named differently, because they are.
 
-                      It was labelled "Edit", and a reviewer who pressed it got a text box: no
-                      field editor, no revalidation, no patch on the candidate. The value they
-                      were looking at stayed exactly as it was and a note went into the ledger.
-                      Calling that Edit sets up the reviewer to believe they have corrected
-                      something. The real inline editor is a separate build; until it lands, the
-                      button says what actually happens.
+                      "Request change" files an opinion: the compiled value stays exactly as it
+                      is and a note goes into the ledger. "Correct" changes it -- the reviewer
+                      types what it should say, a new candidate artifact is compiled, and the
+                      receipt binds who did it, what it said before, what it says now and which
+                      version resulted. The button used to be labelled Edit and did the first,
+                      which set a reviewer up to believe they had corrected something.
                     */}
                     <div className="review-decision-actions" aria-label="Review decision">
                       <button type="button" disabled={evidenceReviewBusy} onClick={() => void recordEvidenceReview("accept", ACCEPTED_WITHOUT_NOTE)}>Accept</button>
                       <button type="button" disabled={evidenceReviewBusy} onClick={() => { setEvidenceReviewAction("accept"); setEvidenceReviewReason(""); }}>Accept with note</button>
-                      <button type="button" disabled={evidenceReviewBusy} onClick={() => { setEvidenceReviewAction("edit"); setEvidenceReviewReason(""); }}>Request change</button>
+                      <button
+                        type="button"
+                        disabled={evidenceReviewBusy || correctableObjects.length === 0}
+                        onClick={() => {
+                          setEvidenceReviewAction("edit");
+                          setEvidenceReviewReason("");
+                          const first = correctableObjects[0];
+                          setPatchObjectId(first?.id ?? null);
+                          setPatchAfter(first?.label ?? "");
+                        }}
+                      >
+                        Correct
+                      </button>
+                      <button type="button" disabled={evidenceReviewBusy} onClick={() => { setEvidenceReviewAction("edit"); setEvidenceReviewReason(""); setPatchObjectId(null); setPatchAfter(""); }}>Request change</button>
                       <button type="button" disabled={evidenceReviewBusy} onClick={() => { setEvidenceReviewAction("reject"); setEvidenceReviewReason(""); }}>Reject</button>
                     </div>
                     {evidenceReviewAction ? (
-                      <form className="review-decision-form" onSubmit={(event) => { event.preventDefault(); void recordEvidenceReview(evidenceReviewAction, evidenceReviewReason); }}>
+                      <form
+                        className="review-decision-form"
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          void recordEvidenceReview(
+                            evidenceReviewAction,
+                            evidenceReviewReason,
+                            patchTarget && patchAfter.trim().length > 0 && patchAfter.trim() !== patchTarget.label
+                              ? { objectId: patchTarget.id, before: patchTarget.label, after: patchAfter.trim() }
+                              : undefined,
+                          );
+                        }}
+                      >
+                        {evidenceReviewAction === "edit" && patchObjectId !== null ? (
+                          <>
+                            {/*
+                              Only Topic, Entity and Claim labels are offered.
+
+                              A Document label is its title as read from the document, and an
+                              Evidence node carries the immutable key it was read from. Letting
+                              either be typed over would make the artifact say the source
+                              contained something it did not.
+                            */}
+                            <label htmlFor="evidence-patch-target">What is wrong?</label>
+                            <select
+                              id="evidence-patch-target"
+                              value={patchObjectId}
+                              onChange={(event) => {
+                                setPatchObjectId(event.target.value);
+                                setPatchAfter(correctableObjects.find((object) => object.id === event.target.value)?.label ?? "");
+                              }}
+                            >
+                              {correctableObjects.map((object) => (
+                                <option key={object.id} value={object.id}>{object.type} - {object.label.slice(0, 70)}</option>
+                              ))}
+                            </select>
+                            <label htmlFor="evidence-patch-after">What should it say?</label>
+                            <input
+                              id="evidence-patch-after"
+                              type="text"
+                              maxLength={500}
+                              value={patchAfter}
+                              onChange={(event) => setPatchAfter(event.target.value)}
+                            />
+                            {patchTarget ? <p className="fine">Before: {patchTarget.label}</p> : null}
+                            <p className="fine">
+                              This compiles a new candidate. The one you are reviewing is not changed, and this
+                              correction does not clear a review requirement or promote anything.
+                            </p>
+                          </>
+                        ) : null}
                         <label htmlFor="evidence-review-reason">
                           {evidenceReviewAction === "accept"
                             ? "Note for the record"
@@ -1883,7 +2009,9 @@ export default function WorkspacePage() {
                             : evidenceReviewAction === "accept"
                               ? "Record acceptance"
                               : evidenceReviewAction === "edit"
-                                ? "Record change request"
+                                ? (patchTarget && patchAfter.trim().length > 0 && patchAfter.trim() !== patchTarget.label
+                                  ? "Correct and compile a new candidate"
+                                  : "Record change request")
                                 : "Record rejection"}
                         </button>
                       </form>

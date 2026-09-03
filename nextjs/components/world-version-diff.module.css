@@ -1,0 +1,71 @@
+.panel {
+  --diff-ink: var(--text-hi, #e8e7e2);
+  --diff-muted: var(--text-lo, #a5a49d);
+  --diff-faint: var(--text-xlo, #74736d);
+  --diff-line: var(--hairline, rgb(255 255 255 / 0.12));
+  --diff-added: var(--verified, #9bb8a4);
+  --diff-removed: var(--changed, #f2a65a);
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+
+.panel h4 {
+  margin: 0 0 6px;
+  color: var(--diff-faint);
+  font: 9px var(--f-mono, monospace);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.versions { display: grid; gap: 1px; margin: 0; padding: 0; list-style: none; background: var(--diff-line); }
+.versions li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: baseline;
+  padding: 10px 12px;
+  background: var(--ground, #11120f);
+  font: 11px var(--f-mono, monospace);
+}
+.versions li[data-current="true"] { border-left: 2px solid var(--diff-added); }
+.versions strong { color: var(--diff-ink); font-weight: 400; }
+.versions code, .versions small { color: var(--diff-faint); font-size: 10px; }
+.versions em { margin-left: auto; color: var(--diff-added); font-style: normal; font-size: 10px; }
+.versions button { margin-left: auto; color: var(--diff-muted); border: 1px solid var(--diff-line); padding: 4px 10px; font: 9px var(--f-mono, monospace); text-transform: uppercase; }
+.versions button[aria-pressed="true"] { color: var(--diff-ink); border-color: var(--diff-added); }
+.status { color: var(--diff-faint); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; }
+
+.summary { margin: 0; color: var(--diff-muted); font: 11px var(--f-mono, monospace); }
+.summary code { color: var(--diff-ink); }
+.note { margin: 0; color: var(--diff-faint); font-size: 11px; line-height: 1.6; }
+
+.plain { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; font: 11px/1.6 var(--f-mono, monospace); }
+.plain > li { color: var(--diff-muted); overflow-wrap: anywhere; }
+/* The sign carries the meaning as much as the colour does, so this reads without hue. */
+.plain > li[data-kind="added"] { color: var(--diff-added); }
+.plain > li[data-kind="removed"] { color: var(--diff-removed); }
+.plain > li[data-kind="changed"] { color: var(--diff-ink); }
+
+.fields { display: grid; gap: 3px; margin: 4px 0 8px 16px; padding: 0; list-style: none; }
+.fields li { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+.fields b { min-width: 74px; color: var(--diff-faint); font: 9px var(--f-mono, monospace); letter-spacing: .08em; text-transform: uppercase; }
+.fields s { color: var(--diff-removed); text-decoration-thickness: 1px; overflow-wrap: anywhere; }
+.fields ins { color: var(--diff-added); text-decoration: none; overflow-wrap: anywhere; }
+
+.decisions { display: grid; gap: 1px; margin: 0; padding: 0; list-style: none; background: var(--diff-line); }
+.decisions li { display: grid; gap: 5px; padding: 10px 12px; background: var(--ground, #11120f); }
+.decisions span { color: var(--diff-faint); font: 9px var(--f-mono, monospace); letter-spacing: .1em; text-transform: uppercase; }
+.decisions li[data-action="reject"] span { color: var(--diff-removed); }
+.decisions li[data-action="edit"] span { color: var(--diff-added); }
+.decisions strong { color: var(--diff-ink); font: 400 12px/1.5 var(--f-sans, sans-serif); }
+.decisions code { color: var(--diff-muted); font-size: 10px; overflow-wrap: anywhere; }
+.decisions small { color: var(--diff-faint); font: 9px var(--f-mono, monospace); }
+
+.rollback { display: grid; gap: 8px; padding: 14px; border: 1px solid var(--diff-removed); }
+.rollback button { justify-self: start; padding: 8px 14px; color: var(--diff-ink); border: 1px solid var(--diff-removed); font: 10px var(--f-mono, monospace); text-transform: uppercase; }
+
+.empty { display: grid; gap: 8px; padding: 32px; border: 1px dashed var(--hairline, rgb(255 255 255 / 0.12)); }
+.empty span { color: var(--text-xlo, #74736d); font: 9px var(--f-mono, monospace); letter-spacing: .12em; }
+.empty h3 { margin: 0; font: 400 18px var(--f-sans, sans-serif); }
+.empty p { margin: 0; color: var(--text-lo, #a5a49d); font-size: 12px; }

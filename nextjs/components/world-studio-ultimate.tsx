@@ -6,6 +6,7 @@ import PdfEvidenceViewer from "@/components/pdf-evidence-viewer";
 import WorldGraphCanvas from "@/components/world-graph-canvas";
 import WorldDirectoryTree from "@/components/world-directory-tree";
 import WorldOntologyViewer from "@/components/world-ontology-viewer";
+import WorldVersionDiffPanel from "@/components/world-version-diff";
 import type {
   SelectedWorldEvidence,
   WorldEvidence,
@@ -20,6 +21,12 @@ type Props = {
   initialLens?: WorldStudioLens;
   selectedEvidenceId?: string | null;
   onEvidenceSelect?: (selection: SelectedWorldEvidence | null) => void;
+  /**
+   * Offered from the Versions lens, where the diff above the button is the confirmation.
+   * Omitted, the lens is read-only and shows no rollback control at all.
+   */
+  onRollback?: (manifestDigest: string) => void;
+  rollbackBusy?: boolean;
 };
 
 const LENSES: Array<{ id: WorldStudioLens; label: string }> = [
@@ -85,6 +92,8 @@ export default function WorldStudioUltimate({
   initialLens = "graph",
   selectedEvidenceId,
   onEvidenceSelect,
+  onRollback,
+  rollbackBusy,
 }: Props) {
   const [lens, setLens] = useState<WorldStudioLens>(initialLens);
   const [localEvidenceId, setLocalEvidenceId] = useState<string | null>(null);
@@ -213,18 +222,14 @@ export default function WorldStudioUltimate({
           )}
 
           {lens === "versions" && (
-            !model || model.history.length === 0 ? (
-              <ReadNotYet>No persisted World history is available.</ReadNotYet>
-            ) : (
-              <ol className={styles.historyList}>
-                {model.history.map((entry) => (
-                  <li key={`${entry.version}:${entry.manifestDigest}`}>
-                    <span>{entry.status}</span><strong>{entry.version}</strong>
-                    <small>{entry.activatedAt.state === "read" ? entry.activatedAt.value : "ACTIVATION READ_NOT_YET"}</small>
-                  </li>
-                ))}
-              </ol>
-            )
+            /*
+              A comparison, not a list.
+
+              What was here enumerated versions. Someone looking at this screen is usually
+              deciding whether to roll one back, and a list of version numbers asks them to
+              approve a change they cannot see.
+            */
+            <WorldVersionDiffPanel model={model} onRollback={onRollback} rollbackBusy={rollbackBusy} />
           )}
 
           {lens === "files" && (

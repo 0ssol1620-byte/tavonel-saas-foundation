@@ -1741,6 +1741,19 @@ footer.site .shell { display: flex; flex-direction: column; gap: 14px; }
 .review-decision-form { display: grid; gap: 10px; max-width: 720px; }
 .review-decision-form textarea { min-height: 110px; }
 .review-decision-form button { justify-self: start; min-width: 140px; }
+/* The correction fields. Same weight as the reason box, because the correction is the point
+   of the form and the reason explains it, not the other way round. */
+.review-decision-form select,
+.review-decision-form input[type="text"] {
+  width: 100%;
+  padding: 9px 10px;
+  color: var(--text-hi);
+  background: var(--g1);
+  border: 1px solid var(--hairline);
+  font: 12px var(--f-mono);
+}
+.review-decision-form select:focus-visible,
+.review-decision-form input[type="text"]:focus-visible { border-color: var(--verified); }
 .review-decision-actions button:first-child { color: var(--ground); background: var(--verified); border-color: var(--verified); }
 
 .card {
