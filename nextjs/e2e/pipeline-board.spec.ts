@@ -70,7 +70,19 @@ const DOCUMENTS = [
   },
 ];
 
+/*
+ * The workspace asks the server, once on mount, whether a compile run is still open so a
+ * reloaded tab rejoins it instead of starting again. That request is as much part of loading the
+ * page as the document list is, and a test that answers one but not the other gets a 401 in the
+ * console -- the same failure the progress poll above already had. "No open run" is the honest
+ * answer for a board that is still reading.
+ */
+async function mockCompileJobs(page: Page) {
+  await page.route("**/api/compile-jobs", route => route.fulfill({ json: { code: "OK", jobs: [] } }));
+}
+
 async function mockWorkspace(page: Page) {
+  await mockCompileJobs(page);
   await page.route("**/api/documents", route => route.fulfill({ json: { documents: DOCUMENTS } }));
   /*
    * A document mid-read is polled for progress, so every test that renders one has to answer that
@@ -275,6 +287,7 @@ test("reads several documents at the same time, each with its own page", async (
     cdrReceiptKey: `w/${id}/v1/cdr-receipt.json`, ocrReviewKey: null,
     processingState: "sanitized",
   });
+  await mockCompileJobs(page);
   await page.route("**/api/documents", route => route.fulfill({
     json: { documents: [reading("doc-a"), reading("doc-b"), reading("doc-c"), DOCUMENTS[0]] },
   }));

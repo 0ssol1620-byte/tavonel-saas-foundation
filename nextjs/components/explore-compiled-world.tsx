@@ -62,7 +62,15 @@ function shortDigest(value: string) {
 export default function ExploreCompiledWorld({ world, documents, answers }: Props) {
   const [lens, setLens] = useState<Lens>("objects");
   const [type, setType] = useState<WorldObjectType>("Claim");
-  const [mobileView, setMobileView] = useState<"source" | "world">("world");
+  /*
+   * A phone opens on the source, not on the World.
+   *
+   * The World panel carries the readings that most resemble a live deployment; the source panel
+   * carries the page, the region and the bbox that make them mean anything. Opening on the World
+   * shows the first without the second on the screen with the least room to argue, which is the
+   * defect this page was already fixed for once. Choosing evidence still switches here.
+   */
+  const [mobileView, setMobileView] = useState<"source" | "world">("source");
   const [activeObjectId, setActiveObjectId] = useState<string>(
     () => world.objects.find((object) => object.type === "Claim" && object.evidenceRefs.length > 0)?.id ?? world.objects[0].id,
   );

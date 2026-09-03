@@ -58,6 +58,14 @@ async function installSession(page: Page) {
 }
 
 async function mockWorkspace(page: Page, reviewRequired = false) {
+  /*
+   * On mount the workspace asks whether a compile run is still open, so a reloaded tab rejoins
+   * it rather than starting a second one. Unanswered, that request 401s against the fake session
+   * and the console assertions below trip on a failure that has nothing to do with the World.
+   */
+  await page.route("**/api/compile-jobs", route =>
+    route.fulfill({ json: { code: "OK", jobs: [] } })
+  );
   await page.route("**/api/documents", route =>
     route.fulfill({ json: { documents: [] } })
   );

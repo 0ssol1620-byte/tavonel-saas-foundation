@@ -20,14 +20,20 @@ test("sample binds an answer to a page-level citation without fabricated proof",
   // The fixture is a maintenance manual now, not TAVONEL's own retention policy. Compiling our
   // own document taught the visitor what we say about ourselves rather than what the product
   // does to their material, and the filename was the tell.
-  await expect(page.getByText("FP-200-maintenance-manual-revC.pdf")).toBeVisible();
-  await expect(page.getByText("BBOX [118, 214, 886, 374]")).toBeVisible();
+  //
+  // These were three frozen literals -- a filename with the wrong case and one hand-written
+  // bbox -- from when the sample was typed into the component. The sample is now compiled from
+  // three committed PDFs by the same code that compiles a customer's, so the coordinates belong
+  // to the text layer and `lib/explore-sample.test.ts` is what pins them. What this file is for
+  // is the thing that test cannot see: that provenance reaches the screen at all.
+  await expect(page.getByText(/^fp-200-[a-z0-9-]+\.pdf$/i)).toBeVisible();
+  await expect(page.getByText(/^BBOX \[\d+, \d+, \d+, \d+\]$/)).toBeVisible();
+  await expect(page.getByText(/^REGION ON PAGE \d+ OF \d+$/)).toBeVisible();
   await expect(page.getByRole("button", { name: /Open citation/ })).toBeVisible();
-  // This asserted a RESEARCH FRONTIER card whose every field read `not_yet`. The card is gone:
-  // a placeholder object on a page whose entire claim is that every object is bound to evidence
-  // argued against the page it appeared on. What the card stood for still has to hold, so it is
-  // asserted directly instead -- provenance is stated, and no placeholder is rendered as a fact.
-  await expect(page.getByText("PAGE + BBOX BOUND")).toBeVisible();
+  // This asserted a RESEARCH FRONTIER card whose every field read `not_yet`, and then the
+  // `PAGE + BBOX BOUND` tile that replaced it. Both were a page claiming provenance in words.
+  // The three assertions above are the page showing it, so the claim is gone and the reading
+  // stands in its place. What must still hold is that no placeholder renders as a fact.
   await expect(page.locator("html")).not.toContainText(/not_yet/i);
   // The page must label itself as a sample exactly once. More than once is the defensiveness
   // that made the strongest page on the site read as the weakest.
