@@ -3,13 +3,27 @@ import PolicyLayout from "@/components/policy-layout";
 import { readCommercialState } from "@/lib/commercial-state";
 import { LEGAL_EFFECTIVE_DATE } from "@/lib/operations";
 
-export const metadata: Metadata = {
-  // Each page declares its own address. Without this every route inherited the root
-  // canonical ("/"), so a crawler was told 22 distinct pages were all the homepage.
-  alternates: { canonical: "/refunds" },
-  openGraph: { url: "/refunds" },
-  title: "Cancellation and refunds - TAVONEL",
-};
+/*
+  The body has two templates and the description has to follow it.
+
+  A fixed sentence here would be a legal statement that is false in one of the two modes: it
+  would either promise refund terms a pilot cannot have, or deny a charge that live checkout
+  can create. `generateMetadata` reads the same switch the page body reads, so the preview a
+  link produces cannot contradict the page it opens.
+*/
+export function generateMetadata(): Metadata {
+  const { liveChargesEnabled } = readCommercialState();
+  return {
+    // Each page declares its own address. Without this every route inherited the root
+    // canonical ("/"), so a crawler was told 22 distinct pages were all the homepage.
+    alternates: { canonical: "/refunds" },
+    openGraph: { url: "/refunds" },
+    title: "Cancellation and refunds - TAVONEL",
+    description: liveChargesEnabled
+      ? "How to cancel TAVONEL access and when a charge is refundable. Checkout is processed by Paddle as merchant of record."
+      : "TAVONEL is a private pilot: nothing can be charged, so there is nothing to cancel. How to end access and export your compiled worlds.",
+  };
+}
 
 /*
   Refund terms for a service that cannot charge you are not refund terms; they are a paragraph

@@ -51,8 +51,73 @@ export function GET(request: Request) {
         post: {
           operationId: "compileCollection",
           "x-tavonel-scope": "collections:compile",
-          requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["documentIds"], properties: { documentIds: { type: "array", minItems: 2, maxItems: 12, uniqueItems: true, items: { type: "string", pattern: "^[0-9a-f-]{36}$" } } } } } } },
+          requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["documentIds"], properties: { documentIds: { type: "array", minItems: 1, maxItems: 12, uniqueItems: true, items: { type: "string", pattern: "^[0-9a-f-]{36}$" } } } } } } },
           responses: { "200": { description: "Immutable candidate package receipt; candidatePromotion is always false" }, "400": errorResponse, "401": errorResponse, "403": errorResponse, "409": errorResponse },
+        },
+      },
+      /*
+        Durable compile orchestration.
+
+        These sit at /api/compile-jobs rather than under /api/v1, so each carries its own
+        server. That is not tidy and it is accurate: the versioned developer surface and the
+        workspace's own orchestration are different contracts with different stability
+        promises, and pretending otherwise in the spec would mislead anyone generating a client.
+      */
+      "/compile-jobs": {
+        servers: [{ url: `${origin}/api` }],
+        post: {
+          operationId: "startCompileJob",
+          "x-tavonel-scope": "collections:compile",
+          description: "Records the intent to compile and returns immediately. The job advances on the server whether or not the caller stays connected, which is the difference between this and /v1/collections/compile. Submitting the same document set again returns the job that already exists rather than starting a second compile.",
+          requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["documentIds"], properties: { documentIds: { type: "array", minItems: 1, maxItems: 12, uniqueItems: true, items: { type: "string", pattern: "^[0-9a-f-]{36}$" } } }, additionalProperties: false } } } },
+          responses: { "202": { description: "Accepted. Returns jobId and the state the job starts in; Location names the job resource." }, "400": errorResponse, "401": errorResponse, "403": errorResponse, "503": errorResponse },
+        },
+        get: {
+          operationId: "listCompileJobs",
+          "x-tavonel-scope": "collections:read",
+          description: "The workspace's recent compiles, so a client that lost its job id can pick a run back up.",
+          responses: { "200": { description: "Recent compile jobs, newest first" }, "401": errorResponse, "503": errorResponse },
+        },
+      },
+      "/compile-jobs/{jobId}": {
+        servers: [{ url: `${origin}/api` }],
+        get: {
+          operationId: "getCompileJob",
+          "x-tavonel-scope": "collections:read",
+          parameters: [{ $ref: "#/components/parameters/CompileJobId" }],
+          description: "The durable current state. A poller against this sees exactly what a stream subscriber sees, because both read the same row.",
+          responses: { "200": { description: "Compile job state, progress and any blocked documents" }, "400": errorResponse, "404": errorResponse, "503": errorResponse },
+        },
+      },
+      "/compile-jobs/{jobId}/events": {
+        servers: [{ url: `${origin}/api` }],
+        get: {
+          operationId: "streamCompileJobEvents",
+          "x-tavonel-scope": "collections:read",
+          parameters: [{ $ref: "#/components/parameters/CompileJobId" }],
+          description: "Replays the persisted transition log after Last-Event-ID, then follows it. The server closes the stream at its own wall clock, so reconnecting is the normal case rather than an error path; every frame carries the durable sequence to resume from.",
+          responses: { "200": { description: "text/event-stream of persisted compile transitions" }, "400": errorResponse, "404": errorResponse },
+        },
+      },
+      "/compile-jobs/{jobId}/blockers": {
+        servers: [{ url: `${origin}/api` }],
+        post: {
+          operationId: "resolveCompileJobBlockers",
+          "x-tavonel-scope": "collections:compile",
+          parameters: [{ $ref: "#/components/parameters/CompileJobId" }],
+          description: "Answers a partial failure. A job with blocked documents stops and waits; nothing skips them by itself. `continue` is refused while any blocker is a security blocker -- those leave the set through `remove_blocked`, which records who removed them.",
+          requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["resolution"], properties: { resolution: { type: "string", enum: ["continue", "remove_blocked", "retry_eligible"] } }, additionalProperties: false } } } },
+          responses: { "200": { description: "The recorded resolution and the job it applies to" }, "400": errorResponse, "404": errorResponse, "409": errorResponse },
+        },
+      },
+      "/compile-jobs/{jobId}/cancel": {
+        servers: [{ url: `${origin}/api` }],
+        post: {
+          operationId: "cancelCompileJob",
+          "x-tavonel-scope": "collections:compile",
+          parameters: [{ $ref: "#/components/parameters/CompileJobId" }],
+          description: "Marks the job cancelled. A job that had already settled is left alone -- a cancel arriving a second after a compile finished does not destroy the result.",
+          responses: { "200": { description: "The cancelled job" }, "404": errorResponse, "409": errorResponse },
         },
       },
       "/collections/{id}": {
@@ -194,6 +259,7 @@ export function GET(request: Request) {
       },
       parameters: {
         CollectionId: { name: "id", in: "path", required: true, schema: { type: "string", pattern: "^collection-[a-f0-9]{32}$" } },
+        CompileJobId: { name: "jobId", in: "path", required: true, schema: { type: "string", pattern: "^cjob-[a-f0-9]{32}$" } },
         ConnectionId: { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
         OAuthConnectionId: { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
         DeveloperKeyId: { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },

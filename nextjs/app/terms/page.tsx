@@ -4,13 +4,24 @@ import LegalOperatorDisclosure from "@/components/legal-operator-disclosure";
 import { readCommercialState } from "@/lib/commercial-state";
 import { LEGAL_EFFECTIVE_DATE } from "@/lib/operations";
 
-export const metadata: Metadata = {
-  // Each page declares its own address. Without this every route inherited the root
-  // canonical ("/"), so a crawler was told 22 distinct pages were all the homepage.
-  alternates: { canonical: "/terms" },
-  openGraph: { url: "/terms" },
-  title: "Terms of service - TAVONEL",
-};
+/*
+  Two templates below, so two descriptions. See the comment on the page body: the one document
+  where the site must not contradict itself about whether it can take money is this one, and a
+  link preview is part of the document.
+*/
+export function generateMetadata(): Metadata {
+  const { liveChargesEnabled } = readCommercialState();
+  return {
+    // Each page declares its own address. Without this every route inherited the root
+    // canonical ("/"), so a crawler was told 22 distinct pages were all the homepage.
+    alternates: { canonical: "/terms" },
+    openGraph: { url: "/terms" },
+    title: "Terms of service - TAVONEL",
+    description: liveChargesEnabled
+      ? "The terms governing the TAVONEL service, including paid subscriptions sold through Paddle as merchant of record."
+      : "The terms governing the TAVONEL service during the private pilot, when no paid checkout is available and no charge can be created.",
+  };
+}
 
 /*
   Two templates, one switch.
