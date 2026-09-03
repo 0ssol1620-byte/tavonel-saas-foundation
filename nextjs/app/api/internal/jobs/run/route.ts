@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
+import { runCompileJobBatch } from "@/lib/compile-job-worker";
 import { claimJob } from "@/lib/job-store";
 import { runSourceImportBatch } from "@/lib/sync-worker";
 
@@ -50,11 +51,21 @@ async function runOneBatch(request: Request) {
   // one could report on a job the other holds.
   const workerId = `worker-${randomBytes(8).toString("hex")}`;
 
+  /*
+    Advance customer compiles first, because they are what someone is waiting on.
+
+    This is the scheduled half of masterplan 6.3: the compile state machine belongs to the
+    server, so something other than a browser tab has to turn it. That something is this cron,
+    once a minute, whether or not anyone has the workspace open. The compile turn is bounded
+    and takes its own lease, so two invocations overlapping does not compile anything twice.
+  */
+  const compiles = await runCompileJobBatch();
+
   // The lease outlives this invocation's own budget so a batch that runs long still owns its
   // job when it reports; the queue reclaims it if this invocation dies outright.
   const claimed = await claimJob(workerId, 180, ["source_import"]);
-  if (!claimed.ok) return NextResponse.json({ code: claimed.code }, { status: 503, headers: HEADERS });
-  if (!claimed.value) return NextResponse.json({ code: "OK", claimed: false }, { headers: HEADERS });
+  if (!claimed.ok) return NextResponse.json({ code: claimed.code, compiles }, { status: 503, headers: HEADERS });
+  if (!claimed.value) return NextResponse.json({ code: "OK", claimed: false, compiles }, { headers: HEADERS });
 
   const job = claimed.value;
   const result = await runSourceImportBatch(job, workerId);
@@ -69,6 +80,7 @@ async function runOneBatch(request: Request) {
     jobType: job.jobType,
     attempt: job.attempt,
     outcome: result.ok ? result.value : { error: result.code },
+    compiles,
   }, { headers: HEADERS });
 }
 

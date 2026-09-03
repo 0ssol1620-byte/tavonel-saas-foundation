@@ -24,7 +24,9 @@ const workspace = readFileSync(new URL("../app/workspace/page.tsx", import.meta.
 describe("workspace compile floor and ceiling", () => {
   it("sends a single uploaded document on to compile", () => {
     expect(workspace).not.toContain("ids.length >= 2");
-    expect(workspace).toContain("if (judgeCompileSet(ids.length).ok) await waitForOcrAndCompile(ids);");
+    // The destination changed -- the batch now starts a durable job instead of driving the
+    // compile from here -- and the gate it passes through did not.
+    expect(workspace).toContain("if (judgeCompileSet(ids.length).ok) await startDurableCompile(ids);");
   });
 
   it("refuses an over-ceiling selection before anything is uploaded", () => {

@@ -35,6 +35,9 @@ import WorldStudioUltimate from "@/components/world-studio-ultimate";
 import OperationsUltimate from "@/components/operations-ultimate";
 import type { WorldReadModel } from "@/lib/world-read-model";
 import { COMPILE_LIMITS_NOTICE, judgeCompileSet } from "@/lib/compile-limits";
+import { CompileJobPanel, type CompileJobView } from "@/components/compile-job-panel";
+import { observeCompileJob } from "@/lib/compile-job-client";
+import type { BlockerResolution } from "@/lib/compile-job-store";
 
 /** What this panel prints when it has no value. Not "0", and not a spinner that never resolves. */
 const UNKNOWN = "not read yet";
@@ -218,6 +221,15 @@ export default function WorkspacePage() {
     return () => window.removeEventListener("popstate", applyLocation);
   }, []);
   const [busy, setBusy] = useState(false);
+  const [compileJob, setCompileJob] = useState<CompileJobView | null>(null);
+  /*
+    One observer at a time, and it must be stoppable.
+
+    Aborting this stops *watching* -- it never stops the compile, which is the whole point of
+    moving the state machine to the server. Without the ref, following a second job would
+    leave the first reader running and the two would fight over the same panel.
+  */
+  const followRef = useRef<AbortController | null>(null);
   const [stagedSelection, setStagedSelection] = useState<WorkspaceSelection | null>(null);
   const [dropActive, setDropActive] = useState(false);
   const [documents, setDocuments] = useState<DocumentListItem[] | null>(null);
@@ -459,6 +471,32 @@ export default function WorkspacePage() {
       if (collectionId) void loadCollectionCandidate(collectionId, params.get("manifest") ?? undefined);
 
       /*
+        Pick up a compile that is already running.
+
+        The URL is the fast path -- a reload or a restored tab still carries `?job=`. The list
+        is the one that matters: a customer who closed the tab, or who came back on a different
+        machine, has no id to carry, and the run they paid for is still theirs to watch. Asking
+        the server is the only way to find it, and the only reason the answer exists is that
+        the job is durable in the first place.
+      */
+      void (async () => {
+        const fromUrl = params.get("job");
+        if (fromUrl && /^cjob-[a-f0-9]{32}$/.test(fromUrl)) {
+          void followCompileJob(fromUrl);
+          return;
+        }
+        const token = data.session?.access_token;
+        if (!token) return;
+        const response = await fetch("/api/compile-jobs", { headers: { authorization: `Bearer ${token}` } });
+        if (!response.ok) return;
+        const json = await response.json() as { jobs?: CompileJobView[] };
+        const open = json.jobs?.find((entry) => !["ready", "failed", "cancelled"].includes(entry.state));
+        if (!open) return;
+        setCompileJob(open);
+        void followCompileJob(open.jobId);
+      })();
+
+      /*
        * R1, last half. Someone who picked a plan before signing in arrives here carrying it --
        * in the URL if they came straight through, in sessionStorage if Google's redirect ate the
        * query string. The parameter is stripped before the checkout opens, so a reload or a
@@ -686,70 +724,168 @@ export default function WorkspacePage() {
     }
   };
 
-  const waitForOcrAndCompile = async (documentIds: string[]) => {
-    const deadline = Date.now() + 15 * 60 * 1000;
-    while (Date.now() < deadline) {
-      const current = await loadDocuments();
-      const ready = documentIds.filter((id) => current.some((item) => item.documentId === id && item.hasOcrJson)).length;
-      const operatorReview = documentIds.filter((id) => {
-        const versions = current.filter((item) => item.documentId === id);
-        return !versions.some((item) => item.hasOcrJson) && versions.some((item) => item.processingState === "operator_review");
-      });
-      // Anything sanitized but not yet read is being read right now; that is what the live view
-      // is for. Documents already carrying ocr.json have nothing left to watch.
-      const stillReading = current
-        .filter((item) => item.sanitizedKey && !item.hasOcrJson && item.processingState !== "operator_review")
-        .map((item) => item.documentId)
-        .filter((documentId) => documentIds.includes(documentId));
-      if (stillReading.length > 0) {
-        const client = getSupabaseBrowserClient();
-        const { data } = client ? await client.auth.getSession() : { data: { session: null } };
-        const progressToken = data.session?.access_token;
-        if (progressToken) await Promise.all(stillReading.map((documentId) => readProgressFor(documentId, progressToken)));
-      }
-      if (operatorReview.length > 0) {
-        setNotice(`Batch processing stopped safely: ${operatorReview.length} document(s) require explicit OCR operator review. No paid retry or candidate compilation was attempted.`);
-        return;
-      }
-      // The board carries the detail now, so this line only has to say what the board cannot:
-      // that the batch is still running and nothing has been compiled yet.
-      setNotice(`Reading ${documentIds.length} documents. ${ready} have written immutable OCR output; no candidate is compiled until every one has.`);
-      if (ready === documentIds.length) {
-        const client = getSupabaseBrowserClient();
-        const { data } = client ? await client.auth.getSession() : { data: { session: null } };
-        const token = data.session?.access_token;
-        if (!token) {
-          setNotice("Sign in with Google first.");
-          return;
-        }
-        const response = await fetch("/api/collections/compile", {
-          method: "POST",
-          headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-          body: JSON.stringify({ documentIds }),
-        });
-        const json = await response.json() as CollectionResult & { code?: string };
-        if (!response.ok || !json.collectionId) {
-          setNotice(`Collection compilation failed (${json.code ?? response.status}). Candidate promotion remains closed.`);
-          return;
-        }
-        setCollectionResult(json);
-        await loadWorldState(json.collectionId, token);
-        const url = new URL(window.location.href);
-        url.searchParams.set("collection", json.collectionId);
-        window.history.replaceState(null, "", url);
-        setNotice(
-          json.lifecycle === "review_required"
-            ? `Collection ${json.collectionId} produced a signed review package with ${json.reviewReasons?.length ?? 0} review reason(s). Download and inspect it; promotion remains blocked.`
-            : `Compiled World ready from ${json.validation.counts.documents} documents: ${json.validation.counts.topics} topics, ${json.validation.counts.entities} entities, ${json.validation.counts.claims} claims and ${json.validation.counts.relations} evidence-bound relations.`,
-        );
-        return;
-      }
-      // Five seconds was invisible when the only output was a sentence. With a board on screen
-      // it is the refresh rate of the thing the visitor is watching, so it tightens while work is
-      // actually in flight and stays slow otherwise.
-      await new Promise((resolve) => window.setTimeout(resolve, 1_500));
+  const sessionToken = async () => {
+    const client = getSupabaseBrowserClient();
+    const { data } = client ? await client.auth.getSession() : { data: { session: null } };
+    return data.session?.access_token ?? null;
+  };
+
+  /*
+    Follow a compile that is already running somewhere else.
+
+    Everything below is a view. The job advances on the server whether this function is called
+    or not; what it does is subscribe to the transition log, replay whatever was missed, and
+    keep replaying across reconnects until the job reaches a state where nothing further will
+    happen on its own.
+
+    This is the half of masterplan 6.3 the customer sees. The half that matters is that
+    deleting this function would not change a single outcome.
+  */
+  const followCompileJob = useCallback(async (jobId: string) => {
+    followRef.current?.abort();
+    const controller = new AbortController();
+    followRef.current = controller;
+    let compiled: string | null = null;
+
+    await observeCompileJob({
+      jobId,
+      authToken: sessionToken,
+      signal: controller.signal,
+      onFrame: (frame) => {
+        setCompileJob((previous) => ({
+          jobId,
+          state: frame.state,
+          documentsTotal: frame.documentsTotal || previous?.documentsTotal || 0,
+          documentsReady: frame.documentsReady,
+          blocked: frame.blocked,
+          blockedResolution: previous?.blockedResolution ?? null,
+          errorCode: frame.errorCode,
+          collectionId: frame.collectionId ?? previous?.collectionId ?? null,
+        }));
+        if (frame.collectionId) compiled = frame.collectionId;
+        // The document board is fed by its own effect; this only has to nudge the list so a
+        // source that finished reading appears without waiting for the next poll.
+        if (frame.eventType === "progressed") void loadDocuments();
+      },
+    });
+
+    if (controller.signal.aborted) return;
+    if (!compiled) return;
+    await loadCollectionCandidate(compiled);
+    /*
+      Say what was built, not that it was restored.
+
+      `loadCollectionCandidate` is shared with the reload path and its notice is written for
+      someone returning to a World that already existed. A compile that has just finished
+      deserves its own sentence, and the counts are the part worth reading.
+    */
+    setCollectionResult((result) => {
+      if (!result || result.collectionId !== compiled) return result;
+      setNotice(result.lifecycle === "review_required"
+        ? `Collection ${result.collectionId} produced a signed review package with ${result.reviewReasons?.length ?? 0} review reason(s). Download and inspect it; promotion remains blocked.`
+        : `Compiled World ready from ${result.validation.counts.documents} documents: ${result.validation.counts.topics} topics, ${result.validation.counts.entities} entities, ${result.validation.counts.claims} claims and ${result.validation.counts.relations} evidence-bound relations.`);
+      return result;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /*
+    Start a compile and stop being responsible for it.
+
+    The browser used to poll the document list until everything had been read and then call the
+    compiler itself, which made this tab part of the pipeline: closing it abandoned a run whose
+    reading had already been paid for. Now the request records the intent durably and returns a
+    job id, and a scheduler on the server does the rest.
+
+    The id goes into the URL because that is the cheapest durable handle a person has -- a
+    reload, a restored tab, a link sent to themselves on another machine all land back on the
+    same run. It is not the only one: the workspace also asks the server for its open jobs on
+    load, so a customer who never had the URL still finds the compile waiting.
+  */
+  const startDurableCompile = async (documentIds: string[]) => {
+    const token = await sessionToken();
+    if (!token) {
+      setNotice("Sign in with Google first.");
+      return;
     }
-    setNotice("Batch processing timed out before every OCR output became immutable. No collection candidate was created.");
+    const response = await fetch("/api/compile-jobs", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+      body: JSON.stringify({ documentIds }),
+    });
+    const json = await response.json() as { jobId?: string; state?: string; code?: string; message?: string };
+    if (!response.ok || !json.jobId) {
+      setNotice(json.message ?? `Compile could not be started (${json.code ?? response.status}).`);
+      return;
+    }
+    setCompileJob({
+      jobId: json.jobId,
+      state: "preflight",
+      documentsTotal: documentIds.length,
+      documentsReady: 0,
+      blocked: [],
+      blockedResolution: null,
+      errorCode: null,
+      collectionId: null,
+    });
+    const url = new URL(window.location.href);
+    url.searchParams.set("job", json.jobId);
+    window.history.replaceState(null, "", url);
+    setNotice(`Compiling ${documentIds.length} source${documentIds.length === 1 ? "" : "s"}. This runs on our servers; you can close this page.`);
+    void followCompileJob(json.jobId);
+  };
+
+  /** Answer a partial failure. The worker will not move until one of these is recorded. */
+  const resolveCompileBlockers = async (resolution: BlockerResolution) => {
+    if (!compileJob) return;
+    const token = await sessionToken();
+    if (!token) return;
+    setBusy(true);
+    try {
+      const response = await fetch(`/api/compile-jobs/${compileJob.jobId}/blockers`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({ resolution }),
+      });
+      const json = await response.json() as { code?: string };
+      if (!response.ok) {
+        setNotice(json.code === "SECURITY_BLOCKER_REQUIRES_EXPLICIT_REMOVAL"
+          ? "A file was stopped by a safety check. Remove it from this compile explicitly, or cancel."
+          : `That choice was not applied (${json.code ?? response.status}).`);
+        return;
+      }
+      setCompileJob((previous) => (previous ? { ...previous, blockedResolution: resolution } : previous));
+      void followCompileJob(compileJob.jobId);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const cancelCompileJob = async () => {
+    if (!compileJob) return;
+    const token = await sessionToken();
+    if (!token) return;
+    setBusy(true);
+    try {
+      const response = await fetch(`/api/compile-jobs/${compileJob.jobId}/cancel`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const json = await response.json() as { code?: string; state?: string };
+      if (!response.ok) {
+        // A compile that finished a second before the button was pressed is not an error, and
+        // the finished World is not thrown away to honour the click.
+        setNotice(json.code === "COMPILE_JOB_ALREADY_SETTLED"
+          ? "That compile had already finished. Nothing was discarded."
+          : `Cancel failed (${json.code ?? response.status}).`);
+        return;
+      }
+      followRef.current?.abort();
+      setCompileJob((previous) => (previous ? { ...previous, state: "cancelled" } : previous));
+      setNotice("Compile cancelled.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const recompileWithCore = async () => {
@@ -800,31 +936,11 @@ export default function WorkspacePage() {
     setCollectionResult(null);
     clearWorldState();
     try {
-      const token = await getAuthToken();
-      if (!token) {
-        setNotice("Sign in with Google before compiling a collection.");
-        return;
-      }
-      setNotice(`Compiling ${documentIds.length} selected sources into a reviewable World...`);
-      const response = await fetch("/api/collections/compile", {
-        method: "POST",
-        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-        body: JSON.stringify({ documentIds }),
-      });
-      const json = await response.json() as CollectionResult & { code?: string };
-      if (!response.ok || !json.collectionId || (json.coreExecution?.status !== "completed" && json.coreExecution?.status !== "review_required")) {
-        setNotice(`Collection compilation failed (${json.code ?? response.status}). No candidate was promoted.`);
-        return;
-      }
-      setCollectionResult(json);
-      await loadWorldState(json.collectionId, token);
-      const url = new URL(window.location.href);
-      url.searchParams.set("collection", json.collectionId);
-      url.searchParams.set("manifest", json.manifestDigest);
-      window.history.replaceState(null, "", url);
-      setNotice(json.lifecycle === "review_required"
-        ? `Selected documents produced a signed review package for ${json.collectionId}. Download and inspect it; promotion remains blocked.`
-        : `Compiled World ready from ${json.validation.counts.documents} selected documents with ${json.validation.counts.claims} claims and ${json.validation.counts.relations} evidence-bound relations.`);
+      // Same durable path as a fresh upload. Compiling a selection that has already been
+      // compiled returns the run that produced it rather than paying for it twice; a
+      // deliberate re-run against a newer Core is a different act and lives in
+      // `recompileWithCore`, which calls the compiler directly on purpose.
+      await startDurableCompile(documentIds);
     } finally {
       setBusy(false);
     }
@@ -902,7 +1018,7 @@ export default function WorkspacePage() {
         and read, and nothing happened. No error: the batch simply ended. Judging the set with
         the shared verdict means this path cannot drift from the route again.
       */
-      if (judgeCompileSet(ids.length).ok) await waitForOcrAndCompile(ids);
+      if (judgeCompileSet(ids.length).ok) await startDurableCompile(ids);
     } finally {
       setBusy(false);
     }
@@ -1450,6 +1566,22 @@ export default function WorkspacePage() {
                 </div>
               ) : null}
             </section>
+          ) : null}
+          {/*
+            The compile itself, as a durable thing rather than a sentence.
+
+            Rendered above the film because it is the panel someone comes back to the tab for:
+            where the run is, what is stuck, and what they can do about it. The film and the
+            board below are still the detail.
+          */}
+          {compileJob ? (
+            <CompileJobPanel
+              job={compileJob}
+              names={names}
+              busy={busy}
+              onResolve={(resolution) => void resolveCompileBlockers(resolution)}
+              onCancel={() => void cancelCompileJob()}
+            />
           ) : null}
           {/*
             The compile, drawn.

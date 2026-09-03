@@ -325,7 +325,7 @@ exist in the first place.
 |---|---|---|
 | Types | `tsc --noEmit` | exit 0, no output |
 | Lint | `eslint app components lib e2e` | exit 0, no findings |
-| Unit + contract tests | `vitest run` | 777 passed / 777, across 121 files |
+| Unit + contract tests | `vitest run` | 781 passed / 781, across 122 files |
 | Production build | `next build` | compiled successfully (~11 min on this machine) |
 | Browser QA | `playwright test` -- every project | **219 passed, 0 failed, 15 skipped**, exit 0 |
 | Internal links | source sweep of every `href` in `app/` and `components/` | 164 files against 113 routes and 28 static assets; all resolve |
@@ -350,10 +350,11 @@ this branch's own work, and the code was fixed:
 - **`/security` stated the same sentence twice.** "Every external operation fails closed."
   appeared as the lede's thesis and again, verbatim, opening the Reliability control. The
   Reliability entry now elaborates rather than repeating.
-- **`/explore` had lost its honesty marker.** The rewrite dropped `DETERMINISTIC PRODUCT SAMPLE`
-  and the "not customer proof" line, leaving a fixed fixture rendered in the product's real
-  interface with nothing saying so -- the instrument bar's `v3 ACTIVE` and `4 WITH EVIDENCE`
-  read as a live deployment. Restored, with the reasoning kept in the source.
+- **`/explore` was misdiagnosed here, and the record is corrected in P0-09.** This pass
+  concluded the page had lost its sample marker and restored `DETERMINISTIC PRODUCT SAMPLE`
+  and "not customer proof". The header already carried the `INTERACTIVE SAMPLE` badge that
+  masterplan 13.9 prescribes, and 13.9 names those two phrases as part of the problem. Both
+  were removed again in the following pass. The page now labels itself once, in the header.
 - **`/refunds` stopped naming its own policy.** The pilot heading read "No paid checkout is
   available.", which is true but leaves a reader arriving from a footer link labelled Refunds
   on a page that never identifies itself. Now "Cancellation and refund terms during the pilot."
@@ -404,15 +405,17 @@ Against a production server, not a dev server:
 - The reduced-motion path: the still renders and loads, its alt text carries the stage label and
   its line, no `<video>` is mounted at all, and there is no Pause control because there is no
   timer to pause.
-- `/explore` at 375 px: `PAGE + BBOX BOUND` survives, only `REVISION C` is hidden, the sample
-  marker and "not customer proof" are both visible, `not_yet` appears nowhere, and horizontal
-  overflow is zero.
+- `/explore` at 375 px: `PAGE + BBOX BOUND` survives, only `REVISION C` is hidden, `not_yet`
+  appears nowhere, and horizontal overflow is zero. The sample label read
+  `DETERMINISTIC PRODUCT SAMPLE` when this was observed; it is now the single `INTERACTIVE
+  SAMPLE` badge in the header, asserted at exactly one occurrence.
 - Header and footer: seven primary items ending in Resources, the pilot CTA reading "Request
   access", four footer groups, no horizontal overflow.
 
-Rendering the page also caught one thing no assertion would have: because the marker's label is
-`display: block`, the em dash that separated it from its sentence was left orphaned at the start
-of the next line. Removed.
+Rendering the page also caught one thing no assertion would have: the marker's label was
+`display: block`, which orphaned the em dash separating it from its sentence at the start of the
+next line. That paragraph has since been removed entirely in favour of the header badge, so the
+defect is gone with it.
 
 ### Not run, and required before any deploy
 

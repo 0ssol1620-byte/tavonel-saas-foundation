@@ -1,21 +1,24 @@
 import { NextResponse } from "next/server";
-import { authorizeFoundationRequest } from "@/lib/developer-auth";
-import { type CollectionCandidateArtifact, validateCollectionOcrInput } from "@/lib/collection-compiler";
+import { runCollectionCompile } from "@/lib/collection-compile-run";
 import { COMPILE_MAX_DOCUMENTS, judgeCompileSet } from "@/lib/compile-limits";
-import { dispatchCoreCompile, readCoreRuntimeEnv } from "@/lib/core-runtime";
-import {
-  dispatchProductCoreV2,
-  projectProductCoreV2Candidate,
-  readProductCoreV2Env,
-} from "@/lib/core-runtime-v2";
-import { collectionCandidateKey, DOCUMENT_ID_PATTERN, groupImmutableDocuments } from "@/lib/immutable-keys";
-import { getWorkspaceOcrJson, listImmutableWorkspaceObjects, putWorkspaceCollectionCandidate } from "@/lib/r2-objects";
-import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
+import { authorizeFoundationRequest } from "@/lib/developer-auth";
+import { DOCUMENT_ID_PATTERN } from "@/lib/immutable-keys";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
+/*
+  Compile a set of read documents, synchronously.
+
+  This is a primitive now, not the customer's orchestration. A browser that calls it has to
+  stay open until it answers, which is the exact dependency masterplan 6.3 removes -- so the
+  workspace goes through POST /api/compile-jobs instead, and the durable worker calls the same
+  compile this route calls (`runCollectionCompile`, shared so the two cannot drift apart).
+
+  It stays public because the API contract published it and because a developer with their own
+  scheduler has a legitimate reason to drive one compile and wait for it.
+*/
 export async function POST(request: Request) {
   const contentLength = Number(request.headers.get("content-length") ?? "0");
   if (!Number.isFinite(contentLength) || contentLength > 4_096) {
@@ -53,120 +56,11 @@ export async function POST(request: Request) {
     );
   }
 
-  const workspaceId = auth.principal.workspaceKey;
-  const signer = readR2SignerEnv();
-  if (!signer) {
-    return NextResponse.json({ code: "SIGNER_NOT_CONFIGURED" }, { status: 503, headers: { "Cache-Control": "no-store" } });
+  const run = await runCollectionCompile(auth.principal.workspaceKey, documentIds);
+  if (!run.ok) {
+    const headers: Record<string, string> = { "Cache-Control": "no-store" };
+    if (run.retryAfterSeconds) headers["Retry-After"] = String(run.retryAfterSeconds);
+    return NextResponse.json({ code: run.code, ...run.payload }, { status: run.status, headers });
   }
-  const coreV2 = readProductCoreV2Env();
-  const coreV1 = coreV2 ? null : readCoreRuntimeEnv();
-  if (!coreV2 && !coreV1) {
-    return NextResponse.json({ code: "CORE_NOT_CONFIGURED" }, { status: 503, headers: { "Cache-Control": "no-store" } });
-  }
-  const listed = await listImmutableWorkspaceObjects(signer, workspaceId);
-  if (!listed.ok) {
-    return NextResponse.json({ code: listed.code }, { status: 503, headers: { "Cache-Control": "no-store" } });
-  }
-  const documents = groupImmutableDocuments(workspaceId, listed.objects);
-  const selected = documentIds.map((id) => documents.find((item) => item.documentId === id && item.hasOcrJson));
-  if (selected.some((item) => !item?.sanitizedKey || !item.ocrJsonKey)) {
-    return NextResponse.json({ code: "OCR_NOT_READY" }, { status: 409, headers: { "Cache-Control": "no-store", "Retry-After": "5" } });
-  }
-
-  const fetched = await Promise.all(selected.map((item) => getWorkspaceOcrJson(signer, workspaceId, item!.ocrJsonKey!)));
-  const inputs = fetched.map((result, index) => {
-    const document = selected[index]!;
-    if (!result.ok || !document.sanitizedKey || !document.ocrJsonKey) return null;
-    const json = result.json as Record<string, unknown>;
-    return validateCollectionOcrInput({
-      documentId: document.documentId,
-      versionKey: document.versionKey,
-      sanitizedKey: document.sanitizedKey,
-      ocrJsonKey: document.ocrJsonKey,
-      pageCount: json.pageCount,
-      text: json.text,
-      inputSha256: json.inputSha256,
-      sourceImmutableKey: json.sourceImmutableKey,
-      regions: json.schemaVersion === "tavonel.ocr_result.v2" ? json.regions : undefined,
-    });
-  });
-  if (inputs.some((item) => item === null)) {
-    return NextResponse.json({ code: "OCR_BINDING_INVALID" }, { status: 422, headers: { "Cache-Control": "no-store" } });
-  }
-
-  const verifiedInputs = inputs.filter((item) => item !== null);
-  let artifact: CollectionCandidateArtifact;
-  let coreExecution: {
-    status: "completed" | "review_required";
-    runtime: string;
-    worldStateId: string | null;
-    receipt: Record<string, unknown> & { requestId: string; outputSha256: string; candidatePromotion: false };
-  };
-  if (coreV2) {
-    const compiled = await dispatchProductCoreV2(coreV2, workspaceId, verifiedInputs);
-    if (!compiled.ok) {
-      return NextResponse.json({ code: compiled.code }, { status: 503, headers: { "Cache-Control": "no-store" } });
-    }
-    if (compiled.result.status === "rejected") {
-      return NextResponse.json({
-        code: "CORE_V2_REJECTED",
-        candidateWorldStateId: compiled.result.candidate.worldStateId,
-        reviewReasons: compiled.result.candidate.reviewReasons,
-        candidatePromotion: false,
-      }, { status: 422, headers: { "Cache-Control": "no-store" } });
-    }
-    const projected = projectProductCoreV2Candidate(compiled.result, verifiedInputs);
-    if (!projected) {
-      return NextResponse.json({ code: "CORE_V2_PROJECTION_INVALID" }, { status: 502, headers: { "Cache-Control": "no-store" } });
-    }
-    artifact = projected;
-    coreExecution = {
-      status: compiled.result.status,
-      runtime: compiled.result.runtime,
-      worldStateId: compiled.result.candidate.worldStateId,
-      receipt: compiled.result.receipt,
-    };
-  } else {
-    const compiled = await dispatchCoreCompile(coreV1!, workspaceId, verifiedInputs);
-    if (!compiled.ok) {
-      return NextResponse.json({ code: compiled.code }, { status: 503, headers: { "Cache-Control": "no-store" } });
-    }
-    artifact = compiled.result.artifact;
-    coreExecution = {
-      status: "completed",
-      runtime: compiled.result.runtime,
-      worldStateId: null,
-      receipt: compiled.result.receipt,
-    };
-  }
-  const key = collectionCandidateKey(workspaceId, artifact.collectionId, artifact.manifestDigest.replace("sha256:", ""));
-  if (!key) {
-    return NextResponse.json({ code: "COLLECTION_KEY_INVALID" }, { status: 500, headers: { "Cache-Control": "no-store" } });
-  }
-  const storedArtifact = {
-    ...artifact,
-    coreExecution,
-  };
-  const stored = await putWorkspaceCollectionCandidate(signer, workspaceId, key, storedArtifact);
-  if (!stored.ok) {
-    return NextResponse.json({ code: stored.code }, { status: 503, headers: { "Cache-Control": "no-store" } });
-  }
-
-  return NextResponse.json({
-    code: artifact.lifecycle === "review_required" ? "COLLECTION_REVIEW_PACKAGE_READY" : "COLLECTION_CANDIDATE_READY",
-    collectionId: artifact.collectionId,
-    artifactKey: key,
-    manifestDigest: artifact.manifestDigest,
-    writeStatus: stored.status,
-    artifactBytes: stored.bytes,
-    candidatePromotion: false,
-    sourceDocuments: artifact.sourceDocuments,
-    coreExecution: storedArtifact.coreExecution,
-    blueprint: artifact.blueprint,
-    directoryPlan: artifact.directoryPlan,
-    ontology: artifact.ontology,
-    validation: artifact.validation,
-    reviewReasons: artifact.reviewReasons ?? [],
-    lifecycle: artifact.lifecycle,
-  }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json(run.payload, { headers: { "Cache-Control": "no-store" } });
 }

@@ -1641,6 +1641,49 @@ footer.site .shell { display: flex; flex-direction: column; gap: 14px; }
 .workspace-preflight dl div { display: grid; gap: 4px; padding: 12px; background: var(--g1); }
 .workspace-preflight dt { color: var(--text-xlo); font: 9px var(--f-mono); letter-spacing: .1em; text-transform: uppercase; }
 .workspace-preflight dd { margin: 0; color: var(--text-hi); font: 15px var(--f-mono); }
+
+/*
+  The durable compile panel.
+
+  Sized like the other workspace cards rather than like an alert, because it is not one: it is
+  present for the whole run and its ordinary state is "this is going fine, you may leave".
+  Only the blocked group is allowed to raise its voice.
+*/
+.workspace-compile-job {
+  display: grid;
+  gap: 10px;
+  margin: 24px 0;
+  padding: 20px;
+  background: var(--g1);
+  border: 1px solid var(--hairline);
+}
+.workspace-compile-job h2 { margin: 0; color: var(--text-hi); font: 400 19px/1.3 var(--f-sans); }
+.workspace-compile-job-progress {
+  width: 100%;
+  height: 3px;
+  appearance: none;
+  border: 0;
+  background: var(--hairline);
+}
+.workspace-compile-job-progress::-webkit-progress-bar { background: var(--hairline); }
+.workspace-compile-job-progress::-webkit-progress-value { background: var(--text-hi); transition: width .3s ease; }
+.workspace-compile-job-progress::-moz-progress-bar { background: var(--text-hi); }
+/* A settled run has nothing left to advance, so a bar creeping toward full would be a lie. */
+.workspace-compile-job[data-state="failed"] .workspace-compile-job-progress::-webkit-progress-value,
+.workspace-compile-job[data-state="cancelled"] .workspace-compile-job-progress::-webkit-progress-value { background: var(--text-xlo); }
+.workspace-compile-job-blocked {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--changed-dim);
+  background: var(--changed-deep);
+}
+.workspace-compile-job-blocked ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.workspace-compile-job-blocked li { color: var(--text-hi); font: 13px/1.5 var(--f-sans); }
+.workspace-compile-job-blocked em { color: var(--changed); font-style: normal; }
+@media (prefers-reduced-motion: reduce) {
+  .workspace-compile-job-progress::-webkit-progress-value { transition: none; }
+}
 .workspace-source-choices {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
