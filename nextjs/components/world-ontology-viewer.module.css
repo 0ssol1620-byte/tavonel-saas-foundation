@@ -1,0 +1,56 @@
+.viewer {
+  --ont-ink: var(--text-hi, #e8e7e2);
+  --ont-muted: var(--text-lo, #a5a49d);
+  --ont-faint: var(--text-xlo, #74736d);
+  --ont-line: var(--hairline, rgb(255 255 255 / 0.12));
+  --ont-accent: var(--verified, #9bb8a4);
+  display: grid;
+  gap: 22px;
+  min-width: 0;
+}
+
+.summary { margin: 0; color: var(--ont-faint); font: 10px var(--f-mono, monospace); letter-spacing: .04em; }
+
+.viewer h3 {
+  margin: 0 0 8px;
+  color: var(--ont-faint);
+  font: 9px var(--f-mono, monospace);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.table { width: 100%; border-collapse: collapse; font: 11px var(--f-mono, monospace); }
+.table th, .table td { padding: 8px 10px; border-top: 1px solid var(--ont-line); text-align: left; vertical-align: top; }
+.table thead th { color: var(--ont-faint); border-top: 0; font-size: 9px; letter-spacing: .1em; text-transform: uppercase; }
+.table tbody th { color: var(--ont-ink); font-weight: 400; }
+.table td { color: var(--ont-muted); }
+
+/* The bar is a background on the cell rather than an element in the flow, so the number stays
+   readable on top of it and the table does not gain a column of decoration. */
+.bar {
+  display: block;
+  height: 2px;
+  width: 100%;
+  margin-bottom: 4px;
+  background: linear-gradient(to right, var(--ont-accent) var(--fill), var(--ont-line) var(--fill));
+}
+
+.notYet { display: grid; gap: 6px; margin: 0; padding: 12px; border: 1px dashed var(--ont-line); color: var(--ont-muted); font-size: 12px; line-height: 1.6; }
+.notYet span { color: var(--ont-faint); font: 9px var(--f-mono, monospace); letter-spacing: .12em; }
+
+.note { max-width: 640px; margin: 8px 0 0; color: var(--ont-faint); font-size: 11px; line-height: 1.6; }
+
+.exports { display: grid; gap: 1px; margin: 0; padding: 0; list-style: none; background: var(--ont-line); }
+.exports li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; padding: 10px; background: var(--ground, #11120f); }
+.exports strong { color: var(--ont-ink); font: 400 11px var(--f-mono, monospace); overflow-wrap: anywhere; }
+.exports span { color: var(--ont-faint); font: 9px var(--f-mono, monospace); }
+.exports code { grid-column: 1 / -1; color: var(--ont-faint); font-size: 9px; overflow-wrap: anywhere; }
+
+.empty { display: grid; gap: 8px; padding: 32px; border: 1px dashed var(--hairline, rgb(255 255 255 / 0.12)); }
+.empty span { color: var(--text-xlo, #74736d); font: 9px var(--f-mono, monospace); letter-spacing: .12em; }
+.empty h3 { margin: 0; font: 400 18px var(--f-sans, sans-serif); }
+.empty p { margin: 0; color: var(--text-lo, #a5a49d); font-size: 12px; }
+
+@media (max-width: 720px) {
+  .table { display: block; overflow-x: auto; }
+}

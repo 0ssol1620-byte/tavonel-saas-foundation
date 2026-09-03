@@ -69,6 +69,52 @@ export type WorldFile = {
   sha256: string;
 };
 
+/*
+  The semantic directory the compiler actually planned.
+
+  Not a grouping of objects by their type. The compiler emits a path-shaped plan -- Sources,
+  Topics, Entities, Claims, Evidence, Assets, MOCs, Packages, with a leaf per compiled record
+  -- and each leaf names the documents it came from. Grouping objects by `type` in the UI
+  produced something that looked like this and was not: it could not show an empty root, could
+  not show a path, and could not say which sources a folder was derived from.
+*/
+export type WorldDirectoryEntry = {
+  path: string;
+  kind: string;
+  sourceIds: string[];
+};
+
+/**
+ * The compiled ontology, described by what the artifact contains rather than by a template.
+ *
+ * `subclassOf` is absent on purpose. The compiled ontology declares no subclass axioms, and a
+ * hierarchy invented for the sake of drawing a tree would be exactly the fabricated data this
+ * repository forbids. The viewer says so instead.
+ */
+export type WorldOntologyClass = {
+  name: WorldObjectType;
+  instances: number;
+  /** Instances carrying at least one evidence reference. */
+  withEvidence: number;
+};
+
+export type WorldOntologyProperty = {
+  name: string;
+  usages: number;
+  /** Observed, not declared: the object types this predicate was actually used between. */
+  domain: WorldObjectType[];
+  range: WorldObjectType[];
+  withEvidence: number;
+};
+
+export type WorldOntology = {
+  classes: WorldOntologyClass[];
+  properties: WorldOntologyProperty[];
+  hierarchy: ReadValue<never>;
+  /** Where this ontology leaves the product, by package path. */
+  exports: Array<{ path: string; mediaType: string; sha256: string }>;
+};
+
 export type WorldHistoryEntry = {
   version: string;
   manifestDigest: string;
@@ -128,6 +174,8 @@ export type WorldReadModel = {
   objects: WorldObject[];
   relations: WorldRelation[];
   evidence: WorldEvidence[];
+  directory: WorldDirectoryEntry[];
+  ontology: WorldOntology;
   history: WorldHistoryEntry[];
   files: WorldFile[];
   signature: ReadValue<"verified">;
@@ -351,6 +399,71 @@ function reviewModel(reasons: string[], model: CanonicalModel, evidence: WorldEv
   };
 }
 
+/*
+  Read the compiler's directory plan, and refuse anything that does not look like one.
+
+  The artifact validator types this field as `unknown[]` -- it checks that a plan is present,
+  not what is in it -- so the shape is established here, once, before the UI sees it. A leaf
+  with a traversal path or a non-string kind is dropped rather than rendered.
+*/
+function parseDirectoryPlan(plan: unknown[]): WorldDirectoryEntry[] {
+  const entries = plan.flatMap((value) => {
+    if (!value || typeof value !== "object") return [];
+    const entry = value as Record<string, unknown>;
+    if (typeof entry.path !== "string" || typeof entry.kind !== "string") return [];
+    const path = entry.path;
+    if (path.length === 0 || path.length > 512 || path.startsWith("/") || path.split("/").some((part) => part === "." || part === "..")) return [];
+    const sourceIds = Array.isArray(entry.sourceIds)
+      ? entry.sourceIds.filter((id): id is string => typeof id === "string" && SAFE_ID.test(id))
+      : [];
+    return [{ path, kind: entry.kind, sourceIds }];
+  });
+  // Sorted so two renders of the same World agree, and so a folder precedes its contents.
+  return entries.sort((left, right) => left.path.localeCompare(right.path));
+}
+
+/**
+ * Describe the ontology from the compiled graph, counting rather than assuming.
+ *
+ * Domain and range are observed: the object types this predicate was actually used between in
+ * this World. That is a weaker claim than a declared domain and range, and it is the only one
+ * the artifact supports -- so it is the one made, and the viewer labels it as observed.
+ */
+function buildOntology(
+  canonical: { nodes: CanonicalNode[]; edges: CanonicalEdge[] },
+  files: WorldFile[],
+): WorldOntology {
+  const kindOf = new Map(canonical.nodes.map((node) => [node.id, node.kind] as const));
+  const classes = [...new Set(canonical.nodes.map((node) => node.kind))].sort().map((name) => {
+    const instances = canonical.nodes.filter((node) => node.kind === name);
+    return {
+      name,
+      instances: instances.length,
+      withEvidence: instances.filter((node) => node.evidenceIds.length > 0).length,
+    };
+  });
+
+  const properties = [...new Set(canonical.edges.map((edge) => edge.type))].sort().map((name) => {
+    const usages = canonical.edges.filter((edge) => edge.type === name);
+    return {
+      name,
+      usages: usages.length,
+      domain: [...new Set(usages.map((edge) => kindOf.get(edge.from)).filter((kind): kind is WorldObjectType => Boolean(kind)))].sort(),
+      range: [...new Set(usages.map((edge) => kindOf.get(edge.to)).filter((kind): kind is WorldObjectType => Boolean(kind)))].sort(),
+      withEvidence: usages.filter((edge) => edge.evidenceIds.length > 0).length,
+    };
+  });
+
+  return {
+    classes,
+    properties,
+    hierarchy: notYet("The compiled ontology declares no subclass axioms, so there is no hierarchy to read."),
+    exports: files
+      .filter((file) => file.path.startsWith("ontology/") || file.path.startsWith("graph/"))
+      .map((file) => ({ path: file.path, mediaType: file.mediaType, sha256: file.sha256 })),
+  };
+}
+
 export function buildWorldReadModel(value: unknown, collectionId: string, context: BuildContext = {}): WorldReadModel | null {
   const artifact = validateReviewableCollectionArtifact(value, collectionId);
   if (!artifact) return null;
@@ -427,6 +540,12 @@ export function buildWorldReadModel(value: unknown, collectionId: string, contex
     });
   }
   const reasons = artifact.reviewReasons ?? artifact.validation.reviewReasons ?? [];
+  const files: WorldFile[] = artifact.package.files.map((file) => ({
+    path: file.path,
+    mediaType: file.mediaType,
+    sizeBytes: file.sizeBytes,
+    sha256: file.sha256,
+  }));
   return {
     schemaVersion: "tavonel.world_read_model.v1",
     contract: {
@@ -445,7 +564,9 @@ export function buildWorldReadModel(value: unknown, collectionId: string, contex
     relations,
     evidence,
     history,
-    files: artifact.package.files.map((file) => ({ path: file.path, mediaType: file.mediaType, sizeBytes: file.sizeBytes, sha256: file.sha256 })),
+    directory: parseDirectoryPlan(artifact.directoryPlan),
+    ontology: buildOntology(canonical, files),
+    files,
     signature: notYet("The candidate artifact does not contain a verified signed-export receipt."),
     review: reviewModel(reasons, canonical, evidence),
   };

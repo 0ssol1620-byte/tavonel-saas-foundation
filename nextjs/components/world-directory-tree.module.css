@@ -1,0 +1,62 @@
+.tree {
+  --dir-ink: var(--text-hi, #e8e7e2);
+  --dir-muted: var(--text-lo, #a5a49d);
+  --dir-faint: var(--text-xlo, #74736d);
+  --dir-line: var(--hairline, rgb(255 255 255 / 0.12));
+  --dir-accent: var(--verified, #9bb8a4);
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.summary { margin: 0; color: var(--dir-faint); font: 10px var(--f-mono, monospace); letter-spacing: .04em; }
+
+.root, .children { margin: 0; padding: 0; list-style: none; }
+.children { margin-left: 14px; border-left: 1px solid var(--dir-line); }
+
+.row { min-width: 0; }
+.rowHead {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 4px 6px;
+  min-width: 0;
+}
+.rowHead:hover { background: var(--g1, rgb(255 255 255 / 0.035)); }
+
+.disclosure {
+  width: 16px;
+  color: var(--dir-faint);
+  font: 11px var(--f-mono, monospace);
+  text-align: center;
+}
+.disclosure:hover, .disclosure:focus-visible { color: var(--dir-ink); }
+.leafMark { width: 16px; color: var(--dir-faint); font: 11px var(--f-mono, monospace); text-align: center; }
+
+.name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--dir-ink);
+  font: 12px var(--f-mono, monospace);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+button.name { text-decoration: underline; text-underline-offset: 2px; }
+button.name:hover, button.name:focus-visible { color: var(--dir-accent); }
+button.name[data-selected="true"] { color: var(--dir-accent); }
+
+.kind, .count, .sources { color: var(--dir-faint); font: 9px var(--f-mono, monospace); letter-spacing: .06em; }
+.kind { text-transform: uppercase; }
+.count { margin-left: auto; }
+/* Sources sit after the count so the eye reads name, kind, size, provenance in one pass. */
+.sources { white-space: nowrap; }
+
+.empty { display: grid; gap: 8px; padding: 32px; border: 1px dashed var(--hairline, rgb(255 255 255 / 0.12)); }
+.empty span { color: var(--text-xlo, #74736d); font: 9px var(--f-mono, monospace); letter-spacing: .12em; }
+.empty h3 { margin: 0; font: 400 18px var(--f-sans, sans-serif); }
+.empty p { margin: 0; color: var(--text-lo, #a5a49d); font-size: 12px; }
+
+@media (max-width: 720px) {
+  .count { margin-left: 0; }
+  .rowHead { flex-wrap: wrap; }
+}

@@ -1,0 +1,106 @@
+.canvas {
+  --graph-ink: var(--text-hi, #e8e7e2);
+  --graph-muted: var(--text-lo, #a5a49d);
+  --graph-faint: var(--text-xlo, #74736d);
+  --graph-line: var(--hairline, rgb(255 255 255 / 0.12));
+  --graph-accent: var(--verified, #9bb8a4);
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.search { display: grid; gap: 4px; }
+.search span, .filter legend { color: var(--graph-faint); font: 8px var(--f-mono, monospace); letter-spacing: .1em; text-transform: uppercase; }
+.search input {
+  width: 190px;
+  padding: 7px 9px;
+  color: var(--graph-ink);
+  background: transparent;
+  border: 1px solid var(--graph-line);
+  font: 11px var(--f-mono, monospace);
+}
+.filter { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0; padding: 6px 10px; border: 1px solid var(--graph-line); }
+.filter label { display: flex; gap: 5px; align-items: center; color: var(--graph-muted); font: 10px var(--f-mono, monospace); }
+.viewControls { display: flex; gap: 6px; margin-left: auto; }
+.viewControls button {
+  min-width: 34px;
+  padding: 7px 10px;
+  color: var(--graph-muted);
+  border: 1px solid var(--graph-line);
+  font: 10px var(--f-mono, monospace);
+  text-transform: uppercase;
+}
+.viewControls button:hover, .viewControls button:focus-visible { color: var(--graph-ink); border-color: var(--graph-accent); }
+.viewControls button[aria-pressed="true"] { color: var(--graph-ink); border-color: var(--graph-accent); }
+
+.summary { margin: 0; color: var(--graph-faint); font: 10px var(--f-mono, monospace); letter-spacing: .04em; }
+
+.svg {
+  width: 100%;
+  height: clamp(320px, 52vh, 640px);
+  border: 1px solid var(--graph-line);
+  background:
+    radial-gradient(circle at 30% 20%, color-mix(in srgb, var(--graph-accent) 6%, transparent), transparent 55%),
+    var(--ground, #11120f);
+  /* Dragging is panning. Without this the browser starts a text selection instead and the
+     graph appears to be stuck. */
+  cursor: grab;
+  touch-action: none;
+}
+.svg:active { cursor: grabbing; }
+
+.edges { pointer-events: stroke; }
+.edge {
+  stroke: var(--graph-line);
+  stroke-width: 1;
+  /* A wide invisible hit area, because a one-pixel line is not a click target. */
+  stroke-linecap: round;
+  cursor: pointer;
+}
+.edge[data-evidence="true"] { stroke: color-mix(in srgb, var(--graph-accent) 45%, transparent); }
+.edge[data-connected="true"] { stroke: var(--graph-accent); stroke-width: 2; }
+.edge:hover { stroke: var(--graph-ink); }
+
+.node { cursor: pointer; }
+.node circle { fill: var(--graph-muted); stroke: var(--ground, #11120f); stroke-width: 1.5; }
+.node text { fill: var(--graph-muted); font: 10px var(--f-mono, monospace); pointer-events: none; }
+/* Type is carried by hue, and every one of these also differs in the label and the tooltip --
+   colour is never the only channel. */
+.node[data-type="Document"] circle { fill: var(--graph-ink); }
+.node[data-type="Topic"] circle { fill: var(--graph-accent); }
+.node[data-type="Entity"] circle { fill: var(--changed, #f2a65a); }
+.node[data-type="Claim"] circle { fill: color-mix(in srgb, var(--graph-accent) 55%, var(--graph-muted)); }
+.node[data-type="Evidence"] circle { fill: var(--graph-faint); }
+.node[data-selected="true"] circle { stroke: var(--graph-accent); stroke-width: 3; }
+.node[data-selected="true"] text { fill: var(--graph-ink); }
+.node[data-matched="true"] circle { stroke: var(--graph-ink); stroke-width: 3; }
+.node[data-dimmed="true"] { opacity: .28; }
+
+.tableWrap { max-height: clamp(320px, 52vh, 640px); overflow: auto; border: 1px solid var(--graph-line); }
+.table { width: 100%; border-collapse: collapse; font: 11px var(--f-mono, monospace); }
+.table caption { padding: 10px; color: var(--graph-faint); font-size: 10px; text-align: left; }
+.table th, .table td { padding: 8px 10px; border-top: 1px solid var(--graph-line); text-align: left; vertical-align: top; }
+.table thead th { position: sticky; top: 0; color: var(--graph-faint); background: var(--ground, #11120f); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; }
+.table tbody th { color: var(--graph-ink); font-weight: 400; }
+.table tr[data-selected="true"] th { color: var(--graph-accent); }
+.table ul { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.table button { color: inherit; text-align: left; text-decoration: underline; text-underline-offset: 2px; }
+.table button:hover, .table button:focus-visible { color: var(--graph-accent); }
+
+.empty { display: grid; gap: 8px; padding: 32px; border: 1px dashed var(--hairline, rgb(255 255 255 / 0.12)); }
+.empty span { color: var(--text-xlo, #74736d); font: 9px var(--f-mono, monospace); letter-spacing: .12em; }
+.empty h3 { margin: 0; font: 400 18px var(--f-sans, sans-serif); }
+.empty p { margin: 0; color: var(--text-lo, #a5a49d); font-size: 12px; }
+
+@media (prefers-reduced-motion: reduce) {
+  /* Nothing here animates by default; this is a guard against a future transition being added
+     to the pan, which would turn every drag frame into an easing curve. */
+  .svg, .node, .edge { transition: none !important; }
+}
+
+@media (max-width: 720px) {
+  .controls { gap: 8px; }
+  .viewControls { margin-left: 0; }
+  .search input { width: 100%; }
+}

@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import PdfEvidenceViewer from "@/components/pdf-evidence-viewer";
+import WorldGraphCanvas from "@/components/world-graph-canvas";
+import WorldDirectoryTree from "@/components/world-directory-tree";
+import WorldOntologyViewer from "@/components/world-ontology-viewer";
 import type {
   SelectedWorldEvidence,
   WorldEvidence,
@@ -157,88 +160,44 @@ export default function WorldStudioUltimate({
       <div className={styles.workspace}>
         <div id={`world-lens-${lens}`} className={styles.lensBody} role="tabpanel">
           {lens === "graph" && (
-            !model || model.objects.length === 0 ? (
-              <ReadNotYet>Compile and validate a collection before its object map can be read.</ReadNotYet>
-            ) : (
-              <div className={styles.mapLens}>
-                <div className={styles.objectGrid} data-sensitive="content">
-                  {model.objects.map((object) => (
-                    <button
-                      key={object.id}
-                      type="button"
-                      data-selected={selectedObject?.id === object.id}
-                      onClick={() => setSelectedObjectId(object.id)}
-                    >
-                      <span>{object.type}</span>
-                      <strong>{object.label}</strong>
-                      <small>{object.evidenceRefs.length} evidence / {object.relations.length} relations</small>
-                    </button>
-                  ))}
-                </div>
-                {model.relations.length === 0 ? (
-                  <ReadNotYet>No compiled relations are present in this World.</ReadNotYet>
-                ) : (
-                  <ol className={styles.relationList} data-sensitive="content" aria-label="Compiled relations">
-                    {model.relations.map((relation) => (
-                      <li key={relation.id}>
-                        <code>{relation.subject}</code>
-                        <b>{relation.predicate}</b>
-                        <code>{relation.object}</code>
-                        <span>{relation.evidenceRefs.length} evidence</span>
-                      </li>
-                    ))}
-                  </ol>
-                )}
-              </div>
-            )
+            /*
+              A graph, not a grid of cards.
+
+              What was here listed objects and relations separately, which showed real
+              compiled data and could not show the one thing a graph is for: that these
+              objects are connected, and how. Positions are computed rather than simulated,
+              so the same World always draws the same picture.
+            */
+            <WorldGraphCanvas
+              model={model}
+              selectedObjectId={selectedObjectId}
+              onObjectSelect={setSelectedObjectId}
+              onEvidenceSelect={(evidenceId) => {
+                const evidence = model?.evidence.find((item) => item.id === evidenceId);
+                if (evidence) selectEvidence(evidence);
+              }}
+            />
           )}
 
           {lens === "directory" && (
-            !model || model.objects.length === 0 ? (
-              <ReadNotYet>No compiled objects are available for the directory lens.</ReadNotYet>
-            ) : (
-              <div className={styles.directoryTree} data-sensitive="content" aria-label="Compiled semantic directory">
-                <strong>Knowledge</strong>
-                {[...new Set(model.objects.map((object) => object.type))].sort().map((type) => (
-                  <section key={type}>
-                    <h3>{type}</h3>
-                    <ul>{model.objects.filter((object) => object.type === type).map((object) => (
-                      <li key={object.id}><button type="button" onClick={() => setSelectedObjectId(object.id)}>{object.label}</button><span>{object.evidenceRefs.length} evidence</span></li>
-                    ))}</ul>
-                  </section>
-                ))}
-              </div>
-            )
+            /*
+              The compiler's own directory plan, not a grouping of objects by type.
+
+              The previous version bucketed `model.objects` on `object.type` and called the
+              result a directory. It looked similar and was a different thing: it could not
+              show a path, could not show a root the compile left empty, and could not say
+              which sources a folder was derived from -- all of which the plan carries.
+            */
+            <WorldDirectoryTree
+              entries={model?.directory ?? []}
+              objects={model?.objects ?? []}
+              selectedObjectId={selectedObjectId}
+              onObjectSelect={setSelectedObjectId}
+            />
           )}
 
           {lens === "ontology" && (
-            !model || model.objects.length === 0 ? (
-              <ReadNotYet>No compiled object types or relation predicates are available.</ReadNotYet>
-            ) : (
-              <div className={styles.mapLens}>
-                <div className={styles.objectGrid}>
-                  {[...new Set(model.objects.map((object) => object.type))].sort().map((type) => (
-                    <article key={type}>
-                      <span>OBJECT TYPE</span>
-                      <strong>{type}</strong>
-                      <small>{model.objects.filter((object) => object.type === type).length} compiled objects</small>
-                    </article>
-                  ))}
-                </div>
-                {model.relations.length === 0 ? (
-                  <ReadNotYet>No compiled relation predicates are present in this World.</ReadNotYet>
-                ) : (
-                  <ol className={styles.relationList} data-sensitive="content" aria-label="Compiled ontology predicates">
-                    {[...new Set(model.relations.map((relation) => relation.predicate))].sort().map((predicate) => (
-                      <li key={predicate}>
-                        <b>{predicate}</b>
-                        <span>{model.relations.filter((relation) => relation.predicate === predicate).length} relations</span>
-                      </li>
-                    ))}
-                  </ol>
-                )}
-              </div>
-            )
+            <WorldOntologyViewer ontology={model?.ontology ?? null} />
           )}
 
           {lens === "evidence" && (
