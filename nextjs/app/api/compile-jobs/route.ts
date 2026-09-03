@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { COMPILE_MAX_DOCUMENTS } from "@/lib/compile-limits";
-import { enqueueCompileJob, enqueueCorpusCompile, listWorkspaceCompileJobs } from "@/lib/compile-job-store";
+import {
+  enqueueCompileJob,
+  enqueueCorpusCompile,
+  listWorkspaceCompileJobs,
+  type CompileJobFailure,
+} from "@/lib/compile-job-store";
 import { CORPUS_MAX_DOCUMENTS, judgeCorpusSet, needsCorpusCompile } from "@/lib/corpus-batching";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { DOCUMENT_ID_PATTERN } from "@/lib/immutable-keys";
@@ -20,6 +25,19 @@ const HEADERS = { "Cache-Control": "no-store" };
   machine on the server, so this endpoint's entire job is to write down the intent durably and
   return. The worker does the rest whether anyone is watching or not.
 */
+/*
+  503 means "ask again"; 409 means "asking again will not help".
+
+  A slot conflict is the second kind. Some other job already holds the corpus position this
+  submission wants, and no amount of retrying dislodges it -- a client that reads 503 and backs
+  off is being told to wait for something that will never change.
+*/
+function enqueueFailureStatus(code: CompileJobFailure) {
+  if (code === "COMPILE_JOB_SCOPE_INVALID") return 400;
+  if (code === "COMPILE_JOB_SLOT_CONFLICT") return 409;
+  return 503;
+}
+
 export async function POST(request: Request) {
   const contentLength = Number(request.headers.get("content-length") ?? "0");
   if (!Number.isFinite(contentLength) || contentLength > 4_096) {
@@ -71,7 +89,7 @@ export async function POST(request: Request) {
       documentIds,
     });
     if (!corpus.ok) {
-      const status = corpus.code === "COMPILE_JOB_SCOPE_INVALID" ? 400 : 503;
+      const status = enqueueFailureStatus(corpus.code);
       return NextResponse.json({ code: corpus.code }, { status, headers: HEADERS });
     }
     /*
@@ -103,7 +121,7 @@ export async function POST(request: Request) {
     documentIds,
   });
   if (!enqueued.ok) {
-    const status = enqueued.code === "COMPILE_JOB_SCOPE_INVALID" ? 400 : 503;
+    const status = enqueueFailureStatus(enqueued.code);
     return NextResponse.json({ code: enqueued.code }, { status, headers: HEADERS });
   }
 

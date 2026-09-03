@@ -90,7 +90,15 @@ export type CompileJobFailure =
   | "COMPILE_JOB_STORE_READ_FAILED"
   | "COMPILE_JOB_STORE_WRITE_FAILED"
   | "COMPILE_JOB_SCOPE_INVALID"
-  | "COMPILE_JOB_NOT_FOUND";
+  | "COMPILE_JOB_NOT_FOUND"
+  /*
+    The corpus slot asked for is already held by something else: a job over a different
+    document set, or -- against a database that has not run 0041 -- a standalone job that the
+    old key let a corpus adopt. Never repaired here. Whichever row is there was created by a
+    writer this one cannot see, and overwriting it would be a compile deciding on its own that
+    another compile's work does not count.
+  */
+  | "COMPILE_JOB_SLOT_CONFLICT";
 
 export type CompileJobResult<T> = { ok: true; value: T } | { ok: false; code: CompileJobFailure };
 
@@ -103,15 +111,36 @@ export function newCompileJobId() {
 }
 
 /**
- * The job's identity is its document set, not the moment it was requested.
+ * The job's identity is its document set, not the moment it was requested -- and for a corpus
+ * part, its slot as well.
  *
  * Sorted before hashing because the compiler is order-independent and the customer's
  * selection order is not meaningful. Two submissions of the same sources therefore collide on
  * purpose, which is what makes a double-clicked Compile button one job instead of two charges.
+ *
+ * The document set alone was wrong, and wrong in a way that only appears with real usage.
+ * Compiling twelve documents on their own and then including those same twelve as the first
+ * part of a 128-document corpus produced the same key, so the corpus enqueue found the earlier
+ * standalone job -- `corpus_id` null, belonging to no corpus -- and adopted it as part 0. The
+ * corpus then had ten parts where it believed it had eleven, `readCorpusParts` never returned
+ * the adopted row, and the run could not finish. A standalone World is not a part of a corpus
+ * even when it covers the same documents, so it must not satisfy a slot.
+ *
+ * Hence two namespaces that cannot collide, and a corpus key that carries all three of the
+ * things that make a part what it is: which corpus, which position, and which documents. The
+ * version prefix is there because these keys are stored: `0041` rewrites the existing ones,
+ * and a key with no version is a key nobody can safely rewrite twice.
  */
-export function compileIdempotencyKey(workspaceKey: string, documentIds: readonly string[]) {
+export function compileIdempotencyKey(
+  workspaceKey: string,
+  documentIds: readonly string[],
+  slot?: { corpusId: string; batchIndex: number },
+) {
   const canonical = [...new Set(documentIds)].sort().join("\n");
-  return createHash("sha256").update(`${workspaceKey}\n${canonical}`).digest("hex");
+  const identity = slot
+    ? `corpus-part\n${workspaceKey}\n${slot.corpusId}\n${slot.batchIndex}\n${canonical}`
+    : `standalone\n${workspaceKey}\n${canonical}`;
+  return createHash("sha256").update(`compile-identity/2\n${identity}`).digest("hex");
 }
 
 function fail(code: CompileJobFailure) {
@@ -140,6 +169,13 @@ async function rpc(name: string, body: unknown): Promise<CompileJobResult<unknow
   if (!config) return fail("COMPILE_JOB_STORE_NOT_CONFIGURED");
   const response = await admin(`/rest/v1/rpc/${name}`, { method: "POST", body: JSON.stringify(body) });
   if (!response) return fail("COMPILE_JOB_STORE_WRITE_FAILED");
+  /*
+    A unique violation reaches PostgREST as 409. From `enqueue_foundation_compile_job` that is
+    never a transport problem -- it is the slot constraint refusing a second, different part in
+    a position that is taken -- and reporting it as a write failure would invite a retry that
+    can only fail the same way.
+  */
+  if (response.status === 409) return fail("COMPILE_JOB_SLOT_CONFLICT");
   if (!response.ok) return fail("COMPILE_JOB_STORE_WRITE_FAILED");
   const payload = await response.json().catch(() => null);
   return { ok: true as const, value: payload };
@@ -210,12 +246,16 @@ export async function enqueueCompileJob(input: {
   if (documentIds.length === 0) return fail("COMPILE_JOB_SCOPE_INVALID");
   if (input.corpus && !CORPUS_ID_PATTERN.test(input.corpus.corpusId)) return fail("COMPILE_JOB_SCOPE_INVALID");
 
+  const slot = input.corpus
+    ? { corpusId: input.corpus.corpusId, batchIndex: input.corpus.batchIndex }
+    : undefined;
+
   const result = await rpc("enqueue_foundation_compile_job", {
     p_job_id: newCompileJobId(),
     p_workspace_key: input.workspaceKey,
     p_created_by_user_id: input.createdByUserId,
     p_document_ids: documentIds,
-    p_idempotency_key: compileIdempotencyKey(input.workspaceKey, documentIds),
+    p_idempotency_key: compileIdempotencyKey(input.workspaceKey, documentIds, slot),
     p_corpus_id: input.corpus?.corpusId ?? null,
     p_batch_index: input.corpus?.batchIndex ?? null,
     p_batch_count: input.corpus?.batchCount ?? null,
@@ -223,10 +263,29 @@ export async function enqueueCompileJob(input: {
   if (!result.ok) return result;
 
   const row = Array.isArray(result.value) ? result.value[0] : result.value;
-  const record = row as { job_id?: unknown; state?: unknown; created?: unknown } | null;
+  const record = row as {
+    job_id?: unknown; state?: unknown; created?: unknown;
+    corpus_id?: unknown; batch_index?: unknown;
+  } | null;
   if (!record || typeof record.job_id !== "string" || !isCompileState(record.state)) {
     return fail("COMPILE_JOB_STORE_WRITE_FAILED");
   }
+
+  /*
+    Check what came back, rather than trusting that it is what was asked for.
+
+    Two keys and a unique index already make the collision impossible in a database that has
+    run 0041. This is the guard for the database that has not -- a Preview mid-deploy, a rolled
+    back migration -- where the old function would answer a corpus enqueue with whatever row
+    the old key matched. `created: false` is the only case worth checking: a row this call
+    inserted carries the arguments it was given.
+  */
+  if (input.corpus && record.created !== true) {
+    if (record.corpus_id !== input.corpus.corpusId || record.batch_index !== input.corpus.batchIndex) {
+      return fail("COMPILE_JOB_SLOT_CONFLICT");
+    }
+  }
+
   return { ok: true, value: { jobId: record.job_id, state: record.state, created: record.created === true } };
 }
 

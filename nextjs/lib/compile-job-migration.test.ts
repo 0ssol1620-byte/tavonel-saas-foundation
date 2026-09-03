@@ -78,3 +78,72 @@ describe("durable compile job schema", () => {
     expect(migration).toContain("foundation_compile_jobs_terminal_is_settled");
   });
 });
+
+const slotMigration = readFileSync(
+  resolve(import.meta.dirname, "../../supabase/migrations/0041_corpus_slot_idempotency.sql"),
+  "utf8",
+);
+
+describe("0041 — a standalone compile is not a corpus part", () => {
+  /*
+    The collision this migration closes is described in `compile-job-idempotency.test.ts`,
+    which reproduces it. These assertions are for the half that cannot run in this process:
+    the SQL executes against a database, and `supabase/tests/foundation_corpus_slot_
+    idempotency.sql` is where it is actually exercised.
+  */
+
+  it("looks a corpus part up by its slot and a standalone compile by its documents", () => {
+    expect(slotMigration).toContain("and corpus_id is null\n       and idempotency_key = p_idempotency_key");
+    expect(slotMigration).toContain("and corpus_id = p_corpus_id\n       and batch_index = p_batch_index");
+  });
+
+  it("refuses a slot whose occupant covers other documents instead of returning it", () => {
+    expect(slotMigration).toContain("v_existing.idempotency_key is distinct from p_idempotency_key");
+    expect(slotMigration).toContain("errcode = '23505'");
+  });
+
+  it("survives two enqueues of one slot racing each other", () => {
+    // select-then-insert let both callers past the select and gave the loser an unhandled
+    // unique violation. The insert now yields and the loser reads back the winner's row.
+    expect(slotMigration).toContain("on conflict do nothing");
+    expect(slotMigration).toContain("get diagnostics v_inserted = row_count");
+    expect(slotMigration).toContain("if v_inserted = 1 then");
+  });
+
+  it("hands the caller the slot it landed in, so the answer can be checked", () => {
+    expect(slotMigration).toContain("corpus_id text,\n  batch_index integer");
+  });
+
+  it("rewrites stored keys with exactly the derivation the application uses", () => {
+    /*
+      The backfill and `compileIdempotencyKey` build the same string in two languages. If they
+      disagree by one separator, every existing job gets a key nothing will ever match again
+      and the next resubmission enqueues a second compile of documents already compiling.
+    */
+    const source = readFileSync(resolve(import.meta.dirname, "./compile-job-store.ts"), "utf8");
+    for (const piece of ["compile-identity/2", "standalone", "corpus-part"]) {
+      expect(slotMigration, piece).toContain(`'${piece}'`);
+      expect(source, piece).toContain(piece);
+    }
+    // Order: version, namespace, workspace, [corpus, batch], documents.
+    const SEP = String.raw`E'\n'`;
+    expect(slotMigration).toContain(
+      `'corpus-part' || ${SEP} || job.workspace_key || ${SEP} ||`,
+    );
+    expect(slotMigration).toContain(`job.corpus_id || ${SEP} || job.batch_index::text`);
+    expect(slotMigration).toContain(`'standalone' || ${SEP} || job.workspace_key`);
+    expect(source).toContain(String.raw`corpus-part\n${"${workspaceKey}"}`);
+    expect(source).toContain(String.raw`${"${slot.corpusId}"}\n${"${slot.batchIndex}"}\n${"${canonical}"}`);
+    expect(source).toContain(String.raw`standalone\n${"${workspaceKey}"}\n${"${canonical}"}`);
+    // Sorted, de-duplicated, newline-joined on both sides.
+    expect(slotMigration).toContain(`string_agg(document_id, ${SEP} order by document_id)`);
+    expect(slotMigration).toContain("select distinct unnest(job.document_ids)");
+    expect(source).toContain(String.raw`[...new Set(documentIds)].sort().join("\n")`);
+  });
+
+  it("is safe to run twice", () => {
+    // Recomputed from the row, never derived from the key it replaces.
+    expect(slotMigration).not.toContain("idempotency_key || ");
+    expect(slotMigration).toContain("Recomputed from workspace_key, document_ids, corpus_id and batch_index");
+  });
+});
