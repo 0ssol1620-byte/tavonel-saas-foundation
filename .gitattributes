@@ -23,3 +23,11 @@ nextjs/public/developer/*.md text eol=lf
 # assert on exact text; keep them stable across platforms for the same reason.
 supabase/migrations/*.sql text eol=lf
 supabase/tests/*.sql text eol=lf
+
+# The /explore sample PDFs are the source documents the public Explore page compiles, and
+# lib/explore-sample.test.ts asserts their bytes reproduce the generator's output exactly and
+# that each sha256 matches the digest the page displays. Passing them through core.autocrlf
+# would rewrite bytes inside a binary stream: the digests would move, the byte-equality test
+# would fail on one platform and pass on the other, and a visitor opening the PDF would be
+# checking a file the page no longer describes.
+nextjs/public/explore-sample/*.pdf binary

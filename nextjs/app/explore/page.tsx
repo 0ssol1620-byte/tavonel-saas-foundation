@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import ExploreCompiledWorld from "@/components/explore-compiled-world";
+import { exploreSampleAnswers, exploreSampleDocuments, exploreSampleWorld } from "@/lib/explore-sample";
 
 export const metadata: Metadata = {
   title: "Explore a Compiled World | TAVONEL",
@@ -17,6 +18,20 @@ export const metadata: Metadata = {
   openGraph: { url: "/explore" },
 };
 
+/*
+  A server component so the compile happens once, at build time, on the server.
+
+  `lib/explore-sample` reads three committed PDFs' extracted text layer, runs the production
+  compiler over them and refuses to load if the result stops matching its frozen digest. Doing
+  that here rather than in the browser keeps `node:crypto` and the compiler off the client
+  bundle, and means the page ships the compiled World as data rather than shipping the compiler.
+*/
 export default function ExplorePage() {
-  return <ExploreCompiledWorld />;
+  return (
+    <ExploreCompiledWorld
+      world={exploreSampleWorld}
+      documents={exploreSampleDocuments}
+      answers={exploreSampleAnswers}
+    />
+  );
 }
