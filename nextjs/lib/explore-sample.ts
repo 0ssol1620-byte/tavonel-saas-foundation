@@ -31,7 +31,7 @@ import rawInputs from "./explore-sample.inputs.json";
 */
 
 /** The compiled World the Explore page shows. Recorded so that it cannot change unobserved. */
-export const EXPLORE_SAMPLE_DIGEST = "sha256:d9e1f273a7639f53c4b9070c04926eba7c0f75cdbc9aca64cd447ed609101b16";
+export const EXPLORE_SAMPLE_DIGEST = "sha256:929153d4d0ad1dd6e7a52e3aebdab45747c9792b64869dbb636c969ab1c79abc";
 
 export const EXPLORE_SAMPLE_SOURCE_DIRECTORY = "public/explore-sample";
 

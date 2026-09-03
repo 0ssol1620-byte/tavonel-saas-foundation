@@ -31,6 +31,10 @@ import { unzipSync } from "fflate";
 export const CANONICAL_MODEL_SCHEMA = "akc.canonical-knowledge-model.v1";
 export const SUPPORTED_BLUEPRINTS = new Set(["generic-mixed-corpus@1.0.0"]);
 
+/* The graph projection's column names, spelled here and in lib/collection-compiler.ts. */
+export const GRAPH_NODE_HEADER = "id,kind,label,document_id";
+export const GRAPH_EDGE_HEADER = "id,subject_id,predicate,object_id,evidence_ids";
+
 /** The roots a package may contain. `manifest` and `signatures` appear only once it is signed. */
 const PACKAGE_ROOTS = new Set([
   "source", "canonical", "obsidian", "ontology", "graph", "rag", "provenance", "validation",
@@ -370,20 +374,27 @@ export function validateCompiledWorldPackage(files, options = {}) {
   }
 
   /*
-    A defect this validator reports and does not fail on.
+    The node CSV's columns must say what is under them.
 
-    graph/nodes.csv writes `id,label,name,document_id` over columns holding id, kind, label and
-    document id -- so a consumer reading the column called `label` gets the object's type. The
-    fix is one string, and it changes the bytes of the CSV, therefore its sha256, therefore the
-    manifestDigest of every artifact ever compiled. That is a deliberate re-derivation with a
-    decision behind it, not something a validator run gets to do quietly, so it is named here
-    and left for the person who owns the contract.
+    This was a warning for one revision, because correcting the header changes the bytes of the
+    CSV, therefore its sha256, therefore the manifestDigest of every artifact. That is a real
+    cost and it is not a reason to ship a header that lies: `id,label,name,document_id` over
+    columns holding id, kind, label and document id means a consumer reading the column called
+    `label` gets the object's type instead, and a consumer reading `name` gets its label. No
+    artifact had been published, so the digests were re-derived and this became an error.
   */
   const header = nodeCsv[0]?.join(",");
-  if (header === "id,label,name,document_id") {
-    warnings.push({
-      code: "GRAPH_CSV_HEADER_MISLABELED",
-      detail: "graph/nodes.csv header reads id,label,name,document_id over id,kind,label,document_id",
+  if (header !== GRAPH_NODE_HEADER) {
+    errors.push({
+      code: "GRAPH_CSV_HEADER_WRONG",
+      detail: `graph/nodes.csv header reads ${header ?? "(missing)"} over ${GRAPH_NODE_HEADER}`,
+    });
+  }
+  const edgeHeader = edgeCsv[0]?.join(",");
+  if (edgeHeader !== GRAPH_EDGE_HEADER) {
+    errors.push({
+      code: "GRAPH_CSV_HEADER_WRONG",
+      detail: `graph/relationships.csv header reads ${edgeHeader ?? "(missing)"} over ${GRAPH_EDGE_HEADER}`,
     });
   }
 

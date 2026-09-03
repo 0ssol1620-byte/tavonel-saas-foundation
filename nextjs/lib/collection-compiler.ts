@@ -245,7 +245,7 @@ export function materializeLabelDerivedFiles(input: LabelDerivedInput) {
     },
     "@graph": nodes.map((node) => ({ "@id": `urn:tavonel:${node.id}`, "@type": node.kind, label: node.label, evidence: node.evidenceIds })),
   }, null, 2) + "\n";
-  const nodeCsv = ["id,label,name,document_id", ...nodes.map((node) => [node.id, node.kind, node.label, node.documentId ?? ""].map(csvCell).join(","))].join("\n") + "\n";
+  const nodeCsv = ["id,kind,label,document_id", ...nodes.map((node) => [node.id, node.kind, node.label, node.documentId ?? ""].map(csvCell).join(","))].join("\n") + "\n";
   const edgeCsv = ["id,subject_id,predicate,object_id,evidence_ids", ...edges.map((edge) => [edge.id, edge.from, edge.type, edge.to, edge.evidenceIds.join("|")].map(csvCell).join(","))].join("\n") + "\n";
 
   return {

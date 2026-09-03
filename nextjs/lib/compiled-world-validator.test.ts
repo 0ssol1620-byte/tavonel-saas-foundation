@@ -91,12 +91,32 @@ describe("a package the compiler produced", () => {
     expect(required.ok).toBe(false);
   });
 
-  it("names the mislabeled CSV header without failing the package for it", () => {
-    // The defect is real and the fix moves every artifact digest, so it is a warning with a
-    // name rather than a silent pass or a red build. `validate.mjs` records why in full.
+  it("carries graph headers that name the columns underneath them", () => {
+    /*
+      For one revision this was a warning: the header read `id,label,name,document_id` over
+      columns holding id, kind, label and document id, and correcting it moved every artifact
+      digest. No artifact had been published, so the digests were re-derived and a header that
+      lies is now an error like any other.
+    */
     const result = validateCompiledWorldPackage(samplePackage());
-    expect(result.warnings.map((warning: { code: string }) => warning.code)).toContain("GRAPH_CSV_HEADER_MISLABELED");
     expect(result.ok).toBe(true);
+    expect(result.warnings).toHaveLength(0);
+    expect(samplePackage().get("graph/nodes.csv")!.split("\n")[0]).toBe("id,kind,label,document_id");
+    expect(samplePackage().get("graph/relationships.csv")!.split("\n")[0])
+      .toBe("id,subject_id,predicate,object_id,evidence_ids");
+  });
+
+  it.each([
+    ["graph/nodes.csv", "id,label,name,document_id"],
+    ["graph/relationships.csv", "id,from,predicate,to,evidence"],
+  ])("refuses %s when its header does not match the columns", (path, wrongHeader) => {
+    // The mutation. A validator that accepted the old header would have passed the bug.
+    const files = samplePackage();
+    const rows = files.get(path)!.split("\n");
+    files.set(path, [wrongHeader, ...rows.slice(1)].join("\n"));
+    const result = validateCompiledWorldPackage(files);
+    expect(codes(result)).toContain("GRAPH_CSV_HEADER_WRONG");
+    expect(result.ok).toBe(false);
   });
 });
 
