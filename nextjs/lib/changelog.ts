@@ -47,7 +47,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
       "The MCP server exposes eight read-only tools: list_sources, get_world, search_world, ask_world, get_object, get_relation, get_evidence and download_package.",
       "A Compiled World Package validator checks what is inside an export: that relations resolve, that every region sits inside its page, that the Turtle, JSON-LD and CSV describe the same graph, and that the package's own report counts what the package holds.",
       "Documentation covering the endpoint reference, the error catalogue, run events and the package format, with each request in cURL, Python and TypeScript.",
-      "Compiling more sources than one compile can hold: a run of up to 128 documents is split into parts and followed as one.",
+      "Compiling more sources than one compile can hold: a run of up to 128 documents is split into parts and followed as one run. Each part compiles to its own World, and the parts are not merged — matching an object in one part to an object in another is identity resolution that is not built.",
     ],
     improved: [
       "Every public page declares its own canonical, description and share card instead of inheriting the homepage's.",

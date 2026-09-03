@@ -200,6 +200,22 @@ export default function ExploreCompiledWorld({ world, documents, answers }: Prop
                   </button>
                 ))}
               </div>
+              {/*
+                Said to the reader, not only in a comment above.
+
+                `Entity` is a capitalised-token regex, and on this corpus it is right three
+                times in fifteen -- the measurement is in `entity-extraction-eval.json` and the
+                reviewed set behind it is small and unblinded. Showing the number is the
+                difference between a sample that discloses its weakest type and one that lets a
+                reader assume every object here is of the same standard as the claims.
+              */}
+              {type === "Entity" ? (
+                <p className={styles.qualifier}>
+                  Extracted by a capitalised-token heuristic, not by a resolver. On this corpus
+                  3 of 15 are real identifiers; the rest are sentence-initial words and month
+                  names. Unreviewed, and not the standard the claims are held to.
+                </p>
+              ) : null}
               <div className={styles.objectList}>
                 {world.objects.filter((object) => object.type === type).map((object) => (
                   <button key={object.id} onClick={() => selectObject(object.id)} aria-pressed={activeObjectId === object.id}>

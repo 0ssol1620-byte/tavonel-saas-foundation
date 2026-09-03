@@ -1,0 +1,125 @@
+{
+  "note": "A reviewed evaluation set for the compiler's entity extractor. Labels are a person's judgement, recorded so a change to the extractor is measured rather than asserted. Read lib/entity-extraction-quality.test.ts before editing.",
+  "reviewedOn": "2026-09-04",
+  "reviewedBy": "implementation session, unblinded — see limitations in the test file",
+  "corpus": {
+    "name": "explore-sample",
+    "documents": 3,
+    "why": "The only corpus in this repository whose text is real, whose page geometry was read back out of real PDFs, and whose compilation is exercised on every build. Three documents is a small sample and every figure below carries that.",
+    "gold": [
+      {
+        "value": "FP-200",
+        "why": "The feedwater pump the whole corpus is about. An equipment identifier, present in all three documents.",
+        "crossDocument": true
+      },
+      {
+        "value": "CN-2026-03",
+        "why": "The change notice's own identifier. Names a specific document-as-artefact.",
+        "crossDocument": false
+      },
+      {
+        "value": "PG-11",
+        "why": "A pressure gauge, named as the instrument a procedure step depends on.",
+        "crossDocument": false
+      }
+    ],
+    "goldExclusions": [
+      {
+        "value": "feedwater pump",
+        "why": "A class, not an instance, and lowercase in the source. Excluded from gold so recall is not credited for something the extractor cannot see by construction."
+      },
+      {
+        "value": "revision B / revision C",
+        "why": "Versions of a document, which the model represents as source revisions rather than entities."
+      },
+      {
+        "value": "2,000 operating hours",
+        "why": "A quantity. Belongs to a claim, not to the entity set."
+      }
+    ]
+  },
+  "falsePositiveTaxonomy": [
+    {
+      "code": "SENTENCE_INITIAL",
+      "description": "A word capitalised because it starts a sentence, not because it names anything.",
+      "examples": ["The", "This", "Before", "Confirm", "Perform", "Scheduled", "Change", "Revision", "Service"]
+    },
+    {
+      "code": "TEMPORAL_EXPRESSION",
+      "description": "A month or other date part. A real thing in the text and the wrong type: it belongs to a temporal field, not to the entity set.",
+      "examples": ["January", "February", "March"]
+    },
+    {
+      "code": "HEADING_FRAGMENT",
+      "description": "A capitalised fragment of a heading or table label. None observed in this corpus; kept because it is the failure a document with headings produces and the corpus has none.",
+      "examples": []
+    }
+  ],
+  "observed": {
+    "candidates": [
+      { "value": "Change", "verdict": "false-positive", "code": "SENTENCE_INITIAL" },
+      { "value": "CN-2026-03", "verdict": "true-entity" },
+      { "value": "FP-200", "verdict": "true-entity" },
+      { "value": "The", "verdict": "false-positive", "code": "SENTENCE_INITIAL" },
+      { "value": "Revision", "verdict": "false-positive", "code": "SENTENCE_INITIAL" },
+      { "value": "Scheduled", "verdict": "false-positive", "code": "SENTENCE_INITIAL" },
+      { "value": "Perform", "verdict": "false-positive", "code": "SENTENCE_INITIAL" },
+      { "value": "This", "verdict": "false-positive", "code": "SENTENCE_INITIAL" },
+      { "value": "Before", "verdict": "false-positive", "code": "SENTENCE_INITIAL" },
+      { "value": "Confirm", "verdict": "false-positive", "code": "SENTENCE_INITIAL" },
+      { "value": "PG-11", "verdict": "true-entity" },
+      { "value": "Service", "verdict": "false-positive", "code": "SENTENCE_INITIAL" },
+      { "value": "January", "verdict": "false-positive", "code": "TEMPORAL_EXPRESSION" },
+      { "value": "March", "verdict": "false-positive", "code": "TEMPORAL_EXPRESSION" },
+      { "value": "February", "verdict": "false-positive", "code": "TEMPORAL_EXPRESSION" }
+    ]
+  },
+  "baseline": {
+    "measuredOn": "2026-09-04",
+    "extractor": "capitalised-token regex in lib/collection-compiler.ts, entitiesFor",
+    "candidates": 15,
+    "truePositives": 3,
+    "falsePositives": 12,
+    "goldMissed": 0,
+    "precision": 0.2,
+    "recall": 1.0,
+    "reading": "On this corpus the extractor finds every identifier that is there and four false ones for each. Recall 1.0 is not evidence of a good extractor: the gold entities are all uppercase alphanumeric identifiers, which is the easiest possible case, and a corpus of person or organisation names would not behave like this."
+  },
+  "identityCases": [
+    {
+      "code": "EXACT_STRING_ACROSS_DOCUMENTS",
+      "description": "FP-200 appears in all three documents and receives one entity id, because ids are derived from the lowercased label. Cross-document identity is exact string match and nothing more.",
+      "holds": true
+    },
+    {
+      "code": "SURFACE_VARIANT",
+      "description": "FP-200, FP 200 and FP200 are three entities. There is no normalisation and no evidence that they are the same pump.",
+      "holds": false
+    },
+    {
+      "code": "CROSS_PART",
+      "description": "Two parts of one corpus compile independently, so the same identifier in part 1 and part 7 produces two entities in two Worlds. Resolving them is the cross-part identity work that is not built.",
+      "holds": false
+    }
+  ],
+  "ocrNoiseCases": [
+    {
+      "code": "DIGIT_LETTER_CONFUSION",
+      "input": "Replace the seal on FP-2OO before the next service.",
+      "description": "Capital O for zero, a routine OCR substitution. Extracted as a separate entity from FP-200 with no signal that anything is wrong.",
+      "resolvesToGold": false
+    },
+    {
+      "code": "INTERNAL_SPACE",
+      "input": "Replace the seal on FP- 200 before the next service.",
+      "description": "A hyphenation or spacing artefact splits the identifier. The regex stops at the space and yields a different candidate.",
+      "resolvesToGold": false
+    },
+    {
+      "code": "CASE_FLATTENED",
+      "input": "replace the seal on fp-200 before the next service.",
+      "description": "A lowercased line, which OCR produces from small caps and from some scans. Invisible to a capitalisation-based extractor: the identifier is not found at all.",
+      "resolvesToGold": false
+    }
+  ]
+}

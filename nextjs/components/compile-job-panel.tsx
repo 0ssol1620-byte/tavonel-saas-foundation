@@ -107,6 +107,20 @@ export function CompileJobPanel({
             {" "}{corpus.partsReady} ready{corpus.partsFailed > 0 ? `, ${corpus.partsFailed} stopped` : ""}
           </p>
           {/*
+            Said in the interface, not only in the code.
+
+            A run of a hundred and twenty-eight sources produces eleven Worlds. Every screen
+            here calls them parts, which is accurate and is also exactly the word a customer
+            will read as "pieces of one thing". Deciding that an object in part three and an
+            object in part seven are the same object is identity resolution with a calibration
+            requirement, and it does not exist -- so the parts are not merged, and the customer
+            is told that in the place where they would otherwise assume it.
+          */}
+          <p className="fine">
+            {corpus.batchCount} separate Worlds, one per part. They are not merged: an object in
+            one part is not matched against an object in another.
+          </p>
+          {/*
             Each part is its own World and its own state machine, so each is its own control.
             Rolling them into one status would make "part 7 needs a decision" invisible.
           */}
