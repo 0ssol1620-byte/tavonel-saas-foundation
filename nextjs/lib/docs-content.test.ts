@@ -6,6 +6,8 @@ import { COMPILE_MAX_DOCUMENTS, COMPILE_MIN_DOCUMENTS, CORPUS_MAX_DOCUMENTS } fr
 import { DEVELOPER_SCOPES } from "./developer-contracts";
 import { DOCS_GROUPS, DOCS_SECTIONS, DOCS_VERSION, docsSearchIndex, findDocsSection } from "./docs-content";
 import { curlFor, readDocsEndpoints } from "./docs-endpoints";
+// The MCP server is dependency-free .mjs; the docs table is checked against its tool list.
+import { TOOLS as MCP_TOOLS } from "../scripts/mcp/tavonel-mcp-server.mjs";
 
 /*
   Documentation that cannot drift from the product.
@@ -156,9 +158,21 @@ describe("what the documentation does not claim", () => {
     }
   });
 
-  it("says plainly that there is no MCP server yet rather than omitting the page", () => {
+  it("documents the MCP server that exists, tool by tool, and the two tools it does not have", () => {
+    /*
+      This used to assert the sentence "no published MCP server yet", which was the honest thing
+      to say while there was none. There is one now, so the check moves to the two claims that
+      can go wrong in the other direction: that the tool list on the page is the tool list the
+      server exposes, and that the absences are still named rather than quietly filled in.
+    */
     const mcp = findDocsSection("mcp")!;
-    expect(JSON.stringify(mcp)).toContain("no published MCP server yet");
+    const table = mcp.blocks.find((block) => block.kind === "table");
+    const documented = table && table.kind === "table" ? table.rows.map((row) => row[0]) : [];
+    expect(documented).toEqual(MCP_TOOLS.map((tool: { name: string }) => tool.name));
+    expect(documented).not.toContain("list_worlds");
+    const text = JSON.stringify(mcp);
+    expect(text).toContain("no list_worlds tool");
+    expect(text).toContain("no write tool");
   });
 });
 

@@ -20,6 +20,7 @@
     "proof:live-ocr": "node scripts/foundation-live-ocr-proof.mjs",
     "ops:smoke": "node scripts/operations-smoke.mjs",
     "verify:export": "node scripts/verify-signed-export.mjs",
+    "verify:package": "node scripts/compiled-world/validate.mjs",
     "verify:developer-clean": "node scripts/verify-developer-clean-install.mjs",
     "qa:links": "node scripts/launch-qa/internal-links.mjs"
   },

@@ -277,7 +277,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
           ["canonical/model.json", "Objects and relations, canonically ordered."],
           ["ontology/knowledge.ttl", "The same graph as Turtle."],
           ["ontology/knowledge.jsonld", "The same graph as JSON-LD."],
-          ["graph/nodes.csv, graph/edges.csv", "Tabular form for spreadsheet and BI tools."],
+          ["graph/nodes.csv, graph/relationships.csv", "Tabular form for spreadsheet and BI tools."],
           ["rag/chunks.jsonl", "Retrieval chunks, each bound to a page and region."],
           ["validation/report.json", "The validation status and any review reasons."],
         ],
@@ -289,10 +289,26 @@ export const DOCS_SECTIONS: DocsSection[] = [
     slug: "mcp",
     title: "MCP",
     group: "API",
-    summary: "What exists today for agent access, and what does not.",
+    summary: "The read-only tools an agent gets, and the two the server deliberately does not offer.",
     blocks: [
-      { kind: "prose", text: "There is no published MCP server yet. The Ask and Search endpoints are the agent surface today: they take a question, return grounded regions and their citations, and abstain when the World does not support an answer." },
-      { kind: "note", text: "This section exists rather than being hidden because a developer looking for MCP should find an answer instead of a missing page. When a server is published it will be documented here with its exact tool schema." },
+      { kind: "prose", text: "A read-only MCP server ships in the repository at scripts/mcp/tavonel-mcp-server.mjs. It speaks JSON-RPC over stdio with no dependency and no build step, so it can be read before it is pointed at anything. Set TAVONEL_API_KEY and run it; TAVONEL_API_BASE_URL defaults to the published API." },
+      {
+        kind: "table",
+        head: ["Tool", "What it returns"],
+        rows: [
+          ["list_sources", "The workspace's documents, with processing state and version key."],
+          ["get_world", "One Compiled World: status, contract, objects, relations, evidence, history."],
+          ["search_world", "Retrieved regions with provenance and ranks. No generated prose."],
+          ["ask_world", "A grounded answer with citations, or an abstention."],
+          ["get_object", "The objects lens, or one object by stable id."],
+          ["get_relation", "The relations lens, or one relation by stable id."],
+          ["get_evidence", "Every region with its source version, page and bbox in the 0-1000 page frame."],
+          ["download_package", "Where the signed package is, how large, and what its manifest hashes to."],
+        ],
+      },
+      { kind: "note", text: "There is no write tool and there is no promotion tool. Promotion is the moment a candidate becomes the World an organisation answers from, and it stays with a person in a browser; the server refuses to start if a tool that writes is ever added to it." },
+      { kind: "note", text: "There is no list_worlds tool. The published API has no endpoint that lists a workspace's collections, and a tool that answered by guessing at ids would be wrong silently. It is absent rather than approximated, and get_world takes the collection id you already hold." },
+      { kind: "note", text: "download_package returns a descriptor rather than the archive: the URL, the size, the signed manifest digest and the signing key id. The bytes are fetched over HTTP with the same key and checked with the verifier on the CLI page." },
     ],
   },
   {
@@ -303,6 +319,16 @@ export const DOCS_SECTIONS: DocsSection[] = [
     blocks: [
       { kind: "prose", text: "A signed developer distribution is published on the Developers page, pinned by sha256 in its channel manifest. It covers the upload and compile path from a terminal." },
       { kind: "note", text: "It is a distribution rather than a package-manager release: the manifest names the exact bytes, and the verification script checks them before anything runs." },
+      { kind: "prose", text: "Two verifiers ship alongside it, and they answer different questions. `verify:export` checks the archive: that the Ed25519 signature is ours, that every file matches the digest we signed, and that nothing was added. `verify:package` checks what is inside it: that relations resolve to objects that exist, that every region sits inside its page in the 0-1000 coordinate frame, that the Turtle, the JSON-LD and the CSV describe the same graph, and that the package's own report counts what the package holds." },
+      {
+        kind: "steps",
+        items: [
+          "node scripts/verify-signed-export.mjs --archive world.zip --trusted-fingerprint sha256:<64 hex>",
+          "node scripts/compiled-world/validate.mjs --package world.zip",
+          "Add --require-signature to make an unsigned package a failure rather than a note.",
+        ],
+      },
+      { kind: "note", text: "A tampered archive fails at the signature. A package whose relations point at objects that are not there verifies perfectly and is still wrong, which is why the second check exists. Both exit non-zero on any error." },
     ],
   },
   {
