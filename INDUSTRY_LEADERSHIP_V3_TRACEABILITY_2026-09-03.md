@@ -7,6 +7,12 @@ Branch `agent/industry-leadership-v3`. **Not merged to `main`, not deployed to P
 tavonel.com alias is unchanged.** Production deploy was not performed. Pushing the branch does
 create a Vercel Preview deployment automatically; §7 below says what that is and what it is not.
 
+**Revised 2026-09-04 after an independent review of `c0459e0`.** That review found two merge
+blockers and one wrong explanation. All three are closed: a standalone compile could be adopted
+as a corpus part (§6), `graph/nodes.csv` mislabelled its own columns (§6), and the Firefox flake
+was not what this file said it was (§10). Two requirements that had been sharing one verdict
+were split, and two ADRs were written for work that is deliberately not implemented here.
+
 ## Status vocabulary
 
 The plain word "Implemented" is not used anywhere in this file. Code existing is not a status.
@@ -35,17 +41,24 @@ decision, a legal sign-off, a real account, or a physical device.
 So `PARTIAL`, `MISSING` and `FOUNDER_DECISION` are **not** zero here, and a version of this file
 in which they were zero would be false.
 
-**69 rows are classified below**, against 55 in the previous revision. The increase is not
+**70 rows are classified below**, against 55 in the previous revision. The increase is not
 scope creep: the combined `/api /developers /integrations /status /contact /changelog /solutions`
 row is now seven rows because those pages no longer share a verdict, the Files lens is classified
 rather than unmentioned, and the four §22 ecosystem items and three named `MISSING` items are
 classified rather than absent.
 
+**The 2026-09-04 correctness pass moved one row and added one.** P0-07 was a single
+`VERIFIED_IMPLEMENTED` covering two requirements — main-thread freeze prevention, which is
+built, and large-archive server-side extraction, which is not. It is now P0-07a
+`VERIFIED_IMPLEMENTED` and P0-07b `MISSING`, so `MISSING` moves from 4 to 5 and the total from
+69 to 70. Nothing was downgraded to look thorough and nothing was upgraded: the two merge
+blockers that pass found were **fixed**, not reclassified.
+
 | Status | Rows |
 |---|---|
 | `VERIFIED_IMPLEMENTED` | 51 |
 | `PARTIAL` | 12 |
-| `MISSING` | 4 |
+| `MISSING` | 5 |
 | `FOUNDER_DECISION` | 2 |
 | `IMPLEMENTED_BUT_UX_INCOMPLETE` | 0 |
 
@@ -110,6 +123,13 @@ spreadsheet billable unit inside P0-06, the real-account runs inside the QA `PAR
   scheduler actually invokes the crank in a deployed environment is a deployment fact.
 - **`EXTERNAL_QA_REQUIRED`.** Close the tab mid-compile against a deployed environment and
   confirm the run finishes and the receipt is written.
+- **What was checked externally on 2026-09-04.** The crank is closed on the deployed Preview:
+  `POST` and `GET` to `/api/internal/jobs/run` with no header, a wrong bearer and an empty
+  bearer all answer `401 {"code":"WORKER_NOT_AUTHORIZED"}` with no detail leaked. The scheduler
+  itself **cannot** be exercised there — Vercel activates `crons` on production deployments
+  only, which its own documentation states — and the crank's shared secret is a credential this
+  session neither holds nor should. So the worker's reachability is verified and the cron firing
+  is not, which is exactly what this line has said since it was written.
 - **Founder decision?** No.
 
 ### P0-04 — compile required a Team subscription
@@ -152,17 +172,44 @@ spreadsheet billable unit inside P0-06, the real-account runs inside the QA `PAR
 
 ### P0-07 — ZIP extraction can freeze the tab
 
+**Split into two verdicts, because one verdict was covering two requirements.** The masterplan's
+archive architecture is *small and medium in a Web Worker, large by direct upload into isolated
+server-side extraction*. Only the first half exists, and reporting the pair as
+`VERIFIED_IMPLEMENTED` read as though the whole architecture had shipped.
+
+#### P0-07a — main-thread freeze prevention
+
 - **Requirement.** §7.4: a large archive must not make the page unresponsive.
 - **Status.** `VERIFIED_IMPLEMENTED`
 - **Implementation.** `lib/archive-worker.ts` runs `expandArchive` off the main thread, because
   `unzipSync` cannot be interrupted and wherever it runs nothing else does. Cancellation is
   cooperative and checked between entries — the finest granularity the decompressor offers —
-  and the client terminates the worker when a wait becomes unreasonable.
+  and the client terminates the worker when a wait becomes unreasonable. Every guard runs
+  against the ZIP central directory *before* expansion: traversal, absolute and drive-letter
+  paths, encryption, nested archives, file count, total expanded size and per-entry ratio.
 - **Test.** `lib/archive-expand.test.ts`, `lib/archive-client.test.ts`.
 - **Remaining risk.** A cancel during one very large member waits for that member. Recorded in
   the file rather than hidden.
 - **`EXTERNAL_QA_REQUIRED`.** 10 MB, 50 MB and 100 MB archives on a real low-end device.
 - **Founder decision?** No.
+
+#### P0-07b — large-archive server-side extraction
+
+- **Requirement.** The masterplan's second path: above a threshold, direct upload and isolated
+  server-side extraction, with the same guards, progress, cancel, durable status and an
+  extracted file hierarchy.
+- **Status.** `MISSING`
+- **What exists instead.** A ceiling. `MAX_WORKER_ARCHIVE_BYTES` is 200 MB and above it the
+  product answers `ARCHIVE_TOO_LARGE` and stops. Nothing half-expands and nothing is silently
+  truncated, so this is a refusal rather than a defect — but it is not the architecture.
+- **Why it was not built here.** `isolated` is the load-bearing word. Expanding a hostile
+  archive means running a decompressor over attacker-controlled bytes, and the constitution's
+  rule is that components which parse documents get no tools, no broad credentials and no
+  outbound network. A route handler on the current deployment holds the service-role key and
+  has open egress; doing the work there and calling it isolated would be false in the one word
+  that matters. Standing up a bounded, single-purpose extractor is infrastructure with a cost.
+- **Design.** `docs/adr/0002-large-archive-server-side-extraction.md`, proposed, not implemented.
+- **Founder decision?** Yes — the isolation boundary and its cost.
 
 ### P0-08 — defensive copy on deep public pages
 
@@ -314,6 +361,15 @@ an interface that was not what the requirement described. That is no longer true
 
 ### Cross-part identity resolution — `MISSING`
 
+**Investigated on 2026-09-04, and the answer did not change.** There is no identity machinery in
+this repository to build on: the only entity resolution that exists is
+`stableId("entity", label.toLowerCase())`, which is exact string match, and the extractor
+feeding it measures 0.20 precision. `akc_cir.identity` lives in the Core repository, where its
+calibration table is `calibrated = False` by construction. Resolving objects across a seam on
+exact string match over a 20%-precision candidate set would manufacture confident duplicates,
+which is worse than eleven honest Worlds. The product copy now says the count and says the
+parts are not merged, in the panel, the changelog and the documentation.
+
 A 128-document run produces eleven Worlds. Merging them requires deciding when an object in part
 three is the same object as one in part seven, which is `akc_cir.identity` work with a
 calibration requirement and an evidence contract of its own. The corpus deliberately does not
@@ -325,6 +381,15 @@ account for, which is worse than eleven honest ones.
 See P0-05. Not a feature that was skipped: a tenancy change with an ADR and an independent
 review in front of it.
 
+**The ADR now exists.** `docs/adr/0001-stored-workspace-identity-and-team-membership.md`, status
+Proposed, nothing implemented. It sets out why an invite on top of a workspace key derived from
+the user id either silently does nothing or removes the isolation guarantee, the ten pieces a
+real membership change needs — stored workspace identity, membership table, invite and accept,
+immediate revoke, R2 namespace, entitlement ownership, API key ownership, migration of existing
+workspaces, audit, rollback — and the cross-tenant security tests required before it ships. The
+tenancy change itself belongs on its own security-critical branch with an independent review.
+`saleChannel: "contact"` is held; self-serve is not opened.
+
 ### Typed SDKs and an interactive API console — `MISSING`
 
 Generated clients need a codegen pipeline and a package registry; a "Try it" console needs a
@@ -332,26 +397,86 @@ real key in a browser and a CORS decision. Both are real work and neither is a c
 
 ---
 
-## 6. Defects this pass found and did not fix
+## 6. Defects found, and what happened to them
 
-Recording these is the point. Each was found by building something that looks at the output.
+Recording these is the point. Each was found by building something that looks at the output, or
+by an independent review of the branch reading the code afterwards.
 
-### Entity extraction is noisy, and `/explore` shows it
+### The correctness pass of 2026-09-04
 
-`entitiesFor` matches any capitalised run, so the sample's Entity list contains fragments that
-are not entities. Fixing the regex changes the objects every artifact contains, therefore the
-manifest digest of every artifact ever compiled, therefore reproducibility. It is
-production-critical compiler semantics and the founder's call. The sample ships with the Entity
-type visible rather than hidden, because hiding it would make the sample look better than the
-compiler is.
+An independent review of `c0459e0` found two defects this file had recorded as acceptable and
+one it had explained wrongly. All three are closed.
 
-### `graph/nodes.csv` mislabels its own columns
+### Entity extraction is noisy — now measured, and said out loud
 
-The header reads `id,label,name,document_id` over columns holding id, **kind**, label and
-document id — so a consumer reading the column called `label` gets the object's type. The
-validator reports it as a named warning (`GRAPH_CSV_HEADER_MISLABELED`) and does not fail on it,
-because the one-string fix changes the CSV bytes, its sha256 and every manifest digest. That is
-a deliberate re-derivation with a decision behind it, not something a validator run does quietly.
+`entitiesFor` matches any capitalised run. The previous revision said so and stopped there,
+which left "noisy" as an adjective nothing could regress against.
+
+It is measured now. On the three real documents of the `/explore` sample: 15 candidates, of
+which `FP-200`, `CN-2026-03` and `PG-11` are real identifiers and twelve are sentence-initial
+words and month names. **Precision 0.20, recall 1.00**, with a false-positive taxonomy, three
+OCR-noise cases and three identity cases in `lib/entity-extraction-eval.json`.
+
+Recall 1.00 is the least impressive true statement there: every gold entity in this corpus is
+an uppercase alphanumeric identifier, the labels are unblinded, and three documents is a
+reviewed precision set rather than a benchmark. All of that is in the file.
+
+**The regex is unchanged.** Tuning a heuristic against the one corpus it was measured on
+produces a heuristic that fits that corpus, so the baseline assertion is an equality rather
+than a floor and any change to the extractor breaks it. What changed is the claim: `/explore`
+now tells the reader, next to the Entity list, that it is a heuristic and not a resolver and
+that three of fifteen are real. Replacing it with a semantic pipeline needs the Core identity
+work, which is not in this repository.
+
+### `graph/nodes.csv` mislabelled its own columns — **fixed**
+
+The header read `id,label,name,document_id` over columns holding id, **kind**, label and
+document id, so a consumer reading the column called `label` got the object's type and one
+reading `name` got its label. Spreadsheet and BI tools are the whole reason that projection
+exists and every one of them reads the header.
+
+The previous revision left it as a validator warning because correcting one string moves the
+CSV's bytes, its sha256 and the `manifestDigest` of every artifact. That cost is real and it is
+not a reason to publish a header that lies. **No artifact has been published**, so the digests
+were re-derived: `EXPLORE_SAMPLE_DIGEST` moved from `d9e1f273` to `929153d4`, and the frozen
+constant did its job by failing the build rather than quietly serving different bytes.
+
+The validator no longer warns, it refuses — `GRAPH_CSV_HEADER_WRONG`, for both graph CSVs — and
+the header strings are exported constants so the compiler and the checker cannot drift. Both
+wrong headers are asserted to fail, because a validator that accepted the old one would have
+passed the bug.
+
+### A standalone compile could be adopted as a corpus part — **fixed, was a merge blocker**
+
+Found by the independent review reading the code, not by any test here, and it is the kind of
+defect two individually-correct halves produce. A job's identity was its document set. A corpus
+is partitioned deterministically and sorted, so batch 0 of a 128-document run is exactly the
+twelve documents a customer may already have compiled on their own — same key. The corpus
+enqueue found that standalone job, was told `created: false`, and took a row with `corpus_id`
+null as its part 0.
+
+`readCorpusParts` filters on `corpus_id`, so part 0 was never in the list. The corpus had ten
+parts where it believed it had eleven, the run could not settle, and twelve of the customer's
+documents sat in a World belonging to no corpus. **Nothing raised.**
+
+Closed in three places, because any one alone still leaves a way in: the key is namespaced
+(`compile-identity/2`, standalone vs corpus-part) and a part's key carries corpus id, batch
+index and documents; migration `0041` looks a part up by its **slot**, refuses a slot whose
+occupant covers different documents, and goes through `ON CONFLICT DO NOTHING` and a re-read so
+two concurrent enqueues of one slot leave one row instead of an unhandled unique violation for
+the loser; and the application checks the slot it was handed, so a database that has not run
+`0041` produces a conflict rather than a silently lost part. `0041` rewrites the stored keys,
+since they are compared and never recomputed.
+
+Reproduced twice. `lib/compile-job-idempotency.test.ts` replays A, B and C through the real
+application code against a model of the RPC written with **both** lookup rules — under 0038's
+the corpus adopts the standalone job, under 0041's it does not — and the mutation was verified
+by removing the fix and watching two tests fail.
+`supabase/tests/foundation_corpus_slot_idempotency.sql` runs the same scenario against the real
+function. **That file has not been executed**: see §8.
+
+A slot conflict answers `409`, not `503`. Retrying does not dislodge whatever holds the
+position.
 
 ### The connector adapters threw on a null provider row
 
@@ -419,10 +544,17 @@ Nothing below was performed, and no emulator result is written as if it were one
 6. **Archives on a low-end device**: 10 MB, 50 MB and 100 MB.
 7. **A connector "last tested" date**: cannot exist until (2) happens.
 8. **The founder visual checklist** in Launch Appendix C.
-9. **Firefox against a deployed Preview**: the one flaky test in §10 fails on a dropped RSC
-   prefetch under the local parallel matrix. Whether that can reach a real visitor is not
-   settled by anything in this repository, and the run that settles it is a navigation pass
-   through the public routes in Firefox against the Preview URL, not against `pnpm start`.
+9. **The corpus slot pgTAP suite**: `supabase/tests/foundation_corpus_slot_idempotency.sql`
+   reproduces the A/B/C collision against the real `enqueue_foundation_compile_job`, and it has
+   **not been executed**. There is no Postgres available here: Docker is not installed, so
+   `supabase start` cannot run, and the machine's local PostgreSQL 17 uses `scram-sha-256` for
+   every host line — guessing a password is not a verification method. The application half is
+   executed and mutation-verified in `lib/compile-job-idempotency.test.ts`; the SQL half needs a
+   database and `supabase db test`.
+
+Item 9 of the previous revision — a Firefox pass against a deployed Preview — **is done**, and
+it changed the answer rather than confirming it. See §10 and
+`docs/evidence/RSC_PREFETCH_FLAKE_2026-09-04.md`.
 
 ## 9. `FOUNDER_DECISION`
 
@@ -458,13 +590,14 @@ verify anyway is worse than telling them exactly what to fetch and what it shoul
 | Command | Result | Exit |
 | --- | --- | --- |
 | `pnpm exec tsc --noEmit` | clean | 0 |
-| `pnpm exec eslint app components lib` | clean | 0 |
-| `pnpm exec vitest run` | **145 files, 1,290 tests, 1,290 passed** | 0 |
+| `pnpm exec eslint app components lib e2e` | clean | 0 |
+| `pnpm exec vitest run` | **148 files, 1,329 tests, 1,329 passed** | 0 |
 | `pnpm build` | 75/75 static pages generated | 0 |
-| internal link crawl | 110 internal paths, no broken link | 0 |
-| Lighthouse (`/`, `/privacy`, `/security`, 3 runs each) | budgets passed - see below | 0 |
-| `pnpm exec playwright test` | **234 tests: 218 passed, 1 flaky, 15 skipped** | 0 |
-| `pnpm verify:package --package <emitted /explore package>` | `PACKAGE VALID` - 14 files, 3 documents, 1 topic, 15 entities, 10 claims, 3 evidence, 32 relations | 0 |
+| `pnpm qa:links` | 110 internal paths, no broken link | 0 |
+| `pnpm qa:lighthouse` | budgets passed - see below | 0 |
+| `pnpm exec playwright test` (11 projects) | **234 tests: 219 passed, 15 skipped, 0 flaky, 0 failed** | 0 |
+| Firefox launch suite vs the Preview, `--retries=0 --repeat-each=20` | **40 passed, 0 flaky** | 0 |
+| `pnpm verify:package --package <emitted /explore package>` | `PACKAGE VALID` - 14 files, 3 documents, 1 topic, 15 entities, 10 claims, 3 evidence, 32 relations, **no warnings** | 0 |
 | the same, `--require-signature` | `PACKAGE INVALID: 1 error(s)` - `SIGNATURE_ABSENT`, the correct answer for an unsigned package | 1 (intended) |
 | `pnpm verify:developer-clean` | `passed` - isolated HOME, no provider secret inherited, `tavonel-cli 2026.9.3.1`, `mcp 2026.9.3.1`, Python 3.12.13 | 0 |
 
@@ -472,59 +605,88 @@ Lighthouse categories, three runs per route:
 
 | Route | Performance | Accessibility | Best practices | SEO | LCP |
 | --- | --- | --- | --- | --- | --- |
-| `/` | 0.96 | 0.97 | 1.00 | 1.00 | 2,197 ms |
-| `/privacy` | 0.98 | 1.00 | 1.00 | 1.00 | 1,953 ms |
-| `/security` | 0.97 | 1.00 | 1.00 | 1.00 | 2,042 ms |
+| `/` | 0.97 | 0.97 | 1.00 | 1.00 | 2,162 ms |
+| `/privacy` | 0.98 | 1.00 | 1.00 | 1.00 | 1,897 ms |
+| `/security` | 0.97 | 1.00 | 1.00 | 1.00 | 2,019 ms |
 
 `pnpm verify:export` is not in this table because it cannot run standalone: it takes an archive
 and a trusted key fingerprint, and refuses without both. The path it verifies is exercised by
 `e2e/launch-qa-signed-download.spec.ts`, which downloads a real signed export and then tampers
 with the content, the manifest, the signature and the inventory in turn - all four rejections
-are inside the 218 above.
+are inside the 219 above.
+
+`supabase/tests/foundation_corpus_slot_idempotency.sql` is **not** in this table because it did
+not run. Item 9 of section 8 says why.
 
 The Playwright matrix is all eleven projects: widths 1920, 1440, 1280, 1024, 768, 390 and 360,
 plus reduced-motion, plus the launch suite in Chromium, Firefox and WebKit.
 
-**No figure from an earlier session is reused.** The previous revision of this file reported
-781/781 unit tests across 122 files, and 219 browser tests passed with 0 flaky. Both suites were
-re-run from scratch on this tree: the unit count is now 1,290 across 145 files, and the browser
-run is 218 passed with 1 flaky, which the previous revision did not have and did not name.
+**No figure from an earlier revision is reused.** The two previous revisions reported 781/781
+unit tests across 122 files, then 1,290 across 145 with 218 browser passes and 1 flaky. Both
+suites were re-run from scratch on this tree: 1,329 unit tests across 148 files, and 219 browser
+passes with **no flaky result**.
 
-### The flaky test, named rather than averaged away
+### The flaky test, found rather than tolerated
 
-One test is flaky, and it is the same one both times the full matrix ran:
+**There is no flaky test in this run.** The one the previous revision named is fixed, and
+fixing it began by discovering that the previous revision's explanation of it was wrong.
 
-    [launch-firefox] > e2e/launch-qa-cross-browser.spec.ts:7:1
-    > renders launch-critical public routes without browser errors
+That revision said `[launch-firefox] launch-qa-cross-browser.spec.ts` flaked only under the
+local eleven-project matrix, and read that as contention between projects sharing one
+`pnpm start`. Run against a Vercel Preview, alone, on an idle machine, it failed on its **first**
+attempt. Contention was a story fitted to where the failure had been seen, not a cause anyone
+had gone looking for.
 
-It fails its first attempt and passes its retry. The failure is a console error Next.js logs
-when a prefetched RSC payload does not arrive:
+`scripts/rsc-prefetch-probe.mjs` measured it. Varying one thing - how long each page is left
+alone before the loop navigates on - four runs each, against the Preview:
 
-    Failed to fetch RSC payload for http://127.0.0.1:3117/pricing.
-    Falling back to browser navigation.
+| Settle | Prefetches issued | Prefetch non-200 | Runs with an RSC error |
+| --- | --- | --- | --- |
+| 0 ms | 0 | 0 | 0 of 4 |
+| 200 ms | 19-24 | 0 | **3 of 4** |
+| 400 ms | 24 | 0 | 0 of 4 |
+| 700 ms | 11-24 | 0 | 0 of 4 |
+| 1500 ms | 24 | 0 | 0 of 4 |
 
-The spec asserts the console is empty, so the log line itself is what fails it - not a broken
-page. Two things are known about it and one is not:
+**No prefetch ever returned a non-200**, in any configuration. The failing requests are
+`NS_BINDING_ABORTED` - Firefox cancelling a request because the page navigated away - and the
+spec's loop moved on about 200 ms after `main` appeared, which is after the prefetches start
+and before they finish. The test was causing the condition it was failing on. Request
+interception was ruled out first: five runs with the spec's own `page.route` installed and a
+1500 ms settle gave 24 prefetches, all 200, no errors.
 
-- **The route changes between runs.** This pass named `/pricing` and `/resources`; the previous
-  full matrix named `/login`. It is not one bad page.
-- **It only appears in `launch-firefox`, and only under the full eleven-project matrix**, where
-  every project is hitting one `pnpm start` in parallel. The same spec passes in Chromium and
-  WebKit in the same run, and Firefox passes it on the retry against the same server.
+A second, unrelated error was failing the same assertion: Vercel injects its feedback widget
+into Preview deployments and the site's CSP refuses it, because `script-src` does not list
+`vercel.live`. That is the policy working. It is Preview-only, it is annotated with its reason,
+and **the policy is not widened to admit a preview tool.**
 
-- **What is not established** is that this cannot happen to a real visitor on real hosting. The
-  fallback is Next's own documented behaviour for a failed prefetch and ends in an ordinary
-  navigation, so the likely reading is contention in the test environment. That reading has not
-  been proven, and settling it needs a Firefox navigation pass against a deployed
-  Preview, which is item 9 of the `EXTERNAL_QA_REQUIRED` list in section 8.
+The spec now waits for the network to settle, which removes the cause. Filtering the message
+would have hidden it and left the assertion unable to tell a cancelled prefetch from a broken
+one. Verified with `--retries=0 --repeat-each=20` against the Preview: 40 passed, no flaky
+result. Full detail in `docs/evidence/RSC_PREFETCH_FLAKE_2026-09-04.md`.
 
-The flaky result is counted on its own line above and is not folded into the 218. Retries are
-not used to make the number look better: `retries: 1` is in the committed config, the run is
-reported as `218 passed, 1 flaky`, and the flaky one is named here.
+What a real visitor sees: clicking a link within about two hundred milliseconds of the page
+painting cancels the prefetch for it and produces an ordinary browser navigation to the page
+they asked for. A log line, not a defect - but nor was it the test-environment artefact the
+previous revision called it, and that difference is why it was measured instead of retried.
 
 ### Verification that is new this pass
 
-- `lib/compiled-world-validator.test.ts` (37) exercises every validator rule twice: once against
+- `lib/compile-job-idempotency.test.ts` (11) replays the standalone-then-corpus scenario through
+  the real application code against a model of the enqueue RPC written with **both** the 0038
+  lookup rule and the 0041 one. Mutation-verified: removing the slot from the key fails two of
+  them.
+- `lib/entity-extraction-quality.test.ts` (8) fixes the extractor's precision at 0.20 as an
+  **equality**, so tuning the regex against the corpus it was measured on breaks the test rather
+  than looking like an improvement.
+- `lib/corpus-and-entity-honesty.test.ts` (7) fails if any surface starts describing a corpus as
+  one World, or if the published precision drifts from the measured one.
+- `lib/compiled-world-validator.test.ts` gained the two header mutations: a validator that
+  accepted `id,label,name,document_id` would have passed the bug it now refuses.
+
+Added earlier in the same session:
+
+- `lib/compiled-world-validator.test.ts` (39) exercises every validator rule twice: once against
   the package the compiler really produced, which must be clean, and once with one field broken,
   which must fail with that rule's own code. A validator that passes everything and a validator
   that works look identical from outside.
