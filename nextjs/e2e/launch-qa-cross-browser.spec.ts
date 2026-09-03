@@ -22,6 +22,22 @@ test("renders launch-critical public routes without browser errors", async ({ pa
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );
     expect(overflow, `${route} should not scroll horizontally`).toBeLessThanOrEqual(1);
+    /*
+      Let the router's prefetches finish before navigating on.
+
+      This test was flaky in Firefox on "Failed to fetch RSC payload ... Falling back to browser
+      navigation", and the first explanation -- contention in the parallel matrix -- was wrong.
+      `scripts/rsc-prefetch-probe.mjs` measured it against a Preview: no prefetch ever returned
+      a non-200, and the failing requests are NS_BINDING_ABORTED, which is Firefox cancelling an
+      in-flight request because the page navigated away. Leaving each page alone for 200 ms
+      reproduces it in three runs out of four; 400 ms and above, never.
+
+      So the loop was the cause. It moved on roughly 200 ms after `main` appeared, which is
+      after the prefetches start and before they finish. Waiting for the network to settle
+      removes the cause; filtering the message would have hidden it and left the assertion
+      unable to tell a cancelled prefetch from a broken one.
+    */
+    await page.waitForLoadState("networkidle").catch(() => {});
   }
 
   const localWebKitUpgradeErrors = testInfo.project.name === "launch-webkit"
@@ -36,6 +52,23 @@ test("renders launch-critical public routes without browser errors", async ({ pa
       return normalized.includes("eval") && (normalized.includes("csp") || normalized.includes("content security policy"));
     })
     : [];
+  /*
+    Vercel injects its feedback widget into Preview deployments, and the site's CSP blocks it.
+
+    That is the CSP doing its job: `script-src` does not list vercel.live, so a third-party
+    script that appears in the page without being in the policy is refused. Production is not
+    affected -- the widget is Preview-only -- and the policy is deliberately not widened to
+    admit a preview tool. Recorded as an annotation so the reason survives the next reader.
+  */
+  const previewToolbarCspErrors = errors.filter(message =>
+    message.includes("vercel.live") && message.includes("Content-Security-Policy"),
+  );
+  if (previewToolbarCspErrors.length > 0) {
+    testInfo.annotations.push({
+      type: "tool-blocker",
+      description: "Vercel injects its Preview feedback script, which this site's CSP correctly refuses. Preview-only; the policy is not widened for it.",
+    });
+  }
   if (localWebKitUpgradeErrors.length > 0) {
     testInfo.annotations.push({
       type: "tool-blocker",
@@ -49,7 +82,9 @@ test("renders launch-critical public routes without browser errors", async ({ pa
     });
   }
   expect(errors.filter(message =>
-    !localWebKitUpgradeErrors.includes(message) && !localDevCspErrors.includes(message),
+    !localWebKitUpgradeErrors.includes(message)
+    && !localDevCspErrors.includes(message)
+    && !previewToolbarCspErrors.includes(message),
   )).toEqual([]);
 });
 

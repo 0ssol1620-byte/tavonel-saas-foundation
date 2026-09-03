@@ -8,7 +8,17 @@ const { defineConfig } =
 
 const widths = [1920, 1440, 1280, 1024, 768, 390, 360] as const;
 const testPort = Number(process.env.PLAYWRIGHT_PORT ?? "3117");
-const testBaseUrl = `http://127.0.0.1:${testPort}`;
+/*
+  PLAYWRIGHT_BASE_URL points the suite at a deployment instead of the local server.
+
+  Added to run the launch suite against a Vercel Preview, which is the only place some
+  questions can be answered -- whether a prefetch race reproduces on real hosting is not
+  something `pnpm start` on one machine can decide either way. Setting it implies an external
+  server, so the built-in webServer is skipped without needing both variables.
+*/
+const externalBaseUrl = process.env.PLAYWRIGHT_BASE_URL?.trim();
+const testBaseUrl = externalBaseUrl || `http://127.0.0.1:${testPort}`;
+const usesExternalServer = Boolean(externalBaseUrl) || process.env.PLAYWRIGHT_EXTERNAL_SERVER === "1";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -45,7 +55,7 @@ export default defineConfig({
       },
     })),
   ],
-  webServer: process.env.PLAYWRIGHT_EXTERNAL_SERVER === "1" ? undefined : {
+  webServer: usesExternalServer ? undefined : {
     // Exercise the production CSP. Next's development React Refresh runtime
     // requires eval, which the shipped policy intentionally forbids.
     command: `pnpm build && pnpm start --hostname 127.0.0.1 --port ${testPort}`,

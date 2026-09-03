@@ -1,3 +1,6 @@
 .vercel
 .env*
 .lighthouse-*.json
+
+# Diagnostic output from scripts/rsc-prefetch-probe.mjs
+.rsc-probe*.jsonl
