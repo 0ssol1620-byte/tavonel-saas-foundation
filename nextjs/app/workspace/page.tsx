@@ -34,9 +34,12 @@ import WorkspaceUltimateShell, { type WorkspaceSurface } from "@/components/work
 import WorldStudioUltimate from "@/components/world-studio-ultimate";
 import OperationsUltimate from "@/components/operations-ultimate";
 import type { WorldReadModel } from "@/lib/world-read-model";
-import { COMPILE_LIMITS_NOTICE, judgeCompileSet } from "@/lib/compile-limits";
+import { compileLimitsNotice, judgeCompileSet } from "@/lib/compile-limits";
 import { CompileJobPanel, type CompileJobView } from "@/components/compile-job-panel";
 import { observeCompileJob } from "@/lib/compile-job-client";
+import { measureSelection, type PageCountResult } from "@/lib/page-count";
+import { type ArchiveExpander, createArchiveExpander } from "@/lib/archive-client";
+import { ARCHIVE_LIMITS } from "@/lib/archive-expand";
 import type { BlockerResolution } from "@/lib/compile-job-store";
 
 /** What this panel prints when it has no value. Not "0", and not a spinner that never resolves. */
@@ -231,6 +234,36 @@ export default function WorkspacePage() {
   */
   const followRef = useRef<AbortController | null>(null);
   const [stagedSelection, setStagedSelection] = useState<WorkspaceSelection | null>(null);
+  /*
+    Real page counts for the staged selection, measured before anything is uploaded.
+
+    Null while the measurement is in flight -- and the quote falls back to the byte bound in
+    the meantime, which is what it always was. Nothing here can make the preflight worse; it
+    can only make it exact.
+  */
+  const [stagedPageCounts, setStagedPageCounts] = useState<PageCountResult[] | null>(null);
+  /*
+    Archive expansion, moved off the main thread.
+
+    `unzipSync` cannot be interrupted, so wherever it runs nothing else runs. On this thread
+    that is the UI: no repaint, no progress, and a Cancel button that cannot be pressed because
+    the event loop is inside the decompressor. The worker is created on first use and torn down
+    on unmount, because it holds the archive and its expansion at once.
+  */
+  const expanderRef = useRef<ArchiveExpander | null>(null);
+  const stagingAbortRef = useRef<AbortController | null>(null);
+  const [staging, setStaging] = useState<{ archive: string; done: number; total: number } | null>(null);
+  /*
+    Built on mount rather than on first use, because the dropzone has to state the archive
+    ceiling before anyone chooses a file -- and the ceiling is whichever path will actually run.
+  */
+  const [archiveCeilingMb, setArchiveCeilingMb] = useState(ARCHIVE_LIMITS.maxSyncArchiveMb);
+  useEffect(() => {
+    expanderRef.current ??= createArchiveExpander();
+    setArchiveCeilingMb(expanderRef.current.ceilingBytes / (1024 * 1024));
+    return () => { expanderRef.current?.close(); expanderRef.current = null; };
+  }, []);
+  const compileLimits = compileLimitsNotice(archiveCeilingMb);
   const [dropActive, setDropActive] = useState(false);
   const [documents, setDocuments] = useState<DocumentListItem[] | null>(null);
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
@@ -1026,8 +1059,17 @@ export default function WorkspacePage() {
 
   const stageWorkspaceFiles = async (files: File[]) => {
     if (files.length === 0) return;
+    expanderRef.current ??= createArchiveExpander();
+    stagingAbortRef.current?.abort();
+    const controller = new AbortController();
+    stagingAbortRef.current = controller;
     try {
-      const prepared = await prepareWorkspaceSelection(files);
+      const prepared = await prepareWorkspaceSelection(files, {
+        expander: expanderRef.current,
+        signal: controller.signal,
+        onArchiveProgress: (archive, done, total) => setStaging({ archive, done, total }),
+      });
+      if (controller.signal.aborted) return;
       if (prepared.files.length === 0) {
         setStagedSelection(prepared);
         setNotice("No supported files were found. Nothing was uploaded or processed.");
@@ -1037,16 +1079,22 @@ export default function WorkspacePage() {
       setNotice(`${prepared.files.length} supported file${prepared.files.length === 1 ? "" : "s"} ready for preflight. Nothing has been uploaded or processed yet.`);
     } catch (error) {
       setStagedSelection(null);
-      setNotice(`Preflight blocked this selection (${error instanceof Error ? error.message : "INVALID_SELECTION"}). Nothing was uploaded.`);
+      const reason = error instanceof Error ? error.message : "INVALID_SELECTION";
+      // Cancelling is something the visitor did, not something that went wrong.
+      setNotice(reason === "ARCHIVE_CANCELLED" || reason === "SELECTION_CANCELLED"
+        ? "Selection cancelled. Nothing was uploaded."
+        : `Preflight blocked this selection (${reason}). Nothing was uploaded.`);
     } finally {
+      setStaging(null);
       if (fileRef.current) fileRef.current.value = "";
       if (folderRef.current) folderRef.current.value = "";
     }
   };
 
-  const stagedEstimates = stagedSelection?.files.map((entry) => estimateBillablePages({
+  const stagedEstimates = stagedSelection?.files.map((entry, index) => estimateBillablePages({
     bytes: entry.file.size,
     mimeType: entry.file.type,
+    declaredPages: stagedPageCounts?.[index]?.pages ?? null,
   })) ?? [];
   const stagedPages = stagedEstimates.reduce((sum, estimate) => sum + (estimate?.pages ?? 0), 0);
   const stagedQuote = quoteCompilePages(stagedPages);
@@ -1059,6 +1107,45 @@ export default function WorkspacePage() {
     stagedEstimates.length > 0 && stagedEstimates.every((estimate) => estimate?.confidence === "verified")
       ? "verified"
       : "provisional";
+  /*
+    Spreadsheets, named rather than folded into the estimate.
+
+    A sheet is not a page and a print area is not a page, and nobody has decided what a
+    spreadsheet is billed in. Quoting one from its file size and saying nothing would make that
+    undecided number the number a customer was charged, which is exactly the kind of invention
+    this repository forbids. So it is disclosed, in the panel, before they press Compile.
+  */
+  const stagedUndecided = stagedPageCounts?.filter((entry) => entry.pages === null
+    && entry.reason === "XLSX_BILLABLE_UNIT_UNDECIDED").length ?? 0;
+
+  /*
+    Read the page counts out of the files themselves.
+
+    A quote derived from file size is an upper bound, and it was labelled as one, but a 40MB
+    scan and a 40MB text-layer report are not the same purchase. This runs once per staged
+    selection, off the render path, bounded so a 128-file folder does not lock the tab, and it
+    abandons its result if the selection changed underneath it.
+
+    Formats that do not state a page count -- ODF, plain text, and spreadsheets, whose billable
+    unit is still the founder's to decide -- fall back to the byte bound and say so through the
+    Verified/Estimated label. They are not guessed at.
+  */
+  useEffect(() => {
+    if (!stagedSelection || stagedSelection.files.length === 0) {
+      setStagedPageCounts(null);
+      return;
+    }
+    let current = true;
+    void (async () => {
+      const measured = await measureSelection(stagedSelection.files.map((entry) => ({
+        mimeType: entry.file.type,
+        name: entry.relativePath,
+        bytes: async () => new Uint8Array(await entry.file.arrayBuffer()),
+      })));
+      if (current) setStagedPageCounts(measured);
+    })();
+    return () => { current = false; };
+  }, [stagedSelection]);
 
   /*
     The compile ceiling is enforced here, before a byte is uploaded.
@@ -1528,7 +1615,7 @@ export default function WorkspacePage() {
                   who knows the ceiling can select within it; someone who does not finds out by
                   losing a batch.
                 */}
-                <small className="workspace-intake-limits">{COMPILE_LIMITS_NOTICE}</small>
+                <small className="workspace-intake-limits">{compileLimits}</small>
                 <div className="workspace-source-choices" aria-label="Available source connections">
                   {WORKSPACE_SOURCE_CHOICES.map((source) => (
                     <button type="button" key={source.name} onClick={() => navigateSurface("connections")}>
@@ -1538,6 +1625,21 @@ export default function WorkspacePage() {
                   ))}
                 </div>
               </div>
+              {staging ? (
+                /*
+                  What an archive is doing while it is being opened, and a way to stop it.
+
+                  Neither was possible before: expansion held the main thread, so there was no
+                  frame in which to draw a number and no event loop in which to hear a click.
+                */
+                <div className="workspace-archive-progress" role="status" aria-live="polite">
+                  <p className="eyebrow">OPENING ARCHIVE</p>
+                  <p>{staging.archive}</p>
+                  <progress max={staging.total} value={staging.done} aria-label={`${staging.done} of ${staging.total} entries expanded`} />
+                  <p className="fine">{staging.done} of {staging.total} entries. Nothing has been uploaded.</p>
+                  <button type="button" onClick={() => stagingAbortRef.current?.abort()}>Cancel</button>
+                </div>
+              ) : null}
               {stagedSelection ? (
                 <div className="workspace-preflight" role="region" aria-label="Compile preflight">
                   <p className="eyebrow">PREFLIGHT</p>
@@ -1554,7 +1656,14 @@ export default function WorkspacePage() {
                       ? "Page counts were read from the documents themselves. You will never be charged above the maximum shown."
                       : "Some files do not declare a page count, so this is an upper-bound estimate from file size. The billed page count is confirmed after the documents are read, and never exceeds the maximum shown."}
                   </p>
-                  <p className="fine">{COMPILE_LIMITS_NOTICE}</p>
+                  {stagedUndecided > 0 ? (
+                    <p className="fine">
+                      {stagedUndecided === 1 ? "One spreadsheet is" : `${stagedUndecided} spreadsheets are`} quoted from
+                      file size. A spreadsheet has no page count, and what it is billed in is not settled — so this part
+                      of the estimate is an upper bound and nothing more.
+                    </p>
+                  ) : null}
+                  <p className="fine">{compileLimits}</p>
                   {stagedVerdict.ok ? null : (
                     <p className="fine workspace-preflight-blocked" role="alert">{stagedVerdict.message}</p>
                   )}
@@ -1639,7 +1748,7 @@ export default function WorkspacePage() {
                 <div className="compile-selection-actions">
                   <small>
                     {selectedDocumentIds.length} OCR-qualified document{selectedDocumentIds.length === 1 ? "" : "s"} selected
-                    {" · "}{COMPILE_LIMITS_NOTICE}
+                    {" · "}{compileLimits}
                   </small>
                   <button type="button" disabled={busy || !judgeCompileSet(selectedDocumentIds.length).ok} onClick={() => void compileSelectedDocuments()}>
                     {busy ? "Compiling selected documents..." : "Compile selected documents"}

@@ -16,7 +16,8 @@ describe("existing immutable document compilation", () => {
   it("offers only OCR-qualified documents and judges the selection against the shared limit", () => {
     expect(source).toContain("doc.hasOcrJson ? (");
     expect(source).toContain("judgeCompileSet(selectedDocumentIds.length).ok");
-    expect(source).toContain("COMPILE_LIMITS_NOTICE");
+    // The sentence is now computed from what this browser can actually expand.
+    expect(source).toContain("compileLimitsNotice(archiveCeilingMb)");
     expect(source).toContain("Compile selected documents");
     expect(source).not.toContain("selectedDocumentIds.length < 2");
   });

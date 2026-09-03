@@ -52,7 +52,18 @@ export function judgeCompileSet(count: number): CompileSetVerdict {
   return { ok: true, count };
 }
 
-/** The limits sentence shown before a customer picks files, not after they fail. */
-export const COMPILE_LIMITS_NOTICE =
-  `Up to ${COMPILE_MAX_DOCUMENTS} sources per compile in this evaluation. ` +
-  "ZIP archives up to 25 MB. Larger corpus? Connect a source or talk to us.";
+/**
+ * The limits sentence shown before a customer picks files, not after they fail.
+ *
+ * The archive ceiling is a parameter because it is not a constant any more: expansion runs in
+ * a worker where one can be built and on this thread where one cannot, and those are different
+ * sizes. Printing the larger number to a browser that will refuse at the smaller one would be
+ * a promise the page cannot keep, so the workspace passes what its own environment can do.
+ */
+export function compileLimitsNotice(archiveMb: number) {
+  return `Up to ${COMPILE_MAX_DOCUMENTS} sources per compile in this evaluation. ` +
+    `ZIP archives up to ${archiveMb} MB. Larger corpus? Connect a source or talk to us.`;
+}
+
+/** The conservative default: what every browser can do, worker or not. */
+export const COMPILE_LIMITS_NOTICE = compileLimitsNotice(25);
