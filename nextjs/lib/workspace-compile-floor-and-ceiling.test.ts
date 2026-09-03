@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { COMPILE_MAX_DOCUMENTS, judgeCompileSet } from "./compile-limits";
+import { COMPILE_MAX_DOCUMENTS, CORPUS_MAX_DOCUMENTS, judgeCompileSet } from "./compile-limits";
+import { judgeCorpusSet } from "./corpus-batching";
 
 const workspace = readFileSync(new URL("../app/workspace/page.tsx", import.meta.url), "utf8");
 
@@ -18,6 +19,11 @@ const workspace = readFileSync(new URL("../app/workspace/page.tsx", import.meta.
   authorised, uploaded, sanitized and read before the last step refused them, with the
   processing already spent. The masterplan names that exact state as forbidden.
 
+  What moved since: thirteen files are no longer refused at all. The gate is now the run
+  ceiling, which matches intake, and a selection above one compile's worth is partitioned into
+  parts server-side. The per-compile limit still exists and still gates the synchronous route;
+  it is no longer the answer to "how many sources may I choose".
+
   Both are asserted against the source because they are control-flow facts in a client
   component, and the thing that broke was a comparison operator in one branch.
 */
@@ -26,15 +32,15 @@ describe("workspace compile floor and ceiling", () => {
     expect(workspace).not.toContain("ids.length >= 2");
     // The destination changed -- the batch now starts a durable job instead of driving the
     // compile from here -- and the gate it passes through did not.
-    expect(workspace).toContain("if (judgeCompileSet(ids.length).ok) await startDurableCompile(ids);");
+    expect(workspace).toContain("if (judgeCorpusSet(ids.length).ok) await startDurableCompile(ids);");
   });
 
   it("refuses an over-ceiling selection before anything is uploaded", () => {
-    expect(workspace).toContain("const stagedVerdict = judgeCompileSet(stagedSelection?.files.length ?? 0);");
+    expect(workspace).toContain("const stagedVerdict = judgeCorpusSet(stagedSelection?.files.length ?? 0);");
     // The button cannot start an upload the compile step would refuse...
     expect(workspace).toContain("!stagedVerdict.ok} onClick={() => void startStagedCompile()}");
     // ...and the handler refuses it too, so the contract does not depend on the disabled prop.
-    expect(workspace).toContain("const verdict = judgeCompileSet(stagedSelection.files.length);");
+    expect(workspace).toContain("const verdict = judgeCorpusSet(stagedSelection.files.length);");
     // The reason is shown rather than the files being silently dropped.
     expect(workspace).toContain("workspace-preflight-blocked");
   });
@@ -44,5 +50,11 @@ describe("workspace compile floor and ceiling", () => {
     expect(judgeCompileSet(COMPILE_MAX_DOCUMENTS).ok).toBe(true);
     expect(judgeCompileSet(COMPILE_MAX_DOCUMENTS + 1).ok).toBe(false);
     expect(judgeCompileSet(0).ok).toBe(false);
+    // And the gate the workspace actually uses accepts the archive-sized selection, which is
+    // the whole point: 13 files no longer get read and then refused.
+    expect(judgeCorpusSet(COMPILE_MAX_DOCUMENTS + 1).ok).toBe(true);
+    expect(judgeCorpusSet(CORPUS_MAX_DOCUMENTS).ok).toBe(true);
+    expect(judgeCorpusSet(CORPUS_MAX_DOCUMENTS + 1).ok).toBe(false);
+    expect(judgeCorpusSet(0).ok).toBe(false);
   });
 });

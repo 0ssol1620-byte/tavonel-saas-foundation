@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GET as openApi } from "../app/api/openapi/route";
-import { COMPILE_MAX_DOCUMENTS, COMPILE_MIN_DOCUMENTS } from "./compile-limits";
+import { COMPILE_MAX_DOCUMENTS, COMPILE_MIN_DOCUMENTS, CORPUS_MAX_DOCUMENTS } from "./compile-limits";
 
 /*
   The published spec is what someone else's generated client is built from.
@@ -41,6 +41,7 @@ describe("the published compile contract", () => {
       "/compile-jobs/{jobId}/events",
       "/compile-jobs/{jobId}/blockers",
       "/compile-jobs/{jobId}/cancel",
+      "/compile-jobs/corpus/{corpusId}",
     ]) {
       expect(Object.keys(document.paths)).toContain(path);
     }
@@ -54,10 +55,16 @@ describe("the published compile contract", () => {
     expect(document.paths["/compile-jobs"].servers).toEqual([{ url: "https://tavonel.com/api" }]);
   });
 
-  it("holds the durable path to the same document limits", async () => {
+  it("publishes the durable path's own ceiling, which is the run one", async () => {
+    /*
+      The two ceilings are different numbers and the spec has to say which one this endpoint
+      enforces. Publishing COMPILE_MAX_DOCUMENTS here would make a generated client refuse the
+      50-document submission the server partitions and accepts.
+    */
     const document = await spec();
     const schema = document.paths["/compile-jobs"].post!.requestBody!.content["application/json"].schema;
     expect(schema.properties?.documentIds.minItems).toBe(COMPILE_MIN_DOCUMENTS);
-    expect(schema.properties?.documentIds.maxItems).toBe(COMPILE_MAX_DOCUMENTS);
+    expect(schema.properties?.documentIds.maxItems).toBe(CORPUS_MAX_DOCUMENTS);
+    expect(CORPUS_MAX_DOCUMENTS).toBeGreaterThan(COMPILE_MAX_DOCUMENTS);
   });
 });

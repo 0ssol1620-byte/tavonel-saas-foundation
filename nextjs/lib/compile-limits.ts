@@ -14,13 +14,27 @@
  * people will try the product; refusing it was a compiler implementation detail, not a
  * product decision.
  *
- * COMPILE_MAX_DOCUMENTS stays at the pilot ceiling. Raising it is not a constant edit — the
- * synchronous compile route runs inside a 60-second request, so a larger corpus needs the
- * durable job orchestration that replaces it, not a bigger number here.
+ * COMPILE_MAX_DOCUMENTS stays at the pilot ceiling and is not the answer to "how many sources
+ * can a customer compile". It is how many documents one compile carries: one Core request,
+ * one function invocation, one artifact. A larger selection is partitioned into parts of this
+ * size by `corpus-batching.ts` and compiled as a corpus, which is what CORPUS_MAX_DOCUMENTS
+ * governs. Raising this number instead would put a hundred documents' OCR output inside a
+ * single request, which is the shape the durable job exists to replace.
  */
 
 export const COMPILE_MIN_DOCUMENTS = 1;
 export const COMPILE_MAX_DOCUMENTS = 12;
+
+/**
+ * The largest selection a workspace may submit in one run.
+ *
+ * Here rather than in `corpus-batching.ts` because this file is where the size contract is
+ * declared, and splitting the pair across two modules is how the two numbers drift. Matched to
+ * the archive intake ceiling in `archive-expand.ts`: dropping a 128-file ZIP and pressing
+ * Compile are the same customer action seen from two ends, and a smaller number here recreates
+ * the gap the corpus path exists to close.
+ */
+export const CORPUS_MAX_DOCUMENTS = 128;
 
 export type CompileSetVerdict =
   | { ok: true; count: number }
@@ -61,7 +75,7 @@ export function judgeCompileSet(count: number): CompileSetVerdict {
  * a promise the page cannot keep, so the workspace passes what its own environment can do.
  */
 export function compileLimitsNotice(archiveMb: number) {
-  return `Up to ${COMPILE_MAX_DOCUMENTS} sources per compile in this evaluation. ` +
+  return `Up to ${CORPUS_MAX_DOCUMENTS} sources per run, compiled in parts of ${COMPILE_MAX_DOCUMENTS}. ` +
     `ZIP archives up to ${archiveMb} MB. Larger corpus? Connect a source or talk to us.`;
 }
 

@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
+import { CORPUS_ID_PATTERN, corpusIdFor, planCorpusBatches, type CorpusBatch } from "./corpus-batching";
 
 /*
   The application's view of durable compile orchestration (migration 0038).
@@ -62,6 +63,10 @@ export type CompileJob = {
   blockedResolution: BlockerResolution | null;
   documentsTotal: number;
   documentsReady: number;
+  /* Set only on a part of a corpus compile; null on an ordinary single compile (0040). */
+  corpusId: string | null;
+  batchIndex: number | null;
+  batchCount: number | null;
   createdAt: string;
   updatedAt: string;
   settledAt: string | null;
@@ -150,6 +155,9 @@ type CompileJobRow = {
   blocked_resolution: string | null;
   documents_total: number;
   documents_ready: number;
+  corpus_id: string | null;
+  batch_index: number | null;
+  batch_count: number | null;
   created_at: string;
   updated_at: string;
   settled_at: string | null;
@@ -179,6 +187,9 @@ function toJob(row: CompileJobRow): CompileJob | null {
     blockedResolution: BLOCKER_RESOLUTIONS.find((value) => value === row.blocked_resolution) ?? null,
     documentsTotal: row.documents_total,
     documentsReady: row.documents_ready,
+    corpusId: typeof row.corpus_id === "string" ? row.corpus_id : null,
+    batchIndex: typeof row.batch_index === "number" ? row.batch_index : null,
+    batchCount: typeof row.batch_count === "number" ? row.batch_count : null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     settledAt: row.settled_at,
@@ -189,11 +200,14 @@ export async function enqueueCompileJob(input: {
   workspaceKey: string;
   createdByUserId: string;
   documentIds: readonly string[];
+  /* Present when this job is one part of a corpus compile. */
+  corpus?: { corpusId: string; batchIndex: number; batchCount: number };
 }): Promise<CompileJobResult<{ jobId: string; state: CompileState; created: boolean }>> {
   if (!WORKSPACE_KEY.test(input.workspaceKey)) return fail("COMPILE_JOB_SCOPE_INVALID");
   if (!UUID.test(input.createdByUserId)) return fail("COMPILE_JOB_SCOPE_INVALID");
   const documentIds = [...new Set(input.documentIds)];
   if (documentIds.length === 0) return fail("COMPILE_JOB_SCOPE_INVALID");
+  if (input.corpus && !CORPUS_ID_PATTERN.test(input.corpus.corpusId)) return fail("COMPILE_JOB_SCOPE_INVALID");
 
   const result = await rpc("enqueue_foundation_compile_job", {
     p_job_id: newCompileJobId(),
@@ -201,6 +215,9 @@ export async function enqueueCompileJob(input: {
     p_created_by_user_id: input.createdByUserId,
     p_document_ids: documentIds,
     p_idempotency_key: compileIdempotencyKey(input.workspaceKey, documentIds),
+    p_corpus_id: input.corpus?.corpusId ?? null,
+    p_batch_index: input.corpus?.batchIndex ?? null,
+    p_batch_count: input.corpus?.batchCount ?? null,
   });
   if (!result.ok) return result;
 
@@ -395,4 +412,78 @@ export async function readOpenCompileJobs(limit = 20): Promise<CompileJobResult<
   const rows = await response.json().catch(() => null) as CompileJobRow[] | null;
   if (!Array.isArray(rows)) return fail("COMPILE_JOB_STORE_READ_FAILED");
   return { ok: true, value: rows.flatMap((row) => { const job = toJob(row); return job ? [job] : []; }) };
+}
+
+/*
+  Enqueue a corpus: one compile job per part, sequentially, into a corpus derived from the set.
+
+  Sequential rather than parallel on purpose. Each part carries its own idempotency key, so a
+  parallel burst is safe against duplication, but a workspace submitting a hundred documents
+  would open eleven Supabase round trips at once for a run whose first part will not start any
+  sooner for it. Enqueue is the cheap half; the compile is not.
+
+  Partial enqueue is a normal outcome, not an error to unwind. If part 7 of 11 fails to write,
+  parts 0..6 exist and are already being worked; the caller is told how far it got, and
+  resubmitting the same selection lands in the same corpus and fills in the rest -- which is
+  why the corpus id is derived from the document set rather than generated.
+*/
+export async function enqueueCorpusCompile(input: {
+  workspaceKey: string;
+  createdByUserId: string;
+  documentIds: readonly string[];
+}): Promise<CompileJobResult<{
+  corpusId: string;
+  batchCount: number;
+  parts: Array<{ jobId: string; batchIndex: number; state: CompileState; created: boolean }>;
+  incompleteReason: CompileJobFailure | null;
+}>> {
+  if (!WORKSPACE_KEY.test(input.workspaceKey)) return fail("COMPILE_JOB_SCOPE_INVALID");
+  const batches: CorpusBatch[] = planCorpusBatches(input.documentIds);
+  if (batches.length === 0) return fail("COMPILE_JOB_SCOPE_INVALID");
+  const corpusId = corpusIdFor(input.workspaceKey, input.documentIds);
+
+  const parts: Array<{ jobId: string; batchIndex: number; state: CompileState; created: boolean }> = [];
+  for (const batch of batches) {
+    const enqueued = await enqueueCompileJob({
+      workspaceKey: input.workspaceKey,
+      createdByUserId: input.createdByUserId,
+      documentIds: batch.documentIds,
+      corpus: { corpusId, batchIndex: batch.index, batchCount: batch.count },
+    });
+    if (!enqueued.ok) {
+      if (parts.length === 0) return enqueued;
+      return {
+        ok: true,
+        value: { corpusId, batchCount: batches.length, parts, incompleteReason: enqueued.code },
+      };
+    }
+    parts.push({ ...enqueued.value, batchIndex: batch.index });
+  }
+  return { ok: true, value: { corpusId, batchCount: batches.length, parts, incompleteReason: null } };
+}
+
+/** Every part of one corpus, in position order. */
+export async function readCorpusParts(
+  workspaceKey: string,
+  corpusId: string,
+): Promise<CompileJobResult<CompileJob[]>> {
+  if (!WORKSPACE_KEY.test(workspaceKey) || !CORPUS_ID_PATTERN.test(corpusId)) {
+    return fail("COMPILE_JOB_SCOPE_INVALID");
+  }
+  const query = new URLSearchParams({
+    workspace_key: `eq.${workspaceKey}`,
+    corpus_id: `eq.${corpusId}`,
+    select: "*",
+    order: "batch_index.asc",
+    limit: "64",
+  });
+  const response = await admin(`/rest/v1/foundation_compile_jobs?${query}`);
+  if (!response) return fail("COMPILE_JOB_STORE_NOT_CONFIGURED");
+  if (!response.ok) return fail("COMPILE_JOB_STORE_READ_FAILED");
+  const rows = await response.json().catch(() => null) as CompileJobRow[] | null;
+  if (!Array.isArray(rows)) return fail("COMPILE_JOB_STORE_READ_FAILED");
+  if (rows.length === 0) return fail("COMPILE_JOB_NOT_FOUND");
+  const jobs = rows.map(toJob);
+  if (jobs.some((job) => job === null)) return fail("COMPILE_JOB_STORE_READ_FAILED");
+  return { ok: true, value: jobs as CompileJob[] };
 }

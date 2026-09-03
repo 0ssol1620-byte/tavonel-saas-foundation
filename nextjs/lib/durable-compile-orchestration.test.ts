@@ -70,8 +70,14 @@ describe("the compile job API", () => {
     expect(create).toContain("COMPILE_JOB_ACCEPTED");
   });
 
-  it("enforces the same document limit as the compiler", () => {
-    expect(create).toContain("judgeCompileSet(documentIds.length)");
+  it("enforces the run limit, and partitions rather than refusing above one compile", () => {
+    /*
+      This asserted `judgeCompileSet` while the endpoint refused anything over twelve. It now
+      judges against the run ceiling and splits a larger selection into parts, so asserting the
+      old call would pin the endpoint to the limit the corpus path exists to lift.
+    */
+    expect(create).toContain("judgeCorpusSet(documentIds.length)");
+    expect(create).toContain("needsCorpusCompile(documentIds.length)");
   });
 
   it("replays from Last-Event-ID", () => {

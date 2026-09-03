@@ -1666,6 +1666,24 @@ footer.site .shell { display: flex; flex-direction: column; gap: 14px; }
   border: 1px solid var(--hairline);
 }
 .workspace-compile-job h2 { margin: 0; color: var(--text-hi); font: 400 19px/1.3 var(--f-sans); }
+/*
+  The parts of a corpus, as a row of numbered controls.
+
+  One per part rather than a single averaged bar: eleven parts averaged into one percentage
+  hides the only thing worth knowing when a run stops, which is which part stopped. The colour
+  is the part's own state, so a stuck part is visible without opening it.
+*/
+.workspace-corpus-parts { display: flex; flex-wrap: wrap; gap: 4px; margin: 10px 0 0; padding: 0; list-style: none; }
+.workspace-corpus-parts button {
+  min-width: 26px; padding: 4px 6px; color: var(--text-lo);
+  border: 1px solid var(--hairline-hi); background: none; font: 9px var(--f-mono);
+}
+.workspace-corpus-parts button[aria-pressed="true"] { color: var(--text-hi); border-color: var(--text-hi); }
+.workspace-corpus-parts button[data-state="ready"] { color: var(--verified); border-color: var(--verified); }
+.workspace-corpus-parts button[data-state="failed"],
+.workspace-corpus-parts button[data-state="cancelled"] { color: var(--changed); border-color: var(--changed); }
+.workspace-corpus-parts button[data-state="review_required"] { color: var(--changed); }
+
 .workspace-compile-job-progress {
   width: 100%;
   height: 3px;

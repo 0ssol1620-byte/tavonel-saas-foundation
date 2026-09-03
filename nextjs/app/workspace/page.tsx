@@ -35,6 +35,7 @@ import WorldStudioUltimate from "@/components/world-studio-ultimate";
 import OperationsUltimate from "@/components/operations-ultimate";
 import type { WorldReadModel } from "@/lib/world-read-model";
 import { compileLimitsNotice, judgeCompileSet } from "@/lib/compile-limits";
+import { judgeCorpusSet, type CorpusProgress } from "@/lib/corpus-batching";
 import { CompileJobPanel, type CompileJobView } from "@/components/compile-job-panel";
 import { observeCompileJob } from "@/lib/compile-job-client";
 import { measureSelection, type PageCountResult } from "@/lib/page-count";
@@ -224,7 +225,18 @@ export default function WorkspacePage() {
     return () => window.removeEventListener("popstate", applyLocation);
   }, []);
   const [busy, setBusy] = useState(false);
+  const corpusFollowRef = useRef<AbortController | null>(null);
   const [compileJob, setCompileJob] = useState<CompileJobView | null>(null);
+  /*
+    A corpus is several compiles, followed as one run.
+
+    Held beside `compileJob` rather than replacing it: the panel still shows one part at a
+    time, because a part is where a decision has to be taken, and the corpus row above it says
+    which part of how many and what the others are doing.
+  */
+  const [corpus, setCorpus] = useState<
+    (CorpusProgress & { parts: Array<{ jobId: string; batchIndex: number | null; state: CompileJobView["state"] }> }) | null
+  >(null);
   /*
     One observer at a time, and it must be stoppable.
 
@@ -522,6 +534,11 @@ export default function WorkspacePage() {
         the job is durable in the first place.
       */
       void (async () => {
+        const fromCorpus = params.get("corpus");
+        if (fromCorpus && /^corpus-[a-f0-9]{32}$/.test(fromCorpus)) {
+          void followCorpus(fromCorpus);
+          return;
+        }
         const fromUrl = params.get("job");
         if (fromUrl && /^cjob-[a-f0-9]{32}$/.test(fromUrl)) {
           void followCompileJob(fromUrl);
@@ -534,6 +551,12 @@ export default function WorkspacePage() {
         const json = await response.json() as { jobs?: CompileJobView[] };
         const open = json.jobs?.find((entry) => !["ready", "failed", "cancelled"].includes(entry.state));
         if (!open) return;
+        // A part found on its own is still part of a run, and showing it alone would say
+        // "12 sources" about a compile the customer started with 128.
+        if (open.corpusId) {
+          void followCorpus(open.corpusId);
+          return;
+        }
         setCompileJob(open);
         void followCompileJob(open.jobId);
       })();
@@ -832,6 +855,54 @@ export default function WorkspacePage() {
   }, []);
 
   /*
+    Follow a corpus: the run above the parts.
+
+    Polled rather than streamed. Each part already has an event stream and the panel subscribes
+    to whichever part is in front of the customer; a second stream carrying only "part 4 also
+    finished" would be a second connection per corpus for a fact that changes eleven times in
+    a run. What this loop does is pick the part worth watching -- the first that has not
+    settled -- and hand it to `followCompileJob`, which is the same code path a single compile
+    uses. There is no corpus-specific progress logic anywhere.
+  */
+  const followCorpus = useCallback(async (corpusId: string) => {
+    corpusFollowRef.current?.abort();
+    const controller = new AbortController();
+    corpusFollowRef.current = controller;
+    let watching: string | null = null;
+
+    while (!controller.signal.aborted) {
+      const token = await sessionToken();
+      if (!token) return;
+      let payload: (CorpusProgress & { parts: CompileJobView[] }) | null = null;
+      try {
+        const response = await fetch(`/api/compile-jobs/corpus/${corpusId}`, {
+          headers: { authorization: `Bearer ${token}` },
+          signal: controller.signal,
+        });
+        if (response.ok) payload = await response.json();
+      } catch {
+        // A dropped poll is not a failed corpus. The next turn asks again.
+      }
+      if (controller.signal.aborted) return;
+      if (payload?.parts?.length) {
+        setCorpus({
+          ...payload,
+          parts: payload.parts.map((part) => ({ jobId: part.jobId, batchIndex: part.batchIndex ?? null, state: part.state })),
+        });
+        const open = payload.parts.find((part) => !["ready", "failed", "cancelled"].includes(part.state))
+          ?? payload.parts[payload.parts.length - 1];
+        if (open && open.jobId !== watching) {
+          watching = open.jobId;
+          setCompileJob(open);
+          void followCompileJob(open.jobId);
+        }
+        if (payload.state !== "running") return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 4_000));
+    }
+  }, [followCompileJob]);
+
+  /*
     Start a compile and stop being responsible for it.
 
     The browser used to poll the document list until everything had been read and then call the
@@ -855,11 +926,39 @@ export default function WorkspacePage() {
       headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
       body: JSON.stringify({ documentIds }),
     });
-    const json = await response.json() as { jobId?: string; state?: string; code?: string; message?: string };
+    const json = await response.json() as {
+      jobId?: string;
+      state?: string;
+      code?: string;
+      message?: string;
+      corpusId?: string;
+      batchCount?: number;
+      partsEnqueued?: number;
+      parts?: Array<{ jobId: string; batchIndex: number }>;
+    };
+    /*
+      Over the per-compile ceiling the server partitions the selection and answers with a
+      corpus instead of a job. The browser does not decide that -- it asks for the whole
+      selection and is told how it was split, so the two sides cannot disagree about the
+      boundary.
+    */
+    if (response.ok && json.code === "COMPILE_CORPUS_ACCEPTED" && json.corpusId && json.parts?.length) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("job");
+      url.searchParams.set("corpus", json.corpusId);
+      window.history.replaceState(null, "", url);
+      setNotice(
+        `Compiling ${documentIds.length} sources in ${json.batchCount ?? json.parts.length} parts. `
+        + "This runs on our servers; you can close this page.",
+      );
+      void followCorpus(json.corpusId);
+      return;
+    }
     if (!response.ok || !json.jobId) {
       setNotice(json.message ?? `Compile could not be started (${json.code ?? response.status}).`);
       return;
     }
+    setCorpus(null);
     setCompileJob({
       jobId: json.jobId,
       state: "preflight",
@@ -969,7 +1068,9 @@ export default function WorkspacePage() {
 
   const compileSelectedDocuments = async () => {
     const documentIds = [...new Set(selectedDocumentIds)];
-    const verdict = judgeCompileSet(documentIds.length);
+    // The durable path, so the ceiling is the corpus one: over twelve the server partitions
+    // the selection rather than refusing it.
+    const verdict = judgeCorpusSet(documentIds.length);
     if (!verdict.ok) {
       setNotice(verdict.message);
       return;
@@ -1060,7 +1161,7 @@ export default function WorkspacePage() {
         and read, and nothing happened. No error: the batch simply ended. Judging the set with
         the shared verdict means this path cannot drift from the route again.
       */
-      if (judgeCompileSet(ids.length).ok) await startDurableCompile(ids);
+      if (judgeCorpusSet(ids.length).ok) await startDurableCompile(ids);
     } finally {
       setBusy(false);
     }
@@ -1169,13 +1270,13 @@ export default function WorkspacePage() {
     stays on screen with the reason, because silently discarding files someone chose is its own
     kind of lie.
   */
-  const stagedVerdict = judgeCompileSet(stagedSelection?.files.length ?? 0);
+  const stagedVerdict = judgeCorpusSet(stagedSelection?.files.length ?? 0);
 
   const startStagedCompile = async () => {
     if (!stagedSelection?.files.length) return;
     // The button is already disabled for this, but the guard is what makes it a contract
     // rather than a styling choice: nothing uploads a set the compile step will refuse.
-    const verdict = judgeCompileSet(stagedSelection.files.length);
+    const verdict = judgeCorpusSet(stagedSelection.files.length);
     if (!verdict.ok) { setNotice(verdict.message); return; }
     const files = stagedSelection.files.map((entry) => entry.file);
     setStagedSelection(null);
@@ -1739,10 +1840,26 @@ export default function WorkspacePage() {
           {compileJob ? (
             <CompileJobPanel
               job={compileJob}
+              corpus={corpus}
               names={names}
               busy={busy}
               onResolve={(resolution) => void resolveCompileBlockers(resolution)}
               onCancel={() => void cancelCompileJob()}
+              onOpenPart={(jobId) => {
+                const part = corpus?.parts.find((entry) => entry.jobId === jobId);
+                setCompileJob((previous) => (previous && previous.jobId === jobId ? previous : {
+                  jobId,
+                  state: part?.state ?? "preflight",
+                  documentsTotal: 0,
+                  documentsReady: 0,
+                  blocked: [],
+                  blockedResolution: null,
+                  errorCode: null,
+                  collectionId: null,
+                  batchIndex: part?.batchIndex ?? null,
+                }));
+                void followCompileJob(jobId);
+              }}
             />
           ) : null}
           {/*
@@ -1803,7 +1920,7 @@ export default function WorkspacePage() {
                     {selectedDocumentIds.length} OCR-qualified document{selectedDocumentIds.length === 1 ? "" : "s"} selected
                     {" · "}{compileLimits}
                   </small>
-                  <button type="button" disabled={busy || !judgeCompileSet(selectedDocumentIds.length).ok} onClick={() => void compileSelectedDocuments()}>
+                  <button type="button" disabled={busy || !judgeCorpusSet(selectedDocumentIds.length).ok} onClick={() => void compileSelectedDocuments()}>
                     {busy ? "Compiling selected documents..." : "Compile selected documents"}
                   </button>
                 </div>

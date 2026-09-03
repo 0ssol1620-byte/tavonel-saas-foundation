@@ -1,6 +1,7 @@
 "use client";
 
 import type { BlockerResolution, CompileBlocker, CompileState } from "@/lib/compile-job-store";
+import type { CorpusProgress } from "@/lib/corpus-batching";
 
 /*
   What the server is doing with a compile, and what the customer is allowed to do about it.
@@ -24,6 +25,9 @@ export type CompileJobView = {
   blockedResolution: BlockerResolution | null;
   errorCode: string | null;
   collectionId: string | null;
+  /* Set when this job is one part of a corpus compile (migration 0040). */
+  corpusId?: string | null;
+  batchIndex?: number | null;
 };
 
 /*
@@ -56,18 +60,36 @@ const BLOCKER_COPY: Record<string, string> = {
 
 const SETTLED: readonly CompileState[] = ["ready", "failed", "cancelled"];
 
+/*
+  A corpus is a run of several compiles, and the panel says so above the part it is showing.
+
+  Deliberately not a second progress bar for the whole corpus. The bar below tracks the part
+  the customer is looking at, and averaging eleven parts into one number would hide the thing
+  they actually need -- which part is stuck, and on what.
+*/
+const CORPUS_COPY: Record<CorpusProgress["state"], string> = {
+  running: "compiling",
+  ready: "all parts compiled",
+  partial: "some parts did not compile",
+  failed: "no part compiled",
+};
+
 export function CompileJobPanel({
   job,
+  corpus,
   names,
   busy,
   onResolve,
   onCancel,
+  onOpenPart,
 }: {
   job: CompileJobView;
+  corpus?: (CorpusProgress & { parts: Array<{ jobId: string; batchIndex: number | null; state: CompileState }> }) | null;
   names?: Record<string, string>;
   busy?: boolean;
   onResolve: (resolution: BlockerResolution) => void;
   onCancel: () => void;
+  onOpenPart?: (jobId: string) => void;
 }) {
   const settled = SETTLED.includes(job.state);
   const undecided = job.blocked.length > 0 && !job.blockedResolution && !settled;
@@ -76,8 +98,34 @@ export function CompileJobPanel({
 
   return (
     <section className="workspace-compile-job" aria-labelledby="workspace-compile-job-title" data-state={job.state}>
-      <p className="eyebrow">COMPILE</p>
+      <p className="eyebrow">{corpus ? `CORPUS · PART ${(job.batchIndex ?? 0) + 1} OF ${corpus.batchCount}` : "COMPILE"}</p>
       <h2 id="workspace-compile-job-title">{STATE_COPY[job.state]}</h2>
+      {corpus ? (
+        <>
+          <p className="fine">
+            {corpus.documentsTotal} sources in {corpus.batchCount} parts, {CORPUS_COPY[corpus.state]} ·
+            {" "}{corpus.partsReady} ready{corpus.partsFailed > 0 ? `, ${corpus.partsFailed} stopped` : ""}
+          </p>
+          {/*
+            Each part is its own World and its own state machine, so each is its own control.
+            Rolling them into one status would make "part 7 needs a decision" invisible.
+          */}
+          <ol className="workspace-corpus-parts">
+            {corpus.parts.map((part) => (
+              <li key={part.jobId}>
+                <button
+                  type="button"
+                  data-state={part.state}
+                  aria-pressed={part.jobId === job.jobId}
+                  onClick={() => onOpenPart?.(part.jobId)}
+                >
+                  {(part.batchIndex ?? 0) + 1}
+                </button>
+              </li>
+            ))}
+          </ol>
+        </>
+      ) : null}
       <p className="fine">
         {job.documentsReady} of {job.documentsTotal} read
         {job.errorCode ? ` · ${job.errorCode}` : ""}

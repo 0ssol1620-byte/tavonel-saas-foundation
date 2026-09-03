@@ -68,15 +68,25 @@ export function GET(request: Request) {
         post: {
           operationId: "startCompileJob",
           "x-tavonel-scope": "collections:compile",
-          description: "Records the intent to compile and returns immediately. The job advances on the server whether or not the caller stays connected, which is the difference between this and /v1/collections/compile. Submitting the same document set again returns the job that already exists rather than starting a second compile.",
-          requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["documentIds"], properties: { documentIds: { type: "array", minItems: 1, maxItems: 12, uniqueItems: true, items: { type: "string", pattern: "^[0-9a-f-]{36}$" } } }, additionalProperties: false } } } },
-          responses: { "202": { description: "Accepted. Returns jobId and the state the job starts in; Location names the job resource." }, "400": errorResponse, "401": errorResponse, "403": errorResponse, "503": errorResponse },
+          description: "Records the intent to compile and returns immediately. The job advances on the server whether or not the caller stays connected, which is the difference between this and /v1/collections/compile. Submitting the same document set again returns the job that already exists rather than starting a second compile. A selection larger than one compile can carry is partitioned server-side into parts and answered with COMPILE_CORPUS_ACCEPTED and a corpusId instead of a jobId; each part is an ordinary compile job with its own id, state and event stream.",
+          requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["documentIds"], properties: { documentIds: { type: "array", minItems: 1, maxItems: 128, uniqueItems: true, items: { type: "string", pattern: "^[0-9a-f-]{36}$" } } }, additionalProperties: false } } } },
+          responses: { "202": { description: "Accepted. Either { code: COMPILE_JOB_ACCEPTED, jobId } or, for a partitioned selection, { code: COMPILE_CORPUS_ACCEPTED, corpusId, batchCount, parts }; Location names whichever resource was created." }, "400": errorResponse, "401": errorResponse, "403": errorResponse, "503": errorResponse },
         },
         get: {
           operationId: "listCompileJobs",
           "x-tavonel-scope": "collections:read",
           description: "The workspace's recent compiles, so a client that lost its job id can pick a run back up.",
           responses: { "200": { description: "Recent compile jobs, newest first" }, "401": errorResponse, "503": errorResponse },
+        },
+      },
+      "/compile-jobs/corpus/{corpusId}": {
+        servers: [{ url: `${origin}/api` }],
+        get: {
+          operationId: "getCompileCorpus",
+          "x-tavonel-scope": "collections:read",
+          parameters: [{ name: "corpusId", in: "path", required: true, schema: { type: "string", pattern: "^corpus-[a-f0-9]{32}$" } }],
+          description: "A partitioned run, summarised from its parts. There is no stored roll-up: the state is computed from the part rows every time, so it cannot disagree with them. `partial` means some parts compiled and at least one did not -- the Worlds that exist are usable, and reporting that as ready would hide missing sources.",
+          responses: { "200": { description: "Corpus state, part list and aggregate progress" }, "400": errorResponse, "404": errorResponse, "503": errorResponse },
         },
       },
       "/compile-jobs/{jobId}": {

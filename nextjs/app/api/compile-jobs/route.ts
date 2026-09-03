@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { COMPILE_MAX_DOCUMENTS, judgeCompileSet } from "@/lib/compile-limits";
-import { enqueueCompileJob, listWorkspaceCompileJobs } from "@/lib/compile-job-store";
+import { COMPILE_MAX_DOCUMENTS } from "@/lib/compile-limits";
+import { enqueueCompileJob, enqueueCorpusCompile, listWorkspaceCompileJobs } from "@/lib/compile-job-store";
+import { CORPUS_MAX_DOCUMENTS, judgeCorpusSet, needsCorpusCompile } from "@/lib/corpus-batching";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { DOCUMENT_ID_PATTERN } from "@/lib/immutable-keys";
 
@@ -40,13 +41,60 @@ export async function POST(request: Request) {
   if (documentIds.some((id) => !DOCUMENT_ID_PATTERN.test(id))) {
     return NextResponse.json({ code: "DOCUMENT_SET_UNQUALIFIED" }, { status: 400, headers: HEADERS });
   }
-  // The same verdict the button and the compiler use. One limit, one place.
-  const verdict = judgeCompileSet(documentIds.length);
+  /*
+    Two ceilings, and they are different numbers on purpose.
+
+    COMPILE_MAX_DOCUMENTS is how many documents one compile carries: one Core request, one
+    function invocation, one artifact. CORPUS_MAX_DOCUMENTS is how many a customer may submit,
+    which is the archive intake ceiling, because dropping a 128-file ZIP and pressing Compile
+    are the same action seen from two ends. Anything above the first is partitioned into parts
+    below it rather than refused -- and the way to raise what a customer can compile is never
+    to edit the first constant.
+  */
+  const verdict = judgeCorpusSet(documentIds.length);
   if (!verdict.ok) {
     return NextResponse.json(
-      { code: verdict.code, message: verdict.message, maximumDocuments: COMPILE_MAX_DOCUMENTS },
+      {
+        code: verdict.code,
+        message: verdict.message,
+        maximumDocuments: CORPUS_MAX_DOCUMENTS,
+        documentsPerCompile: COMPILE_MAX_DOCUMENTS,
+      },
       { status: 400, headers: HEADERS },
     );
+  }
+
+  if (needsCorpusCompile(documentIds.length)) {
+    const corpus = await enqueueCorpusCompile({
+      workspaceKey: auth.principal.workspaceKey,
+      createdByUserId: auth.principal.userId,
+      documentIds,
+    });
+    if (!corpus.ok) {
+      const status = corpus.code === "COMPILE_JOB_SCOPE_INVALID" ? 400 : 503;
+      return NextResponse.json({ code: corpus.code }, { status, headers: HEADERS });
+    }
+    /*
+      202 even when only some parts were written.
+
+      The parts that exist are already being compiled, and reporting the whole submission as
+      failed would tell the customer to start again over work that is running. `partsEnqueued`
+      against `batchCount` says exactly how far it got, and resubmitting the same selection
+      lands in the same corpus and fills in the rest.
+    */
+    return NextResponse.json({
+      code: "COMPILE_CORPUS_ACCEPTED",
+      corpusId: corpus.value.corpusId,
+      batchCount: corpus.value.batchCount,
+      partsEnqueued: corpus.value.parts.length,
+      incompleteReason: corpus.value.incompleteReason,
+      parts: corpus.value.parts,
+      documentsTotal: documentIds.length,
+      documentsPerCompile: COMPILE_MAX_DOCUMENTS,
+    }, {
+      status: 202,
+      headers: { ...HEADERS, Location: `/api/compile-jobs/corpus/${corpus.value.corpusId}` },
+    });
   }
 
   const enqueued = await enqueueCompileJob({

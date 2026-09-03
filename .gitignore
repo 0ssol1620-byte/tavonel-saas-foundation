@@ -124,3 +124,6 @@ client/public/__manus__/version.json
 .project-config.json
 .vercel/
 .env.local
+
+# Agent runtime state (supervisor checkpoints, session caches). Machine-local, not project code.
+.hybrid-agent/
