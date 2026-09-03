@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { API_VERSION } from "@/lib/api-version";
 import { DEVELOPER_SCOPES } from "../../../lib/developer-contracts";
 import { resolveOpenApiOrigin } from "../../../lib/openapi-origin";
 
@@ -29,7 +30,7 @@ export function GET(request: Request) {
     openapi: "3.1.0",
     info: {
       title: "TAVONEL Knowledge Compiler API",
-      version: "2026-09-02.1",
+      version: API_VERSION,
       description: "Tenant-scoped access to immutable documents, candidate knowledge packages, active worlds, grounded retrieval and durable connector cursors. Promotion and rollback remain human-session-only.",
     },
     servers: [{ url: `${origin}/api/v1` }],

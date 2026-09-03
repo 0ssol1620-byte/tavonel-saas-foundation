@@ -228,7 +228,10 @@ describe("descriptions are the length a search result shows", () => {
     One route builds its description from page data rather than writing it twice. Listing it
     here is a deliberate act with a reason, not a way to make the check pass.
   */
-  const COMPUTED = new Map([["/solutions/[slug]", "the description is the solution's own lede, from the page's data map"]]);
+  const COMPUTED = new Map([
+    ["/solutions/[slug]", "the description is the solution's own lede, from the page's data map"],
+    ["/docs/[section]", "the description is the section's own summary, from lib/docs-content.ts"],
+  ]);
 
   const indexable = DECLARING.filter(isIndexable);
 

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { PublicPageShell } from "@/components/public-page-shell";
 
 export const metadata: Metadata = {
@@ -25,7 +26,7 @@ export default function ApiPage() {
           <div className="tiles">{OPERATIONS.map(([title, body]) => <article className="tile" key={title}><h3>{title}</h3><p>{body}</p></article>)}</div>
           <pre><code>{`curl -H "Authorization: Bearer $TAVONEL_API_KEY" \\
   https://tavonel.com/api/v1/documents`}</code></pre>
-          <div className="actions"><a className="btn" href="/openapi.json" download="tavonel-openapi.json">Download OpenAPI</a><a className="btn ghost" href="/docs">Read the docs</a></div>
+          <div className="actions"><a className="btn" href="/openapi.json" download="tavonel-openapi.json">Download OpenAPI</a><Link className="btn ghost" href="/docs">Read the docs</Link></div>
         </div>
       </div></div></section>
     </PublicPageShell>
