@@ -55,6 +55,17 @@ const PROVIDER_CONTRACTS: Record<OAuthConnectorProvider, Omit<OAuthProviderRunti
   },
 };
 
+/*
+  The scopes each provider is asked for, published rather than discovered at the consent screen.
+
+  A buyer's security review asks this question before anyone clicks Allow, and the answer has to
+  be the one the code sends. Derived from the contracts above so the page cannot state a
+  narrower set than the authorization request actually carries.
+*/
+export const OAUTH_CONNECTOR_SCOPES = Object.fromEntries(
+  Object.entries(PROVIDER_CONTRACTS).map(([provider, contract]) => [provider, contract.scopes]),
+) as Record<OAuthConnectorProvider, readonly string[]>;
+
 export function parseOAuthConnectorProvider(value: unknown): OAuthConnectorProvider | null {
   return typeof value === "string" && (OAUTH_CONNECTOR_PROVIDERS as readonly string[]).includes(value)
     ? value as OAuthConnectorProvider

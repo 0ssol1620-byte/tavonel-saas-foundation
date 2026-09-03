@@ -91,6 +91,28 @@ describe("what 13.11 asked to be removed", () => {
   });
 });
 
+describe("every solution page says where it stops too", () => {
+  /*
+    13.22 asks each solution page for its limitations, and it is the section that decides
+    whether the rest of the page is a description or a pitch. The check is that each list names
+    something the product does not do -- an abstention, an uncalibrated threshold, a tenancy
+    limit -- rather than a difficulty it happens to solve.
+  */
+  const solutions = readFileSync(resolve(import.meta.dirname, "../app/solutions/[slug]/page.tsx"), "utf8");
+
+  it("gives all five a limitations list the page renders", () => {
+    expect((solutions.match(/limitations: \[/g) ?? [])).toHaveLength(5);
+    expect(solutions).toContain("solution.limitations.map");
+    expect(solutions).toContain("WHERE THIS STOPS");
+  });
+
+  it("names real limits rather than solved problems", () => {
+    for (const phrase of ["abstains", "not calibrated", "Membership is not available", "is an estimate", "human decision"]) {
+      expect(solutions, phrase).toContain(phrase);
+    }
+  });
+});
+
 describe("what the page must not become", () => {
   it("claims no customer, certification or performance figure", () => {
     /*
