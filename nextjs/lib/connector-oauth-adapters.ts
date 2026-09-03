@@ -25,6 +25,19 @@ export type OAuthSourcePage = {
 const GRAPH_ORIGIN = "https://graph.microsoft.com";
 export const OAUTH_SOURCE_PAGE_SIZE = 25;
 
+/**
+ * A row worth trying to read.
+ *
+ * `Array.isArray(payload.files)` says the payload has an array; it says nothing about what is
+ * in it. A single `null` entry -- which any of these APIs may emit, and which a proxy or a
+ * partial response certainly can -- reached `row.id` and threw a TypeError out of the adapter.
+ * The sync worker classifies failures by code and has no branch for that, so one malformed
+ * entry took down a whole listing instead of being skipped like every other unreadable row.
+ */
+function readableRow(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
 function boundedString(value: unknown, maximum: number) {
   return typeof value === "string" && value.length > 0 && value.length <= maximum ? value : null;
 }
@@ -70,6 +83,7 @@ async function listGoogleDrive(accessToken: string, cursor: string | null, fetch
   const payload = await jsonRequest(url.toString(), accessToken, {}, fetcher);
   const rows = Array.isArray(payload.files) ? payload.files as Array<Record<string, unknown>> : [];
   const items = rows.map((row): OAuthSourceItem | null => {
+    if (!readableRow(row)) return null;
     const nativeId = boundedString(row.id, 512);
     const name = boundedString(row.name, 512);
     if (!nativeId || !name) return null;
@@ -92,6 +106,7 @@ async function listDropbox(accessToken: string, cursor: string | null, target: O
   const payload = await jsonRequest(url, accessToken, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }, fetcher);
   const rows = Array.isArray(payload.entries) ? payload.entries as Array<Record<string, unknown>> : [];
   const items = rows.map((row): OAuthSourceItem | null => {
+    if (!readableRow(row)) return null;
     const tag = row[".tag"];
     const nativeId = boundedString(row.id, 512) ?? boundedString(row.path_lower, 1_024);
     const name = boundedString(row.name, 512);
@@ -120,6 +135,7 @@ async function listMicrosoftGraph(accessToken: string, cursor: string | null, ta
   const payload = await jsonRequest(url, accessToken, {}, fetcher);
   const rows = Array.isArray(payload.value) ? payload.value as Array<Record<string, unknown>> : [];
   const items = rows.map((row): OAuthSourceItem | null => {
+    if (!readableRow(row)) return null;
     const nativeId = boundedString(row.id, 512);
     const name = boundedString(row.name, 512) ?? nativeId;
     if (!nativeId || !name) return null;
