@@ -1,0 +1,36 @@
+/*
+  The diagram borrows the page's type and hairlines rather than bringing its own palette, so it
+  reads as part of the record it sits in. Every size is in user units on the viewBox: the drawing
+  scales as one piece and there is no separate small-screen version to fall out of step.
+*/
+.diagram { width: 100%; height: auto; max-width: 980px; overflow: visible; }
+
+/* Sizes are user units on a 980-wide viewBox, so each renders about four fifths as large. */
+.eyebrow { fill: var(--verified); font: 11px var(--f-mono); letter-spacing: .16em; }
+
+.stage { fill: none; stroke: var(--hairline-hi); }
+.stageLabel { fill: var(--text-hi); font: 13.5px var(--f-mono); letter-spacing: .1em; text-anchor: middle; }
+
+.flow { stroke: var(--hairline-hi); fill: none; }
+.arrowHead { fill: var(--hairline-hi); }
+
+.who { fill: var(--text-hi); font: 14.5px var(--f-mono); letter-spacing: .04em; text-anchor: end; }
+.bracket { stroke: var(--hairline-hi); fill: none; }
+.what { fill: var(--text-xlo); font: 12px var(--f-mono); letter-spacing: .06em; }
+.whatStart { text-anchor: start; }
+.whatMiddle { text-anchor: middle; }
+.whatEnd { text-anchor: end; }
+
+/* The span that covers the whole line is the page's subject, so it is the one drawn in full. */
+.whole .who { fill: var(--verified); }
+.whole .bracket { stroke: var(--verified); }
+.whole .what { fill: var(--text-lo); }
+
+@media (max-width: 760px) {
+  /*
+    Scaled to a phone's width the whole drawing renders at about a third size, which is a
+    picture of a diagram rather than a diagram. It keeps a legible width and its container
+    scrolls -- the same treatment every other wide thing on this site gets.
+  */
+  .diagram { min-width: 700px; }
+}

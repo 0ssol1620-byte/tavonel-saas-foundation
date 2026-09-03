@@ -1,3 +1,6 @@
+import type { ReactNode } from "react";
+import type { Route } from "next";
+import Link from "next/link";
 import { PublicSiteFooter, PublicSiteHeader } from "@/components/public-site-chrome";
 import styles from "./public-proof-registry.module.css";
 
@@ -30,13 +33,28 @@ export default function PublicProofRegistry({ title, eyebrow, summary, state, se
     registries that do report a state -- benchmarks, customers, experiments -- still pass one.
   */
   state?: string;
-  sections: Array<{ title: string; body: string; rows?: RegistryRow[]; empty?: string; download?: { href: string; label: string } }>;
+  /*
+    `figure`, `faq` and `links` exist for the category guide, which masterplan 13.11 asks to
+    carry a comparison drawing, a glossary, a FAQ and a way onward. They are optional and the
+    registries that report measurements pass none of them: a proof registry with a FAQ would be
+    a proof registry arguing.
+  */
+  sections: Array<{
+    title: string;
+    body: string;
+    rows?: RegistryRow[];
+    empty?: string;
+    download?: { href: string; label: string };
+    figure?: ReactNode;
+    faq?: Array<{ question: string; answer: string }>;
+    links?: Array<{ href: Route; label: string }>;
+  }>;
 }) {
   return <div className={styles.page}>
     <PublicSiteHeader />
     <main id="main">
       <section className={styles.hero}><div><p className={styles.eyebrow}>{eyebrow}</p><h1>{title}</h1></div><aside>{state ? <span className={styles.status}>{state}</span> : null}<p>{summary}</p></aside></section>
-      <div className={styles.body}>{sections.map((section) => <section className={styles.row} key={section.title}><h2>{section.title}</h2><div className={styles.rowBody}><p>{section.body}</p>{section.rows ? <ol className={styles.protocol}>{section.rows.map((row) => <li key={row.key}><b>{row.key}</b><span>{row.description}</span><em>{row.state}</em></li>)}</ol> : null}{section.download ? <a className={styles.download} href={section.download.href} download>{section.download.label}</a> : null}</div></section>)}</div>
+      <div className={styles.body}>{sections.map((section) => <section className={styles.row} key={section.title}><h2>{section.title}</h2><div className={styles.rowBody}><p>{section.body}</p>{section.figure ? <figure className={styles.figure}>{section.figure}</figure> : null}{section.rows ? <ol className={styles.protocol}>{section.rows.map((row) => <li key={row.key}><b>{row.key}</b><span>{row.description}</span><em>{row.state}</em></li>)}</ol> : null}{section.faq ? <dl className={styles.faq}>{section.faq.map((entry) => <div key={entry.question}><dt>{entry.question}</dt><dd>{entry.answer}</dd></div>)}</dl> : null}{section.links ? <p className={styles.links}>{section.links.map((link) => <Link key={link.href} href={link.href}>{link.label}</Link>)}</p> : null}{section.download ? <a className={styles.download} href={section.download.href} download>{section.download.label}</a> : null}</div></section>)}</div>
     </main>
     <PublicSiteFooter />
   </div>;
