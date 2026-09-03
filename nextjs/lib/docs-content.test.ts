@@ -5,9 +5,9 @@ import { API_VERSION } from "./api-version";
 import { COMPILE_MAX_DOCUMENTS, COMPILE_MIN_DOCUMENTS, CORPUS_MAX_DOCUMENTS } from "./compile-limits";
 import { DEVELOPER_SCOPES } from "./developer-contracts";
 import { DOCS_GROUPS, DOCS_SECTIONS, DOCS_VERSION, docsSearchIndex, findDocsSection } from "./docs-content";
-import { curlFor, readDocsEndpoints } from "./docs-endpoints";
-// The MCP server is dependency-free .mjs; the docs table is checked against its tool list.
-import { TOOLS as MCP_TOOLS } from "../scripts/mcp/tavonel-mcp-server.mjs";
+import { curlFor, pythonFor, readDocsEndpoints, snippetFor, SNIPPET_LANGUAGES, typescriptFor } from "./docs-endpoints";
+// The docs table is checked against the tool list of the server people actually download.
+import { TOOLS as MCP_TOOLS } from "../public/developer/tavonel-mcp.mjs";
 
 /*
   Documentation that cannot drift from the product.
@@ -22,6 +22,8 @@ import { TOOLS as MCP_TOOLS } from "../scripts/mcp/tavonel-mcp-server.mjs";
   figure stops matching. What they cannot check is whether the prose is true; that is a person's
   job, and `DOCS_REVIEWED` is where they record having done it.
 */
+
+type DocsEndpointLike = Awaited<ReturnType<typeof readDocsEndpoints>> extends Map<string, infer T> ? T : never;
 
 const IA_FROM_MASTERPLAN = [
   "quickstart",
@@ -101,6 +103,48 @@ describe("every endpoint block resolves to a published operation", () => {
     expect(curl).toContain("curl -sS -X POST https://tavonel.com/api/compile-jobs");
     expect(curl).toContain("Authorization: Bearer $TAVONEL_API_KEY");
     expect(curl).toContain("documentIds");
+  });
+
+  it("offers the same request in every language 13.2 names, from the same contract", async () => {
+    /*
+      Three snippets are three chances to be wrong, which is why none of them is written down.
+      Each is generated from the `DocsEndpoint`, so the assertion that matters is that all three
+      carry the same method, URL and body -- a reader who copies the Python one must be making
+      the request the curl one describes.
+    */
+    const compile = (await readDocsEndpoints()).get("startCompileJob")!;
+    expect(SNIPPET_LANGUAGES).toEqual(["curl", "python", "typescript"]);
+    for (const language of SNIPPET_LANGUAGES) {
+      const snippet = snippetFor(compile, language);
+      expect(snippet, language).toContain("https://tavonel.com/api/compile-jobs");
+      expect(snippet, language).toContain("TAVONEL_API_KEY");
+      expect(snippet, language).toContain("documentIds");
+      // The placeholder rule holds in every language: no id anybody could paste and have fail.
+      expect(snippet, language).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}/);
+    }
+    expect(snippetFor(compile, "curl")).toBe(curlFor(compile));
+  });
+
+  it("writes Python that is Python and TypeScript that is TypeScript", () => {
+    // The failure this catches is a JSON body pasted verbatim into a Python snippet, where
+    // `true`, `null` and the trailing shape are all syntax errors.
+    const listed: DocsEndpointLike = {
+      operationId: "example", method: "POST", path: "/example", server: "https://tavonel.com/api",
+      scope: null, description: "",
+      requestExample: JSON.stringify({ ids: ["<ids>"], strict: true, cursor: null, limit: 12 }, null, 2),
+      responses: [],
+    };
+    const python = pythonFor(listed);
+    expect(python).toContain("import requests");
+    expect(python).toContain("True");
+    expect(python).toContain("None");
+    expect(python).not.toMatch(/true|null/);
+
+    const typescript = typescriptFor(listed);
+    expect(typescript).toContain("await fetch(");
+    expect(typescript).toContain("JSON.stringify(");
+    // An example that ignores the status teaches an integration that ignores the status.
+    expect(typescript).toContain("response.ok");
   });
 
   it("puts a placeholder where an id belongs rather than a plausible fake", async () => {

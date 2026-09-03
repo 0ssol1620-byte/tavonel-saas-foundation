@@ -1,8 +1,13 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-// The server is dependency-free .mjs so it runs with no build step and can be read before use.
-import { assertReadOnly, createClient, createServer, SERVER_VERSION, TOOLS, validateInput } from "../scripts/mcp/tavonel-mcp-server.mjs";
+/*
+  The published distribution itself, not a copy of it.
+
+  There was briefly a second MCP server in `scripts/`, which is how two servers with different
+  tool names end up in one repository. The file under test is the one people download.
+*/
+import { assertReadOnly, createClient, createServer, DISTRIBUTION_VERSION, SERVER_VERSION, TOOLS, validateInput } from "../public/developer/tavonel-mcp.mjs";
 import { API_VERSION } from "./api-version";
 
 /*
@@ -37,7 +42,7 @@ function fake(responses: Record<string, unknown>, status = 200, headers: Record<
 
 function server(responses: Record<string, unknown>, status = 200, headers: Record<string, string> = {}) {
   const { fetcher, calls } = fake(responses, status, headers);
-  const handle = createServer({ call: createClient({ baseUrl: "https://tavonel.test/api", apiKey: "sk_test_key", fetcher }) }) as Handler;
+  const handle = createServer({ call: createClient({ baseUrl: "https://tavonel.test", apiKey: "sk_test_key", fetcher }) }) as Handler;
   return { handle, calls };
 }
 
@@ -118,7 +123,7 @@ describe("the tool surface", () => {
     expect(TOOLS.map((tool: { name: string }) => tool.name)).not.toContain("list_worlds");
     const world = TOOLS.find((tool: { name: string }) => tool.name === "get_world")!;
     expect(world.description).toContain("no tool that lists worlds");
-    const source = readFileSync(resolve(import.meta.dirname, "../scripts/mcp/tavonel-mcp-server.mjs"), "utf8");
+    const source = readFileSync(resolve(import.meta.dirname, "../public/developer/tavonel-mcp.mjs"), "utf8");
     expect(source).toContain("list_worlds --");
   });
 
@@ -132,12 +137,14 @@ describe("the tool surface", () => {
     const initialized = resultOf(await handle({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} })) as unknown as {
       protocolVersion: string;
       capabilities: { tools: unknown };
-      serverInfo: { name: string };
+      serverInfo: { name: string; version: string };
       instructions: string;
     };
     expect(initialized.protocolVersion).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(initialized.capabilities.tools).toBeDefined();
-    expect(initialized.serverInfo.name).toBe("tavonel");
+    expect(initialized.serverInfo.name).toBe("tavonel-readonly");
+    // The build a support conversation starts from, not the contract version.
+    expect(initialized.serverInfo.version).toBe(DISTRIBUTION_VERSION);
     expect(initialized.instructions).toContain("abstained");
   });
 
@@ -272,7 +279,7 @@ describe("failure reaches the agent intact", () => {
 
   it("does not present an unreadable body as an answer", async () => {
     const fetcher = (async () => new Response("<html>gateway</html>", { status: 502, headers: { "content-type": "text/html" } })) as unknown as typeof fetch;
-    const handle = createServer({ call: createClient({ baseUrl: "https://tavonel.test/api", apiKey: "sk", fetcher }) }) as Handler;
+    const handle = createServer({ call: createClient({ baseUrl: "https://tavonel.test", apiKey: "sk", fetcher }) }) as Handler;
     const result = await callTool(handle, "list_sources", {});
     expect(result.isError).toBe(true);
     expect(result.text).toContain("API_RESPONSE_UNREADABLE_502");

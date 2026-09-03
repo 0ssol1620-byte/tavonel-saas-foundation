@@ -50,8 +50,8 @@ try {
   const python = pythonRuntime();
   const pythonVersion = run(python, ["--version"]);
   run(python, ["-I", "-m", "py_compile", "tavonel-source-agent.py"]);
-  if (!cliVersion.includes("2026.8.30.1") || !cliHelp.includes("update-check")) throw new Error("CLI distribution contract failed");
-  if (mcp?.result?.serverInfo?.version !== "2026.8.30.1") throw new Error("MCP distribution contract failed");
+  if (!cliVersion.includes("2026.9.3.1") || !cliHelp.includes("update-check")) throw new Error("CLI distribution contract failed");
+  if (mcp?.result?.serverInfo?.version !== "2026.9.3.1") throw new Error("MCP distribution contract failed");
   process.stdout.write(`${JSON.stringify({ status: "passed", isolatedHome: true, providerSecretsInherited: false, cliVersion, mcpVersion: mcp.result.serverInfo.version, pythonVersion, sourceAgentSyntax: "passed" }, null, 2)}\n`);
 } finally {
   rmSync(sandbox, { recursive: true, force: true });

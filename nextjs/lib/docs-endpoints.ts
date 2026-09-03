@@ -119,3 +119,69 @@ export function curlFor(endpoint: DocsEndpoint) {
   }
   return lines.join("\n");
 }
+
+/*
+  The same request in the two languages people actually integrate from.
+
+  Masterplan 13.2 asks /api for curl, Python and TypeScript. These are generated from the same
+  `DocsEndpoint` as the curl above rather than written beside it, for the reason this whole file
+  exists: a hand-written snippet is a third copy of the contract, and the copy is what goes
+  stale. Neither imports an SDK -- there is no published SDK, and a snippet that used one would
+  be documentation for something that does not exist.
+*/
+export type SnippetLanguage = "curl" | "python" | "typescript";
+
+export const SNIPPET_LANGUAGES: readonly SnippetLanguage[] = ["curl", "python", "typescript"];
+
+export function pythonFor(endpoint: DocsEndpoint) {
+  const lines = ["import os", "import requests", ""];
+  if (endpoint.requestExample) lines.push(`body = ${pythonLiteral(endpoint.requestExample)}`, "");
+  lines.push(
+    "response = requests.request(",
+    `    "${endpoint.method}",`,
+    `    "${endpoint.server}${endpoint.path}",`,
+    `    headers={"Authorization": "Bearer " + os.environ["TAVONEL_API_KEY"]},`,
+  );
+  if (endpoint.requestExample) lines.push("    json=body,");
+  lines.push("    timeout=30,", ")", "response.raise_for_status()", "print(response.json())");
+  return lines.join("\n");
+}
+
+export function typescriptFor(endpoint: DocsEndpoint) {
+  const authorization = "authorization: `Bearer ${process.env.TAVONEL_API_KEY}`";
+  const headers = endpoint.requestExample
+    ? `{ ${authorization}, "content-type": "application/json" }`
+    : `{ ${authorization} }`;
+  const lines = [`const response = await fetch("${endpoint.server}${endpoint.path}", {`];
+  lines.push(`  method: "${endpoint.method}",`);
+  lines.push(`  headers: ${headers},`);
+  if (endpoint.requestExample) lines.push(`  body: JSON.stringify(${endpoint.requestExample.replace(/\n\s*/g, " ")}),`);
+  lines.push("});");
+  // The status branch every integration needs, and the one an example usually leaves out.
+  lines.push("if (!response.ok) throw new Error(`${response.status} ${(await response.json()).code}`);");
+  lines.push("console.log(await response.json());");
+  return lines.join("\n");
+}
+
+export function snippetFor(endpoint: DocsEndpoint, language: SnippetLanguage) {
+  if (language === "python") return pythonFor(endpoint);
+  if (language === "typescript") return typescriptFor(endpoint);
+  return curlFor(endpoint);
+}
+
+/** JSON is not Python: the placeholder strings survive, the punctuation and the literals do not. */
+function pythonLiteral(json: string) {
+  const render = (item: unknown, indent: string): string => {
+    if (Array.isArray(item)) return `[${item.map((entry) => render(entry, indent)).join(", ")}]`;
+    if (item && typeof item === "object") {
+      const entries = Object.entries(item as Record<string, unknown>)
+        .map(([key, entry]) => `${indent}    ${JSON.stringify(key)}: ${render(entry, `${indent}    `)}`);
+      return `{\n${entries.join(",\n")}\n${indent}}`;
+    }
+    if (item === null) return "None";
+    if (item === true) return "True";
+    if (item === false) return "False";
+    return JSON.stringify(item);
+  };
+  return render(JSON.parse(json) as unknown, "");
+}

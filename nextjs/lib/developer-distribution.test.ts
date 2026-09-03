@@ -30,7 +30,7 @@ describe("developer distribution", () => {
     const channel = JSON.parse(readFileSync(developerAsset("channel.json"), "utf8")) as { version: string; apiVersion: number; assets: Record<string, { sha256: string }> };
     const cli = readFileSync(developerAsset("tavonel-cli.mjs"), "utf8");
     const mcp = readFileSync(developerAsset("tavonel-mcp.mjs"), "utf8");
-    expect(channel.version).toBe("2026.8.30.1");
+    expect(channel.version).toBe("2026.9.3.1");
     expect(channel.apiVersion).toBe(1);
     expect(cli).toContain(`DISTRIBUTION_VERSION = "${channel.version}"`);
     expect(mcp).toContain(`DISTRIBUTION_VERSION = "${channel.version}"`);

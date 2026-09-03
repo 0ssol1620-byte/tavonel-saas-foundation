@@ -41,9 +41,35 @@ the MCP client's environment or secret facility, not in the command arguments.
 }
 ```
 
-The MCP surface is permanently read-only: document inventory, candidate package,
-active world, and grounded Ask. It has no upload, compile, connector mutation,
-promotion, rollback, billing, or key-management tool.
+The MCP surface is permanently read-only. Eight tools:
+
+| Tool | Returns |
+| --- | --- |
+| `list_sources` | The workspace's documents, with processing state and version key. |
+| `get_world` | One Compiled World: status, contract, objects, relations, evidence, history. |
+| `search_world` | Retrieved regions with provenance and ranks. No generated prose. |
+| `ask_world` | A grounded answer with citations, or an abstention. |
+| `get_object` | The objects lens, or one object by stable id. |
+| `get_relation` | The relations lens, or one relation by stable id. |
+| `get_evidence` | Every region with its source version, page and bbox in the 0-1000 page frame. |
+| `download_package` | Where the signed package is, its size, its manifest digest and signing key. |
+
+There is no upload, compile, connector mutation, promotion, rollback, billing or
+key-management tool, and the server refuses to start if one is ever added to it:
+promotion is the moment a candidate becomes the World an organisation answers
+from, and it stays with a person in a browser.
+
+Two tools are deliberately absent. There is no `list_worlds`, because the API has
+no endpoint that lists a workspace's collections and a tool that guessed at ids
+would be wrong silently. And `download_package` returns a descriptor rather than
+the archive: the bytes are fetched over HTTPS with the same key and checked with
+the offline verifier, which is better than base64ing tens of megabytes through a
+pipe to deliver something the caller must verify anyway.
+
+Tool names changed in release 2026.9.3.1. `list_documents`, `get_collection`,
+`get_active_world` and `ask_active_world` are now `list_sources`, `get_world` and
+`ask_world`, alongside five tools that did not exist before. Pin the release you
+registered and read this table before updating.
 
 Run `node tavonel-mcp.mjs --version` before registration to record the exact
 distribution. Update only from the HTTPS URLs and SHA-256 values in the public

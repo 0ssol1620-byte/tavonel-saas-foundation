@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const DISTRIBUTION_VERSION = "2026.8.30.1";
+const DISTRIBUTION_VERSION = "2026.9.3.1";
 const API_VERSION = "1";
 const baseUrl = (process.env.TAVONEL_BASE_URL || "https://tavonel.com").replace(/\/$/, "");
 const apiKey = process.env.TAVONEL_API_KEY || "";

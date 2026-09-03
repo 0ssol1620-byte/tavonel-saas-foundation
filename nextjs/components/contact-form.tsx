@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { QUALIFICATION } from "@/lib/contact-qualification";
 
 type State = "idle" | "sending" | "sent" | "error";
 
@@ -19,7 +20,12 @@ export default function ContactForm() {
       const response = await fetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...Object.fromEntries(new FormData(form)), startedAt }),
+        /*
+          `getAll` rather than `Object.fromEntries`: source types are checkboxes and share a
+          name, and fromEntries keeps only the last of them -- so a visitor who ticked four
+          boxes would have been reported as having ticked one.
+        */
+        body: JSON.stringify({ ...collect(new FormData(form)), startedAt }),
       });
       const result = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(result.error || "We could not send your inquiry.");
@@ -48,6 +54,38 @@ export default function ContactForm() {
           <option value="partnership">Partnership</option>
         </select>
       </label>
+      {/*
+        The qualification block. Closed lists, all optional -- a visitor who only wants to ask a
+        question answers none of them, and the one who wants a useful first reply answers six
+        without typing anything a customer document could end up inside.
+      */}
+      <fieldset className="contact-qualify">
+        <legend>About the material</legend>
+        {QUALIFICATION.map((field) => (
+          field.multiple ? (
+            <fieldset className="contact-field" key={field.name}>
+              <legend>{field.label}</legend>
+              {field.hint ? <small>{field.hint}</small> : null}
+              <div className="contact-checks">
+                {field.options.map((option) => (
+                  <label key={option}>
+                    <input type="checkbox" name={field.name} value={option} />
+                    <span>{option}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          ) : (
+            <label className="contact-field" key={field.name}>
+              <span>{field.label}</span>
+              <select name={field.name} defaultValue="">
+                <option value="">No answer</option>
+                {field.options.map((option) => <option key={option} value={option}>{option}</option>)}
+              </select>
+            </label>
+          )
+        ))}
+      </fieldset>
       <label className="contact-field">
         <span>What should we understand?</span>
         <textarea
@@ -55,7 +93,7 @@ export default function ContactForm() {
           rows={8}
           minLength={20}
           maxLength={5000}
-          placeholder="Document volume, source types, target outputs, security requirements, and timing."
+          placeholder="What the material is, who needs to answer from it, and anything the questions above did not cover. Do not paste customer documents."
           required
         />
       </label>
@@ -75,6 +113,16 @@ export default function ContactForm() {
       </div>
     </form>
   );
+}
+
+/** Every value for every name, so a repeated checkbox name keeps all of its answers. */
+function collect(data: FormData) {
+  const body: Record<string, string | string[]> = {};
+  for (const key of new Set(data.keys())) {
+    const values = data.getAll(key).map((value) => String(value));
+    body[key] = values.length > 1 ? values : values[0];
+  }
+  return body;
 }
 
 function Field({ label, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) {

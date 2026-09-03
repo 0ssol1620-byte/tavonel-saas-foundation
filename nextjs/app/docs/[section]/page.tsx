@@ -4,6 +4,7 @@ import type { Route } from "next";
 import { notFound } from "next/navigation";
 import { PublicPageShell } from "@/components/public-page-shell";
 import { DocsCopyButton } from "@/components/docs-copy-button";
+import { DocsSnippet } from "@/components/docs-snippet";
 import {
   DOCS_REVIEWED,
   DOCS_SECTIONS,
@@ -11,7 +12,7 @@ import {
   findDocsSection,
   type DocsBlock,
 } from "@/lib/docs-content";
-import { curlFor, readDocsEndpoints, type DocsEndpoint } from "@/lib/docs-endpoints";
+import { readDocsEndpoints, snippetFor, SNIPPET_LANGUAGES, type DocsEndpoint } from "@/lib/docs-endpoints";
 
 export function generateStaticParams() {
   return DOCS_SECTIONS.map((section) => ({ section: section.slug }));
@@ -56,6 +57,9 @@ function CodeBlock({ label, body }: { label: string; body: string }) {
   );
 }
 
+/* The names people call them, rather than the identifiers the generator uses. */
+const LANGUAGE_LABELS = { curl: "cURL", python: "Python", typescript: "TypeScript" } as const;
+
 function Endpoint({ endpoint }: { endpoint: DocsEndpoint }) {
   return (
     <article className="docs-endpoint">
@@ -65,7 +69,13 @@ function Endpoint({ endpoint }: { endpoint: DocsEndpoint }) {
         {endpoint.scope ? <em>{endpoint.scope}</em> : null}
       </header>
       {endpoint.description ? <p>{endpoint.description}</p> : null}
-      <CodeBlock label="Request" body={curlFor(endpoint)} />
+      <DocsSnippet
+        snippets={SNIPPET_LANGUAGES.map((language) => ({
+          language,
+          label: LANGUAGE_LABELS[language],
+          body: snippetFor(endpoint, language),
+        }))}
+      />
       {endpoint.requestExample ? <CodeBlock label="Request body" body={endpoint.requestExample} /> : null}
       <table className="docs-table">
         <thead><tr><th>Status</th><th>Response</th></tr></thead>

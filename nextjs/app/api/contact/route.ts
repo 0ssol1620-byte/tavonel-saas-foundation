@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 
 import { NextResponse } from "next/server";
 
+import { parseQualification, qualificationLines } from "@/lib/contact-qualification";
+
 export const runtime = "nodejs";
 
 const TOPICS = {
@@ -21,6 +23,8 @@ type Contact = {
   message: string;
   website: string;
   startedAt: number;
+  /* Closed-list answers only, validated against the same lists the form renders. */
+  qualification: Record<string, string[]>;
 };
 
 const RATE_WINDOW_MS = 10 * 60 * 1000;
@@ -96,6 +100,13 @@ function parseContact(raw: unknown): Contact | null {
   const message = text(value.message);
   const website = text(value.website);
   const startedAt = value.startedAt;
+  /*
+    A submission carrying an option this form never offered is not an unusual visitor. It is
+    rejected outright rather than dropped, because dropping it would deliver the rest of the
+    message as though nothing had happened.
+  */
+  const qualification = parseQualification(value);
+  if (!qualification) return null;
 
   if (
     name.length < 2 || name.length > 80 ||
@@ -107,7 +118,7 @@ function parseContact(raw: unknown): Contact | null {
     typeof startedAt !== "number" || !Number.isInteger(startedAt) || startedAt <= 0
   ) return null;
 
-  return { name, email, company, topic: topic as Topic, message, website, startedAt };
+  return { name, email, company, topic: topic as Topic, message, website, startedAt, qualification };
 }
 
 function text(value: unknown) {
@@ -185,6 +196,7 @@ function htmlBody(contact: Contact) {
       <tr><th style="text-align:left;padding:10px 0;border-bottom:1px solid #ddd">Name</th><td style="padding:10px 0;border-bottom:1px solid #ddd">${escapeHtml(contact.name)}</td></tr>
       <tr><th style="text-align:left;padding:10px 0;border-bottom:1px solid #ddd">Email</th><td style="padding:10px 0;border-bottom:1px solid #ddd">${escapeHtml(contact.email)}</td></tr>
       <tr><th style="text-align:left;padding:10px 0;border-bottom:1px solid #ddd">Company</th><td style="padding:10px 0;border-bottom:1px solid #ddd">${escapeHtml(contact.company || "Not provided")}</td></tr>
+      ${qualificationLines(contact.qualification).map((line) => `<tr><th style="text-align:left;padding:10px 0;border-bottom:1px solid #ddd">${escapeHtml(line.label)}</th><td style="padding:10px 0;border-bottom:1px solid #ddd">${escapeHtml(line.value)}</td></tr>`).join("")}
     </table>
     <p style="font-size:15px;line-height:1.7;margin-top:28px">${escapeHtml(contact.message).replaceAll("\n", "<br>")}</p>
   </main>`;

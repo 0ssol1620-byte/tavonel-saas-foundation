@@ -291,7 +291,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
     group: "API",
     summary: "The read-only tools an agent gets, and the two the server deliberately does not offer.",
     blocks: [
-      { kind: "prose", text: "A read-only MCP server ships in the repository at scripts/mcp/tavonel-mcp-server.mjs. It speaks JSON-RPC over stdio with no dependency and no build step, so it can be read before it is pointed at anything. Set TAVONEL_API_KEY and run it; TAVONEL_API_BASE_URL defaults to the published API." },
+      { kind: "prose", text: "A read-only MCP server is published on the Developers page as tavonel-mcp.mjs, pinned by sha256 in the channel manifest. It speaks JSON-RPC over stdio with no dependency and no build step, so it can be read before it is pointed at anything. Set TAVONEL_API_KEY and register it; TAVONEL_BASE_URL defaults to https://tavonel.com." },
       {
         kind: "table",
         head: ["Tool", "What it returns"],

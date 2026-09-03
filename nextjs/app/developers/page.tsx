@@ -14,9 +14,9 @@ export const metadata: Metadata = {
 const SURFACE = [
   ["Compile", "Upload or connect sources and follow observed run events from input to Compiled World."],
   ["GET World", "Read a compiled world: ontology, graph, retrieval corpus, provenance, validation."],
-  ["Ask", "Query against the current world. Answers that cannot show evidence should not pretend to."],
+  ["Ask", "Ask returns source-linked citations, or states that the available evidence is insufficient."],
   ["Export", "A signed directory of files, not a vendor lock. Public key at /api/export/trust."],
-  ["MCP", "Read-only MCP surface for agents that should consume the same world."],
+  ["MCP", "Eight read-only tools over the same World an agent would otherwise be given a copy of."],
 ] as const;
 
 export default function DevelopersPage() {
@@ -30,6 +30,7 @@ export default function DevelopersPage() {
         <nav aria-label="Sections">
           <Link href="/">Back to the compiler</Link>
           <a href="/api">API</a>
+          <Link href="/docs">Docs</Link>
           <Link href="/evidence">Evidence</Link>
         </nav>
         <Link className="btn small" href="/login">Sign in</Link>
@@ -55,7 +56,7 @@ export default function DevelopersPage() {
                     </article>
                   ))}
                 </div>
-                <p className="fine">Current API, connector and processing availability is published at <Link href="/status">/status</Link>.</p>
+                <p className="fine">The endpoint reference, the error catalogue and the package format are in <Link href="/docs">the documentation</Link>, with a request in cURL, Python and TypeScript for each endpoint. Current availability is published at <Link href="/status">/status</Link>.</p>
                 <div className="stack">
                   <p className="slate"><b>PUBLIC TOOLING</b><span />VERSIONED FILES</p>
                   <h3>Start with the contract, then a scoped key.</h3>
@@ -64,7 +65,7 @@ export default function DevelopersPage() {
                   <div className="tiles">
                     <article className="tile"><h3>OpenAPI</h3><p>Machine-readable v1 HTTP contract.</p><a href="/openapi.json">Open schema</a></article>
                     <article className="tile"><h3>CLI</h3><p>Node.js 20+ client with immutable version and update check.</p><a href="/developer/tavonel-cli.mjs" download>Download CLI</a></article>
-                    <article className="tile"><h3>MCP</h3><p>Read-only stdio tools for document, World and grounded Ask access.</p><a href="/developer/tavonel-mcp.mjs" download>Download MCP server</a></article>
+                    <article className="tile"><h3>MCP</h3><p>Eight stdio tools: sources, World, search, Ask, objects, relations, evidence, package. No write tool, and it refuses to start if one is added.</p><a href="/developer/tavonel-mcp.mjs" download>Download MCP server</a></article>
                     <article className="tile"><h3>Source agent</h3><p>Local-first SMB, NFS, SFTP and S3-compatible connector agent.</p><a href="/developer/tavonel-source-agent.py" download>Download source agent</a></article>
                   </div>
                   <p className="fine">Verify versions and SHA-256 values against <a href="/developer/channel.json">the public distribution channel</a>. The <a href="/developer/README.md">setup and safety contract</a> documents scopes, secret handling and fail-closed behavior.</p>
