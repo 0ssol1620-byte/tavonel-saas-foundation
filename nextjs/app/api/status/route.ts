@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { activationPolicy } from "@/lib/activation-policy";
 import { readConfiguredBillingOffers, readPaddleBrowserConfig } from "@/lib/billing-catalog";
-import { isBillingLaunchApproved } from "@/lib/billing-launch";
-import { readCommercialMode } from "@/lib/commercial-mode";
+import { readCommercialState } from "@/lib/commercial-state";
 import { readExportSignerEnv } from "@/lib/export-signing";
 import { readPaddleApiConfig } from "@/lib/paddle-api";
 import { readProductCoreV2Env } from "@/lib/core-runtime-v2";
@@ -17,8 +16,8 @@ export function GET() {
   const auth = supabaseUrl.startsWith("https://") && supabaseAnon
     ? "google_oauth_configured"
     : "not_configured";
-  const sandbox = process.env.PADDLE_SANDBOX === "true";
-  const billingLaunchApproved = isBillingLaunchApproved();
+  const commercial = readCommercialState();
+  const sandbox = commercial.provider === "sandbox";
   const billingChecks = {
     webhook: Boolean(process.env.PADDLE_WEBHOOK_SECRET?.trim()),
     checkout: Boolean(readPaddleBrowserConfig()),
@@ -32,7 +31,7 @@ export function GET() {
   const billing = billingConfigured
     ? sandbox
       ? "sandbox_checkout_ready"
-      : billingLaunchApproved
+      : commercial.liveChargesEnabled
         ? "live_checkout_ready"
         : "live_launch_pending"
     : sandbox
@@ -43,7 +42,19 @@ export function GET() {
   const signedExport = readExportSignerEnv() ? "signed_export_ready" : "signed_export_not_configured";
   const coreV2 = readProductCoreV2Env() ? "python_core_v2_configured" : "python_core_v2_not_configured";
   return NextResponse.json(
-    { mode: "foundation", commercialMode: readCommercialMode(), activationPolicy, auth, billing, r2, signedExport, coreV2 },
+    {
+      mode: "foundation",
+      commercialMode: commercial.mode,
+      // The pricing page gates its checkout buttons on this rather than re-deriving it from
+      // `commercialMode`, which is only one of the three inputs to whether a card can be charged.
+      liveCheckout: commercial.liveChargesEnabled,
+      activationPolicy,
+      auth,
+      billing,
+      r2,
+      signedExport,
+      coreV2,
+    },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

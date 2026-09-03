@@ -4,10 +4,21 @@ import { describe, expect, it } from "vitest";
 const source = readFileSync(new URL("../app/workspace/page.tsx", import.meta.url), "utf8");
 
 describe("existing immutable document compilation", () => {
-  it("only offers OCR-qualified documents and requires at least two selections", () => {
+  /*
+    The floor moved from two documents to one, and both sides of it moved together.
+
+    This used to assert the literal `selectedDocumentIds.length < 2`, which was the guard here
+    and also, separately spelled, the guard in the compile route and in the compiler. Asserting
+    the shared judgement instead is the point: a limit written in three places is a limit that
+    will disagree with itself, which is how a customer came to upload 128 files and be refused
+    after all of them had been read.
+  */
+  it("offers only OCR-qualified documents and judges the selection against the shared limit", () => {
     expect(source).toContain("doc.hasOcrJson ? (");
-    expect(source).toContain("selectedDocumentIds.length < 2");
+    expect(source).toContain("judgeCompileSet(selectedDocumentIds.length).ok");
+    expect(source).toContain("COMPILE_LIMITS_NOTICE");
     expect(source).toContain("Compile selected documents");
+    expect(source).not.toContain("selectedDocumentIds.length < 2");
   });
 
   it("submits only the selected document ids to the existing compile route", () => {

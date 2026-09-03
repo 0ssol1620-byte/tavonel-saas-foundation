@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import Logomark from "@/components/logomark";
+import type { Route } from "next";
+import { PublicSitePage } from "@/components/public-site-chrome";
 import { BOUNDARY } from "@/lib/evidence-record";
 import { activationPolicy } from "@/lib/activation-policy";
 
@@ -9,29 +10,36 @@ export const metadata: Metadata = {
   // canonical ("/"), so a crawler was told 22 distinct pages were all the homepage.
   alternates: { canonical: "/security" },
   openGraph: { url: "/security" },
-  title: "Where your documents go — TAVONEL",
+  title: "Security — TAVONEL",
   description:
-    "The path a document takes through TAVONEL, what holds its bytes, what never sees them, and the current capability controls.",
+    "The path a document takes through TAVONEL: what holds its bytes, what never sees them, and who decides what becomes active.",
 };
 
 /**
- * D2 -- the question a buyer asks second, answered in one place.
+ * The question a buyer asks second, answered by describing controls rather than absences.
  *
- * The first question is "what does it do", and the front page answers it. The second is "where
- * do my documents go", and before this page the answer was four sentences inside a marketing
- * scene. That is not enough for the person who has to sign off on it, and it is too much for the
- * person still deciding whether to read on -- which is exactly why the two now live apart.
+ * The architecture on this page has not changed. Three kinds of sentence came off it.
  *
- * Everything here is written from `docs/SECURITY_BOUNDARIES.md`. Nothing on this page is a
- * certification, an audit result or a compliance claim: this deployment holds none, and saying
- * otherwise is barred. What it can honestly say is what the architecture does and does not do,
- * and which capabilities are switched off right now.
+ * "This page holds no certification and claims none" and "Nothing on this page is a
+ * demonstration, an audit result or a compliance claim" were written to prevent a
+ * misreading nobody was making. They spent the reader's attention denying a claim the page
+ * never made. The page simply does not claim a certification, which is what not having one
+ * looks like.
+ *
+ * The dated internal qualification note ("opened only after the recorded 2026-08-29
+ * full-sequence qualification") is release-engineering provenance. It belongs in the release
+ * record, not in the answer to "where do my documents go".
+ *
+ * The GPU vendor's product name was in the data path. A customer's security review cares that
+ * analysis is isolated, bounded and given no outbound network — not which supplier's hardware
+ * it runs on. The legal disclosure of that supplier stays on /subprocessors, where a
+ * subprocessor belongs.
  */
 
 const CAPABILITY_LABELS = {
   customerIntake: "Customer document intake",
   cdr: "Content disarm and reconstruction",
-  ocrGpu: "GPU OCR candidate processing",
+  ocrGpu: "Isolated GPU document reading",
   candidatePromotion: "Candidate promotion into a live world",
 } as const;
 
@@ -42,99 +50,87 @@ const PATH = [
   ["The database", "Stores metadata and immutable proof references. It never stores document bytes."],
 ] as const;
 
+const CONTROLS = [
+  ["Tenant isolation", "Workspace identity is derived server-side from an authenticated session, never from an identifier the browser supplies. Storage prefixes, database rows and signed capabilities are all scoped to it."],
+  ["Encryption and secrets", "Transport is TLS throughout, and stored objects are encrypted at rest by the storage provider. Authentication, billing, storage and disarm credentials are server-side secrets; the browser may hold a provider's own publishable token and nothing else."],
+  ["AI training", "Your documents are not used to train shared models. Models read your sources to compile your world, and for nothing else."],
+  ["Retention and deletion", "Source material, derived artifacts and compiled packages can be deleted on request. The categories, purposes and retention are set out in the privacy notice."],
+  ["Reliability", "A control opens only after the one before it is qualified, so a partial failure stops the pipeline rather than emitting an incomplete world. There is no best-effort path that publishes anyway."],
+] as const;
+
 export default function SecurityPage() {
   return (
-    <div className="page">
-      <header className="nav" data-stuck={1}>
-        <Link href="/" className="wordmark" aria-label="TAVONEL home">
-          <Logomark />
-          <b>TAVONEL</b>
-        </Link>
-        <nav aria-label="Sections">
-          <Link href="/">Back to the compiler</Link>
-          <Link href="/evidence">Evidence</Link>
-        </nav>
-        <Link className="btn small" href="/login">Sign in</Link>
-      </header>
+    <PublicSitePage>
+      <section className="scene doc">
+        <div className="shell">
+          <div className="body">
+            <div className="stack">
+              <p className="slate"><b>SECURITY</b><span />DATA PATH AND CONTROLS</p>
+              <h1 className="document-title">Where your documents go,<br />and what never sees them.</h1>
+            </div>
+            <div className="stack">
+              <p className="lede">
+                Your sources move through a tenant-scoped processing path, and activation remains
+                under human control. Browser-direct upload → quarantine → sanitize and disarm →
+                isolated analysis → candidate world → your approval.
+                <b> Every external operation fails closed.</b>
+              </p>
 
-      <main id="main" tabIndex={-1}>
-        <section className="scene doc">
-          <div className="shell">
-            <div className="body">
-              <div className="stack">
-                <p className="slate"><b>RECORD</b><span />SECURITY &amp; DATA PATH</p>
-                <h1 className="document-title">Where your documents go,<br />and what never sees them.</h1>
+              <p className="slate"><span />THE BOUNDARY, IN THE ORDER IT IS ENFORCED</p>
+              <div className="chain">
+                {BOUNDARY.map(([num, name, text]) => (
+                  <article className="link" key={num}>
+                    <span className="st">{num}</span>
+                    <h2>{name}</h2>
+                    <p>{text}</p>
+                  </article>
+                ))}
               </div>
-              <div className="stack">
-                <p className="lede">
-                  Automation can propose. Promotion is a decision. The path:
-                  browser (signed direct upload) → quarantine → sanitize / CDR → isolated analysis → candidate world → human promotion.
-                  <b> Every external operation fails closed</b> — a control opens only after the one before it is qualified.
-                  This page holds no certification and claims none.
-                </p>
 
-                <p className="slate"><span />THE BOUNDARY, IN THE ORDER IT IS ENFORCED</p>
-                <div className="chain">
-                  {BOUNDARY.map(([num, name, text]) => (
-                    <article className="link" key={num}>
-                      <span className="st">{num}</span>
-                      <h2>{name}</h2>
-                      <p>{text}</p>
-                    </article>
-                  ))}
-                </div>
+              <p className="slate"><span />WHAT HOLDS WHAT</p>
+              <div className="chain">
+                {PATH.map(([name, text]) => (
+                  <article className="link" key={name}>
+                    <h2>{name}</h2>
+                    <p>{text}</p>
+                  </article>
+                ))}
+              </div>
 
-                <p className="slate"><span />WHAT HOLDS WHAT</p>
-                <div className="chain">
-                  {PATH.map(([name, text]) => (
-                    <article className="link" key={name}>
-                      <h2>{name}</h2>
-                      <p>{text}</p>
-                    </article>
-                  ))}
-                </div>
-                <p className="fine">
-                  Tenant identity is derived server-side from an authenticated session, never from
-                  an identifier the browser supplies. Provider credentials &mdash; authentication,
-                  billing, storage, content disarm &mdash; are managed server-side secrets; the
-                  browser may hold a provider&rsquo;s own publishable token and nothing else.
-                </p>
+              <p className="slate"><span />CONTROLS</p>
+              <div className="tiles">
+                {CONTROLS.map(([title, body]) => (
+                  <article className="tile" key={title}>
+                    <h3>{title}</h3>
+                    <p>{body}</p>
+                  </article>
+                ))}
+              </div>
 
-                <p className="slate"><span />CURRENT DEPLOYMENT CONTROLS</p>
-                <div className="status-list">
-                  {Object.entries(activationPolicy).map(([key, value]) => (
-                    <article key={key} data-state={value.enabled ? "operational" : "restricted"}>
-                      <span>{value.enabled ? "enabled" : "human gate"}</span>
-                      <h2>{CAPABILITY_LABELS[key as keyof typeof CAPABILITY_LABELS]}</h2>
-                      <p>{value.reason}</p>
-                    </article>
-                  ))}
-                </div>
-                <p className="fine">
-                  Intake, content disarm and GPU OCR opened only after the recorded 2026-08-29
-                  full-sequence qualification. Promotion remains closed by design: a candidate
-                  becomes active only after an authenticated human approval.
-                </p>
+              <p className="slate"><span />CURRENT DEPLOYMENT CONTROLS</p>
+              <div className="status-list">
+                {Object.entries(activationPolicy).map(([key, value]) => (
+                  <article key={key} data-state={value.enabled ? "operational" : "restricted"}>
+                    <span>{value.enabled ? "enabled" : "human gate"}</span>
+                    <h2>{CAPABILITY_LABELS[key as keyof typeof CAPABILITY_LABELS]}</h2>
+                    <p>{value.reason}</p>
+                  </article>
+                ))}
+              </div>
+              <p className="fine">
+                Promotion is closed by design: a candidate world becomes active only after an
+                authenticated person approves it.
+              </p>
 
-                <div className="actions">
-                  <Link className="btn" href="/evidence">What we measured</Link>
-                  <Link className="btn ghost" href="/#s5">See what access is open</Link>
-                </div>
+              <div className="actions">
+                <Link className="btn" href="/evidence">How evidence works</Link>
+                <Link className="btn ghost" href={"/subprocessors" as Route}>Subprocessors</Link>
+                <Link className="btn ghost" href={"/contact" as Route}>Security contact</Link>
               </div>
             </div>
           </div>
-        </section>
-      </main>
-
-      <footer className="site">
-        <div className="shell">
-          <span className="wordmark"><Logomark /><b>TAVONEL</b></span>
-          <p className="fine">
-            Nothing on this page is a demonstration, an audit result or a compliance claim. It
-            describes the architecture and current controls this deployment enforces.
-          </p>
         </div>
-      </footer>
-    </div>
+      </section>
+    </PublicSitePage>
   );
 }

@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { judgeCompileSet } from "./compile-limits";
 
 export const COLLECTION_CANDIDATE_SCHEMA = "tavonel.collection_candidate.v1" as const;
 export const GENERIC_MIXED_CORPUS_BLUEPRINT = {
@@ -22,7 +23,6 @@ const PACKAGE_ROOTS = [
   "provenance",
   "validation",
 ] as const;
-const MAX_DOCUMENTS = 12;
 const MAX_TEXT_CHARS = 50_000;
 
 export type CollectionOcrInput = {
@@ -265,7 +265,10 @@ export function validateCollectionOcrInput(value: unknown): CollectionOcrInput |
 }
 
 export function compileCollectionCandidate(inputs: CollectionOcrInput[]): CollectionCandidateArtifact {
-  if (inputs.length < 2 || inputs.length > MAX_DOCUMENTS) {
+  // One document is a world. The old floor of two was a compiler implementation detail that
+  // reached the customer as "upload succeeded, nothing was built". The ceiling is shared with
+  // the route and the workspace so a selection cannot pass one check and fail the next.
+  if (!judgeCompileSet(inputs.length).ok) {
     throw new Error("collection_document_count_out_of_bounds");
   }
   const sorted = [...inputs].sort((left, right) =>

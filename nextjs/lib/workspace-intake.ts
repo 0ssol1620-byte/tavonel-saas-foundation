@@ -1,10 +1,35 @@
 import { unzipSync } from "fflate";
 import { qualifiedDocumentInputs } from "./qualified-input";
 
-const MAX_ARCHIVE_BYTES = 100 * 1024 * 1024;
-const MAX_EXPANDED_BYTES = 500 * 1024 * 1024;
+/*
+  Archive limits sized to what a browser tab can survive, not to what a ZIP can contain.
+
+  Extraction runs on the main thread: `source.arrayBuffer()` materialises the whole archive, and
+  `unzipSync` then expands it, synchronously, in the same task as the UI. At the previous ceiling
+  — a 100 MB archive expanding to 500 MB — that is not slow, it is a frozen tab: no repaint, no
+  cancel button, no way to tell whether anything is happening, and on a low-memory device a
+  crashed renderer that loses the whole selection.
+
+  These ceilings are what the synchronous path can do without stalling perceptibly. They are not
+  the product's ambition. A larger corpus wants extraction moved off the main thread for the
+  middle range and an isolated server-side extractor above it; until that exists, the limit is
+  stated in the dropzone before a file is chosen rather than thrown after one is dropped.
+
+  Every other guard here — traversal, absolute paths, encryption, nested archives, the
+  decompression-ratio bomb check, the file count — is unchanged and still runs before a single
+  byte is expanded.
+*/
+const MAX_ARCHIVE_BYTES = 25 * 1024 * 1024;
+const MAX_EXPANDED_BYTES = 100 * 1024 * 1024;
 const MAX_FILES = 128;
 const MAX_RATIO = 100;
+
+/** What the workspace tells someone before they choose an archive, in their units. */
+export const ARCHIVE_LIMITS = {
+  maxArchiveMb: MAX_ARCHIVE_BYTES / (1024 * 1024),
+  maxExpandedMb: MAX_EXPANDED_BYTES / (1024 * 1024),
+  maxFiles: MAX_FILES,
+} as const;
 
 const mimeByExtension = new Map(
   Object.entries(qualifiedDocumentInputs).flatMap(([mime, extensions]) =>
@@ -163,6 +188,8 @@ export async function prepareWorkspaceSelection(input: File[]): Promise<Workspac
     const relativePath = safeRelativePath((source as File & { webkitRelativePath?: string }).webkitRelativePath || source.name);
     if (/\.zip$/i.test(source.name)) {
       archiveCount += 1;
+      // Checked against `source.size` before any read, so an oversized archive is refused
+      // without ever being pulled into memory.
       if (source.size > MAX_ARCHIVE_BYTES) throw new Error("ARCHIVE_TOO_LARGE");
       const bytes = new Uint8Array(await source.arrayBuffer());
       inspectCentralDirectory(bytes);

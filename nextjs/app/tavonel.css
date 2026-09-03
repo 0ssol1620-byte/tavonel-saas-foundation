@@ -719,15 +719,135 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
   border-top: 1px solid var(--hairline);
   border-bottom: 1px solid var(--hairline);
 }
-.compile-film-stages span {
+/*
+  The stage strip is four buttons, not four labels.
+
+  They were <span>s describing what the four stacked films were about. With one viewport the
+  strip is the only way to reach a stage directly, so each is a real tab: focusable, keyboard
+  navigable, and carrying its selected state where a screen reader can find it.
+*/
+.compile-film-stages button {
+  appearance: none;
   padding: 11px 8px;
+  border: 0;
+  background: transparent;
   color: var(--text-lo);
+  font: inherit;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: .14em;
   text-align: center;
+  cursor: pointer;
+  transition: color .18s ease, box-shadow .18s ease;
 }
-.compile-film-stages span + span { border-left: 1px solid var(--hairline); }
+.compile-film-stages button + button { border-left: 1px solid var(--hairline); }
+.compile-film-stages button:hover { color: var(--text-hi); }
+.compile-film-stages button[data-active="1"] {
+  color: var(--text-hi);
+  box-shadow: inset 0 -2px 0 currentColor;
+}
+.compile-film-stages button:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; }
+/*
+  The viewport holds its shape whichever stage is showing.
+
+  All four videos are stacked in the same grid cell so the frame never resizes between stages
+  and the page below it never shifts. `aspect-ratio` reserves the box before any bytes land, so
+  there is no jump when the first frame decodes either.
+*/
+.compile-film-viewport {
+  position: relative;
+  display: grid;
+  width: min(100%, 1440px);
+  margin-inline: auto;
+  aspect-ratio: 1440 / 900;
+  max-height: calc(100dvh - 300px);
+  background: #08090a;
+  border: 1px solid var(--hairline);
+  overflow: hidden;
+}
+/* The panel is focusable because it holds no focusable content of its own, which is what the
+   APG asks of a tabpanel. The ring sits inside the frame so it reads as part of the scene
+   rather than as a box drawn around it. */
+.compile-film-viewport:focus-visible { outline-offset: -3px; }
+.compile-film-video,
+.compile-film-still {
+  grid-area: 1 / 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+/*
+  Hidden with opacity rather than `display: none`.
+
+  A display-none <video> is not laid out, and Safari will not decode into a box with no size —
+  switching stages then showed a blank frame until the element was painted. Zero opacity keeps
+  every element measurable while only one is visible; `visibility` keeps the invisible ones out
+  of the accessibility tree.
+*/
+.compile-film-video { opacity: 0; visibility: hidden; transition: opacity .28s ease; }
+.compile-film-video[data-active="1"] { opacity: 1; visibility: visible; }
+.compile-film-caption {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  width: min(100%, 1440px);
+  margin-inline: auto;
+}
+.compile-film-caption p { margin: 0; color: var(--text-lo); font-size: 13px; }
+.compile-film-toggle {
+  appearance: none;
+  flex: none;
+  padding: 6px 12px;
+  border: 1px solid var(--hairline);
+  background: transparent;
+  color: var(--text-lo);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  cursor: pointer;
+}
+.compile-film-toggle:hover { color: var(--text-hi); }
+@media (prefers-reduced-motion: reduce) {
+  .compile-film-video { transition: none; }
+}
+/*
+  Four groups, laid out as four groups.
+
+  The footer was one flat row of fourteen links that wrapped into an unreadable block on a
+  phone. These collapse to two columns and then one, keeping their headings, so the grouping
+  survives the narrowest screen.
+*/
+.site-footer-groups {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 28px 24px;
+  width: 100%;
+  margin: 20px 0 8px;
+}
+.site-footer-groups nav { display: flex; flex-direction: column; gap: 8px; }
+.site-footer-title {
+  margin: 0 0 2px;
+  color: var(--text-hi);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .14em;
+}
+.site-footer-groups a { color: var(--text-lo); font-size: 13px; text-decoration: none; }
+.site-footer-groups a:hover { color: var(--text-hi); }
+.nav-actions { display: inline-flex; align-items: center; gap: 14px; }
+.nav-signin { color: var(--text-lo); font-size: 13px; text-decoration: none; }
+.nav-signin:hover { color: var(--text-hi); }
+@media (max-width: 860px) {
+  .site-footer-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 480px) {
+  .site-footer-groups { grid-template-columns: minmax(0, 1fr); }
+  .compile-film-viewport { max-height: calc(100svh - 260px); }
+}
 .evidence-path {
   display: flex;
   align-items: center;

@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 import { describe, expect, it } from "vitest";
 
 // Guards the product surface against diagnostic routes and inline credential-like values.
@@ -31,6 +31,23 @@ function walkRouteFiles(directory: string): string[] {
 
 const routeFiles = walkRouteFiles(appDirectory);
 
+/*
+  Read every route handler once, at module load, rather than inside each test.
+
+  Both checks below scan the whole route surface -- around ninety files. Doing that with
+  readFileSync inside an `it` puts the entire scan inside vitest's 5s per-test budget, and on
+  a machine where every open is intercepted by an on-access scanner that budget is not
+  generous. The credential check began failing intermittently with "Test timed out in 5000ms",
+  which in a security test reads exactly like a credential was found. Module-level work is not
+  subject to the per-test timeout, so the scan happens once and each test does only its regex.
+
+  Nothing about what is asserted changes: the same files are read, the same patterns run.
+*/
+const routeSources: ReadonlyArray<readonly [string, string]> = routeFiles.map((path) => [
+  relative(appDirectory, path).split(sep).join("/"),
+  readFileSync(path, "utf8"),
+] as const);
+
 describe("production route surface", () => {
   it("has no retrieval GPU smoke-check route", () => {
     // The specific route that shipped. Named explicitly so a revert cannot quietly restore it.
@@ -48,21 +65,20 @@ describe("production route surface", () => {
     // A long unbroken hex/base64-ish literal assigned to a token/secret/key-shaped name is
     // the shape the removed route used. Env reads (process.env.X) are unaffected.
     const offenders: string[] = [];
-    for (const path of routeFiles) {
-      const source = readFileSync(path, "utf8");
+    for (const [name, source] of routeSources) {
       const matches = source.match(
         /(?:const|let|var)\s+\w*(?:TOKEN|SECRET|KEY|PASSWORD|CREDENTIAL)\w*\s*=\s*["'`][A-Za-z0-9+/=_-]{24,}["'`]/gi,
       );
-      if (matches) offenders.push(`${relative(appDirectory, path).replace(/\\/g, "/")}: ${matches.length}`);
+      if (matches) offenders.push(`${name}: ${matches.length}`);
     }
     expect(offenders).toEqual([]);
   });
 
   it("never marks a route as deliberately temporary in a comment without removing it", () => {
     // "DELETE THIS ROUTE once ..." is exactly what the removed file said, and it stayed.
-    const offenders = routeFiles
-      .filter((path) => /DELETE THIS ROUTE|TEMPORARY .*(route|endpoint)|REMOVE BEFORE (PROD|LAUNCH)/i.test(readFileSync(path, "utf8")))
-      .map((path) => relative(appDirectory, path).replace(/\\/g, "/"));
+    const offenders = routeSources
+      .filter(([, source]) => /DELETE THIS ROUTE|TEMPORARY .*(route|endpoint)|REMOVE BEFORE (PROD|LAUNCH)/i.test(source))
+      .map(([name]) => name);
     expect(offenders).toEqual([]);
   });
 });

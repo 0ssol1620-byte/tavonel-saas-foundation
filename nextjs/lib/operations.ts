@@ -1,6 +1,6 @@
 import { activationPolicy } from "@/lib/activation-policy";
 import { readConfiguredBillingOffers, readPaddleBrowserConfig } from "@/lib/billing-catalog";
-import { isBillingLaunchApproved } from "@/lib/billing-launch";
+import { readCommercialState } from "@/lib/commercial-state";
 import { readExportSignerEnv } from "@/lib/export-signing";
 import { readPaddleApiConfig } from "@/lib/paddle-api";
 import { readProductCoreV2Env } from "@/lib/core-runtime-v2";
@@ -10,8 +10,9 @@ import { readSupabaseAdminConfig } from "@/lib/supabase-admin";
 export const LEGAL_EFFECTIVE_DATE = "2026-08-30";
 
 export function readPublicOperations() {
-  const sandbox = process.env.PADDLE_SANDBOX === "true";
-  const billingLaunchApproved = isBillingLaunchApproved();
+  const commercial = readCommercialState();
+  const sandbox = commercial.provider === "sandbox";
+  const billingLaunchApproved = commercial.liveChargesEnabled;
   const auth = Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL?.trim().startsWith("https://") &&
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim(),
@@ -30,7 +31,9 @@ export function readPublicOperations() {
   return {
     generatedAt: new Date().toISOString(),
     service: "TAVONEL Foundation",
-    phase: sandbox ? "private_pilot" : "live",
+    // Posture is a commercial decision, not a Paddle environment. Reading the provider here
+    // made a production-keyed pilot deployment describe itself as "live".
+    phase: commercial.mode === "live" ? "live" : "private_pilot",
     components: {
       website: { state: "operational", detail: "Public site and authenticated workspace" },
       authentication: {
@@ -71,7 +74,7 @@ export function readPublicOperations() {
       signedExport: Boolean(readExportSignerEnv()),
       compiler: Boolean(readProductCoreV2Env()),
       billingConfigured: Object.values(billingChecks).every(Boolean),
-      billingLive: !sandbox && billingLaunchApproved && Object.values(billingChecks).every(Boolean),
+      billingLive: billingLaunchApproved && Object.values(billingChecks).every(Boolean),
       promotionRequiresHumanApproval: !activationPolicy.candidatePromotion.enabled,
     },
   } as const;

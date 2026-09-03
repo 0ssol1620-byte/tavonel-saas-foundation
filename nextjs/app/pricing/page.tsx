@@ -1,48 +1,62 @@
 "use client";
 
 import Link from "next/link";
+import type { Route } from "next";
 import { useEffect, useState } from "react";
 import Logomark from "@/components/logomark";
 import { useCheckout } from "@/lib/use-checkout";
 import { loginUrlForOffer } from "@/lib/checkout-intent";
-import type { BillingOfferCode } from "@/lib/billing-catalog";
+import { BILLING_OFFERS, type BillingOfferCode } from "@/lib/billing-catalog";
+import { FOOTER_GROUPS, PRIMARY_NAV } from "@/lib/site-navigation";
 import { formatUsd, quoteCompilePages } from "@/lib/usage-pricing";
 
-const PLANS = [
-  {
-    name: "Evaluation",
-    price: "$0",
-    description: "Compile your own sources in an invitation-based evaluation workspace.",
-    features: ["Manual upload", "Compiled World + Ask", "No card to request access"],
-    offerCode: null,
-  },
-  {
-    name: "Developer",
-    price: "$29",
-    description: "For builders shipping source-grounded AI.",
-    features: ["500 standard compile pages", "1 workspace", "API + MCP", "1 connected source"],
-    offerCode: "observer_access",
-  },
-  {
-    name: "Team",
-    price: "$99",
-    description: "For teams reviewing and governing a shared World.",
-    features: ["2,500 standard compile pages", "Up to 5 seats", "Multiple connectors", "Review, versions, budgets"],
-    offerCode: "studio_access",
-  },
-  {
-    name: "Enterprise",
-    price: "Custom",
-    description: "For policy-led knowledge operations and qualified deployment controls.",
-    features: ["SSO / SCIM when qualified", "Custom retention and region", "Audit export", "Dedicated support"],
-    offerCode: null,
-  },
-] as const;
+/*
+  Plans come from the billing catalog, not from a second list kept next to it.
+
+  The array that used to live here promised Developer "500 standard compile pages" while the
+  compile route demanded a Team subscription, and promised Team "Up to 5 seats" against a
+  product with no invitations, roles or seat accounting. It also advertised Enterprise
+  "SSO / SCIM when qualified" — a feature card for something that does not exist, with the
+  qualification caveat doing the work a missing feature should do, which is to be missing.
+*/
+const PAID_PLANS = (Object.entries(BILLING_OFFERS) as Array<[BillingOfferCode, (typeof BILLING_OFFERS)[BillingOfferCode]]>)
+  .map(([offerCode, offer]) => ({
+    name: offer.label,
+    price: `$${offer.priceUsd}`,
+    description: offer.description,
+    features: offer.features as readonly string[],
+    offerCode,
+  }));
+
+const EVALUATION = {
+  name: "Evaluation",
+  price: "$0",
+  description: "Compile your own sources in an invitation-based evaluation workspace.",
+  features: ["Manual upload", "Compiled World, Evidence and Ask", "Signed export", "No card to request access"],
+  offerCode: null,
+} as const;
+
+const ENTERPRISE = {
+  name: "Enterprise",
+  price: "Custom",
+  description: "For larger corpora and knowledge operations run by a team.",
+  features: ["Custom volume", "Custom retention review", "Audit export", "Dedicated onboarding and support"],
+  offerCode: null,
+} as const;
+
+const PLANS = [EVALUATION, ...PAID_PLANS, ENTERPRISE];
 
 export default function PricingPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [signedIn, setSignedIn] = useState(false);
-  const [commercialMode, setCommercialMode] = useState<"pilot" | "live">("pilot");
+  /*
+    Whether a real charge is possible, not merely which mode a label says.
+
+    The page used to read `commercialMode` alone, which is one of the three inputs to that
+    question; a deployment could report mode "live" with launch approval withheld and this page
+    would offer a checkout the API then refused.
+  */
+  const [liveCheckout, setLiveCheckout] = useState(false);
   const [pages, setPages] = useState(348);
   const { start: startCheckout, busy: billingBusy } = useCheckout(setNotice);
   const quote = quoteCompilePages(pages);
@@ -58,10 +72,11 @@ export default function PricingPage() {
       }
       try {
         const response = await fetch("/api/status", { cache: "no-store" });
-        const status = await response.json() as { commercialMode?: "pilot" | "live" };
-        if (!cancelled) setCommercialMode(status.commercialMode === "live" ? "live" : "pilot");
+        const status = await response.json() as { liveCheckout?: boolean };
+        if (!cancelled) setLiveCheckout(status.liveCheckout === true);
       } catch {
-        if (!cancelled) setCommercialMode("pilot");
+        // Fail closed: an unreachable status endpoint must never open a checkout.
+        if (!cancelled) setLiveCheckout(false);
       }
     })();
     return () => { cancelled = true; };
@@ -70,7 +85,7 @@ export default function PricingPage() {
   const requestAccess = () => window.location.assign("/contact");
 
   const chooseOffer = (offerCode: BillingOfferCode) => {
-    if (commercialMode !== "live") {
+    if (!liveCheckout) {
       window.location.assign("/contact");
       return;
     }
@@ -89,19 +104,28 @@ export default function PricingPage() {
           <b>TAVONEL</b>
         </Link>
         <nav aria-label="Sections">
-          <Link href="/">Back to the compiler</Link>
-          <Link href="/contact">Talk to us</Link>
+          {PRIMARY_NAV.map((link) => <Link key={link.href} href={link.href as Route}>{link.label}</Link>)}
         </nav>
-        <Link className="btn small" href="/login">Sign in</Link>
+        <span className="nav-actions">
+          <Link className="btn small" href={(liveCheckout ? "/login" : "/contact") as Route}>
+            {liveCheckout ? "Start with your files" : "Request access"}
+          </Link>
+          <Link className="nav-signin" href="/login">Sign in</Link>
+        </span>
       </header>
       <main id="main">
         <section className="scene doc">
           <div className="shell">
-            <p className="slate"><b>PRICING</b><span />MEASURED COMPUTE</p>
+            <p className="slate"><b>PRICING</b><span />PAGES AND DOLLARS</p>
             <h1 className="document-title">Pages and dollars.<br />No credit arithmetic.</h1>
             <p className="lede">
-              Standard Knowledge Compile is modeled at $0.04 per processed page. Vision escalation
-              is charged only when a page needs it, with a $0.06 per-page hard maximum.
+              {/*
+                "modeled at" is what an internal cost model says, not what a customer is told
+                they will pay. In pilot the honest word for this number is the rate.
+              */}
+              {liveCheckout ? "Standard" : "Pilot"} processing rate: <b>$0.04 per standard page</b>.
+              Complex pages are escalated only when a page needs it, and never exceed
+              <b> $0.06 per page</b> without a new confirmation.
             </p>
             <section className="usage-estimator rv" aria-labelledby="usage-estimator-title">
               <div>
@@ -126,8 +150,8 @@ export default function PricingPage() {
             </section>
             <div className="plans rv">
               {PLANS.map((plan) => (
-                <article className="plan" key={plan.name} data-featured={plan.name === "Team" ? 1 : 0}>
-                  <span className="tag">{plan.name === "Team" ? "TEAM WORKFLOW" : " "}</span>
+                <article className="plan" key={plan.name} data-featured={plan.name === "Developer" ? 1 : 0}>
+                  <span className="tag">{plan.name === "Developer" ? "START HERE" : " "}</span>
                   <h3>{plan.name}</h3>
                   <span className="price">{plan.price}{plan.price !== "$0" && plan.price.startsWith("$") ? <small> / month</small> : null}</span>
                   <p>{plan.description}</p>
@@ -136,9 +160,17 @@ export default function PricingPage() {
                     className="btn ghost"
                     type="button"
                     disabled={Boolean(billingBusy)}
-                    onClick={() => commercialMode === "pilot" || !plan.offerCode ? requestAccess() : chooseOffer(plan.offerCode)}
+                    onClick={() => (!liveCheckout || !plan.offerCode ? requestAccess() : chooseOffer(plan.offerCode))}
                   >
-                    {commercialMode === "pilot" ? "Request access" : plan.name === "Enterprise" ? "Start a conversation" : plan.name === "Evaluation" ? "Request evaluation" : billingBusy === plan.offerCode ? "Opening checkout…" : signedIn ? "Choose this plan" : "Choose this plan → sign in"}
+                    {!liveCheckout
+                      ? "Request access"
+                      : plan.name === "Enterprise"
+                        ? "Start a conversation"
+                        : plan.name === "Evaluation"
+                          ? "Request evaluation"
+                          : billingBusy === plan.offerCode
+                            ? "Opening checkout…"
+                            : signedIn ? "Choose this plan" : "Choose this plan → sign in"}
                   </button>
                 </article>
               ))}
@@ -150,15 +182,34 @@ export default function PricingPage() {
             <details className="status-fold rv">
               <summary>How usage is measured</summary>
               <p>
-                Usage is measured from processed pages. Every preflight shows the standard estimate
-                and the maximum charge before processing begins.
+                Usage is measured in pages. A PDF page is a page; one image is one page; a slide
+                is a page-equivalent.
               </p>
-              <p className="fine">See the estimated and maximum charge before processing.</p>
+              <p>
+                Preflight shows an estimate before you commit. Where a file does not declare its
+                own page count, that estimate is an upper bound derived from file size and is
+                labelled as an estimate. The billed count is confirmed once the documents have
+                been read, and never exceeds the maximum you were shown.
+              </p>
             </details>
             {notice ? <p className="notice" role="status">{notice}</p> : null}
           </div>
         </section>
       </main>
+      <footer className="site">
+        <div className="shell">
+          <span className="wordmark"><Logomark /><b>TAVONEL</b></span>
+          <div className="site-footer-groups">
+            {FOOTER_GROUPS.map((group) => (
+              <nav key={group.title} aria-label={group.title}>
+                <p className="site-footer-title">{group.title}</p>
+                {group.links.map((link) => <Link key={link.href} href={link.href as Route}>{link.label}</Link>)}
+              </nav>
+            ))}
+          </div>
+          <p className="fine">Knowledge compiled with a traceable path back to every source.</p>
+        </div>
+      </footer>
     </div>
   );
 }

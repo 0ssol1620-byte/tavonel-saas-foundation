@@ -71,7 +71,11 @@ test("command palette is keyboard reachable and closes with Escape", async ({ pa
 
 test("captures public architecture and authenticated run evidence", async ({ page }, testInfo) => {
   await page.goto("/enterprise");
-  await expect(page.getByRole("heading", { name: "Control and content take different paths." })).toBeVisible();
+  // The heading moved from "Control and content take different paths." to the buyer-facing
+  // promise. The old line stated an architectural fact about the system; the page now leads
+  // with what an enterprise gets and carries the controls -- identity, data handling,
+  // retention, audit, deployment review, support -- as the named sections beneath it.
+  await expect(page.getByRole("heading", { name: /Compile enterprise knowledge/ })).toBeVisible();
   await testInfo.attach(`enterprise-${testInfo.project.name}`, { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
 
   await page.goto("/knowledge-compiler");

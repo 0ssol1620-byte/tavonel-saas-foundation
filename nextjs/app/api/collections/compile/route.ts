@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { type CollectionCandidateArtifact, validateCollectionOcrInput } from "@/lib/collection-compiler";
+import { COMPILE_MAX_DOCUMENTS, judgeCompileSet } from "@/lib/compile-limits";
 import { dispatchCoreCompile, readCoreRuntimeEnv } from "@/lib/core-runtime";
 import {
   dispatchProductCoreV2,
@@ -20,7 +21,15 @@ export async function POST(request: Request) {
   if (!Number.isFinite(contentLength) || contentLength > 4_096) {
     return NextResponse.json({ code: "METADATA_ONLY_ENDPOINT" }, { status: 415, headers: { "Cache-Control": "no-store" } });
   }
-  const auth = await authorizeFoundationRequest(request, "collections:compile", "studio");
+  /*
+    Compiling a world is the product, not a Team upgrade.
+
+    This route required "studio" while upload and OCR required only "observer", so a Developer
+    subscriber could buy 500 compile pages, spend them on reading documents, and then be told
+    the compile step needed a different plan. Collaboration is what Team sells; the compiler
+    itself belongs to every paid plan.
+  */
+  const auth = await authorizeFoundationRequest(request, "collections:compile", "observer");
   if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: { "Cache-Control": "no-store" } });
   let body: { documentIds?: unknown };
   try {
@@ -32,8 +41,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ code: "DOCUMENT_IDS_REQUIRED" }, { status: 400, headers: { "Cache-Control": "no-store" } });
   }
   const documentIds = [...new Set(body.documentIds.filter((item): item is string => typeof item === "string"))];
-  if (documentIds.length < 2 || documentIds.length > 12 || documentIds.some((id) => !DOCUMENT_ID_PATTERN.test(id))) {
+  if (documentIds.some((id) => !DOCUMENT_ID_PATTERN.test(id))) {
     return NextResponse.json({ code: "DOCUMENT_SET_UNQUALIFIED" }, { status: 400, headers: { "Cache-Control": "no-store" } });
+  }
+  // Shared with the workspace so a selection cannot be accepted by the UI and refused here.
+  const verdict = judgeCompileSet(documentIds.length);
+  if (!verdict.ok) {
+    return NextResponse.json(
+      { code: verdict.code, message: verdict.message, maximumDocuments: COMPILE_MAX_DOCUMENTS },
+      { status: 400, headers: { "Cache-Control": "no-store" } },
+    );
   }
 
   const workspaceId = auth.principal.workspaceKey;

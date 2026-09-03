@@ -46,7 +46,7 @@ const COPY_SURFACES = [
   "lib/demo-world.ts",
   "lib/film-script.ts",
   "components/opening-film.tsx",
-  "components/film-band.tsx",
+  "components/compile-stage-player.tsx",
   "components/compile-stage.tsx",
   "app/film/page.tsx",
   "app/research/page.tsx",
@@ -80,8 +80,19 @@ function read(surface: string): string {
   return readFileSync(join(root, surface), "utf8");
 }
 
+/*
+  The landing page is three files now.
+
+  Scene 3's four stacked bands became one pinned player, so the film sources, posters and stage
+  labels moved into `compile-stage-player.tsx`. Every assertion below is about what a visitor
+  sees at `/`, so the player is part of the landing source they read.
+*/
 function landingSource(): string {
-  return `${read("app/page.tsx")}\n${read("components/home-page-client.tsx")}`;
+  return [
+    read("app/page.tsx"),
+    read("components/home-page-client.tsx"),
+    read("components/compile-stage-player.tsx"),
+  ].join("\n");
 }
 
 describe("public copy", () => {
@@ -142,25 +153,25 @@ describe("public copy", () => {
   });
 
   it("does not wrap the films in a clickable link", () => {
-    const band = read("components/film-band.tsx");
-    expect(band).not.toContain("href");
-    expect(band).not.toContain("CanvasTransitionLink");
-    expect(landingSource()).not.toMatch(/FilmBand[\s\S]{0,200}href=/);
+    const player = read("components/compile-stage-player.tsx");
+    expect(player).not.toContain("href");
+    expect(player).not.toContain("CanvasTransitionLink");
   });
 
   /*
-    Every band on the landing page goes through FilmBand.
+    One player owns every landing film, and the scene files hand-roll none.
 
-    The hero was twice rewritten as a hand-written <video> — once for an LCP experiment, once in
-    a server-component split — and both times it lost the playback logic that lives in
-    FilmBand: the observer, the resume on visibility change, the resume on decoder stall. The
-    other cuts hide that failure because scrolling back to them restarts them; the hero is on
-    screen from load, crosses its loop point untouched, and simply freezes.
+    The hero was twice rewritten as a bare <video> — once for an LCP experiment, once in a
+    server-component split — and both times it lost the playback logic it needs: the observer,
+    the resume on visibility change, the resume on a decoder stall. Bands further down hide
+    that failure because scrolling back restarts them; a film on screen from load crosses its
+    loop point untouched and simply freezes.
 
-    It also carried inline `aspectRatio: 1280 / 800` describing a resolution the masters no
-    longer have, which overrode the stylesheet's viewport-fitting rules from an attribute.
+    That logic now lives in `CompileStagePlayer` rather than a per-band component, because the
+    four cuts share one viewport and the interesting invariant is that only one of them holds a
+    decoder. The scene files must still contain no <video> of their own.
   */
-  it("renders every landing film through FilmBand, never a hand-written video element", () => {
+  it("keeps every landing film inside the stage player, never in a scene file", () => {
     for (const file of ["app/page.tsx", "components/home-page-client.tsx"]) {
       // Comments in these files discuss the <video> element by name, so the check is run
       // against the source with comments stripped — otherwise it fails on its own rationale.
@@ -170,6 +181,48 @@ describe("public copy", () => {
       expect(source, `${file} must not hand-roll a <video>`).not.toMatch(/<video[\s>]/);
       expect(source, `${file} must not inline an aspect ratio`).not.toContain("aspectRatio");
     }
+    const player = read("components/compile-stage-player.tsx");
+    expect(player, "the player owns exactly one <video> template").toMatch(/<video/);
+    expect(player, "only the active and admitted stages may hold a source")
+      .toContain("admitted.has(position) ?");
+  });
+
+  /*
+    Scene 3 is one frame, not four stacked ones.
+
+    The four cuts used to be four `FilmBand`s in a column: the scene counter said five and the
+    reader scrolled through eight screens of film, while four <video> elements competed for
+    bandwidth and, on a phone, for a limited number of hardware decoders.
+  */
+  it("presents the compile film as a single staged viewport", () => {
+    const landing = read("components/home-page-client.tsx");
+    expect(landing).toContain("<CompileStagePlayer");
+    expect(landing.match(/<CompileStagePlayer/g)).toHaveLength(1);
+
+    const player = read("components/compile-stage-player.tsx");
+    for (const stage of ["SOURCES", "READ", "STRUCTURE", "WORLD"]) {
+      expect(player, `the stage strip must offer ${stage}`).toContain(stage);
+    }
+    expect(player, "stages must be selectable, not decorative").toContain('role="tab"');
+    expect(player, "reduced motion gets stills and no timer").toContain("prefers-reduced-motion");
+  });
+
+  /*
+    No invented instrument readings.
+
+    The bar read WORLD v184 / FACTS 128,470 / NEEDS REVIEW 1, from a demo fixture. While the
+    page still carried a large "this is a demonstration" banner those were legible as
+    illustration; the banner came off and the numbers stayed, leaving three precise fabricated
+    figures reading as results from a real deployment.
+  */
+  it("keeps fabricated world metrics off the landing instrument bar", () => {
+    const landing = read("components/home-page-client.tsx")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/^\s*\/\/.*$/gm, "")
+      .replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
+    expect(landing).not.toContain("FACTS");
+    expect(landing).not.toContain("NEEDS REVIEW");
+    expect(landing, "the demo fixture must not reach the landing page").not.toContain("demo-world");
   });
 
   /*
@@ -216,11 +269,17 @@ describe("public copy", () => {
     }
   });
 
-  it("gives every film band a poster file that actually exists", () => {
+  it("gives every film stage a poster file that actually exists", () => {
     const page = landingSource();
-    const posters = [...page.matchAll(/\b(?:poster|src)="(\/film\/poster-[^"]+)"/g)]
-      .map((match) => match[1]);
-    expect(posters.length).toBeGreaterThanOrEqual(4);
+    /*
+      Match the path wherever it is written, not only in a JSX attribute.
+
+      The old pattern required `poster="/film/..."` literally. Posters are now declared once in
+      the stage table and passed through as `poster={stage.poster}`, so an attribute-shaped
+      regex found none of them and the check silently had nothing to assert.
+    */
+    const posters = [...page.matchAll(/["'](\/film\/poster-[^"']+)["']/g)].map((match) => match[1]!);
+    expect(posters.length, "every stage names a poster").toBeGreaterThanOrEqual(4);
     for (const poster of posters) {
       expect(
         existsSync(join(root, "public", poster)),

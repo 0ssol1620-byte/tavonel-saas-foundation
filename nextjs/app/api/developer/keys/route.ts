@@ -17,7 +17,16 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = await requireFoundationSession(request, "studio");
+  /*
+    An API key is how the Developer plan is used at all.
+
+    Key issue, rotation and revocation all required "studio" while the plan that advertises
+    "API and MCP access" is the observer-level one. That is the same mismatch the compile route
+    had: a subscriber could pay for API access and then be unable to mint the credential that
+    grants it. Collaboration is what the Team plan sells; a key to your own workspace is not
+    collaboration.
+  */
+  const auth = await requireFoundationSession(request, "observer");
   if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: NO_STORE });
   const declaredLength = Number(request.headers.get("content-length") ?? "0");
   if (Number.isFinite(declaredLength) && declaredLength > 8_192) return NextResponse.json({ code: "REQUEST_TOO_LARGE" }, { status: 413, headers: NO_STORE });

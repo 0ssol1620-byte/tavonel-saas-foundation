@@ -1,3 +1,15 @@
+/**
+ * The plan catalog, and the only place a plan's public claims are written.
+ *
+ * The pricing page carried its own hand-written `PLANS` array beside this one. They agreed on
+ * price and disagreed on everything else: the page promised Developer "500 standard compile
+ * pages" while the compile route required a Team subscription, and promised Team "Up to 5
+ * seats" against a product with no invitation, no roles and no seat accounting. A plan claim
+ * that nothing enforces is a refund conversation with extra steps.
+ *
+ * `features` is therefore the enforced list, and `features.test.ts` checks each entry against
+ * the code that enforces it. Adding a bullet here means adding the thing.
+ */
 export const BILLING_OFFERS = {
   observer_access: {
     kind: "subscription",
@@ -6,6 +18,13 @@ export const BILLING_OFFERS = {
     credits: 2_000,
     includedPages: 500,
     priceEnv: "PADDLE_PRICE_OBSERVER_ACCESS",
+    description: "For builders shipping source-grounded AI.",
+    features: [
+      "500 verified standard pages",
+      "Compile your own worlds",
+      "Evidence, Ask and signed export",
+      "API and MCP access",
+    ],
   },
   studio_access: {
     kind: "subscription",
@@ -14,6 +33,19 @@ export const BILLING_OFFERS = {
     credits: 10_000,
     includedPages: 2_500,
     priceEnv: "PADDLE_PRICE_STUDIO_ACCESS",
+    /*
+      Collaboration is what this plan sells, and collaboration is the part not finished.
+      Invitations, roles and seat accounting do not exist yet, so "Up to 5 seats" came off the
+      card rather than onto a roadmap footnote. Team stays reachable through a conversation
+      until the membership flow ships end to end.
+    */
+    description: "For teams compiling and reviewing a larger shared corpus.",
+    features: [
+      "2,500 verified standard pages",
+      "Everything in Developer",
+      "Review queue and version history",
+      "Shared workspace onboarding",
+    ],
   },
 } as const;
 

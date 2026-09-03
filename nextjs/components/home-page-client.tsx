@@ -7,13 +7,12 @@
 
 import Link from "next/link";
 import type { Route } from "next";
-import { Fragment, cloneElement, isValidElement, useEffect, useRef, useState } from "react";
-import CanvasTransitionLink from "@/components/canvas-transition-link";
-import FilmBand from "@/components/film-band";
+import { Fragment, cloneElement, isValidElement, useCallback, useEffect, useRef, useState } from "react";
+import CompileStagePlayer, { type CompileStage } from "@/components/compile-stage-player";
 import Logomark from "@/components/logomark";
 import WorldField, { type WorldMode } from "@/components/world-field";
-import { CHANGE, WORLD, n } from "@/lib/demo-world";
 import { trackFunnel, trackSceneDepth } from "@/lib/funnel-events";
+import { FOOTER_GROUPS, PRIMARY_NAV } from "@/lib/site-navigation";
 import { useScrollProgress, useScrollScenes } from "@/lib/use-scroll-scenes";
 
 const SCENES = [
@@ -26,20 +25,36 @@ const SCENES = [
 
 type BandName = "scatter" | "structure" | "world" | "change" | "rebuild" | "answer" | "access";
 
-const BANDS: Record<BandName, { mode: WorldMode; state: string; version: string; facts: number | null }> = {
-  scatter: { mode: "scatter", state: "SCATTERED", version: "v0", facts: null },
-  structure: { mode: "structure", state: "COMPILING", version: "v0", facts: null },
-  world: { mode: "current", state: "COMPILED", version: `v${WORLD.versionBefore}`, facts: WORLD.facts },
-  change: { mode: "change", state: "CHANGED", version: `v${WORLD.versionBefore}`, facts: WORLD.facts },
-  rebuild: { mode: "recompile", state: "VERIFIED", version: `v${WORLD.versionAfter}`, facts: WORLD.facts },
-  answer: { mode: "answer", state: "CURRENT", version: `v${WORLD.versionAfter}`, facts: WORLD.facts },
-  access: { mode: "current", state: "CURRENT", version: `v${WORLD.versionAfter}`, facts: WORLD.facts },
+/*
+  A band now only chooses how the background field renders.
+
+  It also carried `state`, `version` and `facts` for the instrument bar, every one of them read
+  from a demonstration fixture. Those fields are gone along with the bar readouts they fed.
+*/
+const BANDS: Record<BandName, { mode: WorldMode }> = {
+  scatter: { mode: "scatter" },
+  structure: { mode: "structure" },
+  world: { mode: "current" },
+  change: { mode: "change" },
+  rebuild: { mode: "recompile" },
+  answer: { mode: "answer" },
+  access: { mode: "current" },
 };
 
-const BAND_ORDER: BandName[] = ["scatter", "structure", "world", "change", "rebuild", "answer", "access"];
-
-export default function HomePageClient({ heroProof }: { heroProof: React.ReactNode }) {
+export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean }) {
   const [signedIn, setSignedIn] = useState(false);
+  const [filmStage, setFilmStage] = useState("SOURCES");
+  const handleStageChange = useCallback((stage: CompileStage) => setFilmStage(stage.label), []);
+
+  /*
+    In pilot there is nothing to check out, so the primary action is to ask for access.
+
+    Read on the server from the one commercial state and handed in as a prop: a client component
+    cannot see COMMERCIAL_MODE, so deciding this here would silently call every deployment a
+    pilot — including a live one.
+  */
+  const startHref = (signedIn ? "/workspace" : liveCommerce ? "/login" : "/contact") as Route;
+  const startLabel = signedIn ? "Open workspace" : liveCommerce ? "Start with your files" : "Request access";
 
   const { scene, band } = useScrollScenes(SCENES.length);
   const progress = useScrollProgress();
@@ -79,7 +94,6 @@ export default function HomePageClient({ heroProof }: { heroProof: React.ReactNo
       reset();
     };
   }, []);
-  const reachedChange = BAND_ORDER.indexOf(band as BandName) >= BAND_ORDER.indexOf("change");
   useEffect(() => { trackSceneDepth(scene); }, [scene]);
 
   useEffect(() => {
@@ -111,29 +125,23 @@ export default function HomePageClient({ heroProof }: { heroProof: React.ReactNo
     if (scene === 2) return { label: "WATCH IT COMPILE", run: () => jump(3) };
     if (scene === 3) return { label: "FOLLOW THE EVIDENCE", run: () => jump(4) };
     if (scene < 5) return { label: "START", run: () => jump(5) };
-    return signedIn
-      ? { label: "OPEN WORKSPACE", run: () => window.location.assign("/workspace") }
-      : { label: "SIGN IN", run: () => window.location.assign("/login") };
+    // The bar's final action is the page's primary action. It used to say SIGN IN in pilot,
+    // sending a first-time visitor to a login for an account they cannot create.
+    return { label: startLabel.toUpperCase(), run: () => window.location.assign(startHref) };
   })();
 
   return (
     <div className="page landing-page">
       {/*
-        The hero film is above the fold, so it is fetched with the document, at high priority.
+        The first stage's poster, not its film.
 
-        Without this the browser does not learn the cut exists until React has hydrated and the
-        <video> is in the DOM, which on a cold visit is a second of poster before anything
-        moves. React hoists this into <head>. Only cut 1 is preloaded — the other three are
-        deliberately deferred so they cannot compete for the connection, and `fetchPriority`
-        keeps the hero ahead of the fonts and the stylesheet's own images.
+        This was a high-priority `preload` of an 18-second video, written when cut 1 was the hero
+        and never revisited after it moved three screens down into the compile scene. It was
+        pulling a megabyte ahead of the fonts for text the visitor was actually reading, to fill
+        a frame below the fold. The player admits the first film when the scene comes into view;
+        what is worth having early is the still that holds the frame's shape until it does.
       */}
-      <link
-        rel="preload"
-        as="video"
-        href="/film/compile-cut.mp4"
-        type="video/mp4"
-        fetchPriority="high"
-      />
+      <link rel="preload" as="image" href="/film/poster-1.webp" fetchPriority="low" />
       <OpeningWorldField band={band} mode={world.mode} />
 
       <header className="nav" data-stuck={progress > 0.005 ? 1 : 0}>
@@ -146,19 +154,12 @@ export default function HomePageClient({ heroProof }: { heroProof: React.ReactNo
           KNOWLEDGE COMPILER
         </span>
         <nav aria-label="Sections">
-          <Link href="/product">Product</Link>
-          <Link href={"/solutions/ai-ready-knowledge" as Route}>Solutions</Link>
-          <Link href={"/integrations" as Route}>Integrations</Link>
-          <Link href="/developers">Developers</Link>
-          <Link href="/security">Security</Link>
-          <Link href="/pricing">Pricing</Link>
-          <Link href="/research">Resources</Link>
+          {PRIMARY_NAV.map((link) => <Link key={link.href} href={link.href as Route}>{link.label}</Link>)}
         </nav>
-        {signedIn ? (
-          <Link className="btn small" href="/workspace">Open workspace</Link>
-        ) : (
-          <Link className="btn small" href="/login">Sign in</Link>
-        )}
+        <span className="nav-actions">
+          <Link className="btn small" href={startHref}>{startLabel}</Link>
+          {signedIn ? null : <Link className="nav-signin" href="/login">Sign in</Link>}
+        </span>
       </header>
 
       <div className="rail" aria-hidden="true">
@@ -183,7 +184,7 @@ export default function HomePageClient({ heroProof }: { heroProof: React.ReactNo
               relationships, and compiles a versioned knowledge layer with evidence back to the page.
             </p>
             <div className="actions">
-              <Link className="btn" href={signedIn ? "/workspace" : "/login"}>Compile your own files</Link>
+              <Link className="btn" href={startHref}>{startLabel}</Link>
               <Link className="btn ghost" href={"/explore" as Route}>Explore a Compiled World</Link>
             </div>
           </div>
@@ -191,24 +192,25 @@ export default function HomePageClient({ heroProof }: { heroProof: React.ReactNo
 
         <Scene id={2} band="structure" eyebrow="INPUT" title="Bring the knowledge you already have.">
           <p className="lede rv">Upload files, folders or ZIP archives, or connect the system where your knowledge already lives.</p>
+          {/*
+            Named formats, not a category.
+
+            "Office documents" reads as every Office file ever made, and the intake whitelist is
+            narrower: DOCX, XLSX, PPTX and the OpenDocument equivalents, but not legacy
+            DOC/XLS/PPT. Naming the extensions is the difference between a promise and a
+            rejection at upload. ZIP is listed as a container, because that is what it is.
+          */}
           <ul className="input-formats rv" aria-label="Supported knowledge sources">
             {[
-              "PDF", "Office documents", "Images / scans", "Folders", "ZIP archives",
-              "Google Drive", "Dropbox", "OneDrive / SharePoint", "S3 / R2 / MinIO", "SMB / NFS / SFTP",
+              "PDF", "DOCX / XLSX / PPTX", "ODT / ODS / ODP", "JPG / PNG / TIFF scans",
+              "Folders", "ZIP archives", "Google Drive", "Dropbox",
+              "OneDrive / SharePoint", "S3 / R2 / MinIO", "SMB / NFS / SFTP",
             ].map((source) => <li key={source}>{source}</li>)}
           </ul>
         </Scene>
 
         <Scene id={3} film band="change" eyebrow="COMPILE FILM" title="Watch knowledge take shape.">
-          <div className="compile-film-sequence rv">
-            <div className="compile-film-stages" aria-label="Compilation stages">
-              {['SOURCES', 'READ', 'STRUCTURE', 'WORLD'].map((stage) => <span key={stage}>{stage}</span>)}
-            </div>
-            {heroProof}
-            <FilmBand src="/film/compile-cut-2.mp4" poster="/film/poster-2.webp" index={1} label="READ — pages, regions and document structure" />
-            <FilmBand src="/film/compile-cut-3.mp4" poster="/film/poster-3.webp" index={2} label="STRUCTURE — entities, claims, relations and evidence" />
-            <FilmBand src="/film/compile-cut-4.mp4" poster="/film/poster-4.webp" index={3} label="WORLD — compiled knowledge used across AI surfaces" />
-          </div>
+          <CompileStagePlayer onStageChange={handleStageChange} />
         </Scene>
 
         <Scene id={4} band="answer" eyebrow="EVIDENCE" title="Follow grounded results back to the source.">
@@ -224,9 +226,13 @@ export default function HomePageClient({ heroProof }: { heroProof: React.ReactNo
         <Scene id={5} band="access" eyebrow="START" title="Compile your own knowledge.">
           <p className="lede rv">Files go in. Structured, traceable knowledge comes out.</p>
           <div className="actions rv">
-            <Link className="btn" href={signedIn ? "/workspace" : "/login"}>Start with your files</Link>
-            <Link className="btn ghost" href={signedIn ? "/workspace/connections" : "/login"}>Connect a source</Link>
-            <Link className="btn ghost" href={"/explore" as Route}>Explore sample World</Link>
+            {/*
+              Two actions, not three. "Connect a source" asked a visitor who has not yet seen the
+              product to authorise OAuth against their company drive. It belongs in the empty
+              state after sign-up, where connecting something is the obvious next move.
+            */}
+            <Link className="btn" href={startHref}>{startLabel}</Link>
+            <Link className="btn ghost" href={"/explore" as Route}>Explore a Compiled World</Link>
           </div>
         </Scene>
       </main>
@@ -234,32 +240,31 @@ export default function HomePageClient({ heroProof }: { heroProof: React.ReactNo
       <footer className="site">
         <div className="shell">
           <span className="wordmark"><Logomark /><b>TAVONEL</b></span>
-          <nav className="site-links" aria-label="More">
-            <CanvasTransitionLink href="/film">Watch it compile</CanvasTransitionLink>
-            <Link href="/research">Research</Link>
-            <Link href={"/reproducibility" as Route}>Reproducibility</Link>
-            <Link href={"/solutions/ai-ready-knowledge" as Route}>Solutions</Link>
-            <Link href={"/integrations" as Route}>Integrations</Link>
-            <Link href="/developers">Developers</Link>
-            <Link href="/pricing">Pricing</Link>
-            <Link href="/evidence">What we measured</Link>
-            <Link href="/security">Where your documents go</Link>
-            <Link href={"/contact" as Route}>Talk to us</Link>
-            <Link href={"/status" as Route}>Service status</Link>
-            <Link href={"/privacy" as Route}>Privacy</Link>
-            <Link href={"/terms" as Route}>Terms</Link>
-            <Link href={"/refunds" as Route}>Refunds</Link>
-          </nav>
-          <p className="fine">Interactive product samples are labeled. Capability and evidence details remain available in their technical records.</p>
+          <div className="site-footer-groups">
+            {FOOTER_GROUPS.map((group) => (
+              <nav key={group.title} aria-label={group.title}>
+                <p className="site-footer-title">{group.title}</p>
+                {group.links.map((link) => <Link key={link.href} href={link.href as Route}>{link.label}</Link>)}
+              </nav>
+            ))}
+          </div>
+          <p className="fine">Knowledge compiled with a traceable path back to every source.</p>
         </div>
       </footer>
 
       <div className="bar" role="status" aria-live="off" data-scene={scene}>
         <span className="scroll" style={{ width: `${progress * 100}%` }} />
-        <span className="bc"><span className="bk">WORLD</span><span className="bv">{world.version}</span></span>
-        <span className="bc"><span className="bk">STATE</span><span className="bv state" data-s={world.state.toLowerCase()}>{world.state}</span></span>
-        <span className="bc opt"><span className="bk">FACTS</span><span className="bv">{world.facts ? n(world.facts) : "—"}</span></span>
-        <span className="bc opt"><span className="bk">NEEDS REVIEW</span><span className="bv">{reachedChange ? CHANGE.held : 0}</span></span>
+        {/*
+          The bar reports where the reader is, and nothing else.
+
+          It used to read WORLD v184 / FACTS 128,470 / NEEDS REVIEW 1, taken from a demo fixture.
+          While the page still carried a large "this is a demonstration" disclaimer those numbers
+          were legible as illustration. The disclaimer came off — correctly, it was defensive and
+          in the way — and the numbers stayed, which left three precise, wholly invented figures
+          reading as measured results from a customer deployment. There is no version of this bar
+          with fictional metrics on it that is worth the disclaimer needed to keep them.
+        */}
+        <span className="bc"><span className="bk">STAGE</span><span className="bv">{filmStage}</span></span>
         <span className="bar-ticks" aria-label="Scenes">
           {SCENES.map((sc) => (
             <button

@@ -1,54 +1,89 @@
 "use client";
 
 import Link from "next/link";
+import type { Route } from "next";
 import { useState } from "react";
 import { ArrowLeft, Braces, FileText, Network, Quote, Search } from "lucide-react";
 import Logomark from "@/components/logomark";
 import styles from "@/app/explore/explore.module.css";
 
+/*
+  The sample changed subject, and lost its asterisks.
+
+  Two problems with the old one. It compiled TAVONEL's own retention policy, so the page taught
+  a first-time visitor that "source material is retained for 30 days" — presented in product
+  chrome, indistinguishable from our actual privacy commitment, which is not what that page
+  says. And the third object was a RESEARCH FRONTIER card whose every field read `not_yet`: the
+  one interactive demonstration on the site, showing a reader a feature that does not work.
+
+  This is a maintenance manual instead. It is neutral, it is the kind of document the product is
+  actually for, and every object in it resolves to a real region of the page. The chrome says
+  "Interactive sample" once, quietly, and then gets out of the way — a sample does not need four
+  paragraphs explaining that it is a sample.
+*/
+
 const OBJECTS = [
-  { id: "claim-retention", type: "CLAIM", label: "Retention defaults to 30 days", evidence: "ev-01", status: "QUALIFIED" },
-  { id: "policy-export", type: "POLICY", label: "Administrators can shorten retention", evidence: "ev-02", status: "QUALIFIED" },
-  { id: "research-impact", type: "RESEARCH", label: "Selective downstream impact path", evidence: "not_yet", status: "RESEARCH FRONTIER" },
+  { id: "asset-fp200", type: "ASSET", label: "Feedwater pump FP-200", detail: "Equipment identified across the manual, the change notice and the service log as one asset." },
+  { id: "claim-interval", type: "CLAIM", label: "Service interval is 2,000 operating hours", detail: "The interval as stated in revision C of the maintenance manual." },
+  { id: "claim-depressurise", type: "CLAIM", label: "Seal replacement requires depressurisation", detail: "A safety precondition attached to the seal replacement procedure." },
+  { id: "relation-supersedes", type: "RELATION", label: "Revision C supersedes revision B", detail: "The 1,500-hour interval in revision B is superseded and no longer answers this question." },
 ] as const;
 
 const SOURCE = {
-  name: "sample-retention-policy.pdf",
+  name: "FP-200-maintenance-manual-revC.pdf",
   digest: "sha256:3e118d4e...bf1c",
-  version: "src_v_01",
-  page: 4,
+  version: "src_v_03",
+  page: 12,
   bbox: "[118, 214, 886, 374]",
 };
 
 export default function ExploreCompiledWorld() {
-  const [selected, setSelected] = useState(0);
+  const [selected, setSelected] = useState(1);
   const [mobileView, setMobileView] = useState<"source" | "world">("source");
-  const object = OBJECTS[selected];
+  const object = OBJECTS[selected] ?? OBJECTS[0];
 
   return (
     <main className={styles.page}>
       <header className={styles.header}>
         <Link href="/" className={styles.brand}><Logomark size={22} /><b>TAVONEL</b></Link>
-        <span>DETERMINISTIC PRODUCT SAMPLE</span>
-        <nav><Link href="/evidence">Evidence record</Link><Link href="/login">Sign in</Link></nav>
+        <span>INTERACTIVE SAMPLE</span>
+        <nav><Link href="/evidence">How evidence works</Link><Link href="/login">Sign in</Link></nav>
       </header>
 
       <section className={styles.intro}>
         <Link href="/" className={styles.back}><ArrowLeft size={14} /> Home</Link>
         <p>EXPLORE · NO LOGIN REQUIRED</p>
-        <h1>Follow one fact<br />all the way back.</h1>
+        <h1>Follow a result all the way<br />back to its source.</h1>
         <div className={styles.introCopy}>
-          <p>This is a fixed, reproducible sample, not customer proof. Select a compiled object and TAVONEL reveals its source version, page region, relation, and answer citation.</p>
-          <div><span data-tone="qualified">QUALIFIED</span><span data-tone="research">RESEARCH FRONTIER</span></div>
+          <p>
+            A maintenance manual, compiled. Pick any object and TAVONEL shows the document version,
+            the page and the exact region it came from — the same path an answer takes when it
+            cites its evidence.
+          </p>
+          {/*
+            The sample has to say that it is one.
+
+            This page renders a fixed fixture in the product's real interface, which is the
+            point -- an illustration of an Evidence Inspector is worth nothing. But a fixed
+            fixture shown in the real interface, with no label, reads as a live customer
+            deployment, and the numbers in the instrument bar read as measured. The marker is
+            not a disclaimer bolted on for safety; it is the one fact a visitor cannot get
+            from looking.
+          */}
+          <p className={styles.sampleNote}>
+            <b>DETERMINISTIC PRODUCT SAMPLE</b>
+            The same document and the same compiled world every time. It demonstrates what the
+            product does; it is not customer proof, and none of it is customer data.
+          </p>
         </div>
       </section>
 
       <section className={styles.instrument} aria-label="Compiled World sample">
         <div className={styles.instrumentBar}>
-          <div><small>WORLD</small><strong>sample-policy · v3 ACTIVE</strong></div>
-          <div><small>OBJECTS</small><strong>2 QUALIFIED · 1 RESEARCH</strong></div>
+          <div><small>WORLD</small><strong>fp-200-maintenance · v3 ACTIVE</strong></div>
+          <div><small>OBJECTS</small><strong>4 WITH EVIDENCE</strong></div>
           <div><small>PROVENANCE</small><strong>PAGE + BBOX BOUND</strong></div>
-          <div><small>SAMPLE DIGEST</small><strong>{SOURCE.digest}</strong></div>
+          <div><small>SOURCE</small><strong>REVISION C</strong></div>
         </div>
 
         <div className={styles.mobileSwitch} role="group" aria-label="Sample view">
@@ -59,10 +94,10 @@ export default function ExploreCompiledWorld() {
         <article className={styles.source} data-mobile-hidden={mobileView !== "source"}>
           <header><FileText size={15} /><span>{SOURCE.name}</span><b>PAGE {SOURCE.page}</b></header>
           <div className={styles.paper}>
-            <p>4. Data retention and deletion</p>
-            <p>Uploaded source material is retained for a default period of thirty days after a compile completes.</p>
-            <mark data-selected={selected === 0}>Workspace administrators may configure a shorter retention period. Deletion requests are recorded in the workspace activity ledger.</mark>
-            <p>Compiled exports remain under the customer&apos;s control and can be removed separately.</p>
+            <p>12. Scheduled maintenance — feedwater pump FP-200</p>
+            <p>The unit is rated for continuous duty. Inspection points are listed in table 12.1.</p>
+            <mark data-selected={selected === 1}>Perform the full service procedure every 2,000 operating hours. This interval replaces the 1,500-hour interval published in revision B.</mark>
+            <p>Before replacing the mechanical seal, isolate and fully depressurise the unit.</p>
             <i aria-hidden="true" />
           </div>
           <footer><span>VERSION {SOURCE.version}</span><span>BBOX {SOURCE.bbox}</span></footer>
@@ -77,34 +112,40 @@ export default function ExploreCompiledWorld() {
           <div className={styles.objectList}>
             {OBJECTS.map((item, index) => (
               <button key={item.id} onClick={() => setSelected(index)} aria-pressed={selected === index}>
-                <small>{item.type}</small><span>{item.label}</span><b data-tone={item.status === "QUALIFIED" ? "qualified" : "research"}>{item.status}</b>
+                <small>{item.type}</small><span>{item.label}</span><b data-tone="qualified">EVIDENCE</b>
               </button>
             ))}
           </div>
           <section className={styles.inspector}>
             <p>SEMANTIC OBJECT INSPECTOR</p>
             <h2>{object.label}</h2>
+            <p>{object.detail}</p>
             <dl>
               <div><dt>Stable key</dt><dd>{object.id}</dd></div>
-              <div><dt>Evidence</dt><dd>{object.evidence}</dd></div>
-              <div><dt>Source version</dt><dd>{object.evidence === "not_yet" ? "not_yet" : SOURCE.version}</dd></div>
-              <div><dt>Location</dt><dd>{object.evidence === "not_yet" ? "not_yet" : `p.${SOURCE.page} · ${SOURCE.bbox}`}</dd></div>
+              <div><dt>Source version</dt><dd>{SOURCE.version}</dd></div>
+              <div><dt>Location</dt><dd>p.{SOURCE.page} · {SOURCE.bbox}</dd></div>
+              <div><dt>Source digest</dt><dd>{SOURCE.digest}</dd></div>
             </dl>
           </section>
         </article>
 
         <aside className={styles.answer}>
-          <div><Search size={15} /><span>How long is source material retained?</span></div>
-          <p>Source material is retained for <strong>30 days by default</strong>. Workspace administrators can configure a shorter period.</p>
-          <button onClick={() => { setSelected(0); setMobileView("source"); }}><Quote size={13} /> Open citation · p.4</button>
-          <small>Answer generated from this deterministic compiled sample. No external model result is represented.</small>
+          <div><Search size={15} /><span>How often does FP-200 need servicing?</span></div>
+          <p>
+            Every <strong>2,000 operating hours</strong>. This interval is from revision C and
+            replaces the 1,500-hour interval in revision B.
+          </p>
+          <button onClick={() => { setSelected(1); setMobileView("source"); }}><Quote size={13} /> Open citation · p.12</button>
         </aside>
       </section>
 
       <section className={styles.next}>
         <p>INPUT → COMPILED WORLD → GROUNDED USE</p>
         <h2>Bring your own sources when you are ready.</h2>
-        <div><Link href="/login">Start in a private workspace</Link><Link href="/product/compiled-world">How Compiled Worlds work</Link></div>
+        <div>
+          <Link href={"/contact" as Route}>Request access</Link>
+          <Link href="/product/compiled-world">How Compiled Worlds work</Link>
+        </div>
       </section>
     </main>
   );

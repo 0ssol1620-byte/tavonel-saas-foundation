@@ -1,7 +1,16 @@
 import type { Metadata } from "next";
 import PublicProofRegistry from "@/components/public-proof-registry";
 
-export const metadata: Metadata = { title: "Reproducibility — TAVONEL", description: "Inputs, digests, environment boundaries and downloadable manifests for public TAVONEL evidence.", alternates: { canonical: "/reproducibility" }, openGraph: { url: "/reproducibility" } };
+/*
+  Noindex until there is a run to reproduce.
+
+  Most of what this page could say is what is missing: there is no frozen container digest, no
+  evaluator version and no raw predictions to hand a third party yet. Fixture identity is real
+  and worth keeping for anyone who follows a link here from Resources, but a page whose largest
+  section was an empty "No independent reproduction receipt is currently registered" panel
+  should not be advertised to search. The index entry comes back when the bundle does.
+*/
+export const metadata: Metadata = { title: "Reproducibility — TAVONEL", description: "Frozen public fixtures and digest-bound sample artifacts for TAVONEL evidence.", alternates: { canonical: "/reproducibility" }, openGraph: { url: "/reproducibility" }, robots: { index: false, follow: true } };
 
 export default function ReproducibilityPage() {
   return <PublicProofRegistry eyebrow="PUBLIC PROOF PROTOCOL" title="Rebuild the evidence, not the claim." state="FIXTURE VERIFIED · EXTERNAL BENCHMARK OPEN" summary="This portal separates deterministic public fixtures from customer proof and independent benchmark evidence. A digest proves bytes; it does not prove semantic quality." sections={[
@@ -16,6 +25,5 @@ export default function ReproducibilityPage() {
       { key: "QUALITY", description: "Independent semantic correctness evaluation is not attached to this fixture.", state: "NOT YET" },
     ] },
     { title: "Portable sample World", body: "A deterministic JSON package mirrors the public Explore object, relation and page-region evidence. Its response carries a SHA-256 Content-Digest header so the downloaded bytes can be verified. It is unsigned and is not a promoted customer World.", download: { href: "/reproducibility/sample-world", label: "Download digest-bound sample World" } },
-    { title: "Independent replay", body: "A third-party replay requires a frozen container digest, evaluator version, raw predictions and scorer output. Those artifacts are not yet published as a complete external bundle.", empty: "No independent reproduction receipt is currently registered. The absence is public rather than replaced with a proxy score." },
   ]} />;
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import Logomark from "@/components/logomark";
+import type { Route } from "next";
+import { PublicSitePage } from "@/components/public-site-chrome";
 
 export const metadata: Metadata = {
   // Each page declares its own address. Without this every route inherited the root
@@ -8,67 +9,105 @@ export const metadata: Metadata = {
   alternates: { canonical: "/research" },
   openGraph: { url: "/research" },
   title: "Research — TAVONEL",
-  description: "We test the compiler against the messy parts. Measured results, failed hypotheses, and methodology.",
+  description:
+    "The open problems in compiling documents into evidence-bound, versioned knowledge, and how we work on them.",
 };
 
-const PILLARS = [
-  ["MEASURED", "Document reading", "GPU OCR path, layout recovery and scan quality on declared corpora. Failures stay in the record."],
-  ["BUILT, NOT PROVEN", "Knowledge construction", "Entity identity, relation extraction and provenance packages exist as artifacts. External correctness benchmarks are not closed."],
-  ["IN PROGRESS", "Knowledge maintenance", "Selective recompilation is a research direction, demonstrated on fixture data, not a shipped claim."],
-  ["NOT SUPPORTED", "Retrieval comparisons", "External baseline comparisons stay unpublished until a frozen run is reproduced."],
+/*
+  Research leadership, rather than an internal claim-governance policy.
+
+  The previous page's four cards were badges — MEASURED, BUILT NOT PROVEN, IN PROGRESS, NOT
+  SUPPORTED — attached to research areas, plus a note that "Patent language does not belong in
+  the hero", which is an editing rule for us that had been published to visitors. A researcher
+  arriving here wants the problems and the approach; the per-result states are a property of
+  results, and live with the results at /research/notes.
+*/
+
+const AREAS = [
+  [
+    "Document reading",
+    "Recovering text, layout, tables and figures from scans and complex pages, and reporting uncertainty instead of filling it in. The read has to produce coordinates, because everything downstream binds to them.",
+  ],
+  [
+    "Semantic identity",
+    "Deciding when two mentions across a corpus are the same thing. Identity is the hard part of compilation: merge too eagerly and the world is wrong, merge too little and it is useless.",
+  ],
+  [
+    "Knowledge construction",
+    "Building objects, claims and relations that carry their supporting regions, and refusing to emit the ones that cannot.",
+  ],
+  [
+    "Evidence coverage",
+    "Measuring how much of a compiled world is actually supported by a source region, rather than assuming coverage from the absence of errors.",
+  ],
+  [
+    "Temporal integrity",
+    "Keeping worlds versioned as their sources change, so a past answer stays traceable to what the sources said at the time.",
+  ],
+  [
+    "Selective recompilation",
+    "Working out which parts of a world a source change actually invalidates, so a corpus update does not mean recompiling everything.",
+  ],
+  [
+    "Multi-model verification",
+    "Treating models as replaceable workers and checking their output against the source, so the world contract survives swapping any one of them.",
+  ],
+] as const;
+
+const METHOD = [
+  ["Freeze the configuration", "Model, revision, prompt, schema and price snapshot are pinned before a run, or the result is not comparable to anything."],
+  ["Publish the denominator", "A rate without the population it was measured over is not a result. Every number carries what it was measured on."],
+  ["Publish what failed", "A hypothesis that did not hold is a finding. It is recorded with the same weight as one that did."],
+  ["Reproduce before comparing", "A competitor's published score is quoted as theirs, never restated as something we reproduced. Comparative claims wait for a same-condition run."],
 ] as const;
 
 export default function ResearchPage() {
   return (
-    <div className="page">
-      <header className="nav" data-stuck={1}>
-        <Link href="/" className="wordmark" aria-label="TAVONEL home">
-          <Logomark />
-          <b>TAVONEL</b>
-        </Link>
-        <nav aria-label="Sections">
-          <Link href="/">Back to the compiler</Link>
-          <Link href="/evidence">Evidence</Link>
-          <Link href="/developers">Developers</Link>
-        </nav>
-        <Link className="btn small" href="/login">Sign in</Link>
-      </header>
-      <main id="main">
-        <section className="scene doc">
-          <div className="shell">
-            <div className="body">
-              <div className="stack">
-                <p className="slate"><b>RESEARCH</b><span />KNOWLEDGE COMPILER</p>
-                <h2>We test the compiler against the messy parts.</h2>
+    <PublicSitePage>
+      <section className="scene doc">
+        <div className="shell">
+          <div className="body">
+            <div className="stack">
+              <p className="slate"><b>RESEARCH</b><span />KNOWLEDGE COMPILATION</p>
+              <h1 className="document-title">The hard parts of turning<br />documents into knowledge.</h1>
+            </div>
+            <div className="stack">
+              <p className="lede">
+                Parsing a document is a solved-enough problem. Deciding what the document is
+                about, which of its statements are the same statement as one in another document,
+                what supports them, and what a change to page 40 invalidates three files away — is
+                not. These are the problems we work on.
+              </p>
+
+              <p className="slate"><span />RESEARCH AREAS</p>
+              <div className="tiles">
+                {AREAS.map(([title, body]) => (
+                  <article className="tile" key={title}>
+                    <h3>{title}</h3>
+                    <p>{body}</p>
+                  </article>
+                ))}
               </div>
-              <div className="stack">
-                <p className="lede">
-                  Status is a protocol, not a mood. Every public result carries a badge:
-                  MEASURED, REPRODUCED, SUPPORTED, NOT SUPPORTED, BUILT NOT PROVEN, or IN PROGRESS.
-                </p>
-                <div className="tiles">
-                  {PILLARS.map(([state, title, body]) => (
-                    <article className="tile" key={title}>
-                      <span className="n">{state}</span>
-                      <h3>{title}</h3>
-                      <p>{body}</p>
-                    </article>
-                  ))}
-                </div>
-                <p className="fine">
-                  Machine-readable receipts and failed hypotheses live on <Link href="/evidence">/evidence</Link>.
-                  The public claim inventory is <code>docs/CLAIM_LEDGER_v1.md</code> in the product repository.
-                  Patent language does not belong in the hero.
-                </p>
-                <p className="lede">
-                  We do not publish competitor comparison tables first. Order: reproduce a baseline,
-                  freeze the environment, publish config and metrics, publish failures, then review.
-                </p>
+
+              <p className="slate"><span />HOW WE REPORT</p>
+              <div className="chain">
+                {METHOD.map(([title, body]) => (
+                  <article className="link" key={title}>
+                    <h2>{title}</h2>
+                    <p>{body}</p>
+                  </article>
+                ))}
+              </div>
+
+              <div className="actions">
+                <Link className="btn" href={"/research/notes" as Route}>Notes and findings</Link>
+                <Link className="btn ghost" href="/evidence">How evidence is bound</Link>
+                <Link className="btn ghost" href={"/reproducibility" as Route}>Reproducibility</Link>
               </div>
             </div>
           </div>
-        </section>
-      </main>
-    </div>
+        </div>
+      </section>
+    </PublicSitePage>
   );
 }

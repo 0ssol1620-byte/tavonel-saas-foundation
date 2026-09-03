@@ -12,7 +12,13 @@ import { useCheckout } from "@/lib/use-checkout";
 import { formatCount, formatTimestamp } from "@/lib/format";
 import { readOfferParam, takeCheckoutIntent } from "@/lib/checkout-intent";
 import { putWithProgress } from "@/lib/upload-transfer";
-import { estimateBillablePages, formatUsd, quoteCompilePages } from "@/lib/usage-pricing";
+import {
+  estimateBillablePages,
+  formatUsd,
+  pageCountLabel,
+  quoteCompilePages,
+  type PageEstimateConfidence,
+} from "@/lib/usage-pricing";
 import { collectDroppedWorkspaceFiles, prepareWorkspaceSelection, type WorkspaceSelection, type WorkspaceUploadFile } from "@/lib/workspace-intake";
 import { runBounded } from "@/lib/concurrent";
 import { buildPipeline, type LocalUpload } from "@/lib/pipeline";
@@ -28,6 +34,7 @@ import WorkspaceUltimateShell, { type WorkspaceSurface } from "@/components/work
 import WorldStudioUltimate from "@/components/world-studio-ultimate";
 import OperationsUltimate from "@/components/operations-ultimate";
 import type { WorldReadModel } from "@/lib/world-read-model";
+import { COMPILE_LIMITS_NOTICE, judgeCompileSet } from "@/lib/compile-limits";
 
 /** What this panel prints when it has no value. Not "0", and not a spinner that never resolves. */
 const UNKNOWN = "not read yet";
@@ -314,7 +321,7 @@ export default function WorkspacePage() {
   const [worldBusy, setWorldBusy] = useState(false);
   const [reviewReason, setReviewReason] = useState("");
   const [reviewEvidenceId, setReviewEvidenceId] = useState<string | null>(null);
-  const [evidenceReviewAction, setEvidenceReviewAction] = useState<"edit" | "reject" | null>(null);
+  const [evidenceReviewAction, setEvidenceReviewAction] = useState<"accept" | "edit" | "reject" | null>(null);
   const [evidenceReviewReason, setEvidenceReviewReason] = useState("");
   const [evidenceReviewBusy, setEvidenceReviewBusy] = useState(false);
   const [rollbackReason, setRollbackReason] = useState("");
@@ -747,8 +754,9 @@ export default function WorkspacePage() {
 
   const recompileWithCore = async () => {
     const documentIds = collectionResult?.sourceDocuments.map((document) => document.documentId) ?? [];
-    if (documentIds.length < 2) {
-      setNotice("The durable collection does not contain enough source bindings for Core recompilation.");
+    const recompileVerdict = judgeCompileSet(documentIds.length);
+    if (!recompileVerdict.ok) {
+      setNotice(recompileVerdict.message);
       return;
     }
     setBusy(true);
@@ -783,8 +791,9 @@ export default function WorkspacePage() {
 
   const compileSelectedDocuments = async () => {
     const documentIds = [...new Set(selectedDocumentIds)];
-    if (documentIds.length < 2) {
-      setNotice("Select at least two sources that are ready to compile.");
+    const verdict = judgeCompileSet(documentIds.length);
+    if (!verdict.ok) {
+      setNotice(verdict.message);
       return;
     }
     setBusy(true);
@@ -910,11 +919,21 @@ export default function WorkspacePage() {
     }
   };
 
-  const stagedPages = stagedSelection?.files.reduce((sum, entry) => sum + (estimateBillablePages({
+  const stagedEstimates = stagedSelection?.files.map((entry) => estimateBillablePages({
     bytes: entry.file.size,
     mimeType: entry.file.type,
-  })?.pages ?? 0), 0) ?? 0;
+  })) ?? [];
+  const stagedPages = stagedEstimates.reduce((sum, estimate) => sum + (estimate?.pages ?? 0), 0);
   const stagedQuote = quoteCompilePages(stagedPages);
+  /*
+    A count is only "Verified" when every file in the set gave one up. One PDF without a
+    declared page count drags the whole preflight back to an estimate, because the total is
+    then partly derived from file size and the customer is about to authorise money against it.
+  */
+  const stagedConfidence: PageEstimateConfidence =
+    stagedEstimates.length > 0 && stagedEstimates.every((estimate) => estimate?.confidence === "verified")
+      ? "verified"
+      : "provisional";
 
   const startStagedCompile = async () => {
     if (!stagedSelection?.files.length) return;
@@ -1037,6 +1056,21 @@ export default function WorkspacePage() {
     window.history.pushState(null, "", url.toString());
   };
 
+  /*
+    What the ledger says when a reviewer accepts without writing anything.
+
+    It used to say "Accepted after comparing the compiled result with its exact source region."
+    — a specific claim about what the reviewer did, written by the button rather than by them.
+    Someone who clicked Accept without opening the page had an assertion filed under their name
+    saying they had compared it, which is the one thing an audit record must never do. This
+    sentence describes only what is actually known: the action, and where it came from. The
+    reviewer's own words go in when they choose to write them.
+
+    Eight characters is the ledger's floor for this column, so the neutral default has to be a
+    real sentence rather than an empty string.
+  */
+  const ACCEPTED_WITHOUT_NOTE = "Accepted in the review interface. No note was given.";
+
   const recordEvidenceReview = async (action: "accept" | "edit" | "reject", reason: string) => {
     const evidence = worldReadModel?.evidence.find((item) => item.id === reviewEvidenceId)
       ?? worldReadModel?.evidence[0];
@@ -1060,7 +1094,7 @@ export default function WorkspacePage() {
       if (!response.ok) { setNotice(`Review decision could not be recorded (${body.code ?? response.status}).`); return; }
       setEvidenceReviewAction(null);
       setEvidenceReviewReason("");
-      setNotice(`${action === "accept" ? "Accepted" : action === "edit" ? "Edit requested" : "Rejected"}. The evidence-bound human decision was recorded.`);
+      setNotice(`${action === "accept" ? "Accepted" : action === "edit" ? "Change requested" : "Rejected"}. The evidence-bound human decision was recorded.`);
     } finally {
       setEvidenceReviewBusy(false);
     }
@@ -1271,16 +1305,44 @@ export default function WorkspacePage() {
           {notice ? <p className="notice static" role="status"><strong>Activity.</strong> {notice}</p> : null}
 
           {tab === "overview" && collectionResult ? (
+            /*
+              A candidate is not a world yet, and the completion panel now says which one you have.
+
+              It announced "Your Compiled World is ready" for both, including a candidate sitting
+              in `review_required` with reasons attached. The Ask button was disabled underneath
+              with a tooltip explaining that the candidate had to be activated first — so the
+              heading claimed a finished world while the controls contradicted it. The whole
+              point of the candidate stage is that automated extraction is not yet organizational
+              truth; a heading that skips it undoes the guarantee.
+            */
             <section className="workspace-complete" aria-labelledby="workspace-complete-title">
               <div>
-                <p className="eyebrow">COMPILE COMPLETE</p>
-                <h2 id="workspace-complete-title">Your Compiled World is ready.</h2>
+                <p className="eyebrow">{activeWorld ? "ACTIVE WORLD" : "CANDIDATE READY"}</p>
+                <h2 id="workspace-complete-title">
+                  {activeWorld ? "Your Compiled World is ready." : "Your compiled candidate is ready for review."}
+                </h2>
                 <p>{collectionResult.validation.counts.documents} sources became {collectionResult.validation.counts.entities} entities, {collectionResult.validation.counts.claims} claims, and {collectionResult.validation.counts.relations} evidence-bound relations.</p>
+                {activeWorld ? null : (
+                  <p className="fine">
+                    Nothing is active until you approve it. Review the evidence, then activate the
+                    candidate to make it the world that Ask, the API and MCP read.
+                  </p>
+                )}
               </div>
               <div className="workspace-complete-actions">
-                <button type="button" onClick={() => navigateSurface("world")}>Open World</button>
-                <button type="button" disabled={!activeWorld} title={activeWorld ? undefined : "Review and activate this candidate before asking."} onClick={() => navigateSurface("ask")}>Ask</button>
-                <button type="button" disabled={downloading} onClick={() => void downloadCollection()}>{downloading ? "Preparing…" : "Download"}</button>
+                {activeWorld ? (
+                  <>
+                    <button type="button" onClick={() => navigateSurface("world")}>Open World</button>
+                    <button type="button" onClick={() => navigateSurface("ask")}>Ask</button>
+                    <button type="button" disabled={downloading} onClick={() => void downloadCollection()}>{downloading ? "Preparing…" : "Download active World"}</button>
+                  </>
+                ) : (
+                  <>
+                    <button type="button" onClick={() => navigateSurface("review")}>Review items</button>
+                    <button type="button" onClick={() => navigateSurface("world")}>Inspect candidate</button>
+                    <button type="button" disabled={downloading} onClick={() => void downloadCollection()}>{downloading ? "Preparing…" : "Download candidate package"}</button>
+                  </>
+                )}
               </div>
             </section>
           ) : null}
@@ -1313,7 +1375,16 @@ export default function WorkspacePage() {
                   <button type="button" onClick={() => folderRef.current?.click()}>Choose folder</button>
                   <button type="button" onClick={() => navigateSurface("connections")}>Connect a source</button>
                 </div>
-                <small>PDF · DOCX · PPTX · XLSX · ODF · images · ZIP</small>
+                <small>PDF · DOCX · PPTX · XLSX · ODF · JPG / PNG / TIFF · ZIP</small>
+                {/*
+                  The limits belong here, before anything is chosen.
+
+                  Every one of these was previously discovered as an exception thrown after the
+                  files were picked — or, worse, after they had been uploaded and read. Someone
+                  who knows the ceiling can select within it; someone who does not finds out by
+                  losing a batch.
+                */}
+                <small className="workspace-intake-limits">{COMPILE_LIMITS_NOTICE}</small>
                 <div className="workspace-source-choices" aria-label="Available source connections">
                   {WORKSPACE_SOURCE_CHOICES.map((source) => (
                     <button type="button" key={source.name} onClick={() => navigateSurface("connections")}>
@@ -1328,12 +1399,18 @@ export default function WorkspacePage() {
                   <p className="eyebrow">PREFLIGHT</p>
                   <dl>
                     <div><dt>Files</dt><dd>{stagedSelection.files.length}</dd></div>
-                    <div><dt>Pages</dt><dd>{stagedPages}</dd></div>
+                    <div><dt>{pageCountLabel(stagedConfidence)}</dt><dd>{stagedPages}</dd></div>
                     <div><dt>Archives</dt><dd>{stagedSelection.archiveCount}</dd></div>
                     <div><dt>Warnings</dt><dd>{stagedSelection.unsupported.length}</dd></div>
                     <div><dt>Estimated</dt><dd>{stagedQuote ? formatUsd(stagedQuote.estimatedUsd) : "—"}</dd></div>
                     <div><dt>Maximum</dt><dd>{stagedQuote ? formatUsd(stagedQuote.maximumUsd) : "—"}</dd></div>
                   </dl>
+                  <p className="fine">
+                    {stagedConfidence === "verified"
+                      ? "Page counts were read from the documents themselves. You will never be charged above the maximum shown."
+                      : "Some files do not declare a page count, so this is an upper-bound estimate from file size. The billed page count is confirmed after the documents are read, and never exceeds the maximum shown."}
+                  </p>
+                  <p className="fine">{COMPILE_LIMITS_NOTICE}</p>
                   {stagedSelection.warnings.map((warning) => <p className="fine" key={warning}>{warning}</p>)}
                   <div className="workspace-intake-actions">
                     <button type="button" disabled={busy || !stagedQuote} onClick={() => void startStagedCompile()}>{busy ? "Compiling…" : "Compile"}</button>
@@ -1397,8 +1474,11 @@ export default function WorkspacePage() {
                   ))}
                 </ul>
                 <div className="compile-selection-actions">
-                  <small>{selectedDocumentIds.length} OCR-qualified document{selectedDocumentIds.length === 1 ? "" : "s"} selected</small>
-                  <button type="button" disabled={busy || selectedDocumentIds.length < 2} onClick={() => void compileSelectedDocuments()}>
+                  <small>
+                    {selectedDocumentIds.length} OCR-qualified document{selectedDocumentIds.length === 1 ? "" : "s"} selected
+                    {" · "}{COMPILE_LIMITS_NOTICE}
+                  </small>
+                  <button type="button" disabled={busy || !judgeCompileSet(selectedDocumentIds.length).ok} onClick={() => void compileSelectedDocuments()}>
                     {busy ? "Compiling selected documents..." : "Compile selected documents"}
                   </button>
                 </div>
@@ -1499,16 +1579,41 @@ export default function WorkspacePage() {
                       selectedEvidenceId={reviewEvidenceId ?? worldReadModel.evidence[0].id}
                       onEvidenceSelect={(selection) => setReviewEvidenceId(selection?.id ?? null)}
                     />
+                    {/*
+                      "Request change", because that is what the button does.
+
+                      It was labelled "Edit", and a reviewer who pressed it got a text box: no
+                      field editor, no revalidation, no patch on the candidate. The value they
+                      were looking at stayed exactly as it was and a note went into the ledger.
+                      Calling that Edit sets up the reviewer to believe they have corrected
+                      something. The real inline editor is a separate build; until it lands, the
+                      button says what actually happens.
+                    */}
                     <div className="review-decision-actions" aria-label="Review decision">
-                      <button type="button" disabled={evidenceReviewBusy} onClick={() => void recordEvidenceReview("accept", "Accepted after comparing the compiled result with its exact source region.")}>Accept</button>
-                      <button type="button" disabled={evidenceReviewBusy} onClick={() => { setEvidenceReviewAction("edit"); setEvidenceReviewReason(""); }}>Edit</button>
+                      <button type="button" disabled={evidenceReviewBusy} onClick={() => void recordEvidenceReview("accept", ACCEPTED_WITHOUT_NOTE)}>Accept</button>
+                      <button type="button" disabled={evidenceReviewBusy} onClick={() => { setEvidenceReviewAction("accept"); setEvidenceReviewReason(""); }}>Accept with note</button>
+                      <button type="button" disabled={evidenceReviewBusy} onClick={() => { setEvidenceReviewAction("edit"); setEvidenceReviewReason(""); }}>Request change</button>
                       <button type="button" disabled={evidenceReviewBusy} onClick={() => { setEvidenceReviewAction("reject"); setEvidenceReviewReason(""); }}>Reject</button>
                     </div>
                     {evidenceReviewAction ? (
                       <form className="review-decision-form" onSubmit={(event) => { event.preventDefault(); void recordEvidenceReview(evidenceReviewAction, evidenceReviewReason); }}>
-                        <label htmlFor="evidence-review-reason">{evidenceReviewAction === "edit" ? "What needs to change?" : "Why does this not match the source?"}</label>
+                        <label htmlFor="evidence-review-reason">
+                          {evidenceReviewAction === "accept"
+                            ? "Note for the record"
+                            : evidenceReviewAction === "edit"
+                              ? "What needs to change?"
+                              : "Why does this not match the source?"}
+                        </label>
                         <textarea id="evidence-review-reason" required minLength={8} maxLength={1000} autoFocus value={evidenceReviewReason} onChange={(event) => setEvidenceReviewReason(event.target.value)} />
-                        <button type="submit" disabled={evidenceReviewBusy || evidenceReviewReason.trim().length < 8}>{evidenceReviewBusy ? "Recording…" : evidenceReviewAction === "edit" ? "Record edit" : "Record rejection"}</button>
+                        <button type="submit" disabled={evidenceReviewBusy || evidenceReviewReason.trim().length < 8}>
+                          {evidenceReviewBusy
+                            ? "Recording…"
+                            : evidenceReviewAction === "accept"
+                              ? "Record acceptance"
+                              : evidenceReviewAction === "edit"
+                                ? "Record change request"
+                                : "Record rejection"}
+                        </button>
                       </form>
                     ) : null}
                   </>

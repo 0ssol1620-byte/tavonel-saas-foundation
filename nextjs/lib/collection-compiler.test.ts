@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { compileCollectionCandidate, validateCollectionOcrInput, type CollectionOcrInput, type CollectionOcrRegion } from "./collection-compiler";
+import { COMPILE_MAX_DOCUMENTS } from "./compile-limits";
 import { answerGroundedQuestion } from "./grounded-ask";
 
 const WS = "pilot-proof";
@@ -53,9 +54,27 @@ describe("Foundation collection candidate compiler", () => {
     expect(first.manifestDigest).toMatch(/^sha256:[a-f0-9]{64}$/);
   });
 
-  it("rejects missing immutable OCR bindings and unsafe collection cardinality", () => {
+  /*
+    One document is a world.
+
+    This test used to assert the opposite — that a single input threw
+    `collection_document_count_out_of_bounds` — which is what a customer experienced as a file
+    that uploaded, read, and produced nothing. The floor of two was a compiler detail with no
+    product reason behind it. The ceiling is still enforced, because the synchronous compile
+    route has a 60-second budget and a larger corpus needs durable job orchestration rather
+    than a larger constant.
+  */
+  it("compiles a single document into a candidate world", () => {
+    const one = compileCollectionCandidate([input("one", "a".repeat(64), "Only one.")]);
+    expect(one.sourceDocuments).toHaveLength(1);
+    expect(one.manifestDigest).toMatch(/^sha256:[a-f0-9]{64}$/);
+  });
+
+  it("rejects missing immutable OCR bindings and a corpus past the ceiling", () => {
     expect(validateCollectionOcrInput({ documentId: "doc", text: "unbound" })).toBeNull();
-    expect(() => compileCollectionCandidate([input("one", "a".repeat(64), "Only one.")])).toThrow(
+    const tooMany = Array.from({ length: COMPILE_MAX_DOCUMENTS + 1 }, (_item, index) =>
+      input(`doc-${index}`, String(index).padStart(64, "0"), `Document ${index}.`));
+    expect(() => compileCollectionCandidate(tooMany)).toThrow(
       "collection_document_count_out_of_bounds",
     );
   });

@@ -9,6 +9,11 @@
 .intro h1 { margin: 0; font-size: clamp(52px, 8vw, 126px); line-height: .89; letter-spacing: -.065em; font-weight: 500; }
 .introCopy { align-self: end; display: grid; gap: 28px; max-width: 530px; }
 .introCopy > p { margin: 0; color: var(--text-lo); font-size: clamp(15px, 1.35vw, 20px); line-height: 1.6; }
+/* The sample marker reads as an annotation on the page, not as body copy: smaller, set in
+   the mono face the instrument bar uses, so it belongs to the interface rather than to
+   the argument. The <b> carries the label itself. */
+.introCopy > p.sampleNote { padding-top: 14px; border-top: 1px solid var(--hairline); color: var(--text-xlo); font-size: clamp(12px, 1vw, 14px); line-height: 1.55; }
+.sampleNote b { display: block; margin-bottom: 5px; color: var(--text-hi); font: 8px var(--f-mono); letter-spacing: .12em; }
 .introCopy div { display: flex; flex-wrap: wrap; gap: 8px; }
 .introCopy span, .objectList b { padding: 5px 7px; border: 1px solid; font: 8px var(--f-mono); letter-spacing: .08em; }
 .page [data-tone="qualified"] { color: var(--verified); border-color: var(--verified) !important; }
@@ -41,5 +46,15 @@
 .mobileSwitch { display: none; }
 .next { display: grid; grid-template-columns: 1fr 2fr; gap: 26px; padding: clamp(70px, 10vw, 140px) clamp(18px, 6vw, 96px); }.next p { color: var(--verified); font: 9px var(--f-mono); letter-spacing: .14em; }.next h2 { margin: 0; font-size: clamp(38px, 6vw, 88px); line-height: .95; letter-spacing: -.05em; font-weight: 500; }.next div { grid-column: 2; display: flex; gap: 10px; }.next a { padding: 11px 14px; border: 1px solid var(--hairline-hi); font: 9px var(--f-mono); }
 @media (max-width: 820px) { .header { grid-template-columns: 1fr auto; }.header > span { grid-column:1 / -1; grid-row:2; padding:0 0 10px; }.header nav { grid-column:2; grid-row:1; }.intro { grid-template-columns: 1fr; }.introCopy { max-width:none; }.instrument { grid-template-columns: 1fr; }.instrumentBar { grid-template-columns: 1fr 1fr; }.source { border-right:0; }.source[data-mobile-hidden="true"], .world[data-mobile-hidden="true"] { display:none; }.mobileSwitch { grid-column: 1; display:grid; grid-template-columns:1fr 1fr; border-bottom:1px solid var(--hairline-hi); }.mobileSwitch button { padding:12px; color:var(--text-xlo); font:9px var(--f-mono); }.mobileSwitch button[aria-pressed="true"] { color:var(--text-hi); background:var(--g2); }.answer { grid-template-columns:1fr; }.answer small { grid-column:1; }.next { grid-template-columns:1fr; }.next div { grid-column:1; } }
-@media (max-width: 480px) { .header nav a:first-child { display:none; }.header > span { font-size:8px; }.intro h1 { font-size: 50px; }.instrumentBar { grid-template-columns:1fr; }.instrumentBar div:nth-child(n+3) { display:none; }.paper { min-height:430px; margin:14px; padding:28px 23px; }.objectList button { grid-template-columns:1fr; gap:6px; }.inspector dl div { grid-template-columns:1fr; gap:5px; }.next div { display:grid; } }
+/*
+  The narrow bar drops one tile, not two.
+
+  It used to hide `nth-child(n+3)`, which took PROVENANCE and SOURCE together and left a phone
+  showing `v3 ACTIVE` and `4 WITH EVIDENCE` -- the two readings that look most like a live
+  deployment -- with the sentence that makes them meaningful, PAGE + BBOX BOUND, gone. On the
+  screen where the page has the least room to argue, that is the wrong three-of-four to keep.
+  Only SOURCE goes now, and it loses nothing: the revision is already stated in the source
+  panel's own footer.
+*/
+@media (max-width: 480px) { .header nav a:first-child { display:none; }.header > span { font-size:8px; }.intro h1 { font-size: 50px; }.instrumentBar { grid-template-columns:1fr; }.instrumentBar div:nth-child(4) { display:none; }.paper { min-height:430px; margin:14px; padding:28px 23px; }.objectList button { grid-template-columns:1fr; gap:6px; }.inspector dl div { grid-template-columns:1fr; gap:5px; }.next div { display:grid; } }
 @media (prefers-reduced-motion: reduce) { .page *, .page *::before, .page *::after { scroll-behavior:auto !important; animation:none !important; transition:none !important; } }
