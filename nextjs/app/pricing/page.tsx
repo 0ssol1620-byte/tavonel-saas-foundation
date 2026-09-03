@@ -25,7 +25,9 @@ const PAID_PLANS = (Object.entries(BILLING_OFFERS) as Array<[BillingOfferCode, (
     price: `$${offer.priceUsd}`,
     description: offer.description,
     features: offer.features as readonly string[],
-    offerCode,
+    // A plan whose product is unfinished is sold through a conversation, whatever the
+    // commercial mode says. See `saleChannel` in the billing catalog.
+    offerCode: offer.saleChannel === "self_serve" ? offerCode : null,
   }));
 
 const EVALUATION = {

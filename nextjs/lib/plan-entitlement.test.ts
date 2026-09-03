@@ -84,6 +84,21 @@ describe("plan entitlement", () => {
     }
   });
 
+  /*
+    Team is contact-sales until the membership flow exists, and that must not depend on
+    billing being in pilot. Pilot routes every plan to /contact because checkout is closed
+    for everyone; the day live checkout opens, that cover disappears and a plan selling
+    invitations, roles and seat accounting -- none of which exist in any migration or route
+    -- would start taking cards. The gate therefore lives on the offer, not on the mode.
+  */
+  it("keeps a plan whose product is unfinished off self-serve checkout", () => {
+    expect(BILLING_OFFERS.studio_access.saleChannel).toBe("contact");
+    expect(BILLING_OFFERS.observer_access.saleChannel).toBe("self_serve");
+    const pricing = readFileSync(new URL("../app/pricing/page.tsx", import.meta.url), "utf8");
+    expect(pricing, "the pricing card must derive checkout from saleChannel")
+      .toContain('offerCode: offer.saleChannel === "self_serve" ? offerCode : null');
+  });
+
   it("does not sell a plan the pricing page invents on its own", () => {
     const pricing = read("app/pricing/page.tsx");
     expect(pricing, "plans come from the billing catalog").toContain("BILLING_OFFERS");

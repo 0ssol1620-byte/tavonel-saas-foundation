@@ -1,132 +1,323 @@
 # Industry Leadership V3 — traceability
 
-**Sources**
-
-- `TAVONEL_INDUSTRY_LEADERSHIP_FULL_SITE_LAUNCH_BLUEPRINT_V3_2026-09-03.md`
-- `TAVONEL_INDUSTRY_LEADERSHIP_FULL_SITE_PRODUCTION_MASTERPLAN_2026-09-03.md`
-
-**Baseline** `d919070` (`origin/main`, the commit both documents audited)
-**Branch** `agent/industry-leadership-v3`
-**Date** 2026-09-03
-
-Every numbered item in both documents appears below exactly once, with an honest state. Nothing
-is marked done that was not done, and nothing is dropped without saying who has to decide it.
+Audited against `TAVONEL_INDUSTRY_LEADERSHIP_FULL_SITE_PRODUCTION_MASTERPLAN_2026-09-03.md`,
+which supersedes the V1/V2/V3 drafts wherever they differ.
 
 ## Status vocabulary
 
-| State | Meaning |
+The plain word "Implemented" is not used anywhere in this file. Code existing is not a status.
+
+| Status | Means |
 |---|---|
-| `DONE` | Implemented on this branch, with tests, and verified by the checks named at the bottom |
-| `PARTIAL` | Implemented as far as it can go without something listed under BLOCKED; what remains is named |
-| `BLOCKED-FOUNDER` | Requires a decision that `CLAUDE.md` reserves for the founder — pricing, public claims, legal wording, consent |
-| `BLOCKED-EXTERNAL` | Requires infrastructure, money, a third party or a production migration this session cannot perform |
-| `DEFERRED` | Correctly out of scope for a launch-blocking pass; the document itself schedules it later |
+| `VERIFIED_IMPLEMENTED` | The requirement holds end to end, and something in this repository fails if it stops holding. |
+| `IMPLEMENTED_BUT_UX_INCOMPLETE` | The data and the API are real; the interface does not yet deliver what the requirement describes. |
+| `PARTIAL` | Some of the requirement holds. What is missing is named. |
+| `MISSING` | Not built. |
+| `FOUNDER_DECISION` | Not an agent's call: pricing, legal wording, published claims, contracts, credentials. |
+
+**The scope of this pass is masterplan section 28.1, "0–14 days: clear the Production Pilot
+blockers."** Sections 28.2 (server batch state machine, durable resume, actual page preflight)
+and 28.3 (true Graph canvas, actual `directoryPlan`, ontology schema viewer, inline Review patch
+editor, Team membership, 100-file orchestration) are scheduled *after* this stage by the
+masterplan itself. Items belonging to them appear below as `MISSING` or
+`IMPLEMENTED_BUT_UX_INCOMPLETE` because that is what they are today — not because this pass
+failed to reach them.
+
+So `PARTIAL` and `MISSING` are **not** zero, and a version of this file in which they were zero
+would be false.
 
 ---
 
-## 1. P0 — product truth
+## 1. Section 5 — the twelve P0 blockers
 
-| ID | Item | State | Where |
-|---|---|---|---|
-| P0-04 | Developer plan can compile a World | `DONE` | `app/api/collections/compile/route.ts` now requires `observer`, not `studio` |
-| — | Developer plan can mint, rotate and revoke an API key | `DONE` | Same mismatch, found while testing the above: three `developer/keys` routes required `studio` while the Developer card sells "API and MCP access" |
-| P0-02 | One-document compile | `DONE` | `lib/compile-limits.ts`; the compiler's floor of two is gone |
-| P0-01 | UI and API limits agree | `DONE` | One shared `judgeCompileSet`, used by the route, the compiler, the workspace and the operations view model |
-| — | Limits shown before selection | `DONE` | `COMPILE_LIMITS_NOTICE` in the dropzone and the compile selection bar |
-| P0-06 | Estimated vs verified page count | `DONE` | `PageEstimate.confidence`; a byte-derived count can never be labelled "Verified pages" or authorise a charge |
-| P0-11 | Fabricated landing metrics removed | `DONE` | `WORLD v184 / FACTS 128,470 / NEEDS REVIEW 1` gone; a regression test bars them |
-| — | Commercial state unified | `DONE` | `lib/commercial-state.ts` replaces `commercial-mode.ts` + `billing-launch.ts`; sandbox can no longer publish live legal copy |
-| P0-10 | Review `Edit` renamed to what it does | `DONE` | "Request change"; the real patch editor is a separate build |
-| — | Accept stops asserting what the reviewer did | `DONE` | The canned "Accepted after comparing…" is replaced by a neutral record plus an optional note |
-| P0-12 | Candidate vs active wording | `DONE` | The completion panel distinguishes "candidate ready for review" from "Compiled World is ready" |
-| P0-07 | ZIP cannot freeze the main thread | `PARTIAL` | Ceiling lowered from 100 MB / 500 MB expanded to 25 MB / 100 MB, refused before the archive is read. Moving extraction to a Web Worker is not done — see *Not attempted*. |
-| P0-03 | Durable server-side compile orchestration | `BLOCKED-EXTERNAL` | Needs job tables, a worker and a queue; new migrations against production Supabase |
-| P0-05 | Team seats enforced, or not sold | `PARTIAL` | The unenforceable claims are off the card and `plan-entitlement.test.ts` bars them returning. Team still appears as a plan; whether to withdraw it entirely is a commercial call |
+### P0-01 — intake accepts 128 files, compile accepts 12
 
-## 2. P0 — public site
+- **Requirement.** §6.1: "1–12 supported files per compile". Accepting 128 and then failing at
+  the final compile is explicitly forbidden.
+- **Status.** `VERIFIED_IMPLEMENTED`
+- **Implementation.** `lib/compile-limits.ts` states the range once. The workspace computes
+  `stagedVerdict` over the supported set, disables Compile, and refuses again inside
+  `startStagedCompile`; the route and the compiler judge with the same function.
+- **Test.** `lib/workspace-compile-floor-and-ceiling.test.ts`, `lib/compile-limits.test.ts`.
+- **Remaining risk.** Intake still structurally accepts 128 so that a folder or an archive can be
+  inspected whole, with unsupported entries filtered out before the verdict. The two numbers
+  therefore still differ by design, and the comment has to keep saying why.
+- **Founder decision?** No.
+- **This pass found it broken.** The previous revision of this file recorded it as done. The
+  guard existed only on the recompile paths; the primary path staged, quoted, uploaded and OCR'd
+  thirteen or more files before the last step refused them.
 
-| Item | State | Where |
-|---|---|---|
-| Scene 3 becomes one pinned player | `DONE` | `components/compile-stage-player.tsx`; tabs, keyboard, swipe, one decoder, reduced-motion stills |
-| `PublicProofRegistry` links into deliberate 404s | `DONE` | Its own nav is gone; it wears the standard chrome |
-| Empty "NO QUALIFIED RECORDS" panel | `DONE` | Removed |
-| One header and footer everywhere | `DONE` | `lib/site-navigation.ts` + `components/public-site-chrome.tsx` |
-| Footer reduced to four groups | `DONE` | Product / Build / Trust / Legal |
-| `Resources` stops meaning `/research` | `DONE` | `/resources` hub added |
-| `/enterprise` rewritten for a buyer | `DONE` | `NOT YET`, `POLICY-GATED`, `REVIEW REQUIRED` and the GPU vendor are gone |
-| `/security` copy purged | `DONE` | Certification denials, the dated internal qualification note and the vendor name removed; controls section added |
-| `/evidence` becomes Technical Evidence | `DONE` | Mechanism and self-verification |
-| Research record preserved, relocated | `DONE` | `/research/notes` — see *Where the blueprints and the constitution disagree* |
-| `/research` rewritten as research leadership | `DONE` | Areas and method; per-result states live with the results |
-| `/product/compiled-world` unshipped card | `DONE` | The `DIRECTION — Automated ontology` card is gone |
-| `/product/document-understanding` defensive copy | `DONE` | Replaced with what the reader gets |
-| `/explore` neutral sample, no research object | `DONE` | Maintenance manual; every object resolves |
-| Supported formats match the whitelist | `DONE` | "Office documents" replaced by named extensions on the landing page and the dropzone |
-| `/pricing` single plan source, no unenforced claims | `DONE` | Built from `BILLING_OFFERS`; `modeled at`, seats and SSO/SCIM removed |
-| `/terms`, `/refunds` pilot and live templates | `PARTIAL` | Split and driven by one state; the wording still needs a lawyer — `BLOCKED-FOUNDER` |
-| `/reproducibility` noindex until complete | `DONE` | `robots: { index: false }`, out of the sitemap, empty section removed |
-| `/customers`, `/benchmarks`, `/research/experiments` stay 404 | `DONE` | Unchanged; both documents call this correct |
+### P0-02 — collection compile requires at least two files
 
-## 3. Blocked — founder decisions
+- **Requirement.** §5: one file must produce a World.
+- **Status.** `VERIFIED_IMPLEMENTED`
+- **Implementation.** The floor is 1 in `compile-limits.ts`, in the route and in the compiler.
+  The last holdout was `uploadDocuments`, which gated `waitForOcrAndCompile` on a count of two.
+- **Test.** `lib/workspace-compile-floor-and-ceiling.test.ts` asserts the gate is the shared
+  verdict; `lib/collection-compiler.test.ts` compiles a single document.
+- **Remaining risk.** None known for the upload path. Connector-sourced single documents are not
+  exercised, because no connector is live.
+- **Founder decision?** No.
+- **This pass found it broken.** A visitor who dropped one PDF watched it upload, sanitize and
+  get read, and then nothing happened — no error; the batch simply ended.
 
-`CLAUDE.md` reserves these. None was decided on the branch.
+### P0-03 — the final compile depends on browser polling
 
-| Item | Question | Blueprint reference |
-|---|---|---|
-| Team price at GA | Keep `$99 / 2,500` as a founding rate, move to `$149`, or cut included pages to 1,500? The card still shows the live price. | Launch 9.12, 17.5; Masterplan 9.2 |
-| Legal wording | Pilot and live Terms, Privacy and Refunds are now separate templates. The text needs counsel before live charges. | Launch 9.26–9.28; Masterplan 13.13, 13.18, 13.29 |
-| Server-side filenames | Storing customer filenames tenant-side reverses a deliberate privacy decision recorded in `lib/document-names.ts`. Cross-device names cannot work without it. | Launch 7.6; Masterplan 7.5 |
-| Withdrawing Team | Whether Team is sold at all before invitations, roles and seats exist. | Masterplan 10.3 |
-| Public claims | Any number added to a page needs a receipt and the founder's sign-off. None was added. | `CLAUDE.md` — Evidence |
+- **Requirement.** §6.3: the browser starts and observes. The server owns the state machine,
+  retries, resumption and the final receipt.
+- **Status.** `MISSING`
+- **Implementation.** None. `waitForOcrAndCompile` still polls for up to fifteen minutes in the
+  tab and calls `/api/collections/compile` itself. Closing the tab abandons the run after the
+  reading has been paid for.
+- **Test.** None. There is nothing to test.
+- **Remaining risk.** This is the largest single gap in the product contract. Everything else in
+  this file is smaller than it.
+- **Founder decision?** No — it is engineering, scheduled at §28.2. The design §28.1 asks for at
+  this stage is in section 5 below.
 
-## 4. Blocked — external
+### P0-04 — compile required a Team subscription
 
-| Item | What it needs |
+- **Requirement.** The Developer card promises compiling; the route required `studio`.
+- **Status.** `VERIFIED_IMPLEMENTED`
+- **Implementation.** `/api/collections/compile` and the three developer-key routes require
+  `observer`. `billingProductDecision` admits `studio_access` wherever `observer` is required, so
+  Team keeps everything Developer has.
+- **Test.** `lib/plan-entitlement.test.ts` — 12 tests, including that no route behind the
+  Developer card's promise requires a Team subscription.
+- **Remaining risk.** None known.
+- **Founder decision?** No.
+
+### P0-05 — the Team plan promised five seats
+
+- **Requirement.** §10.3: Team is contact-sales until invite, accept, role enforcement, review
+  assignment, removal, immediate access loss, audit event and seat/billing update all work.
+- **Status.** `VERIFIED_IMPLEMENTED` for the sale gate. The membership product itself is `MISSING`.
+- **Implementation.** The seat claim is off the card. `BILLING_OFFERS.studio_access.saleChannel`
+  is `"contact"` and the pricing page derives `offerCode` from it, so Team routes to `/contact`
+  independently of commercial mode.
+- **Test.** `lib/plan-entitlement.test.ts` asserts the sale channel and that pricing derives
+  checkout from it.
+- **Remaining risk.** Before this pass the gate was an accident. Pilot routes every plan to
+  `/contact` because checkout is closed for everyone, so on the day live checkout opened, Team
+  would have begun taking cards for a product with no invitations, roles or seat accounting in
+  any migration or route.
+- **Founder decision?** Whether to sell Team at all before membership ships.
+
+### P0-06 — preflight Pages is a byte estimate
+
+- **Requirement.** §8.2: per-format units — PDF actual pages, image 1, PPTX slides, DOCX/ODT
+  page-equivalents, XLSX/ODS a defined billable unit.
+- **Status.** `PARTIAL`
+- **Implementation.** `estimateBillablePages` marks a byte-derived count `provisional`, and
+  `pageCountLabel` renders it as "Estimated pages". Only a declared count or a single image is
+  `verified`; `canAuthorizeCharge` refuses everything else. One undeclared file drags the whole
+  preflight back to provisional.
+- **Test.** `lib/usage-pricing.test.ts`.
+- **Remaining risk.** No format-specific counting exists. PPTX slides, DOCX page-equivalents and
+  the XLSX billable unit are undefined. The number is honest about being an estimate, and it is
+  not yet the actual count §8.2 requires. Scheduled at §28.2.
+- **Founder decision?** The XLSX billable unit is a pricing definition.
+
+### P0-07 — ZIP extraction can freeze the tab
+
+- **Requirement.** §7.4: a small ZIP in a Web Worker, a large ZIP through an isolated
+  server-side extractor.
+- **Status.** `PARTIAL`
+- **Implementation.** The ceiling dropped from 100 MB compressed / 500 MB expanded to 25 / 100,
+  and the limit is stated in the dropzone before a file is chosen. Every security guard —
+  traversal, absolute paths, encryption, nested archives, the decompression-ratio bomb, the file
+  count — still runs before a byte is expanded.
+- **Test.** `lib/workspace-intake.test.ts`.
+- **Remaining risk.** Extraction is still synchronous on the main thread. The freeze hazard is
+  reduced, not removed, and the worker does not exist.
+- **Founder decision?** No.
+
+### P0-08 — defensive copy on deep public pages
+
+- **Requirement.** §14: purge the defensive vocabulary from sales surfaces, keep what legal
+  needs, allow it inside noindex research artifacts.
+- **Status.** `VERIFIED_IMPLEMENTED`
+- **Implementation.** A comment-stripped sweep across all 27 public routes and the components
+  they import. What remains is `/reproducibility` (noindex, filed under Resources exactly where
+  §13.19 puts it), `/research/notes` (the technical-note location §13.20 designates for failure
+  records), and RunPod named in `/privacy` and `/subprocessors`, which is a legally required
+  subprocessor disclosure.
+- **Test.** Not automated. The sweep is a script, not a committed test.
+- **Remaining risk.** Nothing prevents the vocabulary returning. A committed copy-purge test
+  would close that, and it does not exist.
+- **Founder decision?** No.
+
+### P0-09 — Explore shows Research Frontier and `not_yet`
+
+- **Requirement.** §13.9: a small `Interactive sample` label, three to five objects all bound to
+  evidence, research object removed. Hero: "Follow a result all the way back to its source."
+- **Status.** `VERIFIED_IMPLEMENTED`
+- **Implementation.** The research card is gone, the fixture is a neutral maintenance manual, the
+  hero matches §13.9 exactly, and the page labels itself once, in the header badge.
+- **Test.** `e2e/ultimate-blueprint.spec.ts` asserts the label appears exactly once, that
+  provenance is stated, and that `not_yet` renders nowhere.
+- **Remaining risk.** §13.9 also asks that the sample be compiled by the real backend on the same
+  contract. It is still a fixture rendered by the real interface. Scheduled at §28.3.
+- **Founder decision?** No.
+- **A correction.** An earlier revision of this file said Explore "had lost its honesty marker"
+  and restored `DETERMINISTIC PRODUCT SAMPLE` and "not customer proof". That was wrong twice: the
+  header already carried the `INTERACTIVE SAMPLE` badge §13.9 prescribes, and §13.9 names those
+  two phrases as part of the problem. Both have been removed again.
+
+### P0-10 — Review "Edit" does not edit
+
+- **Requirement.** §18.3: rename it, or build the real patch editor.
+- **Status.** `VERIFIED_IMPLEMENTED` for the rename. The patch editor is `MISSING` (§28.3).
+- **Implementation.** The actions are Accept, Accept with note, Request change, Reject. The
+  neutral acceptance record no longer fabricates a comparison the reviewer did not make.
+- **Test.** `lib/workspace-existing-compile.test.ts`.
+- **Remaining risk.** A reviewer still cannot correct a value.
+- **Founder decision?** No.
+
+### P0-11 — fictional metrics on the landing page
+
+- **Requirement.** §11.4: remove the fake FACTS, WORLD version and review counts.
+- **Status.** `VERIFIED_IMPLEMENTED`
+- **Implementation.** The instrument bar carries `STAGE` only. Of the nine components importing
+  `lib/demo-world`, six render nowhere, one is `/film`, one is the workspace stage fed only by
+  customer data, and `world-field` uses area *names* for the background canvas — no `facts`
+  number reaches the page.
+- **Test.** `lib/brand-copy.test.ts`.
+- **Remaining risk.** Six unused components still import the demo fixture. Dead code, but exactly
+  the kind that gets re-imported.
+- **Founder decision?** No.
+
+### P0-12 — the paid-live legal and operator gate
+
+- **Requirement.** §23.3 / §23.4: an atomic pilot-to-live switch, after legal, operator and
+  Paddle E2E.
+- **Status.** `FOUNDER_DECISION`
+- **Implementation.** `lib/commercial-state.ts` resolves mode, provider and launch approval into
+  one `CommercialState`, and `liveChargesEnabled` is the only flag legal copy reads. Pricing
+  fails closed when `/api/status` is unreachable.
+- **Test.** `lib/commercial-state.test.ts`, `lib/plan-entitlement.test.ts`.
+- **Remaining risk.** The switch is built and unexercised. No Paddle production E2E has run.
+- **Founder decision?** Yes — legal wording, operator readiness, and when to flip.
+
+---
+
+## 2. Section 28.1 — the 0–14 day checklist, item by item
+
+| §28.1 item | Status |
 |---|---|
-| Durable batch orchestration, 100+ file corpora | Job tables, worker, queue, resume; production migrations |
-| Real page-count service | Server-side PDF and Office pagination in the sanitisation worker |
-| Independent status page | A third-party uptime provider and an account |
-| Connector GA end-to-end | Real Google, Dropbox and Microsoft accounts and OAuth review |
-| Physical device film QA | iPhone, iPad and Android hardware |
-| Paddle production E2E | A live transaction against a real card |
-| Public benchmark, case studies, customer logos | Customer consent and a frozen reproducible run |
-| SOC 2 / ISO 27001, SSO / SCIM, DPA, SLA | Contracts, audit and budget |
+| 1 file → World | `VERIFIED_IMPLEMENTED` (fixed this pass) |
+| UI/API compile limit unified | `VERIFIED_IMPLEMENTED` (fixed this pass) |
+| 13+ safe block, or batch orchestrator | `VERIFIED_IMPLEMENTED` as a safe block |
+| client-dependent final compile removal — *design* | `PARTIAL`: design in section 5 below, no code |
+| Developer compile entitlement | `VERIFIED_IMPLEMENTED` |
+| Team sale blocked, or seats finished | `VERIFIED_IMPLEMENTED` as a sale block |
+| Edit → Request change | `VERIFIED_IMPLEMENTED` |
+| page label → estimated | `VERIFIED_IMPLEMENTED` |
+| ZIP main-thread freeze prevention | `PARTIAL`: ceiling lowered, worker missing |
+| Research/Evidence/Security/Enterprise copy purge | `VERIFIED_IMPLEMENTED` |
+| Explore research frontier removed | `VERIFIED_IMPLEMENTED` |
+| Product unshipped cards removed | `VERIFIED_IMPLEMENTED` |
+| fictional instrument metrics removed | `VERIFIED_IMPLEMENTED` |
+| Footer reduced | `VERIFIED_IMPLEMENTED` (four groups) |
+| Resources hub | `VERIFIED_IMPLEMENTED` |
+| global CTA unified | `VERIFIED_IMPLEMENTED` |
+| QA: physical iOS/Android film | `MISSING` — needs real devices |
+| QA: real Google Drive / Dropbox / OneDrive | `MISSING` — needs real accounts |
+| QA: 1/2/12/13/128 file scenarios | `PARTIAL` — limits unit-tested, not run against live storage |
+| QA: tab close and resume | `MISSING` — there is nothing to resume; see P0-03 |
+| QA: ZIP 10/50/100 MB | `PARTIAL` — 100 MB now exceeds the 25 MB ceiling by design |
+| QA: unsupported / malware / encrypted / nested archive | `PARTIAL` — unit-tested, not run end to end |
 
-## 5. Deferred by the documents themselves
+---
 
-P1 and P2 as scheduled in Launch §25 and Masterplan §28: graph canvas, `directoryPlan` lens,
-ontology viewer, inline review patch editor with revalidation, full documentation IA, SDKs,
-changelog rebuild, integration detail pages, MCP tool matrix, Compiled World Package spec and
-open-source validator, SEO pillar cluster, design-partner programme, KPI instrumentation.
+## 3. Section 13 — per-page verdicts
 
-## 6. Where the blueprints and the constitution disagree
+Every page below renders, passes the accessibility and cross-browser suites, and has no
+horizontal overflow at any of the seven widths.
 
-Both documents call for removing `BUILT, NOT PROVEN`, `NOT SUPPORTED` and the failed
-blind-quality-detection result from the public site. `CLAUDE.md` requires the opposite: *"A
-failed hypothesis is evidence. Blind quality detection is published as not supported."*
+| Page | Masterplan verdict | Status | Note |
+|---|---|---|---|
+| `/` | P0 items inside §11 | `VERIFIED_IMPLEMENTED` | five scenes, one pinned Scene 3 player, `STAGE` only |
+| `/pricing` | P0 | `VERIFIED_IMPLEMENTED` | plans from the catalog, fail-closed checkout, Team gated |
+| `/enterprise` | P0 COPY/IA | `VERIFIED_IMPLEMENTED` | the internal deployment record is gone |
+| `/security` | P0 COPY | `VERIFIED_IMPLEMENTED` | de-duplicated; the Trust Center is P1 |
+| `/evidence` | P0 | `VERIFIED_IMPLEMENTED` | rewritten as Technical Evidence |
+| `/explore` | P0 | `VERIFIED_IMPLEMENTED` | see P0-09 |
+| `/research` | P0 REWRITE | `PARTIAL` | defensive copy relocated; of the seven prescribed sections only Research areas and Reproducibility exist |
+| `/product/compiled-world` | P0 COPY | `VERIFIED_IMPLEMENTED` | DIRECTION card removed |
+| `/product/document-understanding` | P0 COPY | `VERIFIED_IMPLEMENTED` | the proof work is P1 |
+| `/privacy` `/terms` `/refunds` | P0 LEGAL | `PARTIAL` | pilot/live templates split and driven by one flag; final wording is `FOUNDER_DECISION` |
+| `/knowledge-compiler` | P1 | `PARTIAL` | the prescribed deletion is done; diagram, FAQ and glossary are P1 |
+| `/reproducibility` | P1, noindex advised | `VERIFIED_IMPLEMENTED` | noindex, and under Resources where §13.19 puts it |
+| `/film` | KEEP NOINDEX | `VERIFIED_IMPLEMENTED` | noindex added this pass; it was indexable |
+| `/docs` | P1, required for live | `MISSING` | the twelve-section IA does not exist |
+| `/api` `/developers` `/integrations` `/status` `/contact` `/changelog` `/solutions/*` | P1/P2 | `PARTIAL` | they render correctly; the P1 expansions are not built |
 
-Read closely the documents ask for **relocation**, not deletion — Masterplan 13.8 offers moving
-the record to `/research/notes`, and 13.20 says failures belong inside research notes with their
-context. That is what was done. Every entry is still published, in full, at `/research/notes`,
-linked from `/research`, from `/evidence` and from `/product/document-understanding`. What
-changed is that a buyer following "Technical evidence" is no longer handed a list of experiments
-that did not work, and a research reader is no longer expected to find findings on a sales page.
+---
 
-Nothing was softened, and no measurement was removed.
+## 4. Section 19 — the World Studio lenses
 
-## 7. Not attempted, and why
+The distinction drawn in the brief is the right one, and the answer is uncomfortable: the data
+is real and the interface is not what the requirement describes.
 
-- **Web Worker archive extraction.** The right fix for P0-07, and the upload path is the product's
-  critical path. A worker that fails to bundle breaks every upload, and this session could not
-  test one against real archives behind authentication. The freeze hazard is removed by the lower
-  ceiling; the worker is a scoped follow-up.
-- **Inline review patch editor.** Needs a candidate patch model, revalidation and receipt
-  regeneration. Both documents schedule it at P1. The button now states what it does.
-- **Review `reason` column.** The neutral acceptance record is a sentence rather than an empty
-  note because `foundation_review_decisions.reason` is `not null check (char_length between 8 and
-  1000)`. Making the note truly optional is a migration.
+| Lens | Status | What it actually is |
+|---|---|---|
+| Graph | `IMPLEMENTED_BUT_UX_INCOMPLETE` | persisted objects and relations are real; the lens renders a card grid and an ordered relation list. No canvas, no edges drawn, no zoom, pan, fit, search, filter, cluster or evidence highlight. |
+| Directory | `IMPLEMENTED_BUT_UX_INCOMPLETE` | groups objects by `object.type`. The compiler emits a real `directoryPlan` (`Sources`, `Topics/*.md`, `MOCs/Home.md`, `Packages/*`) and the lens does not read it. Calling a type grouping a directory is exactly the mislabel §19.2 warns about. |
+| Ontology | `IMPLEMENTED_BUT_UX_INCOMPLETE` | distinct types and predicates with counts. No classes, hierarchy, properties, domain, range, instance counts or evidence coverage. |
+| Evidence | `PARTIAL` | signed URL, PDF.js, page and bbox all exist; not exercised end to end in this session against live storage. |
+| Versions | `PARTIAL` | active, candidate and superseded are modelled; there is no diff. |
 
-## 8. Verification
+The first three are scheduled at §28.3.
+
+---
+
+## 5. Design — removing the client-dependent final compile
+
+§28.1 asks for the *design* at this stage, not the implementation. This is it.
+
+**Today.** The browser uploads, then polls `loadDocuments()` every 1.5 seconds for up to fifteen
+minutes, and when every document reports `hasOcrJson` the browser itself calls
+`/api/collections/compile`. Closing the tab abandons the run after the reading has been paid
+for. No server-side record exists that a compile was ever intended.
+
+**Proposed.**
+
+```text
+POST /api/compile-jobs              -> 202 + { jobId }   idempotency key = sorted documentIds + workspace
+GET  /api/compile-jobs/{id}         -> current state + cursor
+GET  /api/compile-jobs/{id}/events  -> SSE, resumable via Last-Event-ID
+POST /api/compile-jobs/{id}/cancel
+```
+
+The job row carries the §6.4 state model exactly: `draft`, `preflight`,
+`awaiting_confirmation`, `uploading`, `sanitizing`, `reading`, `structuring`, `resolving`,
+`building_world`, `review_required`, `ready`, `failed`, `cancelled`.
+
+Four properties the current design lacks and this one needs:
+
+1. **The transition into compile is server-owned.** A worker observes OCR completion and
+   advances the job. No browser call decides it.
+2. **Delivery is at-least-once, so the worker is idempotent.** The job is keyed by the document
+   set; a replayed message finds the state already advanced and does nothing. The worker ACKs
+   only after its output is durable and a receipt is committed.
+3. **Events are replayable.** The SSE stream is a cursor over a persisted event ledger —
+   `0034_foundation_job_event_ledger.sql` already exists — so a reconnecting tab replays from
+   `Last-Event-ID` instead of re-deriving state.
+4. **Partial failure is a choice, not a stop.** §6.5: report `124 qualified, 3 unsupported,
+   1 encrypted`, and offer Continue with 124 / Remove blocked items / Cancel.
+
+Migration follows the ladder the constitution requires: compatibility contract, then shadow the
+job against the existing polling path, then benchmark, then canary, then cut over. The polling
+path stays authoritative until a benchmark says the job path is not worse.
+
+**Deliberately not built here.** It touches money, durable state and a public API contract, and
+it is §28.2 work. Writing it in the same pass as a copy audit is how the polling path came to
+exist in the first place.
+
+---
+
+## 6. Verification
 
 ### What was actually run in this session
 

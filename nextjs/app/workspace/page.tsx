@@ -893,7 +893,16 @@ export default function WorkspacePage() {
       if (lost > 0) {
         setNotice(`${ids.length} of ${files.length} files uploaded. ${lost} did not, and nothing was retried automatically.`);
       }
-      if (ids.length >= 2) await waitForOcrAndCompile(ids);
+      /*
+        One uploaded file is a compile.
+
+        This gate compared the uploaded count against two, the last place the old floor
+        survived. The route accepts one, the compiler accepts one, and the preflight panel
+        offers one -- and then a visitor who dropped a single PDF watched it upload, sanitize
+        and read, and nothing happened. No error: the batch simply ended. Judging the set with
+        the shared verdict means this path cannot drift from the route again.
+      */
+      if (judgeCompileSet(ids.length).ok) await waitForOcrAndCompile(ids);
     } finally {
       setBusy(false);
     }
@@ -935,8 +944,27 @@ export default function WorkspacePage() {
       ? "verified"
       : "provisional";
 
+  /*
+    The compile ceiling is enforced here, before a byte is uploaded.
+
+    Intake structurally accepts up to 128 files so that a folder or an archive can be inspected
+    whole, and the unsupported ones are filtered out before this point. But the compile ceiling
+    was only checked at the end, so a visitor could drop thirteen files, authorise a quote,
+    watch every one of them upload, sanitize and get read -- and be refused at the last step,
+    having spent the processing. The masterplan names that exact state as forbidden.
+
+    So the verdict is computed on the supported set and gates the Compile button. The selection
+    stays on screen with the reason, because silently discarding files someone chose is its own
+    kind of lie.
+  */
+  const stagedVerdict = judgeCompileSet(stagedSelection?.files.length ?? 0);
+
   const startStagedCompile = async () => {
     if (!stagedSelection?.files.length) return;
+    // The button is already disabled for this, but the guard is what makes it a contract
+    // rather than a styling choice: nothing uploads a set the compile step will refuse.
+    const verdict = judgeCompileSet(stagedSelection.files.length);
+    if (!verdict.ok) { setNotice(verdict.message); return; }
     const files = stagedSelection.files.map((entry) => entry.file);
     setStagedSelection(null);
     await uploadDocuments(files);
@@ -1411,9 +1439,12 @@ export default function WorkspacePage() {
                       : "Some files do not declare a page count, so this is an upper-bound estimate from file size. The billed page count is confirmed after the documents are read, and never exceeds the maximum shown."}
                   </p>
                   <p className="fine">{COMPILE_LIMITS_NOTICE}</p>
+                  {stagedVerdict.ok ? null : (
+                    <p className="fine workspace-preflight-blocked" role="alert">{stagedVerdict.message}</p>
+                  )}
                   {stagedSelection.warnings.map((warning) => <p className="fine" key={warning}>{warning}</p>)}
                   <div className="workspace-intake-actions">
-                    <button type="button" disabled={busy || !stagedQuote} onClick={() => void startStagedCompile()}>{busy ? "Compiling…" : "Compile"}</button>
+                    <button type="button" disabled={busy || !stagedQuote || !stagedVerdict.ok} onClick={() => void startStagedCompile()}>{busy ? "Compiling…" : "Compile"}</button>
                     <button type="button" onClick={() => setStagedSelection(null)}>Clear</button>
                   </div>
                 </div>

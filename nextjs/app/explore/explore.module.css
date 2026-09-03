@@ -9,11 +9,6 @@
 .intro h1 { margin: 0; font-size: clamp(52px, 8vw, 126px); line-height: .89; letter-spacing: -.065em; font-weight: 500; }
 .introCopy { align-self: end; display: grid; gap: 28px; max-width: 530px; }
 .introCopy > p { margin: 0; color: var(--text-lo); font-size: clamp(15px, 1.35vw, 20px); line-height: 1.6; }
-/* The sample marker reads as an annotation on the page, not as body copy: smaller, set in
-   the mono face the instrument bar uses, so it belongs to the interface rather than to
-   the argument. The <b> carries the label itself. */
-.introCopy > p.sampleNote { padding-top: 14px; border-top: 1px solid var(--hairline); color: var(--text-xlo); font-size: clamp(12px, 1vw, 14px); line-height: 1.55; }
-.sampleNote b { display: block; margin-bottom: 5px; color: var(--text-hi); font: 8px var(--f-mono); letter-spacing: .12em; }
 .introCopy div { display: flex; flex-wrap: wrap; gap: 8px; }
 .introCopy span, .objectList b { padding: 5px 7px; border: 1px solid; font: 8px var(--f-mono); letter-spacing: .08em; }
 .page [data-tone="qualified"] { color: var(--verified); border-color: var(--verified) !important; }

@@ -769,6 +769,9 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
    APG asks of a tabpanel. The ring sits inside the frame so it reads as part of the scene
    rather than as a box drawn around it. */
 .compile-film-viewport:focus-visible { outline-offset: -3px; }
+/* A blocked preflight is not a warning among warnings: it is the reason the Compile button
+   will not move, so it reads in the changed-state colour rather than the muted fine print. */
+.workspace-preflight-blocked { color: var(--changed); }
 .compile-film-video,
 .compile-film-still {
   grid-area: 1 / 1;

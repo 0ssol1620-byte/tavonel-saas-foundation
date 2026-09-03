@@ -52,6 +52,16 @@ export default function ExploreCompiledWorld() {
 
       <section className={styles.intro}>
         <Link href="/" className={styles.back}><ArrowLeft size={14} /> Home</Link>
+        {/*
+          The sample says it is one exactly once, in the header badge above.
+
+          It is worth naming what was removed. This page used to carry "DETERMINISTIC PRODUCT
+          SAMPLE", "not customer proof", and a research card whose every field read `not_yet` --
+          three separate answers to an accusation nobody browsing a demo has made, which
+          together made the strongest page on the site look like the weakest. The label stays
+          because a fixed fixture in the product's real interface would otherwise read as a
+          live deployment; the arguing goes.
+        */}
         <p>EXPLORE · NO LOGIN REQUIRED</p>
         <h1>Follow a result all the way<br />back to its source.</h1>
         <div className={styles.introCopy}>
@@ -59,21 +69,6 @@ export default function ExploreCompiledWorld() {
             A maintenance manual, compiled. Pick any object and TAVONEL shows the document version,
             the page and the exact region it came from — the same path an answer takes when it
             cites its evidence.
-          </p>
-          {/*
-            The sample has to say that it is one.
-
-            This page renders a fixed fixture in the product's real interface, which is the
-            point -- an illustration of an Evidence Inspector is worth nothing. But a fixed
-            fixture shown in the real interface, with no label, reads as a live customer
-            deployment, and the numbers in the instrument bar read as measured. The marker is
-            not a disclaimer bolted on for safety; it is the one fact a visitor cannot get
-            from looking.
-          */}
-          <p className={styles.sampleNote}>
-            <b>DETERMINISTIC PRODUCT SAMPLE</b>
-            The same document and the same compiled world every time. It demonstrates what the
-            product does; it is not customer proof, and none of it is customer data.
           </p>
         </div>
       </section>

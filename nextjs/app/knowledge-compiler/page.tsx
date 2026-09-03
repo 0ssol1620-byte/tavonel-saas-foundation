@@ -4,7 +4,7 @@ import PublicProofRegistry from "@/components/public-proof-registry";
 export const metadata: Metadata = { title: "What Is a Knowledge Compiler? — TAVONEL", description: "A practical guide to Knowledge Compilers, RAG, knowledge graphs and enterprise search.", alternates: { canonical: "/knowledge-compiler" }, openGraph: { url: "/knowledge-compiler" } };
 
 export default function KnowledgeCompilerPage() {
-  return <PublicProofRegistry eyebrow="CATEGORY GUIDE" title="What is a Knowledge Compiler?" state="CATEGORY DEFINITION · NOT A PERFORMANCE CLAIM" summary="A Knowledge Compiler turns changing source material into a versioned, evidence-bound, portable knowledge object that people and AI systems can inspect together." sections={[
+  return <PublicProofRegistry eyebrow="CATEGORY GUIDE" title="What is a Knowledge Compiler?" summary="A Knowledge Compiler turns changing source material into a versioned, evidence-bound, portable knowledge object that people and AI systems can inspect together." sections={[
     { title: "The compile contract", body: "The unit of value is not a chat response. It is a Compiled World with immutable inputs, structured objects, exact evidence, review state, retrieval material and portable files.", rows: [
       { key: "INPUT", description: "Versioned source files and connector cursors.", state: "IMMUTABLE" },
       { key: "STRUCTURE", description: "Directory, ontology, entities, claims and relations.", state: "REVIEWABLE" },

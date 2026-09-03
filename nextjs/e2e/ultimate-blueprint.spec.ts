@@ -9,7 +9,10 @@ test("homepage opens the no-login Compiled World sample", async ({ page }) => {
   await cta.click();
   await expect(page).toHaveURL(/\/explore$/);
   await expect(page.getByRole("heading", { name: /Follow a result all the way/ })).toBeVisible();
-  await expect(page.getByText("DETERMINISTIC PRODUCT SAMPLE")).toBeVisible();
+  // The sample declares itself once, in the header badge. It used to say "DETERMINISTIC
+  // PRODUCT SAMPLE" here and "not customer proof" further down, which is two answers to an
+  // accusation nobody browsing a demo has made. The label has to survive; the arguing does not.
+  await expect(page.getByText("INTERACTIVE SAMPLE")).toBeVisible();
 });
 
 test("sample binds an answer to a page-level citation without fabricated proof", async ({ page }) => {
@@ -26,7 +29,9 @@ test("sample binds an answer to a page-level citation without fabricated proof",
   // asserted directly instead -- provenance is stated, and no placeholder is rendered as a fact.
   await expect(page.getByText("PAGE + BBOX BOUND")).toBeVisible();
   await expect(page.locator("html")).not.toContainText(/not_yet/i);
-  await expect(page.getByText(/not customer proof/i)).toBeVisible();
+  // The page must label itself as a sample exactly once. More than once is the defensiveness
+  // that made the strongest page on the site read as the weakest.
+  await expect(page.getByText("INTERACTIVE SAMPLE")).toHaveCount(1);
   await expect(page.locator("html")).not.toContainText(/trusted by|customer success|certified/i);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
