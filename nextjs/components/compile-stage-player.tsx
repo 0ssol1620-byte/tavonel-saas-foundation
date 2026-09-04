@@ -12,42 +12,12 @@ export type CompileStage = {
 };
 
 export const COMPILE_STAGES: readonly CompileStage[] = [
-  {
-    id: "sources",
-    label: "SOURCES",
-    line: "Files, folders, archives and connected drives arrive together.",
-    src: "/film/compile-cut.mp4",
-    poster: "/film/poster-1.webp",
-  },
-  {
-    id: "read",
-    label: "READ",
-    line: "Pages, regions, tables and layout are recovered with their coordinates.",
-    src: "/film/compile-cut-2.mp4",
-    poster: "/film/poster-2.webp",
-  },
-  {
-    id: "structure",
-    label: "STRUCTURE",
-    line: "Entities, claims and relations form, each bound to the region that supports it.",
-    src: "/film/compile-cut-3.mp4",
-    poster: "/film/poster-3.webp",
-  },
-  {
-    id: "world",
-    label: "WORLD",
-    line: "One compiled world, read by Ask, search, the API and MCP.",
-    src: "/film/compile-cut-4.mp4",
-    poster: "/film/poster-4.webp",
-  },
+  { id: "sources", label: "SOURCES", line: "Files, folders, archives and connected drives arrive together.", src: "/film/compile-cut.mp4", poster: "/film/poster-1.webp" },
+  { id: "read", label: "READ", line: "Pages, regions, tables and layout are recovered with their coordinates.", src: "/film/compile-cut-2.mp4", poster: "/film/poster-2.webp" },
+  { id: "structure", label: "STRUCTURE", line: "Entities, claims and relations form, each bound to the region that supports it.", src: "/film/compile-cut-3.mp4", poster: "/film/poster-3.webp" },
+  { id: "world", label: "WORLD", line: "One compiled world, read by Ask, search, the API and MCP.", src: "/film/compile-cut-4.mp4", poster: "/film/poster-4.webp" },
 ] as const;
 
-/*
- * The MP4 cuts remain useful as capture artefacts, but the public site no longer enlarges those
- * differently-compressed files. The original renderers are already in the product, draw at the
- * current element size and scale their backing canvas to devicePixelRatio (capped at 2). Mounting
- * exactly one of them gives every stage the same sharp text/hairlines and avoids four decoders.
- */
 const LIVE_FILMS = [
   dynamic(() => import("./opening-film"), { ssr: false }),
   dynamic(() => import("./opening-film-2"), { ssr: false }),
@@ -67,14 +37,18 @@ export default function CompileStagePlayer({
   const [index, setIndex] = useState(0);
   const [inView, setInView] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
+  const [canvasReady, setCanvasReady] = useState(false);
   const frameRef = useRef<HTMLDivElement | null>(null);
   const active = stages[index] ?? stages[0]!;
+  const admitted = useMemo(() => new Set([index]), [index]);
 
   useEffect(() => {
     const query = window.matchMedia("(prefers-reduced-motion: reduce)");
     const apply = () => setReducedMotion(query.matches);
     apply();
     query.addEventListener("change", apply);
+    const probe = document.createElement("canvas");
+    setCanvasReady(Boolean(probe.getContext("2d")));
     return () => query.removeEventListener("change", apply);
   }, []);
 
@@ -140,43 +114,23 @@ export default function CompileStagePlayer({
   const LiveFilm = LIVE_FILMS[index] ?? LIVE_FILMS[0];
 
   return (
-    <div className="compile-film-sequence rv" ref={frameRef} {...touchHandlers} data-film-renderer="live-canvas">
+    <div className="compile-film-sequence rv" ref={frameRef} {...touchHandlers} data-film-renderer={canvasReady ? "live-canvas" : "video-fallback"}>
       <div className="compile-film-stages" role="tablist" aria-label="Compilation stages" onKeyDown={onKeyDown}>
         {stages.map((stage, position) => (
-          <button
-            key={stage.id}
-            type="button"
-            role="tab"
-            id={`compile-stage-tab-${stage.id}`}
-            aria-selected={position === index}
-            aria-controls="compile-stage-panel"
-            tabIndex={position === index ? 0 : -1}
-            data-active={position === index ? 1 : 0}
-            onClick={() => chooseStage(position)}
-          >
-            {stage.label}
-          </button>
+          <button key={stage.id} type="button" role="tab" id={`compile-stage-tab-${stage.id}`} aria-selected={position === index} aria-controls="compile-stage-panel" tabIndex={position === index ? 0 : -1} data-active={position === index ? 1 : 0} onClick={() => chooseStage(position)}>{stage.label}</button>
         ))}
       </div>
 
-      <div
-        className="compile-film-viewport"
-        role="tabpanel"
-        id="compile-stage-panel"
-        tabIndex={0}
-        aria-labelledby={`compile-stage-tab-${active.id}`}
-      >
+      <div className="compile-film-viewport" role="tabpanel" id="compile-stage-panel" tabIndex={0} aria-labelledby={`compile-stage-tab-${active.id}`}>
         {reducedMotion || !inView ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img
-            className="compile-film-still"
-            src={active.poster}
-            width={1440}
-            height={900}
-            alt={`${active.label} — ${active.line}`}
-          />
-        ) : (
+          <img className="compile-film-still" src={active.poster} width={1440} height={900} alt={`${active.label} — ${active.line}`} />
+        ) : canvasReady ? (
           <div className="compile-film-live" aria-hidden="true"><LiveFilm /></div>
+        ) : (
+          <video className="compile-film-video" muted loop autoPlay playsInline preload="metadata" poster={active.poster} aria-label={`${active.label} — ${active.line}`}>
+            {stages.map((stage, position) => admitted.has(position) ? <source key={stage.id} src={stage.src} type="video/mp4" /> : null)}
+          </video>
         )}
       </div>
 
