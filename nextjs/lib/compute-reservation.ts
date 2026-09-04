@@ -4,6 +4,7 @@ import { quoteCompilePages } from "./usage-pricing";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const OUTCOMES = new Set(["settled", "operator_review", "released"]);
+const BILLING_SOURCES = new Set(["paid", "trial", "owner"]);
 
 function errorCode(message: string) {
   const mappings = [
@@ -12,6 +13,10 @@ function errorCode(message: string) {
     ["foundation_subscription_required", "SUBSCRIPTION_REQUIRED"],
     ["foundation_billing_hold", "BILLING_HOLD"],
     ["foundation_credits_required", "GPU_CREDITS_REQUIRED"],
+    ["foundation_trial_page_limit_exceeded", "TRIAL_PAGE_LIMIT_EXCEEDED"],
+    ["foundation_trial_global_budget_exceeded", "TRIAL_CAPACITY_REACHED"],
+    ["foundation_trial_not_active", "TRIAL_NOT_ACTIVE"],
+    ["foundation_trial_disabled", "TRIAL_DISABLED"],
     ["foundation_compute_idempotency_conflict", "COMPUTE_IDEMPOTENCY_CONFLICT"],
     ["foundation_compute_reservation_not_found", "COMPUTE_RESERVATION_NOT_FOUND"],
     ["foundation_compute_settlement_conflict", "COMPUTE_SETTLEMENT_CONFLICT"],
@@ -36,7 +41,7 @@ export async function reserveFoundationCompute(value: {
   if (!config) return { ok: false as const, code: "COMPUTE_LEDGER_NOT_CONFIGURED" };
   let response: Response;
   try {
-    response = await supabaseAdminRequest(config, "/rest/v1/rpc/reserve_foundation_compute_v2", {
+    response = await supabaseAdminRequest(config, "/rest/v1/rpc/reserve_foundation_compute_v3", {
       method: "POST",
       body: JSON.stringify({
         p_workspace_key: value.workspaceKey,
@@ -54,9 +59,10 @@ export async function reserveFoundationCompute(value: {
     return { ok: false as const, code: errorCode(typeof body?.message === "string" ? body.message : "") };
   }
   const result = await response.json().catch(() => null) as Record<string, unknown> | null;
+  const billingSource = String(result?.billingSource ?? "paid");
   if (!result || !UUID.test(String(result.reservationId ?? "")) || result.documentId !== value.documentId
     || result.state !== "reserved" || result.reservedCredits !== quote.standardUnits
-    || result.maximumCredits !== quote.maximumUnits
+    || result.maximumCredits !== quote.maximumUnits || !BILLING_SOURCES.has(billingSource)
     || typeof result.expiresAt !== "string" || !Number.isFinite(Date.parse(result.expiresAt))) {
     return { ok: false as const, code: "COMPUTE_RESERVATION_RECEIPT_INVALID" };
   }
@@ -69,6 +75,7 @@ export async function reserveFoundationCompute(value: {
       expiresAt: String(result.expiresAt),
       reservedCredits: quote.standardUnits,
       maximumCredits: quote.maximumUnits,
+      billingSource: billingSource as "paid" | "trial" | "owner",
       idempotentReplay: result.idempotentReplay === true,
       quote,
     },
@@ -91,7 +98,7 @@ export async function settleFoundationCompute(value: {
   if (!config) return { ok: false as const, code: "COMPUTE_LEDGER_NOT_CONFIGURED" };
   let response: Response;
   try {
-    response = await supabaseAdminRequest(config, "/rest/v1/rpc/settle_foundation_compute_v2", {
+    response = await supabaseAdminRequest(config, "/rest/v1/rpc/settle_foundation_compute_v3", {
       method: "POST",
       body: JSON.stringify({
         p_workspace_key: value.workspaceKey,
