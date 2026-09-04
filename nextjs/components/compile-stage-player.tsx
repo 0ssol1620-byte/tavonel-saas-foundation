@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 export type CompileStage = {
@@ -41,6 +42,19 @@ export const COMPILE_STAGES: readonly CompileStage[] = [
   },
 ] as const;
 
+/*
+ * The MP4 cuts remain useful as capture artefacts, but the public site no longer enlarges those
+ * differently-compressed files. The original renderers are already in the product, draw at the
+ * current element size and scale their backing canvas to devicePixelRatio (capped at 2). Mounting
+ * exactly one of them gives every stage the same sharp text/hairlines and avoids four decoders.
+ */
+const LIVE_FILMS = [
+  dynamic(() => import("./opening-film"), { ssr: false }),
+  dynamic(() => import("./opening-film-2"), { ssr: false }),
+  dynamic(() => import("./opening-film-3"), { ssr: false }),
+  dynamic(() => import("./opening-film-4"), { ssr: false }),
+] as const;
+
 const STAGE_MS = 5_000;
 
 export default function CompileStagePlayer({
@@ -51,13 +65,9 @@ export default function CompileStagePlayer({
   onStageChange?: (stage: CompileStage, index: number) => void;
 }) {
   const [index, setIndex] = useState(0);
-  const [playing, setPlaying] = useState(true);
   const [inView, setInView] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
-  const [admitted, setAdmitted] = useState<ReadonlySet<number>>(() => new Set<number>());
-
   const frameRef = useRef<HTMLDivElement | null>(null);
-  const videoRefs = useRef<Array<HTMLVideoElement | null>>([]);
   const active = stages[index] ?? stages[0]!;
 
   useEffect(() => {
@@ -73,7 +83,6 @@ export default function CompileStagePlayer({
   const go = useCallback((next: number) => {
     const wrapped = ((next % stages.length) + stages.length) % stages.length;
     setIndex(wrapped);
-    setAdmitted((current) => (current.has(wrapped) ? current : new Set([...current, wrapped])));
   }, [stages.length]);
 
   useEffect(() => {
@@ -88,29 +97,10 @@ export default function CompileStagePlayer({
   }, []);
 
   useEffect(() => {
-    if (!inView || reducedMotion) return;
-    setAdmitted((current) => (current.has(index) ? current : new Set([...current, index])));
-  }, [inView, reducedMotion, index]);
-
-  useEffect(() => {
-    if (reducedMotion || !playing || !inView) return;
+    if (reducedMotion || !inView) return;
     const timer = window.setTimeout(() => go(index + 1), STAGE_MS);
     return () => window.clearTimeout(timer);
-  }, [reducedMotion, playing, inView, index, go]);
-
-  useEffect(() => {
-    if (reducedMotion) return;
-    videoRefs.current.forEach((video, position) => {
-      if (!video) return;
-      if (position === index) {
-        if (playing && inView) void video.play().catch(() => undefined);
-        else video.pause();
-      } else {
-        video.pause();
-        if (video.currentTime > 0) video.currentTime = 0;
-      }
-    });
-  }, [index, playing, inView, reducedMotion, admitted]);
+  }, [reducedMotion, inView, index, go]);
 
   const focusStage = useCallback((position: number) => {
     const stage = stages[((position % stages.length) + stages.length) % stages.length];
@@ -118,7 +108,6 @@ export default function CompileStagePlayer({
   }, [stages]);
 
   const chooseStage = useCallback((next: number, moveFocus = false) => {
-    setPlaying(true);
     go(next);
     if (moveFocus) focusStage(next);
   }, [focusStage, go]);
@@ -148,8 +137,10 @@ export default function CompileStagePlayer({
     },
   }), [chooseStage, index]);
 
+  const LiveFilm = LIVE_FILMS[index] ?? LIVE_FILMS[0];
+
   return (
-    <div className="compile-film-sequence rv" ref={frameRef} {...touchHandlers}>
+    <div className="compile-film-sequence rv" ref={frameRef} {...touchHandlers} data-film-renderer="live-canvas">
       <div className="compile-film-stages" role="tablist" aria-label="Compilation stages" onKeyDown={onKeyDown}>
         {stages.map((stage, position) => (
           <button
@@ -175,7 +166,7 @@ export default function CompileStagePlayer({
         tabIndex={0}
         aria-labelledby={`compile-stage-tab-${active.id}`}
       >
-        {reducedMotion ? (
+        {reducedMotion || !inView ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             className="compile-film-still"
@@ -185,38 +176,7 @@ export default function CompileStagePlayer({
             alt={`${active.label} — ${active.line}`}
           />
         ) : (
-          stages.map((stage, position) => (
-            <video
-              key={stage.id}
-              ref={(element) => { videoRefs.current[position] = element; }}
-              className="compile-film-video"
-              data-active={position === index ? 1 : 0}
-              muted
-              loop
-              autoPlay
-              playsInline
-              preload={admitted.has(position) ? "auto" : "none"}
-              poster={stage.poster}
-              aria-label={`${stage.label} — ${stage.line}`}
-              onPlaying={() => setAdmitted((current) => {
-                const next = (position + 1) % stages.length;
-                return current.has(next) ? current : new Set([...current, next]);
-              })}
-            >
-              {admitted.has(position) ? <source src={stage.src} type="video/mp4" /> : null}
-            </video>
-          ))
-        )}
-        {reducedMotion ? null : (
-          <button
-            type="button"
-            className="compile-film-motion-control"
-            aria-label={playing ? "Pause compilation film" : "Resume compilation film"}
-            aria-pressed={!playing}
-            onClick={() => setPlaying((value) => !value)}
-          >
-            <span aria-hidden="true">{playing ? "Ⅱ" : "▶"}</span>
-          </button>
+          <div className="compile-film-live" aria-hidden="true"><LiveFilm /></div>
         )}
       </div>
 
