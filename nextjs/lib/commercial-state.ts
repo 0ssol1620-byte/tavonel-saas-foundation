@@ -45,9 +45,19 @@ export function readCommercialState(env: Environment = process.env): CommercialS
   const mode: CommercialMode = env.COMMERCIAL_MODE?.trim().toLowerCase() === "live" ? "live" : "pilot";
   const provider: PaymentProvider = env.PADDLE_SANDBOX === "true" ? "sandbox" : "production";
   const launchApproved = env.TAVONEL_BILLING_LAUNCH_APPROVED === "true";
+  /*
+   * Production is an independent gate.
+   *
+   * A preview can intentionally inherit the same non-secret launch flags as production while
+   * still being a preview. It must never become capable of charging merely because those two
+   * flags are version-controlled. Vercel supplies VERCEL_ENV at runtime; local/unit-test
+   * environments omit it, so the historical three-input contract remains directly testable.
+   */
+  const deploymentAllowsLiveCharges = env.VERCEL_ENV === undefined || env.VERCEL_ENV === "production";
 
-  // Real money requires all three to agree. Any one of them dissenting keeps us in pilot.
-  const liveChargesEnabled = mode === "live" && provider === "production" && launchApproved;
+  // Real money requires every gate to agree. Any one of them dissenting keeps checkout closed.
+  const liveChargesEnabled =
+    deploymentAllowsLiveCharges && mode === "live" && provider === "production" && launchApproved;
 
   return {
     mode,
