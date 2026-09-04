@@ -12,21 +12,31 @@ function statusOf(row: PipelineRow): Exclude<Filter, "all"> { if (row.stages.som
 function statusLabel(row: PipelineRow, reading: Record<string, OcrProgress>): string { const status = statusOf(row); if (status === "attention") return "Needs review"; if (status === "failed") return "Failed"; if (row.transfer) return "Uploading"; if (row.stages[2].state === "active") return reading[row.id]?.pagesRead ? `Reading page ${reading[row.id].pagesRead}` : "Reading"; if (row.stages[1].state === "active") return "Preparing"; if (row.stages[3].state === "active") return "Ready to compile"; if (row.stages[3].state === "done") return "Compiled"; return status === "processing" ? "Processing" : "Ready"; }
 
 export default function PipelineBoard({ rows, reading = {}, names = {}, onDismiss }: { rows: PipelineRow[]; reading?: Record<string, OcrProgress>; names?: DocumentNames; onDismiss?: () => void }) {
-  const [filter, setFilter] = useState<Filter>("attention");
+  const firstFailed = rows.find((row) => statusOf(row) === "failed") ?? null;
+  const [filter, setFilter] = useState<Filter>(() => firstFailed ? "failed" : "attention");
   const [query, setQuery] = useState("");
   const [visibleCount, setVisibleCount] = useState(12);
-  const [expandedId, setExpandedId] = useState<string | null>(() => rows.find((row) => row.stages[2].state === "active")?.id ?? null);
+  const [expandedId, setExpandedId] = useState<string | null>(() => firstFailed?.id ?? rows.find((row) => row.stages[2].state === "active")?.id ?? null);
   const counts = useMemo(() => ({ all: rows.length, attention: rows.filter((row) => statusOf(row) === "attention").length, processing: rows.filter((row) => statusOf(row) === "processing").length, ready: rows.filter((row) => statusOf(row) === "ready").length, failed: rows.filter((row) => statusOf(row) === "failed").length }), [rows]);
   if (rows.length === 0) return null;
-  const effectiveFilter: Filter = filter === "attention" && counts.attention === 0 ? "all" : filter;
+  const effectiveFilter: Filter = filter === "attention" && counts.attention === 0 ? (counts.failed > 0 ? "failed" : "all") : filter;
   const normalizedQuery = query.trim().toLowerCase();
   const filtered = rows.filter((row) => (effectiveFilter === "all" || statusOf(row) === effectiveFilter) && (!normalizedQuery || displayName(row.id, names, row.filename).toLowerCase().includes(normalizedQuery)));
   const visible = filtered.slice(0, visibleCount);
-  const selectFilter = (next: Filter) => { setFilter(next); setVisibleCount(12); setExpandedId(null); trackFunnel("source_filter_changed", { filter: next }); };
+  const selectFilter = (next: Filter) => { setFilter(next); setVisibleCount(12); setExpandedId(next === "failed" ? firstFailed?.id ?? null : null); trackFunnel("source_filter_changed", { filter: next }); };
+  const failedReason = firstFailed?.stages.find((stage) => stage.state === "failed")?.detail || "The source stopped before processing completed.";
 
   return (
     <section className="card board board-compact" aria-label="Document processing">
-      <div className="board-head board-head-compact"><div><p className="eyebrow">SOURCES</p><h2>{rows.length} sources</h2><p className="board-summary-copy">{counts.attention > 0 ? `${counts.attention} need review. Focus on exceptions first; ready sources stay collapsed.` : counts.processing > 0 ? `${counts.processing} still processing. Ready sources stay out of the way.` : "All observed sources are settled."}</p></div>{onDismiss ? <button type="button" className="board-dismiss" onClick={onDismiss}>Clear finished</button> : null}</div>
+      <div className="board-head board-head-compact"><div><p className="eyebrow">SOURCES</p><h2>{rows.length} sources</h2><p className="board-summary-copy">{counts.failed > 0 ? `${counts.failed} failed and needs attention first.` : counts.attention > 0 ? `${counts.attention} need review. Focus on exceptions first; ready sources stay collapsed.` : counts.processing > 0 ? `${counts.processing} still processing. Ready sources stay out of the way.` : "All observed sources are settled."}</p></div>{onDismiss ? <button type="button" className="board-dismiss" onClick={onDismiss}>Clear finished</button> : null}</div>
+
+      {firstFailed ? (
+        <div className="board-failure-banner" role="alert">
+          <div><strong>{displayName(firstFailed.id, names, firstFailed.filename)} could not start.</strong><p>{failedReason}</p></div>
+          <button type="button" onClick={() => { selectFilter("failed"); setExpandedId(firstFailed.id); }}>Inspect failure</button>
+        </div>
+      ) : null}
+
       <div className="board-metrics" aria-label="Source status summary">
         <button type="button" data-active={effectiveFilter === "attention"} onClick={() => selectFilter("attention")}><strong>{counts.attention}</strong><span>Need review</span></button>
         <button type="button" data-active={effectiveFilter === "processing"} onClick={() => selectFilter("processing")}><strong>{counts.processing}</strong><span>Processing</span></button>
