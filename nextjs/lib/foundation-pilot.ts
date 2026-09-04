@@ -41,20 +41,18 @@ export function readAccessMode(
   return env.ACCESS_MODE?.trim().toLowerCase() === "self_service" ? "self_service" : "pilot";
 }
 
-// The entitlement a brand-new self-service workspace starts with.
-//
-// Deliberately the same shape and the same bounded limits the pilot grant uses: signing up
-// must not hand someone a larger allowance than a hand-vetted pilot user, and a workspace
-// that has not paid yet must still be bounded. Status is `trialing`, not `active` -- a real
-// entitlement change only ever comes from a verified Paddle webhook (see
-// app/api/paddle/webhook), never from the act of signing in.
+// This object is only the immediate, in-process onboarding envelope. The durable trial policy
+// (7 days / 3 files / 50 standard pages / 1 World) lives in foundation_trial_policy and is
+// re-checked transactionally before intake/compute. Keeping the provisional document and byte
+// envelope no larger than the durable free tier prevents UI/read paths from advertising a larger
+// allowance during the milliseconds before the database bootstrap finishes.
 function selfServiceEntitlement(workspaceId: string): WorkspaceEntitlement {
   return {
     workspaceId,
     status: "trialing",
-    uploadBytesLimit: FOUNDATION_INTAKE_MAX_BYTES * 20,
+    uploadBytesLimit: FOUNDATION_INTAKE_MAX_BYTES * 3,
     uploadBytesUsed: 0,
-    documentLimit: 20,
+    documentLimit: 3,
     documentCount: 0,
     validUntil: null,
   };
