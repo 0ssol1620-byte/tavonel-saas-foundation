@@ -1,23 +1,6 @@
 "use client";
 
-/**
- * Paddle checkout, in one place.
- *
- * The landing page and the workspace both need to open a checkout, and until now only the
- * landing page could -- so a signed-in user who ran out of credits had to navigate back out to
- * the marketing page to buy more. Duplicating the flow to fix that would have been worse: this
- * is the path that moves money, and two copies drift.
- *
- * Every guarantee the original flow made is preserved here, and they are the point of the
- * function rather than incidental to it:
- *
- *   - A session token is required before the server is asked for anything.
- *   - The server owns the price allow-list; the client sends an offer code, never a price.
- *   - The response must carry a client token, an environment, a price id and custom data, or
- *     nothing opens. A partial response is a failure, not something to work around.
- *   - Completing checkout changes nothing. Only a signed, idempotently persisted webhook moves
- *     an entitlement, and the message on success says so rather than implying access is live.
- */
+/** Paddle checkout, in one place. */
 
 import { useCallback, useState } from "react";
 import type { BillingOfferCode } from "./billing-catalog";
@@ -39,7 +22,7 @@ export function useCheckout(notify: (message: string) => void) {
       const { getSupabaseBrowserClient } = await import("./supabase-browser");
       const client = getSupabaseBrowserClient();
       if (!client) {
-        notify("Foundation mode is active. Provider configuration is required before checkout is available.");
+        notify("Provider configuration is required before checkout is available.");
         return;
       }
       const { data } = await client.auth.getSession();
@@ -57,6 +40,10 @@ export function useCheckout(notify: (message: string) => void) {
           body: JSON.stringify({ offerCode }),
         });
         const checkout = (await response.json()) as CheckoutResponse;
+        if (checkout.code === "OWNER_ACCESS_ACTIVE") {
+          notify("Owner access is already active. No checkout or payment is required for this account.");
+          return;
+        }
         if (
           !response.ok ||
           !checkout.clientToken ||
