@@ -673,12 +673,12 @@ verify anyway is worse than telling them exactly what to fetch and what it shoul
 | --- | --- | --- |
 | `pnpm exec tsc --noEmit` | clean | 0 |
 | `pnpm exec eslint app components lib e2e` | clean | 0 |
-| `pnpm exec vitest run` | **148 files, 1,329 tests, 1,329 passed** | 0 |
+| `pnpm exec vitest run` | **149 files, 1,367 tests, 1,367 passed** | 0 |
 | `pnpm build` | 75/75 static pages generated | 0 |
 | `pnpm qa:links` | 110 internal paths, no broken link | 0 |
 | `pnpm qa:lighthouse` | budgets passed - see below | 0 |
 | `pnpm exec playwright test` (11 projects) | **234 tests: 219 passed, 15 skipped, 0 flaky, 0 failed** | 0 |
-| Firefox launch suite vs the Preview, `--retries=0 --repeat-each=20` | **40 passed, 0 flaky** | 0 |
+| Firefox launch suite vs the Preview, `--retries=0 --repeat-each=20` | **40 passed, 0 flaky** (against `dpl_4LamnERJtoCwhXK16xYDU3aCikRa`) | 0 |
 | `pnpm verify:package --package <emitted /explore package>` | `PACKAGE VALID` - 14 files, 3 documents, 1 topic, 15 entities, 10 claims, 3 evidence, 32 relations, **no warnings** | 0 |
 | the same, `--require-signature` | `PACKAGE INVALID: 1 error(s)` - `SIGNATURE_ABSENT`, the correct answer for an unsigned package | 1 (intended) |
 | `pnpm verify:developer-clean` | `passed` - isolated HOME, no provider secret inherited, `tavonel-cli 2026.9.3.1`, `mcp 2026.9.3.1`, Python 3.12.13 | 0 |
@@ -687,9 +687,20 @@ Lighthouse categories, three runs per route:
 
 | Route | Performance | Accessibility | Best practices | SEO | LCP |
 | --- | --- | --- | --- | --- | --- |
-| `/` | 0.97 | 0.97 | 1.00 | 1.00 | 2,162 ms |
-| `/privacy` | 0.98 | 1.00 | 1.00 | 1.00 | 1,897 ms |
-| `/security` | 0.97 | 1.00 | 1.00 | 1.00 | 2,019 ms |
+| `/` | 0.97 | 0.97 | 1.00 | 1.00 | 2,150 ms |
+| `/privacy` | 0.98 | 1.00 | 1.00 | 1.00 | 1,885 ms |
+| `/security` | 0.97 | 1.00 | 1.00 | 1.00 | 2,038 ms |
+
+Run on a real PostgreSQL 17.2, and **not** in the table above because they need a server that
+CI does not have. Both are reproducible from
+`docs/evidence/SQL_MIGRATION_CHAIN_2026-09-04.md`:
+
+| Command | Result | Exit |
+| --- | --- | --- |
+| `node scripts/db/apply-migrations.mjs --shim-vector` | **42 of 42 applied**, no failure | 0 |
+| the same, against the tree before this pass | **21 of 42**, stops at `0022` | 1 |
+| `node scripts/db/corpus-slot-race.mjs` | **4 of 4 scenarios pass** | 0 |
+| the same, against a mutant with only the race-path assertion removed | **3 of 4** — the concurrent different-documents case fails | 1 |
 
 `pnpm verify:export` is not in this table because it cannot run standalone: it takes an archive
 and a trusted key fingerprint, and refuses without both. The path it verifies is exercised by
@@ -698,15 +709,18 @@ with the content, the manifest, the signature and the inventory in turn - all fo
 are inside the 219 above.
 
 `supabase/tests/foundation_corpus_slot_idempotency.sql` is **not** in this table because it did
-not run. Item 9 of section 8 says why.
+not run: pgTAP is not installable here. Item 9 of section 8 says what replaced it — the same
+scenarios, on a real server, including the concurrent one pgTAP cannot express.
 
 The Playwright matrix is all eleven projects: widths 1920, 1440, 1280, 1024, 768, 390 and 360,
 plus reduced-motion, plus the launch suite in Chromium, Firefox and WebKit.
 
-**No figure from an earlier revision is reused.** The two previous revisions reported 781/781
-unit tests across 122 files, then 1,290 across 145 with 218 browser passes and 1 flaky. Both
-suites were re-run from scratch on this tree: 1,329 unit tests across 148 files, and 219 browser
-passes with **no flaky result**.
+**No figure from an earlier revision is reused.** The three previous revisions reported 781/781
+unit tests across 122 files, then 1,290 across 145 with 218 browser passes and 1 flaky, then
+1,329 across 148. Every suite was re-run from scratch on this tree: **1,367 unit tests across
+149 files**, and **219 browser passes** with no flaky result. The unit count rose by 38 because
+of the suites this pass added — the execution budget, the client half of the slot race, the
+page-count basis, and the mirror check between the race harness and the application.
 
 ### The flaky test, found rather than tolerated
 
