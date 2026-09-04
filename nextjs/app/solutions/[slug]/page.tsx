@@ -41,7 +41,7 @@ const SOLUTIONS = {
     limitations: [
       "The graph is compiled from documents, so an object exists only where a source region supports it.",
       "Exports are Turtle, JSON-LD and CSV. There is no live connector into a graph database yet.",
-      "Identity resolution across a corpus is the hard part, so uncertain merges remain reviewable.",
+      "Identity-resolution thresholds are not calibrated across every corpus, so uncertain merges remain reviewable.",
     ],
   },
   "source-grounded-assistants": {
@@ -66,7 +66,7 @@ const SOLUTIONS = {
     outcomes: ["Candidate-to-active lifecycle", "Human promotion gate", "Activity and audit records", "Budget and retention controls"],
     limitations: [
       "Promotion is a human decision by design.",
-      "Shared workspace membership is not available yet; Team remains contact-only until tenancy is complete.",
+      "Membership is not available yet for shared workspaces; Team remains contact-only until tenancy is complete.",
       "Rollback restores a prior revision. It does not undo downstream use of an older answer.",
     ],
   },
@@ -141,7 +141,7 @@ export default async function SolutionPage({ params }: { params: Promise<{ slug:
         </section>
 
         <details className="solution-notes">
-          <summary>Things to know before you compile</summary>
+          <summary><span>WHERE THIS STOPS</span> · Things to know before you compile</summary>
           <div>
             {solution.limitations.map((item) => <p key={item}>{item}</p>)}
           </div>
