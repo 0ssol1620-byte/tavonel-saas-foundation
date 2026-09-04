@@ -2,17 +2,19 @@ import HomePageClient from "@/components/home-page-client";
 import { isLiveCommerce } from "@/lib/commercial-state";
 
 /**
- * The compile cuts moved into `CompileStagePlayer`, which owns all four of them.
+ * The landing CTA is commercial state, not static content.
  *
- * This file used to server-render cut 1 as a `FilmBand` so its markup was in the initial HTML,
- * dating from when that cut sat in the hero. It has not been the hero for some time — it was the
- * first of four bands stacked inside scene 3, three screens down — so the server render and the
- * high-priority preload beside it were buying nothing: a visitor's first paint is the headline,
- * and the film was being fetched at high priority before the fonts for text they could see.
+ * Vercel can qualify a Production build in an environment where the build-time commercial flags
+ * are intentionally scrubbed while the deployed runtime is live. If this route is prerendered,
+ * that safe build-time "pilot" result gets frozen into the HTML and a live self-service site can
+ * keep saying "Request access" even while /api/status correctly reports selfService=true.
  *
- * The only thing this page still decides is whether there is a checkout to send anyone to, which
- * it can read directly and a client component cannot.
+ * Resolve the state on each request instead. The page itself is light, the deployed function is in
+ * the same region as the rest of the app, and this avoids a wrong CTA or a hydration-time label
+ * swap on the most important conversion surface.
  */
+export const dynamic = "force-dynamic";
+
 export default function HomePage() {
   return <HomePageClient liveCommerce={isLiveCommerce()} />;
 }
