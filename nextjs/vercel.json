@@ -3,7 +3,8 @@
   "regions": ["icn1"],
   "env": {
     "COMMERCIAL_MODE": "live",
-    "TAVONEL_BILLING_LAUNCH_APPROVED": "true"
+    "TAVONEL_BILLING_LAUNCH_APPROVED": "true",
+    "ACCESS_MODE": "self_service"
   },
   "crons": [{ "path": "/api/internal/jobs/run", "schedule": "* * * * *" }],
   "headers": [{ "source": "/api/:path*", "headers": [{ "key": "Cache-Control", "value": "no-store" }] }]
