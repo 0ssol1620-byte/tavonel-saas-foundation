@@ -47,7 +47,7 @@ export function PublicSiteFooter() {
 
 export function PublicSitePage({ children }: { children: React.ReactNode }) {
   return (
-    <div className="page">
+    <div className="page public-page">
       <PublicSiteHeader />
       <main id="main" tabIndex={-1}>{children}</main>
       <PublicSiteFooter />
