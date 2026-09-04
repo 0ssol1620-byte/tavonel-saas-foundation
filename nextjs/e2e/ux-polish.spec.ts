@@ -56,6 +56,10 @@ test("Explore reaches the actual interactive instrument without a hero-length de
 });
 
 test("product page shows the product path before secondary product surfaces", async ({ page }) => {
+  // Public CTA is runtime-derived, not compiled into the page. Pin the access posture here so
+  // this test verifies the live self-service wording rather than whichever environment the
+  // runner happens to inherit.
+  await page.route("**/api/status", route => route.fulfill({ json: { selfService: true, liveCheckout: true } }));
   await page.goto("/product");
   await expect(page.locator(".product-flow > article")).toHaveCount(4);
   await expect(page.getByText("SOURCE", { exact: false }).first()).toBeVisible();
