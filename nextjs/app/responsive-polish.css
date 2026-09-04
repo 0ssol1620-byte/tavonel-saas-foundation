@@ -1,0 +1,57 @@
+/* Cross-surface finishing pass: density, performance and touch ergonomics. */
+
+/* Skip expensive layout/paint for long off-screen collections while preserving intrinsic size. */
+.document-meta li,
+.board-list > li,
+.solution-section,
+.product-surface,
+.site-footer-groups nav {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 72px;
+}
+.solution-section { contain-intrinsic-size: auto 420px; }
+.product-surface { contain-intrinsic-size: auto 250px; }
+
+/* Interactive surfaces move subtly; no decorative animation competes with the product film. */
+.btn,
+.workspace button,
+.product-surface,
+.solution-flow li,
+.solution-outcomes article,
+.card {
+  transition-property: background-color, border-color, color, opacity, transform;
+  transition-duration: 140ms;
+  transition-timing-function: ease-out;
+}
+.btn:active, .workspace button:active { transform: translateY(1px); }
+
+/* Utility text stays readable; mono is metadata, not a body typeface. */
+.workspace p, .workspace li, .workspace label, .workspace input,
+.scene.doc p, .solution-page p, .product-overview p { text-wrap: pretty; }
+
+/* Tablet: dense multi-pane surfaces become one task at a time rather than four crushed columns. */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .workspace-content { padding-inline: clamp(18px, 3vw, 30px); }
+  .workspace-grid { grid-template-columns: minmax(0, 1fr); }
+  .compile-stage { min-height: 360px; }
+  .document-meta { max-height: 46vh; }
+}
+
+/* Touch target floor. */
+@media (pointer: coarse) {
+  .workspace button, .workspace a, .nav a, .btn, .lenses button { min-height: 42px; }
+  .board-row-summary { min-height: 54px; }
+}
+
+@media (max-width: 560px) {
+  .scene.doc h1, .scene.doc h2 { text-wrap: balance; }
+  .workspace-content { overflow-x: clip; }
+  .workspace-intake-actions { display: grid; grid-template-columns: 1fr; width: 100%; }
+  .workspace-intake-actions .btn { width: 100%; justify-content: center; }
+  .document-meta { max-height: 50vh; }
+  .board-list-wrap { max-height: 52vh; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.001ms !important; animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
+}

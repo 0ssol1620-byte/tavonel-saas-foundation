@@ -1,0 +1,27 @@
+.product-overview { min-height: auto; justify-content: flex-start; padding-top: clamp(110px, 12vw, 168px); }
+.product-overview .shell { max-width: 1280px; }
+.product-hero { align-items: end; padding-bottom: clamp(54px, 7vw, 96px); border-bottom: 1px solid var(--hairline); }
+.product-hero .actions { margin-top: 26px; }
+.product-flow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  margin-top: clamp(48px, 6vw, 82px);
+  border: 1px solid var(--hairline-hi);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--hairline);
+}
+.product-flow article { min-height: 164px; display: flex; flex-direction: column; justify-content: space-between; padding: 20px; background: var(--g1); }
+.product-flow article:last-child { background: color-mix(in srgb, var(--verified-deep) 30%, var(--g1)); }
+.product-flow span { color: var(--text-xlo); font: 9px var(--f-mono); letter-spacing: .13em; }
+.product-flow strong { max-width: 20ch; color: var(--text-hi); font-size: 16px; font-weight: 540; line-height: 1.35; }
+.product-surface-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: clamp(54px, 7vw, 96px); }
+.product-surface { min-height: 260px; display: flex; flex-direction: column; padding: 24px; border: 1px solid var(--hairline); border-radius: 6px; background: var(--g1); transition: border-color 160ms ease, transform 160ms ease, background 160ms ease; }
+.product-surface:hover { border-color: var(--hairline-hi); background: var(--g2); transform: translateY(-2px); }
+.product-surface > span { color: var(--verified); font: 9px var(--f-mono); letter-spacing: .12em; }
+.product-surface h2 { margin: auto 0 10px; color: var(--text-hi); font-size: 26px; }
+.product-surface p { margin: 0; color: var(--text-lo); font-size: 13px; line-height: 1.65; }
+.product-surface b { margin-top: 22px; color: var(--text-mid); font: 9px var(--f-mono); letter-spacing: .08em; font-weight: 500; }
+@media (max-width: 900px) { .product-flow { grid-template-columns: repeat(2, 1fr); } .product-surface-grid { grid-template-columns: 1fr; } .product-surface { min-height: 210px; } }
+@media (max-width: 560px) { .product-flow { grid-template-columns: 1fr; } .product-flow article { min-height: 112px; } }

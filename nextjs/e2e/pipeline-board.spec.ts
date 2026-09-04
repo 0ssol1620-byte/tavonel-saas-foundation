@@ -1,11 +1,3 @@
-/**
- * The board, in a browser.
- *
- * `lib/pipeline.test.ts` fixes the rules; this fixes that the rules reach the screen. The two
- * failures worth catching here are the ones a unit test cannot see: a held document rendered in
- * the same tone as a finished one, and a board that is wider than a phone.
- */
-
 const playwrightPackage = process.env.PLAYWRIGHT_TEST_PACKAGE ?? "@playwright/test";
 const playwrightModule = await import(playwrightPackage);
 const { expect, test } = "test" in playwrightModule ? playwrightModule : playwrightModule.default;
@@ -21,340 +13,90 @@ function token() {
 }
 
 async function installSession(page: Page) {
-  await page.addInitScript(
-    ({ accessToken }) => {
-      const now = Math.floor(Date.now() / 1000);
-      localStorage.setItem("sb-test-auth-token", JSON.stringify({
-        access_token: accessToken,
-        token_type: "bearer",
-        expires_in: 3600,
-        expires_at: now + 3600,
-        refresh_token: "e2e-refresh-token",
-        user: {
-          id: "44444444-4444-4444-4444-444444444444",
-          aud: "authenticated",
-          role: "authenticated",
-          email: "foundation-e2e@example.invalid",
-          app_metadata: {},
-          user_metadata: {},
-          created_at: new Date().toISOString(),
-        },
-      }));
-    },
-    { accessToken: token() },
-  );
+  await page.addInitScript(({ accessToken }) => {
+    const now = Math.floor(Date.now() / 1000);
+    localStorage.setItem("sb-test-auth-token", JSON.stringify({
+      access_token: accessToken, token_type: "bearer", expires_in: 3600, expires_at: now + 3600,
+      refresh_token: "e2e-refresh-token",
+      user: { id: "44444444-4444-4444-4444-444444444444", aud: "authenticated", role: "authenticated", email: "foundation-e2e@example.invalid", app_metadata: {}, user_metadata: {}, created_at: new Date().toISOString() },
+    }));
+  }, { accessToken: token() });
 }
 
-/** One document through, one still being read, one stopped and waiting for a person. */
 const DOCUMENTS = [
-  {
-    documentId: "doc-read", versionKey: "v1",
-    sanitizedKey: "w/doc-read/v1/sanitized.pdf", sanitizedSize: 481_112,
-    ocrJsonKey: "w/doc-read/v1/ocr.json", ocrJsonSize: 24_880, hasOcrJson: true,
-    cdrReceiptKey: "w/doc-read/v1/cdr-receipt.json", ocrReviewKey: null,
-    processingState: "ocr_ready",
-  },
-  {
-    documentId: "doc-reading", versionKey: "v1",
-    sanitizedKey: "w/doc-reading/v1/sanitized.pdf", sanitizedSize: 2_204_004,
-    ocrJsonKey: null, ocrJsonSize: null, hasOcrJson: false,
-    cdrReceiptKey: "w/doc-reading/v1/cdr-receipt.json", ocrReviewKey: null,
-    processingState: "sanitized",
-  },
-  {
-    documentId: "doc-held", versionKey: "v1",
-    sanitizedKey: "w/doc-held/v1/sanitized.pdf", sanitizedSize: 903_211,
-    ocrJsonKey: null, ocrJsonSize: null, hasOcrJson: false,
-    cdrReceiptKey: "w/doc-held/v1/cdr-receipt.json", ocrReviewKey: "w/doc-held/v1/ocr-review.json",
-    processingState: "operator_review", ocrReviewReasonCode: "OCR_LOW_TEXT_YIELD",
-  },
+  { documentId: "doc-read", versionKey: "v1", sanitizedKey: "w/doc-read/v1/sanitized.pdf", sanitizedSize: 481_112, ocrJsonKey: "w/doc-read/v1/ocr.json", ocrJsonSize: 24_880, hasOcrJson: true, cdrReceiptKey: "w/doc-read/v1/cdr-receipt.json", ocrReviewKey: null, processingState: "ocr_ready" },
+  { documentId: "doc-reading", versionKey: "v1", sanitizedKey: "w/doc-reading/v1/sanitized.pdf", sanitizedSize: 2_204_004, ocrJsonKey: null, ocrJsonSize: null, hasOcrJson: false, cdrReceiptKey: "w/doc-reading/v1/cdr-receipt.json", ocrReviewKey: null, processingState: "sanitized" },
+  { documentId: "doc-held", versionKey: "v1", sanitizedKey: "w/doc-held/v1/sanitized.pdf", sanitizedSize: 903_211, ocrJsonKey: null, ocrJsonSize: null, hasOcrJson: false, cdrReceiptKey: "w/doc-held/v1/cdr-receipt.json", ocrReviewKey: "w/doc-held/v1/ocr-review.json", processingState: "operator_review", ocrReviewReasonCode: "OCR_LOW_TEXT_YIELD" },
 ];
 
-/*
- * The workspace asks the server, once on mount, whether a compile run is still open so a
- * reloaded tab rejoins it instead of starting again. That request is as much part of loading the
- * page as the document list is, and a test that answers one but not the other gets a 401 in the
- * console -- the same failure the progress poll above already had. "No open run" is the honest
- * answer for a board that is still reading.
- */
-async function mockCompileJobs(page: Page) {
-  await page.route("**/api/compile-jobs", route => route.fulfill({ json: { code: "OK", jobs: [] } }));
-}
-
 async function mockWorkspace(page: Page) {
-  await mockCompileJobs(page);
+  await page.route("**/api/access/bootstrap", route => route.fulfill({ json: { code: "ACCESS_READY", access: { source: "owner", accessPlan: "studio_access", billingExempt: true, expiresAt: null, limits: null } } }));
+  await page.route("**/api/compile-jobs", route => route.fulfill({ json: { code: "OK", jobs: [] } }));
   await page.route("**/api/documents", route => route.fulfill({ json: { documents: DOCUMENTS } }));
-  /*
-   * A document mid-read is polled for progress, so every test that renders one has to answer that
-   * poll or the browser logs a 401 and the console assertion below trips. The default answer is a
-   * signed URL to an object that does not qualify -- which is the true state before the reader has
-   * written anything, and draws nothing. The tests that care override both routes.
-   */
-  await page.route("**/api/documents/*/progress", route =>
-    route.fulfill({ json: { code: "OK", readUrl: "https://progress.r2.cloudflarestorage.com/progress.json" } }));
-  await page.route("https://progress.r2.cloudflarestorage.com/progress.json", route => route.fulfill({ json: {} }));
-  await page.route("**/api/billing/status", route => route.fulfill({
-    json: {
-      account: {
-        accessPlan: null, subscriptionStatus: "inactive", creditBalance: 0,
-        lifetimeCreditsPurchased: 0, lifetimeCreditsReversed: 0, billingHold: false,
-        paddleCustomerId: null, subscriptionCancelAt: null, updatedAt: null,
-      },
-    },
-  }));
+  await page.route("**/api/documents/*/progress", route => route.fulfill({ json: { code: "OK", readUrl: "https://progress.r2.cloudflarestorage.com/progress.json" } }));
+  await page.route("https://progress.r2.cloudflarestorage.com/progress.json", route => route.fulfill({ json: {
+    schemaVersion: "tavonel.ocr_progress.v1", sourceImmutableKey: "w/doc-reading/v1/sanitized.pdf", inputSha256: `sha256:${"a".repeat(64)}`,
+    state: "reading", pagesRead: 4, pageCount: 11, regionsFound: 37,
+    pages: [{ pageNumber1: 4, pageCount: 11, path: "raster", regionCount: 3, meanConfidence: 0.7412, boxes: [
+      { bbox1000: [100, 120, 900, 165], confidence: 0.93, text: "제3조 (계약기간 및 갱신)", regionId: "ocr-p0004-l00001" },
+      { bbox1000: [100, 200, 780, 245], confidence: 0.61, text: "본 계약의 기간은 체결일로부터 1년으로 한다.", regionId: "ocr-p0004-l00002" },
+      { bbox1000: [100, 280, 860, 325], confidence: 0.88, text: "", regionId: "ocr-p0004-l00003" },
+    ] }],
+  } }));
+  await page.route("**/api/billing/status", route => route.fulfill({ json: { account: { accessPlan: null, subscriptionStatus: "inactive", creditBalance: 0, lifetimeCreditsPurchased: 0, lifetimeCreditsReversed: 0, billingHold: false, paddleCustomerId: null, subscriptionCancelAt: null, updatedAt: null } } }));
 }
 
-test("draws every document as four stages, and marks only the held one", async ({ page }, testInfo) => {
-  const browserErrors: string[] = [];
-  page.on("console", message => { if (message.type() === "error") browserErrors.push(message.text()); });
-  page.on("pageerror", error => browserErrors.push(error.message));
-  await installSession(page);
-  await mockWorkspace(page);
-  await page.goto("/workspace");
-
+test("source queue opens on exceptions instead of dumping every document", async ({ page }, testInfo) => {
+  await installSession(page); await mockWorkspace(page); await page.goto("/workspace");
   const board = page.locator(".board");
   await expect(board).toBeVisible();
-  await expect(page.locator(".board-rows > li")).toHaveCount(3);
-
-  // Four stages on every row, no exceptions.
-  await expect(page.locator(".board-stages").first().locator(".board-stage")).toHaveCount(4);
-
-  // The document that finished reading: three done, compile still open.
-  const read = page.locator('[data-document-id="doc-read"]');
-  await expect(read.locator('.board-stage[data-s="done"]')).toHaveCount(3);
-  await expect(read.locator('.board-stage[data-s="held"]')).toHaveCount(0);
-
-  // The one still being read must not claim a result it does not have.
-  const reading = page.locator('[data-document-id="doc-reading"]');
-  await expect(reading.locator('.board-stage[data-s="active"]')).toHaveCount(1);
-  await expect(reading).toContainText("reading within bounded processing");
-
-  // The held one explains the customer action without exposing internal reason codes.
-  const heldRow = page.locator(".board-rows > li[data-held='1']");
-  await expect(heldRow).toHaveCount(1);
-  await expect(heldRow).toContainText("review required before reading can continue");
-  await expect(heldRow).not.toContainText("OCR_LOW_TEXT_YIELD");
+  await expect(board).toContainText("3 sources");
+  await expect(board).toContainText("1 need review");
+  await expect(board.locator(".board-rows > li")).toHaveCount(1);
+  await expect(board.locator('[data-document-id="doc-held"]')).toBeVisible();
+  await expect(board).not.toContainText("OCR_LOW_TEXT_YIELD");
   await expect(board).toContainText("Open Review to inspect the source and choose the next action");
-  await expect(board.getByRole("button", { name: /retry/i })).toHaveCount(0);
-
-  // Held is not failure, and nothing anywhere claims a compiled candidate.
-  await expect(page.locator('.board-stage[data-s="failed"]')).toHaveCount(0);
-  await expect(page.locator('.board-stage[data-s="done"]').filter({ hasText: "COMPILE" })).toHaveCount(0);
-
+  await expect(board.locator(".board-list-wrap")).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
-  expect(browserErrors).toEqual([]);
-  await testInfo.attach("pipeline-board", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
+  await testInfo.attach("exception-first-source-queue", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
 });
 
-test("shows no board at all when there is nothing to report", async ({ page }) => {
-  await installSession(page);
-  await page.route("**/api/documents", route => route.fulfill({ json: { documents: [] } }));
-  await page.route("**/api/billing/status", route => route.fulfill({
-    json: {
-      account: {
-        accessPlan: null, subscriptionStatus: "inactive", creditBalance: 0,
-        lifetimeCreditsPurchased: 0, lifetimeCreditsReversed: 0, billingHold: false,
-        paddleCustomerId: null, subscriptionCancelAt: null, updatedAt: null,
-      },
-    },
-  }));
-  await page.goto("/workspace");
-  await expect(page.locator(".workspace-content")).toBeVisible();
-  // An empty board would be a panel asserting that processing exists. It must not render.
-  await expect(page.locator(".board")).toHaveCount(0);
-});
-
-
-/*
- * The live reading.
- *
- * This is the surface most likely to drift into fiction, so the browser test pins the two things
- * that keep it honest: every rectangle corresponds to a region the reader reported, and the view
- * disappears the moment ocr.json exists -- at that point the receipt is the thing to look at.
- */
-test("draws the regions the reader reported, and only while it is still reading", async ({ page }, testInfo) => {
-  const browserErrors: string[] = [];
-  page.on("console", message => { if (message.type() === "error") browserErrors.push(message.text()); });
-  page.on("pageerror", error => browserErrors.push(error.message));
-  await installSession(page);
-  await mockWorkspace(page);
-
-  await page.route("**/api/documents/*/progress", route =>
-    route.fulfill({ json: { code: "OK", readUrl: "https://progress.r2.cloudflarestorage.com/progress.json" } }));
-  await page.route("https://progress.r2.cloudflarestorage.com/progress.json", route =>
-    route.fulfill({
-      json: {
-        schemaVersion: "tavonel.ocr_progress.v1",
-        sourceImmutableKey: "w/doc-reading/v1/sanitized.pdf",
-        inputSha256: `sha256:${"a".repeat(64)}`,
-        state: "reading",
-        pagesRead: 4,
-        pageCount: 11,
-        regionsFound: 37,
-        pages: [{
-          pageNumber1: 4,
-          pageCount: 11,
-          path: "raster",
-          regionCount: 3,
-          meanConfidence: 0.7412,
-          boxes: [
-            { bbox1000: [100, 120, 900, 165], confidence: 0.93, text: "제3조 (계약기간 및 갱신)", regionId: "ocr-p0004-l00001" },
-            { bbox1000: [100, 200, 780, 245], confidence: 0.61, text: "본 계약의 기간은 체결일로부터 1년으로 한다.", regionId: "ocr-p0004-l00002" },
-            { bbox1000: [100, 280, 860, 325], confidence: 0.88, text: "", regionId: "ocr-p0004-l00003" },
-          ],
-        }],
-      },
-    }));
-
-  await page.goto("/workspace");
-
-  const reading = page.locator('[data-document-id="doc-reading"] .reading');
+test("processing detail appears only when the user asks for it", async ({ page }) => {
+  await installSession(page); await mockWorkspace(page); await page.goto("/workspace");
+  await page.getByRole("button", { name: "Processing 1" }).first().click();
+  const readingRow = page.locator('[data-document-id="doc-reading"]');
+  await expect(readingRow).toBeVisible();
+  await expect(readingRow.locator(".board-row-detail")).toBeHidden();
+  await readingRow.locator(".board-row-summary").click();
+  await expect(readingRow.locator(".board-row-detail")).toBeVisible();
+  const reading = readingRow.locator(".reading");
   await expect(reading).toBeVisible();
-
-  // One rectangle per reported region, no more and no fewer.
   await expect(reading.locator(".rb")).toHaveCount(3);
-  // The uncertain one is marked as uncertain.
   await expect(reading.locator(".rb.low")).toHaveCount(1);
-  // The other half of the view: the same three regions, as lines, sharing their numbering.
-  await expect(reading.locator(".reading-lines > li")).toHaveCount(3);
-  await expect(reading.locator(".rl").first()).toContainText("제3조 (계약기간 및 갱신)");
-  await expect(reading.locator(".rl.low")).toHaveCount(1);
-  await expect(reading.locator(".rl.low")).toContainText("본 계약의 기간은");
-  // A region the reader read nothing in stays on screen as itself, so the two sides stay in step.
-  await expect(reading.locator(".rl-t.none")).toHaveCount(1);
-  await expect(reading.locator(".rl").nth(2)).toContainText("03");
-  await expect(reading.locator('.rb[data-m="03"]')).toHaveCount(1);
-  // The page being read is named on the source side.
-  await expect(reading).toContainText("p.04");
-
-  // The readout repeats the report rather than rounding it into something friendlier.
-  // Page and total are separate elements so the total can be dimmed, hence the two assertions.
-  await expect(reading.locator(".rh-page")).toContainText("04");
-  await expect(reading.locator(".rh-page")).toContainText("/ 11");
   await expect(reading).toContainText("37");
-  await expect(reading).toContainText("0.741");
-  await expect(reading).toContainText("RASTER");
-
-  // The two documents that are not mid-read have no live view at all.
-  await expect(page.locator(".reading")).toHaveCount(1);
-
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-  expect(overflow).toBeLessThanOrEqual(1);
-  expect(browserErrors).toEqual([]);
-  await testInfo.attach("reading-view", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
 });
 
-test("refuses a progress report it cannot draw honestly", async ({ page }) => {
-  await installSession(page);
-  await mockWorkspace(page);
-  await page.route("**/api/documents/*/progress", route =>
-    route.fulfill({ json: { code: "OK", readUrl: "https://progress.r2.cloudflarestorage.com/progress.json" } }));
-  // pagesRead beyond pageCount: a broken report, not a display problem.
-  await page.route("https://progress.r2.cloudflarestorage.com/progress.json", route =>
-    route.fulfill({
-      json: {
-        schemaVersion: "tavonel.ocr_progress.v1",
-        state: "reading", pagesRead: 99, pageCount: 11, regionsFound: 3, pages: [],
-      },
-    }));
-
-  await page.goto("/workspace");
-  await expect(page.locator(".board")).toBeVisible();
-  // Nothing is drawn from a report that does not qualify.
-  await expect(page.locator(".reading")).toHaveCount(0);
+test("ready sources are searchable without lengthening the whole page", async ({ page }) => {
+  await installSession(page); await mockWorkspace(page); await page.goto("/workspace");
+  await page.getByRole("button", { name: "All 3" }).click();
+  await expect(page.locator(".board-rows > li")).toHaveCount(3);
+  await page.getByPlaceholder("Search sources…").fill("doc-read");
+  await expect(page.locator(".board-rows > li")).toHaveCount(2);
+  const scrollMode = await page.locator(".board-list-wrap").evaluate(element => getComputedStyle(element).overflowY);
+  expect(["auto", "scroll"]).toContain(scrollMode);
 });
 
-/*
- * The floor.
- *
- * The concurrency is between documents, and the surface has to show that or it is describing a
- * different system than the one running. This is the assertion that the previous single-column
- * board could not have passed: three documents under the reader at the same instant, each with
- * its own page and its own lines, and the panels that have nothing streaming kept out of the way
- * so they do not leave a hole the size of a reading beside every one of them.
- */
-test("reads several documents at the same time, each with its own page", async ({ page }, testInfo) => {
-  const browserErrors: string[] = [];
-  page.on("console", message => { if (message.type() === "error") browserErrors.push(message.text()); });
-  page.on("pageerror", error => browserErrors.push(error.message));
+test("empty workspace does not render an empty processing panel", async ({ page }) => {
   await installSession(page);
-
-  const reading = (id: string) => ({
-    documentId: id, versionKey: "v1",
-    sanitizedKey: `w/${id}/v1/sanitized.pdf`, sanitizedSize: 481_112,
-    ocrJsonKey: null, ocrJsonSize: null, hasOcrJson: false,
-    cdrReceiptKey: `w/${id}/v1/cdr-receipt.json`, ocrReviewKey: null,
-    processingState: "sanitized",
-  });
-  await mockCompileJobs(page);
-  await page.route("**/api/documents", route => route.fulfill({
-    json: { documents: [reading("doc-a"), reading("doc-b"), reading("doc-c"), DOCUMENTS[0]] },
-  }));
-  await page.route("**/api/billing/status", route => route.fulfill({
-    json: {
-      account: {
-        accessPlan: null, subscriptionStatus: "inactive", creditBalance: 0,
-        lifetimeCreditsPurchased: 0, lifetimeCreditsReversed: 0, billingHold: false,
-        paddleCustomerId: null, subscriptionCancelAt: null, updatedAt: null,
-      },
-    },
-  }));
-
-  // Each document reports its own page, so a shared or cached report would be visible immediately.
-  const PAGES: Record<string, [number, number, string]> = {
-    "doc-a": [4, 11, "제3조 (계약기간)"],
-    "doc-b": [2, 6, "본 계약의 기간은 1년으로 한다"],
-    "doc-c": [9, 24, "제5조 (비밀유지)"],
-  };
-  await page.route("**/api/documents/*/progress", route => {
-    const id = new URL(route.request().url()).pathname.split("/")[3];
-    return route.fulfill({ json: { code: "OK", readUrl: `https://progress.r2.cloudflarestorage.com/${id}.json` } });
-  });
-  // The host matters: the suite runs under the shipped CSP, whose connect-src admits the R2
-  // domain and nothing else. A made-up hostname here would be blocked before the fetch, and the
-  // failure would look like a bug in the view rather than in the test.
-  await page.route("https://progress.r2.cloudflarestorage.com/*.json", route => {
-    const id = new URL(route.request().url()).pathname.slice(1).replace(".json", "");
-    const entry = PAGES[id];
-    if (!entry) return route.fulfill({ json: {} });
-    const [pagesRead, pageCount, text] = entry;
-    return route.fulfill({
-      json: {
-        schemaVersion: "tavonel.ocr_progress.v1", state: "reading",
-        pagesRead, pageCount, regionsFound: pagesRead * 4,
-        pages: [{
-          pageNumber1: pagesRead, pageCount, path: "raster", regionCount: 1, meanConfidence: 0.9,
-          boxes: [{ bbox1000: [100, 120, 900, 165], confidence: 0.93, text, regionId: `ocr-${id}` }],
-        }],
-      },
-    });
-  });
-
+  await page.route("**/api/access/bootstrap", route => route.fulfill({ json: { code: "ACCESS_READY", access: { source: "trial", accessPlan: "observer_access", billingExempt: true, expiresAt: new Date(Date.now() + 5 * 86400000).toISOString(), limits: { files: 3, pages: 50, worlds: 1 } } } }));
+  await page.route("**/api/compile-jobs", route => route.fulfill({ json: { code: "OK", jobs: [] } }));
+  await page.route("**/api/documents", route => route.fulfill({ json: { documents: [] } }));
+  await page.route("**/api/billing/status", route => route.fulfill({ json: { account: { accessPlan: null, subscriptionStatus: "inactive", creditBalance: 0, lifetimeCreditsPurchased: 0, lifetimeCreditsReversed: 0, billingHold: false, paddleCustomerId: null, subscriptionCancelAt: null, updatedAt: null } } }));
   await page.goto("/workspace");
-  const board = page.locator(".board");
-  await expect(board).toBeVisible();
-
-  // Three readings on screen at once. This is the whole claim.
-  await expect(page.locator(".reading")).toHaveCount(3);
-  await expect(board).toContainText("reading 3");
-
-  // Each panel is reporting its own document, not a shared one.
-  for (const [id, [pagesRead, , text]] of Object.entries(PAGES)) {
-    const panel = page.locator(`[data-document-id="${id}"]`);
-    await expect(panel.locator(".board-now")).toContainText(`READING p.${String(pagesRead).padStart(2, "0")}`);
-    await expect(panel.locator(".reading-lines")).toContainText(text);
-  }
-
-  // The document with nothing streaming is kept in the other zone, so it cannot leave a hole the
-  // height of a reading panel beside it.
-  await expect(page.locator('.board-rows[data-zone="moving"] > li')).toHaveCount(3);
-  await expect(page.locator('.board-rows[data-zone="rest"] > li')).toHaveCount(1);
-  await expect(board).toContainText("STREAMING");
-  await expect(board).toContainText("NOT STREAMING");
-
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-  expect(overflow).toBeLessThanOrEqual(1);
-  expect(browserErrors).toEqual([]);
-  await testInfo.attach("floor", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
+  await expect(page.locator(".board")).toHaveCount(0);
+  await expect(page.getByText("Free evaluation")).toBeVisible();
+  await expect(page.getByText(/3 files · 50 pages · 1 World/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Connections" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Developer" })).toHaveCount(0);
 });

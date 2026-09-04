@@ -6,6 +6,7 @@
   "packageManager": "pnpm@10.34.4",
   "scripts": {
     "dev": "next dev",
+    "prebuild": "pnpm check && pnpm test",
     "build": "next build",
     "start": "next start",
     "test": "vitest run",

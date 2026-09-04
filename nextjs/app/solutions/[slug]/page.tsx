@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PublicPageShell } from "@/components/public-page-shell";
+import PublicPrimaryCta from "@/components/public-primary-cta";
 
 const SOLUTIONS = {
   "ai-ready-knowledge": {
@@ -27,7 +28,7 @@ const SOLUTIONS = {
     limitations: [
       "Where a format does not state a page count, the quote is an estimate and is labelled one. Spreadsheets have no decided billable unit at all.",
       "Handwriting, stamps and heavily degraded scans are routed to review rather than guessed at, and review is a person's time.",
-      "No accuracy figure is published, because no same-condition benchmark has been run. A vendor score is not a substitute.",
+      "No accuracy figure is published without a same-condition benchmark.",
     ],
   },
   "knowledge-graph": {
@@ -39,8 +40,8 @@ const SOLUTIONS = {
     outcomes: ["Stable object and relation IDs", "Ontology and graph exports", "Version history and rollback", "Evidence for every qualified edge"],
     limitations: [
       "The graph is compiled from documents, so an object exists only where a source region supports it.",
-      "Exports are Turtle, JSON-LD and CSV. There is no live connector into a graph database; a load is a load.",
-      "Identity resolution across a corpus is the hard part and its thresholds are not calibrated. Merges are reviewable for that reason.",
+      "Exports are Turtle, JSON-LD and CSV. There is no live connector into a graph database yet.",
+      "Identity-resolution thresholds are not calibrated across every corpus, so uncertain merges remain reviewable.",
     ],
   },
   "source-grounded-assistants": {
@@ -51,9 +52,9 @@ const SOLUTIONS = {
     flow: ["Ask the active World", "Retrieve qualified objects", "Generate with version context", "Attach evidence", "Abstain when support is insufficient"],
     outcomes: ["Answer and evidence share one World version", "Page-level citation inspection", "Explicit abstention", "Model-independent knowledge"],
     limitations: [
-      "The World abstains where the sources do not support an answer. An assistant that must always answer is the wrong fit.",
-      "Ask, the API and MCP read the same active revision, so an assistant is exactly as current as the last promotion.",
-      "Model choice is yours; the World is the contract. Nothing here evaluates a model for you.",
+      "The World abstains where the sources do not support an answer.",
+      "Ask, the API and MCP read the same active revision, so an assistant is as current as the last promotion.",
+      "Model choice is yours; the World is the contract.",
     ],
   },
   "knowledge-operations": {
@@ -64,9 +65,9 @@ const SOLUTIONS = {
     flow: ["Compile a candidate", "Route review reasons", "Inspect source versus result", "Promote explicitly", "Rollback when needed"],
     outcomes: ["Candidate-to-active lifecycle", "Human promotion gate", "Activity and audit records", "Budget and retention controls"],
     limitations: [
-      "Promotion is a human decision by design. Without somebody to make it, a candidate never becomes the World anyone answers from.",
-      "Membership is not available: one workspace belongs to one account today, and shared review queues need a tenancy change first.",
-      "Rollback restores a prior revision. It does not undo what was done elsewhere with an answer from the one being rolled back.",
+      "Promotion is a human decision by design.",
+      "Membership is not available yet for shared workspaces; Team remains contact-only until tenancy is complete.",
+      "Rollback restores a prior revision. It does not undo downstream use of an older answer.",
     ],
   },
 } as const;
@@ -89,24 +90,67 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   };
 }
 
-/*
-  Masterplan 13.22 asks every solution page for its limitations, and it is the section that
-  decides whether the rest of the page is a description or a pitch. Each entry below names
-  something this product genuinely does not do for that buyer -- an uncalibrated threshold, an
-  abstention, a tenancy limit -- rather than a difficulty it happens to solve.
-*/
 export default async function SolutionPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const solution = SOLUTIONS[slug as SolutionSlug];
   if (!solution) notFound();
+
   return (
     <PublicPageShell>
-      <section className="scene doc"><div className="shell">
-        <div className="body"><div className="stack"><p className="slate"><b>SOLUTION</b><span />{solution.eyebrow}</p><h1 className="document-title">{solution.title}</h1></div><div className="stack"><p className="lede">{solution.lede}</p><p>{solution.problem}</p></div></div>
-        <div className="body"><div className="stack"><p className="slate"><b>WORKFLOW</b><span />FROM SOURCE TO WORLD</p><h2>A traceable compilation path.</h2></div><div className="chain">{solution.flow.map((item, index) => <article className="link" key={item}><span className="st">{String(index + 1).padStart(2, "0")}</span><h3>{item}</h3></article>)}</div></div>
-        <div className="body"><div className="stack"><p className="slate"><b>OUTCOMES</b><span />ACTUAL PRODUCT CONTRACT</p><h2>What the workflow leaves behind.</h2></div><div className="chain">{solution.outcomes.map((item) => <article className="link" key={item}><h3>{item}</h3></article>)}</div></div>
-        <div className="body"><div className="stack"><p className="slate"><b>LIMITS</b><span />WHERE THIS STOPS</p><h2>What it does not do.</h2></div><div className="chain">{solution.limitations.map((item) => <article className="link" key={item}><p>{item}</p></article>)}</div></div>
-        <div className="actions"><Link className="btn" href="/login">Compile your own sources</Link><Link className="btn ghost" href="/explore">Explore a Compiled World</Link></div>
+      <section className="scene doc solution-page"><div className="shell">
+        <div className="body solution-hero">
+          <div className="stack">
+            <p className="slate"><b>SOLUTION</b><span />{solution.eyebrow}</p>
+            <h1 className="document-title">{solution.title}</h1>
+          </div>
+          <div className="stack solution-hero-copy">
+            <p className="lede">{solution.lede}</p>
+            <p>{solution.problem}</p>
+            <div className="solution-proofline" aria-label="From source to compiled World">
+              <span>SOURCE</span><i aria-hidden="true" />
+              <span>READ</span><i aria-hidden="true" />
+              <span>STRUCTURE</span><i aria-hidden="true" />
+              <span>WORLD</span>
+            </div>
+          </div>
+        </div>
+
+        <section className="solution-section" aria-labelledby="solution-flow-title">
+          <div className="solution-section-heading">
+            <p className="slate"><b>WORKFLOW</b><span />FROM SOURCE TO WORLD</p>
+            <h2 id="solution-flow-title">A traceable compilation path.</h2>
+          </div>
+          <ol className="solution-flow">
+            {solution.flow.map((item, index) => (
+              <li key={item}>
+                <span>{String(index + 1).padStart(2, "0")}</span>
+                <h3>{item}</h3>
+              </li>
+            ))}
+          </ol>
+        </section>
+
+        <section className="solution-section" aria-labelledby="solution-outcomes-title">
+          <div className="solution-section-heading">
+            <p className="slate"><b>OUTCOMES</b><span />WHAT YOU CAN USE</p>
+            <h2 id="solution-outcomes-title">What the workflow leaves behind.</h2>
+          </div>
+          <div className="solution-outcomes">
+            {solution.outcomes.map((item) => <article key={item}><h3>{item}</h3></article>)}
+          </div>
+        </section>
+
+        <details className="solution-notes">
+          <summary><span>WHERE THIS STOPS</span> · Things to know before you compile</summary>
+          <div>
+            {solution.limitations.map((item) => <p key={item}>{item}</p>)}
+          </div>
+        </details>
+
+        <div className="actions solution-actions">
+          <PublicPrimaryCta className="btn" />
+          <Link className="btn ghost" href="/explore">Explore a World</Link>
+        </div>
       </div></section>
     </PublicPageShell>
   );

@@ -1,19 +1,10 @@
 import Link from "next/link";
 import type { Route } from "next";
 import Logomark from "@/components/logomark";
-import { primaryCallToAction } from "@/lib/commercial-state";
+import PublicPrimaryCta from "@/components/public-primary-cta";
 import { FOOTER_GROUPS, PRIMARY_NAV } from "@/lib/site-navigation";
 
-/**
- * The header and footer every public page wears.
- *
- * Server components, so the call to action can read commercial state directly: in pilot the
- * primary button says "Request access" and goes to contact, and there is no page left that can
- * quietly offer a checkout the deployment cannot honour.
- */
-
 export function PublicSiteHeader({ cta }: { cta?: { label: string; href: string } }) {
-  const action = cta ?? primaryCallToAction();
   return (
     <header className="nav" data-stuck={1}>
       <Link href="/" className="wordmark" aria-label="TAVONEL home">
@@ -26,7 +17,7 @@ export function PublicSiteHeader({ cta }: { cta?: { label: string; href: string 
         ))}
       </nav>
       <span className="nav-actions">
-        <Link className="btn small" href={action.href as Route}>{action.label}</Link>
+        {cta ? <Link className="btn small" href={cta.href as Route}>{cta.label}</Link> : <PublicPrimaryCta />}
         <Link className="nav-signin" href="/login">Sign in</Link>
       </span>
     </header>
@@ -54,7 +45,6 @@ export function PublicSiteFooter() {
   );
 }
 
-/** A whole public page, chrome included. Pages supply only their own content. */
 export function PublicSitePage({ children }: { children: React.ReactNode }) {
   return (
     <div className="page">
