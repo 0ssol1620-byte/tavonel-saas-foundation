@@ -47,6 +47,7 @@ const COPY_SURFACES = [
   "lib/film-script.ts",
   "components/opening-film.tsx",
   "components/compile-stage-player.tsx",
+  "components/compile-stage-vector-film.tsx",
   "components/compile-stage.tsx",
   "app/film/page.tsx",
   "app/research/page.tsx",
@@ -81,17 +82,18 @@ function read(surface: string): string {
 }
 
 /*
-  The landing page is three files now.
+  The landing page is four files now.
 
-  Scene 3's four stacked bands became one pinned player, so the film sources, posters and stage
-  labels moved into `compile-stage-player.tsx`. Every assertion below is about what a visitor
-  sees at `/`, so the player is part of the landing source they read.
+  Scene 3 owns one stage player. The player owns stage selection and timing while the vector film
+  owns the visible proof surface. Keeping both in the landing source means public-copy rules apply
+  to the text a visitor actually sees, not just to the wrapper around it.
 */
 function landingSource(): string {
   return [
     read("app/page.tsx"),
     read("components/home-page-client.tsx"),
     read("components/compile-stage-player.tsx"),
+    read("components/compile-stage-vector-film.tsx"),
   ].join("\n");
 }
 
@@ -144,12 +146,13 @@ describe("public copy", () => {
     expect(page).toContain("evidence back to the page.");
   });
 
-  it("puts the locked hero proof and three motion cuts on the landing page", () => {
+  it("keeps the legacy motion masters addressable while the landing uses vector proof", () => {
     const page = landingSource();
     expect(page).toContain("/film/poster-1.webp");
     expect(page).toContain("/film/compile-cut-2.mp4");
     expect(page).toContain("/film/compile-cut-3.mp4");
     expect(page).toContain("/film/compile-cut-4.mp4");
+    expect(page).toContain("CompileStageVectorFilm");
   });
 
   it("does not wrap the films in a clickable link", () => {
@@ -159,32 +162,33 @@ describe("public copy", () => {
   });
 
   /*
-    One player owns every landing film, and the scene files hand-roll none.
+    One player owns the landing proof, and scene files hand-roll no raster playback.
 
-    The hero was twice rewritten as a bare <video> — once for an LCP experiment, once in a
-    server-component split — and both times it lost the playback logic it needs: the observer,
-    the resume on visibility change, the resume on a decoder stall. Bands further down hide
-    that failure because scrolling back restarts them; a film on screen from load crosses its
-    loop point untouched and simply freezes.
-
-    That logic now lives in `CompileStagePlayer` rather than a per-band component, because the
-    four cuts share one viewport and the interesting invariant is that only one of them holds a
-    decoder. The scene files must still contain no <video> of their own.
+    The visible stage used to depend on a video/canvas master whose tiny raster type could look
+    soft when the frame was enlarged. The landing renderer is now DOM + SVG: the browser shapes
+    text and geometry at the device's native scale. Legacy MP4s remain addressable for dedicated
+    film surfaces, but they are not the visible renderer inside the landing stage player.
   */
-  it("keeps every landing film inside the stage player, never in a scene file", () => {
+  it("keeps every landing film inside the stage player as resolution-independent vector proof", () => {
     for (const file of ["app/page.tsx", "components/home-page-client.tsx"]) {
-      // Comments in these files discuss the <video> element by name, so the check is run
-      // against the source with comments stripped — otherwise it fails on its own rationale.
       const source = read(file)
         .replace(/\/\*[\s\S]*?\*\//g, "")
         .replace(/^\s*\/\/.*$/gm, "");
       expect(source, `${file} must not hand-roll a <video>`).not.toMatch(/<video[\s>]/);
+      expect(source, `${file} must not hand-roll a <canvas>`).not.toMatch(/<canvas[\s>]/);
       expect(source, `${file} must not inline an aspect ratio`).not.toContain("aspectRatio");
     }
+
     const player = read("components/compile-stage-player.tsx");
-    expect(player, "the player owns exactly one <video> template").toMatch(/<video/);
-    expect(player, "only the active and admitted stages may hold a source")
-      .toContain("admitted.has(position) ?");
+    expect(player).toContain("CompileStageVectorFilm");
+    expect(player).toContain('data-film-renderer="vector-dom-svg"');
+    expect(player, "the landing player must not rasterize its visible proof through video").not.toMatch(/<video[\s>]/);
+    expect(player, "the landing player must not rasterize its visible proof through canvas").not.toMatch(/<canvas[\s>]/);
+
+    const vector = read("components/compile-stage-vector-film.tsx");
+    expect(vector, "the vector film must contain SVG geometry").toContain("<svg");
+    expect(vector, "the vector film must not embed a raster video/canvas/image surface")
+      .not.toMatch(/<(?:video|canvas|img)[\s>]/);
   });
 
   /*
@@ -204,7 +208,7 @@ describe("public copy", () => {
       expect(player, `the stage strip must offer ${stage}`).toContain(stage);
     }
     expect(player, "stages must be selectable, not decorative").toContain('role="tab"');
-    expect(player, "reduced motion gets stills and no timer").toContain("prefers-reduced-motion");
+    expect(player, "reduced motion disables automatic stage cycling").toContain("prefers-reduced-motion");
   });
 
   /*
@@ -226,39 +230,15 @@ describe("public copy", () => {
   });
 
   /*
-    A poster that does not exist renders a broken-image icon and the alt text.
-
-    Cuts 2-4 shipped for one deploy with their posters deleted as a bandwidth saving, which the
-    reduced-motion branch turned into `<img src={undefined}>` — a visitor with that setting saw
-    a broken image where the film should be. Both halves are asserted: every band names a
-    poster, and every poster it names is a file in the repo.
+    The legacy masters remain 2x for the dedicated film surfaces and as archival fallbacks.
+    They are no longer the landing's visible proof renderer, but keeping their dimensions pinned
+    prevents a future route from silently reintroducing the original 1440-wide upscale problem.
   */
-  /*
-    The masters are 2x, so a HiDPI display has real pixels to paint.
-
-    A 1440-wide master is upscaled ~1.7x on a 2x screen — measured 1440 source pixels stretched
-    into 2460 device pixels — and the small mono type in these cuts is the first thing to smear.
-    That is why a film could look sharp on one monitor and mushy on another.
-
-    This asserts the shipped bytes, not the recording script, because the two have drifted
-    before: `deviceScaleFactor` looks like it should raise the recorded resolution and does not,
-    and a 2880 viewport raises it while silently breaking the composition.
-  */
-  it("ships the compile cuts at 2x so HiDPI screens do not upscale them", () => {
+  it("keeps the legacy compile masters at 2x", () => {
     const film = join(root, "public", "film");
     for (const name of ["compile-cut", "compile-cut-2", "compile-cut-3", "compile-cut-4"]) {
       const file = join(film, `${name}.mp4`);
       expect(existsSync(file), `${name}.mp4 is missing`).toBe(true);
-      /*
-        Read the dimensions from the file rather than shelling out to ffprobe, which is not on
-        every machine that runs these tests.
-
-        `tkhd` ends with width and height as 16.16 fixed-point, 80 bytes past the type field in
-        a version-0 box — located by searching the box for the known pair rather than counting
-        the spec's fields, after three hand-counted offsets each produced plausible wrong
-        numbers (68 gave "1800x0", 76 the unity matrix's 16384, 84 "1800x0" again). The
-        assertion prints what it read so a future drift is legible rather than a bare false.
-      */
       const bytes = readFileSync(file);
       const at = bytes.indexOf(Buffer.from("tkhd"));
       expect(at, `${name}.mp4 has no tkhd box`).toBeGreaterThan(0);
@@ -269,15 +249,8 @@ describe("public copy", () => {
     }
   });
 
-  it("gives every film stage a poster file that actually exists", () => {
+  it("gives every legacy film stage a poster file that actually exists", () => {
     const page = landingSource();
-    /*
-      Match the path wherever it is written, not only in a JSX attribute.
-
-      The old pattern required `poster="/film/..."` literally. Posters are now declared once in
-      the stage table and passed through as `poster={stage.poster}`, so an attribute-shaped
-      regex found none of them and the check silently had nothing to assert.
-    */
     const posters = [...page.matchAll(/["'](\/film\/poster-[^"']+)["']/g)].map((match) => match[1]!);
     expect(posters.length, "every stage names a poster").toBeGreaterThanOrEqual(4);
     for (const poster of posters) {
@@ -311,8 +284,6 @@ describe("public copy", () => {
     const stage = read("components/compile-stage.tsx");
     expect(stage).toContain("SOURCES");
     expect(stage).toContain("WORLD");
-    // The landing fixture must never be pasted into the authenticated surface: no import of
-    // the demo world, and no census figure. (The file may name them in prose to say so.)
     expect(stage).not.toMatch(/from ["']@\/lib\/demo-world["']/);
     expect(stage).not.toContain("SOURCE_CENSUS");
   });
