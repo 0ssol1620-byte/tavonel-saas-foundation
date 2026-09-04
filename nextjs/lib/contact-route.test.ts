@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { POST } from "../app/api/contact/route";
 
@@ -11,6 +11,12 @@ const valid = {
   website: "",
   startedAt: Date.now() - 5_000,
 };
+
+beforeEach(() => {
+  // Vercel Preview builds run unit tests with NODE_ENV=production. These route tests exercise
+  // the local/default posture unless a case explicitly opts into production below.
+  vi.stubEnv("NODE_ENV", "test");
+});
 
 afterEach(() => {
   vi.unstubAllEnvs();
