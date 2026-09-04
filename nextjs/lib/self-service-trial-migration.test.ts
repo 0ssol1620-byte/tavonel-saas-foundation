@@ -13,7 +13,8 @@ describe("owner and self-service evaluation migration", () => {
     expect(migration).toContain("grant_kind in ('owner')");
     expect(migration).toContain("billing_exempt boolean not null default false");
     expect(migration).toContain("billing_source in ('paid', 'trial', 'owner')");
-    expect(migration).toContain("billing_source = 'owner'");
+    expect(migration).toContain("reservation.billing_source in ('owner', 'trial')");
+    expect(migration).toContain("'billingsource', 'owner'");
   });
 
   it("sets the free evaluation to 7 days, 3 files, 50 pages and one World", () => {
