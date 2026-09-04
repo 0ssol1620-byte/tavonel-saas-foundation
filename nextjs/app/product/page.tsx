@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PublicPageShell } from "@/components/public-page-shell";
+import PublicPrimaryCta from "@/components/public-primary-cta";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/product" },
@@ -34,7 +35,7 @@ export default function ProductPage() {
             </div>
             <div className="stack">
               <p className="lede">Documents, scans and connected systems go in. A source-grounded, versioned Compiled World comes out — with evidence still attached.</p>
-              <div className="actions"><Link className="btn" href="/login">Start free</Link><Link className="btn ghost" href="/explore">Explore a World</Link></div>
+              <div className="actions"><PublicPrimaryCta className="btn" /><Link className="btn ghost" href="/explore">Explore a World</Link></div>
             </div>
           </div>
 
