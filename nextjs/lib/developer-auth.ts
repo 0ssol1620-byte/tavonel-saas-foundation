@@ -2,6 +2,11 @@ import { authorizeFoundationProduct } from "./billing-product-access";
 import type { DeveloperScope } from "./developer-contracts";
 import { authenticateDeveloperApiKey, consumeDeveloperApiRateLimit } from "./developer-store";
 import { foundationPilotAccess, getRequestUser } from "./foundation-pilot";
+import {
+  authorizeFoundationSessionProduct,
+  trialFeatureBlocked,
+  type SessionAccessSource,
+} from "./self-service-trial";
 
 export type FoundationPrincipal = {
   kind: "session" | "api-key";
@@ -9,6 +14,7 @@ export type FoundationPrincipal = {
   userId: string;
   keyId?: string;
   scopes: readonly DeveloperScope[];
+  accessSource?: SessionAccessSource;
 };
 
 const SCOPE_RATE_LIMITS: Record<DeveloperScope, number> = {
@@ -31,12 +37,18 @@ export async function authorizeFoundationRequest(
 ) {
   const authorization = request.headers.get("authorization") ?? "";
   const bearer = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
-  let principal: FoundationPrincipal | null = null;
+
   if (bearer.startsWith("tvnl_live_")) {
+    // API keys remain a paid/owner Developer capability. A free evaluation may exercise the
+    // product in the browser, but it never mints a reusable credential that can be scripted into
+    // an unbounded client. Explicit owner grants are allowed because authorizeFoundationProduct
+    // recognizes them independently of Paddle.
     const authenticated = await authenticateDeveloperApiKey(bearer);
     if (!authenticated.ok) return { ok: false as const, code: authenticated.code, status: 401 };
-    if (!authenticated.principal.scopes.includes(scope)) return { ok: false as const, code: "API_SCOPE_REQUIRED", status: 403 };
-    principal = authenticated.principal;
+    if (!authenticated.principal.scopes.includes(scope)) {
+      return { ok: false as const, code: "API_SCOPE_REQUIRED", status: 403 };
+    }
+    const principal: FoundationPrincipal = authenticated.principal;
     const pilot = foundationPilotAccess(principal.userId);
     if (!pilot || pilot.membership.workspaceId !== principal.workspaceKey) {
       return { ok: false as const, code: "PILOT_ACCESS_REQUIRED", status: 403 };
@@ -52,20 +64,32 @@ export async function authorizeFoundationRequest(
       code: rate.code,
       status: rate.code === "API_RATE_LIMITED" ? 429 : 503,
     };
-  } else {
-    const user = await getRequestUser(request);
-    if (!user) return { ok: false as const, code: "AUTH_REQUIRED", status: 401 };
-    const access = foundationPilotAccess(user.id);
-    if (!access) return { ok: false as const, code: "PILOT_ACCESS_REQUIRED", status: 403 };
-    principal = {
-      kind: "session",
-      workspaceKey: access.membership.workspaceId,
-      userId: user.id,
-      scopes: [scope],
-    };
+    const productAccess = await authorizeFoundationProduct(principal.workspaceKey, principal.userId, minimumPlan);
+    if (!productAccess.ok) {
+      return { ok: false as const, code: productAccess.code, status: productAccess.status };
+    }
+    principal.accessSource = productAccess.source;
+    return { ok: true as const, principal };
   }
-  const productAccess = await authorizeFoundationProduct(principal.workspaceKey, principal.userId, minimumPlan);
-  if (!productAccess.ok) return { ok: false as const, code: productAccess.code, status: productAccess.status };
+
+  const user = await getRequestUser(request);
+  if (!user) return { ok: false as const, code: "AUTH_REQUIRED", status: 401 };
+  const access = foundationPilotAccess(user.id);
+  if (!access) return { ok: false as const, code: "PILOT_ACCESS_REQUIRED", status: 403 };
+  const productAccess = await authorizeFoundationSessionProduct(access.membership.workspaceId, user.id, minimumPlan);
+  if (!productAccess.ok) {
+    return { ok: false as const, code: productAccess.code, status: productAccess.status };
+  }
+  if (productAccess.access.source === "trial" && trialFeatureBlocked(scope)) {
+    return { ok: false as const, code: "TRIAL_FEATURE_NOT_INCLUDED", status: 402 };
+  }
+  const principal: FoundationPrincipal = {
+    kind: "session",
+    workspaceKey: access.membership.workspaceId,
+    userId: user.id,
+    scopes: [scope],
+    accessSource: productAccess.access.source,
+  };
   return { ok: true as const, principal };
 }
 
@@ -74,8 +98,10 @@ export async function requireFoundationSession(request: Request, minimumPlan: "o
   if (!user) return { ok: false as const, code: "AUTH_REQUIRED", status: 401 };
   const access = foundationPilotAccess(user.id);
   if (!access) return { ok: false as const, code: "PILOT_ACCESS_REQUIRED", status: 403 };
-  const productAccess = await authorizeFoundationProduct(access.membership.workspaceId, user.id, minimumPlan);
-  if (!productAccess.ok) return { ok: false as const, code: productAccess.code, status: productAccess.status };
+  const productAccess = await authorizeFoundationSessionProduct(access.membership.workspaceId, user.id, minimumPlan);
+  if (!productAccess.ok) {
+    return { ok: false as const, code: productAccess.code, status: productAccess.status };
+  }
   return {
     ok: true as const,
     principal: {
@@ -83,6 +109,7 @@ export async function requireFoundationSession(request: Request, minimumPlan: "o
       workspaceKey: access.membership.workspaceId,
       userId: user.id,
       scopes: [] as DeveloperScope[],
+      accessSource: productAccess.access.source,
     },
   };
 }
