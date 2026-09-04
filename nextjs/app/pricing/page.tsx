@@ -179,8 +179,8 @@ export default function PricingPage() {
                       ? selfService ? "Start free evaluation" : "Request evaluation"
                       : !liveCheckout
                         ? "Request access"
-                        : plan.name === "Enterprise"
-                          ? "Start a conversation"
+                        : !plan.offerCode
+                          ? plan.name === "Enterprise" ? "Start a conversation" : "Contact sales"
                           : billingBusy === plan.offerCode
                             ? "Opening checkout…"
                             : signedIn ? "Choose this plan" : "Choose this plan → sign in"}
