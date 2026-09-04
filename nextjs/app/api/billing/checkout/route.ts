@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getFoundationAccountGrant } from "@/lib/account-grants";
 import { createCheckoutBinding } from "@/lib/billing-binding";
 import { isBillingOfferCode, readConfiguredBillingOffers, readPaddleBrowserConfig } from "@/lib/billing-catalog";
 import { readCommercialState } from "@/lib/commercial-state";
@@ -17,6 +18,15 @@ export async function POST(request: Request) {
   const user = await getRequestUser(request);
   if (!user) return NextResponse.json({ code: "AUTH_REQUIRED" }, { status: 401, headers: NO_STORE });
 
+  // An explicit billing-exempt owner grant is the source of truth for the product owner. Do not
+  // create another Paddle checkout merely because an old provider record exists or the UI still
+  // has a purchase button somewhere.
+  const grant = await getFoundationAccountGrant(user.id);
+  if (!grant.ok) return NextResponse.json({ code: grant.code }, { status: 503, headers: NO_STORE });
+  if (grant.grant?.billingExempt) {
+    return NextResponse.json({ code: "OWNER_ACCESS_ACTIVE" }, { status: 409, headers: NO_STORE });
+  }
+
   let body: { offerCode?: unknown };
   try {
     body = await request.json();
@@ -32,8 +42,6 @@ export async function POST(request: Request) {
   if (!paddle || !offer || secret.length < 32) {
     return NextResponse.json({ code: "BILLING_NOT_CONFIGURED" }, { status: 503, headers: NO_STORE });
   }
-  // checkoutEnabled, not liveChargesEnabled: sandbox must stay able to open a session so the
-  // end-to-end payment path can be qualified before it is ever pointed at a real card.
   if (!readCommercialState().checkoutEnabled) {
     return NextResponse.json({ code: "BILLING_LAUNCH_PENDING" }, { status: 503, headers: NO_STORE });
   }
