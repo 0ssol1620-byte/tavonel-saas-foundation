@@ -31,14 +31,18 @@ export function readFoundationPilotUserIds(
 // nothing at all. That is correct for a private pilot and fatal for self-service signup.
 //
 // Default is `pilot`. A deployment opts into public signup explicitly by setting
-// ACCESS_MODE=self_service -- forgetting to configure something must never silently open a
-// deployment to the world, so the fail-closed direction is the default.
+// ACCESS_MODE=self_service. Vercel preview deployments remain pilot even when they inherit the
+// project value: otherwise a public preview URL could mint free trials against the production
+// database. Local/test environments have no VERCEL_ENV and may opt in explicitly.
 export type AccessMode = "pilot" | "self_service";
 
 export function readAccessMode(
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): AccessMode {
-  return env.ACCESS_MODE?.trim().toLowerCase() === "self_service" ? "self_service" : "pilot";
+  if (env.ACCESS_MODE?.trim().toLowerCase() !== "self_service") return "pilot";
+  const vercelEnv = env.VERCEL_ENV?.trim().toLowerCase() ?? "";
+  if (vercelEnv && vercelEnv !== "production") return "pilot";
+  return "self_service";
 }
 
 // This object is only the immediate, in-process onboarding envelope. The durable trial policy

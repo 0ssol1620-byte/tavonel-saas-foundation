@@ -33,8 +33,13 @@ const PAID_PLANS = (Object.entries(BILLING_OFFERS) as Array<[BillingOfferCode, (
 const EVALUATION = {
   name: "Evaluation",
   price: "$0",
-  description: "Compile your own sources in an invitation-based evaluation workspace.",
-  features: ["Manual upload", "Compiled World, Evidence and Ask", "Signed export", "No card to request access"],
+  description: "Try TAVONEL with your own files. No card required.",
+  features: [
+    "Up to 3 files and 50 standard pages",
+    "1 Compiled World with Evidence and Ask",
+    "Signed export",
+    "7 days, no card required",
+  ],
   offerCode: null,
 } as const;
 
@@ -59,6 +64,7 @@ export default function PricingPage() {
     would offer a checkout the API then refused.
   */
   const [liveCheckout, setLiveCheckout] = useState(false);
+  const [selfService, setSelfService] = useState(false);
   const [pages, setPages] = useState(348);
   const { start: startCheckout, busy: billingBusy } = useCheckout(setNotice);
   const quote = quoteCompilePages(pages);
@@ -74,17 +80,24 @@ export default function PricingPage() {
       }
       try {
         const response = await fetch("/api/status", { cache: "no-store" });
-        const status = await response.json() as { liveCheckout?: boolean };
-        if (!cancelled) setLiveCheckout(status.liveCheckout === true);
+        const status = await response.json() as { liveCheckout?: boolean; selfService?: boolean };
+        if (!cancelled) {
+          setLiveCheckout(status.liveCheckout === true);
+          setSelfService(status.selfService === true);
+        }
       } catch {
-        // Fail closed: an unreachable status endpoint must never open a checkout.
-        if (!cancelled) setLiveCheckout(false);
+        // Fail closed: an unreachable status endpoint must never open checkout or public signup.
+        if (!cancelled) {
+          setLiveCheckout(false);
+          setSelfService(false);
+        }
       }
     })();
     return () => { cancelled = true; };
   }, []);
 
   const requestAccess = () => window.location.assign("/contact");
+  const startEvaluation = () => window.location.assign(selfService ? "/login" : "/contact");
 
   const chooseOffer = (offerCode: BillingOfferCode) => {
     if (!liveCheckout) {
@@ -109,8 +122,8 @@ export default function PricingPage() {
           {PRIMARY_NAV.map((link) => <Link key={link.href} href={link.href as Route}>{link.label}</Link>)}
         </nav>
         <span className="nav-actions">
-          <Link className="btn small" href={(liveCheckout ? "/login" : "/contact") as Route}>
-            {liveCheckout ? "Start with your files" : "Request access"}
+          <Link className="btn small" href={(liveCheckout || selfService ? "/login" : "/contact") as Route}>
+            {liveCheckout || selfService ? "Start with your files" : "Request access"}
           </Link>
           <Link className="nav-signin" href="/login">Sign in</Link>
         </span>
@@ -121,10 +134,6 @@ export default function PricingPage() {
             <p className="slate"><b>PRICING</b><span />PAGES AND DOLLARS</p>
             <h1 className="document-title">Pages and dollars.<br />No credit arithmetic.</h1>
             <p className="lede">
-              {/*
-                "modeled at" is what an internal cost model says, not what a customer is told
-                they will pay. In pilot the honest word for this number is the rate.
-              */}
               {liveCheckout ? "Standard" : "Pilot"} processing rate: <b>$0.04 per standard page</b>.
               Complex pages are escalated only when a page needs it, and never exceed
               <b> $0.06 per page</b> without a new confirmation.
@@ -153,7 +162,7 @@ export default function PricingPage() {
             <div className="plans rv">
               {PLANS.map((plan) => (
                 <article className="plan" key={plan.name} data-featured={plan.name === "Developer" ? 1 : 0}>
-                  <span className="tag">{plan.name === "Developer" ? "START HERE" : " "}</span>
+                  <span className="tag">{plan.name === "Developer" ? "START HERE" : plan.name === "Evaluation" ? "TRY IT FREE" : " "}</span>
                   <h3>{plan.name}</h3>
                   <span className="price">{plan.price}{plan.price !== "$0" && plan.price.startsWith("$") ? <small> / month</small> : null}</span>
                   <p>{plan.description}</p>
@@ -162,14 +171,16 @@ export default function PricingPage() {
                     className="btn ghost"
                     type="button"
                     disabled={Boolean(billingBusy)}
-                    onClick={() => (!liveCheckout || !plan.offerCode ? requestAccess() : chooseOffer(plan.offerCode))}
+                    onClick={() => plan.name === "Evaluation"
+                      ? startEvaluation()
+                      : (!liveCheckout || !plan.offerCode ? requestAccess() : chooseOffer(plan.offerCode))}
                   >
-                    {!liveCheckout
-                      ? "Request access"
-                      : plan.name === "Enterprise"
-                        ? "Start a conversation"
-                        : plan.name === "Evaluation"
-                          ? "Request evaluation"
+                    {plan.name === "Evaluation"
+                      ? selfService ? "Start free evaluation" : "Request evaluation"
+                      : !liveCheckout
+                        ? "Request access"
+                        : plan.name === "Enterprise"
+                          ? "Start a conversation"
                           : billingBusy === plan.offerCode
                             ? "Opening checkout…"
                             : signedIn ? "Choose this plan" : "Choose this plan → sign in"}

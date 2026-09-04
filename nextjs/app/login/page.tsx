@@ -27,6 +27,7 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [commercialMode, setCommercialMode] = useState<"pilot" | "live">("pilot");
+  const [selfService, setSelfService] = useState(false);
   /**
    * R1, second half. Someone who arrived by picking a plan is not here to "open a workspace" --
    * they are part-way through a purchase, and the page has to say so or the detour looks like the
@@ -58,13 +59,21 @@ export default function LoginPage() {
       }
       try {
         const response = await fetch("/api/status", { cache: "no-store" });
-        const body = (await response.json()) as { auth?: string; commercialMode?: "pilot" | "live" };
+        const body = (await response.json()) as {
+          auth?: string;
+          commercialMode?: "pilot" | "live";
+          selfService?: boolean;
+        };
         if (cancelled) return;
         setCommercialMode(body.commercialMode === "live" ? "live" : "pilot");
+        setSelfService(body.selfService === true);
         setAuthState(body.auth === "google_oauth_configured" ? "ready" : "unconfigured");
       } catch {
         // Fail closed: if the deployment cannot be asked, do not offer a control that will fail.
-        if (!cancelled) setAuthState("unconfigured");
+        if (!cancelled) {
+          setSelfService(false);
+          setAuthState("unconfigured");
+        }
       }
     })();
     return () => { cancelled = true; };
@@ -85,7 +94,7 @@ export default function LoginPage() {
       options: { redirectTo: `${window.location.origin}/auth/callback` },
     });
     if (authError) {
-      setError("Google sign-in could not start. This pilot admits testing-mode users only.");
+      setError("Google sign-in could not start. Please try again.");
       setBusy(false);
     }
   };
@@ -113,6 +122,11 @@ export default function LoginPage() {
               itself once you are in. Nothing is charged by signing in, and access changes only
               after a signed webhook is persisted.
             </p>
+          ) : selfService ? (
+            <p className="notice static" role="status">
+              <strong>Start with a free evaluation.</strong> Use up to 3 files and 50 standard
+              pages to compile 1 World for 7 days. No card is required.
+            </p>
           ) : null}
 
           <div className="auth-actions">
@@ -137,6 +151,7 @@ export default function LoginPage() {
             <li><b>Google sign-in.</b> No separate TAVONEL password is created or stored.</li>
             <li><b>Tenant scoped.</b> Workspace access and source processing remain bound to your account.</li>
             <li><b>Human review.</b> Review gates remain visible before a candidate World is activated.</li>
+            {selfService ? <li><b>Bounded evaluation.</b> Free compute is limited before processing begins, so paid workloads remain protected.</li> : null}
           </ul>
         </div>
       </div>

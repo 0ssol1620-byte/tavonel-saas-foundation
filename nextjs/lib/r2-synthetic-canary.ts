@@ -3,6 +3,7 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 export const FOUNDATION_R2_BUCKET = "tavonel-saas-foundation-quarantine";
 export const SYNTHETIC_PREFIX = "synthetic/";
 export const SYNTHETIC_CANARY_BODY = "TAVONEL foundation synthetic canary. Not customer data.\n";
+const MAX_QUARANTINE_READ_BYTES = 5 * 1024 * 1024;
 
 export type R2SignerEnv = {
   accountId: string;
@@ -64,9 +65,9 @@ function amzDate(now: Date) {
   return { amzDate: iso, dateStamp: iso.slice(0, 8) };
 }
 
-async function signedS3(
+async function signedS3Response(
   env: R2SignerEnv,
-  method: "PUT" | "HEAD" | "DELETE",
+  method: "PUT" | "HEAD" | "DELETE" | "GET",
   key: string,
   body: Buffer | undefined,
   now = new Date(),
@@ -108,16 +109,25 @@ async function signedS3(
   const signature = createHmac("sha256", kSigning).update(stringToSign, "utf8").digest("hex");
   headers.authorization = `AWS4-HMAC-SHA256 Credential=${env.accessKeyId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
   try {
-    const response = await fetch(`https://${host}${canonicalUri}`, {
+    return await fetch(`https://${host}${canonicalUri}`, {
       method,
       headers,
       body: body ? new Uint8Array(body) : undefined,
       signal: AbortSignal.timeout(8_000),
     });
-    return response.status;
   } catch {
-    return 599;
+    return null;
   }
+}
+
+async function signedS3(
+  env: R2SignerEnv,
+  method: "PUT" | "HEAD" | "DELETE",
+  key: string,
+  body: Buffer | undefined,
+  now = new Date(),
+) {
+  return (await signedS3Response(env, method, key, body, now))?.status ?? 599;
 }
 
 export async function headFoundationQuarantineObject(
@@ -133,6 +143,37 @@ export async function headFoundationQuarantineObject(
   if (status === 200) return { ok: true as const, exists: true as const };
   if (status === 404) return { ok: true as const, exists: false as const };
   return { ok: false as const, code: "HEAD_FAILED", status };
+}
+
+/**
+ * Read the just-uploaded quarantine object before CDR/OCR starts.
+ *
+ * Intake itself is capped at 5 MiB. We repeat that bound here and reject before allocating the
+ * body when Content-Length is larger. This read exists only to derive a keyed content digest for
+ * free-evaluation abuse detection; callers must not persist or log the returned bytes.
+ */
+export async function readFoundationQuarantineObject(
+  env: R2SignerEnv,
+  workspaceKey: string,
+  documentId: string,
+  now = new Date(),
+) {
+  const key = `quarantine/${workspaceKey}/${documentId}/source`;
+  const blocked = assertFoundationQuarantineKey(env.bucket, workspaceKey, documentId, key);
+  if (blocked) return { ok: false as const, code: blocked };
+  const response = await signedS3Response(env, "GET", key, undefined, now);
+  if (!response) return { ok: false as const, code: "READ_FAILED" };
+  if (response.status === 404) return { ok: false as const, code: "QUARANTINE_OBJECT_NOT_FOUND" };
+  if (!response.ok) return { ok: false as const, code: "READ_FAILED", status: response.status };
+  const declaredLength = Number(response.headers.get("content-length") ?? "0");
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_QUARANTINE_READ_BYTES) {
+    return { ok: false as const, code: "QUARANTINE_OBJECT_TOO_LARGE" };
+  }
+  const bytes = Buffer.from(await response.arrayBuffer());
+  if (bytes.length < 1 || bytes.length > MAX_QUARANTINE_READ_BYTES) {
+    return { ok: false as const, code: "QUARANTINE_OBJECT_SIZE_INVALID" };
+  }
+  return { ok: true as const, bytes };
 }
 
 export async function runSyntheticR2Canary(env: R2SignerEnv, now = new Date()): Promise<SyntheticCanaryResult> {

@@ -21,6 +21,12 @@ describe("access mode", () => {
       expect(readAccessMode({ ACCESS_MODE: value }), `${value} must not open self-service`).toBe("pilot");
     }
   });
+
+  it("opens production but refuses Vercel previews that inherit the same project value", () => {
+    expect(readAccessMode({ ACCESS_MODE: "self_service", VERCEL_ENV: "production" })).toBe("self_service");
+    expect(readAccessMode({ ACCESS_MODE: "self_service", VERCEL_ENV: "preview" })).toBe("pilot");
+    expect(readAccessMode({ ACCESS_MODE: "self_service", VERCEL_ENV: "development" })).toBe("pilot");
+  });
 });
 
 describe("pilot mode is unchanged", () => {

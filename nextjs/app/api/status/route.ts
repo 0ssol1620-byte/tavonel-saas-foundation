@@ -5,6 +5,7 @@ import { readCommercialState } from "@/lib/commercial-state";
 import { readExportSignerEnv } from "@/lib/export-signing";
 import { readPaddleApiConfig } from "@/lib/paddle-api";
 import { readProductCoreV2Env } from "@/lib/core-runtime-v2";
+import { readAccessMode } from "@/lib/foundation-pilot";
 import { FOUNDATION_R2_BUCKET, readR2SignerEnv } from "@/lib/r2-synthetic-canary";
 import { readSupabaseAdminConfig } from "@/lib/supabase-admin";
 
@@ -48,6 +49,10 @@ export function GET() {
       // The pricing page gates its checkout buttons on this rather than re-deriving it from
       // `commercialMode`, which is only one of the three inputs to whether a card can be charged.
       liveCheckout: commercial.liveChargesEnabled,
+      // Public, non-sensitive product readiness. This keeps free-evaluation CTAs honest in
+      // preview/pilot deployments instead of assuming that a live billing switch also means
+      // public signup is open.
+      selfService: readAccessMode() === "self_service",
       activationPolicy,
       auth,
       billing,
