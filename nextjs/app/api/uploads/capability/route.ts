@@ -4,7 +4,7 @@ import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { reserveFoundationCompute } from "@/lib/compute-reservation";
 import { reserveFoundationIntake } from "@/lib/intake-admission";
 import { validateQualifiedDocumentInput } from "@/lib/qualified-input";
-import { FOUNDATION_INTAKE_MAX_BYTES, presignFoundationQuarantinePut } from "@/lib/r2-presign";
+import { FOUNDATION_INTAKE_MAX_BYTES, FOUNDATION_TRIAL_INTAKE_MAX_BYTES, presignFoundationQuarantinePut } from "@/lib/r2-presign";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
 import { deterministicSourceDocumentId, validSourceIdempotencyKey } from "@/lib/source-intake";
 import { estimateBillablePages } from "@/lib/usage-pricing";
@@ -37,13 +37,16 @@ export async function POST(request: Request) {
   const originalFilename = typeof body.originalFilename === "string" ? body.originalFilename : "";
   const declaredMimeType = typeof body.declaredMimeType === "string" ? body.declaredMimeType : "";
   const requestedBytes = typeof body.requestedBytes === "number" ? body.requestedBytes : Number.NaN;
-  if (!Number.isSafeInteger(requestedBytes) || requestedBytes <= 0 || requestedBytes > FOUNDATION_INTAKE_MAX_BYTES) {
+  if (!Number.isSafeInteger(requestedBytes) || requestedBytes <= 0) {
     return NextResponse.json({ code: "UNQUALIFIED_INPUT" }, { status: 400, headers: NO_STORE });
   }
+  if (requestedBytes > FOUNDATION_INTAKE_MAX_BYTES) {
+    return NextResponse.json({ code: "FILE_TOO_LARGE", maxBytes: FOUNDATION_INTAKE_MAX_BYTES }, { status: 413, headers: NO_STORE });
+  }
+  if (auth.principal.accessSource === "trial" && requestedBytes > FOUNDATION_TRIAL_INTAKE_MAX_BYTES) {
+    return NextResponse.json({ code: "TRIAL_FILE_TOO_LARGE", maxBytes: FOUNDATION_TRIAL_INTAKE_MAX_BYTES }, { status: 413, headers: NO_STORE });
+  }
 
-  // ZIP is a paid/owner intake convenience. A direct archive can never be smuggled through a
-  // free evaluation. Browser-expanded archives are still bounded by the database's three-file
-  // trial cap and free-compute budget, so a client cannot use expansion to escape the cost gate.
   if (auth.principal.accessSource === "trial" && /\.zip$/i.test(originalFilename)) {
     return NextResponse.json({ code: "TRIAL_ARCHIVE_NOT_INCLUDED" }, { status: 402, headers: NO_STORE });
   }
@@ -53,9 +56,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ code: qualified.code }, { status: 400, headers: NO_STORE });
   }
 
-  // The client may provide a better preflight count, but it can never lower the server's own
-  // conservative reservation. This closes the trivial "send estimatedPages: 1" path before any
-  // OCR/GPU capability is issued.
   const serverEstimate = estimateBillablePages({
     bytes: requestedBytes,
     mimeType: qualified.normalizedMimeType,
@@ -89,11 +89,15 @@ export async function POST(request: Request) {
   if (!admission.ok) {
     const rateLimited = admission.code === "INTAKE_RATE_LIMITED" || admission.code === "INTAKE_DAILY_QUOTA_EXCEEDED";
     const trialLimited = admission.code === "TRIAL_FILE_LIMIT_EXCEEDED" || admission.code === "TRIAL_NOT_ACTIVE";
+    const tooLarge = admission.code === "INTAKE_FILE_TOO_LARGE" || admission.code === "TRIAL_FILE_TOO_LARGE";
     const conflict = admission.code === "INTAKE_IDEMPOTENCY_CONFLICT";
     return NextResponse.json(
-      { code: admission.code },
       {
-        status: rateLimited ? 429 : trialLimited ? 402 : conflict ? 409 : 503,
+        code: admission.code,
+        ...(tooLarge ? { maxBytes: admission.code === "TRIAL_FILE_TOO_LARGE" ? FOUNDATION_TRIAL_INTAKE_MAX_BYTES : FOUNDATION_INTAKE_MAX_BYTES } : {}),
+      },
+      {
+        status: tooLarge ? 413 : rateLimited ? 429 : trialLimited ? 402 : conflict ? 409 : 503,
         headers: {
           ...NO_STORE,
           ...(rateLimited ? { "Retry-After": admission.code === "INTAKE_RATE_LIMITED" ? "60" : "3600" } : {}),

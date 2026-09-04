@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { confirmFoundationIntake, reserveFoundationIntake, validateIntakeAdmission } from "./intake-admission";
+import { FOUNDATION_INTAKE_MAX_BYTES } from "./r2-presign";
 
 const admission = {
   workspaceKey: "pilot-4444444444444444",
@@ -19,7 +20,8 @@ describe("Foundation intake admission", () => {
   it("accepts only an exact bounded tenant/document binding", () => {
     expect(validateIntakeAdmission(admission)).toBe(true);
     expect(validateIntakeAdmission({ ...admission, objectKey: `${admission.objectKey}/../source` })).toBe(false);
-    expect(validateIntakeAdmission({ ...admission, requestedBytes: 5 * 1024 * 1024 + 1 })).toBe(false);
+    expect(validateIntakeAdmission({ ...admission, requestedBytes: FOUNDATION_INTAKE_MAX_BYTES })).toBe(true);
+    expect(validateIntakeAdmission({ ...admission, requestedBytes: FOUNDATION_INTAKE_MAX_BYTES + 1 })).toBe(false);
     expect(validateIntakeAdmission({ ...admission, userId: "not-a-user" })).toBe(false);
   });
 
@@ -73,6 +75,8 @@ describe("Foundation intake admission", () => {
   });
 
   it.each([
+    ["foundation_intake_file_too_large", "INTAKE_FILE_TOO_LARGE"],
+    ["foundation_trial_file_too_large", "TRIAL_FILE_TOO_LARGE"],
     ["foundation_intake_rate_limited", "INTAKE_RATE_LIMITED"],
     ["foundation_intake_daily_quota_exceeded", "INTAKE_DAILY_QUOTA_EXCEEDED"],
     ["foundation_intake_idempotency_conflict", "INTAKE_IDEMPOTENCY_CONFLICT"],

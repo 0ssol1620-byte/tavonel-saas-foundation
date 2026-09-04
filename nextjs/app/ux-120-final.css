@@ -1,0 +1,170 @@
+/* TAVONEL 120-point visual/interaction qualification layer.
+   This file intentionally sits last in globals.css. It changes presentation only; product-state
+   colours and observed-stage semantics continue to come from the base design system. */
+
+:root {
+  --shell-wide: 1640px;
+  --section-gap: clamp(72px, 7vw, 124px);
+  --content-gap: clamp(24px, 3vw, 52px);
+}
+
+/* A precision-instrument pointer rather than a decorative trailing cursor. Text editing keeps the
+   platform I-beam, touch has no custom cursor, and the hotspot is the centre of the reticle. */
+@media (pointer: fine) {
+  body {
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='2' fill='%239aa3a8'/%3E%3Cpath d='M12 2v5M12 17v5M2 12h5M17 12h5' stroke='%237d878d' stroke-width='1'/%3E%3C/svg%3E") 12 12, crosshair;
+  }
+  a, button, [role='button'], summary, label[for] {
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26'%3E%3Cpath d='M4 10V4h6M16 4h6v6M22 16v6h-6M10 22H4v-6' fill='none' stroke='%237be0be' stroke-width='1.5'/%3E%3Ccircle cx='13' cy='13' r='1.7' fill='%237be0be'/%3E%3C/svg%3E") 13 13, pointer;
+  }
+  input, textarea, [contenteditable='true'], code, pre { cursor: text; }
+}
+
+/* Marketing canvas: text retains readable measure, product visuals get the pixels they deserve. */
+.landing-page .shell,
+.public-page .shell { max-width: var(--shell-wide); }
+.landing-page .lede,
+.public-page .lede,
+.public-page .body p { max-width: 68ch; }
+.landing-page .compile-film-sequence {
+  width: min(94vw, 1580px);
+  margin-left: max(calc((100% - min(94vw, 1580px)) / 2 * -1), -110px);
+}
+
+/* One intentional scene per desktop viewport. The browser still owns scrolling; snap is proximity,
+   not a wheel-event hijack, so trackpads and keyboard remain natural. */
+@media (min-width: 900px) and (prefers-reduced-motion: no-preference) {
+  html.landing-scroll { scroll-snap-type: y proximity; scroll-padding-top: 52px; }
+  .landing-page .scene { min-height: 100svh; scroll-snap-align: start; scroll-snap-stop: normal; }
+  .landing-page .scene.film { scroll-snap-align: center; }
+}
+
+/* Secondary pages are not five-act cinema. Removing the inherited 92vh scene contract eliminates
+   the dead vertical oceans visible on Integrations and other buyer pages. */
+.public-page .scene,
+.public-page .scene.doc {
+  min-height: auto;
+  justify-content: flex-start;
+  padding: clamp(112px, 11vw, 156px) 0 clamp(72px, 8vw, 112px);
+}
+.public-page .scene.doc .body { gap: var(--content-gap); }
+.public-page .scene.doc .body + .body { margin-top: var(--section-gap); }
+.public-page .scene.doc .actions { margin-top: clamp(56px, 6vw, 88px); }
+.public-page .body > .stack:first-child { position: static; top: auto; }
+
+/* Integration cards: three real connectors means three real columns. Never paint a fourth empty
+   cell. Security-review details stay available without dominating the buyer-facing surface. */
+.connector-public-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1px solid var(--hairline-hi);
+}
+.connector-public-grid > article {
+  min-width: 0;
+  padding: clamp(20px, 2vw, 30px);
+  border-right: 1px solid var(--hairline);
+}
+.connector-public-grid > article:last-child { border-right: 0; }
+.connector-public-grid h3 { margin-top: 5px; }
+.connector-public-grid .integration-summary { margin: 8px 0 0; color: var(--text-mid); }
+.integration-technical {
+  margin-top: 18px;
+  border-top: 1px solid var(--hairline);
+  padding-top: 12px;
+}
+.integration-technical > summary {
+  list-style: none;
+  color: var(--text-lo);
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.integration-technical > summary::-webkit-details-marker { display: none; }
+.integration-technical > summary::after { content: ' +'; color: var(--verified); }
+.integration-technical[open] > summary::after { content: ' −'; }
+.integration-technical .integration-facts { margin-top: 14px; }
+.integration-footnote { max-width: 80ch; margin-top: 20px; }
+
+/* The live canvas replaces compressed MP4 as the normal film path. Exactly one canvas is mounted,
+   so this raises fidelity without four decoders or four requestAnimationFrame loops. */
+.compile-film-live { position: absolute; inset: 0; }
+.compile-film-live .film { width: 100%; height: 100%; }
+.compile-film-live .film-canvas { width: 100%; height: 100%; display: block; }
+.compile-film-viewport { min-height: clamp(430px, 52vw, 850px); background: #070809; }
+.compile-film-still { object-fit: cover; }
+.compile-film-motion-control { opacity: .42; }
+.compile-film-viewport:hover .compile-film-motion-control,
+.compile-film-motion-control:focus-visible { opacity: 1; }
+
+/* Avoid the temporary 'out of focus' impression users saw between scenes. State should arrive via
+   position/luminance, not simulated optical blur. */
+.js .rv.word { filter: none; transform: translateY(10px); }
+.js .rv.word.in { filter: none; transform: none; }
+
+/* Workspace information density: failures win attention, inventories remain bounded and rows are
+   scan-able at 1/12/55/128+ source counts. */
+.board-failure-banner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  margin: 0 0 18px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, #d76d68 62%, var(--hairline));
+  background: color-mix(in srgb, #d76d68 7%, var(--g1));
+}
+.board-failure-banner strong { display: block; color: var(--text-hi); font-weight: 560; }
+.board-failure-banner p { margin: 3px 0 0; color: var(--text-mid); }
+.board-failure-banner button {
+  min-height: 36px;
+  padding: 7px 11px;
+  border: 1px solid var(--hairline-hi);
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.board-list-wrap { max-height: min(54vh, 610px); overflow: auto; overscroll-behavior: contain; }
+.board-row-name { font-family: var(--f-sans); font-weight: 520; }
+.board-row-detail:not([hidden]) { animation: detail-in 160ms var(--ease); }
+@keyframes detail-in { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+
+/* Empty states are content, not slabs of grey. */
+.empty-state, .board-empty, [data-empty='true'] {
+  background: transparent;
+  border-style: dashed;
+  color: var(--text-lo);
+}
+
+/* Reduce the wireframe effect: top-level instruments keep borders; nested informational surfaces
+   use separators instead of boxes inside boxes. */
+.public-page .chain .link .integration-facts,
+.public-page .integration-facts div { border-color: var(--hairline); }
+
+/* Ultrawide: preserve editorial line length while allowing visual proof to breathe. */
+@media (min-width: 1800px) {
+  :root { --shell-wide: 1740px; }
+  .landing-page .compile-film-sequence { width: min(94vw, 1700px); }
+}
+
+@media (max-width: 1100px) {
+  .connector-public-grid { grid-template-columns: 1fr; }
+  .connector-public-grid > article { border-right: 0; border-bottom: 1px solid var(--hairline); }
+  .connector-public-grid > article:last-child { border-bottom: 0; }
+  .landing-page .compile-film-sequence { width: 100%; margin-left: 0; }
+  .compile-film-viewport { min-height: min(62vw, 620px); }
+}
+
+@media (max-width: 720px) {
+  .public-page .scene, .public-page .scene.doc { padding: 92px 0 68px; }
+  .public-page .scene.doc .body + .body { margin-top: 66px; }
+  .compile-film-viewport { min-height: 58vw; }
+  .board-failure-banner { grid-template-columns: 1fr; }
+}
+
+@media (pointer: coarse), (prefers-reduced-motion: reduce) {
+  body, a, button, [role='button'], summary { cursor: auto; }
+  html.landing-scroll { scroll-snap-type: none; }
+  .board-row-detail:not([hidden]) { animation: none; }
+}

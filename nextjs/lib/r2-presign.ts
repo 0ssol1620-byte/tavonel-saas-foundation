@@ -3,7 +3,11 @@ import { FOUNDATION_R2_BUCKET, type R2SignerEnv } from "./r2-synthetic-canary";
 import { immutableWorkspacePrefix } from "./immutable-keys";
 
 export const QUARANTINE_PREFIX = "quarantine/";
-export const FOUNDATION_INTAKE_MAX_BYTES = 5 * 1024 * 1024;
+/** Browser-direct R2 uploads never traverse the application server. Paid/owner workspaces can
+ * therefore accept real manuals and technical packages without an arbitrary 5 MiB bottleneck. */
+export const FOUNDATION_INTAKE_MAX_BYTES = 250 * 1024 * 1024;
+/** Free evaluation stays bounded independently of page/compute quotas. */
+export const FOUNDATION_TRIAL_INTAKE_MAX_BYTES = 50 * 1024 * 1024;
 
 function hmac(key: Buffer | string, data: string) {
   return createHmac("sha256", key).update(data, "utf8").digest();
@@ -21,19 +25,6 @@ export function assertFoundationQuarantineKey(bucket: string, key: string) {
   return null;
 }
 
-/**
- * The one key shape a reader is allowed to fetch for itself.
- *
- * The progress object exists so a person can watch a document being read. Serving it through this
- * application would put the reading -- and eventually the document -- on a path the product says
- * it never travels: "the application server never carries file bytes" is printed on the workspace
- * page. So the browser fetches it the same way it uploaded: directly, with a short-lived
- * capability this server signs but does not carry.
- *
- * The URL is therefore a capability, and the check below is what keeps it narrow. It must name a
- * progress object, inside the caller's own workspace prefix, and nothing else. Widening this
- * function is widening what a signed URL can reach.
- */
 export function assertWorkspaceProgressKey(bucket: string, workspaceId: string, key: string) {
   if (bucket !== FOUNDATION_R2_BUCKET) return "BUCKET_NOT_FOUNDATION";
   if (key.includes("..") || key.includes("//")) return "KEY_NOT_QUALIFIED";
@@ -88,7 +79,6 @@ export function presignWorkspaceSanitizedPdfGet(
   return presignWorkspaceGet(env, input, assertWorkspaceSanitizedPdfKey);
 }
 
-/** Signs a short-lived GET for one progress object. Read-only, single key, no listing. */
 export function presignWorkspaceProgressGet(
   env: R2SignerEnv,
   {
