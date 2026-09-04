@@ -112,16 +112,16 @@ export default function CompileStagePlayer({
     });
   }, [index, playing, inView, reducedMotion, admitted]);
 
-  const focusStage = (position: number) => {
+  const focusStage = useCallback((position: number) => {
     const stage = stages[((position % stages.length) + stages.length) % stages.length];
     if (stage) document.getElementById(`compile-stage-tab-${stage.id}`)?.focus();
-  };
+  }, [stages]);
 
   const chooseStage = useCallback((next: number, moveFocus = false) => {
     setPlaying(true);
     go(next);
     if (moveFocus) focusStage(next);
-  }, [go]);
+  }, [focusStage, go]);
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     const move = (next: number) => {
