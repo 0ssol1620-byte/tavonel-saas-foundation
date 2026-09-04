@@ -1,11 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { displayName, elideKey, recallDocumentNames, rememberDocumentName, shortHandle } from "./document-names";
 
-/**
- * The two behaviours worth pinning are the two that failed in production: a document with no
- * remembered name printed a 36-character UUID, and a remembered name did not survive a reload.
- */
-
 class MemoryStorage {
   private map = new Map<string, string>();
   getItem(key: string) { return this.map.has(key) ? this.map.get(key)! : null; }
@@ -22,26 +17,24 @@ beforeEach(() => {
 });
 
 describe("what a document is called", () => {
-  it("shortens an id to something a person can hold in their head", () => {
-    expect(shortHandle(ID)).toBe("doc-10fc3cfd");
-    // Never longer than the id it replaces, whatever it is handed.
-    expect(shortHandle("").length).toBeLessThanOrEqual(4);
+  it("uses a compact source label rather than exposing the internal doc id", () => {
+    expect(shortHandle(ID)).toBe("Source 10FC3C");
+    expect(shortHandle(ID)).not.toContain("doc-");
+    expect(shortHandle("")).toBe("Unnamed source");
   });
 
-  it("prefers the remembered filename, then a local one, then the handle", () => {
+  it("prefers the remembered filename, then a local one, then the source label", () => {
     expect(displayName(ID, { [ID]: "Services Agreement 2026.pdf" })).toBe("Services Agreement 2026.pdf");
     expect(displayName(ID, {}, "in-flight.pdf")).toBe("in-flight.pdf");
-    expect(displayName(ID, {})).toBe("doc-10fc3cfd");
+    expect(displayName(ID, {})).toBe("Source 10FC3C");
   });
 
   it("survives the reload that lost it before", () => {
     rememberDocumentName(ID, "Services Agreement 2026.pdf");
-    // A fresh read, as a page load would do: nothing is held in module state.
     expect(recallDocumentNames()[ID]).toBe("Services Agreement 2026.pdf");
   });
 
   it("never breaks the workspace when storage refuses or holds junk", () => {
-    // The shape a different app, or a corrupted entry, could leave behind.
     window.localStorage.setItem("tavonel.document-names.v1", "[not an object]");
     expect(recallDocumentNames()).toEqual({});
 
@@ -65,7 +58,6 @@ describe("what a document is called", () => {
     expect(short.length).toBeLessThan(key.length);
     expect(short.startsWith("immutable/pilot-")).toBe(true);
     expect(short.endsWith("sanitized.pdf")).toBe(true);
-    // A key that is already short is returned untouched rather than gaining an ellipsis.
     expect(elideKey("immutable/short.pdf")).toBe("immutable/short.pdf");
   });
 });
