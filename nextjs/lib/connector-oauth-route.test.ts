@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/developer-auth", () => ({
   requireFoundationSession: vi.fn(async () => ({
@@ -24,8 +24,14 @@ const environmentKeys = [
   "SUPABASE_SERVICE_ROLE_KEY",
 ] as const;
 
+beforeEach(() => {
+  // Vercel Production has real OAuth/Supabase configuration. Tests start empty and opt in
+  // to the exact managed configuration required by each case.
+  for (const key of environmentKeys) vi.stubEnv(key, "");
+});
+
 afterEach(() => {
-  for (const key of environmentKeys) delete process.env[key];
+  vi.unstubAllEnvs();
   vi.unstubAllGlobals();
 });
 
@@ -45,13 +51,13 @@ describe("OAuth authorization route", () => {
   });
 
   it("returns only a PKCE provider URL after broker, metadata, and audit writes succeed", async () => {
-    process.env.TAVONEL_PUBLIC_ORIGIN = "https://tavonel.com";
-    process.env.TAVONEL_OAUTH_GOOGLE_DRIVE_CLIENT_ID = "google-client";
-    process.env.TAVONEL_OAUTH_GOOGLE_DRIVE_CLIENT_SECRET_REF = "gcp-sm://tavonel/oauth/google";
-    process.env.TAVONEL_OAUTH_SECRET_BROKER_URL = "https://vault.test";
-    process.env.TAVONEL_OAUTH_SECRET_BROKER_TOKEN = "x".repeat(40);
-    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://oauth-test.supabase.co";
-    process.env.SUPABASE_SERVICE_ROLE_KEY = `sb_secret_${"x".repeat(40)}`;
+    vi.stubEnv("TAVONEL_PUBLIC_ORIGIN", "https://tavonel.com");
+    vi.stubEnv("TAVONEL_OAUTH_GOOGLE_DRIVE_CLIENT_ID", "google-client");
+    vi.stubEnv("TAVONEL_OAUTH_GOOGLE_DRIVE_CLIENT_SECRET_REF", "gcp-sm://tavonel/oauth/google");
+    vi.stubEnv("TAVONEL_OAUTH_SECRET_BROKER_URL", "https://vault.test");
+    vi.stubEnv("TAVONEL_OAUTH_SECRET_BROKER_TOKEN", "x".repeat(40));
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://oauth-test.supabase.co");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", `sb_secret_${"x".repeat(40)}`);
     const fetcher = vi.fn(async (input: string | URL | Request) => {
       const url = String(input);
       if (url.endsWith("/v1/secrets/write")) return Response.json({ reference: "vault://tavonel/oauth/pkce/state" });
