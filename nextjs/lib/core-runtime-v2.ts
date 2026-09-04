@@ -4,6 +4,7 @@ import {
   type CollectionCandidateArtifact,
   type CollectionOcrInput,
 } from "./collection-compiler";
+import { CORE_CLIENT_TIMEOUT_MS, CORE_MAX_LATENCY_MS } from "./execution-budget";
 
 export const PRODUCT_CORE_REQUEST_SCHEMA = "tavonel.product_core.compile_request.v2" as const;
 export const PRODUCT_CORE_RESPONSE_SCHEMA = "tavonel.product_core.compile_response.v2" as const;
@@ -142,7 +143,16 @@ export function buildProductCoreV2Request(
   return {
     schemaVersion: PRODUCT_CORE_REQUEST_SCHEMA,
     requestId,
-    idempotencyKey: `compile-${sha256(`${workspaceId}\n${binding}\n${requestId}`).slice(0, 40)}`,
+    /*
+      The identity of the work, not of the attempt.
+
+      This used to hash `requestId` as well, and `requestId` defaults to a fresh UUID -- so every
+      call carried a different idempotency key and a retry after a timeout was, to Core, a compile
+      it had never seen. That is a second World and a second charge for the one the caller could
+      not confirm, which is exactly what an idempotency key exists to prevent. The attempt is
+      still identified, by `requestId`, which is what the receipt binds to.
+    */
+    idempotencyKey: `compile-${sha256(`${workspaceId}\n${binding}`).slice(0, 40)}`,
     tenantId: workspaceId,
     workspaceId,
     collectionId,
@@ -151,7 +161,8 @@ export function buildProductCoreV2Request(
       operationClass: "initial_compile",
       qualityRequirement: "high_assurance",
       maxCostCredits: 10,
-      maxLatencyMs: 90_000,
+      // Never more than this process will wait; see lib/execution-budget.ts.
+      maxLatencyMs: CORE_MAX_LATENCY_MS,
       privacyPolicy: "foundation_synthetic_only",
     },
     documents: [...documents]
@@ -325,10 +336,21 @@ export async function dispatchProductCoreV2(
         "x-tavonel-core-signature": signature,
       },
       body,
-      signal: AbortSignal.timeout(60_000),
+      signal: AbortSignal.timeout(CORE_CLIENT_TIMEOUT_MS),
     });
-  } catch {
-    return { ok: false, code: "CORE_V2_UNAVAILABLE" };
+  } catch (cause) {
+    /*
+      A timeout and a refused connection are different problems with different recoveries, and
+      collapsing both into CORE_V2_UNAVAILABLE meant the caller could not tell "Core is down, do
+      not retry into it" from "Core is still working, this attempt gave up".
+
+      A retry is safe now in a way it was not: the idempotency key no longer varies per attempt,
+      so re-dispatching the same document binding reaches the same compile rather than starting a
+      second one.
+    */
+    const timedOut = cause instanceof Error
+      && (cause.name === "TimeoutError" || cause.name === "AbortError");
+    return { ok: false, code: timedOut ? "CORE_V2_TIMEOUT" : "CORE_V2_UNAVAILABLE" };
   }
   const json = await response.json().catch(() => null) as ProductCoreV2CompileResponse | { code?: unknown } | null;
   if (!response.ok || !json) {

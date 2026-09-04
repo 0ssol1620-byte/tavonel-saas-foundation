@@ -250,12 +250,14 @@ export async function enqueueCompileJob(input: {
     ? { corpusId: input.corpus.corpusId, batchIndex: input.corpus.batchIndex }
     : undefined;
 
+  const idempotencyKey = compileIdempotencyKey(input.workspaceKey, documentIds, slot);
+
   const result = await rpc("enqueue_foundation_compile_job", {
     p_job_id: newCompileJobId(),
     p_workspace_key: input.workspaceKey,
     p_created_by_user_id: input.createdByUserId,
     p_document_ids: documentIds,
-    p_idempotency_key: compileIdempotencyKey(input.workspaceKey, documentIds, slot),
+    p_idempotency_key: idempotencyKey,
     p_corpus_id: input.corpus?.corpusId ?? null,
     p_batch_index: input.corpus?.batchIndex ?? null,
     p_batch_count: input.corpus?.batchCount ?? null,
@@ -265,7 +267,7 @@ export async function enqueueCompileJob(input: {
   const row = Array.isArray(result.value) ? result.value[0] : result.value;
   const record = row as {
     job_id?: unknown; state?: unknown; created?: unknown;
-    corpus_id?: unknown; batch_index?: unknown;
+    corpus_id?: unknown; batch_index?: unknown; idempotency_key?: unknown;
   } | null;
   if (!record || typeof record.job_id !== "string" || !isCompileState(record.state)) {
     return fail("COMPILE_JOB_STORE_WRITE_FAILED");
@@ -274,14 +276,26 @@ export async function enqueueCompileJob(input: {
   /*
     Check what came back, rather than trusting that it is what was asked for.
 
-    Two keys and a unique index already make the collision impossible in a database that has
-    run 0041. This is the guard for the database that has not -- a Preview mid-deploy, a rolled
-    back migration -- where the old function would answer a corpus enqueue with whatever row
-    the old key matched. `created: false` is the only case worth checking: a row this call
-    inserted carries the arguments it was given.
+    `created: false` is the only case worth checking -- a row this call inserted carries the
+    arguments it was given -- but for that case the answer is a row somebody else wrote, and the
+    reasons it might be the wrong one are not all closed on the server:
+
+      * A database that has not run 0041 answers a corpus enqueue with whatever row the old,
+        un-namespaced key matched, which could be a standalone job.
+      * A database that has not run 0042 answers a *lost race* on a slot with the winner's row
+        without checking it is the same job, so two callers with different documents both get
+        told their part is enqueued.
+
+    So the identity is verified here too. 0042 returns the stored idempotency key for this;
+    against a database without it the field is absent, which reads as a mismatch and fails
+    closed rather than silently skipping the check.
   */
-  if (input.corpus && record.created !== true) {
-    if (record.corpus_id !== input.corpus.corpusId || record.batch_index !== input.corpus.batchIndex) {
+  if (record.created !== true) {
+    if (typeof record.idempotency_key !== "string" || record.idempotency_key !== idempotencyKey) {
+      return fail("COMPILE_JOB_SLOT_CONFLICT");
+    }
+    if (input.corpus
+      && (record.corpus_id !== input.corpus.corpusId || record.batch_index !== input.corpus.batchIndex)) {
       return fail("COMPILE_JOB_SLOT_CONFLICT");
     }
   }

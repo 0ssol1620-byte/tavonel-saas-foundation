@@ -6,6 +6,17 @@ import { runSourceImportBatch } from "@/lib/sync-worker";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+/*
+  Must equal WORKER_MAX_DURATION_SECONDS in lib/execution-budget.ts, which derives every timeout
+  Core is given from it.
+
+  It is a literal and not that import because Next.js reads route segment config statically, out
+  of the source, before any module is evaluated -- an identifier here fails the build with
+  `Unknown identifier "WORKER_MAX_DURATION_SECONDS" at "maxDuration"`. The link is therefore
+  enforced by a test that reads this file, which is the next best thing to a shared constant:
+  "the worker route declares the same wall clock the budget is derived from" in
+  lib/execution-budget.test.ts fails if either number moves alone.
+*/
 export const maxDuration = 60;
 
 const HEADERS = { "Cache-Control": "no-store" };

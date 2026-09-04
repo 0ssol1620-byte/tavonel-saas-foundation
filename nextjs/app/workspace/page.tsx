@@ -17,6 +17,7 @@ import {
   formatUsd,
   pageCountLabel,
   quoteCompilePages,
+  weakestConfidence,
   type PageEstimateConfidence,
 } from "@/lib/usage-pricing";
 import { collectDroppedWorkspaceFiles, prepareWorkspaceSelection, type WorkspaceSelection, type WorkspaceUploadFile } from "@/lib/workspace-intake";
@@ -1201,22 +1202,27 @@ export default function WorkspacePage() {
     }
   };
 
-  const stagedEstimates = stagedSelection?.files.map((entry, index) => estimateBillablePages({
-    bytes: entry.file.size,
-    mimeType: entry.file.type,
-    declaredPages: stagedPageCounts?.[index]?.pages ?? null,
-  })) ?? [];
+  const stagedEstimates = stagedSelection?.files.map((entry, index) => {
+    const measured = stagedPageCounts?.[index];
+    return estimateBillablePages({
+      bytes: entry.file.size,
+      mimeType: entry.file.type,
+      declaredPages: measured?.pages ?? null,
+      // Carried through, not flattened: a PDF page tree and a Word file's saved metadata are
+      // not the same kind of fact, and only one of them may be called verified.
+      declaredBasis: measured && "basis" in measured ? measured.basis : null,
+    });
+  }) ?? [];
   const stagedPages = stagedEstimates.reduce((sum, estimate) => sum + (estimate?.pages ?? 0), 0);
   const stagedQuote = quoteCompilePages(stagedPages);
   /*
-    A count is only "Verified" when every file in the set gave one up. One PDF without a
-    declared page count drags the whole preflight back to an estimate, because the total is
-    then partly derived from file size and the customer is about to authorise money against it.
+    The set is as strong as its weakest file. One PDF without a page count drags the preflight
+    back to an estimate; one Word file drags it to "declared", because the total the customer
+    authorises against is then partly a number Word wrote rather than one anything counted.
   */
-  const stagedConfidence: PageEstimateConfidence =
-    stagedEstimates.length > 0 && stagedEstimates.every((estimate) => estimate?.confidence === "verified")
-      ? "verified"
-      : "provisional";
+  const stagedConfidence: PageEstimateConfidence = weakestConfidence(
+    stagedEstimates.map((estimate) => estimate?.confidence ?? "provisional"),
+  );
   /*
     Spreadsheets, named rather than folded into the estimate.
 
@@ -1807,8 +1813,10 @@ export default function WorkspacePage() {
                   </dl>
                   <p className="fine">
                     {stagedConfidence === "verified"
-                      ? "Page counts were read from the documents themselves. You will never be charged above the maximum shown."
-                      : "Some files do not declare a page count, so this is an upper-bound estimate from file size. The billed page count is confirmed after the documents are read, and never exceeds the maximum shown."}
+                      ? "Page counts were counted from the documents themselves. You will never be charged above the maximum shown."
+                      : stagedConfidence === "declared"
+                        ? "Some files state their own page count rather than being counted — Word records the number it last saved, which can be out of date. The billed page count is confirmed once the documents are processed, and never exceeds the maximum shown."
+                        : "Some files do not state a page count, so this is an upper-bound estimate from file size. The billed page count is confirmed after the documents are read, and never exceeds the maximum shown."}
                   </p>
                   {stagedUndecided > 0 ? (
                     <p className="fine">

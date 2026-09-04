@@ -37,7 +37,16 @@ type LookupRule = "legacy-document-set" | "key-only" | "slot-aware";
 
 class FakeCompileJobs {
   readonly rows: Row[] = [];
-  constructor(private readonly rule: LookupRule) {}
+  /*
+    `returnsIdempotencyKey` is a second axis, independent of the lookup rule: 0042 added the
+    stored key to the result so a caller can confirm an existing row is its own. A database
+    without that migration simply has no such column, and the client must fail closed rather
+    than skip the check -- which is what setting this false models.
+  */
+  constructor(
+    private readonly rule: LookupRule,
+    private readonly returnsIdempotencyKey = true,
+  ) {}
 
   private find(body: Record<string, unknown>) {
     const workspaceKey = body.p_workspace_key as string;
@@ -83,6 +92,7 @@ class FakeCompileJobs {
           created: false,
           corpus_id: existing.corpusId,
           batch_index: existing.batchIndex,
+          ...(this.returnsIdempotencyKey ? { idempotency_key: existing.idempotencyKey } : {}),
         }],
       };
     }
@@ -100,6 +110,7 @@ class FakeCompileJobs {
       rows: [{
         job_id: row.jobId, state: "preflight", created: true,
         corpus_id: row.corpusId, batch_index: row.batchIndex,
+        ...(this.returnsIdempotencyKey ? { idempotency_key: row.idempotencyKey } : {}),
       }],
     };
   }
@@ -110,8 +121,8 @@ const USER = "77777777-7777-4777-8777-777777777777";
 const docs = (from: number, to: number) =>
   Array.from({ length: to - from + 1 }, (_, i) => `doc-${String(from + i).padStart(3, "0")}`);
 
-function install(rule: LookupRule) {
-  const store = new FakeCompileJobs(rule);
+function install(rule: LookupRule, returnsIdempotencyKey = true) {
+  const store = new FakeCompileJobs(rule, returnsIdempotencyKey);
   vi.stubGlobal("fetch", async (url: string | URL, init?: RequestInit) => {
     const href = typeof url === "string" ? url : url.toString();
     if (!href.includes("/rpc/enqueue_foundation_compile_job")) {
@@ -312,5 +323,116 @@ describe("an answer that is not the slot that was asked for", () => {
     expect(second.value.corpusId).toEqual(first.value.corpusId);
     expect(second.value.parts.map(part => part.jobId)).toEqual(first.value.parts.map(part => part.jobId));
     expect(second.value.parts.every(part => part.created)).toBe(false);
+  });
+});
+
+/*
+  The client half of the race 0042 closes.
+
+  The database is the place this is actually settled -- scripts/db/corpus-slot-race.mjs drives two
+  real connections through the interleaving, and against the migration chain minus 0042 the loser
+  is handed the winner's row as success. These are the assertions that hold when the client is
+  talking to a database that has not been migrated, or has been rolled back, which is exactly when
+  the server-side check is not there to help.
+*/
+describe("an existing row must be the job this call described", () => {
+  it("refuses a row whose stored identity is not the one asked for", async () => {
+    /*
+      What the race loser sees after 0042: it asked for its own documents and the slot holds a
+      job over someone else's. The server raises 23505 for this, and independently the client
+      compares the key it sent with the key it got back.
+    */
+    const store = install("key-only");
+    const corpusId = corpusIdFor(WORKSPACE, docs(1, 128));
+
+    store.rows.push({
+      jobId: "cjob-race-winner", workspaceKey: WORKSPACE, documentIds: docs(25, 36),
+      idempotencyKey: compileIdempotencyKey(WORKSPACE, docs(25, 36), { corpusId, batchIndex: 0 }),
+      corpusId, batchIndex: 0,
+    });
+
+    const result = await enqueueCompileJob({
+      workspaceKey: WORKSPACE, createdByUserId: USER, documentIds: docs(25, 36),
+      corpus: { corpusId, batchIndex: 0, batchCount: 11 },
+    });
+    // Same documents, same slot: this one is the caller's own job and must come back.
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.value.jobId).toBe("cjob-race-winner");
+    expect(result.ok && result.value.created).toBe(false);
+  });
+
+  it("fails closed when the database does not return the stored identity", async () => {
+    /*
+      A database without 0042 has no idempotency_key in the result. Treating an absent field as
+      "nothing to check" would silently disable the guard on precisely the deployments that need
+      it, so it reads as a mismatch.
+    */
+    const store = install("slot-aware", false);
+    const corpusId = corpusIdFor(WORKSPACE, docs(1, 128));
+    store.rows.push({
+      jobId: "cjob-unverifiable", workspaceKey: WORKSPACE, documentIds: docs(1, 12),
+      idempotencyKey: compileIdempotencyKey(WORKSPACE, docs(1, 12), { corpusId, batchIndex: 0 }),
+      corpusId, batchIndex: 0,
+    });
+
+    const result = await enqueueCompileJob({
+      workspaceKey: WORKSPACE, createdByUserId: USER, documentIds: docs(1, 12),
+      corpus: { corpusId, batchIndex: 0, batchCount: 11 },
+    });
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.code).toBe("COMPILE_JOB_SLOT_CONFLICT");
+  });
+
+  it("applies the same check to a standalone compile", async () => {
+    const store = install("key-only", false);
+    store.rows.push({
+      jobId: "cjob-standalone", workspaceKey: WORKSPACE, documentIds: docs(1, 12),
+      idempotencyKey: compileIdempotencyKey(WORKSPACE, docs(1, 12)),
+      corpusId: null, batchIndex: null,
+    });
+
+    const result = await enqueueCompileJob({
+      workspaceKey: WORKSPACE, createdByUserId: USER, documentIds: docs(1, 12),
+    });
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.code).toBe("COMPILE_JOB_SLOT_CONFLICT");
+  });
+
+  it("still accepts the row it did ask for", async () => {
+    const store = install("slot-aware");
+    const corpusId = corpusIdFor(WORKSPACE, docs(1, 128));
+    store.rows.push({
+      jobId: "cjob-mine", workspaceKey: WORKSPACE, documentIds: docs(1, 12),
+      idempotencyKey: compileIdempotencyKey(WORKSPACE, docs(1, 12), { corpusId, batchIndex: 0 }),
+      corpusId, batchIndex: 0,
+    });
+
+    const result = await enqueueCompileJob({
+      workspaceKey: WORKSPACE, createdByUserId: USER, documentIds: docs(1, 12),
+      corpus: { corpusId, batchIndex: 0, batchCount: 11 },
+    });
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.value.jobId).toBe("cjob-mine");
+  });
+});
+
+describe("the race harness computes the same identity as the application", () => {
+  /*
+    scripts/db/corpus-slot-race.mjs re-implements compileIdempotencyKey because it runs under
+    bare node against a real server and cannot import TypeScript. A drift between the two would
+    not fail that harness -- it would keep passing, over identities the product never issues --
+    so the equality is asserted here, where both are loadable.
+  */
+  it("agrees on standalone and corpus-part keys", async () => {
+    const harness = await import("../scripts/db/corpus-slot-race.mjs");
+    const corpusId = corpusIdFor(WORKSPACE, docs(1, 128));
+
+    expect(harness.compileIdempotencyKey(WORKSPACE, docs(1, 12)))
+      .toEqual(compileIdempotencyKey(WORKSPACE, docs(1, 12)));
+    expect(harness.compileIdempotencyKey(WORKSPACE, docs(1, 12), { corpusId, batchIndex: 0 }))
+      .toEqual(compileIdempotencyKey(WORKSPACE, docs(1, 12), { corpusId, batchIndex: 0 }));
+    // Duplicates and order are not part of the identity in either implementation.
+    expect(harness.compileIdempotencyKey(WORKSPACE, ["b", "a", "b"]))
+      .toEqual(compileIdempotencyKey(WORKSPACE, ["a", "b"]));
   });
 });

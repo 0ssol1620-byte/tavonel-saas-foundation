@@ -13,6 +13,13 @@ as a corpus part (§6), `graph/nodes.csv` mislabelled its own columns (§6), and
 was not what this file said it was (§10). Two requirements that had been sharing one verdict
 were split, and two ADRs were written for work that is deliberately not implemented here.
 
+**Revised again 2026-09-04 after a second independent review, of `f47b3d2`.** It asked for the
+migration chain to be run on a real PostgreSQL rather than asserted as text. Doing that found
+three further defects, two of which made the feature they belong to unusable — see §6 and
+`docs/evidence/SQL_MIGRATION_CHAIN_2026-09-04.md`. It also produced the finding in §11: **the
+live Supabase project has never had this chain applied**, and has none of the compile-job,
+corpus or retrieval tables. That is a Production GO blocker this branch does not resolve.
+
 ## Status vocabulary
 
 The plain word "Implemented" is not used anywhere in this file. Code existing is not a status.
@@ -164,10 +171,22 @@ spreadsheet billable unit inside P0-06, the real-account runs inside the QA `PAR
   PDF page tree, PPTX slides, a DOCX declared count, an image — and returns the basis with it.
   Where a format does not state one it returns `null` with a reason and the caller falls back to
   the byte bound *and says so*. It never guesses.
-- **Test.** `lib/page-count.test.ts`.
+- **Test.** `lib/page-count.test.ts`, `lib/usage-pricing.test.ts`.
+- **Corrected 2026-09-04.** `page-count.ts` distinguished four bases and `usage-pricing.ts`
+  flattened all of them to `declared` → `verified`, so a Word file's `docProps/app.xml` count
+  appeared under the heading **"Verified pages"** next to a dollar figure. That number is not a
+  measurement: it is what the last application to save the file recorded about a rendering that
+  is not the one that will happen. The bases are now carried through:
+  `pdf_page_tree`, `image` and `pptx_slides` are `verified`; `docx_declared` is `declared`;
+  the byte bound is `provisional`. A declared count may hold a reservation and the maximum
+  (`canReserveAgainst`) but may not close a charge (`canAuthorizeCharge`). The heading reads
+  "Declared pages", the byte-bound heading reads "Estimated page-equivalents", and a set takes
+  the weakest confidence in it. A caller that supplies a count without saying where it came
+  from gets `declared`, not `verified` — the guard fails closed rather than by omission.
 - **Remaining risk.** Spreadsheets have no billable unit: `XLSX_BILLABLE_UNIT_UNDECIDED` is
   reported rather than quoted. That is the `FOUNDER_DECISION` in §5, and inventing one here
-  would have invented a charge.
+  would have invented a charge. A DOCX count becomes `verified` only after the document is
+  actually rendered in processing; that promotion is not implemented on this branch.
 - **Founder decision?** The spreadsheet unit, yes. The counting, no.
 
 ### P0-07 — ZIP extraction can freeze the tab
@@ -407,6 +426,60 @@ by an independent review of the branch reading the code afterwards.
 An independent review of `c0459e0` found two defects this file had recorded as acceptable and
 one it had explained wrongly. All three are closed.
 
+### The second correctness pass of 2026-09-04 — running the SQL
+
+A review of `f47b3d2` asked for the migration chain to be executed on a real PostgreSQL instead
+of asserted as text. That single instruction found more than everything the text tests had.
+Detail and reproduction: `docs/evidence/SQL_MIGRATION_CHAIN_2026-09-04.md`.
+
+**`0022_retrieval_lexical_search.sql` could not be applied to any PostgreSQL — fixed.**
+`generated always as (to_tsvector('simple', array_to_string(search_tokens, ' '))) stored` is
+rejected with *"generation expression is not immutable"*: `array_to_string(anyarray, text)` is
+declared STABLE. The lexical retrieval path had therefore never existed in any database, while
+`lib/retrieval-lexical-search-migration.test.ts` passed on every assertion — it read the file as
+text. Fixed in place, because a migration the chain stops at cannot be repaired by a later one,
+and safe to edit in place because §11 establishes there is no deployed state to diverge from.
+The fix is an immutable wrapper, not `array_to_tsvector`: the latter drops positions, and
+`lib/lexical-search.ts` ranks with `ts_rank_cd`, which is a cover-density measure over them.
+
+**`0041`'s `enqueue_foundation_compile_job` failed on every call — fixed in `0042`.**
+`ERROR: column reference "corpus_id" is ambiguous` — the function's OUT columns `corpus_id` and
+`batch_index` become plpgsql variables, and the body compares bare `corpus_id` against them. A
+plpgsql body is not parsed until it is called, so the migration applied cleanly and no corpus
+compile could ever be enqueued. `0042` aliases the table and qualifies every column.
+
+**The corpus slot race — fixed in `0042`, was a merge blocker.** `0041` validates the slot
+occupant's identity on its first lookup and not on the re-read after `ON CONFLICT DO NOTHING`.
+Two concurrent enqueues of one slot with different document sets: the loser is handed the
+winner's row as `created: false`, i.e. success, and is told its part is enqueued while somebody
+else's documents compile under it. `0042` moves the check into a function both paths call, adds
+canonical `document_ids` equality behind the key, and returns the stored idempotency key so the
+caller can verify the row it was given. `lib/compile-job-store.ts` checks it and fails closed
+when the field is absent.
+
+Proven on a real server, and **isolated with a mutant**: the full chain with only the race-path
+assertion commented out fails exactly one of four scenarios (`bReturnedARow: true`, no error)
+while the other three still pass. `bBlockedUntilACommitted: true` in every run is the evidence
+the second connection really did block on the slot index.
+
+**The Core execution budget contradicted itself — fixed.** `maxLatencyMs: 90_000`,
+`AbortSignal.timeout(60_000)` and `maxDuration = 60` cannot all be true. Core was promised
+ninety seconds by a caller that abandons it at sixty, inside a function killed at sixty, so
+every response past 60s was unreachable and a timeout raced the platform kill — when the kill
+won there was no catch block, no job event and no receipt, and the lease stayed held until it
+expired. `lib/execution-budget.ts` now derives all three from one number with an invariant
+asserted in a test. ADR-0003 records what this does *not* fix: a compile needing more than
+`CORE_MAX_LATENCY_MS` still cannot complete, and making it possible needs asynchronous dispatch,
+which is a change to the Core contract.
+
+**A retry created a second World and a second charge — fixed.** `idempotencyKey` hashed
+`requestId`, which defaults to a fresh UUID, so the key identified the attempt rather than the
+work and every retry was a compile Core had never seen. A test asserted this as intended. The
+key is now the document binding; `requestId` still identifies the attempt and still binds the
+receipt.
+
+**A Word file's saved page count was labelled "Verified pages" — fixed.** See P0-06.
+
 ### Entity extraction is noisy — now measured, and said out loud
 
 `entitiesFor` matches any capitalised run. The previous revision said so and stopped there,
@@ -544,13 +617,22 @@ Nothing below was performed, and no emulator result is written as if it were one
 6. **Archives on a low-end device**: 10 MB, 50 MB and 100 MB.
 7. **A connector "last tested" date**: cannot exist until (2) happens.
 8. **The founder visual checklist** in Launch Appendix C.
-9. **The corpus slot pgTAP suite**: `supabase/tests/foundation_corpus_slot_idempotency.sql`
-   reproduces the A/B/C collision against the real `enqueue_foundation_compile_job`, and it has
-   **not been executed**. There is no Postgres available here: Docker is not installed, so
-   `supabase start` cannot run, and the machine's local PostgreSQL 17 uses `scram-sha-256` for
-   every host line — guessing a password is not a verification method. The application half is
-   executed and mutation-verified in `lib/compile-job-idempotency.test.ts`; the SQL half needs a
-   database and `supabase db test`.
+9. **The corpus slot pgTAP suite**: `supabase/tests/foundation_corpus_slot_idempotency.sql` is
+   still **not executed**. pgTAP is not installable on this machine —
+   `pg_available_extensions` returns none and it is not in the PostgreSQL 17 extension
+   directory. It has been updated to `0042`'s signature and to `plan(25)`.
+   **What changed since the previous revision:** a real PostgreSQL *was* found. A disposable
+   `initdb --auth=trust` cluster runs the whole chain, and the scenarios this suite describes
+   are now executed on a real server by `nextjs/scripts/db/corpus-slot-race.mjs` — including the
+   concurrent case pgTAP cannot express at all, since it has only one session. So the SQL half
+   is no longer unverified; it is the pgTAP *harness* that has not run.
+10. **pgvector semantics.** The three retrieval migrations declaring `create extension vector`
+   are applied with a shim over `double precision[]`, because stock PostgreSQL does not ship
+   pgvector. Distance operators appear only inside function bodies, which are never resolved by
+   a call here. Every run of `apply-migrations.mjs` reports `vectorSemanticsVerified: false`.
+11. **The chain against the live project.** §11 — the numbered migrations have never been
+   applied to `tavonel-saas-foundation`. Applying them is a production action and is not an
+   agent's to perform.
 
 Item 9 of the previous revision — a Firefox pass against a deployed Preview — **is done**, and
 it changed the answer rather than confirming it. See §10 and
@@ -706,3 +788,28 @@ Whether the sentences are true. The documentation, the category guide, the solut
 and the changelog are all checked for shape, for consistency with the constants they cite, and
 for the absence of claims — never for truth. `DOCS_REVIEWED` is where a person records having
 read them.
+
+## 11. The live project has no schema for any of this
+
+Read-only, via the Supabase MCP, against `tavonel-saas-foundation` (`tfcorhjkqcuisqhsjemz`):
+
+- `list_migrations` returns **four** rows, all named `tavonel_tenant_foundation_0001`.
+- `list_tables` shows no `foundation_compile_jobs`, no `foundation_compile_job_events`, no
+  `foundation_corpora` and no `foundation_retrieval_units`.
+
+The numbered chain `0002`–`0042` has not been applied to the live project. The compile-job,
+corpus compile and retrieval features have **no schema there at all**, so nothing in §1 that
+depends on them can run against it regardless of what this branch contains.
+
+**This is a Production GO blocker and this branch does not resolve it.** Applying migrations to
+the live project is a production action, and not an agent's to perform. What this branch can
+say — and now does, on a real server — is that the chain applies cleanly end to end, which it
+did not before today.
+
+Two things follow for whoever does apply it:
+
+- `0022` and `0041` as they stood would have failed: one at apply time, one at first call. Both
+  are fixed here. A deployment attempted from the previous revision would have stopped at
+  `0022`.
+- `vectorSemanticsVerified` is `false`. The live project must have real pgvector; the shim used
+  here proves nothing about it.

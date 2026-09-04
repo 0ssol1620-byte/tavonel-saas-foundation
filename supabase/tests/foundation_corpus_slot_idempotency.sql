@@ -1,4 +1,4 @@
--- Run with Supabase CLI db test after 0041_corpus_slot_idempotency.sql.
+-- Run with Supabase CLI db test after 0042_corpus_slot_race_revalidation.sql.
 --
 -- The bug this file exists for could not be seen from the migration text. Both halves were
 -- individually right: the document set is a job's identity, and a corpus is partitioned
@@ -10,7 +10,7 @@
 -- So the scenario is reproduced literally: standalone [1..12], then corpus [1..128] whose
 -- first batch is exactly [1..12], then the assertions that they are two different jobs.
 begin;
-select plan(22);
+select plan(25);
 
 -- The production key derivation, written once here so the test cannot drift into asserting a
 -- key shape the application does not use. Identical to compileIdempotencyKey in
@@ -191,9 +191,12 @@ select is(
 -- ---------------------------------------------------------------------------------------
 -- Concurrency. Two enqueues of one slot leave one row.
 --
--- Real interleaving needs two sessions, which pgTAP does not have; what is checked here is
--- the constraint that makes the race safe and the guard that fires when an insert is refused
--- for a reason the identity lookup cannot see -- a duplicate job_id.
+-- Real interleaving needs two sessions, which pgTAP does not have. It is covered instead by
+-- nextjs/scripts/db/corpus-slot-race.mjs, which holds one transaction open while a second
+-- connection blocks on the slot index, and which fails against this chain minus 0042 -- the
+-- loser is handed the winner's row as success. What is checked here is the constraint that
+-- makes the race safe and the guard that fires when an insert is refused for a reason the
+-- identity lookup cannot see -- a duplicate job_id.
 -- ---------------------------------------------------------------------------------------
 select is(
   (select count(*)::integer from pg_indexes
@@ -215,6 +218,27 @@ select is(
   (select count(*)::integer from public.foundation_compile_jobs where workspace_key = 'pilot-slottest01'),
   5,
   'no failed call left a row behind');
+
+-- ---------------------------------------------------------------------------------------
+-- 0042. The result carries the identity back, so a caller can check the row it was given.
+-- ---------------------------------------------------------------------------------------
+select has_function(
+  'public', 'assert_foundation_compile_identity',
+  'the identity assertion both lookup paths call exists');
+
+select is(
+  public.foundation_canonical_document_ids(array['doc-b', 'doc-a', 'doc-b']),
+  array['doc-a', 'doc-b'],
+  'document identity ignores the order and multiplicity a caller happens to send');
+
+select is(
+  (select idempotency_key from public.enqueue_foundation_compile_job(
+     'cjob-' || repeat('8', 32), 'pilot-slottest01',
+     '77777777-7777-7777-7777-777777777777', pg_temp.docs(1, 12),
+     pg_temp.compile_key('pilot-slottest01', pg_temp.docs(1, 12), 'corpus-' || repeat('a', 32), 0),
+     'corpus-' || repeat('a', 32), 0, 11)),
+  pg_temp.compile_key('pilot-slottest01', pg_temp.docs(1, 12), 'corpus-' || repeat('a', 32), 0),
+  'an existing slot comes back carrying the identity it is stored under');
 
 select * from finish();
 rollback;
