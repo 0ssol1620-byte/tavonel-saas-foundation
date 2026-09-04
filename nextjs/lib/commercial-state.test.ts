@@ -24,6 +24,12 @@ describe("readCommercialState", () => {
     expect(readCommercialState({ ...LIVE, PADDLE_SANDBOX: "true" }).liveChargesEnabled).toBe(false);
   });
 
+  it("allows real charges only on a production Vercel deployment", () => {
+    expect(readCommercialState({ ...LIVE, VERCEL_ENV: "production" }).liveChargesEnabled).toBe(true);
+    expect(readCommercialState({ ...LIVE, VERCEL_ENV: "preview" }).liveChargesEnabled).toBe(false);
+    expect(readCommercialState({ ...LIVE, VERCEL_ENV: "development" }).liveChargesEnabled).toBe(false);
+  });
+
   /*
     The regression this module exists for. isBillingLaunchApproved() returned true for
     PADDLE_SANDBOX, and Terms/Refunds read it directly, so a sandbox deployment published
@@ -35,6 +41,7 @@ describe("readCommercialState", () => {
       COMMERCIAL_MODE: "live",
       PADDLE_SANDBOX: "true",
       TAVONEL_BILLING_LAUNCH_APPROVED: "true",
+      VERCEL_ENV: "preview",
     });
     expect(sandbox.provider).toBe("sandbox");
     expect(sandbox.checkoutEnabled).toBe(true);
@@ -43,13 +50,13 @@ describe("readCommercialState", () => {
   });
 
   it("keeps production checkout closed until launch is approved", () => {
-    const pending = readCommercialState({ ...LIVE, TAVONEL_BILLING_LAUNCH_APPROVED: "false" });
+    const pending = readCommercialState({ ...LIVE, TAVONEL_BILLING_LAUNCH_APPROVED: "false", VERCEL_ENV: "production" });
     expect(pending.checkoutEnabled).toBe(false);
   });
 
   it("derives one call to action from the same state", () => {
     expect(primaryCallToAction({}).label).toBe("Request access");
-    expect(primaryCallToAction(LIVE).label).toBe("Start with your files");
-    expect(isLiveCommerce(LIVE)).toBe(true);
+    expect(primaryCallToAction({ ...LIVE, VERCEL_ENV: "production" }).label).toBe("Start with your files");
+    expect(isLiveCommerce({ ...LIVE, VERCEL_ENV: "production" })).toBe(true);
   });
 });
