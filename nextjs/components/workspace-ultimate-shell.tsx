@@ -203,7 +203,7 @@ export default function WorkspaceUltimateShell({
         <header className={styles.topbar}>
           <div className={styles.workspaceIdentity}>
             <span>TAVONEL</span>
-            <strong>Private pilot workspace</strong>
+            <strong>Knowledge workspace</strong>
           </div>
           <button type="button" className={styles.topStatus} onClick={() => onNavigate("world")}>
             <small>WORLD</small>
