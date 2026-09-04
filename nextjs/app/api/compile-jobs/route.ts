@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { COMPILE_MAX_DOCUMENTS } from "@/lib/compile-limits";
 import {
+  compileIdempotencyKey,
   enqueueCompileJob,
   enqueueCorpusCompile,
   listWorkspaceCompileJobs,
@@ -9,29 +10,13 @@ import {
 import { CORPUS_MAX_DOCUMENTS, judgeCorpusSet, needsCorpusCompile } from "@/lib/corpus-batching";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { DOCUMENT_ID_PATTERN } from "@/lib/immutable-keys";
+import { checkTrialCompileCapacity } from "@/lib/self-service-trial";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const HEADERS = { "Cache-Control": "no-store" };
 
-/*
-  Start a compile, and hand back a receipt rather than a result.
-
-  The old path had the browser wait for every document to finish reading and then call
-  /api/collections/compile itself. That made the tab a required participant in a run the
-  customer had already paid for: closing it abandoned the work with the reading already spent,
-  and no record anywhere said a compile had been intended. Masterplan 6.3 puts the state
-  machine on the server, so this endpoint's entire job is to write down the intent durably and
-  return. The worker does the rest whether anyone is watching or not.
-*/
-/*
-  503 means "ask again"; 409 means "asking again will not help".
-
-  A slot conflict is the second kind. Some other job already holds the corpus position this
-  submission wants, and no amount of retrying dislodges it -- a client that reads 503 and backs
-  off is being told to wait for something that will never change.
-*/
 function enqueueFailureStatus(code: CompileJobFailure) {
   if (code === "COMPILE_JOB_SCOPE_INVALID") return 400;
   if (code === "COMPILE_JOB_SLOT_CONFLICT") return 409;
@@ -59,16 +44,7 @@ export async function POST(request: Request) {
   if (documentIds.some((id) => !DOCUMENT_ID_PATTERN.test(id))) {
     return NextResponse.json({ code: "DOCUMENT_SET_UNQUALIFIED" }, { status: 400, headers: HEADERS });
   }
-  /*
-    Two ceilings, and they are different numbers on purpose.
 
-    COMPILE_MAX_DOCUMENTS is how many documents one compile carries: one Core request, one
-    function invocation, one artifact. CORPUS_MAX_DOCUMENTS is how many a customer may submit,
-    which is the archive intake ceiling, because dropping a 128-file ZIP and pressing Compile
-    are the same action seen from two ends. Anything above the first is partitioned into parts
-    below it rather than refused -- and the way to raise what a customer can compile is never
-    to edit the first constant.
-  */
   const verdict = judgeCorpusSet(documentIds.length);
   if (!verdict.ok) {
     return NextResponse.json(
@@ -82,6 +58,24 @@ export async function POST(request: Request) {
     );
   }
 
+  // The evaluation includes one Compiled World. A retry of the exact same document set must
+  // remain idempotent rather than becoming "World #2", so the capacity check is given the same
+  // identity the enqueue function will use. The free file cap is three, therefore an evaluation
+  // never reaches the corpus path below.
+  if (auth.principal.accessSource === "trial") {
+    const capacity = await checkTrialCompileCapacity(
+      auth.principal.workspaceKey,
+      auth.principal.userId,
+      compileIdempotencyKey(auth.principal.workspaceKey, documentIds),
+    );
+    if (!capacity.ok) {
+      return NextResponse.json({ code: capacity.code }, { status: 503, headers: HEADERS });
+    }
+    if (!capacity.allowed) {
+      return NextResponse.json({ code: "TRIAL_WORLD_LIMIT_REACHED" }, { status: 402, headers: HEADERS });
+    }
+  }
+
   if (needsCorpusCompile(documentIds.length)) {
     const corpus = await enqueueCorpusCompile({
       workspaceKey: auth.principal.workspaceKey,
@@ -92,14 +86,6 @@ export async function POST(request: Request) {
       const status = enqueueFailureStatus(corpus.code);
       return NextResponse.json({ code: corpus.code }, { status, headers: HEADERS });
     }
-    /*
-      202 even when only some parts were written.
-
-      The parts that exist are already being compiled, and reporting the whole submission as
-      failed would tell the customer to start again over work that is running. `partsEnqueued`
-      against `batchCount` says exactly how far it got, and resubmitting the same selection
-      lands in the same corpus and fills in the rest.
-    */
     return NextResponse.json({
       code: "COMPILE_CORPUS_ACCEPTED",
       corpusId: corpus.value.corpusId,
@@ -125,14 +111,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ code: enqueued.code }, { status, headers: HEADERS });
   }
 
-  /*
-    202 whether or not this call is the one that created the row.
-
-    Resubmitting the same document set returns the job that already exists, so a
-    double-clicked button, a retried fetch and an at-least-once redelivery converge on one
-    compile instead of three. The caller gets the same jobId either way and does not have to
-    care which of them it was.
-  */
   return NextResponse.json({
     code: "COMPILE_JOB_ACCEPTED",
     jobId: enqueued.value.jobId,
