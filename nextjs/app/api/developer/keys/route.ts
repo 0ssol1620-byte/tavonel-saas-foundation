@@ -8,26 +8,27 @@ export const runtime = "nodejs";
 
 const NO_STORE = { "Cache-Control": "no-store" };
 
+function trialBlocked(source: string | undefined) {
+  return source === "trial"
+    ? NextResponse.json({ code: "TRIAL_FEATURE_NOT_INCLUDED" }, { status: 402, headers: NO_STORE })
+    : null;
+}
+
 export async function GET(request: Request) {
   const auth = await requireFoundationSession(request, "observer");
   if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: NO_STORE });
+  const blocked = trialBlocked(auth.principal.accessSource);
+  if (blocked) return blocked;
   const result = await listDeveloperApiKeys(auth.principal.workspaceKey);
   if (!result.ok) return NextResponse.json({ code: result.code }, { status: 503, headers: NO_STORE });
   return NextResponse.json({ code: "OK", keys: result.keys }, { headers: NO_STORE });
 }
 
 export async function POST(request: Request) {
-  /*
-    An API key is how the Developer plan is used at all.
-
-    Key issue, rotation and revocation all required "studio" while the plan that advertises
-    "API and MCP access" is the observer-level one. That is the same mismatch the compile route
-    had: a subscriber could pay for API access and then be unable to mint the credential that
-    grants it. Collaboration is what the Team plan sells; a key to your own workspace is not
-    collaboration.
-  */
   const auth = await requireFoundationSession(request, "observer");
   if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: NO_STORE });
+  const blocked = trialBlocked(auth.principal.accessSource);
+  if (blocked) return blocked;
   const declaredLength = Number(request.headers.get("content-length") ?? "0");
   if (Number.isFinite(declaredLength) && declaredLength > 8_192) return NextResponse.json({ code: "REQUEST_TOO_LARGE" }, { status: 413, headers: NO_STORE });
   const text = await request.text();
