@@ -1,0 +1,63 @@
+/* Final workspace hierarchy pass.
+   Home is an operational summary, not a second copy of the full Sources inventory. */
+
+/* When Home is active and documents already exist, keep intake to one compact action row. */
+.workspace:has(button[title^="Home"][aria-current="page"]):has(.document-meta li) .workspace-intake-copy {
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 14px 16px;
+  gap: 4px 18px;
+}
+.workspace:has(button[title^="Home"][aria-current="page"]):has(.document-meta li) .workspace-intake-copy .eyebrow,
+.workspace:has(button[title^="Home"][aria-current="page"]):has(.document-meta li) .workspace-intake-copy > p:not(.eyebrow) {
+  display: none;
+}
+.workspace:has(button[title^="Home"][aria-current="page"]):has(.document-meta li) .workspace-intake-copy h2 {
+  font-size: 14px;
+  font-weight: 540;
+}
+.workspace:has(button[title^="Home"][aria-current="page"]):has(.document-meta li) .workspace-intake-copy h2::after {
+  content: " · Add or connect sources";
+  color: var(--text-lo);
+  font-weight: 400;
+}
+.workspace:has(button[title^="Home"][aria-current="page"]):has(.document-meta li) .workspace-intake-actions button {
+  min-height: 34px;
+  padding: 7px 10px;
+}
+
+/* Home already has the exception-first queue. The complete inventory belongs on Sources. */
+.workspace:has(button[title^="Home"][aria-current="page"]) .document-card {
+  display: none;
+}
+
+/* Keep the live view useful but subordinate to the current-state summary. */
+.workspace:has(button[title^="Home"][aria-current="page"]) .compile-stage {
+  max-height: 300px;
+}
+
+/* Source inventory itself remains bounded and scan-friendly on the dedicated Sources surface. */
+.workspace:has(button[title^="Sources"][aria-current="page"]) .document-meta {
+  max-height: min(58vh, 620px);
+}
+.workspace:has(button[title^="Sources"][aria-current="page"]) .document-card > h2 {
+  margin-bottom: 10px;
+}
+
+/* Internal identifiers are technical metadata, never the visual emphasis. */
+.board-row-name,
+.document-meta label > span:first-child {
+  font-family: var(--f-sans);
+  letter-spacing: 0;
+}
+
+@media (max-width: 720px) {
+  .workspace:has(button[title^="Home"][aria-current="page"]):has(.document-meta li) .workspace-intake-copy {
+    grid-template-columns: 1fr;
+  }
+  .workspace:has(button[title^="Home"][aria-current="page"]):has(.document-meta li) .workspace-intake-actions {
+    grid-column: 1;
+    grid-row: auto;
+    justify-content: stretch;
+  }
+}
