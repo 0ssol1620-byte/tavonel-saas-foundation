@@ -1,81 +1,64 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import Logomark from "@/components/logomark";
+import { PublicPageShell } from "@/components/public-page-shell";
 
 export const metadata: Metadata = {
-  // Each page declares its own address. Without this every route inherited the root
-  // canonical ("/"), so a crawler was told 22 distinct pages were all the homepage.
   alternates: { canonical: "/product" },
   openGraph: { url: "/product" },
   title: "Product — TAVONEL",
-  description:
-    "TAVONEL is a Knowledge Compiler. Documents, scans, code and connected systems go in. A Compiled World comes out.",
+  description: "TAVONEL is a Knowledge Compiler. Documents, scans, code and connected systems go in. A Compiled World comes out.",
 };
 
 const SURFACES = [
-  [
-    "/product/knowledge-compiler",
-    "CATEGORY",
-    "Knowledge Compiler",
-    "Read sources, reconstruct structure, resolve identities, map relationships, keep evidence attached, and compile the result.",
-  ],
-  [
-    "/product/document-understanding",
-    "READING",
-    "Document understanding",
-    "Recover text, layout and structure from documents and scans before anything is compiled.",
-  ],
-  [
-    "/product/compiled-world",
-    "OUTPUT",
-    "Compiled World",
-    "Structured knowledge with provenance and reusable retrieval artifacts — not a pile of searchable files.",
-  ],
+  ["/product/knowledge-compiler", "CATEGORY", "Knowledge Compiler", "Read sources, reconstruct structure, resolve identities, map relationships, keep evidence attached, and compile the result."],
+  ["/product/document-understanding", "READING", "Document understanding", "Recover text, layout and structure from documents and scans before anything is compiled."],
+  ["/product/compiled-world", "OUTPUT", "Compiled World", "Structured knowledge with provenance and reusable retrieval artifacts — not a pile of searchable files."],
+] as const;
+
+const PRODUCT_FLOW = [
+  ["SOURCE", "Files, folders, ZIP and connected systems"],
+  ["READ", "Pages, tables, regions and coordinates"],
+  ["STRUCTURE", "Entities, claims, relations and review"],
+  ["WORLD", "Evidence, graph, retrieval and portable export"],
 ] as const;
 
 export default function ProductPage() {
   return (
-    <div className="page">
-      <header className="nav" data-stuck={1}>
-        <Link href="/" className="wordmark" aria-label="TAVONEL home">
-          <Logomark />
-          <b>TAVONEL</b>
-        </Link>
-        <nav aria-label="Sections">
-          <Link href="/">Back to the compiler</Link>
-          <Link href="/research">Research</Link>
-          <Link href="/evidence">Evidence</Link>
-        </nav>
-        <Link className="btn small" href="/login">Sign in</Link>
-      </header>
-      <main id="main">
-        <section className="scene doc">
-          <div className="shell">
-            <div className="body">
-              <div className="stack">
-                <p className="slate"><b>PRODUCT</b><span />KNOWLEDGE COMPILER</p>
-                <h2>Compile documents into a world an AI can reason about.</h2>
-              </div>
-              <div className="stack">
-                <p className="lede">
-                  TAVONEL is a Knowledge Compiler. Documents, scans, code and connected systems go in.
-                  <b> A Compiled World comes out</b> &mdash; structured knowledge, evidence, graph and retrieval artifacts.
-                </p>
-                <div className="tiles">
-                  {SURFACES.map(([href, state, title, body]) => (
-                    <Link className="tile" href={href} key={href}>
-                      <span className="n">{state}</span>
-                      <h3>{title}</h3>
-                      <p>{body}</p>
-                    </Link>
-                  ))}
-                </div>
-                <p className="fine">Technical evidence and current deployment state remain available in the <Link href="/evidence">evidence record</Link>.</p>
-              </div>
+    <PublicPageShell>
+      <section className="scene doc product-overview">
+        <div className="shell">
+          <div className="body product-hero">
+            <div className="stack">
+              <p className="slate"><b>PRODUCT</b><span />KNOWLEDGE COMPILER</p>
+              <h1 className="document-title">Compile documents into a World an AI can actually use.</h1>
+            </div>
+            <div className="stack">
+              <p className="lede">Documents, scans and connected systems go in. A source-grounded, versioned Compiled World comes out — with evidence still attached.</p>
+              <div className="actions"><Link className="btn" href="/login">Start free</Link><Link className="btn ghost" href="/explore">Explore a World</Link></div>
             </div>
           </div>
-        </section>
-      </main>
-    </div>
+
+          <div className="product-flow" aria-label="TAVONEL product flow">
+            {PRODUCT_FLOW.map(([stage, detail], index) => (
+              <article key={stage}>
+                <span>{String(index + 1).padStart(2, "0")} · {stage}</span>
+                <strong>{detail}</strong>
+              </article>
+            ))}
+          </div>
+
+          <div className="product-surface-grid">
+            {SURFACES.map(([href, state, title, body]) => (
+              <Link className="product-surface" href={href} key={href}>
+                <span>{state}</span>
+                <h2>{title}</h2>
+                <p>{body}</p>
+                <b>Open →</b>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+    </PublicPageShell>
   );
 }
