@@ -1,4 +1,5 @@
 import { DOCUMENT_ID_PATTERN, WORKSPACE_ID_PATTERN } from "./immutable-keys";
+import { FOUNDATION_INTAKE_MAX_BYTES } from "./r2-presign";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
 
 const USER_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -22,7 +23,7 @@ export function validateIntakeAdmission(value: IntakeAdmission) {
     value.objectKey === `quarantine/${value.workspaceKey}/${value.documentId}/source` &&
     Number.isSafeInteger(value.requestedBytes) &&
     value.requestedBytes >= 1 &&
-    value.requestedBytes <= 5 * 1024 * 1024 &&
+    value.requestedBytes <= FOUNDATION_INTAKE_MAX_BYTES &&
     value.declaredMimeType.length >= 3 &&
     value.declaredMimeType.length <= 160;
 }
@@ -50,6 +51,8 @@ export async function reserveFoundationIntake(value: IntakeAdmission) {
   if (!response.ok) {
     const error = await response.json().catch(() => null) as { message?: unknown } | null;
     const message = typeof error?.message === "string" ? error.message : "";
+    if (message.includes("foundation_intake_file_too_large")) return { ok: false as const, code: "INTAKE_FILE_TOO_LARGE" };
+    if (message.includes("foundation_trial_file_too_large")) return { ok: false as const, code: "TRIAL_FILE_TOO_LARGE" };
     if (message.includes("foundation_intake_rate_limited")) return { ok: false as const, code: "INTAKE_RATE_LIMITED" };
     if (message.includes("foundation_intake_daily_quota_exceeded")) return { ok: false as const, code: "INTAKE_DAILY_QUOTA_EXCEEDED" };
     if (message.includes("foundation_trial_file_limit_exceeded")) return { ok: false as const, code: "TRIAL_FILE_LIMIT_EXCEEDED" };
