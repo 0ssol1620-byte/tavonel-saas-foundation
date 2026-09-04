@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PublicPageShell } from "@/components/public-page-shell";
+import PublicPrimaryCta from "@/components/public-primary-cta";
 
 const SOLUTIONS = {
   "ai-ready-knowledge": {
@@ -147,7 +148,7 @@ export default async function SolutionPage({ params }: { params: Promise<{ slug:
         </details>
 
         <div className="actions solution-actions">
-          <Link className="btn" href="/login">Start free</Link>
+          <PublicPrimaryCta className="btn" />
           <Link className="btn ghost" href="/explore">Explore a World</Link>
         </div>
       </div></section>
