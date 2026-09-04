@@ -12,10 +12,18 @@ const valid = {
   startedAt: Date.now() - 5_000,
 };
 
+const deliveryEnv = [
+  "AKC_RESEND_API_KEY",
+  "AKC_CONTACT_FROM",
+  "AKC_CONTACT_TO",
+  "AKC_CONTACT_ALLOWED_ORIGINS",
+] as const;
+
 beforeEach(() => {
-  // Vercel Preview builds run unit tests with NODE_ENV=production. These route tests exercise
-  // the local/default posture unless a case explicitly opts into production below.
+  // Vercel injects real Production/Preview environment variables while running prebuild.
+  // These tests must start from a deterministic empty delivery posture and opt in explicitly.
   vi.stubEnv("NODE_ENV", "test");
+  for (const key of deliveryEnv) vi.stubEnv(key, "");
 });
 
 afterEach(() => {
