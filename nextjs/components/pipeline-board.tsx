@@ -10,6 +10,17 @@ import { trackFunnel } from "@/lib/funnel-events";
 type Filter = "all" | "attention" | "processing" | "ready" | "failed";
 function statusOf(row: PipelineRow): Exclude<Filter, "all"> { if (row.stages.some((stage) => stage.state === "failed")) return "failed"; if (row.needsPerson) return "attention"; if (row.transfer || row.stages.some((stage) => stage.state === "active")) return "processing"; return "ready"; }
 function statusLabel(row: PipelineRow, reading: Record<string, OcrProgress>): string { const status = statusOf(row); if (status === "attention") return "Needs review"; if (status === "failed") return "Failed"; if (row.transfer) return "Uploading"; if (row.stages[2].state === "active") return reading[row.id]?.pagesRead ? `Reading page ${reading[row.id].pagesRead}` : "Reading"; if (row.stages[1].state === "active") return "Preparing"; if (row.stages[3].state === "active") return "Ready to compile"; if (row.stages[3].state === "done") return "Compiled"; return status === "processing" ? "Processing" : "Ready"; }
+function failureCopy(detail: string) {
+  if (detail.includes("TRIAL_FILE_TOO_LARGE")) return "Free Evaluation accepts files up to 50 MB. Use a smaller source or upgrade for larger manuals.";
+  if (detail.includes("FILE_TOO_LARGE") || detail.includes("INTAKE_FILE_TOO_LARGE")) return "This file exceeds the 250 MB direct-upload limit. Connect the source system instead of uploading it directly.";
+  if (detail.includes("UNQUALIFIED_MIME")) return "This file type is not supported yet. Use PDF, DOCX, XLSX, PPTX, OpenDocument, JPG, PNG, TIFF or GIF.";
+  if (detail.includes("FILENAME_MIME_MISMATCH")) return "The file extension and detected browser type disagree. Export the source again with its correct format and retry.";
+  if (detail.includes("TRIAL_ARCHIVE_NOT_INCLUDED")) return "ZIP archives are not included in Free Evaluation. Upload the files directly or use Developer access.";
+  if (detail.includes("UNQUALIFIED_INPUT")) return "This source was rejected by the previous intake contract. Re-add it now; the direct-upload ceiling has been raised.";
+  if (detail.includes("INTAKE_RATE_LIMITED")) return "Too many source bytes arrived at once. Wait a minute and retry; already accepted sources are safe.";
+  if (detail.includes("INTAKE_DAILY_QUOTA_EXCEEDED")) return "This workspace reached its 24-hour direct-upload safety bound. Connect a source system or retry after the window resets.";
+  return detail || "The source stopped before processing completed.";
+}
 
 export default function PipelineBoard({ rows, reading = {}, names = {}, onDismiss }: { rows: PipelineRow[]; reading?: Record<string, OcrProgress>; names?: DocumentNames; onDismiss?: () => void }) {
   const firstFailed = rows.find((row) => statusOf(row) === "failed") ?? null;
@@ -24,7 +35,8 @@ export default function PipelineBoard({ rows, reading = {}, names = {}, onDismis
   const filtered = rows.filter((row) => (effectiveFilter === "all" || statusOf(row) === effectiveFilter) && (!normalizedQuery || displayName(row.id, names, row.filename).toLowerCase().includes(normalizedQuery)));
   const visible = filtered.slice(0, visibleCount);
   const selectFilter = (next: Filter) => { setFilter(next); setVisibleCount(12); setExpandedId(next === "failed" ? firstFailed?.id ?? null : null); trackFunnel("source_filter_changed", { filter: next }); };
-  const failedReason = firstFailed?.stages.find((stage) => stage.state === "failed")?.detail || "The source stopped before processing completed.";
+  const failedDetail = firstFailed?.stages.find((stage) => stage.state === "failed")?.detail ?? "";
+  const failedReason = failureCopy(failedDetail);
 
   return (
     <section className="card board board-compact" aria-label="Document processing">
@@ -51,7 +63,7 @@ export default function PipelineBoard({ rows, reading = {}, names = {}, onDismis
             {row.transfer ? <div className="board-transfer compact" aria-label="Upload progress"><i style={{ width: `${row.transfer.total > 0 ? (row.transfer.loaded / row.transfer.total) * 100 : 0}%` }} /></div> : null}
             <div className="board-row-detail" hidden={!expanded}>
               {progress && row.stages[2].state === "active" ? <ReadingView progress={progress} /> : null}
-              <div className="board-stages board-stages-detail">{row.stages.map((stageItem) => <div className="board-stage" key={stageItem.key} data-s={stageItem.state}><span className="board-stage-k"><i aria-hidden="true" />{stageItem.label}</span><span className="board-stage-d">{stageItem.detail || "Not started"}</span></div>)}</div>
+              <div className="board-stages board-stages-detail">{row.stages.map((stageItem) => <div className="board-stage" key={stageItem.key} data-s={stageItem.state}><span className="board-stage-k"><i aria-hidden="true" />{stageItem.label}</span><span className="board-stage-d">{stageItem.state === "failed" ? failureCopy(stageItem.detail) : stageItem.detail || "Not started"}</span></div>)}</div>
             </div>
           </li>
         ); })}
