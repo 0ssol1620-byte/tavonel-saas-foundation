@@ -20,13 +20,16 @@ describe("Foundation compute ledger", () => {
     ["foundation_studio_subscription_required", "STUDIO_SUBSCRIPTION_REQUIRED"],
     ["foundation_billing_hold", "BILLING_HOLD"],
     ["foundation_credits_required", "GPU_CREDITS_REQUIRED"],
+    ["foundation_trial_page_limit_exceeded", "TRIAL_PAGE_LIMIT_EXCEEDED"],
+    ["foundation_trial_global_budget_exceeded", "TRIAL_CAPACITY_REACHED"],
+    ["foundation_trial_not_active", "TRIAL_NOT_ACTIVE"],
   ])("maps fail-closed reservation guard %s", async (message, code) => {
     configure();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ message }), { status: 400 })));
     await expect(reserveFoundationCompute(base)).resolves.toEqual({ ok: false, code });
   });
 
-  it("accepts a reservation receipt bound to the requested document", async () => {
+  it.each(["paid", "trial", "owner"] as const)("accepts a %s reservation receipt bound to the requested document", async (billingSource) => {
     configure();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
       reservationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
@@ -35,10 +38,11 @@ describe("Foundation compute ledger", () => {
       expiresAt: "2026-08-29T12:10:00Z",
       reservedCredits: 12,
       maximumCredits: 18,
+      billingSource,
       idempotentReplay: false,
     }), { status: 200 })));
-    await expect(reserveFoundationCompute(base)).resolves.toMatchObject({ ok: true });
-    expect(fetch).toHaveBeenCalledWith(expect.stringContaining("reserve_foundation_compute_v2"), expect.objectContaining({
+    await expect(reserveFoundationCompute(base)).resolves.toMatchObject({ ok: true, result: { billingSource } });
+    expect(fetch).toHaveBeenCalledWith(expect.stringContaining("reserve_foundation_compute_v3"), expect.objectContaining({
       body: expect.stringContaining('"p_reserved_credits":12,"p_maximum_credits":18'),
     }));
   });
@@ -50,6 +54,7 @@ describe("Foundation compute ledger", () => {
       reservationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
       state: "operator_review",
       settledCredits: 2,
+      billingSource: "trial",
     }), { status: 200 })));
     await expect(settleFoundationCompute({
       workspaceKey: base.workspaceKey,
@@ -58,5 +63,6 @@ describe("Foundation compute ledger", () => {
       actualCredits: 12,
       reasonCode: "OCR_TIMEOUT_OR_NETWORK",
     })).resolves.toMatchObject({ ok: true });
+    expect(fetch).toHaveBeenCalledWith(expect.stringContaining("settle_foundation_compute_v3"), expect.any(Object));
   });
 });

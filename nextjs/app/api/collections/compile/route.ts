@@ -11,29 +11,22 @@ export const maxDuration = 60;
 /*
   Compile a set of read documents, synchronously.
 
-  This is a primitive now, not the customer's orchestration. A browser that calls it has to
-  stay open until it answers, which is the exact dependency masterplan 6.3 removes -- so the
-  workspace goes through POST /api/compile-jobs instead, and the durable worker calls the same
-  compile this route calls (`runCollectionCompile`, shared so the two cannot drift apart).
-
-  It stays public because the API contract published it and because a developer with their own
-  scheduler has a legitimate reason to drive one compile and wait for it.
+  This is a paid/owner primitive, not the customer's orchestration. A free evaluation must use
+  /api/compile-jobs, where the one-World cap, idempotency and resumable lifecycle are enforced
+  before work is enqueued. Keeping this primitive outside the trial also prevents a caller from
+  bypassing that cap with repeated synchronous requests.
 */
 export async function POST(request: Request) {
   const contentLength = Number(request.headers.get("content-length") ?? "0");
   if (!Number.isFinite(contentLength) || contentLength > 4_096) {
     return NextResponse.json({ code: "METADATA_ONLY_ENDPOINT" }, { status: 415, headers: { "Cache-Control": "no-store" } });
   }
-  /*
-    Compiling a world is the product, not a Team upgrade.
-
-    This route required "studio" while upload and OCR required only "observer", so a Developer
-    subscriber could buy 500 compile pages, spend them on reading documents, and then be told
-    the compile step needed a different plan. Collaboration is what Team sells; the compiler
-    itself belongs to every paid plan.
-  */
   const auth = await authorizeFoundationRequest(request, "collections:compile", "observer");
   if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: { "Cache-Control": "no-store" } });
+  if (auth.principal.accessSource === "trial") {
+    return NextResponse.json({ code: "TRIAL_DURABLE_COMPILE_REQUIRED" }, { status: 402, headers: { "Cache-Control": "no-store" } });
+  }
+
   let body: { documentIds?: unknown };
   try {
     body = await request.json();
@@ -47,7 +40,6 @@ export async function POST(request: Request) {
   if (documentIds.some((id) => !DOCUMENT_ID_PATTERN.test(id))) {
     return NextResponse.json({ code: "DOCUMENT_SET_UNQUALIFIED" }, { status: 400, headers: { "Cache-Control": "no-store" } });
   }
-  // Shared with the workspace so a selection cannot be accepted by the UI and refused here.
   const verdict = judgeCompileSet(documentIds.length);
   if (!verdict.ok) {
     return NextResponse.json(

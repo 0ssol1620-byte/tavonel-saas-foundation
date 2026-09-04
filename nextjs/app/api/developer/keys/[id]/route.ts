@@ -9,17 +9,11 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 const NO_STORE = { "Cache-Control": "no-store" };
 
 export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
-  /*
-    An API key is how the Developer plan is used at all.
-
-    Key issue, rotation and revocation all required "studio" while the plan that advertises
-    "API and MCP access" is the observer-level one. That is the same mismatch the compile route
-    had: a subscriber could pay for API access and then be unable to mint the credential that
-    grants it. Collaboration is what the Team plan sells; a key to your own workspace is not
-    collaboration.
-  */
   const auth = await requireFoundationSession(request, "observer");
   if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: NO_STORE });
+  if (auth.principal.accessSource === "trial") {
+    return NextResponse.json({ code: "TRIAL_FEATURE_NOT_INCLUDED" }, { status: 402, headers: NO_STORE });
+  }
   const { id } = await context.params;
   if (!UUID.test(id)) return NextResponse.json({ code: "API_KEY_ID_INVALID" }, { status: 400, headers: NO_STORE });
   const result = await revokeDeveloperApiKey(auth.principal.workspaceKey, auth.principal.userId, id);

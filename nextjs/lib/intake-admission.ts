@@ -52,6 +52,8 @@ export async function reserveFoundationIntake(value: IntakeAdmission) {
     const message = typeof error?.message === "string" ? error.message : "";
     if (message.includes("foundation_intake_rate_limited")) return { ok: false as const, code: "INTAKE_RATE_LIMITED" };
     if (message.includes("foundation_intake_daily_quota_exceeded")) return { ok: false as const, code: "INTAKE_DAILY_QUOTA_EXCEEDED" };
+    if (message.includes("foundation_trial_file_limit_exceeded")) return { ok: false as const, code: "TRIAL_FILE_LIMIT_EXCEEDED" };
+    if (message.includes("foundation_trial_not_active")) return { ok: false as const, code: "TRIAL_NOT_ACTIVE" };
     if (message.includes("foundation_intake_idempotency_conflict")) return { ok: false as const, code: "INTAKE_IDEMPOTENCY_CONFLICT" };
     return { ok: false as const, code: "INTAKE_ADMISSION_FAILED" };
   }
