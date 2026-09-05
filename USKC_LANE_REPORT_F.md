@@ -20,9 +20,9 @@ Branch `agent/uskc-f-customer-data-gate`, four commits on top of `4c18e86`:
 | `223b01d` | Record gate decisions and source ACLs in two append-only tables |
 | `fc1e286` | Say the customer-data gate is closed, and test the live path |
 | `5d2c338` | Name a security suite, and write down what it does not prove |
-| `PUSHED_SHA` | Lane F report |
+| `fc3b349` | Report lane F: gates, failure paths, conflicts and founder decisions |
 
-Pushed SHA: see §1 of the returned structured object (the report commit is the branch head).
+Pushed SHA: `fc3b349c6eccd36ab5d29cb380b6eb23671a676f`.
 Preview deployment auto-created; not verified — the Vercel MCP was not consulted from this lane.
 
 ## 2. Files
