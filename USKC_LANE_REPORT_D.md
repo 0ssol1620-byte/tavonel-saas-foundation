@@ -7,7 +7,11 @@ Campaign `TAVONEL-USKC-P0-20260906-V1`. Contract `USKC_LANE_CONTRACT_2026-09-06.
 
 - Repo: `0ssol1620-byte/tavonel-saas-foundation`, worktree `D:\CodexProjects\uskc-lanes\site-d-capability-manifest`
 - Branch: `agent/uskc-d-capability-manifest`, based on `4c18e86`
-- Pushed SHA: `PUSHED_SHA_PLACEHOLDER`
+- Pushed SHA: **`ed2eadc63c26833af510527d33dc34824f7096aa`** — the tip at first push, carrying the whole lane.
+  Three commits on top of `4c18e86`:
+  `9f3ba19` (the manifest and the six surfaces derived from it), `ed2eadc` (the `.gitattributes` LF pin and this
+  report), and one follow-up commit that fills this line in with the SHA above — its own SHA is printed by
+  `git log --oneline origin/main..HEAD` and is the branch tip a reviewer should check out.
 - Production deploy 안 함. Git push로 Preview deployment는 자동 생성됨. Preview not verified through the Vercel MCP.
 
 ## 2. Files created and modified
