@@ -52,8 +52,9 @@ same convergence (`docs/REPO_CONVERGENCE_MATRIX.md`, `docs/PRODUCT_CONVERGENCE_A
   export-signing configuration in full — read it before changing anything under `nextjs/app` or
   `nextjs/components`.
 - **`client/` / `server/` / `shared/`** — the earlier Vite + Express application this platform is
-  converging out of. `shared/` holds cross-surface contracts (`productCoreCompileEnvelope.ts`,
-  `candidateWorldContract.ts`, `productCoreFieldMap.ts`) that both surfaces depend on.
+  converging out of. `shared/` holds cross-surface contracts
+  (`shared/productCoreCompileEnvelope.ts`, `shared/candidateWorldContract.ts`,
+  `shared/productCoreFieldMap.ts`) that both surfaces depend on.
 
 Supporting services: `workers/` (OCR dispatch, CPU and GPU), `quarantine-sidecar/` (content-disarm
 services), `retrieval-runtime/` (a Python retrieval service), `supabase/` (schema migrations and
@@ -68,25 +69,48 @@ manifest digest, validation receipt, equivalence status and an explicit promotio
 
 ## Compiler Contract
 
-Eight properties a compile is expected to hold. Each is demonstrated somewhere in this codebase
-today; none is asserted here as more finished than the product itself claims at
-`/product/compiled-world`, `/evidence` and `/research`:
+Eight properties a compile is expected to hold. The right-hand column says what this repository
+actually does about each one *today* — which is not the same for all eight, and the differences
+are the point. Three kinds of entry appear, in the product's own vocabulary
+(`nextjs/lib/claim-state.ts`, `nextjs/lib/capabilities.ts`):
 
-| Clause | What it means | Where it shows up today |
+- **Demonstrated** — built and shown on a declared sample, not a production qualification. There
+  is exactly one such sample here: the three committed FP-200 PDFs in
+  `nextjs/public/explore-sample/`, compiled at build time and pinned by `EXPLORE_SAMPLE_DIGEST` in
+  `nextjs/lib/explore-sample.ts`, asserted by `nextjs/lib/explore-sample.test.ts`, and shown at
+  `/explore` under an `INTERACTIVE SAMPLE` label. Two limits on what that sample can support:
+  it is compiled by *this repository's* TypeScript compiler at build time, not by the Core
+  runtime (`nextjs/lib/explore-sample.ts` says so in its own execution record), and it contains
+  one revision of each document, so nothing here demonstrates behaviour across a source revision.
+- **Described** — the property is explained on a product page. That is prose about the design,
+  not a running demonstration of it.
+- **Research frontier / Direction** — an active research direction that is not a shipped
+  capability here.
+
+No clause below is claimed as qualified, and none is claimed as a production capability.
+
+| Clause | What it means | What this repository does about it today |
 |---|---|---|
-| Evidence-preserving | A claim without a supporting source region is not emitted | `/evidence`, `nextjs/lib/evidence-record.ts` |
-| Stable semantic identity | The same real-world thing keeps one identity across document revisions | `/product/compiled-world` (OBJECTS), `/research` (Semantic identity) |
-| Typed dependencies | Relations are typed (supports, supersedes, depends on, contradicts), not generic edges | `/product/compiled-world` (RELATIONS) |
-| Temporal integrity | A world is versioned; an old answer stays traceable to what its sources said at the time | `/product/compiled-world` (VERSIONS), `/research` (Temporal integrity) |
-| Selective recompilation | A source change invalidates only the world it actually touches, not the whole corpus | `/research` (Selective recompilation) — **Direction**: demonstrated on fixture data, not a shipped capability in this deployment (`nextjs/lib/capabilities.ts`) |
-| Full-rebuild equivalence | A selective rebuild is checked against a full rebuild before it is trusted | Core-side concept; no public receipt is wired into this deployment yet — see [Reproducibility](#reproducibility) |
-| Multi-model verification | Model output is checked against the source, so the contract survives swapping any one model | `/research` (Multi-model verification) |
-| Portable World | The world leaves as a signed, hash-verifiable package, not a vendor lock-in | `/product/compiled-world` (PACKAGE), `/api/export/trust` |
+| Evidence-preserving | A claim without a supporting source region is not emitted | **Demonstrated.** The sample world holds 10 claims and 10 evidence rows, and every claim carries at least one. `nextjs/lib/explore-sample.test.ts` asserts each evidence row against a real page number, an in-bounds box, an excerpt that is a literal slice of the source text, and the source file's sha256. Described at `/evidence` |
+| Stable semantic identity | The same real-world thing keeps one identity across document revisions | **Not demonstrated here**, in either direction. Exactly one object in the sample world spans more than one document, and it is the catch-all topic `General`; `FP-200` — the thing all three documents are about — resolves as an entity inside a single document, not across them. The sample also holds one revision of each document, so identity across a revision is not exercised at all. `/explore` publishes its own limit on the entity extractor: labels come from a capitalised-token heuristic, and 3 of 15 were true positives in the recorded evaluation. Described at `/product/compiled-world` (OBJECTS); named as an unsolved problem at `/research` ("Semantic identity") |
+| Typed dependencies | Relations are typed (supports, supersedes, depends on, contradicts), not generic edges | **Partly demonstrated, in a narrower vocabulary than this clause describes.** The sample world's 32 relations are typed and each carries the evidence that justifies it, but the whole predicate vocabulary is three structural edges — `mentions_entity` (19), `supported_by` (10, claim→evidence), `discusses_topic` (3). No claim-to-claim edge exists in it, so nothing here shows a `supersedes` or `contradicts` relation. Described at `/product/compiled-world` (RELATIONS) |
+| Temporal integrity | A world is versioned; an old answer stays traceable to what its sources said at the time | **Described** at `/product/compiled-world` (VERSIONS); listed as an open problem at `/research` ("Temporal integrity"). No public artifact on this deployment shows a past answer being re-resolved against an older world version |
+| Selective recompilation | A source change invalidates only the world it actually touches, not the whole corpus | **Direction**, verbatim from `nextjs/lib/capabilities.ts`: "Demonstrated above on fixture data. Not offered as a shipped capability in this deployment" |
+| Full-rebuild equivalence | A selective rebuild is checked against a full rebuild before it is trusted | **Not shown here.** A Core Engine property; this repository publishes no equivalence receipt — see [Reproducibility](#reproducibility) |
+| Multi-model verification | Model output is checked against the source, so the contract survives swapping any one model | **Research frontier.** The only place this phrase appears in this repository is the open-problems list at `/research`, a page whose stated subject is "the open problems in compiling documents into evidence-bound, versioned knowledge". Nothing here demonstrates it |
+| Portable World | The world leaves as a signed, hash-verifiable package, not a vendor lock-in | **Implemented and unit-tested**, not demonstrated on a public artifact: `nextjs/lib/export-signing.ts` and `nextjs/lib/collection-download.ts` with their own tests, an offline verifier (`pnpm verify:export`), and `/api/export/trust` publishing the verification key. That endpoint is fail-closed — with no signer configured it returns `503 EXPORT_SIGNER_NOT_CONFIGURED` rather than an unsigned answer — so whether a given deployment serves a key depends on its environment. Described at `/product/compiled-world` (PACKAGE) |
 
-A dedicated Compiler Contract page is planned at `/product/continuous-knowledge`; on this baseline
-it is a stable 404 kept for a retired inbound URL, not yet the page described above.
+A dedicated Compiler Contract page is planned at `/product/continuous-knowledge`. As of this
+commit that route is a stable 404 kept for a retired inbound URL
+(`nextjs/app/product/continuous-knowledge/page.tsx` calls `notFound()`), not yet the page
+described above. If a later commit activates the route, the route is the current statement and
+this paragraph is stale — check the file, not this line.
 
 ## Compiled World
+
+*The sections from here to [Open Formats](#open-formats) describe the design. The Compiler
+Contract table above is the one that says how much of that design this repository currently
+shows, and it is the one to read if the two ever seem to disagree.*
 
 The output of a compile. Objects (entities, topics, claims) with stable identity; typed relations
 between them; evidence binding every claim to a document version, page and region; versions, so a
@@ -131,13 +155,13 @@ labelled **Direction**, not a shipped production capability, in `nextjs/lib/capa
 ## Equivalence
 
 Before a selectively-rebuilt world is trusted, it is expected to be checked against a full
-rebuild of the same sources. `/reproducibility` states this precisely for what is public today: a
-digest proves the bytes a fixture was built from are the bytes it claims; it does not by itself
-prove semantic quality, and no independent reproduction receipt is currently registered on this
-deployment. A deterministic, hash-bound equivalence receipt for a maintenance-manual revision
-fixture is being produced separately in the Core Engine repository
-(`research/explore_change_receipt_20260905/`, commit `26bb892` at time of writing); it is Core
-research output, not yet a claim this site publishes.
+rebuild of the same sources. **This repository publishes no equivalence receipt, and there is no
+artifact here to point at.** Equivalence verification is Core Engine work; until a receipt exists
+and is wired in, it is a design property of the compiler, not a claim this site makes.
+
+`/reproducibility` states precisely what *is* public today: a digest proves the bytes a fixture
+was built from are the bytes it claims; it does not by itself prove semantic quality, and no
+independent reproduction receipt is currently registered on this deployment.
 
 ## Open Formats
 
@@ -156,9 +180,11 @@ until both are settled.
 - **REST** — versioned endpoints under `nextjs/app/api/v1`, bearer-token authenticated, documented
   with a request in cURL, Python and TypeScript per endpoint at `/docs`. Machine-readable contract
   at `/openapi.json`.
-- **MCP** — eight read-only stdio tools (sources, World, search, Ask, objects, relations,
-  evidence, package) over the same World a human sees. No write tool exists, and the server
-  refuses to start if one is added (`/developers`).
+- **MCP** — eight read-only stdio tools (`list_sources`, `get_world`, `search_world`,
+  `ask_world`, `get_object`, `get_relation`, `get_evidence`, `download_package`) over the same
+  World a human sees. No write tool exists, and the server refuses to start if one is added; both
+  the exact tool list and the read-only refusal are asserted by `nextjs/lib/mcp-server.test.ts`.
+  Download from `/developers`.
 - **CLI** — a Node.js 20+ client with an immutable version and update check, downloadable from
   `/developers`.
 - **Source agent** — a local-first SMB/NFS/SFTP/S3-compatible connector agent, same page.
@@ -168,12 +194,15 @@ independent verification before running anything downloaded from this site.
 
 ## Benchmarks
 
-This deployment does not currently publish a Knowledge Compilation Benchmark or any comparative
-performance number; `/benchmarks` returns a stable 404. Publishing a benchmark or a competitor
-comparison here is a founder decision (`CLAUDE.md`, "What is not an agent's call"), gated on a
-frozen evaluation protocol, a published denominator, and a same-condition run — never a vendor's
-own reported number restated as reproduced. The current public evidence surfaces are `/research`
-and `/reproducibility`.
+As of this commit, this deployment publishes no Knowledge Compilation Benchmark and no comparative
+performance number: `nextjs/app/benchmarks/page.tsx` calls `notFound()`, so `/benchmarks` is a
+stable 404 kept for a retired inbound URL. If a later commit activates that route, the route is
+the current statement and this paragraph is stale — check the file, not this line.
+
+What does *not* change with the route: publishing a benchmark or a competitor comparison is an
+owner decision (`.github/CODEOWNERS`), gated on a frozen evaluation protocol, a published
+denominator, and a same-condition run — never a vendor's own reported number restated as
+reproduced. The current public evidence surfaces are `/research` and `/reproducibility`.
 
 ## Reproducibility
 
@@ -228,7 +257,7 @@ Pull requests are opened against `main` and reviewed by the owners in
 [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) to confirm the gates above
 before requesting review. Repository governance (branch protection, required checks, tagging) is
 described in [`docs/GITHUB_GOVERNANCE_2026-09-05.md`](docs/GITHUB_GOVERNANCE_2026-09-05.md) — none
-of it is enabled yet; enabling it is a founder action, not an agent one.
+of it is enabled yet, and enabling it is an owner action (`.github/CODEOWNERS`).
 
 ## Release Policy
 
@@ -239,7 +268,5 @@ See [`RELEASE_POLICY.md`](RELEASE_POLICY.md).
 This repository currently publishes **no LICENSE file** — all rights reserved by default under
 applicable copyright law. Reading this code, including the parts that are public, does not grant
 a right to copy, modify, redistribute or commercially reuse it. Whether and under what terms to
-license any part of TAVONEL is a founder decision pending; see
-`docs/ip/TECHNOLOGY_INTAKE_REGISTER.yaml` in the Core Engine repository for the related
-freedom-to-operate posture. Do not add a LICENSE file to this repository without that decision
-being made explicitly.
+license any part of TAVONEL is an owner decision that has not been made
+(`.github/CODEOWNERS`); do not add a LICENSE file to this repository until it is.
