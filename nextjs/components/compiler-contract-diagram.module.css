@@ -15,8 +15,20 @@
 
 .eyebrow { fill: var(--verified); font: 11px var(--f-mono); letter-spacing: 0.16em; }
 
+/*
+  The arrows carry the same claim the boxes do, so they are drawn to the same rule.
+
+  A dashed box joined by a solid arrow tells a reader the connection is real and only the box is
+  aspirational, which is the opposite of the truth here: the whole selective route is the
+  contract. One solid edge exists -- the bypass -- and it is the one thing on this drawing that
+  describes a code path this deployment actually takes.
+*/
 .edge { stroke: var(--hairline-hi); fill: none; }
+.edgeDirection { stroke: var(--hairline); stroke-dasharray: 4 3; fill: none; }
 .arrowHead { fill: var(--hairline-hi); }
+.arrowHeadDirection { fill: var(--hairline); }
+
+.bypassLabel text { fill: var(--text-mid); font: 9.5px var(--f-mono); letter-spacing: 0.13em; }
 
 /* -------------------------------------------------------------------- stages */
 

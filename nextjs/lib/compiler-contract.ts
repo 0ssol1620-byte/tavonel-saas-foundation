@@ -89,9 +89,9 @@ export const CONTRACT_CLAUSES: readonly ContractClause[] = [
     name: "Evidence-preserving",
     promise: "Every promoted fact resolves to a region of a page of a source revision.",
     body:
-      "A relation resolves to the claim that supports it, the claim to a statement, the statement to a block or table cell with a bounding box on a numbered page, and that page to an exact source revision. The chain runs the other way too: a changed region names the statements, claims and relations standing on it. A package whose evidence reference does not resolve fails validation with EVIDENCE_DANGLING and is not emitted, so a world with a broken link never reaches a reader.",
+      "Every relation is typed and carries the evidence that justifies it, and a claim reaches that evidence through a supported_by relation to one exact document version — identified by the sha256 of the bytes that were read, not by a filename. The coordinates live on the region: each retrieval unit names a bounding box on a numbered page of that version and lists the claims and entities found inside it, so a changed region can be read back to what stands on it. Where an anchor is missing the compiler abstains rather than inventing one — a document version whose regions fail validation stops the compile with OCR_BINDING_INVALID, and a document read without regions emits no retrieval unit rather than a guessed page or box. Resolving every evidence reference in a finished package, and reporting EVIDENCE_DANGLING where one does not, is an offline check anyone holding the package can run — not a gate on the emit path.",
     state: "demonstrated",
-    evidence: "scripts/compiled-world/validate.mjs, exercised against the compiled /explore sample in lib/compiled-world-validator.test.ts",
+    evidence: "lib/collection-compiler.ts (rag/chunks.jsonl carries pageNumber1, bbox1000 and sourceVersionId), and scripts/compiled-world/validate.mjs — pnpm verify:package — exercised against the compiled /explore sample in lib/compiled-world-validator.test.ts",
   },
   {
     id: "stable-semantic-identity",

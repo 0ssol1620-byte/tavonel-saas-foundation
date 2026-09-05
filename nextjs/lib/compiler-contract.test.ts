@@ -122,6 +122,148 @@ describe("compiler contract clauses", () => {
       expect(clause(id).state, `${id} must not be presented as shipped`).toBe("direction");
     }
   });
+
+  /*
+    The evidence chain the first clause describes has to be the one the compiler writes.
+
+    An earlier draft of this clause copied the blueprint's aspirational chain -- relation, claim,
+    *statement*, block or *table cell* -- into a clause graded DEMONSTRATED. Neither rung exists:
+    there is no statement object anywhere in the compiled model, and `blockType` has exactly one
+    member, so a table-cell region is rejected by the very validator the clause was citing. Those
+    are the details a technical evaluator quotes back, which is what makes them worth a test.
+  */
+  it("describes only the evidence rungs the compiler actually emits", () => {
+    const compiler = read("./collection-compiler.ts");
+    // The rung the clause names, in the order the clause names it: a typed relation carrying its
+    // own evidence, a claim reaching that evidence, and the region where the coordinates live.
+    expect(compiler).toContain('type: "supported_by"');
+    expect(compiler).toContain("evidenceIds: [evidenceId]");
+    expect(compiler).toContain("sourceVersionId: input.versionKey");
+    expect(compiler).toContain("pageNumber1: region.pageNumber1");
+    expect(compiler).toContain("bbox1000: region.bbox1000");
+    expect(compiler).toContain("claimIds: regionClaimIds");
+    // The version key is the sha256 of the bytes that were read, checked against inputSha256.
+    expect(compiler).toContain("`sha256:${input.versionKey.toLowerCase()}`");
+    // The only block type a region may carry, enforced in validateCollectionOcrInput.
+    expect(compiler).toContain('region.blockType !== "paragraph"');
+    expect(compiler.toLowerCase()).not.toContain("table cell");
+    expect(compiler.toLowerCase()).not.toContain("statement");
+    // The abstention the clause promises, at the one place a bad region reaches the compiler.
+    expect(read("./collection-compile-run.ts")).toContain('code: "OCR_BINDING_INVALID"');
+
+    const body = clause("evidence-preserving").body.toLowerCase();
+    for (const invented of ["statement", "table cell"]) {
+      expect(body, `the evidence clause claims a "${invented}" rung the compiler does not build`)
+        .not.toContain(invented);
+    }
+    for (const named of ["supported_by", "ocr_binding_invalid", "bounding box"]) {
+      expect(body, `the evidence clause no longer names "${named}", which the test above pins`)
+        .toContain(named);
+    }
+  });
+
+  /*
+    The package validator is an offline check, and the clause has to keep saying so.
+
+    `validateCompiledWorldPackage` is imported by exactly one module -- its own test -- and is
+    otherwise reached through the `verify:package` CLI. Describing it as an emission gate would
+    promise a runtime refusal that no code performs, on the clause carrying the stronger word.
+  */
+  it("does not present the package validator as a gate on the emit path", () => {
+    const importers = ["./collection-compiler.ts", "./collection-download.ts", "./retrieval-compile.ts"]
+      .filter((path) => read(path).includes("compiled-world/validate"));
+    expect(importers, "the validator now runs on the emit path; the clause may be upgraded").toEqual([]);
+
+    const body = clause("evidence-preserving").body;
+    expect(body).toContain("offline check");
+    expect(body, "the clause promises a refusal the emit path does not perform")
+      .not.toContain("is not emitted");
+  });
+});
+
+/*
+  The drawing has to agree with the clause list it illustrates.
+
+  A flowchart is the one element a reader looks at instead of reading eight paragraphs, so a
+  stage drawn solid under a legend that reads "RUNS IN THIS DEPLOYMENT" is a stronger claim than
+  any sentence on the page. Each stage belongs to a clause; a stage whose clause is graded a
+  direction may not be drawn as built. The diagram is a component, and vitest only collects
+  `lib/**`, so it is read as text -- which is enough, because the states are literals.
+*/
+describe("compiler contract diagram", () => {
+  const DIAGRAM = read("../components/compiler-contract-diagram.tsx");
+
+  /** Which clause each drawn stage is an illustration of. Stages absent from the map stand alone. */
+  const STAGE_CLAUSE: Record<string, string> = {
+    "semantic-diff": "selective-recompilation",
+    "dependency-impact": "selective-recompilation",
+    preserved: "selective-recompilation",
+    recompiled: "selective-recompilation",
+    equivalence: "full-rebuild-equivalence",
+    pass: "full-rebuild-equivalence",
+    refuse: "full-rebuild-equivalence",
+    "previous-world": "full-rebuild-equivalence",
+  };
+
+  // `title:` is what separates a stage entry from an edge entry; both carry an id and a state.
+  const stages = [...DIAGRAM.matchAll(/\{ id: "([a-z-]+)", title: .*?state: "(built|direction)"/g)]
+    .map(([, id, state]) => ({ id: id!, state: state! }));
+
+  it("draws the ten stages of the contract", () => {
+    expect(stages.map((entry) => entry.id)).toEqual([
+      "source-change",
+      "semantic-diff",
+      "dependency-impact",
+      "preserved",
+      "recompiled",
+      "equivalence",
+      "pass",
+      "refuse",
+      "new-world",
+      "previous-world",
+    ]);
+  });
+
+  it("never draws a stage as built that its own clause grades a direction", () => {
+    for (const entry of stages) {
+      const owning = STAGE_CLAUSE[entry.id];
+      if (!owning || entry.state !== "built") continue;
+      expect(
+        clause(owning).state,
+        `the drawing shows "${entry.id}" as running here while clause "${owning}" is a direction`,
+      ).not.toBe("direction");
+    }
+  });
+
+  /*
+    Only two stages run, and the deployment is the reason.
+
+    `lib/pipeline.ts` compiles in four stages and none of them is a diff or an impact resolver,
+    and `lib/world-version-diff.ts` compares two worlds that have both already been compiled in
+    full. If either changes, this fails and the drawing is re-derived rather than left behind.
+  */
+  it("draws as built only the two stages this deployment executes", () => {
+    expect(stages.filter((entry) => entry.state === "built").map((entry) => entry.id))
+      .toEqual(["source-change", "new-world"]);
+
+    const pipeline = read("./pipeline.ts");
+    expect(pipeline).toContain('export type StageKey = "quarantine" | "sanitize" | "read" | "compile"');
+    expect(read("./world-version-diff.ts")).toContain("derived from two compiled read models");
+  });
+
+  it("carries a solid route from the source change to the new World, because a full recompile is what runs", () => {
+    expect(DIAGRAM).toContain('{ id: "full-recompile", d: bypass(), state: "built" }');
+    expect(DIAGRAM).toContain("FULL RECOMPILE");
+    // Every other edge is the contract, not the code path.
+    const edges = [...DIAGRAM.matchAll(/\{ id: "([^"]+)", d: [a-z]+\([^)]*\), state: "(built|direction)" \}/g)]
+      .map(([, id, state]) => ({ id: id!, state: state! }));
+    expect(edges.filter((edge) => edge.state === "built").map((edge) => edge.id)).toEqual(["full-recompile"]);
+  });
+
+  it("says in its own description how many stages are solid, and why", () => {
+    expect(DIAGRAM).toContain("Two stages are drawn");
+    expect(DIAGRAM).toContain("rebuilds the whole collection it is given");
+  });
 });
 
 describe("portable world formats", () => {

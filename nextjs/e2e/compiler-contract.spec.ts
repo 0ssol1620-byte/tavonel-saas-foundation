@@ -20,6 +20,7 @@ type Locator = {
   count: () => Promise<number>;
   first: () => Locator;
   nth: (index: number) => Locator;
+  locator: (selector: string) => Locator;
   innerText: () => Promise<string>;
   getAttribute: (name: string) => Promise<string | null>;
   isVisible: () => Promise<boolean>;
@@ -99,10 +100,22 @@ test("draws the whole source-change flow, and says which half of it runs here", 
     "new-world",
     "previous-world",
   ]);
-  // Equivalence and its outcome are not executed here, and the drawing has to keep saying so.
-  for (const id of ["equivalence", "pass", "refuse", "preserved", "recompiled"]) {
-    expect(stages.find((stage) => stage.id === id)?.state, `${id} is drawn as if it ran here`).toBe("direction");
-  }
+  /*
+    Two stages run here, and the assertion is written from that side.
+
+    An earlier version listed the five stages that had to stay dashed, which pinned the other
+    five as built without ever saying so -- and two of them (the semantic diff of a source change,
+    and the dependency impact resolved from it) are not implemented anywhere in this deployment.
+    Asserting the built set instead means adding a stage cannot silently promote it.
+  */
+  expect(stages.filter((stage) => stage.state === "built").map((stage) => stage.id))
+    .toEqual(["source-change", "new-world"]);
+
+  // And the one solid route between them is the full recompile, named in the drawing.
+  const bypass = page.locator("[data-contract-edge='full-recompile']").first();
+  expect(await bypass.getAttribute("data-state")).toBe("built");
+  expect((await page.locator("[data-contract-bypass]").first().innerText()).replace(/\s+/g, " "))
+    .toContain("FULL RECOMPILE");
 });
 
 test("lists the nine interchange standards without implying all nine are emitted", async ({ page }: { page: Page }) => {

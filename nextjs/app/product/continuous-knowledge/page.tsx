@@ -97,20 +97,25 @@ export default function ContinuousKnowledgePage() {
           <section className={styles.section} aria-labelledby="flow">
             <h2 id="flow">What a source change does</h2>
             <p className="lede">
-              A revision arrives. The compiler reads what the change <i>means</i> rather than which
-              bytes moved, resolves which knowledge units stand on the changed region, and splits
-              the world in two: what is untouched is carried over, what is affected is rebuilt.
-              <b> The rebuilt result is then compared against what a full rebuild would have
-              produced</b>, and a mismatch refuses to publish rather than shipping a world that
-              looks finished.
+              The contract describes one path. A revision arrives; the change is read for what it{" "}
+              <i>means</i> rather than which bytes moved; the units standing on the changed region
+              are resolved; the untouched half is carried over and the affected half rebuilt; and
+              the result is compared against what a full rebuild would have produced, with a
+              mismatch refusing to publish rather than shipping a world that looks finished.{" "}
+              <b>Two stages of that path run in this deployment.</b> The drawing says which two,
+              and the solid line down its left side is what happens here instead.
             </p>
             <CompilerContractDiagram />
             <p className="fine">
-              Solid stages run in this deployment; dashed stages are the contract this compiler is
-              written to. A compile here rebuilds the collection it is given and produces a
-              candidate version for a person to activate — the selective path between the two is
-              the work described above, not a description of what runs today. The version a
-              candidate replaces stays intact and readable either way.
+              Solid is what this deployment executes: a source revision arrives, and a compile
+              rebuilds the whole collection it is given into a candidate version a person
+              activates. Everything dashed — the semantic diff, the dependency impact, the
+              preserve-and-rebuild split, the equivalence comparison and the pass or refuse it
+              would end in — is the contract this compiler is written to and does not run here,
+              which is what clause 05 says in words. The kept previous World is dashed for that
+              reason and not because a version is discarded: there is no equivalence check here to
+              refuse, and the version a candidate replaces stays intact and readable either way.
+              That is clause 04, and it is demonstrated.
             </p>
           </section>
 
