@@ -71,8 +71,9 @@ manifest digest, validation receipt, equivalence status and an explicit promotio
 
 Eight properties a compile is expected to hold. The right-hand column says what this repository
 actually does about each one *today* — which is not the same for all eight, and the differences
-are the point. Three kinds of entry appear, in the product's own vocabulary
-(`nextjs/lib/claim-state.ts`, `nextjs/lib/capabilities.ts`):
+are the point. Each entry states its own standing rather than picking from a badge set, but the
+load-bearing words are the product's own (`nextjs/lib/claim-state.ts`,
+`nextjs/lib/capabilities.ts`):
 
 - **Demonstrated** — built and shown on a declared sample, not a production qualification. There
   is exactly one such sample here: the three committed FP-200 PDFs in
