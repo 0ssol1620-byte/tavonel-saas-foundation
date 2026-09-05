@@ -195,8 +195,13 @@ export const exploreChangeStory: ExploreChangeStory = {
   */
   equivalence: {
     state: "not_yet",
+    /*
+      Read on the page directly after `EXPLORE_COPY.equivalenceLead`, which already says both
+      revisions were fully compiled. Saying it again here ran the two into one paragraph that
+      repeated itself, so this states only what the lead does not.
+    */
     reason:
-      "Both revisions were fully compiled and compared. Full-rebuild equivalence is a separate check, run by the compiler core over a selective rebuild; no receipt from it is wired into this deployment.",
+      "Full-rebuild equivalence is a separate check, run by the compiler core over a selective rebuild; no receipt from it is wired into this deployment.",
   },
 };
 
