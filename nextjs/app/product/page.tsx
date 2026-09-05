@@ -14,6 +14,7 @@ const SURFACES = [
   ["/knowledge-compiler", "CATEGORY", "Knowledge Compiler", "Read sources, reconstruct structure, resolve identities, map relationships, keep evidence attached, and compile the result."],
   ["/product/document-understanding", "READING", "Document understanding", "Recover text, layout and structure from documents and scans before anything is compiled."],
   ["/product/compiled-world", "OUTPUT", "Compiled World", "Structured knowledge with provenance and reusable retrieval artifacts — not a pile of searchable files."],
+  ["/product/continuous-knowledge", "CONTRACT", "Continuous recompilation", "What a compile promises when a source changes: eight clauses, each carrying the state it holds in this deployment."],
 ] as const;
 
 const PRODUCT_FLOW = [
