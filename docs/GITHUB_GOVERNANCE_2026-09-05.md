@@ -13,22 +13,53 @@ $ gh api repos/0ssol1620-byte/tavonel-saas-foundation/tags
 ```
 
 `main` has no branch protection, there are no tags, and there are no releases. This document is
-the exact set of `gh api` commands to close that gap. **Do not run them.** Opening a PR, merging,
-changing a repository setting, or creating a tag/release is not an agent's call — it is listed
-explicitly as a founder decision in `CLAUDE.md` ("What is not an agent's call") and in the lane
-contract (§7). This document exists so that when the founder decides to do it, the exact,
-reviewed command is already written down rather than improvised at the terminal.
+the exact set of `gh api` commands to close that gap. **Do not run them.** Changing a repository
+setting, enabling branch protection, and creating a tag or release are owner actions;
+`.github/CODEOWNERS` names `@0ssol1620-byte` as the owner of the repository and of `/.github/`.
+This document exists so that when the owner decides to do it, the exact, reviewed command is
+already written down rather than improvised at the terminal.
 
 Every command below targets `0ssol1620-byte/tavonel-saas-foundation` and needs a token with
 `repo` (and, for the ruleset/protection endpoints, `admin:repo_hook`-level repo admin) scope.
 
 ## 1. Required status checks
 
-The check names below are the job names GitHub reports for the workflows already in
-`.github/workflows/`. Confirm the exact strings in the repository's **Settings → Branches** UI
-before running this — GitHub sometimes qualifies a job name with its matrix value (e.g. a Launch
-QA browser leg reports as `Browser QA (chromium)`), and a required check that does not exactly
-match a reported name blocks every PR from ever going green.
+The context strings below were read from the GitHub Checks API, not inferred from the workflow
+YAML. Observed on 2026-09-05 for `main` at commit `9a7a93d`:
+
+```
+$ gh api "repos/0ssol1620-byte/tavonel-saas-foundation/commits/9a7a93d/check-runs?per_page=100" \
+    --jq '.check_runs[].name' | sort -u
+Browser QA (chromium)
+Browser QA (firefox)
+Browser QA (webkit)
+Launch gate
+Lighthouse budgets
+analyze
+nextjs
+root
+smoke
+```
+
+Two things in that list are easy to get wrong, and both are merge-blocking if you do:
+
+- **The CodeQL check is `analyze`, not `CodeQL / analyze`.** `.github/workflows/codeql.yml`
+  declares `jobs: analyze:` with no `name:` key, so `analyze` is the whole context string —
+  `CodeQL` is the *workflow* name and does not appear in it. If you would rather see the
+  qualified form, add `name: CodeQL / analyze` to that job, let it run once on `main`, and
+  re-read the list above before requiring the new string.
+- **Do not require `smoke`.** `.github/workflows/operations-smoke.yml` triggers only on
+  `schedule` and `workflow_dispatch` — never on `pull_request`. A required check that never runs
+  on a PR is a permanent merge block.
+
+`Launch gate` is the aggregate job that fails unless every browser leg and the Lighthouse job
+succeeded, so requiring it instead of the four individual legs is a defensible simplification —
+but require one shape or the other, not a mix you have not re-read.
+
+Re-run the `check-runs` command above against the current `main` immediately before enabling.
+The observation is pinned to one commit on one date; a workflow or job rename changes the string,
+and a required check that does not exactly match a reported name blocks every PR from ever going
+green.
 
 ```bash
 gh api -X PUT repos/0ssol1620-byte/tavonel-saas-foundation/branches/main/protection \
@@ -36,7 +67,7 @@ gh api -X PUT repos/0ssol1620-byte/tavonel-saas-foundation/branches/main/protect
   -f required_status_checks[strict]=true \
   -f 'required_status_checks[contexts][]=root' \
   -f 'required_status_checks[contexts][]=nextjs' \
-  -f 'required_status_checks[contexts][]=CodeQL / analyze' \
+  -f 'required_status_checks[contexts][]=analyze' \
   -f 'required_status_checks[contexts][]=Browser QA (chromium)' \
   -f 'required_status_checks[contexts][]=Browser QA (firefox)' \
   -f 'required_status_checks[contexts][]=Browser QA (webkit)' \
@@ -75,7 +106,7 @@ gh api -X POST repos/0ssol1620-byte/tavonel-saas-foundation/rulesets \
         "required_status_checks": [
           { "context": "root" },
           { "context": "nextjs" },
-          { "context": "CodeQL / analyze" },
+          { "context": "analyze" },
           { "context": "Browser QA (chromium)" },
           { "context": "Browser QA (firefox)" },
           { "context": "Browser QA (webkit)" }
@@ -129,6 +160,9 @@ gh pr list --repo 0ssol1620-byte/tavonel-saas-foundation --state open   # confir
 ```
 
 A required check name that does not match what GitHub actually reports leaves every open and
-future PR permanently unable to merge. Verify the exact context strings against a real recent
-run (`gh run list`, then inspect one run's check names) immediately after enabling, not after the
-first complaint.
+future PR permanently unable to merge. That is why the context strings in section 1 are read from
+the Checks API rather than from the workflow YAML — a job's *file* name, its `jobs:` key and the
+string GitHub reports are three different things, and `.github/workflows/codeql.yml` is the case
+where they diverge.
+Re-run the `check-runs` command in section 1 against the current `main` before enabling, and open
+one real PR afterwards to confirm it can still go green.
