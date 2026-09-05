@@ -307,7 +307,7 @@ export default function OpeningFilm(_props: { onEnded?: () => void }) {
     let cancelled = false;
 
     const layout = () => {
-      const ratio = Math.min(window.devicePixelRatio || 1, 2);
+      const ratio = Math.min(3, Math.max(2, window.devicePixelRatio || 1));
       width = canvas.clientWidth;
       height = canvas.clientHeight;
       canvas.width = Math.round(width * ratio);
