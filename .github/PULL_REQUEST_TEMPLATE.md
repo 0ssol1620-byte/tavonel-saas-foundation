@@ -21,7 +21,12 @@ you did not run is left unchecked with a reason in Notes — never checked witho
 - [ ] A Preview deployment exists for this branch (Vercel comments the PR automatically) and has
       been opened at least once
 - [ ] No fabricated data: every number, hash, count or "PASS" this PR adds is derived from a
-      committed fixture under test or a receipt with a hash — never typed by hand
+      committed fixture under test or a receipt with a hash — never typed by hand. This includes
+      command output quoted in documentation: if a doc shows `$ some-command` and its result, that
+      command was actually run and that is actually what it printed
+- [ ] Documentation references resolve: for every file this PR touches, each `](relative/path)`
+      link AND each backtick-quoted repository path names something that exists in this repository
+      at this commit. A link checker alone does not cover the second half
 - [ ] `nextjs/lib/brand-copy.test.ts` passes if this PR adds or changes public copy, and any new
       copy surface is added to `COPY_SURFACES` in that file
 
