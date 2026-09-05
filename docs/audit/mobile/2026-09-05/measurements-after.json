@@ -1,0 +1,937 @@
+{
+ "phase": "after",
+ "base": "http://127.0.0.1:3137",
+ "at": "2026-09-05T14:02:46.118Z",
+ "widths": {
+  "360": {
+   "overflow": {
+    "win": 360,
+    "docW": 360,
+    "clientW": 360,
+    "wide": []
+   },
+   "header": {
+    "wordmark": {
+     "x": 12,
+     "y": 10,
+     "w": 104,
+     "h": 44
+    },
+    "menu": {
+     "x": 122,
+     "y": 10,
+     "w": 66,
+     "h": 44
+    },
+    "cta": {
+     "x": 194,
+     "y": 10,
+     "w": 164,
+     "h": 44
+    },
+    "wordmarkVsMenu": 0,
+    "menuVsCta": 0,
+    "headerH": 65
+   },
+   "menuPanel": {
+    "present": true,
+    "x": 0,
+    "right": 360,
+    "w": 360,
+    "h": 318,
+    "viewport": 360,
+    "offLeft": 0,
+    "offRight": 0,
+    "links": [
+     {
+      "label": "Product",
+      "x": 1,
+      "w": 358,
+      "h": 44
+     },
+     {
+      "label": "Solutions",
+      "x": 1,
+      "w": 358,
+      "h": 44
+     },
+     {
+      "label": "Integrations",
+      "x": 1,
+      "w": 358,
+      "h": 44
+     },
+     {
+      "label": "Developers",
+      "x": 1,
+      "w": 358,
+      "h": 44
+     },
+     {
+      "label": "Security",
+      "x": 1,
+      "w": 358,
+      "h": 44
+     },
+     {
+      "label": "Pricing",
+      "x": 1,
+      "w": 358,
+      "h": 44
+     },
+     {
+      "label": "Resources",
+      "x": 1,
+      "w": 358,
+      "h": 44
+     }
+    ]
+   },
+   "film": {
+    "renderer": "video-fallback",
+    "canvasMounted": false,
+    "videoMounted": true,
+    "stillMounted": false,
+    "canvasCssWidth": null,
+    "videoSources": [
+     "/film/compile-cut.mp4"
+    ],
+    "videoPoster": "/film/poster-1.webp",
+    "frame": {
+     "w": 320,
+     "h": 200,
+     "ratio": 1.6
+    },
+    "stripRows": 1,
+    "buttons": [
+     {
+      "label": "SOURCES",
+      "x": 20,
+      "y": 326,
+      "w": 80,
+      "h": 44,
+      "scrollW": 80,
+      "clientW": 80,
+      "font": "9.5px"
+     },
+     {
+      "label": "READ",
+      "x": 100,
+      "y": 326,
+      "w": 80,
+      "h": 44,
+      "scrollW": 79,
+      "clientW": 79,
+      "font": "9.5px"
+     },
+     {
+      "label": "STRUCTURE",
+      "x": 180,
+      "y": 326,
+      "w": 80,
+      "h": 44,
+      "scrollW": 79,
+      "clientW": 79,
+      "font": "9.5px"
+     },
+     {
+      "label": "WORLD",
+      "x": 260,
+      "y": 326,
+      "w": 80,
+      "h": 44,
+      "scrollW": 79,
+      "clientW": 79,
+      "font": "9.5px"
+     }
+    ],
+    "captionFont": "12.5px",
+    "captionText": "Files, folders, archives and connected drives arrive together.",
+    "progressFont": "10.5px",
+    "progressText": "01 / 04"
+   },
+   "smallTargets": [
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 30,
+     "h": 44
+    },
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 30,
+     "h": 44
+    },
+    {
+     "tag": "button",
+     "cls": "bt on",
+     "text": "",
+     "w": 30,
+     "h": 44
+    },
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 30,
+     "h": 44
+    },
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 30,
+     "h": 44
+    }
+   ],
+   "consoleErrors": []
+  },
+  "390": {
+   "overflow": {
+    "win": 390,
+    "docW": 390,
+    "clientW": 390,
+    "wide": []
+   },
+   "header": {
+    "wordmark": {
+     "x": 12,
+     "y": 10,
+     "w": 104,
+     "h": 44
+    },
+    "menu": {
+     "x": 141,
+     "y": 10,
+     "w": 66,
+     "h": 44
+    },
+    "cta": {
+     "x": 214,
+     "y": 10,
+     "w": 164,
+     "h": 44
+    },
+    "wordmarkVsMenu": 0,
+    "menuVsCta": 0,
+    "headerH": 65
+   },
+   "menuPanel": {
+    "present": true,
+    "x": 0,
+    "right": 390,
+    "w": 390,
+    "h": 318,
+    "viewport": 390,
+    "offLeft": 0,
+    "offRight": 0,
+    "links": [
+     {
+      "label": "Product",
+      "x": 1,
+      "w": 388,
+      "h": 44
+     },
+     {
+      "label": "Solutions",
+      "x": 1,
+      "w": 388,
+      "h": 44
+     },
+     {
+      "label": "Integrations",
+      "x": 1,
+      "w": 388,
+      "h": 44
+     },
+     {
+      "label": "Developers",
+      "x": 1,
+      "w": 388,
+      "h": 44
+     },
+     {
+      "label": "Security",
+      "x": 1,
+      "w": 388,
+      "h": 44
+     },
+     {
+      "label": "Pricing",
+      "x": 1,
+      "w": 388,
+      "h": 44
+     },
+     {
+      "label": "Resources",
+      "x": 1,
+      "w": 388,
+      "h": 44
+     }
+    ]
+   },
+   "film": {
+    "renderer": "video-fallback",
+    "canvasMounted": false,
+    "videoMounted": true,
+    "stillMounted": false,
+    "canvasCssWidth": null,
+    "videoSources": [
+     "/film/compile-cut.mp4"
+    ],
+    "videoPoster": "/film/poster-1.webp",
+    "frame": {
+     "w": 350,
+     "h": 219,
+     "ratio": 1.6
+    },
+    "stripRows": 1,
+    "buttons": [
+     {
+      "label": "SOURCES",
+      "x": 20,
+      "y": 302,
+      "w": 88,
+      "h": 44,
+      "scrollW": 88,
+      "clientW": 88,
+      "font": "9.5px"
+     },
+     {
+      "label": "READ",
+      "x": 108,
+      "y": 302,
+      "w": 88,
+      "h": 44,
+      "scrollW": 87,
+      "clientW": 87,
+      "font": "9.5px"
+     },
+     {
+      "label": "STRUCTURE",
+      "x": 195,
+      "y": 302,
+      "w": 88,
+      "h": 44,
+      "scrollW": 87,
+      "clientW": 87,
+      "font": "9.5px"
+     },
+     {
+      "label": "WORLD",
+      "x": 283,
+      "y": 302,
+      "w": 88,
+      "h": 44,
+      "scrollW": 87,
+      "clientW": 87,
+      "font": "9.5px"
+     }
+    ],
+    "captionFont": "12.5px",
+    "captionText": "Files, folders, archives and connected drives arrive together.",
+    "progressFont": "10.5px",
+    "progressText": "01 / 04"
+   },
+   "smallTargets": [
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 30,
+     "h": 44
+    },
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 30,
+     "h": 44
+    },
+    {
+     "tag": "button",
+     "cls": "bt on",
+     "text": "",
+     "w": 30,
+     "h": 44
+    },
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 30,
+     "h": 44
+    },
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 30,
+     "h": 44
+    }
+   ],
+   "consoleErrors": []
+  },
+  "412": {
+   "overflow": {
+    "win": 412,
+    "docW": 412,
+    "clientW": 412,
+    "wide": []
+   },
+   "header": {
+    "wordmark": {
+     "x": 14,
+     "y": 10,
+     "w": 104,
+     "h": 44
+    },
+    "menu": {
+     "x": 153,
+     "y": 10,
+     "w": 66,
+     "h": 44
+    },
+    "cta": {
+     "x": 228,
+     "y": 10,
+     "w": 170,
+     "h": 44
+    },
+    "wordmarkVsMenu": 0,
+    "menuVsCta": 0,
+    "headerH": 65
+   },
+   "menuPanel": {
+    "present": true,
+    "x": 0,
+    "right": 412,
+    "w": 412,
+    "h": 318,
+    "viewport": 412,
+    "offLeft": 0,
+    "offRight": 0,
+    "links": [
+     {
+      "label": "Product",
+      "x": 1,
+      "w": 410,
+      "h": 44
+     },
+     {
+      "label": "Solutions",
+      "x": 1,
+      "w": 410,
+      "h": 44
+     },
+     {
+      "label": "Integrations",
+      "x": 1,
+      "w": 410,
+      "h": 44
+     },
+     {
+      "label": "Developers",
+      "x": 1,
+      "w": 410,
+      "h": 44
+     },
+     {
+      "label": "Security",
+      "x": 1,
+      "w": 410,
+      "h": 44
+     },
+     {
+      "label": "Pricing",
+      "x": 1,
+      "w": 410,
+      "h": 44
+     },
+     {
+      "label": "Resources",
+      "x": 1,
+      "w": 410,
+      "h": 44
+     }
+    ]
+   },
+   "film": {
+    "renderer": "video-fallback",
+    "canvasMounted": false,
+    "videoMounted": true,
+    "stillMounted": false,
+    "canvasCssWidth": null,
+    "videoSources": [
+     "/film/compile-cut.mp4"
+    ],
+    "videoPoster": "/film/poster-1.webp",
+    "frame": {
+     "w": 372,
+     "h": 233,
+     "ratio": 1.6
+    },
+    "stripRows": 1,
+    "buttons": [
+     {
+      "label": "SOURCES",
+      "x": 20,
+      "y": 295,
+      "w": 93,
+      "h": 44,
+      "scrollW": 93,
+      "clientW": 93,
+      "font": "9.5px"
+     },
+     {
+      "label": "READ",
+      "x": 113,
+      "y": 295,
+      "w": 93,
+      "h": 44,
+      "scrollW": 92,
+      "clientW": 92,
+      "font": "9.5px"
+     },
+     {
+      "label": "STRUCTURE",
+      "x": 206,
+      "y": 295,
+      "w": 93,
+      "h": 44,
+      "scrollW": 92,
+      "clientW": 92,
+      "font": "9.5px"
+     },
+     {
+      "label": "WORLD",
+      "x": 299,
+      "y": 295,
+      "w": 93,
+      "h": 44,
+      "scrollW": 92,
+      "clientW": 92,
+      "font": "9.5px"
+     }
+    ],
+    "captionFont": "12.5px",
+    "captionText": "Files, folders, archives and connected drives arrive together.",
+    "progressFont": "10.5px",
+    "progressText": "01 / 04"
+   },
+   "smallTargets": [
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 30,
+     "h": 44
+    },
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 30,
+     "h": 44
+    },
+    {
+     "tag": "button",
+     "cls": "bt on",
+     "text": "",
+     "w": 30,
+     "h": 44
+    },
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 30,
+     "h": 44
+    },
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 30,
+     "h": 44
+    }
+   ],
+   "consoleErrors": []
+  },
+  "430": {
+   "overflow": {
+    "win": 430,
+    "docW": 430,
+    "clientW": 430,
+    "wide": []
+   },
+   "header": {
+    "wordmark": {
+     "x": 14,
+     "y": 10,
+     "w": 104,
+     "h": 44
+    },
+    "menu": {
+     "x": 171,
+     "y": 10,
+     "w": 66,
+     "h": 44
+    },
+    "cta": {
+     "x": 246,
+     "y": 10,
+     "w": 170,
+     "h": 44
+    },
+    "wordmarkVsMenu": 0,
+    "menuVsCta": 0,
+    "headerH": 65
+   },
+   "menuPanel": {
+    "present": true,
+    "x": 0,
+    "right": 430,
+    "w": 430,
+    "h": 318,
+    "viewport": 430,
+    "offLeft": 0,
+    "offRight": 0,
+    "links": [
+     {
+      "label": "Product",
+      "x": 1,
+      "w": 428,
+      "h": 44
+     },
+     {
+      "label": "Solutions",
+      "x": 1,
+      "w": 428,
+      "h": 44
+     },
+     {
+      "label": "Integrations",
+      "x": 1,
+      "w": 428,
+      "h": 44
+     },
+     {
+      "label": "Developers",
+      "x": 1,
+      "w": 428,
+      "h": 44
+     },
+     {
+      "label": "Security",
+      "x": 1,
+      "w": 428,
+      "h": 44
+     },
+     {
+      "label": "Pricing",
+      "x": 1,
+      "w": 428,
+      "h": 44
+     },
+     {
+      "label": "Resources",
+      "x": 1,
+      "w": 428,
+      "h": 44
+     }
+    ]
+   },
+   "film": {
+    "renderer": "video-fallback",
+    "canvasMounted": false,
+    "videoMounted": true,
+    "stillMounted": false,
+    "canvasCssWidth": null,
+    "videoSources": [
+     "/film/compile-cut.mp4"
+    ],
+    "videoPoster": "/film/poster-1.webp",
+    "frame": {
+     "w": 390,
+     "h": 244,
+     "ratio": 1.6
+    },
+    "stripRows": 1,
+    "buttons": [
+     {
+      "label": "SOURCES",
+      "x": 20,
+      "y": 299,
+      "w": 98,
+      "h": 44,
+      "scrollW": 98,
+      "clientW": 98,
+      "font": "9.5px"
+     },
+     {
+      "label": "READ",
+      "x": 118,
+      "y": 299,
+      "w": 98,
+      "h": 44,
+      "scrollW": 97,
+      "clientW": 97,
+      "font": "9.5px"
+     },
+     {
+      "label": "STRUCTURE",
+      "x": 215,
+      "y": 299,
+      "w": 98,
+      "h": 44,
+      "scrollW": 97,
+      "clientW": 97,
+      "font": "9.5px"
+     },
+     {
+      "label": "WORLD",
+      "x": 313,
+      "y": 299,
+      "w": 98,
+      "h": 44,
+      "scrollW": 97,
+      "clientW": 97,
+      "font": "9.5px"
+     }
+    ],
+    "captionFont": "12.5px",
+    "captionText": "Files, folders, archives and connected drives arrive together.",
+    "progressFont": "10.5px",
+    "progressText": "01 / 04"
+   },
+   "smallTargets": [
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 30,
+     "h": 44
+    },
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 30,
+     "h": 44
+    },
+    {
+     "tag": "button",
+     "cls": "bt on",
+     "text": "",
+     "w": 30,
+     "h": 44
+    },
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 30,
+     "h": 44
+    },
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 30,
+     "h": 44
+    }
+   ],
+   "consoleErrors": []
+  },
+  "768": {
+   "overflow": {
+    "win": 768,
+    "docW": 768,
+    "clientW": 768,
+    "wide": []
+   },
+   "header": {
+    "wordmark": {
+     "x": 23,
+     "y": 12,
+     "w": 104,
+     "h": 44
+    },
+    "menu": {
+     "x": 475,
+     "y": 12,
+     "w": 66,
+     "h": 44
+    },
+    "cta": {
+     "x": 556,
+     "y": 12,
+     "w": 189,
+     "h": 44
+    },
+    "wordmarkVsMenu": 0,
+    "menuVsCta": 0,
+    "headerH": 69
+   },
+   "menuPanel": {
+    "present": true,
+    "x": 0,
+    "right": 768,
+    "w": 768,
+    "h": 318,
+    "viewport": 768,
+    "offLeft": 0,
+    "offRight": 0,
+    "links": [
+     {
+      "label": "Product",
+      "x": 1,
+      "w": 766,
+      "h": 44
+     },
+     {
+      "label": "Solutions",
+      "x": 1,
+      "w": 766,
+      "h": 44
+     },
+     {
+      "label": "Integrations",
+      "x": 1,
+      "w": 766,
+      "h": 44
+     },
+     {
+      "label": "Developers",
+      "x": 1,
+      "w": 766,
+      "h": 44
+     },
+     {
+      "label": "Security",
+      "x": 1,
+      "w": 766,
+      "h": 44
+     },
+     {
+      "label": "Pricing",
+      "x": 1,
+      "w": 766,
+      "h": 44
+     },
+     {
+      "label": "Resources",
+      "x": 1,
+      "w": 766,
+      "h": 44
+     }
+    ]
+   },
+   "film": {
+    "renderer": "video-fallback",
+    "canvasMounted": false,
+    "videoMounted": true,
+    "stillMounted": false,
+    "canvasCssWidth": null,
+    "videoSources": [
+     "/film/compile-cut.mp4"
+    ],
+    "videoPoster": "/film/poster-1.webp",
+    "frame": {
+     "w": 707,
+     "h": 442,
+     "ratio": 1.6
+    },
+    "stripRows": 1,
+    "buttons": [
+     {
+      "label": "SOURCES",
+      "x": 31,
+      "y": 404,
+      "w": 177,
+      "h": 44,
+      "scrollW": 177,
+      "clientW": 177,
+      "font": "10px"
+     },
+     {
+      "label": "READ",
+      "x": 207,
+      "y": 404,
+      "w": 177,
+      "h": 44,
+      "scrollW": 176,
+      "clientW": 176,
+      "font": "10px"
+     },
+     {
+      "label": "STRUCTURE",
+      "x": 384,
+      "y": 404,
+      "w": 177,
+      "h": 44,
+      "scrollW": 176,
+      "clientW": 176,
+      "font": "10px"
+     },
+     {
+      "label": "WORLD",
+      "x": 561,
+      "y": 404,
+      "w": 177,
+      "h": 44,
+      "scrollW": 176,
+      "clientW": 176,
+      "font": "10px"
+     }
+    ],
+    "captionFont": "13px",
+    "captionText": "Files, folders, archives and connected drives arrive together.",
+    "progressFont": "10.5px",
+    "progressText": "01 / 04"
+   },
+   "smallTargets": [
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 30,
+     "h": 44
+    },
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 30,
+     "h": 44
+    },
+    {
+     "tag": "button",
+     "cls": "bt on",
+     "text": "",
+     "w": 30,
+     "h": 44
+    },
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 30,
+     "h": 44
+    },
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 30,
+     "h": 44
+    }
+   ],
+   "consoleErrors": []
+  }
+ }
+}
