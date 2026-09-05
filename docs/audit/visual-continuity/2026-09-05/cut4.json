@@ -1,0 +1,35 @@
+{
+  "route": "http://127.0.0.1:3136/#s3",
+  "stageSelector": "#compile-stage-tab-world",
+  "canvasSelector": ".compile-film-live canvas.film-canvas",
+  "seekSeconds": 16.8,
+  "canvasFound": true,
+  "canvasBackingSize": {
+    "width": 2704,
+    "height": 1494
+  },
+  "canvasCssSize": {
+    "width": 1351.59375,
+    "height": 746.796875
+  },
+  "drawnGeometryExposed": false,
+  "hooksObserved": {
+    "__filmSeek": "function",
+    "__filmFreeze": "undefined",
+    "__filmElapsed": "number"
+  },
+  "seekVerification": {
+    "method": "sha256 of a 320x180 downscale of the canvas, taken in-page at the probe beat, at the locked beat, and again after a hold at the locked beat. Within-run change detection only — the digests are renderer-specific and are not a cross-machine baseline.",
+    "probeSeconds": 3.2,
+    "lockedSeconds": 16.8,
+    "freezeHoldMs": 350,
+    "freezeFlagTypeAfterSet": "boolean",
+    "probeDigestSha256": "5c646fd36dae3209d9a03927e2adaf75e8ae397f48a6a45327003c83495315e1",
+    "lockedDigestSha256": "647e9a8094865a86aa2d7d706c9947bb470d3d93fdd35f281d404e21449f642a",
+    "heldDigestSha256": "647e9a8094865a86aa2d7d706c9947bb470d3d93fdd35f281d404e21449f642a",
+    "frameChangedOnSeek": true,
+    "frameStableUnderFreeze": true
+  },
+  "note": "opening-film-4 exposes no drawn-geometry data structure (nodes/edges/labels) on window, so this capture records the PNG and the canvas backing size only. Capture hooks as observed in the page: __filmSeek=function, __filmElapsed=number, __filmFreeze=undefined before this script set it (the film reads that flag in its rAF tick and never defines it; typeof after setting it: boolean). The seek and the freeze were verified by frame digest — see seekVerification.",
+  "errors": []
+}
