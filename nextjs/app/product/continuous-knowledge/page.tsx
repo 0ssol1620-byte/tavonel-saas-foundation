@@ -20,6 +20,19 @@ export const metadata: Metadata = {
   title: "Continuous recompilation — TAVONEL",
   description:
     "The Compiler Contract: eight clauses that say what a compile guarantees when a source changes, each carrying the state it holds in this deployment.",
+  /*
+    Noindex until someone who can approve the copy says the page may be advertised.
+
+    `app/robots.ts` has disallowed this route since it was a `notFound()` stub, and that file
+    belongs to no lane in this campaign. An earlier revision of this branch removed the disallow
+    so the sitemap and robots.txt would stop contradicting each other; that resolved the
+    contradiction in the direction that publishes eight brand-new claims about what the compiler
+    guarantees, which is not a decision this work gets to make on its own. So it is resolved the
+    other way instead: robots.ts is untouched, the route is not in the sitemap, and the page says
+    the same thing about itself that robots.txt already says. `follow: true` because the links out
+    of here go to pages that are advertised. This is one field to delete when the copy is approved.
+  */
+  robots: { index: false, follow: true },
 };
 
 /*

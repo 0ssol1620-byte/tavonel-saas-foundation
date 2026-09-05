@@ -7,7 +7,7 @@ import { DOCS_SECTIONS } from "@/lib/docs-content";
   whose substance is "not yet" is not a page a search engine should be led to. It stays
   reachable from Resources and carries `noindex` until it has a run to describe.
 */
-const ROUTES = ["", "/api", "/changelog", "/contact", "/developers", "/docs", "/enterprise", "/evidence", "/explore", "/integrations", "/knowledge-compiler", "/pricing", "/privacy", "/product", "/product/compiled-world", "/product/continuous-knowledge", "/product/document-understanding", "/refunds", "/research", "/research/notes", "/resources", "/security", "/solutions/ai-ready-knowledge", "/solutions/document-intelligence", "/solutions/knowledge-graph", "/solutions/source-grounded-assistants", "/solutions/knowledge-operations", "/status", "/subprocessors", "/terms"];
+const ROUTES = ["", "/api", "/changelog", "/contact", "/developers", "/docs", "/enterprise", "/evidence", "/explore", "/integrations", "/knowledge-compiler", "/pricing", "/privacy", "/product", "/product/compiled-world", "/product/document-understanding", "/refunds", "/research", "/research/notes", "/resources", "/security", "/solutions/ai-ready-knowledge", "/solutions/document-intelligence", "/solutions/knowledge-graph", "/solutions/source-grounded-assistants", "/solutions/knowledge-operations", "/status", "/subprocessors", "/terms"];
 /*
   The documentation sections come from the documentation rather than being listed again here.
 
