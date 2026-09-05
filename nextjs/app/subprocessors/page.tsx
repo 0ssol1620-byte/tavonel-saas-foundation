@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   // canonical ("/"), so a crawler was told 22 distinct pages were all the homepage.
   alternates: { canonical: "/subprocessors" },
   openGraph: { url: "/subprocessors" },
-  title: "Subprocessors - TAVONEL",
+  title: "Subprocessors — TAVONEL",
   description: "Every third-party service permitted to process TAVONEL account, document, billing or inquiry data, and what each one receives.",
 };
 const PROCESSORS = [

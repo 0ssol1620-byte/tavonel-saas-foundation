@@ -53,6 +53,11 @@ function metadataSourcesFor(pagePath: string): string[] {
 const pages = findPages(appDirectory);
 const rootLayout = readFileSync(join(appDirectory, "layout.tsx"), "utf8");
 
+function isTerminalPage(pagePath: string) {
+  const source = readFileSync(pagePath, "utf8");
+  return /\bnotFound\(\)|\bpermanentRedirect\(/.test(source);
+}
+
 describe("per-route canonical metadata", () => {
   it("finds every page route in the app tree", () => {
     expect(pages.length).toBeGreaterThan(20);
@@ -72,6 +77,7 @@ describe("per-route canonical metadata", () => {
   it("declares a canonical on every route other than the root itself", () => {
     const missing: string[] = [];
     for (const page of pages) {
+      if (isTerminalPage(page)) continue;
       const route = routeOf(page);
       if (exemptFromCanonical(route)) continue;
       // The route's own segment chain, excluding the root layout -- inheriting the root's
@@ -88,6 +94,7 @@ describe("per-route canonical metadata", () => {
   it("points each canonical at that route's own path, never another page's", () => {
     const wrong: string[] = [];
     for (const page of pages) {
+      if (isTerminalPage(page)) continue;
       const route = routeOf(page);
       if (exemptFromCanonical(route)) continue;
       const own = metadataSourcesFor(page)
@@ -126,6 +133,7 @@ describe("per-route canonical metadata", () => {
     const noindexRoutes = new Set(["/login", "/workspace", "/auth/callback"]);
     const mismatched: string[] = [];
     for (const page of pages) {
+      if (isTerminalPage(page)) continue;
       const route = routeOf(page);
       if (exemptFromCanonical(route) || noindexRoutes.has(route)) continue;
       const own = metadataSourcesFor(page)

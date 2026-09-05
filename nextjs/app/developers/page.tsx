@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Logomark from "@/components/logomark";
+import MobilePrimaryNav from "@/components/mobile-primary-nav";
 
 export const metadata: Metadata = {
   // Each page declares its own address. Without this every route inherited the root
@@ -13,9 +14,9 @@ export const metadata: Metadata = {
 
 const SURFACE = [
   ["Compile", "Upload or connect sources and follow observed run events from input to Compiled World."],
-  ["GET World", "Read a compiled world: ontology, graph, retrieval corpus, provenance, validation."],
+  ["Read World", "Read a compiled world: ontology, graph, retrieval corpus, provenance, validation."],
   ["Ask", "Ask returns source-linked citations, or states that the available evidence is insufficient."],
-  ["Export", "A signed directory of files, not a vendor lock. Public key at /api/export/trust."],
+  ["Export", "Take a signed, hash-verifiable package with a published trust key instead of a vendor-locked copy."],
   ["MCP", "Eight read-only tools over the same World an agent would otherwise be given a copy of."],
 ] as const;
 
@@ -33,6 +34,7 @@ export default function DevelopersPage() {
           <Link href="/docs">Docs</Link>
           <Link href="/evidence">Evidence</Link>
         </nav>
+        <MobilePrimaryNav />
         <Link className="btn small" href="/login">Sign in</Link>
       </header>
       <main id="main">
@@ -41,7 +43,7 @@ export default function DevelopersPage() {
             <div className="body">
               <div className="stack">
                 <p className="slate"><b>DEVELOPERS</b><span />ONE WORLD</p>
-                <h2>Give every model the same grounded world.</h2>
+                <h1 className="document-title">Give every model the same grounded world.</h1>
               </div>
               <div className="stack">
                 <p className="lede">

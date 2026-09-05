@@ -38,7 +38,7 @@ export default function DocumentUnderstandingPage() {
           <div className="body">
             <div className="stack">
               <p className="slate"><b>PRODUCT</b><span />DOCUMENT UNDERSTANDING</p>
-              <h2>Reading is the first compile step.</h2>
+              <h1 className="document-title">Reading is the first compile step.</h1>
             </div>
             <div className="stack">
               <p className="lede">
@@ -63,7 +63,7 @@ export default function DocumentUnderstandingPage() {
               </p>
               <div className="actions">
                 <Link className="btn" href={"/explore" as Route}>See a page and its regions</Link>
-                <Link className="btn ghost" href="/product/knowledge-compiler">What happens after the read</Link>
+                <Link className="btn ghost" href="/knowledge-compiler">What happens after the read</Link>
               </div>
             </div>
           </div>

@@ -10,6 +10,7 @@ import type { Route } from "next";
 import { Fragment, cloneElement, isValidElement, useCallback, useEffect, useRef, useState } from "react";
 import CompileStagePlayer, { type CompileStage } from "@/components/compile-stage-player";
 import Logomark from "@/components/logomark";
+import MobilePrimaryNav from "@/components/mobile-primary-nav";
 import WorldField, { type WorldMode } from "@/components/world-field";
 import { trackFunnel, trackSceneDepth } from "@/lib/funnel-events";
 import { FOOTER_GROUPS, PRIMARY_NAV } from "@/lib/site-navigation";
@@ -156,6 +157,7 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
         <nav aria-label="Sections">
           {PRIMARY_NAV.map((link) => <Link key={link.href} href={link.href as Route}>{link.label}</Link>)}
         </nav>
+        <MobilePrimaryNav />
         <span className="nav-actions">
           <Link className="btn small" href={startHref}>{startLabel}</Link>
           {signedIn ? null : <Link className="nav-signin" href="/login">Sign in</Link>}

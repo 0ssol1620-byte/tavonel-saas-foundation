@@ -1,6 +1,7 @@
 import Link from "next/link";
 import LegalOperatorDisclosure from "@/components/legal-operator-disclosure";
 import Logomark from "@/components/logomark";
+import MobilePrimaryNav from "@/components/mobile-primary-nav";
 
 export default function PolicyLayout({
   label,
@@ -18,6 +19,7 @@ export default function PolicyLayout({
       <header className="nav" data-stuck={1}>
         <Link href="/" className="wordmark" aria-label="TAVONEL home"><Logomark /><b>TAVONEL</b></Link>
         <nav aria-label="Policy navigation"><Link href="/status">Service status</Link><Link href="/contact">Contact</Link></nav>
+        <MobilePrimaryNav />
         <Link className="btn small" href="/login">Sign in</Link>
       </header>
       <main id="main" tabIndex={-1}>

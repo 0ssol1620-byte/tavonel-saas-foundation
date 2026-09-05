@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import Logomark from "@/components/logomark";
+import MobilePrimaryNav from "@/components/mobile-primary-nav";
 import PublicPrimaryCta from "@/components/public-primary-cta";
 import { FOOTER_GROUPS, PRIMARY_NAV } from "@/lib/site-navigation";
 
@@ -16,6 +17,7 @@ export function PublicSiteHeader({ cta }: { cta?: { label: string; href: string 
           <Link key={link.href} href={link.href as Route}>{link.label}</Link>
         ))}
       </nav>
+      <MobilePrimaryNav />
       <span className="nav-actions">
         {cta ? <Link className="btn small" href={cta.href as Route}>{cta.label}</Link> : <PublicPrimaryCta />}
         <Link className="nav-signin" href="/login">Sign in</Link>

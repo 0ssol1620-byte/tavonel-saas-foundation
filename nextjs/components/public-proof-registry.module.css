@@ -8,16 +8,16 @@
 .hero h1 { max-width: 940px; margin: 0; color: var(--text-hi); font-size: clamp(48px, 7.2vw, 112px); line-height: .9; letter-spacing: -.06em; }
 .hero aside { display: grid; gap: 18px; padding-bottom: 7px; }
 .hero aside p { margin: 0; color: var(--text-lo); font-size: 14px; line-height: 1.7; }
-.status { width: fit-content; padding: 5px 8px; border: 1px solid var(--changed); color: var(--changed); font: 9px var(--f-mono); letter-spacing: .12em; }
+.status { width: fit-content; max-width: 100%; padding: 5px 8px; border: 1px solid var(--changed); color: var(--changed); font: 9px/1.5 var(--f-mono); letter-spacing: .12em; overflow-wrap: anywhere; }
 .body { max-width: 1440px; margin: 0 auto; padding: 0 clamp(24px, 7vw, 112px) 110px; }
 .row { display: grid; grid-template-columns: minmax(180px, .38fr) minmax(0, 1fr); gap: 8vw; padding: 42px 0; border-bottom: 1px solid var(--hairline); }
 .row h2 { margin: 0; color: var(--text-hi); font-size: clamp(23px, 3vw, 42px); letter-spacing: -.035em; }
-.rowBody { display: grid; gap: 18px; }
+.rowBody { min-width: 0; display: grid; gap: 18px; }
 .rowBody > p { max-width: 760px; margin: 0; color: var(--text-lo); font-size: 13px; line-height: 1.7; }
-.protocol { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--hairline); }
+.protocol { min-width: 0; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--hairline); }
 .protocol li { display: grid; grid-template-columns: 120px minmax(0, 1fr) auto; gap: 18px; align-items: baseline; padding: 14px 0; border-bottom: 1px solid var(--hairline); }
 .protocol b, .protocol code { color: var(--text-hi); font: 10px var(--f-mono); }
-.protocol span { color: var(--text-lo); font-size: 11px; line-height: 1.5; }
+.protocol span { min-width: 0; color: var(--text-lo); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
 .protocol em { color: var(--text-xlo); font: normal 9px var(--f-mono); letter-spacing: .08em; }
 /* A drawing wider than the column scrolls inside its own box; the page never does. */
 .figure { margin: 4px 0 0; overflow-x: auto; }

@@ -85,7 +85,7 @@ export default function ExploreCompiledWorld({ world, documents, answers }: Prop
         </aside>
       </section>
 
-      <section className={styles.next}><p>YOUR SOURCES</p><h2>Try the same path with your own documents.</h2><div><Link href="/login">Start free</Link><Link href="/product/knowledge-compiler">How compilation works</Link></div></section>
+      <section className={styles.next}><p>YOUR SOURCES</p><h2>Try the same path with your own documents.</h2><div><Link href="/login">Start free</Link><Link href="/knowledge-compiler">How compilation works</Link></div></section>
     </main>
   );
 }

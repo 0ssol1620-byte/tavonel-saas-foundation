@@ -3,6 +3,8 @@ import PolicyLayout from "@/components/policy-layout";
 import { readCommercialState } from "@/lib/commercial-state";
 import { LEGAL_EFFECTIVE_DATE } from "@/lib/operations";
 
+export const dynamic = "force-dynamic";
+
 /*
   The body has two templates and the description has to follow it.
 
@@ -18,7 +20,7 @@ export function generateMetadata(): Metadata {
     // canonical ("/"), so a crawler was told 22 distinct pages were all the homepage.
     alternates: { canonical: "/refunds" },
     openGraph: { url: "/refunds" },
-    title: "Cancellation and refunds - TAVONEL",
+    title: "Cancellation and refunds — TAVONEL",
     description: liveChargesEnabled
       ? "How to cancel TAVONEL access and when a charge is refundable. Checkout is processed by Paddle as merchant of record."
       : "TAVONEL is a private pilot: nothing can be charged, so there is nothing to cancel. How to end access and export your compiled worlds.",

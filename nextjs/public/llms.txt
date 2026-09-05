@@ -1,27 +1,38 @@
 # TAVONEL
 
-> Knowledge Compiler. Compile documents, scans, code and connected systems into source-grounded knowledge.
+> Knowledge Compiler. Compile documents, scans and connected systems into source-grounded knowledge.
 
-This file is a curated map of public pages for language models. It is not a ranking document and does not request preferential indexing.
+This file is a curated map of public TAVONEL pages for language models. It does not request preferential indexing.
 
-TAVONEL is a private pilot. Do not treat demonstration figures on the homepage as measurements. Do not invent general availability. Evidence, including failures, lives at /evidence.
+TAVONEL offers self-service evaluation and paid Developer access. Product and research claims should be read from the public pages below; measured evidence and methodology are published separately from product descriptions.
 
-Indexing: robots.ts currently allows `/`. It disallows `/api/`, `/auth/`, `/login`, and `/workspace`.
+Indexing: public product, documentation, research and trust pages are indexable. Authenticated, API-internal and workspace surfaces are excluded from search indexing.
 
 ## Pages
 
-- [Home](https://tavonel.com/): Knowledge Compiler. Compile documents, scans, code and connected systems into a source-grounded world.
-- [Product](https://tavonel.com/product): Product surfaces — compiler, document understanding, compiled world, continuous knowledge.
-- [Research](https://tavonel.com/research): Measured, built-not-proven, in-progress, and not-supported results.
-- [Evidence](https://tavonel.com/evidence): What was measured, what failed, and what has only been built.
-- [Developers](https://tavonel.com/developers): API, MCP, retrieval packages, signed exports.
-- [Pricing](https://tavonel.com/pricing): Developer, Team, Enterprise. Private pilot. Measured compute.
-- [Security](https://tavonel.com/security): Where documents go, and what never sees them.
-- [Film](https://tavonel.com/film): A drawn compile sequence, not a recording.
+- [Home](https://tavonel.com/): Knowledge Compiler. Turn documents and connected systems into a source-grounded world an AI can use.
+- [Product](https://tavonel.com/product): Product overview — document understanding, compilation, evidence and Compiled Worlds.
+- [Knowledge Compiler guide](https://tavonel.com/knowledge-compiler): What a Knowledge Compiler is, how it differs from RAG/search/graphs, and when to use one.
+- [Explore a Compiled World](https://tavonel.com/explore): Inspect a source-to-world example and follow evidence back to its page region.
+- [Research](https://tavonel.com/research): Research areas, methods and current findings.
+- [Research notes](https://tavonel.com/research/notes): Measurements, limitations and experiment notes.
+- [Evidence](https://tavonel.com/evidence): How claims, source regions, versions and signed packages are bound together.
+- [Developers](https://tavonel.com/developers): API, MCP, retrieval packages and signed exports.
+- [Documentation](https://tavonel.com/docs): Product and developer documentation.
+- [Pricing](https://tavonel.com/pricing): Free Evaluation, Developer, Team and Enterprise access.
+- [Security](https://tavonel.com/security): Data path, tenant isolation, retention and security controls.
+- [Status](https://tavonel.com/status): Current service status.
 
 ## Product
 
-- [Knowledge Compiler](https://tavonel.com/product/knowledge-compiler): Category. Sources in, Compiled World out.
-- [Document understanding](https://tavonel.com/product/document-understanding): Recover text, layout and structure from documents and scans.
-- [Compiled World](https://tavonel.com/product/compiled-world): Output — structured knowledge with provenance and reusable retrieval artifacts.
-- [Continuous knowledge](https://tavonel.com/product/continuous-knowledge): Campaign question. Selective recompilation is Direction/Research, not a shipped claim.
+- [Document understanding](https://tavonel.com/product/document-understanding): Recover text, layout, tables and source geometry from documents and scans.
+- [Compiled World](https://tavonel.com/product/compiled-world): Structured knowledge with provenance, versions and reusable retrieval artifacts.
+- [Integrations](https://tavonel.com/integrations): Connect supported systems where knowledge already lives.
+
+## Trust and legal
+
+- [Privacy](https://tavonel.com/privacy)
+- [Terms](https://tavonel.com/terms)
+- [Refunds](https://tavonel.com/refunds)
+- [Subprocessors](https://tavonel.com/subprocessors)
+- [Contact](https://tavonel.com/contact)

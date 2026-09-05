@@ -31,12 +31,27 @@
   margin-left: max(calc((100% - min(94vw, 1580px)) / 2 * -1), -110px);
 }
 
-/* One intentional scene per desktop viewport. The browser still owns scrolling; snap is proximity,
-   not a wheel-event hijack, so trackpads and keyboard remain natural. */
+/* The film earns a viewport; short claims do not. Forcing every landing scene to 100svh left
+   hundreds of pixels of dead air between a headline and the next argument. Keep proximity snap
+   only for the immersive film and let the compact scenes take the height their content needs. */
+@media (min-width: 900px) {
+  .landing-page .scene:not(.film) {
+    min-height: auto;
+    justify-content: flex-start;
+    padding-top: clamp(72px, 7vw, 104px);
+    padding-bottom: clamp(72px, 7vw, 104px);
+  }
+  .landing-page .scene.hero {
+    min-height: auto;
+    padding-top: 88px;
+    padding-bottom: 40px;
+  }
+  .landing-page #s2 { padding-top: 40px; }
+}
 @media (min-width: 900px) and (prefers-reduced-motion: no-preference) {
   html.landing-scroll { scroll-snap-type: y proximity; scroll-padding-top: 52px; }
-  .landing-page .scene { min-height: 100svh; scroll-snap-align: start; scroll-snap-stop: normal; }
-  .landing-page .scene.film { scroll-snap-align: center; }
+  .landing-page .scene { scroll-snap-stop: normal; }
+  .landing-page .scene.film { min-height: 100svh; scroll-snap-align: center; }
 }
 
 /* Secondary pages are not five-act cinema. Removing the inherited 92vh scene contract eliminates

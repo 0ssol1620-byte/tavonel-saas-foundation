@@ -1725,13 +1725,17 @@ export default function WorkspacePage() {
                   <>
                     <button type="button" onClick={() => navigateSurface("world")}>Open World</button>
                     <button type="button" onClick={() => navigateSurface("ask")}>Ask</button>
-                    <button type="button" disabled={downloading} onClick={() => void downloadCollection()}>{downloading ? "Preparing…" : "Download active World"}</button>
+                    <button type="button" disabled={downloading} onClick={() => void downloadCollection()}>{downloading ? "Preparing…" : "Download signed package"}</button>
+                    <button type="button" onClick={() => navigateSurface("review")}>View evidence</button>
+                    <button type="button" onClick={() => navigateSettings("trust")}>Verify export</button>
+                    <button type="button" onClick={() => fileRef.current?.click()}>Add sources</button>
                   </>
                 ) : (
                   <>
                     <button type="button" onClick={() => navigateSurface("review")}>Review items</button>
                     <button type="button" onClick={() => navigateSurface("world")}>Inspect candidate</button>
                     <button type="button" disabled={downloading} onClick={() => void downloadCollection()}>{downloading ? "Preparing…" : "Download candidate package"}</button>
+                    <button type="button" onClick={() => fileRef.current?.click()}>Add sources</button>
                   </>
                 )}
               </div>
@@ -1740,9 +1744,9 @@ export default function WorkspacePage() {
 
           {tab === "overview" && surface !== "runs" && surface !== "activity" ? (
           <>
-          {!activeWorld && !candidateNeedsDecision ? (
-            <section
+          <section
               className="workspace-intake"
+              data-compact={activeWorld || candidateNeedsDecision ? 1 : 0}
               data-active={dropActive}
               onDragEnter={(event) => { event.preventDefault(); setDropActive(true); }}
               onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; }}
@@ -1758,9 +1762,17 @@ export default function WorkspacePage() {
               aria-labelledby="workspace-intake-title"
             >
               <div className="workspace-intake-copy">
-                <p className="eyebrow">BUILD YOUR FIRST COMPILED WORLD</p>
-                <h2 id="workspace-intake-title">Drop files, folders or ZIP here</h2>
-                <p>Upload sources or connect the system where your knowledge already lives.</p>
+                <p className="eyebrow">
+                  {activeWorld ? "ADD SOURCES" : candidateNeedsDecision ? "ADD SOURCES FOR THE NEXT COMPILE" : "BUILD YOUR FIRST COMPILED WORLD"}
+                </p>
+                <h2 id="workspace-intake-title">
+                  {activeWorld || candidateNeedsDecision ? "Add files, folders or ZIP" : "Drop files, folders or ZIP here"}
+                </h2>
+                <p>
+                  {activeWorld || candidateNeedsDecision
+                    ? "Add more knowledge without losing access to the World you already have."
+                    : "Upload sources or connect the system where your knowledge already lives."}
+                </p>
                 <div className="workspace-intake-actions">
                   <button type="button" onClick={() => fileRef.current?.click()}>Choose files</button>
                   <button type="button" onClick={() => folderRef.current?.click()}>Choose folder</button>
@@ -1803,6 +1815,10 @@ export default function WorkspacePage() {
               {stagedSelection ? (
                 <div className="workspace-preflight" role="region" aria-label="Compile preflight">
                   <p className="eyebrow">PREFLIGHT</p>
+                  <p className="workspace-staged-summary">
+                    <strong>{stagedSelection.files.length} file{stagedSelection.files.length === 1 ? "" : "s"} staged.</strong>{" "}
+                    Nothing has been uploaded yet. Review the estimate, then upload and compile.
+                  </p>
                   <dl>
                     <div><dt>Files</dt><dd>{stagedSelection.files.length}</dd></div>
                     <div><dt>{pageCountLabel(stagedConfidence)}</dt><dd>{stagedPages}</dd></div>
@@ -1831,13 +1847,12 @@ export default function WorkspacePage() {
                   )}
                   {stagedSelection.warnings.map((warning) => <p className="fine" key={warning}>{warning}</p>)}
                   <div className="workspace-intake-actions">
-                    <button type="button" disabled={busy || !stagedQuote || !stagedVerdict.ok} onClick={() => void startStagedCompile()}>{busy ? "Compiling…" : "Compile"}</button>
+                    <button type="button" disabled={busy || !stagedQuote || !stagedVerdict.ok} onClick={() => void startStagedCompile()}>{busy ? "Uploading & compiling…" : "Upload & compile"}</button>
                     <button type="button" onClick={() => setStagedSelection(null)}>Clear</button>
                   </div>
                 </div>
               ) : null}
             </section>
-          ) : null}
           {/*
             The compile itself, as a durable thing rather than a sentence.
 
@@ -1879,8 +1894,8 @@ export default function WorkspacePage() {
             their own documents are building. It is fed entirely from this visitor's own uploads,
             pipeline rows and streamed OCR progress. No fixture ever reaches it.
           */}
-          {pipelineRows.length > 0 ? (
-            <CompileStage rows={pipelineRows} reading={reading} names={names} world={worldReadModel} />
+          {compileJob || pipelineRows.length > 0 ? (
+            <CompileStage rows={pipelineRows} reading={reading} names={names} world={worldReadModel} state={compileJob?.state ?? null} />
           ) : null}
 
           <div id="workspace-runs">
@@ -1891,8 +1906,8 @@ export default function WorkspacePage() {
               onDismiss={uploads.length > 0 ? () => { setUploads([]); setReading({}); } : undefined}
             />
           </div>
-          <p className="eyebrow">FOUNDATION · QUALIFIED INTAKE</p>
-          <p className="lead">Build a traceable body of knowledge from documents that have passed the full safety chain. Quarantine is browser-direct; the application server never carries file bytes.</p>
+          <p className="eyebrow">SOURCE PIPELINE</p>
+          <p className="lead">Build a traceable body of knowledge from your sources. Each file is prepared, read and compiled through a recorded chain you can inspect.</p>
           <div className="workspace-grid">
             <section id="workspace-sources" className="card document-card">
               <p className="eyebrow">SOURCES</p>
@@ -1972,7 +1987,7 @@ export default function WorkspacePage() {
               ) : (
                 <div className="collection-result" role="status">
                   <strong>No Compiled World yet</strong>
-                  <small>Compile at least two ready sources. The graph appears only after real objects and relations exist.</small>
+                  <small>Compile one or more ready sources. The graph appears only after real objects and relations exist.</small>
                 </div>
               )}
               <p>Prepared sources produce a reviewable directory, ontology, graph, retrieval index and provenance package. A human review keeps activation explicit.</p>
@@ -2313,7 +2328,7 @@ export default function WorkspacePage() {
           <section className="card billing-card">
             <div>
               <p className="eyebrow">BILLING & CAPACITY</p>
-              <h2>{billingAccount?.accessPlan ? `${billingAccount.accessPlan.replace("_access", "")} access` : "Private-pilot billing"}</h2>
+              <h2>{billingAccount?.accessPlan ? `${billingAccount.accessPlan.replace("_access", "")} access` : "Usage & billing"}</h2>
               <p>Included usage is granted only from a signed subscription transaction and settled from observed processing.</p>
             </div>
             {/*

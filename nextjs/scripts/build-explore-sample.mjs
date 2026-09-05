@@ -147,6 +147,17 @@ export function renderPdf(document) {
  * it would report where the script intended to put the text. This reads where the text is.
  */
 export async function extractRegions(bytes, documentId) {
+  // pdfjs 6 uses the ES2024 Promise.withResolvers helper. Vercel and current Node releases have
+  // it, but the repository's local/CI qualification matrix still includes Node 20. Keep the
+  // deterministic evidence extractor runnable there rather than weakening the test.
+  if (typeof Promise.withResolvers !== "function") {
+    Promise.withResolvers = function withResolvers() {
+      let resolve;
+      let reject;
+      const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+      return { promise, resolve, reject };
+    };
+  }
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   const task = pdfjs.getDocument({ data: new Uint8Array(bytes), useSystemFonts: false });
   const pdf = await task.promise;
