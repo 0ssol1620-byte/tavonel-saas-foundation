@@ -10,6 +10,7 @@
     "build": "next build",
     "start": "next start",
     "test": "vitest run",
+    "security:suite": "vitest run lib/security-headers.test.ts lib/connector-oauth.test.ts lib/connector-oauth-secrets.test.ts lib/connector-oauth-vault.test.ts lib/connector-oauth-route.test.ts lib/connector-contract.test.ts lib/archive-expand.test.ts lib/activation-policy.test.ts lib/customer-data-live-path.test.ts",
     "test:e2e": "playwright test",
     "qa:launch": "playwright test --project=launch-chromium --project=launch-firefox --project=launch-webkit",
     "qa:launch:chromium": "playwright test --project=launch-chromium",
