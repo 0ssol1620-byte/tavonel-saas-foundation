@@ -1,9 +1,11 @@
 /*
   Change Inbox — dark instrument, hairlines for depth, colour only where it reports a state.
 
-  Added / removed / changed carry the same three tokens the version diff already uses, so a
-  reader who learned them in the Versions lens does not have to learn them again here. Every
-  distinction also survives without hue: the sign, the label and the position carry it.
+  The three state tokens keep their own meanings: verified for what the newer version says,
+  changed for what the older one said, unresolved for something the product could not read.
+  Selection and removal get no hue at all -- a selected row is marked by luminance, and a
+  removal is marked by the word "removed", because neither is a state of the knowledge. Every
+  distinction here survives without colour: the sign, the label and the position carry it.
 */
 
 .surface {
@@ -12,9 +14,9 @@
   --ci-faint: var(--text-xlo, #78828a);
   --ci-line: var(--hairline, #23282d);
   --ci-line-hi: var(--hairline-hi, #2e353b);
-  --ci-added: var(--verified, #7be0be);
-  --ci-removed: var(--changed, #f2a65a);
-  --ci-changed: var(--unresolved, #6e93b8);
+  --ci-verified: var(--verified, #7be0be);
+  --ci-changed: var(--changed, #f2a65a);
+  --ci-unresolved: var(--unresolved, #6e93b8);
   display: grid;
   gap: 22px;
   min-width: 0;
@@ -31,7 +33,7 @@
   border: 1px dashed var(--ci-line-hi);
 }
 .state span { color: var(--ci-faint); font: 9px var(--f-mono, monospace); letter-spacing: .12em; }
-.state[data-state="unavailable"] span { color: var(--ci-removed); }
+.state[data-state="unavailable"] span { color: var(--ci-unresolved); }
 .state p { margin: 0; color: var(--ci-muted); font-size: 13px; line-height: 1.6; }
 
 .split { display: grid; gap: 1px; background: var(--ci-line); border: 1px solid var(--ci-line); }
@@ -51,7 +53,7 @@
   color: var(--ci-muted);
 }
 .inbox button:hover { color: var(--ci-ink); }
-.inbox button[data-current="true"] { border-left-color: var(--ci-added); color: var(--ci-ink); }
+.inbox button[data-current="true"] { border-left-color: var(--ci-ink); color: var(--ci-ink); }
 .inbox code { color: var(--ci-faint); font: 10px var(--f-mono, monospace); overflow-wrap: anywhere; }
 .inbox small { color: var(--ci-faint); font: 10px var(--f-mono, monospace); }
 
@@ -87,8 +89,10 @@
   font: 10px var(--f-mono, monospace);
   letter-spacing: .08em;
   text-transform: uppercase;
+  background: transparent;
+  transition: background-color 120ms linear;
 }
-.inspect:hover { border-color: var(--ci-added); }
+.inspect:hover { background: var(--g2, #14171a); }
 
 .impact { display: grid; gap: 20px; padding-top: 6px; border-top: 1px solid var(--ci-line); }
 @media (min-width: 900px) {
@@ -99,13 +103,13 @@
 
 .lines { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
 .lines > li { display: grid; gap: 3px; padding-left: 10px; border-left: 1px solid var(--ci-line-hi); min-width: 0; }
-.lines > li[data-effect="added"] { border-left-color: var(--ci-added); }
-.lines > li[data-effect="removed"] { border-left-color: var(--ci-removed); }
+.lines > li[data-effect="added"] { border-left-color: var(--ci-verified); }
+/* Removal has no state token, and the row says "removed" in words. */
 .lines > li[data-effect="changed"] { border-left-color: var(--ci-changed); }
 .lines b { color: var(--ci-ink); font: 400 12px/1.5 var(--f-sans, sans-serif); overflow-wrap: anywhere; }
 .lines small { color: var(--ci-faint); font: 9px var(--f-mono, monospace); letter-spacing: .06em; text-transform: uppercase; }
-.lines s { color: var(--ci-removed); font: 11px/1.6 var(--f-mono, monospace); text-decoration-thickness: 1px; overflow-wrap: anywhere; }
-.lines ins { color: var(--ci-added); font: 11px/1.6 var(--f-mono, monospace); text-decoration: none; overflow-wrap: anywhere; }
+.lines s { color: var(--ci-changed); font: 11px/1.6 var(--f-mono, monospace); text-decoration-thickness: 1px; overflow-wrap: anywhere; }
+.lines ins { color: var(--ci-verified); font: 11px/1.6 var(--f-mono, monospace); text-decoration: none; overflow-wrap: anywhere; }
 
 .where { color: var(--ci-faint); font: 9px var(--f-mono, monospace); letter-spacing: .08em; text-transform: uppercase; overflow-wrap: anywhere; }
 
@@ -124,7 +128,7 @@
   border-left: 2px solid transparent;
   font: 11px var(--f-mono, monospace);
 }
-.versions > li[data-status="active"] { border-left-color: var(--ci-added); }
+.versions > li[data-status="active"] { border-left-color: var(--ci-verified); }
 .versions > li[data-status="candidate"] { border-left-color: var(--ci-changed); }
 .versions strong { color: var(--ci-ink); font-weight: 400; }
 .versions code { color: var(--ci-faint); font-size: 10px; overflow-wrap: anywhere; }
