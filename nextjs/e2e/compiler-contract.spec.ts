@@ -22,6 +22,8 @@ type Locator = {
   nth: (index: number) => Locator;
   locator: (selector: string) => Locator;
   innerText: () => Promise<string>;
+  /* `innerText` is an HTMLElement property, so it is not available on the SVG drawing. */
+  textContent: () => Promise<string | null>;
   getAttribute: (name: string) => Promise<string | null>;
   isVisible: () => Promise<boolean>;
 };
@@ -114,7 +116,9 @@ test("draws the whole source-change flow, and says which half of it runs here", 
   // And the one solid route between them is the full recompile, named in the drawing.
   const bypass = page.locator("[data-contract-edge='full-recompile']").first();
   expect(await bypass.getAttribute("data-state")).toBe("built");
-  expect((await page.locator("[data-contract-bypass]").first().innerText()).replace(/\s+/g, " "))
+  // textContent, not innerText: the label is three <text> nodes inside the SVG, and innerText
+  // is an HTMLElement property that Playwright refuses on an SVG node.
+  expect(((await page.locator("[data-contract-bypass]").first().textContent()) ?? "").replace(/\s+/g, " "))
     .toContain("FULL RECOMPILE");
 });
 
