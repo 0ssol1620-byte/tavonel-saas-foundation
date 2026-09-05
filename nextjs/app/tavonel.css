@@ -817,6 +817,10 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 .compile-film-viewport {
   position: relative;
   display: grid;
+  /* The stacked media cell is the frame's own height, never the poster's. See the note above
+     `.compile-film-still` below: an `auto` row lets a replaced element with an intrinsic ratio
+     lay itself out taller than the frame, which then clips it. */
+  grid-template-rows: minmax(0, 1fr);
   width: min(100%, var(--compile-film-width, 1440px));
   margin-inline: auto;
   aspect-ratio: 1440 / 900;
@@ -841,6 +845,35 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
   object-fit: contain;
   pointer-events: none;
 }
+/*
+  The poster is shown whole. Reduced motion drops the film, not the frame's contents.
+
+  Two rules were cutting it. The media cell was an `auto` grid row, so an <img> carrying the
+  poster's own 1440x900 ratio laid itself out at its full height and pushed past a frame whose
+  used height comes from `min-height: clamp(430px, 52vw, 850px)` (ux-120-final.css), and the
+  frame's `overflow: hidden` took the difference; `object-fit: cover` then cropped whatever was
+  left. Measured on this branch's preview at 6590dde: the still is 1698x1061 in a 1700x850 frame
+  at 1920 and 20.0% of the poster never reaches the screen -- 11.5% at 1440 and 1280, 12.4% at
+  1024, 6.9% at 768, 2.4% at 390. What sits in the lost band is not margin. In poster-3 it is the
+  tail of the SOURCES diff and the whole `trace  WORLD edge -> NoticePeriod -> handbook-2026.pdf
+  -> §12` line, which is the one sentence in the cut that says the change was traced.
+
+  The still is not a decoration: it is what `prefers-reduced-motion` viewers get, and what every
+  viewer gets before the scene scrolls into view. Deferring the frame to `--compile-film-width`
+  above raised the 1920 loss from 5.7% to 20.0%, so the widening is what turned an old blemish
+  into a regression on the accessibility path.
+
+  `minmax(0, 1fr)` on the frame gives the media box the frame's height rather than the poster's,
+  so it can no longer overflow; `contain` then fits the whole poster inside that box. The frame
+  keeps its measured width and the live canvas still fills it edge to edge on the motion path,
+  which is the normal path. Where the frame is wider than 1.6:1 the still is letterboxed against
+  the frame's own background instead of being cropped -- 170px each side at 1920, 78px at 1440.
+
+  The override carries `.compile-film-viewport` because ux-120-final.css sets
+  `.compile-film-still { object-fit: cover }` and loads last; that file belongs to another lane,
+  so this file has to out-specify it rather than edit it.
+*/
+.compile-film-viewport .compile-film-still { object-fit: contain; }
 /*
   Hidden with opacity rather than `display: none`.
 

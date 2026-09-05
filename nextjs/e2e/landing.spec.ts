@@ -297,6 +297,63 @@ test("scene 03 gives the film the screen and the text a caption", async ({ page 
 });
 
 /*
+ * Reduced motion drops the film, not what the film was showing.
+ *
+ * The frame is not the poster's shape and never has been: its height comes from
+ * `min-height: clamp(430px, 52vw, 850px)` while its width follows the scene, so at 1920 it is
+ * 1700x850 against a 1440x900 poster. Two rules removed the difference instead of fitting it.
+ * The media cell was an `auto` grid row, so the <img> laid itself out at its own ratio
+ * (1698x1061) and the frame's `overflow: hidden` cut 213px off the bottom; `object-fit: cover`
+ * cropped the rest. Measured on this branch at 6590dde: 20.0% of the poster lost at 1920, 11.5%
+ * at 1440, 12.4% at 1024, 2.4% at 390 -- and the band that goes missing at 1920 holds the
+ * `trace  WORLD edge -> ...` line, the sentence that makes cut 3 a trace rather than a picture.
+ *
+ * The assertion is on the poster, not on the element: object-fit means the box and the pixels
+ * are different rectangles, and it is the pixels a visitor either sees or does not. Reduced
+ * motion is emulated here rather than taken from the project name, for the reason above.
+ */
+test("reduced motion shows the whole compile still, cropped by nothing", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  await page.locator("#s3").scrollIntoViewIfNeeded();
+  await page.locator("#s3 .compile-film-still").waitFor({ state: "visible" });
+
+  const measured = await page.evaluate(() => {
+    const frameEl = document.querySelector("#s3 .compile-film-viewport");
+    const stillEl = document.querySelector<HTMLImageElement>("#s3 .compile-film-still");
+    if (!frameEl || !stillEl) return { present: false, fit: "", lostPct: 100, frame: "", box: "" };
+    const frame = frameEl.getBoundingClientRect();
+    const box = stillEl.getBoundingClientRect();
+    const fit = getComputedStyle(stillEl).objectFit;
+    const naturalWidth = stillEl.naturalWidth || 1440;
+    const naturalHeight = stillEl.naturalHeight || 900;
+    // Where object-fit actually paints the poster inside the element box.
+    const ratios = [box.width / naturalWidth, box.height / naturalHeight];
+    const scale = fit === "cover" ? Math.max(...ratios) : Math.min(...ratios);
+    const paintedWidth = naturalWidth * scale;
+    const paintedHeight = naturalHeight * scale;
+    const left = box.left + (box.width - paintedWidth) / 2;
+    const top = box.top + (box.height - paintedHeight) / 2;
+    const visible =
+      Math.max(0, Math.min(left + paintedWidth, frame.right) - Math.max(left, frame.left)) *
+      Math.max(0, Math.min(top + paintedHeight, frame.bottom) - Math.max(top, frame.top));
+    return {
+      present: true,
+      fit,
+      lostPct: Number((100 - (visible / (paintedWidth * paintedHeight)) * 100).toFixed(1)),
+      frame: `${Math.round(frame.width)}x${Math.round(frame.height)}`,
+      box: `${Math.round(box.width)}x${Math.round(box.height)}`,
+    };
+  });
+
+  expect(measured.present, "reduced motion renders the still, not the canvas").toBe(true);
+  expect(
+    measured.lostPct,
+    `still ${measured.box} (object-fit: ${measured.fit}) inside a ${measured.frame} frame loses ${measured.lostPct}% of the poster`,
+  ).toBeLessThanOrEqual(0.5);
+});
+
+/*
  * The STRUCTURE caption reads the film that is playing.
  *
  * Cut 3 changes one clause in one source and shows which documents that clause reaches --
