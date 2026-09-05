@@ -76,13 +76,12 @@ load-bearing words are the product's own (`nextjs/lib/claim-state.ts`,
 `nextjs/lib/capabilities.ts`):
 
 - **Demonstrated** — built and shown on a declared sample, not a production qualification. There
-  is exactly one such sample here: the three committed FP-200 PDFs in
+  is exactly one such sample here: the FP-200 documents committed under
   `nextjs/public/explore-sample/`, compiled at build time and pinned by `EXPLORE_SAMPLE_DIGEST` in
-  `nextjs/lib/explore-sample.ts`, asserted by `nextjs/lib/explore-sample.test.ts`, and shown at
-  `/explore` under an `INTERACTIVE SAMPLE` label. Two limits on what that sample can support:
-  it is compiled by *this repository's* TypeScript compiler at build time, not by the Core
-  runtime (`nextjs/lib/explore-sample.ts` says so in its own execution record), and it contains
-  one revision of each document, so nothing here demonstrates behaviour across a source revision.
+  `nextjs/lib/explore-sample.ts`, checked by `nextjs/lib/explore-sample.test.ts`, and shown at
+  `/explore` under an `INTERACTIVE SAMPLE` label. One limit applies to everything that sample can
+  support: it is compiled by *this repository's* TypeScript compiler at build time, not by the
+  Core runtime — `nextjs/lib/explore-sample.ts` says so in its own execution record.
 - **Described** — the property is explained on a product page. That is prose about the design,
   not a running demonstration of it.
 - **Research frontier / Direction** — an active research direction that is not a shipped
@@ -90,22 +89,33 @@ load-bearing words are the product's own (`nextjs/lib/claim-state.ts`,
 
 No clause below is claimed as qualified, and none is claimed as a production capability.
 
+**No count from that sample is quoted in this file, deliberately.**
+`nextjs/lib/explore-sample.test.ts` asserts the per-row facts — a real page number, an in-bounds
+box, an excerpt that is a literal slice of the extracted text, the source file's sha256, and that
+every Claim and Document object the page shows carries at least one evidence reference. It
+asserts no totals. A total printed here would therefore be a hand-typed number on a public
+surface, which this project's own rule forbids, and it would silently go stale the first time a
+document is added to or removed from the sample. The counts are rendered from the compiled world
+itself at `/explore`; read them there. What the clauses below cite instead is the compiler's own
+source, `nextjs/lib/collection-compiler.ts`, which decides the shape of any sample it is given
+and does not change when the sample does.
+
 | Clause | What it means | What this repository does about it today |
 |---|---|---|
-| Evidence-preserving | A claim without a supporting source region is not emitted | **Demonstrated.** The sample world holds 10 claims and 10 evidence rows, and every claim carries at least one. `nextjs/lib/explore-sample.test.ts` asserts each evidence row against a real page number, an in-bounds box, an excerpt that is a literal slice of the source text, and the source file's sha256. Described at `/evidence` |
-| Stable semantic identity | The same real-world thing keeps one identity across document revisions | **Not demonstrated here**, in either direction. Exactly one object in the sample world spans more than one document, and it is the catch-all topic `General`; `FP-200` — the thing all three documents are about — resolves as an entity inside a single document, not across them. The sample also holds one revision of each document, so identity across a revision is not exercised at all. `/explore` publishes its own limit on the entity extractor: labels come from a capitalised-token heuristic, and 3 of 15 were true positives in the recorded evaluation. Described at `/product/compiled-world` (OBJECTS); named as an unsolved problem at `/research` ("Semantic identity") |
-| Typed dependencies | Relations are typed (supports, supersedes, depends on, contradicts), not generic edges | **Partly demonstrated, in a narrower vocabulary than this clause describes.** The sample world's 32 relations are typed and each carries the evidence that justifies it, but the whole predicate vocabulary is three structural edges — `mentions_entity` (19), `supported_by` (10, claim→evidence), `discusses_topic` (3). No claim-to-claim edge exists in it, so nothing here shows a `supersedes` or `contradicts` relation. Described at `/product/compiled-world` (RELATIONS) |
+| Evidence-preserving | A claim without a supporting source region is not emitted | **Demonstrated.** `nextjs/lib/explore-sample.test.ts` asserts that every Claim and Document object the page shows carries at least one evidence reference, and binds each evidence row to a real page number, an in-bounds box, an excerpt that is a literal slice of the extracted source text, and the source file's sha256. The compiler creates a claim's `supported_by` edge in the same step that creates the claim (`nextjs/lib/collection-compiler.ts`), so an evidence-free claim is not a state it can reach. Described at `/evidence` |
+| Stable semantic identity | The same real-world thing keeps one identity across document revisions | **Not demonstrated.** What the sample shows is label equality, not identity resolution. `nextjs/lib/collection-compiler.ts` keys an entity node on its lower-cased surface label and reuses that same node for every later document carrying the same label — so `FP-200` is one node that every document in the sample points at, and so, by the identical rule, is the bare word `The`. `/explore` publishes that limit on its own page: entity labels come from a capitalised-token heuristic rather than a resolver, and the page prints the true-positive rate from the recorded evaluation beside them. Deciding that two *different* surface forms are the same real-world thing, and holding that decision across a source revision, is Core Engine work and is not exercised here. Described at `/product/compiled-world` (OBJECTS); named as an unsolved problem at `/research` ("Semantic identity") |
+| Typed dependencies | Relations are typed (supports, supersedes, depends on, contradicts), not generic edges | **Partly demonstrated, in a narrower vocabulary than this clause describes.** Relations are typed and each carries the evidence that justifies it, but `nextjs/lib/collection-compiler.ts` constructs exactly three predicates and declares them as its whole ontology: `discusses_topic` and `mentions_entity` (document → object) and `supported_by` (claim → evidence). It builds no claim-to-claim edge at all, so nothing here shows a `supersedes` or a `contradicts` — where the sample's own documents supersede one another they say so in prose that no edge represents. Described at `/product/compiled-world` (RELATIONS) |
 | Temporal integrity | A world is versioned; an old answer stays traceable to what its sources said at the time | **Described** at `/product/compiled-world` (VERSIONS); listed as an open problem at `/research` ("Temporal integrity"). No public artifact on this deployment shows a past answer being re-resolved against an older world version |
 | Selective recompilation | A source change invalidates only the world it actually touches, not the whole corpus | **Direction**, verbatim from `nextjs/lib/capabilities.ts`: "Demonstrated above on fixture data. Not offered as a shipped capability in this deployment" |
 | Full-rebuild equivalence | A selective rebuild is checked against a full rebuild before it is trusted | **Not shown here.** A Core Engine property; this repository publishes no equivalence receipt — see [Reproducibility](#reproducibility) |
-| Multi-model verification | Model output is checked against the source, so the contract survives swapping any one model | **Research frontier.** The only place this phrase appears in this repository is the open-problems list at `/research`, a page whose stated subject is "the open problems in compiling documents into evidence-bound, versioned knowledge". Nothing here demonstrates it |
+| Multi-model verification | Model output is checked against the source, so the contract survives swapping any one model | **Research frontier.** Nothing in this repository checks one model's output against another's, or against the source, at any point in a compile. Where the phrase appears it appears as an open problem: it is on the list at `/research`, a page whose stated subject is "The open problems in compiling documents into evidence-bound, versioned knowledge, and how we work on them." |
 | Portable World | The world leaves as a signed, hash-verifiable package, not a vendor lock-in | **Implemented and unit-tested**, not demonstrated on a public artifact: `nextjs/lib/export-signing.ts` and `nextjs/lib/collection-download.ts` with their own tests, an offline verifier (`pnpm verify:export`), and `/api/export/trust` publishing the verification key. That endpoint is fail-closed — with no signer configured it returns `503 EXPORT_SIGNER_NOT_CONFIGURED` rather than an unsigned answer — so whether a given deployment serves a key depends on its environment. Described at `/product/compiled-world` (PACKAGE) |
 
-A dedicated Compiler Contract page is planned at `/product/continuous-knowledge`. As of this
-commit that route is a stable 404 kept for a retired inbound URL
-(`nextjs/app/product/continuous-knowledge/page.tsx` calls `notFound()`), not yet the page
-described above. If a later commit activates the route, the route is the current statement and
-this paragraph is stale — check the file, not this line.
+A dedicated Compiler Contract page belongs at `/product/continuous-knowledge`, and whether that
+route renders at any given commit is a question for the route rather than for this file. What
+does not change with it: a product page describes the design, and this table describes how much
+of that design this repository actually *shows*. Where a page and this table seem to disagree,
+this table is the narrower and more conservative statement, deliberately.
 
 ## Compiled World
 
@@ -195,15 +205,18 @@ independent verification before running anything downloaded from this site.
 
 ## Benchmarks
 
-As of this commit, this deployment publishes no Knowledge Compilation Benchmark and no comparative
-performance number: `nextjs/app/benchmarks/page.tsx` calls `notFound()`, so `/benchmarks` is a
-stable 404 kept for a retired inbound URL. If a later commit activates that route, the route is
-the current statement and this paragraph is stale — check the file, not this line.
+This repository publishes no Knowledge Compilation Benchmark result and no comparative
+performance number. That is a statement about what is committed here, not about which routes
+happen to render: a `/benchmarks` route may publish the evaluation protocol and the metric
+definitions — the content of a benchmark — without any qualified record existing, and a page
+describing a protocol is not a score.
 
-What does *not* change with the route: publishing a benchmark or a competitor comparison is an
-owner decision (`.github/CODEOWNERS`), gated on a frozen evaluation protocol, a published
-denominator, and a same-condition run — never a vendor's own reported number restated as
-reproduced. The current public evidence surfaces are `/research` and `/reproducibility`.
+A number reaches a public surface in this repository only after a frozen evaluation protocol, a
+published denominator, a same-condition run, and a receipt whose every digest is computed over
+the bytes it names. None of that exists yet, so there is nothing here to quote and nothing here
+to compare against. Publishing a benchmark or a competitor comparison is an owner decision
+(`.github/CODEOWNERS`), and a vendor's own reported number is never restated here as reproduced.
+The public evidence surfaces today are `/research` and `/reproducibility`.
 
 ## Reproducibility
 
