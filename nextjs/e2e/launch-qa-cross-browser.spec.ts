@@ -15,7 +15,11 @@ test("renders launch-critical public routes without browser errors", async ({ pa
   page.on("pageerror", error => errors.push(error.message));
 
   for (const route of routes) {
-    const response = await page.goto(route, { waitUntil: "domcontentloaded" });
+    // WebKit can report the DOM as ready before the linked stylesheet has finished applying.
+    // Measuring geometry in that window sees the browser-default 8px body margin and the
+    // poster's intrinsic 1440px width, which is not the rendered product state. The launch
+    // contract is the fully styled page, so wait for the load event before taking geometry.
+    const response = await page.goto(route, { waitUntil: "load" });
     expect(response?.status(), `${route} should be available`).toBe(200);
     await expect(page.locator("main")).toBeVisible();
     const geometry = await page.evaluate(() => {
