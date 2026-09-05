@@ -3,6 +3,7 @@ export const activationPolicy = {
   cdr: { enabled: true, reason: "The CDR worker sanitizes quarantine source objects and writes immutable PDFs before downstream reading." },
   ocrGpu: { enabled: true, reason: "GPU OCR is release-qualified from the recorded 2026-08-29 full-sequence evidence, with scale-to-zero and candidate-only review controls enforced." },
   candidatePromotion: { enabled: false, reason: "Promotion is always an explicit human decision." },
+  customerData: { enabled: false, reason: "Customer-data processing is gated until the security suite passes and the founder records an approval receipt." },
 } as const;
 
 export type ActivationCapability = keyof typeof activationPolicy;
