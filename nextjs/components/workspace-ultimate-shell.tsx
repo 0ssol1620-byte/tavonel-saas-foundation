@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import {
-  Activity, Braces, CircleHelp, Command, FileStack, GitCompareArrows, Home, Network, Plug, Search, Settings, Upload, X,
+  Activity, Braces, CircleHelp, Command, FileStack, GitCompareArrows, Home, Inbox, Network, Plug, Search, Settings, Upload, X,
 } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import Logomark from "@/components/logomark";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import styles from "@/app/workspace/workspace-ultimate.module.css";
 
-export type WorkspaceSurface = "home" | "sources" | "runs" | "review" | "world" | "ask" | "connections" | "developer" | "activity" | "settings";
+export type WorkspaceSurface = "home" | "sources" | "runs" | "review" | "changes" | "world" | "ask" | "connections" | "developer" | "activity" | "settings";
 
 type NavItem = { surface: WorkspaceSurface; label: string; icon: typeof Home; shortcut?: string; secondary?: boolean; mobileLabel?: string };
 const NAV_ITEMS: NavItem[] = [
@@ -18,6 +18,18 @@ const NAV_ITEMS: NavItem[] = [
   { surface: "review", label: "Review", icon: GitCompareArrows, shortcut: "G R" },
   { surface: "world", label: "World", icon: Network, shortcut: "G W" },
   { surface: "ask", label: "Ask", icon: CircleHelp, shortcut: "G A" },
+  /*
+    Changes closes the primary group rather than sitting next to Review, where it belongs by
+    meaning.
+
+    The mobile rail is five fixed columns and picks which surfaces fill them by position --
+    `:nth-child(1), (2), (4), (5), :last-child` in `workspace-ultimate.module.css`. Inserting a
+    row anywhere before World therefore pushes Ask off the mobile rail entirely, which is a
+    worse product than a rail whose desktop order reads slightly out of sequence. Which five
+    surfaces belong on a five-slot mobile rail is a product decision, not a placement this row
+    should make on its own; moving Changes up is one line here and one line there.
+  */
+  { surface: "changes", label: "Changes", icon: Inbox },
   { surface: "connections", label: "Connections", icon: Plug, secondary: true },
   { surface: "developer", label: "Developer", icon: Braces, secondary: true },
   { surface: "activity", label: "Activity", icon: Activity, secondary: true },
