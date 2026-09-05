@@ -181,12 +181,12 @@ Three files carrying public copy are not in that array:
 ../.github/PULL_REQUEST_TEMPLATE.md
 ```
 
-Adding those three lines and running `pnpm test` in `nextjs/` was tried before this was written:
-the suite goes from 80 to 86 passing tests — the six new ones being each file against `BARRED`
-and against `OVERCLAIMS` — and all 86 pass. The edit was then reverted, because
-`nextjs/lib/brand-copy.test.ts` was outside the scope of the change that created these documents.
-It is not blocked by anything, and it is not the impossibility an earlier note in this repository
-claimed it was.
+This was tried before it was written down, not assumed. With the three lines added,
+`pnpm exec vitest run lib/brand-copy.test.ts` in `nextjs/` goes from 80 passing tests to 86 — the
+six new ones being each file against `BARRED` and each against `OVERCLAIMS` — and all 86 pass.
+The edit was then reverted, because `nextjs/lib/brand-copy.test.ts` was outside the scope of the
+change that created these documents. Nothing blocks it: it is a scope decision, not a technical
+one.
 
 Until it lands, those three files are covered by a hand check, and a hand check is not a gate:
 nothing stops the next edit from reintroducing a barred phrase, and
