@@ -35,6 +35,7 @@ export const RESOURCE_LINKS: readonly SiteLink[] = [
   { href: "/api", label: "API" },
   { href: "/changelog", label: "Changelog" },
   { href: "/research", label: "Research" },
+  { href: "/benchmarks", label: "Benchmarks" },
   { href: "/evidence", label: "Technical evidence" },
   { href: "/reproducibility", label: "Reproducibility" },
 ] as const;

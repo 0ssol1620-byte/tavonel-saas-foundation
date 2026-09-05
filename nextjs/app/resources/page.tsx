@@ -28,6 +28,7 @@ const DESCRIPTIONS: Record<string, string> = {
   "/api": "Endpoints, authentication, errors and limits, with the machine-readable OpenAPI document alongside.",
   "/changelog": "What changed, in the order it changed, written for the people using it.",
   "/research": "The open problems in compiling documents into evidence-bound, versioned knowledge.",
+  "/benchmarks": "The eight metric families, the receipt a result must carry, and the rules that decide whether it may be compared.",
   "/evidence": "How a result stays bound to a document version, page and region, and how to verify a signed package.",
   "/reproducibility": "Fixture identity and the material needed to reproduce a published run.",
 };

@@ -27,6 +27,7 @@ import { describe, expect, it } from "vitest";
 
 const SALES_SURFACES = [
   "",
+  "benchmarks",
   "product",
   "product/compiled-world",
   "product/document-understanding",
@@ -63,7 +64,7 @@ const EXEMPT = {
   research: "research index",
   "research/notes": "noindex-adjacent research: 13.20 puts failure records here, with context",
   reproducibility: "noindex: 13.19 files it under Resources",
-  benchmarks: "noindex",
+  // `benchmarks` left this list for SALES_SURFACES when it stopped being a noindex 404.
   customers: "noindex",
   "research/experiments": "noindex",
 } as const;

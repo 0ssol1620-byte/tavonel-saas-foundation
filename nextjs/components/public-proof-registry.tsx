@@ -11,10 +11,12 @@ export type RegistryRow = { key: string; description: string; state: string };
  *
  * Two things were removed rather than restyled.
  *
- * Its own three-link nav pointed at /reproducibility, /benchmarks and /research/experiments.
- * The last two call notFound() on purpose — there are no qualified benchmark records to publish
- * yet — so the site was navigating visitors into deliberate 404s from its own header. It now
- * wears the standard chrome like every other public page.
+ * Its own three-link nav pointed at /reproducibility, /benchmarks and /research/experiments,
+ * both of the last two calling notFound() at the time, so the site was navigating visitors into
+ * deliberate 404s from its own header. It now wears the standard chrome like every other public
+ * page. (/benchmarks has since become a real page: it publishes the compilation benchmark
+ * protocol and the receipt contract, and still shows no results table, because there are no
+ * qualified records. /research/experiments is still a deliberate 404.)
  *
  * The `empty` panel rendered a large "NO QUALIFIED RECORDS" block whenever a section had
  * nothing in it. Publishing an empty table is not more honest than publishing no table; it is
