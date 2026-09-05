@@ -1,0 +1,86 @@
+/*
+  Page-local layout for the Compiler Contract.
+
+  Everything chromatic here resolves to a token in `app/tavonel.css`; nothing defines a colour of
+  its own. The one thing this file really owns is the state chip, and it exists as its own class
+  rather than reusing the evidence-page tile states because the words are different -- that page
+  grades research results, this one grades contract clauses -- and one class quietly serving two
+  vocabularies is how a label ends up meaning neither.
+*/
+
+.section { display: flex; flex-direction: column; gap: 18px; margin-top: clamp(48px, 5vw, 84px); }
+.section h2 { margin: 0; font-size: clamp(21px, 2.1vw, 28px); }
+
+/* --------------------------------------------------------------- the state key */
+
+.key { display: flex; flex-direction: column; gap: 8px; margin: 0; }
+.key div { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 14px; align-items: baseline; }
+.key dd { margin: 0; font-size: 12.5px; color: var(--text-lo); }
+
+/* ---------------------------------------------------------------- the clauses */
+
+.clauses { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 4px; overflow: hidden; }
+@media (min-width: 1100px) { .clauses { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.clause { background: var(--g1); padding: 20px 22px 22px; display: flex; flex-direction: column; gap: 10px; scroll-margin-top: 96px; }
+
+.head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.head h3 { margin: 0; flex: 1 1 auto; }
+.index { font-family: var(--f-mono); font-size: 10px; letter-spacing: 0.16em; color: var(--decor); }
+
+/*
+  The chip is the only place on the page where a colour is a claim, so the neutral is the
+  default and a hue has to be asked for by name. A direction gets no hue at all: it is not a
+  state the product is in, it is a state it intends to reach.
+*/
+.state { display: inline-block; font-family: var(--f-mono); font-size: 9.5px; letter-spacing: 0.16em; color: var(--text-xlo); border: 1px solid var(--hairline); border-radius: 2px; padding: 3px 7px; white-space: nowrap; }
+/* Attribute-driven so the clause list, the standards table and the key all read one rule. */
+[data-state="demonstrated"] .state { color: var(--unresolved); border-color: var(--unresolved-dim); }
+[data-state="qualified"] .state { color: var(--verified); border-color: var(--verified-dim); }
+
+.promise { margin: 0; font-size: 14px; color: var(--text-hi); line-height: 1.5; }
+.explain { margin: 0; font-size: 13px; color: var(--text-lo); line-height: 1.68; }
+
+.check { margin: 2px 0 0; font-family: var(--f-mono); font-size: 10.5px; line-height: 1.62; color: var(--text-xlo); overflow-wrap: anywhere; }
+.check b { display: block; color: var(--decor); font-weight: 500; letter-spacing: 0.14em; }
+
+/* ---------------------------------------------------------------- the package */
+
+/*
+  Six formats, and every column count below divides six.
+
+  `auto-fit` was the obvious way to write this and the wrong one: at a width that fits four
+  tracks it leaves two empty cells, and because the gap is a 1px hairline showing the container
+  through, an empty cell is not blank -- it is a lighter rectangle with a border, which is the
+  one thing this design system says a grid may never paint.
+*/
+.formats { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 1px; margin: 0; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 4px; overflow: hidden; }
+@media (max-width: 1180px) { .formats { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .formats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 460px) { .formats { grid-template-columns: minmax(0, 1fr); } }
+.formats > div { background: var(--g1); padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+.formats dt { font-family: var(--f-mono); font-size: 11px; letter-spacing: 0.1em; color: var(--text-hi); }
+.formats dd { margin: 0; font-family: var(--f-mono); font-size: 10.5px; color: var(--text-xlo); overflow-wrap: anywhere; }
+
+/* -------------------------------------------------------------- the standards */
+
+.standards { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--hairline); }
+.standard { display: grid; grid-template-columns: 116px 116px minmax(0, 1fr); gap: 16px; align-items: baseline; padding: 14px 0; border-bottom: 1px solid var(--hairline); }
+.standard b { font-family: var(--f-mono); font-size: 12px; letter-spacing: 0.08em; color: var(--text-hi); font-weight: 500; }
+.standard p { margin: 0; font-size: 12.5px; color: var(--text-lo); line-height: 1.62; }
+
+@media (max-width: 760px) {
+  /* Three columns at 390px gives a 60px name column. Stacked, the row keeps its reading order. */
+  .standard { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .standard .state { justify-self: start; }
+  .key div { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+
+  /*
+    Flex-wrap put the chip inline on short clause names and on its own line on long ones, so
+    eight rows landed in two different shapes down one column. A grid puts every chip on the
+    second row, which is one shape regardless of how long the name is.
+  */
+  .head { display: grid; grid-template-columns: auto minmax(0, 1fr); row-gap: 9px; align-items: baseline; }
+  .head .index, .head h3 { grid-row: 1; }
+  .head .state { grid-column: 1 / -1; justify-self: start; }
+}

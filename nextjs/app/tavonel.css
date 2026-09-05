@@ -442,12 +442,28 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
   transition: color 200ms ease;
 }
 .nav > nav button:hover, .nav > nav a:hover { color: var(--text-hi); }
-.mobile-primary-nav { display: none; position: relative; margin-left: auto; }
+/*
+  The panel hangs from the header, not from the button.
+
+  It was `position: absolute; right: 0` inside a `position: relative` wrapper, so its right edge
+  was pinned to the right edge of the MENU button -- and the MENU button is not at the right edge
+  of the header, the primary action is. With a 300px panel and the button ending 202px into a
+  390px viewport, the panel started at x = -98 and the first half of every label was off screen:
+  measured -93px at 360, -98px at 390, -76px at 412, -58px at 430 (before/ screenshots and
+  `measurements-before.json` in docs/audit/mobile/2026-09-05).
+
+  `header.nav` is `position: fixed`, which makes it the containing block for an absolutely
+  positioned descendant, so dropping `position: relative` from this wrapper lets the panel take
+  `left: 0; right: 0` off the header itself: a full-width sheet under the header at every width
+  from 320 to 1079, with no arithmetic that can put it outside the viewport.
+*/
+.mobile-primary-nav { display: none; margin-left: auto; }
 .mobile-primary-nav summary {
-  min-height: 34px;
+  /* 44px, not 34: this is the only way to the site's seven sections on a phone. */
+  min-height: 44px;
   display: inline-flex;
   align-items: center;
-  padding: 7px 10px;
+  padding: 7px 12px;
   border: 1px solid var(--hairline-hi);
   border-radius: 3px;
   color: var(--text-lo);
@@ -461,26 +477,36 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 .mobile-primary-nav summary::-webkit-details-marker { display: none; }
 .mobile-primary-nav summary::after { content: "+"; margin-left: 7px; color: var(--verified); }
 .mobile-primary-nav[open] summary::after { content: "−"; }
+/* The disclosure and every row in it keep a visible ring; the header's dark ground needs the
+   offset or the outline is drawn on top of the control's own border. */
+.mobile-primary-nav summary:focus-visible,
+.mobile-primary-nav nav a:focus-visible { outline: 2px solid var(--verified); outline-offset: 2px; }
 .mobile-primary-nav nav {
   position: absolute;
-  top: calc(100% + 8px);
+  top: 100%;
+  left: 0;
   right: 0;
-  width: min(78vw, 300px);
   display: grid;
   gap: 1px;
   padding: 1px;
-  border: 1px solid var(--hairline-hi);
+  border-top: 1px solid var(--hairline-hi);
+  border-bottom: 1px solid var(--hairline-hi);
   background: var(--hairline);
-  box-shadow: 0 18px 48px rgba(0, 0, 0, .36);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .46);
+  /* Seven 44px rows is 308px; a short phone in landscape is not given a panel it cannot reach
+     the end of. `contain` keeps the scroll from chaining out to the page behind it. */
+  max-height: calc(100svh - 76px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .mobile-primary-nav nav a {
   min-height: 44px;
   display: flex;
   align-items: center;
-  padding: 0 14px;
+  padding: 0 clamp(14px, 4vw, 24px);
   background: var(--ground);
   color: var(--text-lo);
-  font: 500 11px var(--f-mono);
+  font: 500 12px var(--f-mono);
   letter-spacing: .06em;
 }
 .mobile-primary-nav nav a:hover,
@@ -797,11 +823,31 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
   All four videos are stacked in the same grid cell so the frame never resizes between stages
   and the page below it never shifts. `aspect-ratio` reserves the box before any bytes land, so
   there is no jump when the first frame decodes either.
+
+  1440 was the master's width, not the frame's.
+
+  The cap dates from when this frame showed an MP4 recorded at a 1440 stage, and it stopped
+  being the right number twice over: the shipped cuts are 2880 wide, and the normal path is now
+  a live canvas that lays itself out at `clientWidth × devicePixelRatio` and has no native size
+  at all. What it did in the meantime was hold the film to 1440px on a 1920 screen — 75% of the
+  viewport, where the scene's own frame width (`--compile-film-width`, set on the sequence by
+  ux-120-final.css and already bounded to 94vw and a hard ceiling) offers 1700. Blueprint §13
+  puts the film at 80–85% of this scene; measured before the change it was 94.0% at 1440 and
+  75.0% at 1920, so only the wide end was wrong.
+
+  Deferring to that custom property makes the frame exactly as wide as the sequence it sits in,
+  which is where the centring and the ceilings already live. Below ~1532px, 94vw is under 1440
+  and nothing moves. The literal stays as the fallback for any surface that mounts the player
+  without the landing's width variable.
 */
 .compile-film-viewport {
   position: relative;
   display: grid;
-  width: min(100%, 1440px);
+  /* The stacked media cell is the frame's own height, never the poster's. See the note above
+     `.compile-film-still` below: an `auto` row lets a replaced element with an intrinsic ratio
+     lay itself out taller than the frame, which then clips it. */
+  grid-template-rows: minmax(0, 1fr);
+  width: min(100%, var(--compile-film-width, 1440px));
   margin-inline: auto;
   aspect-ratio: 1440 / 900;
   max-height: calc(100dvh - 300px);
@@ -826,6 +872,35 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
   pointer-events: none;
 }
 /*
+  The poster is shown whole. Reduced motion drops the film, not the frame's contents.
+
+  Two rules were cutting it. The media cell was an `auto` grid row, so an <img> carrying the
+  poster's own 1440x900 ratio laid itself out at its full height and pushed past a frame whose
+  used height comes from `min-height: clamp(430px, 52vw, 850px)` (ux-120-final.css), and the
+  frame's `overflow: hidden` took the difference; `object-fit: cover` then cropped whatever was
+  left. Measured on this branch's preview at 6590dde: the still is 1698x1061 in a 1700x850 frame
+  at 1920 and 20.0% of the poster never reaches the screen -- 11.5% at 1440 and 1280, 12.4% at
+  1024, 6.9% at 768, 2.4% at 390. What sits in the lost band is not margin. In poster-3 it is the
+  tail of the SOURCES diff and the whole `trace  WORLD edge -> NoticePeriod -> handbook-2026.pdf
+  -> §12` line, which is the one sentence in the cut that says the change was traced.
+
+  The still is not a decoration: it is what `prefers-reduced-motion` viewers get, and what every
+  viewer gets before the scene scrolls into view. Deferring the frame to `--compile-film-width`
+  above raised the 1920 loss from 5.7% to 20.0%, so the widening is what turned an old blemish
+  into a regression on the accessibility path.
+
+  `minmax(0, 1fr)` on the frame gives the media box the frame's height rather than the poster's,
+  so it can no longer overflow; `contain` then fits the whole poster inside that box. The frame
+  keeps its measured width and the live canvas still fills it edge to edge on the motion path,
+  which is the normal path. Where the frame is wider than 1.6:1 the still is letterboxed against
+  the frame's own background instead of being cropped -- 170px each side at 1920, 78px at 1440.
+
+  The override carries `.compile-film-viewport` because ux-120-final.css sets
+  `.compile-film-still { object-fit: cover }` and loads last; that file belongs to another lane,
+  so this file has to out-specify it rather than edit it.
+*/
+.compile-film-viewport .compile-film-still { object-fit: contain; }
+/*
   Hidden with opacity rather than `display: none`.
 
   A display-none <video> is not laid out, and Safari will not decode into a box with no size —
@@ -835,12 +910,26 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 */
 .compile-film-video { opacity: 0; visibility: hidden; transition: opacity .28s ease; }
 .compile-film-video[data-active="1"] { opacity: 1; visibility: visible; }
+/*
+  The stage film gives up the transition name; the world field keeps it.
+
+  `view-transition-name` must be unique in a document, and two elements here claim
+  `world-canvas`: the fixed `.world-field` behind the whole page, and `.film-canvas` inside the
+  live stage film (the same component that also serves /film, where it is the only one). A
+  duplicate name makes the browser skip the transition outright — silently — so every Explore
+  CTA on this page would have degraded to a hard cut the moment the compile scene was on screen
+  and rendering live. The field is the right half of the pair to keep: it is what the Explore
+  stage crossfades into. Scoped to the landing embed, so /film is untouched.
+*/
+.compile-film-live .film-canvas { view-transition-name: none; }
+/* The caption is the frame's bottom edge, so it takes the frame's width — including the
+   `--compile-film-width` deference above, or the two would part company on a wide screen. */
 .compile-film-caption {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 16px;
-  width: min(100%, 1440px);
+  width: min(100%, var(--compile-film-width, 1440px));
   margin-inline: auto;
 }
 .compile-film-caption p { margin: 0; color: var(--text-lo); font-size: 13px; }
@@ -860,6 +949,42 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 .compile-film-toggle:hover { color: var(--text-hi); }
 @media (prefers-reduced-motion: reduce) {
   .compile-film-video { transition: none; }
+}
+/*
+  The narrow frame is the film's own shape, and the strip around it is a control, not a caption.
+
+  Two things were wrong below the tablet break. `ux-120-final.css` gives the frame a
+  `min-height` in viewport units -- `58vw` under 720px, `min(62vw, 620px)` under 1100 -- which
+  wins over the 1440/900 `aspect-ratio` and made the box 1.53:1 at 360, 1.55:1 at 390 and 1.48:1
+  at 768 (measured). Against a 16:10 raster that is a letterbox at one end and a squeeze at the
+  other; on the phone path the frame now holds the film's ratio exactly and the poster fills it.
+  These rules carry `.landing-page` because that file loads after this one and has to be
+  out-specified rather than edited -- it belongs to another lane.
+
+  And the four stage tabs are the only way to reach a cut directly on a touch screen. At 10px
+  with .14em tracking, STRUCTURE measured 79px of text inside an 80px button at 360 -- one row,
+  but with nothing left, and a hair more tracking or a longer label wraps it into two. Tightening
+  the tracking buys the room back and the buttons take a 44px touch target with it.
+*/
+@media (max-width: 1079px) {
+  .landing-page .compile-film-viewport { min-height: 0; }
+}
+@media (max-width: 620px) {
+  .compile-film-sequence { gap: 12px; }
+  .compile-film-stages button { padding: 12px 4px; font-size: 9.5px; letter-spacing: .06em; }
+  .compile-film-caption { align-items: center; gap: 10px; }
+  .compile-film-caption p { font-size: 12.5px; line-height: 1.5; }
+}
+/* 9px of tracked mono is a mark, not a number, and the counter is the one thing the strip cannot
+   show while a tab is under a thumb. It grows on a narrow screen and on any touch screen the
+   strip is still stacked on. */
+@media (max-width: 620px), (pointer: coarse) and (max-width: 1079px) {
+  .compile-film-caption .compile-film-progress { font-size: 10.5px; letter-spacing: .08em; }
+}
+/* The tab is sized by what is pressing it, not by how wide the screen is: a 768px tablet has the
+   room for a wide tab and still needs it to be 44px tall. */
+@media (pointer: coarse) and (max-width: 1079px) {
+  .compile-film-stages button { min-height: 44px; }
 }
 /*
   Four groups, laid out as four groups.
@@ -2572,13 +2697,26 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
   .connection-layout, .developer-layout { grid-template-columns: minmax(0, 1fr); }
 }
 
-/*
-   Section links survive to 760px. They were hidden from 900px down, which took them off tablets
-   that still had room for them -- a page whose order is its argument should keep the means to move
-   through that order for as long as it fits.
-*/
 @media (max-width: 760px) {
   .usage-estimator { grid-template-columns: minmax(0, 1fr); }
+}
+
+/*
+   The section links come back when they fit, and 760px was not where they fit.
+
+   The rule that hid them said they "survive to 760px ... tablets that still had room for them".
+   They did not have room. Measured on this build at 12 widths (docs/audit/mobile/2026-09-05):
+   with the seven links shown, the header's content ends at x = 1069 at a 768px viewport, 1073 at
+   900 and 1076 at 1024 -- so from 761px all the way to 1076px the primary action and Sign in are
+   laid out past the right edge and clipped by the `overflow-x: hidden` on the document. A tablet
+   visitor could read the section links and could not reach the button the page is asking them to
+   press. Nothing about that was visible in a document-overflow check, because the clip hides it.
+
+   1079px is the last width at which that is still true, so the swap happens there. Tightening
+   the links instead does not reach 768: dropping the gap to 14px and the KNOWLEDGE COMPILER
+   badge still leaves the row needing 933px.
+*/
+@media (max-width: 1079px) {
   .nav > nav { display: none; }
   .mobile-primary-nav { display: block; }
 }
@@ -2619,6 +2757,20 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
   .api-key-form fieldset { grid-template-columns: minmax(0, 1fr); }
 }
 
+/*
+  The narrowest header still has to hold four things.
+
+  At 360 the row is the wordmark (104px), MENU (66px), the access action and Sign in, and giving
+  Sign in the 44px target below took the row to 384px inside a 360px viewport -- the access
+  action's right edge measured at 370. The 24px of gap and padding this recovers is what pays for
+  that target; the alternative was dropping Sign in from the phone header, which would leave a
+  returning customer no way in.
+*/
+@media (max-width: 400px) {
+  .nav { gap: 6px; padding: 10px 12px; }
+  .nav-actions { gap: 8px; }
+}
+
 @media (max-width: 520px) {
   .mode { display: none; }
   /*
@@ -2633,6 +2785,62 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
   .ch { padding: 11px 12px; }
   .ch-v { font-size: 19px; }
   .ch-k { font-size: 8.5px; letter-spacing: 0.1em; margin-top: 4px; }
+}
+
+/*
+  Touch targets, measured rather than assumed.
+
+  A pass over `/` at 360, 390, 412, 430 and 768 found 35 controls under 44px in either axis.
+  Most were 42px -- the floor `responsive-polish.css` sets under `(pointer: coarse)`, two short
+  of the 44px the guideline asks for -- but three groups were not close: the scene ticks in the
+  instrument bar at 6x6 (12x6 including the gap that separates them), the bar's own next-step
+  control at 27px tall, and the fifteen footer links at 21px.
+
+  The ticks keep their 6px dot; what changes is that the dot is now drawn by the button rather
+  than being the button, so the target can be 44px tall without the mark growing. `min-width` is
+  30px and not 44: the bar is one row, and five 44px targets plus the 154px next-step control
+  measure 386px against the 332px a 360px viewport leaves inside the bar's padding. 30px is what
+  fits, is above the 24px WCAG 2.5.8 floor with no adjacent target closer than its own width,
+  and is five times what was there.
+
+  These rules out-specify `responsive-polish.css`, which loads after this file.
+*/
+@media (pointer: coarse) {
+  .page .btn, .page .nav a { min-height: 44px; }
+  body .skip { min-height: 44px; display: inline-flex; align-items: center; }
+  .page .bar-next { min-height: 44px; display: inline-flex; align-items: center; }
+  .page .bar-ticks { gap: 0; }
+  .page .bar-ticks .bt {
+    width: auto;
+    min-width: 30px;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border-radius: 0;
+    transform: none;
+  }
+  .page .bar-ticks .bt::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--decor);
+    transition: background 220ms ease, transform 220ms ease;
+  }
+  .page .bar-ticks .bt:hover { background: transparent; }
+  .page .bar-ticks .bt.on::before { background: var(--verified); transform: scale(1.35); }
+  .site-footer-groups a {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+  .site-footer-groups nav { gap: 0; }
+  /* "Sign in" is a two-word text link in a header row that is already full at 360px: the
+     wordmark, MENU and the access action measure 322px of a 360px viewport before it. It takes
+     the 44px height and as much width as the row can spare. */
+  .page .nav-signin { min-width: 44px; justify-content: center; display: inline-flex; align-items: center; }
 }
 
 /* Short viewports: a full-height centred hero must not push its own content under the nav. */

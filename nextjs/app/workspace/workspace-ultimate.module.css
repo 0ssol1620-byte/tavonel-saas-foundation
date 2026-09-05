@@ -83,7 +83,8 @@
   .brand, .railFooter { display: none; }
   .nav { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; }
   .nav > div { display: none; }
-  .nav > div:nth-child(1), .nav > div:nth-child(2), .nav > div:nth-child(4), .nav > div:nth-child(5), .nav > div:last-child { display: block; }
+  /* The five rail surfaces are named in workspace-ultimate-shell.tsx, not counted by position. */
+  .nav > div[data-mobile-rail] { display: block; }
   .secondaryStart { margin: 0; padding: 0; border: 0; }
   .nav button { min-height: 51px; display: flex; flex-direction: column; justify-content: center; gap: 3px; padding: 4px; text-align: center; font-size: 9px; }
   .nav span[data-mobile-label] { font-size: 0; }

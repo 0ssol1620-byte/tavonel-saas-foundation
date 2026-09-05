@@ -1,0 +1,951 @@
+{
+  "capturedAgainst": "http://127.0.0.1:3140",
+  "capturedAt": "2026-09-05T18:33:49.707Z",
+  "branch": "agent/cl-integration",
+  "note": "Viewport screenshots, not full-page: a panel outside the viewport does not appear in a stitched full-page shot.",
+  "expected": {
+    "frameAspect": 1.6,
+    "stageHoldMs": 18000,
+    "horizontalOverflowPx": 0,
+    "menuOverflowPx": 0
+  },
+  "runs": [
+    {
+      "browser": "chromium",
+      "viewport": {
+        "width": 412,
+        "height": 915
+      },
+      "label": "chromium-412x915",
+      "shots": [
+        {
+          "file": "chromium-412x915-01-top-menu-open.png",
+          "what": "landing top with MENU open; panel measured against the viewport",
+          "captured": true
+        },
+        {
+          "file": "chromium-412x915-02-s3-01-sources.png",
+          "what": "Scene 03 at stage SOURCES",
+          "tabFound": true,
+          "captured": true,
+          "strip": {
+            "found": true,
+            "renderer": "video-fallback",
+            "frameRect": {
+              "left": 20,
+              "right": 392,
+              "top": 388,
+              "bottom": 621,
+              "width": 372,
+              "height": 233
+            },
+            "frameAspect": 1.597,
+            "tabsOnOneLine": true,
+            "tabLineTops": [
+              331
+            ],
+            "tabsClipped": [],
+            "tabs": [
+              {
+                "id": "compile-stage-tab-sources",
+                "label": "SOURCES",
+                "selected": true,
+                "rect": {
+                  "left": 20,
+                  "right": 113,
+                  "top": 331,
+                  "bottom": 375,
+                  "width": 93,
+                  "height": 44
+                },
+                "clipped": false
+              },
+              {
+                "id": "compile-stage-tab-read",
+                "label": "READ",
+                "selected": false,
+                "rect": {
+                  "left": 113,
+                  "right": 206,
+                  "top": 331,
+                  "bottom": 375,
+                  "width": 93,
+                  "height": 44
+                },
+                "clipped": false
+              },
+              {
+                "id": "compile-stage-tab-structure",
+                "label": "STRUCTURE",
+                "selected": false,
+                "rect": {
+                  "left": 206,
+                  "right": 299,
+                  "top": 331,
+                  "bottom": 375,
+                  "width": 93,
+                  "height": 44
+                },
+                "clipped": false
+              },
+              {
+                "id": "compile-stage-tab-world",
+                "label": "WORLD",
+                "selected": false,
+                "rect": {
+                  "left": 299,
+                  "right": 392,
+                  "top": 331,
+                  "bottom": 375,
+                  "width": 93,
+                  "height": 44
+                },
+                "clipped": false
+              }
+            ],
+            "textOverlaps": [],
+            "selectedTab": "compile-stage-tab-sources",
+            "painter": {
+              "canvas": [],
+              "video": [
+                {
+                  "left": 21,
+                  "right": 391,
+                  "top": 389,
+                  "bottom": 620,
+                  "width": 370,
+                  "height": 231,
+                  "src": "http://127.0.0.1:3140/film/compile-cut.mp4",
+                  "paused": false
+                }
+              ],
+              "img": []
+            }
+          }
+        },
+        {
+          "file": "chromium-412x915-02-s3-02-read.png",
+          "what": "Scene 03 at stage READ",
+          "tabFound": true,
+          "captured": true,
+          "strip": {
+            "found": true,
+            "renderer": "video-fallback",
+            "frameRect": {
+              "left": 20,
+              "right": 392,
+              "top": 388,
+              "bottom": 621,
+              "width": 372,
+              "height": 233
+            },
+            "frameAspect": 1.597,
+            "tabsOnOneLine": true,
+            "tabLineTops": [
+              331
+            ],
+            "tabsClipped": [],
+            "tabs": [
+              {
+                "id": "compile-stage-tab-sources",
+                "label": "SOURCES",
+                "selected": false,
+                "rect": {
+                  "left": 20,
+                  "right": 113,
+                  "top": 331,
+                  "bottom": 375,
+                  "width": 93,
+                  "height": 44
+                },
+                "clipped": false
+              },
+              {
+                "id": "compile-stage-tab-read",
+                "label": "READ",
+                "selected": true,
+                "rect": {
+                  "left": 113,
+                  "right": 206,
+                  "top": 331,
+                  "bottom": 375,
+                  "width": 93,
+                  "height": 44
+                },
+                "clipped": false
+              },
+              {
+                "id": "compile-stage-tab-structure",
+                "label": "STRUCTURE",
+                "selected": false,
+                "rect": {
+                  "left": 206,
+                  "right": 299,
+                  "top": 331,
+                  "bottom": 375,
+                  "width": 93,
+                  "height": 44
+                },
+                "clipped": false
+              },
+              {
+                "id": "compile-stage-tab-world",
+                "label": "WORLD",
+                "selected": false,
+                "rect": {
+                  "left": 299,
+                  "right": 392,
+                  "top": 331,
+                  "bottom": 375,
+                  "width": 93,
+                  "height": 44
+                },
+                "clipped": false
+              }
+            ],
+            "textOverlaps": [],
+            "selectedTab": "compile-stage-tab-read",
+            "painter": {
+              "canvas": [],
+              "video": [
+                {
+                  "left": 21,
+                  "right": 391,
+                  "top": 389,
+                  "bottom": 620,
+                  "width": 370,
+                  "height": 231,
+                  "src": "http://127.0.0.1:3140/film/compile-cut-2.mp4",
+                  "paused": false
+                }
+              ],
+              "img": []
+            }
+          }
+        },
+        {
+          "file": "chromium-412x915-02-s3-03-structure.png",
+          "what": "Scene 03 at stage STRUCTURE",
+          "tabFound": true,
+          "captured": true,
+          "strip": {
+            "found": true,
+            "renderer": "video-fallback",
+            "frameRect": {
+              "left": 20,
+              "right": 392,
+              "top": 388,
+              "bottom": 621,
+              "width": 372,
+              "height": 233
+            },
+            "frameAspect": 1.597,
+            "tabsOnOneLine": true,
+            "tabLineTops": [
+              331
+            ],
+            "tabsClipped": [],
+            "tabs": [
+              {
+                "id": "compile-stage-tab-sources",
+                "label": "SOURCES",
+                "selected": false,
+                "rect": {
+                  "left": 20,
+                  "right": 113,
+                  "top": 331,
+                  "bottom": 375,
+                  "width": 93,
+                  "height": 44
+                },
+                "clipped": false
+              },
+              {
+                "id": "compile-stage-tab-read",
+                "label": "READ",
+                "selected": false,
+                "rect": {
+                  "left": 113,
+                  "right": 206,
+                  "top": 331,
+                  "bottom": 375,
+                  "width": 93,
+                  "height": 44
+                },
+                "clipped": false
+              },
+              {
+                "id": "compile-stage-tab-structure",
+                "label": "STRUCTURE",
+                "selected": true,
+                "rect": {
+                  "left": 206,
+                  "right": 299,
+                  "top": 331,
+                  "bottom": 375,
+                  "width": 93,
+                  "height": 44
+                },
+                "clipped": false
+              },
+              {
+                "id": "compile-stage-tab-world",
+                "label": "WORLD",
+                "selected": false,
+                "rect": {
+                  "left": 299,
+                  "right": 392,
+                  "top": 331,
+                  "bottom": 375,
+                  "width": 93,
+                  "height": 44
+                },
+                "clipped": false
+              }
+            ],
+            "textOverlaps": [],
+            "selectedTab": "compile-stage-tab-structure",
+            "painter": {
+              "canvas": [],
+              "video": [
+                {
+                  "left": 21,
+                  "right": 391,
+                  "top": 389,
+                  "bottom": 620,
+                  "width": 370,
+                  "height": 231,
+                  "src": "http://127.0.0.1:3140/film/compile-cut-3.mp4",
+                  "paused": false
+                }
+              ],
+              "img": []
+            }
+          }
+        },
+        {
+          "file": "chromium-412x915-02-s3-04-world.png",
+          "what": "Scene 03 at stage WORLD",
+          "tabFound": true,
+          "captured": true,
+          "strip": {
+            "found": true,
+            "renderer": "video-fallback",
+            "frameRect": {
+              "left": 20,
+              "right": 392,
+              "top": 388,
+              "bottom": 621,
+              "width": 372,
+              "height": 233
+            },
+            "frameAspect": 1.597,
+            "tabsOnOneLine": true,
+            "tabLineTops": [
+              331
+            ],
+            "tabsClipped": [],
+            "tabs": [
+              {
+                "id": "compile-stage-tab-sources",
+                "label": "SOURCES",
+                "selected": false,
+                "rect": {
+                  "left": 20,
+                  "right": 113,
+                  "top": 331,
+                  "bottom": 375,
+                  "width": 93,
+                  "height": 44
+                },
+                "clipped": false
+              },
+              {
+                "id": "compile-stage-tab-read",
+                "label": "READ",
+                "selected": false,
+                "rect": {
+                  "left": 113,
+                  "right": 206,
+                  "top": 331,
+                  "bottom": 375,
+                  "width": 93,
+                  "height": 44
+                },
+                "clipped": false
+              },
+              {
+                "id": "compile-stage-tab-structure",
+                "label": "STRUCTURE",
+                "selected": false,
+                "rect": {
+                  "left": 206,
+                  "right": 299,
+                  "top": 331,
+                  "bottom": 375,
+                  "width": 93,
+                  "height": 44
+                },
+                "clipped": false
+              },
+              {
+                "id": "compile-stage-tab-world",
+                "label": "WORLD",
+                "selected": true,
+                "rect": {
+                  "left": 299,
+                  "right": 392,
+                  "top": 331,
+                  "bottom": 375,
+                  "width": 93,
+                  "height": 44
+                },
+                "clipped": false
+              }
+            ],
+            "textOverlaps": [],
+            "selectedTab": "compile-stage-tab-world",
+            "painter": {
+              "canvas": [],
+              "video": [
+                {
+                  "left": 21,
+                  "right": 391,
+                  "top": 389,
+                  "bottom": 620,
+                  "width": 370,
+                  "height": 231,
+                  "src": "http://127.0.0.1:3140/film/compile-cut-4.mp4",
+                  "paused": false
+                }
+              ],
+              "img": []
+            }
+          }
+        }
+      ],
+      "errors": [],
+      "openedInMs": 1617,
+      "overflowAtTop": {
+        "where": "landing top",
+        "viewportWidth": 412,
+        "documentScrollWidth": 412,
+        "bodyScrollWidth": 412,
+        "horizontalOverflowPx": 0
+      },
+      "menu": {
+        "triggerFound": true,
+        "triggerLabel": "Menu",
+        "summaryRect": {
+          "left": 153,
+          "right": 220,
+          "top": 10,
+          "bottom": 54,
+          "width": 66,
+          "height": 44
+        },
+        "open": true,
+        "panelRect": {
+          "left": 0,
+          "right": 412,
+          "top": 64,
+          "bottom": 382,
+          "width": 412,
+          "height": 318
+        },
+        "linkCount": 7,
+        "viewport": {
+          "width": 412,
+          "height": 915
+        },
+        "overflowLeftPx": 0,
+        "overflowRightPx": 0,
+        "overflowTopPx": 0,
+        "fullyInsideViewport": true
+      },
+      "stageShotsReducedMotion": false,
+      "stageShotsNote": "Scene 03 shots taken with motion allowed, on the narrow video-fallback path.",
+      "overflowAtScene": {
+        "where": "scene 03",
+        "viewportWidth": 412,
+        "documentScrollWidth": 412,
+        "bodyScrollWidth": 412,
+        "horizontalOverflowPx": 0
+      },
+      "autoAdvance": {
+        "measured": true,
+        "fromStage": "compile-stage-tab-sources",
+        "toStage": "compile-stage-tab-read",
+        "heldMs": 18032
+      }
+    },
+    {
+      "browser": "webkit",
+      "viewport": {
+        "width": 360,
+        "height": 780
+      },
+      "label": "webkit-360x780",
+      "shots": [
+        {
+          "file": "webkit-360x780-01-top-menu-open.png",
+          "what": "landing top with MENU open; panel measured against the viewport",
+          "captured": true
+        },
+        {
+          "file": "webkit-360x780-02-s3-01-sources.png",
+          "what": "Scene 03 at stage SOURCES",
+          "tabFound": true,
+          "captured": true,
+          "strip": {
+            "found": true,
+            "renderer": "video-fallback",
+            "frameRect": {
+              "left": 20,
+              "right": 330,
+              "top": 354,
+              "bottom": 548,
+              "width": 310,
+              "height": 194
+            },
+            "frameAspect": 1.598,
+            "tabsOnOneLine": true,
+            "tabLineTops": [
+              297
+            ],
+            "tabsClipped": [],
+            "tabs": [
+              {
+                "id": "compile-stage-tab-sources",
+                "label": "SOURCES",
+                "selected": true,
+                "rect": {
+                  "left": 20,
+                  "right": 98,
+                  "top": 297,
+                  "bottom": 341,
+                  "width": 78,
+                  "height": 44
+                },
+                "clipped": false
+              },
+              {
+                "id": "compile-stage-tab-read",
+                "label": "READ",
+                "selected": false,
+                "rect": {
+                  "left": 98,
+                  "right": 175,
+                  "top": 297,
+                  "bottom": 341,
+                  "width": 78,
+                  "height": 44
+                },
+                "clipped": false
+              },
+              {
+                "id": "compile-stage-tab-structure",
+                "label": "STRUCTURE",
+                "selected": false,
+                "rect": {
+                  "left": 175,
+                  "right": 253,
+                  "top": 297,
+                  "bottom": 341,
+                  "width": 78,
+                  "height": 44
+                },
+                "clipped": false
+              },
+              {
+                "id": "compile-stage-tab-world",
+                "label": "WORLD",
+                "selected": false,
+                "rect": {
+                  "left": 253,
+                  "right": 330,
+                  "top": 297,
+                  "bottom": 341,
+                  "width": 78,
+                  "height": 44
+                },
+                "clipped": false
+              }
+            ],
+            "textOverlaps": [],
+            "selectedTab": "compile-stage-tab-sources",
+            "painter": {
+              "canvas": [],
+              "video": [],
+              "img": [
+                {
+                  "left": 21,
+                  "right": 329,
+                  "top": 355,
+                  "bottom": 547,
+                  "width": 308,
+                  "height": 192,
+                  "src": "http://127.0.0.1:3140/film/poster-1.webp"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "file": "webkit-360x780-02-s3-02-read.png",
+          "what": "Scene 03 at stage READ",
+          "tabFound": true,
+          "captured": true,
+          "strip": {
+            "found": true,
+            "renderer": "video-fallback",
+            "frameRect": {
+              "left": 20,
+              "right": 330,
+              "top": 354,
+              "bottom": 548,
+              "width": 310,
+              "height": 194
+            },
+            "frameAspect": 1.598,
+            "tabsOnOneLine": true,
+            "tabLineTops": [
+              297
+            ],
+            "tabsClipped": [],
+            "tabs": [
+              {
+                "id": "compile-stage-tab-sources",
+                "label": "SOURCES",
+                "selected": false,
+                "rect": {
+                  "left": 20,
+                  "right": 98,
+                  "top": 297,
+                  "bottom": 341,
+                  "width": 78,
+                  "height": 44
+                },
+                "clipped": false
+              },
+              {
+                "id": "compile-stage-tab-read",
+                "label": "READ",
+                "selected": true,
+                "rect": {
+                  "left": 98,
+                  "right": 175,
+                  "top": 297,
+                  "bottom": 341,
+                  "width": 78,
+                  "height": 44
+                },
+                "clipped": false
+              },
+              {
+                "id": "compile-stage-tab-structure",
+                "label": "STRUCTURE",
+                "selected": false,
+                "rect": {
+                  "left": 175,
+                  "right": 253,
+                  "top": 297,
+                  "bottom": 341,
+                  "width": 78,
+                  "height": 44
+                },
+                "clipped": false
+              },
+              {
+                "id": "compile-stage-tab-world",
+                "label": "WORLD",
+                "selected": false,
+                "rect": {
+                  "left": 253,
+                  "right": 330,
+                  "top": 297,
+                  "bottom": 341,
+                  "width": 78,
+                  "height": 44
+                },
+                "clipped": false
+              }
+            ],
+            "textOverlaps": [],
+            "selectedTab": "compile-stage-tab-read",
+            "painter": {
+              "canvas": [],
+              "video": [],
+              "img": [
+                {
+                  "left": 21,
+                  "right": 329,
+                  "top": 355,
+                  "bottom": 547,
+                  "width": 308,
+                  "height": 192,
+                  "src": "http://127.0.0.1:3140/film/poster-2.webp"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "file": "webkit-360x780-02-s3-03-structure.png",
+          "what": "Scene 03 at stage STRUCTURE",
+          "tabFound": true,
+          "captured": true,
+          "strip": {
+            "found": true,
+            "renderer": "video-fallback",
+            "frameRect": {
+              "left": 20,
+              "right": 330,
+              "top": 354,
+              "bottom": 548,
+              "width": 310,
+              "height": 194
+            },
+            "frameAspect": 1.598,
+            "tabsOnOneLine": true,
+            "tabLineTops": [
+              297
+            ],
+            "tabsClipped": [],
+            "tabs": [
+              {
+                "id": "compile-stage-tab-sources",
+                "label": "SOURCES",
+                "selected": false,
+                "rect": {
+                  "left": 20,
+                  "right": 98,
+                  "top": 297,
+                  "bottom": 341,
+                  "width": 78,
+                  "height": 44
+                },
+                "clipped": false
+              },
+              {
+                "id": "compile-stage-tab-read",
+                "label": "READ",
+                "selected": false,
+                "rect": {
+                  "left": 98,
+                  "right": 175,
+                  "top": 297,
+                  "bottom": 341,
+                  "width": 78,
+                  "height": 44
+                },
+                "clipped": false
+              },
+              {
+                "id": "compile-stage-tab-structure",
+                "label": "STRUCTURE",
+                "selected": true,
+                "rect": {
+                  "left": 175,
+                  "right": 253,
+                  "top": 297,
+                  "bottom": 341,
+                  "width": 78,
+                  "height": 44
+                },
+                "clipped": false
+              },
+              {
+                "id": "compile-stage-tab-world",
+                "label": "WORLD",
+                "selected": false,
+                "rect": {
+                  "left": 253,
+                  "right": 330,
+                  "top": 297,
+                  "bottom": 341,
+                  "width": 78,
+                  "height": 44
+                },
+                "clipped": false
+              }
+            ],
+            "textOverlaps": [],
+            "selectedTab": "compile-stage-tab-structure",
+            "painter": {
+              "canvas": [],
+              "video": [],
+              "img": [
+                {
+                  "left": 21,
+                  "right": 329,
+                  "top": 355,
+                  "bottom": 547,
+                  "width": 308,
+                  "height": 192,
+                  "src": "http://127.0.0.1:3140/film/poster-3.webp"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "file": "webkit-360x780-02-s3-04-world.png",
+          "what": "Scene 03 at stage WORLD",
+          "tabFound": true,
+          "captured": true,
+          "strip": {
+            "found": true,
+            "renderer": "video-fallback",
+            "frameRect": {
+              "left": 20,
+              "right": 330,
+              "top": 354,
+              "bottom": 548,
+              "width": 310,
+              "height": 194
+            },
+            "frameAspect": 1.598,
+            "tabsOnOneLine": true,
+            "tabLineTops": [
+              297
+            ],
+            "tabsClipped": [],
+            "tabs": [
+              {
+                "id": "compile-stage-tab-sources",
+                "label": "SOURCES",
+                "selected": false,
+                "rect": {
+                  "left": 20,
+                  "right": 98,
+                  "top": 297,
+                  "bottom": 341,
+                  "width": 78,
+                  "height": 44
+                },
+                "clipped": false
+              },
+              {
+                "id": "compile-stage-tab-read",
+                "label": "READ",
+                "selected": false,
+                "rect": {
+                  "left": 98,
+                  "right": 175,
+                  "top": 297,
+                  "bottom": 341,
+                  "width": 78,
+                  "height": 44
+                },
+                "clipped": false
+              },
+              {
+                "id": "compile-stage-tab-structure",
+                "label": "STRUCTURE",
+                "selected": false,
+                "rect": {
+                  "left": 175,
+                  "right": 253,
+                  "top": 297,
+                  "bottom": 341,
+                  "width": 78,
+                  "height": 44
+                },
+                "clipped": false
+              },
+              {
+                "id": "compile-stage-tab-world",
+                "label": "WORLD",
+                "selected": true,
+                "rect": {
+                  "left": 253,
+                  "right": 330,
+                  "top": 297,
+                  "bottom": 341,
+                  "width": 78,
+                  "height": 44
+                },
+                "clipped": false
+              }
+            ],
+            "textOverlaps": [],
+            "selectedTab": "compile-stage-tab-world",
+            "painter": {
+              "canvas": [],
+              "video": [],
+              "img": [
+                {
+                  "left": 21,
+                  "right": 329,
+                  "top": 355,
+                  "bottom": 547,
+                  "width": 308,
+                  "height": 192,
+                  "src": "http://127.0.0.1:3140/film/poster-4.webp"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "errors": [],
+      "openedInMs": 2146,
+      "overflowAtTop": {
+        "where": "landing top",
+        "viewportWidth": 360,
+        "documentScrollWidth": 350,
+        "bodyScrollWidth": 350,
+        "horizontalOverflowPx": 0
+      },
+      "menu": {
+        "triggerFound": true,
+        "triggerLabel": "Menu",
+        "summaryRect": {
+          "left": 122,
+          "right": 188,
+          "top": 10,
+          "bottom": 54,
+          "width": 66,
+          "height": 44
+        },
+        "open": true,
+        "panelRect": {
+          "left": 0,
+          "right": 350,
+          "top": 64,
+          "bottom": 382,
+          "width": 350,
+          "height": 318
+        },
+        "linkCount": 7,
+        "viewport": {
+          "width": 360,
+          "height": 780
+        },
+        "overflowLeftPx": 0,
+        "overflowRightPx": 0,
+        "overflowTopPx": 0,
+        "fullyInsideViewport": true
+      },
+      "stageShotsReducedMotion": true,
+      "stageShotsNote": "Scene 03 shots taken with prefers-reduced-motion: reduce (poster still, no <video>): WebKit-on-Windows wedged on all four with motion allowed. Layout is identical; playback is not evidenced here. Not a statement about iOS Safari.",
+      "overflowAtScene": {
+        "where": "scene 03",
+        "viewportWidth": 360,
+        "documentScrollWidth": 350,
+        "bodyScrollWidth": 350,
+        "horizontalOverflowPx": 0
+      },
+      "autoAdvance": {
+        "measured": false,
+        "reason": "harness timeout",
+        "detail": {
+          "ok": false,
+          "timedOut": true,
+          "label": "auto-advance"
+        }
+      }
+    }
+  ]
+}

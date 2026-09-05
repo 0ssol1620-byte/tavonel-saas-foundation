@@ -32,7 +32,8 @@ test("public proof routes expose honest registries and a downloadable manifest",
   expect(world.ok()).toBe(true);
   expect(world.headers()["content-digest"]).toMatch(/^sha-256=:/);
   expect((await world.json()).disclosure).toBe("deterministic_product_sample_not_customer_proof");
-  expect((await page.request.get("/benchmarks")).status()).toBe(404);
+  // /benchmarks is a page now, not a 404; e2e/benchmarks.spec.ts holds what it may not contain.
+  expect((await page.request.get("/benchmarks")).status()).toBe(200);
   expect((await page.request.get("/research/experiments")).status()).toBe(404);
 });
 

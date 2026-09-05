@@ -1,0 +1,5 @@
+{
+  "schema": "tavonel.benchmark-registry.v1",
+  "note": "A record is added here only after a same-condition run has produced every field listed in RECEIPT_FIELDS, each digest computed over the bytes it names. An empty array is the state of this deployment, not a placeholder to be filled in with plausible values.",
+  "records": []
+}

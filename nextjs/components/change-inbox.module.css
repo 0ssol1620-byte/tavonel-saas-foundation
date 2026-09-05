@@ -1,0 +1,146 @@
+/*
+  Change Inbox — dark instrument, hairlines for depth, colour only where it reports a state.
+
+  The three state tokens keep their own meanings: verified for what the newer version says,
+  changed for what the older one said, unresolved for something the product could not read.
+  Selection and removal get no hue at all -- a selected row is marked by luminance, and a
+  removal is marked by the word "removed", because neither is a state of the knowledge. Every
+  distinction here survives without colour: the sign, the label and the position carry it.
+*/
+
+.surface {
+  --ci-ink: var(--text-hi, #edeae4);
+  --ci-muted: var(--text-lo, #7d878d);
+  --ci-faint: var(--text-xlo, #78828a);
+  --ci-line: var(--hairline, #23282d);
+  --ci-line-hi: var(--hairline-hi, #2e353b);
+  --ci-verified: var(--verified, #7be0be);
+  --ci-changed: var(--changed, #f2a65a);
+  --ci-unresolved: var(--unresolved, #6e93b8);
+  display: grid;
+  gap: 22px;
+  min-width: 0;
+}
+
+.intro { display: grid; gap: 8px; }
+.intro h2 { margin: 0; }
+.intro p:last-child { margin: 0; max-width: 62ch; color: var(--ci-muted); font-size: 13px; line-height: 1.6; }
+
+.state {
+  display: grid;
+  gap: 8px;
+  padding: 26px;
+  border: 1px dashed var(--ci-line-hi);
+}
+.state span { color: var(--ci-faint); font: 9px var(--f-mono, monospace); letter-spacing: .12em; }
+.state[data-state="unavailable"] span { color: var(--ci-unresolved); }
+.state p { margin: 0; color: var(--ci-muted); font-size: 13px; line-height: 1.6; }
+
+.split { display: grid; gap: 1px; background: var(--ci-line); border: 1px solid var(--ci-line); }
+@media (min-width: 1100px) {
+  .split { grid-template-columns: minmax(0, 330px) minmax(0, 1fr); }
+}
+
+.inbox { display: grid; gap: 1px; align-content: start; margin: 0; padding: 0; list-style: none; background: var(--ci-line); }
+.inbox > li { background: var(--ground, #08090a); }
+.inbox button {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  padding: 12px 14px;
+  text-align: left;
+  border-left: 2px solid transparent;
+  color: var(--ci-muted);
+}
+.inbox button:hover { color: var(--ci-ink); }
+.inbox button[data-current="true"] { border-left-color: var(--ci-ink); color: var(--ci-ink); }
+.inbox code { color: var(--ci-faint); font: 10px var(--f-mono, monospace); overflow-wrap: anywhere; }
+.inbox small { color: var(--ci-faint); font: 10px var(--f-mono, monospace); }
+
+.rowVersions { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+.rowVersions strong { color: inherit; font: 400 13px var(--f-sans, sans-serif); }
+.rowVersions i { color: var(--ci-faint); font-style: normal; }
+
+.detail { display: grid; gap: 14px; align-content: start; padding: 16px 18px; background: var(--ground, #08090a); min-width: 0; }
+.detail h3 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: baseline;
+  margin: 0;
+  font: 400 15px var(--f-sans, sans-serif);
+}
+.detail h3 i { color: var(--ci-faint); font-style: normal; }
+
+.status { color: var(--ci-faint); font: 9px var(--f-mono, monospace); letter-spacing: .1em; text-transform: uppercase; }
+.note { margin: 0; color: var(--ci-faint); font-size: 12px; line-height: 1.6; }
+.summary { margin: 0; color: var(--ci-ink); font: 12px/1.6 var(--f-mono, monospace); overflow-wrap: anywhere; }
+
+.counts { display: grid; gap: 1px; margin: 0; background: var(--ci-line); border: 1px solid var(--ci-line); }
+.counts > div { display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; padding: 9px 12px; background: var(--ground, #08090a); }
+.counts dt { color: var(--ci-faint); font: 9px var(--f-mono, monospace); letter-spacing: .1em; text-transform: uppercase; }
+.counts dd { margin: 0; color: var(--ci-ink); font: 11px var(--f-mono, monospace); }
+
+.inspect {
+  justify-self: start;
+  padding: 8px 14px;
+  color: var(--ci-ink);
+  border: 1px solid var(--ci-line-hi);
+  font: 10px var(--f-mono, monospace);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  background: transparent;
+  transition: background-color 120ms linear;
+}
+.inspect:hover { background: var(--g2, #14171a); }
+
+.impact { display: grid; gap: 20px; padding-top: 6px; border-top: 1px solid var(--ci-line); }
+@media (min-width: 900px) {
+  .impact { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+  .full { grid-column: 1 / -1; }
+}
+.impact h4 { margin: 0 0 8px; color: var(--ci-faint); font: 9px var(--f-mono, monospace); letter-spacing: .12em; }
+
+.lines { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.lines > li { display: grid; gap: 3px; padding-left: 10px; border-left: 1px solid var(--ci-line-hi); min-width: 0; }
+.lines > li[data-effect="added"] { border-left-color: var(--ci-verified); }
+/* Removal has no state token, and the row says "removed" in words. */
+.lines > li[data-effect="changed"] { border-left-color: var(--ci-changed); }
+.lines b { color: var(--ci-ink); font: 400 12px/1.5 var(--f-sans, sans-serif); overflow-wrap: anywhere; }
+.lines small { color: var(--ci-faint); font: 9px var(--f-mono, monospace); letter-spacing: .06em; text-transform: uppercase; }
+.lines s { color: var(--ci-changed); font: 11px/1.6 var(--f-mono, monospace); text-decoration-thickness: 1px; overflow-wrap: anywhere; }
+.lines ins { color: var(--ci-verified); font: 11px/1.6 var(--f-mono, monospace); text-decoration: none; overflow-wrap: anywhere; }
+
+.where { color: var(--ci-faint); font: 9px var(--f-mono, monospace); letter-spacing: .08em; text-transform: uppercase; overflow-wrap: anywhere; }
+
+.full { display: grid; gap: 8px; }
+
+.timeline { display: grid; gap: 10px; }
+.timeline h3 { margin: 0; font: 400 14px var(--f-sans, sans-serif); }
+.versions { display: grid; gap: 1px; margin: 0; padding: 0; list-style: none; background: var(--ci-line); border: 1px solid var(--ci-line); }
+.versions > li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: baseline;
+  padding: 10px 12px;
+  background: var(--ground, #08090a);
+  border-left: 2px solid transparent;
+  font: 11px var(--f-mono, monospace);
+}
+.versions > li[data-status="active"] { border-left-color: var(--ci-verified); }
+.versions > li[data-status="candidate"] { border-left-color: var(--ci-changed); }
+.versions strong { color: var(--ci-ink); font-weight: 400; }
+.versions code { color: var(--ci-faint); font-size: 10px; overflow-wrap: anywhere; }
+.versions small { color: var(--ci-faint); font-size: 10px; }
+.versions small:last-child { margin-left: auto; }
+
+/*
+  Motion here would only ever decorate: selecting a row is an instant state change and the
+  panel below reports whether it has finished reading. The colour transition on the row is the
+  single exception, and it goes away when the reader has asked for less movement.
+*/
+.inbox button { transition: color 120ms linear, border-color 120ms linear; }
+@media (prefers-reduced-motion: reduce) {
+  .inbox button, .inspect { transition: none; }
+}

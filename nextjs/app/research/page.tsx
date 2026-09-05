@@ -101,6 +101,7 @@ export default function ResearchPage() {
 
               <div className="actions">
                 <Link className="btn" href={"/research/notes" as Route}>Notes and findings</Link>
+                <Link className="btn ghost" href={"/benchmarks" as Route}>Benchmark protocol</Link>
                 <Link className="btn ghost" href="/evidence">How evidence is bound</Link>
                 <Link className="btn ghost" href={"/reproducibility" as Route}>Reproducibility</Link>
               </div>

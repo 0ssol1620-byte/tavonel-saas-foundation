@@ -27,8 +27,13 @@ import { describe, expect, it } from "vitest";
 
 const SALES_SURFACES = [
   "",
+  "benchmarks",
   "product",
   "product/compiled-world",
+  // `product/continuous-knowledge` stopped being a stub in this campaign: it is in the sitemap,
+  // its own test forbids `index: false` on it, and it is linked from /product. That makes it a
+  // sales surface, and a sales surface that is on no list is a page nobody checks.
+  "product/continuous-knowledge",
   "product/document-understanding",
   "product/knowledge-compiler",
   "solutions/[slug]",
@@ -63,7 +68,7 @@ const EXEMPT = {
   research: "research index",
   "research/notes": "noindex-adjacent research: 13.20 puts failure records here, with context",
   reproducibility: "noindex: 13.19 files it under Resources",
-  benchmarks: "noindex",
+  // `benchmarks` left this list for SALES_SURFACES when it stopped being a noindex 404.
   customers: "noindex",
   "research/experiments": "noindex",
 } as const;

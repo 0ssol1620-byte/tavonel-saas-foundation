@@ -2,26 +2,33 @@
 
 import Link from "next/link";
 import {
-  Activity, Braces, CircleHelp, Command, FileStack, GitCompareArrows, Home, Network, Plug, Search, Settings, Upload, X,
+  Activity, Braces, CircleHelp, Command, FileStack, GitCompareArrows, Home, Inbox, Network, Plug, Search, Settings, Upload, X,
 } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import Logomark from "@/components/logomark";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import styles from "@/app/workspace/workspace-ultimate.module.css";
 
-export type WorkspaceSurface = "home" | "sources" | "runs" | "review" | "world" | "ask" | "connections" | "developer" | "activity" | "settings";
+export type WorkspaceSurface = "home" | "sources" | "runs" | "review" | "changes" | "world" | "ask" | "connections" | "developer" | "activity" | "settings";
 
-type NavItem = { surface: WorkspaceSurface; label: string; icon: typeof Home; shortcut?: string; secondary?: boolean; mobileLabel?: string };
+/*
+  `rail` marks the surfaces the condensed mobile rail shows. It used to be decided by counting
+  positions in CSS (`.nav > div:nth-child(1), (2), (4), (5), :last-child`), so inserting a row
+  anywhere near the top silently pushed the surface that had been fifth off mobile altogether.
+  Naming the five here means a new row changes the rail only when someone says it should.
+*/
+type NavItem = { surface: WorkspaceSurface; label: string; icon: typeof Home; shortcut?: string; secondary?: boolean; mobileLabel?: string; rail?: boolean };
 const NAV_ITEMS: NavItem[] = [
-  { surface: "home", label: "Home", icon: Home, shortcut: "G H" },
-  { surface: "sources", label: "Sources", icon: FileStack, shortcut: "G S" },
+  { surface: "home", label: "Home", icon: Home, shortcut: "G H", rail: true },
+  { surface: "sources", label: "Sources", icon: FileStack, shortcut: "G S", rail: true },
   { surface: "review", label: "Review", icon: GitCompareArrows, shortcut: "G R" },
-  { surface: "world", label: "World", icon: Network, shortcut: "G W" },
-  { surface: "ask", label: "Ask", icon: CircleHelp, shortcut: "G A" },
+  { surface: "changes", label: "Changes", icon: Inbox },
+  { surface: "world", label: "World", icon: Network, shortcut: "G W", rail: true },
+  { surface: "ask", label: "Ask", icon: CircleHelp, shortcut: "G A", rail: true },
   { surface: "connections", label: "Connections", icon: Plug, secondary: true },
   { surface: "developer", label: "Developer", icon: Braces, secondary: true },
   { surface: "activity", label: "Activity", icon: Activity, secondary: true },
-  { surface: "settings", label: "Settings", mobileLabel: "More", icon: Settings, secondary: true },
+  { surface: "settings", label: "Settings", mobileLabel: "More", icon: Settings, secondary: true, rail: true },
 ];
 
 type TruthGate = { label: string; qualified: boolean; detail: string };
@@ -158,7 +165,7 @@ export default function WorkspaceUltimateShell({
             const Icon = item.icon;
             const beginsSecondary = item.secondary && !navItems[index - 1]?.secondary;
             return (
-              <div key={item.surface} className={beginsSecondary ? styles.secondaryStart : undefined}>
+              <div key={item.surface} data-mobile-rail={item.rail ? "" : undefined} className={beginsSecondary ? styles.secondaryStart : undefined}>
                 <button type="button" data-rail-item aria-current={surface === item.surface ? "page" : undefined}
                   className={surface === item.surface ? styles.current : undefined} onClick={() => onNavigate(item.surface)}
                   title={item.shortcut ? `${item.label} (${item.shortcut})` : item.label}>

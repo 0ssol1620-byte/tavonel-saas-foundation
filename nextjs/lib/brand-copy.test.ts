@@ -50,6 +50,9 @@ const COPY_SURFACES = [
   "components/compile-stage.tsx",
   "app/film/page.tsx",
   "app/research/page.tsx",
+  "app/benchmarks/page.tsx",
+  // Most of what /benchmarks says is written in the registry, not in the page that arranges it.
+  "lib/benchmark-registry.ts",
   "app/developers/page.tsx",
   "app/pricing/page.tsx",
   "app/product/page.tsx",
@@ -57,7 +60,40 @@ const COPY_SURFACES = [
   "app/product/document-understanding/page.tsx",
   "app/product/compiled-world/page.tsx",
   "app/product/continuous-knowledge/page.tsx",
+  "lib/compiler-contract.ts",
+  // The drawing is copy, not geometry: ten stage titles, a legend whose stroke weight asserts
+  // what runs in this deployment, and the <desc> paragraph that is the whole of what a screen
+  // reader gets from it. `read` takes a literal path and never follows an import, so a component
+  // the page renders is unguarded until its own row is here.
+  "components/compiler-contract-diagram.tsx",
   "app/enterprise/page.tsx",
+  /*
+    The Explore stage, added at integration rather than by the lane that built it.
+
+    `/explore` was a public route before this campaign and had no row here at all, so the
+    rebuild did not remove a guard -- it inherited a missing one. The rebuild is the moment to
+    fix that, because almost every visible word on the route now lives in `explore-story.ts`
+    and in the six act components, none of which `read` would reach on its own: it takes a
+    literal path and never follows an import. `explore-change.ts` is on the list for one
+    sentence, the equivalence reason the Change Act prints verbatim -- the sentence most likely
+    to be rewritten into a claim later.
+  */
+  "app/explore/page.tsx",
+  "lib/explore-story.ts",
+  "lib/explore-change.ts",
+  "components/explore/explore-stage.tsx",
+  "components/explore/world-act.tsx",
+  "components/explore/evidence-act.tsx",
+  "components/explore/change-act.tsx",
+  "components/explore/ask-overlay.tsx",
+  "components/explore/technical-details.tsx",
+  /*
+    The workspace Change Inbox. `app/workspace/page.tsx` has been on this list since it was
+    written, and the changes surface it now renders puts its own sentences on screen from
+    these two files.
+  */
+  "components/change-inbox.tsx",
+  "lib/change-inbox.ts",
 ];
 
 const BARRED = [

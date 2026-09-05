@@ -1,0 +1,72 @@
+/*
+  The drawing borrows the page's type, hairlines and four state hues rather than bringing a
+  palette of its own, so it reads as part of the record it sits in rather than as an illustration
+  dropped into it. Every size is a user unit on the 980-wide viewBox: one drawing, scaled as a
+  piece, with no separate small-screen version to fall out of step.
+
+  Nothing here transitions or animates, so there is no reduced-motion block to write -- the
+  drawing is already the same for every reader.
+*/
+
+.scroller { width: 100%; overflow-x: auto; }
+.scroller:focus-visible { outline-offset: 4px; }
+
+.diagram { width: 100%; height: auto; max-width: 980px; display: block; }
+
+.eyebrow { fill: var(--verified); font: 11px var(--f-mono); letter-spacing: 0.16em; }
+
+/*
+  The arrows carry the same claim the boxes do, so they are drawn to the same rule.
+
+  A dashed box joined by a solid arrow tells a reader the connection is real and only the box is
+  aspirational, which is the opposite of the truth here: the whole selective route is the
+  contract. One solid edge exists -- the bypass -- and it is the one thing on this drawing that
+  describes a code path this deployment actually takes.
+*/
+.edge { stroke: var(--hairline-hi); fill: none; }
+.edgeDirection { stroke: var(--hairline); stroke-dasharray: 4 3; fill: none; }
+.arrowHead { fill: var(--hairline-hi); }
+.arrowHeadDirection { fill: var(--hairline); }
+
+.bypassLabel text { fill: var(--text-mid); font: 9.5px var(--f-mono); letter-spacing: 0.13em; }
+
+/* -------------------------------------------------------------------- stages */
+
+.frame { fill: var(--g1); stroke: var(--hairline-hi); }
+.title { fill: var(--text-hi); font: 12.5px var(--f-mono); letter-spacing: 0.1em; text-anchor: middle; }
+.detail { fill: var(--text-xlo); font: 10.5px var(--f-mono); letter-spacing: 0.04em; text-anchor: middle; }
+
+/*
+  Dashed is the whole honesty mechanism of this drawing, so it is one rule and not a per-box
+  decision in the markup: a stage the deployment does not execute cannot be drawn solid by
+  writing a different class beside it.
+*/
+.stage[data-state="direction"] .frame { fill: none; stroke: var(--hairline); stroke-dasharray: 4 3; }
+.stage[data-state="direction"] .title { fill: var(--text-lo); }
+
+/*
+  Colour is state, and only these four exist. `reused` is the token for knowledge carried over
+  untouched, which is exactly what the preserved branch is.
+*/
+.stage[data-tone="reused"] .frame { stroke: var(--reused); }
+.stage[data-tone="changed"] .frame { stroke: var(--changed-dim); }
+.stage[data-tone="changed"] .title { fill: var(--changed); }
+.stage[data-tone="verified"] .frame { stroke: var(--verified-dim); }
+.stage[data-tone="verified"] .title { fill: var(--verified); }
+.stage[data-tone="unresolved"] .frame { stroke: var(--unresolved-dim); }
+.stage[data-tone="unresolved"] .title { fill: var(--unresolved); }
+
+/* -------------------------------------------------------------------- legend */
+
+.legend text { fill: var(--text-xlo); font: 9.5px var(--f-mono); letter-spacing: 0.14em; }
+.legendBuilt { stroke: var(--hairline-hi); fill: none; }
+.legendDirection { stroke: var(--hairline); stroke-dasharray: 4 3; fill: none; }
+
+@media (max-width: 900px) {
+  /*
+    Below about 900px the ten labelled boxes render as unreadable grey bars. The drawing keeps a
+    legible width and `.scroller` scrolls it, which is the treatment every other wide thing on
+    this site gets.
+  */
+  .diagram { min-width: 860px; }
+}

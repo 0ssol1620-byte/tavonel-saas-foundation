@@ -1,16 +1,16 @@
 [
   {
-    "documentId": "fp200-maintenance-manual-rev-c",
+    "documentId": "fp200-maintenance-manual",
     "versionKey": "e8772bf183ab5bb284ab5da62870609ebd79b4bf5bec51ed70c68e2fe4ee48e4",
     "sanitizedKey": "public/explore-sample/fp-200-maintenance-manual-revC.pdf",
-    "ocrJsonKey": "public/explore-sample/fp200-maintenance-manual-rev-c/e8772bf183ab5bb284ab5da62870609ebd79b4bf5bec51ed70c68e2fe4ee48e4/text-layer.json",
+    "ocrJsonKey": "public/explore-sample/fp200-maintenance-manual/e8772bf183ab5bb284ab5da62870609ebd79b4bf5bec51ed70c68e2fe4ee48e4/text-layer.json",
     "pageCount": 1,
     "text": "Scheduled maintenance for feedwater pump FP-200, revision C.\nPerform the full service procedure every 2,000 operating hours. This interval replaces the 1,500 hour interval published in revision B.\nBefore replacing the mechanical seal, isolate the unit and fully depressurise the casing. Confirm zero pressure at gauge PG-11 before removing any fastener.\nThe pump is rated for continuous duty at 2.4 MPa discharge pressure, and inspection points are listed in table 12.1.",
     "inputSha256": "sha256:e8772bf183ab5bb284ab5da62870609ebd79b4bf5bec51ed70c68e2fe4ee48e4",
     "sourceImmutableKey": "public/explore-sample/fp-200-maintenance-manual-revC.pdf",
     "regions": [
       {
-        "regionId": "fp200-maintenance-manual-rev-c-p1-r0",
+        "regionId": "fp200-maintenance-manual-p1-r0",
         "pageIndex0": 0,
         "pageNumber1": 1,
         "order": 0,
@@ -26,7 +26,7 @@
         "authority": "official"
       },
       {
-        "regionId": "fp200-maintenance-manual-rev-c-p1-r1",
+        "regionId": "fp200-maintenance-manual-p1-r1",
         "pageIndex0": 0,
         "pageNumber1": 1,
         "order": 1,
@@ -42,7 +42,7 @@
         "authority": "official"
       },
       {
-        "regionId": "fp200-maintenance-manual-rev-c-p1-r2",
+        "regionId": "fp200-maintenance-manual-p1-r2",
         "pageIndex0": 0,
         "pageNumber1": 1,
         "order": 2,
@@ -58,7 +58,7 @@
         "authority": "official"
       },
       {
-        "regionId": "fp200-maintenance-manual-rev-c-p1-r3",
+        "regionId": "fp200-maintenance-manual-p1-r3",
         "pageIndex0": 0,
         "pageNumber1": 1,
         "order": 3,

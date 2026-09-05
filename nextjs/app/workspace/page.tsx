@@ -33,6 +33,7 @@ import ConnectionsPanel from "@/components/connections-panel";
 import DeveloperPanel from "@/components/developer-panel";
 import WorkspaceUltimateShell, { type WorkspaceSurface } from "@/components/workspace-ultimate-shell";
 import WorldStudioUltimate from "@/components/world-studio-ultimate";
+import ChangeInbox from "@/components/change-inbox";
 import OperationsUltimate from "@/components/operations-ultimate";
 import type { WorldReadModel } from "@/lib/world-read-model";
 import { compileLimitsNotice, judgeCompileSet } from "@/lib/compile-limits";
@@ -176,6 +177,7 @@ const SURFACE_TO_TAB: Record<WorkspaceSurface, WorkspaceTab> = {
   sources: "overview",
   runs: "overview",
   review: "knowledge",
+  changes: "knowledge",
   world: "knowledge",
   ask: "knowledge",
   connections: "connections",
@@ -1386,6 +1388,7 @@ export default function WorkspacePage() {
       sources: "workspace-sources",
       runs: "workspace-runs",
       review: "workspace-review",
+      changes: "workspace-changes",
       world: "workspace-world",
       ask: "workspace-ask",
       activity: "workspace-runs",
@@ -2035,6 +2038,14 @@ export default function WorkspacePage() {
                   onUpload={activationPolicy.customerIntake.enabled ? () => fileRef.current?.click() : undefined}
                 />
               </div>
+              ) : null}
+
+              {surface === "changes" ? (
+                <ChangeInbox
+                  model={worldReadModel}
+                  collectionId={collectionResult?.collectionId ?? null}
+                  names={names}
+                />
               ) : null}
               {/*
                 This control was lost when the sidebar buttons became tabs: the handler survived
