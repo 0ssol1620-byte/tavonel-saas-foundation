@@ -9,11 +9,12 @@ Lane contract §29 named `/film-4` as the film route. That route is now `notFoun
 ## Cut 4 (film side)
 
 - Route: `http://127.0.0.1:3136/#s3` → `#compile-stage-tab-world`
-- Hooks used: `window.__filmFreeze = true`, `window.__filmSeek(16.8)` (both confirmed present in `components/opening-film-4.tsx`)
+- Hooks used: `window.__filmFreeze = true`, `window.__filmSeek(16.8)`. Observed on `window` in the running page before the seek: `__filmSeek` → function, `__filmElapsed` → number, `__filmFreeze` → undefined (the film reads that flag in its rAF tick and never defines it, so `undefined` before the capture sets it is the expected observation). The capture refuses when `__filmSeek` is not callable.
+- Seek/freeze verified by frame digest: seeking 3.2s → 16.8s changed the frame (yes: sha256 `5c646fd36dae3209…` → `647e9a8094865a86…`), and the frame did not move over a 350ms hold (yes: `647e9a8094865a86…`). sha256 of a 320x180 downscale of the canvas, taken in-page at the probe beat, at the locked beat, and again after a hold at the locked beat. Within-run change detection only — the digests are renderer-specific and are not a cross-machine baseline.
 - Canvas found: yes
 - Canvas backing store: 2704×1494px (device pixels, DSF 2)
 - Canvas CSS size: 1351.59375×746.796875px
-- Drawn-geometry data exposed on `window`: no — opening-film-4 exposes window.__filmFreeze (bool) and window.__filmSeek(t) for capture, and window.__filmElapsed for the recorder's own clock, but no drawn-geometry data structure (nodes/edges/labels) on window — recording the PNG and canvas backing size only.
+- Drawn-geometry data exposed on `window`: no — opening-film-4 exposes no drawn-geometry data structure (nodes/edges/labels) on window, so this capture records the PNG and the canvas backing size only. Capture hooks as observed in the page: __filmSeek=function, __filmElapsed=number, __filmFreeze=undefined before this script set it (the film reads that flag in its rAF tick and never defines it; typeof after setting it: boolean). The seek and the freeze were verified by frame digest — see seekVerification.
 - Console/page errors during capture: 0
 - Image: `cut4.png`
 
