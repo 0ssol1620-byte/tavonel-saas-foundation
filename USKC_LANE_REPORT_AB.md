@@ -97,7 +97,8 @@ failure mid-chain · tombstoned source refused before any write.
   exist; nothing yet writes one, because the deletion signal (a Drive trash, a customer request)
   is lane F and P2 connector work.
 - **§48 P0-A "existing PDF/Office upload regression 0" is not verifiable locally.** Nothing in the
-  upload, CDR or compile path was touched and all 1,685 existing tests pass, which is the strongest
+  upload, CDR or compile path was touched and all 1,641 pre-existing tests still pass (1,685 total
+  minus the 44 added here), which is the strongest
   statement the repository supports. Migration 0049 has not been applied anywhere — no Supabase
   CLI, no Docker, and applying it is a founder action.
 
