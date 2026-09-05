@@ -1,11 +1,26 @@
 # Release Policy
 
-**Status:** No release has been tagged on this repository yet (`git tag`, `gh api .../releases`,
-and `gh api .../tags` are all empty at time of writing). This document describes the policy this
-repository intends to follow once release management is turned on, and links the exact steps to
-turn it on. Enabling any part of this — protecting `main`, cutting the first tag, publishing a
-release — is a founder decision, not something an agent does unilaterally
-(`CLAUDE.md`, "What is not an agent's call"; lane contract §7).
+**Status:** no release has been tagged or published on this repository yet. Observed read-only
+against `0ssol1620-byte/tavonel-saas-foundation` on 2026-09-05:
+
+```
+$ git ls-remote --tags origin
+(no output)
+$ gh api repos/0ssol1620-byte/tavonel-saas-foundation/tags
+[]
+$ gh api repos/0ssol1620-byte/tavonel-saas-foundation/releases
+[]
+```
+
+The remote tag list is the one that counts here. A local `git tag` in a working clone proves
+nothing about this repository — a clone can hold unpushed local tags, and at least one working
+clone does (two `safety/*` checkpoint tags, never pushed, not releases). Read `git ls-remote
+--tags origin`, not `git tag`, when you want to know what this repository has published.
+
+This document describes the policy this repository intends to follow once release management is
+turned on, and links the exact steps to turn it on. Enabling any part of it — protecting `main`,
+cutting the first tag, publishing a release — is an owner decision. `.github/CODEOWNERS` names the
+owner; a contributor does not do it unilaterally.
 
 ## Versioning
 
@@ -59,7 +74,7 @@ implying either exists until it is wired and tested.
 
 ## Sequence to cut the first tag
 
-Only the founder runs this sequence, and only after the governance steps in
+Only the repository owner runs this sequence, and only after the governance steps in
 [`docs/GITHUB_GOVERNANCE_2026-09-05.md`](docs/GITHUB_GOVERNANCE_2026-09-05.md) are in place, so the
 commit a tag points to has already gone through required status checks and review:
 
