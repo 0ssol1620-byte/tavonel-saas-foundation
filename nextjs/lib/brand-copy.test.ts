@@ -50,6 +50,7 @@ const COPY_SURFACES = [
   "components/compile-stage.tsx",
   "app/film/page.tsx",
   "app/research/page.tsx",
+  "app/benchmarks/page.tsx",
   "app/developers/page.tsx",
   "app/pricing/page.tsx",
   "app/product/page.tsx",

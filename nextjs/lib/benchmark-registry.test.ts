@@ -234,28 +234,15 @@ describe("the committed registry", () => {
 /*
   The page, checked as source.
 
-  Two of these duplicate rules that live in brand-copy.test.ts for the surfaces listed there.
-  `/benchmarks` is a new public copy surface and belongs on that list; adding it is a one-line
-  edit to a file another lane owns in this campaign, so the rule is enforced here in the meantime
-  and the list entry is an integration step. The duplication is deliberate and should be removed
-  when the entry lands, not left as two half-rules.
+  The barred phrases and the readiness overclaims are not repeated here. `app/benchmarks/page.tsx`
+  is on the COPY_SURFACES list in brand-copy.test.ts, which is the one place those two rules are
+  written, and a second copy of a brand rule drifts from the first. What is left below is what
+  only this page can be asked: that it draws its content from the registry, that it shows no
+  table until a record qualifies, and that it hand-types no digit anyone could mistake for a
+  result.
 */
 describe("the /benchmarks page", () => {
   const page = readFileSync(new URL("../app/benchmarks/page.tsx", import.meta.url), "utf8");
-
-  it("keeps every barred phrase out of the copy", () => {
-    const lower = page.toLowerCase();
-    for (const phrase of ["unlock your data", "second brain", "100% accurate", "never hallucinates", "better than rag", "ai brain"]) {
-      expect(lower, `SPEC 13.3 bars "${phrase}"`).not.toContain(phrase);
-    }
-  });
-
-  it("makes no readiness overclaim", () => {
-    const lower = page.toLowerCase();
-    for (const phrase of ["generally available", "production-ready", "fully automated ontology"]) {
-      expect(lower, `"${phrase}" asserts a readiness this deployment has not established`).not.toContain(phrase);
-    }
-  });
 
   it("draws the families and the receipt from the registry rather than retyping them", () => {
     expect(page).toContain("BENCHMARK_FAMILIES.map");
