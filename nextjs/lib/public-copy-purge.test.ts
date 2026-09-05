@@ -64,11 +64,7 @@ const EXEMPT = {
   research: "research index",
   "research/notes": "noindex-adjacent research: 13.20 puts failure records here, with context",
   reproducibility: "noindex: 13.19 files it under Resources",
-  /*
-    `benchmarks` was exempt here as a noindex 404. It is now an indexed page that publishes the
-    Knowledge Compilation Benchmark protocol, so it moved up into SALES_SURFACES and is checked
-    like every other public surface -- which is the point of the exemption list being short.
-  */
+  // `benchmarks` left this list for SALES_SURFACES when it stopped being a noindex 404.
   customers: "noindex",
   "research/experiments": "noindex",
 } as const;

@@ -32,14 +32,8 @@ test("public proof routes expose honest registries and a downloadable manifest",
   expect(world.ok()).toBe(true);
   expect(world.headers()["content-digest"]).toMatch(/^sha-256=:/);
   expect((await world.json()).disclosure).toBe("deterministic_product_sample_not_customer_proof");
-  /*
-    /benchmarks used to be asserted as a 404 beside /research/experiments. It now publishes the
-    benchmark protocol, so what matters is the property that made the 404 right in the first
-    place: the page must not carry a results table while no record qualifies.
-  */
-  const benchmarks = await page.request.get("/benchmarks");
-  expect(benchmarks.status()).toBe(200);
-  expect(await benchmarks.text()).not.toContain("<table");
+  // /benchmarks is a page now, not a 404; e2e/benchmarks.spec.ts holds what it may not contain.
+  expect((await page.request.get("/benchmarks")).status()).toBe(200);
   expect((await page.request.get("/research/experiments")).status()).toBe(404);
 });
 
