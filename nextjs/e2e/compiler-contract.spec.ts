@@ -118,6 +118,32 @@ test("draws the whole source-change flow, and says which half of it runs here", 
     .toContain("FULL RECOMPILE");
 });
 
+/*
+  The /product index it is linked from must not gain an orphan slot because of that link.
+
+  A fourth card in a three-column grid leaves one card beside two empty tracks on row two, which
+  the visual rules bar. This lane added the fourth card, so this lane checks the row.
+*/
+test("leaves no orphan slot in the product surface grid", async ({ page }: { page: Page }) => {
+  await page.goto("/product");
+
+  const layout = await page.evaluate(() => {
+    const grid = document.querySelector(".product-surface-grid");
+    if (!grid) return { columns: 0, cards: 0, rows: [] as number[] };
+    const columns = getComputedStyle(grid).gridTemplateColumns.split(" ").filter(Boolean).length;
+    const rows = [...new Set([...grid.children].map((card) => Math.round(card.getBoundingClientRect().top)))];
+    return { columns, cards: grid.children.length, rows };
+  });
+
+  expect(layout.cards).toBeGreaterThan(0);
+  expect(layout.columns).toBeGreaterThan(0);
+  expect(
+    layout.cards % layout.columns,
+    `${layout.cards} cards in ${layout.columns} columns leaves ${layout.columns - (layout.cards % layout.columns)} empty slot(s)`,
+  ).toBe(0);
+  expect(layout.rows.length).toBe(layout.cards / layout.columns);
+});
+
 test("lists the nine interchange standards without implying all nine are emitted", async ({ page }: { page: Page }) => {
   await page.goto(ROUTE);
 
