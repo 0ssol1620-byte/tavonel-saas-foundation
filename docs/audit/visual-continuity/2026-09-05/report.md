@@ -8,7 +8,7 @@ Lane contract §29 named `/film-4` as the film route. That route is now `notFoun
 
 ## Cut 4 (film side)
 
-- Route: `http://127.0.0.1:3136/#s3` → `#compile-stage-tab-world`
+- Route: `http://127.0.0.1:3140/#s3` → `#compile-stage-tab-world`
 - Hooks used: `window.__filmFreeze = true`, `window.__filmSeek(16.8)`. Observed on `window` in the running page before the seek: `__filmSeek` → function, `__filmElapsed` → number, `__filmFreeze` → undefined (the film reads that flag in its rAF tick and never defines it, so `undefined` before the capture sets it is the expected observation). The capture refuses when `__filmSeek` is not callable.
 - Seek/freeze verified by frame digest: seeking 3.2s → 16.8s changed the frame (yes: sha256 `5c646fd36dae3209…` → `647e9a8094865a86…`), and the frame did not move over a 350ms hold (yes: `647e9a8094865a86…`). sha256 of a 320x180 downscale of the canvas, taken in-page at the probe beat, at the locked beat, and again after a hold at the locked beat. Within-run change detection only — the digests are renderer-specific and are not a cross-machine baseline.
 - Canvas found: yes
@@ -20,14 +20,22 @@ Lane contract §29 named `/film-4` as the film route. That route is now `notFoun
 
 ## Explore stage (world side)
 
-- Status: **pending**
-- Reason: The explore stage root [data-visual-world="explore"] was not found at /explore?act=world. Lane contract §4.2 defines this attribute for the redesigned Explore stage, which the `explore` lane (agent/cl-explore) builds in parallel and had not landed on this branch at capture time. This is expected, not a failure — the screenshot records whatever /explore currently renders on this branch (the pre-redesign page), for reference only; it is not the Interactive Product Film the comparison is meant to check. Re-run this script once the explore lane's markup is merged.
+- Status: **captured**
+- Route: `http://127.0.0.1:3140/explore?act=world`
+- `data-world-act`: `world`
+- Node count: 10 (7–12 band: yes)
+- Edge count: 7
 - Console/page errors during capture: 0
-- Image: `explore.png` (current /explore on this branch, not the redesigned stage — reference only)
+- Image: `explore.png`
 
 ## Comparison
 
-Not yet possible: the explore side has no `[data-visual-world="explore"]` markup on this branch. This is `not_yet`, not a failed comparison — re-run this script after the `explore` lane merges its Interactive Product Film rebuild.
+| Check | Film (cut 4) | Explore | Match |
+|---|---|---|---|
+| Node/composition present | canvas rendered | 10 nodes | yes |
+| Node count in 7–12 band | n/a (canvas has no discrete node list) | 10 | yes |
+| Camera / composition bounds | 1440×900 viewport, canvas fills its column | see `explore.json` `compositionBounds` | manual review |
+| State color | n/a (canvas draws directly, no discrete state attributes) | see `explore.json` node `color`/`backgroundColor` | manual review |
 
 ## Reproduce
 

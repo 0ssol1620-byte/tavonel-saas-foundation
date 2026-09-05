@@ -1,9 +1,260 @@
 {
-  "status": "pending",
-  "reason": "The explore stage root [data-visual-world=\"explore\"] was not found at /explore?act=world. Lane contract §4.2 defines this attribute for the redesigned Explore stage, which the `explore` lane (agent/cl-explore) builds in parallel and had not landed on this branch at capture time. This is expected, not a failure — the screenshot records whatever /explore currently renders on this branch (the pre-redesign page), for reference only; it is not the Interactive Product Film the comparison is meant to check. Re-run this script once the explore lane's markup is merged.",
-  "route": "http://127.0.0.1:3136/explore?act=world",
-  "nodes": [],
-  "edges": [],
-  "compositionBounds": null,
+  "status": "captured",
+  "route": "http://127.0.0.1:3140/explore?act=world",
+  "worldAct": "world",
+  "compositionBounds": {
+    "x": 40,
+    "y": 56,
+    "width": 1360,
+    "height": 830.046875
+  },
+  "nodeCount": 10,
+  "nodeCountInBand": true,
+  "nodes": [
+    {
+      "id": "evidence-e487049cea5f8541bd13baf5c4d05f8f",
+      "kind": "Evidence",
+      "state": "candidate",
+      "label": "SOURCEfp-200-maintenance-manual-revC.pdf4 regions",
+      "bbox": {
+        "x": 304.6328125,
+        "y": 439.578125,
+        "width": 188.796875,
+        "height": 76.25
+      },
+      "color": "rgb(125, 135, 141)",
+      "backgroundColor": "rgb(27, 31, 35)",
+      "borderColor": "rgb(46, 53, 59)"
+    },
+    {
+      "id": "claim-5b6d9401a6c97a8c12fd0ee815ef4e69",
+      "kind": "Claim",
+      "state": "candidate",
+      "label": "CLAIMThis interval replaces the 1,500 hour interval published in revision B.4 regions",
+      "bbox": {
+        "x": 283.8671875,
+        "y": 324.140625,
+        "width": 188.796875,
+        "height": 91.875
+      },
+      "color": "rgb(237, 234, 228)",
+      "backgroundColor": "rgb(20, 23, 26)",
+      "borderColor": "rgb(123, 224, 190)"
+    },
+    {
+      "id": "claim-b35ba378988d3283e516747bfd5224c3",
+      "kind": "Claim",
+      "state": "candidate",
+      "label": "CLAIMBefore replacing the mechanical seal, isolate the unit and fully depressurise the casing.4 regions",
+      "bbox": {
+        "x": 325.3984375,
+        "y": 539.375,
+        "width": 188.796875,
+        "height": 91.875
+      },
+      "color": "rgb(125, 135, 141)",
+      "backgroundColor": "rgb(20, 23, 26)",
+      "borderColor": "rgb(46, 53, 59)"
+    },
+    {
+      "id": "claim-f03c48b245ca13844567ab474b2c24ad",
+      "kind": "Claim",
+      "state": "candidate",
+      "label": "CLAIMPerform the full service procedure every 2,000 operating hours.4 regions",
+      "bbox": {
+        "x": 283.8671875,
+        "y": 216.53125,
+        "width": 188.796875,
+        "height": 91.875
+      },
+      "color": "rgb(125, 135, 141)",
+      "backgroundColor": "rgb(20, 23, 26)",
+      "borderColor": "rgb(46, 53, 59)"
+    },
+    {
+      "id": "evidence-253db1a152b1788f19b60dce1414af42",
+      "kind": "Evidence",
+      "state": "candidate",
+      "label": "SOURCEfp-200-change-notice-CN-2026-03.pdf3 regions",
+      "bbox": {
+        "x": 625.6015625,
+        "y": 415.96875,
+        "width": 188.796875,
+        "height": 76.25
+      },
+      "color": "rgb(125, 135, 141)",
+      "backgroundColor": "rgb(27, 31, 35)",
+      "borderColor": "rgb(46, 53, 59)"
+    },
+    {
+      "id": "claim-1ed914d30f64bf8d86b4120df716caa1",
+      "kind": "Claim",
+      "state": "candidate",
+      "label": "CLAIMRevision B is superseded and must not be used to schedule work on this pump.3 regions",
+      "bbox": {
+        "x": 604.8203125,
+        "y": 300.546875,
+        "width": 188.796875,
+        "height": 91.875
+      },
+      "color": "rgb(125, 135, 141)",
+      "backgroundColor": "rgb(20, 23, 26)",
+      "borderColor": "rgb(46, 53, 59)"
+    },
+    {
+      "id": "claim-2e4c277f4efe2f343857bc83f1e91755",
+      "kind": "Claim",
+      "state": "candidate",
+      "label": "CLAIMThe service interval moves from 1,500 operating hours to 2,000 operating hours with effect from revision C.3 regions",
+      "bbox": {
+        "x": 646.3671875,
+        "y": 515.78125,
+        "width": 188.796875,
+        "height": 91.875
+      },
+      "color": "rgb(125, 135, 141)",
+      "backgroundColor": "rgb(20, 23, 26)",
+      "borderColor": "rgb(46, 53, 59)"
+    },
+    {
+      "id": "evidence-be5242f81e63ee36b58e4f88d60a450c",
+      "kind": "Evidence",
+      "state": "candidate",
+      "label": "SOURCEfp-200-service-log-2026.pdf3 regions",
+      "bbox": {
+        "x": 946.5546875,
+        "y": 393.578125,
+        "width": 188.796875,
+        "height": 60.625
+      },
+      "color": "rgb(125, 135, 141)",
+      "backgroundColor": "rgb(27, 31, 35)",
+      "borderColor": "rgb(46, 53, 59)"
+    },
+    {
+      "id": "claim-38408767f22c376a7543e88d2001eb64",
+      "kind": "Claim",
+      "state": "candidate",
+      "label": "CLAIMThe mechanical seal on FP-200 was replaced on 14 February 2026 after the unit was depressurised.3 regions",
+      "bbox": {
+        "x": 925.7890625,
+        "y": 270.328125,
+        "width": 188.796875,
+        "height": 91.875
+      },
+      "color": "rgb(125, 135, 141)",
+      "backgroundColor": "rgb(20, 23, 26)",
+      "borderColor": "rgb(46, 53, 59)"
+    },
+    {
+      "id": "claim-8fc65ef4d09680dfa1d6b4427caaa0d6",
+      "kind": "Claim",
+      "state": "candidate",
+      "label": "CLAIMThe next full service falls due at 2,000 operating hours from the February visit.3 regions",
+      "bbox": {
+        "x": 967.3203125,
+        "y": 485.5625,
+        "width": 188.796875,
+        "height": 91.875
+      },
+      "color": "rgb(125, 135, 141)",
+      "backgroundColor": "rgb(20, 23, 26)",
+      "borderColor": "rgb(46, 53, 59)"
+    }
+  ],
+  "edges": [
+    {
+      "from": "claim-2e4c277f4efe2f343857bc83f1e91755",
+      "to": "evidence-253db1a152b1788f19b60dce1414af42",
+      "state": "candidate",
+      "bbox": {
+        "x": 720,
+        "y": 454.10400390625,
+        "width": 20.76800537109375,
+        "height": 107.615966796875
+      },
+      "color": "rgb(237, 234, 228)",
+      "borderColor": "rgb(237, 234, 228)"
+    },
+    {
+      "from": "claim-1ed914d30f64bf8d86b4120df716caa1",
+      "to": "evidence-253db1a152b1788f19b60dce1414af42",
+      "state": "candidate",
+      "bbox": {
+        "x": 699.2319946289062,
+        "y": 346.4880065917969,
+        "width": 20.76800537109375,
+        "height": 107.61599731445312
+      },
+      "color": "rgb(237, 234, 228)",
+      "borderColor": "rgb(237, 234, 228)"
+    },
+    {
+      "from": "claim-f03c48b245ca13844567ab474b2c24ad",
+      "to": "evidence-e487049cea5f8541bd13baf5c4d05f8f",
+      "state": "candidate",
+      "bbox": {
+        "x": 378.2720031738281,
+        "y": 262.47198486328125,
+        "width": 20.767974853515625,
+        "height": 215.23202514648438
+      },
+      "color": "rgb(237, 234, 228)",
+      "borderColor": "rgb(237, 234, 228)"
+    },
+    {
+      "from": "claim-5b6d9401a6c97a8c12fd0ee815ef4e69",
+      "to": "evidence-e487049cea5f8541bd13baf5c4d05f8f",
+      "state": "candidate",
+      "bbox": {
+        "x": 378.2720031738281,
+        "y": 370.0880126953125,
+        "width": 20.767974853515625,
+        "height": 107.61599731445312
+      },
+      "color": "rgb(237, 234, 228)",
+      "borderColor": "rgb(237, 234, 228)"
+    },
+    {
+      "from": "claim-b35ba378988d3283e516747bfd5224c3",
+      "to": "evidence-e487049cea5f8541bd13baf5c4d05f8f",
+      "state": "candidate",
+      "bbox": {
+        "x": 399.03997802734375,
+        "y": 477.7040100097656,
+        "width": 20.76800537109375,
+        "height": 107.61599731445312
+      },
+      "color": "rgb(237, 234, 228)",
+      "borderColor": "rgb(237, 234, 228)"
+    },
+    {
+      "from": "claim-38408767f22c376a7543e88d2001eb64",
+      "to": "evidence-be5242f81e63ee36b58e4f88d60a450c",
+      "state": "candidate",
+      "bbox": {
+        "x": 1020.1920166015625,
+        "y": 316.2799987792969,
+        "width": 20.7679443359375,
+        "height": 107.61599731445312
+      },
+      "color": "rgb(237, 234, 228)",
+      "borderColor": "rgb(237, 234, 228)"
+    },
+    {
+      "from": "claim-8fc65ef4d09680dfa1d6b4427caaa0d6",
+      "to": "evidence-be5242f81e63ee36b58e4f88d60a450c",
+      "state": "candidate",
+      "bbox": {
+        "x": 1040.9599609375,
+        "y": 423.89599609375,
+        "width": 20.76806640625,
+        "height": 107.615966796875
+      },
+      "color": "rgb(237, 234, 228)",
+      "borderColor": "rgb(237, 234, 228)"
+    }
+  ],
+  "unknownStates": [],
   "errors": []
 }
