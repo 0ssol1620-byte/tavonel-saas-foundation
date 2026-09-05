@@ -107,9 +107,9 @@ export const CONTRACT_CLAUSES: readonly ContractClause[] = [
     name: "Typed dependencies",
     promise: "The edges between knowledge units are typed and carry their own evidence.",
     body:
-      "A source region supports a claim, a claim supports a relation, a relation is projected into a retrieval unit, and a retrieval unit is what an answer is built from. Each edge is typed rather than implied by co-occurrence, and each carries the evidence that justifies it. A retrieval unit with no evidence bound to it is rejected before it can enter an answer's context, which is the check that makes the chain load-bearing instead of decorative.",
+      "Three relation types leave the compiler, and every one of them is typed and carries the evidence ids that justify it: a document discusses_topic, a document mentions_entity, and a claim is supported_by the evidence for one exact document version. They are written as graph/relationships.csv under the header id, subject_id, predicate, object_id, evidence_ids, so a relation naming no evidence is not a row this emitter can produce. Two of the three are heuristics rather than read semantics: the topic edge comes from a small set of keyword rules and the entity edge from a capitalised-token scan, both run across the whole document text, which makes those two document-level co-occurrence — said here rather than left for a reader to assume that a typed edge means a read one. A retrieval unit names the claims and entities found inside its own region, and the gate in front of retrieval rejects a unit with nothing bound to it; the unit carries no relation id. Justifying a relation by the claim it rests on, and projecting a relation into the retrieval unit an answer is built from, are the two rungs this deployment does not build.",
     state: "demonstrated",
-    evidence: "lib/world-gate.ts (NO_EVIDENCE_BOUND), graph/relationships.csv in every compiled package",
+    evidence: "lib/collection-compiler.ts (three edge types, each carrying evidenceIds, emitted to graph/relationships.csv), lib/world-gate.ts (NO_EVIDENCE_BOUND)",
   },
   {
     id: "temporal-integrity",

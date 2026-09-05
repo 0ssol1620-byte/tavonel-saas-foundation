@@ -163,6 +163,55 @@ describe("compiler contract clauses", () => {
   });
 
   /*
+    The dependency clause has to describe the graph the compiler writes, not the one it wants.
+
+    This is the same defect the test above catches on clause 01, found a second time on clause 03:
+    the blueprint's ladder -- region supports claim, claim supports relation, relation projected
+    into a retrieval unit -- was pasted verbatim into a clause graded DEMONSTRATED. Three of those
+    rungs are absent from the emitter, and the sentence "typed rather than implied by
+    co-occurrence" inverted what two of the three edge types actually are. Clause 01 was pinned
+    and clause 03 was not, which is exactly why it survived a round of review, so it is pinned
+    here in both directions: the edges the compiler emits, and the words the clause may not use.
+  */
+  it("describes only the dependency edges the compiler actually emits", () => {
+    const compiler = read("./collection-compiler.ts");
+    // The entire edge vocabulary. A fourth type means the clause is re-derived, not extended.
+    expect(compiler).toContain('type: "discusses_topic" | "mentions_entity" | "supported_by";');
+    // The one claim edge runs claim -> evidence, and that evidence is a whole document version.
+    expect(compiler).toContain('type: "supported_by"');
+    expect(compiler).toContain("from: claimId");
+    expect(compiler).toContain("to: evidenceId");
+    expect(compiler).toContain('const evidenceId = stableId("evidence", input.documentId, input.versionKey)');
+    // Both document edges are derived from the whole document text, which is co-occurrence.
+    expect(compiler).toContain("const text = normalizeText(input.text);");
+    expect(compiler).toContain("for (const topic of topicsFor(text))");
+    expect(compiler).toContain("for (const entity of entitiesFor(text))");
+    // The header the clause quotes, taken from the emitter rather than retyped.
+    expect(compiler).toContain('"id,subject_id,predicate,object_id,evidence_ids"');
+    // A retrieval unit carries claims and entities and no relation of any kind.
+    const chunkType = /export type GroundedChunk = \{[\s\S]*?\n\};/.exec(read("./grounded-ask.ts"))?.[0];
+    expect(chunkType, "GroundedChunk is no longer a type literal this test can read").toBeTruthy();
+    expect(chunkType!).toContain("claimIds: string[]");
+    expect(chunkType!.toLowerCase(), "a retrieval unit now carries a relation; the clause may say so")
+      .not.toContain("relation");
+    expect(read("./world-gate.ts")).toContain('reason: "NO_EVIDENCE_BOUND"');
+
+    const body = clause("typed-dependencies").body.toLowerCase();
+    for (const absent of [
+      "a claim supports a relation",
+      "a relation is projected into a retrieval unit",
+      "rather than implied by co-occurrence",
+    ]) {
+      expect(body, `the dependency clause claims "${absent}", which the compiler does not do`)
+        .not.toContain(absent);
+    }
+    for (const named of ["discusses_topic", "mentions_entity", "supported_by", "co-occurrence"]) {
+      expect(body, `the dependency clause no longer names "${named}", which the test above pins`)
+        .toContain(named);
+    }
+  });
+
+  /*
     The package validator is an offline check, and the clause has to keep saying so.
 
     `validateCompiledWorldPackage` is imported by exactly one module -- its own test -- and is
