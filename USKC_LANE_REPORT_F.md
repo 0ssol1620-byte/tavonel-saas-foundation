@@ -22,7 +22,9 @@ Branch `agent/uskc-f-customer-data-gate`, four commits on top of `4c18e86`:
 | `5d2c338` | Name a security suite, and write down what it does not prove |
 | `fc3b349` | Report lane F: gates, failure paths, conflicts and founder decisions |
 
-Pushed SHA: `fc3b349c6eccd36ab5d29cb380b6eb23671a676f`.
+Pushed SHA of the last code commit: `fc3b349c6eccd36ab5d29cb380b6eb23671a676f`. One further commit
+after it fills this line in, so the branch head is later than the SHA written here — a file cannot
+contain the digest of the commit that adds it. The head SHA is in the returned structured object.
 Preview deployment auto-created; not verified — the Vercel MCP was not consulted from this lane.
 
 ## 2. Files
