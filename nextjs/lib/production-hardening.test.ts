@@ -73,6 +73,14 @@ describe("2026-09-05 production hardening", () => {
     expect(css).toContain(".landing-page .scene.film { min-height: 100svh");
   });
 
+  it("centres the wide compile film instead of pushing it beyond the viewport", () => {
+    const css = read("app/ux-120-final.css");
+    expect(css).toContain("--compile-film-width: min(94vw, 1580px)");
+    expect(css).toContain("calc((100% - var(--compile-film-width)) / 2)");
+    expect(css).not.toContain("min(94vw, 1580px)) / 2 * -1");
+    expect(css).toContain("--compile-film-width: min(94vw, 1700px)");
+  });
+
   it("does not sell collaboration that has not shipped", () => {
     const catalog = read("lib/billing-catalog.ts");
     expect(catalog).not.toContain("Shared workspace onboarding");
