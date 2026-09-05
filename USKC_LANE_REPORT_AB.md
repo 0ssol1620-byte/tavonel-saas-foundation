@@ -8,7 +8,9 @@ Worktree `D:\CodexProjects\uskc-lanes\site-ab-source-domain` · base `4c18e86`
 ## 1. Branch and pushed SHA
 
 Branch: `agent/uskc-ab-source-domain`
-Pushed SHA: `9c8f7a1a55a03cbe14a04d0e73b21e2b8d54b52e`
+Pushed SHA: `30fade8ec6d8db740c2c581e512e005e339dbb61` — the commit carrying the whole lane and the
+first version of this report. Writing this line down is itself a commit, so the branch head is one
+commit later; the campaign's structured record carries the final SHA.
 
 Production deploy 안 함. Git push로 Preview deployment는 자동 생성됨. The preview was **not**
 verified through the Vercel MCP.
@@ -16,7 +18,7 @@ verified through the Vercel MCP.
 Commits (`git log --oneline origin/main..HEAD`):
 
 ```
-9c8f7a1 Report lane AB
+30fade8 Report lane AB
 5cb620a Add the source ledger table, store and migration 0049
 6d183c0 Define Source, SourceVersion and SourceRepresentation with their invariants
 8a48762 Carry the frozen USKC contract-v1 vocabularies
