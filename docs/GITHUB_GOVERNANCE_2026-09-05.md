@@ -1,11 +1,11 @@
 # GitHub Governance — commands to enable, not yet run
 
-**Status:** none of this is enabled. Verified read-only against the live repository at time of
-writing:
+**Status:** none of this is enabled. Observed read-only against the live repository on
+2026-09-05:
 
 ```
 $ gh api repos/0ssol1620-byte/tavonel-saas-foundation/branches/main/protection
-{"message":"Branch not protected", ... "status":"404"}
+{"message":"Branch not protected","documentation_url":"https://docs.github.com/rest/branches/branch-protection#get-branch-protection","status":"404"}
 $ gh api repos/0ssol1620-byte/tavonel-saas-foundation/releases
 []
 $ gh api repos/0ssol1620-byte/tavonel-saas-foundation/tags
@@ -53,8 +53,8 @@ Two things in that list are easy to get wrong, and both are merge-blocking if yo
   on a PR is a permanent merge block.
 
 `Launch gate` is the aggregate job that fails unless every browser leg and the Lighthouse job
-succeeded, so requiring it instead of the four individual legs is a defensible simplification —
-but require one shape or the other, not a mix you have not re-read.
+succeeded, so requiring it instead of the three `Browser QA` legs plus `Lighthouse budgets` is a
+defensible simplification — but require one shape or the other, not a mix you have not re-read.
 
 Re-run the `check-runs` command above against the current `main` immediately before enabling.
 The observation is pinned to one commit on one date; a workflow or job rename changes the string,
