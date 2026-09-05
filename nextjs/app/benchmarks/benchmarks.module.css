@@ -1,0 +1,232 @@
+/*
+  Local to /benchmarks. Everything here is built from the tokens in app/tavonel.css -- no new
+  colour is invented, and the only hue on the page is the one state colour that marks the two
+  places a reader is being told something about state rather than about structure.
+
+  The three shapes this page needs and the shared stylesheet does not already have: a definition
+  list where the term is an instrument label (the receipt), a panel for a metric that is defined
+  and not yet measured (the north star), and a results table that only exists when there is a
+  result. Everything else reuses .tiles, .chain and .slate.
+*/
+
+/* The state line. One rule, one ground step -- the same depth vocabulary as every panel. */
+.state {
+  margin: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--hairline-hi);
+  /* --unresolved, because that is what the state is: the question is open, nothing regressed. */
+  border-left: 2px solid var(--unresolved);
+  background: var(--g1);
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--text-mid);
+  max-width: 76ch;
+}
+.state b {
+  color: var(--text-hi);
+  font-weight: 500;
+}
+
+/*
+  Body copy under a section heading. Not .lede: the page has one lede, at the top, and reusing
+  that voice four times down the page turns every section into another introduction.
+*/
+.para {
+  margin: 0;
+  max-width: 72ch;
+  font-size: 13.5px;
+  line-height: 1.66;
+  color: var(--text-mid);
+}
+
+/* A section heading that reads as an instrument label. Pairs with the global .slate. */
+.sectionTitle {
+  font-variation-settings: "wght" 500;
+  text-wrap: initial;
+}
+
+/*
+  The metric names inside a family tile: taxonomy, not readings.
+
+  `margin-top: auto` pushes the strip to the foot of the tile, so the two tiles in a row line
+  their rules up with each other however long their definitions run.
+*/
+.taxonomy {
+  margin: auto 0 0;
+  padding-top: 11px;
+  border-top: 1px solid var(--hairline);
+  font-family: var(--f-mono);
+  font-size: 10px;
+  line-height: 1.75;
+  letter-spacing: 0.04em;
+  color: var(--text-xlo);
+}
+
+/* ---------------------------------------------------------------- receipt */
+
+.receipt {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  background: var(--hairline);
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.receiptRow {
+  display: grid;
+  grid-template-columns: minmax(0, 216px) minmax(0, 1fr);
+  gap: 6px 22px;
+  padding: 12px 18px;
+  background: var(--g1);
+  align-items: baseline;
+}
+.receiptRow dt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text-lo);
+}
+/* What the field has to be, beside the field's name. Not decoration: it is the check. */
+.receiptRow dt em {
+  font-style: normal;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--decor);
+}
+.receiptRow dd {
+  margin: 0;
+  min-width: 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-lo);
+}
+
+@media (max-width: 720px) {
+  .receiptRow {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 5px;
+  }
+}
+
+/* ---------------------------------------------------------------- north star */
+
+.north {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 20px;
+  border: 1px solid var(--hairline-hi);
+  background: var(--g1);
+  border-radius: 4px;
+}
+.north h3 {
+  font-size: 21px;
+  letter-spacing: -0.018em;
+  font-variation-settings: "wght" 580;
+}
+.north p {
+  margin: 0;
+  max-width: 68ch;
+  font-size: 13.5px;
+  line-height: 1.66;
+  color: var(--text-mid);
+}
+.northMark {
+  margin: 0;
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-xlo);
+}
+.supporting {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.supporting li {
+  padding: 4px 9px;
+  border: 1px solid var(--hairline-hi);
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-xlo);
+}
+
+/* ---------------------------------------------------------------- results */
+
+/*
+  Rendered only when a record validates. There is no empty state here on purpose: an empty
+  bordered table is a page about an absence, and the absence is already stated once, above,
+  in a sentence a person can read.
+*/
+.resultsScroll {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+}
+.results {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.results caption {
+  padding: 12px 16px;
+  text-align: left;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-xlo);
+  border-bottom: 1px solid var(--hairline);
+}
+.results th,
+.results td {
+  padding: 10px 16px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--hairline);
+  white-space: nowrap;
+}
+.results thead th {
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 400;
+  color: var(--text-xlo);
+}
+.results tbody th {
+  font-weight: 500;
+  color: var(--text-hi);
+}
+.results td {
+  color: var(--text-lo);
+}
+.results td.value {
+  color: var(--text-hi);
+  font-family: var(--f-mono);
+}
+.results tbody tr:last-child th,
+.results tbody tr:last-child td {
+  border-bottom: 0;
+}
+.results td.denominator {
+  white-space: normal;
+  min-width: 22ch;
+}
