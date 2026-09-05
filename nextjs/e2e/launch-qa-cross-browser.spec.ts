@@ -119,6 +119,7 @@ test("ships launch security headers in every browser engine", async ({ request }
   const response = await request.get("/");
   expect(response.status()).toBe(200);
   expect(response.headers()["content-security-policy"]).toContain("frame-ancestors 'none'");
+  expect(response.headers()["content-security-policy"]).toContain("upgrade-insecure-requests");
   expect(response.headers()["x-content-type-options"]).toBe("nosniff");
   expect(response.headers()["x-frame-options"]).toBe("DENY");
   expect(response.headers()["referrer-policy"]).toBe("strict-origin-when-cross-origin");

@@ -19,6 +19,7 @@ const testPort = Number(process.env.PLAYWRIGHT_PORT ?? "3117");
 const externalBaseUrl = process.env.PLAYWRIGHT_BASE_URL?.trim();
 const testBaseUrl = externalBaseUrl || `http://127.0.0.1:${testPort}`;
 const usesExternalServer = Boolean(externalBaseUrl) || process.env.PLAYWRIGHT_EXTERNAL_SERVER === "1";
+const localHttpBaseUrl = /^http:\/\/(?:127\.0\.0\.1|localhost)(?::|\/|$)/.test(testBaseUrl);
 
 export default defineConfig({
   testDir: "./e2e",
@@ -52,6 +53,13 @@ export default defineConfig({
       use: {
         browserName,
         viewport: { width: 1440, height: 900 },
+        // WebKit applies `upgrade-insecure-requests` to localhost subresources and therefore
+        // tries to fetch the local HTTP server's CSS/JS over HTTPS. There is intentionally no
+        // TLS listener in the built-in Playwright server, so the page becomes unstyled even
+        // though the response carries the exact production CSP. Bypass enforcement only for
+        // this local WebKit rendering context; external Preview/Production HTTPS runs enforce
+        // CSP normally, and the launch header test below still validates the shipped policy.
+        bypassCSP: browserName === "webkit" && localHttpBaseUrl,
       },
     })),
   ],
