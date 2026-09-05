@@ -57,6 +57,7 @@ const COPY_SURFACES = [
   "app/product/document-understanding/page.tsx",
   "app/product/compiled-world/page.tsx",
   "app/product/continuous-knowledge/page.tsx",
+  "lib/compiler-contract.ts",
   "app/enterprise/page.tsx",
 ];
 
