@@ -249,8 +249,9 @@ test("Changes is reachable from the workspace rail and by keyboard", async ({ pa
   const changes = rail.getByRole("button", { name: "Changes", exact: true });
   await expect(changes).toBeVisible();
 
-  // The rail moves focus with the arrow keys; the new row has to take part in that.
-  await rail.getByRole("button", { name: "Ask", exact: true }).focus();
+  // The rail moves focus with the arrow keys; the new row has to take part in that. Changes
+  // follows Review, so one step down from Review has to land on it.
+  await rail.getByRole("button", { name: "Review", exact: true }).focus();
   await page.keyboard.press("ArrowDown");
   await expect(changes).toBeFocused();
   await page.keyboard.press("Enter");
@@ -268,6 +269,15 @@ test("mobile Changes stacks the inbox above the impact it opens", async ({ page 
 
   const surface = page.locator("#workspace-changes");
   await expect(page.getByRole("heading", { name: "What changed, and what it changed." })).toBeVisible();
+
+  // Adding Changes next to Review must not change who gets one of the five mobile rail slots.
+  const rail = page.getByRole("complementary", { name: "Workspace navigation" });
+  await expect(rail.locator("button[data-rail-item]:visible")).toHaveCount(5);
+  for (const label of ["Home", "Sources", "World", "Ask"]) {
+    await expect(rail.getByRole("button", { name: label, exact: true })).toBeVisible();
+  }
+  await expect(rail.getByRole("button", { name: "Changes", exact: true })).toBeHidden();
+
   const record = surface.getByRole("button", { name: /world-revision-b.*world-revision-c/s });
   const inspect = surface.getByRole("button", { name: "Inspect impact" });
   const recordBox = await record.boundingBox();

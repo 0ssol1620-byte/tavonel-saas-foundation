@@ -287,22 +287,26 @@ describe("where the Change Inbox is wired", () => {
   const shell = readFileSync(new URL("../components/workspace-ultimate-shell.tsx", import.meta.url), "utf8");
   const workspace = readFileSync(new URL("../app/workspace/page.tsx", import.meta.url), "utf8");
   const inbox = readFileSync(new URL("../components/change-inbox.tsx", import.meta.url), "utf8");
+  const railCss = readFileSync(new URL("../app/workspace/workspace-ultimate.module.css", import.meta.url), "utf8");
+  const navRows = [...shell.matchAll(/\{ surface: "(\w+)"/g)].map((match) => match[1]);
 
-  it("is a primary workspace surface, ahead of the secondary group", () => {
+  it("sits immediately after Review in the rail, and ahead of the secondary group", () => {
     expect(shell).toContain(`{ surface: "changes", label: "Changes"`);
-    expect(shell.indexOf(`surface: "changes"`)).toBeGreaterThan(shell.indexOf(`surface: "review"`));
-    expect(shell.indexOf(`surface: "changes"`)).toBeLessThan(shell.indexOf(`surface: "connections"`));
+    expect(navRows.indexOf("changes")).toBe(navRows.indexOf("review") + 1);
+    expect(navRows.indexOf("changes")).toBeLessThan(navRows.indexOf("connections"));
   });
 
-  it("does not push a primary surface off the five-slot mobile rail", () => {
+  it("leaves the five mobile rail surfaces exactly as they were", () => {
     /*
-      The mobile rail fills five fixed columns by position. A new row inserted before World
-      silently drops Ask from the rail, so the position of this row is load-bearing until the
-      slot list stops being positional.
+      The rail used to be filled by counting positions in CSS, so a row inserted before World
+      silently dropped Ask from mobile. The five are named now; this pins them so that adding a
+      surface still cannot evict one by accident.
     */
-    const rows = [...shell.matchAll(/\{ surface: "(\w+)"/g)].map((match) => match[1]);
-    const mobile = [rows[0], rows[1], rows[3], rows[4], rows[rows.length - 1]];
-    expect(mobile).toEqual(["home", "sources", "world", "ask", "settings"]);
+    const rail = [...shell.matchAll(/\{ surface: "(\w+)"[^\n]*\brail: true/g)].map((match) => match[1]);
+    expect(rail).toEqual(["home", "sources", "world", "ask", "settings"]);
+    expect(shell).toContain(`data-mobile-rail={item.rail ? "" : undefined}`);
+    expect(railCss).toContain(".nav > div[data-mobile-rail] { display: block; }");
+    expect(railCss).not.toMatch(/\.nav > div:nth-child/);
   });
 
   it("is rendered from the workspace page with the loaded World and its collection", () => {
