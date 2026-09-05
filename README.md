@@ -6,9 +6,10 @@ TAVONEL compiles fragmented organizational documents into a Compiled World: a ve
 evidence-bound knowledge structure that an AI system can query, cite and trust — instead of a
 pile of chunks a vector search happens to return. This repository is the Product Platform: the
 public website, the signed-in workspace, auth, billing and the connector/upload control plane.
-The compiler itself (identity, semantic diff, dependency graph, recompilation, equivalence) lives
-in a separate Core Engine repository and is treated here as a boundary this platform calls, never
-as code this platform reimplements. See [Architecture](#architecture).
+The compiler's design boundary (identity, semantic diff, dependency graph, recompilation,
+equivalence) is owned by a separate Core Engine repository — but which of that boundary this
+repository actually calls, versus runs itself, depends on which compile path a deployment has
+configured. See [Architecture](#architecture) for exactly which path does what.
 
 This README describes what the code in this repository actually does, as of the commit it ships
 with. Where a capability is designed but not yet live in this deployment, it is labelled
@@ -33,14 +34,46 @@ interoperable output — not any single piece of it.
 
 ## Architecture
 
-Two canonical authorities, kept deliberately separate because compiler semantics and product/
-control-plane concerns have different release, security and scaling boundaries (full statement in
+Two canonical authorities are the intended design boundary, kept deliberately separate because
+compiler semantics and product/control-plane concerns have different release, security and
+scaling boundaries (full statement in
 [`docs/CANONICAL_RESPONSIBILITY.md`](docs/CANONICAL_RESPONSIBILITY.md)):
 
 | Authority | Repository | Owns |
 |---|---|---|
 | **Core Engine** | `ai-knowledge-compiler` | CIR/Knowledge IR, parser and evidence contracts, stable identity, semantic/structural/temporal diff, typed dependency graph, impact analysis, selective recompilation, full-rebuild equivalence, world validation |
 | **Product Platform** | *this repository* | Next.js product and marketing site, auth/workspaces/tenants, billing/credits/entitlements, upload and connector control plane, candidate persistence, active-world pointer, public API/MCP |
+
+That table is the target boundary. What the committed code in this repository actually calls for
+a compile is narrower, and it depends on which of two paths a deployment has configured
+(`nextjs/lib/collection-compile-run.ts` lines 60-62, `if (coreV2) { … } else if (coreV1) { … }`):
+
+- **`FOUNDATION_CORE_V2_URL` configured** — `dispatchProductCoreV2`
+  (`nextjs/lib/core-runtime-v2.ts`) makes an HMAC-signed HTTP call to that URL and relays back the
+  artifact and receipt it returns, including its `equivalence` field (line 104: `"passed" |
+  "failed" | "not_run"`). This is the path the table above describes: a genuinely separate Core
+  service this repository does not contain.
+- **`FOUNDATION_CORE_V2_URL` unset** — `collection-compile-run.ts` falls back to
+  `readCoreRuntimeEnv` / `dispatchCoreCompile` (`nextjs/lib/core-runtime.ts`), which HTTP-calls
+  `FOUNDATION_CORE_URL/v1/compile`. On this repository's own `core-runtime/vercel.json`, that exact
+  route (`POST /v1/compile`) is served by `core-runtime/api/compile.ts` — whose own second import
+  line pulls `compileCollectionCandidate` straight from `nextjs/lib/collection-compiler.ts`, the
+  same TypeScript compiler that builds the `/explore` sample and that the Compiler Contract table
+  below names as the thing that keys entity identity. The result is labelled `runtime:
+  "tavonel-foundation-core-deterministic-v1"` (`core-runtime.ts` line 17) — the exact string
+  `nextjs/lib/explore-sample.test.ts` (line 88) refuses to attach to the sample, on the stated
+  ground that it "would be a Core execution claim with no Core execution behind it." So on this
+  fallback path, the "Core worker" the platform calls is this repository's own compiler, deployed
+  as a second Vercel function rather than reached as a separate service.
+- **Diff, on either path** — `nextjs/lib/world-version-diff.ts` computes the structural diff
+  between two compiled World read models entirely in this repository; it is not a call to either
+  Core path.
+- **What stays outside this repository on both paths** — dependency-graph impact analysis, and the
+  *computation* of full-rebuild equivalence: `core-runtime-v2.ts` only relays an `equivalence`
+  value an external response already produced; nothing committed here computes one. The
+  `CANDIDATE → ACTIVE` promotion decision is also Product-only, made after checking manifest
+  digest, validation receipt, equivalence status and an explicit promotion policy; Core cannot
+  mutate Product's databases or active-world pointer on either path.
 
 Inside this repository, two application surfaces exist side by side, at different stages of the
 same convergence (`docs/REPO_CONVERGENCE_MATRIX.md`, `docs/PRODUCT_CONVERGENCE_AUDIT_2026-08-28.md`):
@@ -60,12 +93,6 @@ Supporting services: `workers/` (OCR dispatch, CPU and GPU), `quarantine-sidecar
 services), `retrieval-runtime/` (a Python retrieval service), `supabase/` (schema migrations and
 RLS policy tests). None of these accept customer document bytes without the quarantine and
 admission checks described in `docs/CANONICAL_RESPONSIBILITY.md`.
-
-The Product Platform never reimplements identity, diff, dependency or equivalence logic locally —
-it sends a versioned `CompileJobEnvelope` to the Core worker and persists back a `CompileReceipt`
-and `DerivedArtifactManifest`. Core cannot mutate Product's databases or active-world pointer;
-only Product performs the tenant-scoped `CANDIDATE → ACTIVE` promotion, and only after checking
-manifest digest, validation receipt, equivalence status and an explicit promotion policy.
 
 ## Compiler Contract
 
@@ -143,10 +170,12 @@ decided, when, and on what — nothing beyond that. Detail: `/evidence`.
 Stable semantic identity — deciding that a mention in one document and a mention in another are
 the same real-world thing — is treated as the hardest part of compilation, not a solved
 preprocessing step: merge too eagerly and the world is wrong, merge too little and it is useless.
-The identity, semantic-diff and dependency logic this depends on is Protected Core in the Core
-Engine repository; this Product Platform calls it through the compile envelope and never
-reimplements it locally. See `/research` ("Semantic identity") for the open problem as currently
-described to the public.
+Whether that keying runs as a call to a separate Core Engine service or as this repository's own
+`nextjs/lib/collection-compiler.ts` depends on which compile path a deployment has configured —
+see [Architecture](#architecture) for exactly which. Neither path resolves *different* surface
+forms to one identity today; what `collection-compiler.ts` actually does is measured and named as
+a limit in the Compiler Contract table above ("Stable semantic identity"). See `/research`
+("Semantic identity") for the open problem as currently described to the public.
 
 ## Temporal Integrity
 
@@ -281,8 +310,21 @@ See [`RELEASE_POLICY.md`](RELEASE_POLICY.md).
 
 ## License
 
-This repository currently publishes **no LICENSE file** — all rights reserved by default under
-applicable copyright law. Reading this code, including the parts that are public, does not grant
-a right to copy, modify, redistribute or commercially reuse it. Whether and under what terms to
-license any part of TAVONEL is an owner decision that has not been made
-(`.github/CODEOWNERS`); do not add a LICENSE file to this repository until it is.
+Two facts about this repository's licensing disagree, and this section states both rather than
+resolving one in the other's favor:
+
+1. **No LICENSE file is published.** `git ls-files | grep -i '^LICENSE'` returns nothing, in this
+   repository and on the public GitHub mirror. Absent a LICENSE file, the default under copyright
+   law is all rights reserved — reading this code, including the parts that are public, would not
+   by itself grant a right to copy, modify, redistribute or commercially reuse it.
+2. **The repository's own tracked root `package.json` declares `"license": "MIT"`** (line 5) — a
+   permissive grant, committed on `origin/main` and shipped with every clone, every
+   `npm install`/`pnpm install`, and every dependency-graph or license scanner that reads this
+   repository (this repository is public: `visibility: public`).
+
+Those are not the same claim, and a visitor who checks only one of them will reach the wrong
+answer about the other. This file does not pick a side: whether the correct fix is to add a
+LICENSE file that matches `package.json`, to correct `package.json` to have no declared license,
+or to publish a different license entirely, is an owner decision that has not been made
+(`.github/CODEOWNERS`). Do not add a LICENSE file and do not edit `package.json` to resolve this
+disagreement until that decision is made.
