@@ -14,6 +14,7 @@ import Logomark from "@/components/logomark";
 import MobilePrimaryNav from "@/components/mobile-primary-nav";
 import WorldField, { type WorldMode } from "@/components/world-field";
 import { trackFunnel, trackSceneDepth } from "@/lib/funnel-events";
+import { sourceFamilyChips } from "@/lib/qualified-input";
 import { FOOTER_GROUPS, PRIMARY_NAV } from "@/lib/site-navigation";
 import { useScrollProgress, useScrollScenes } from "@/lib/use-scroll-scenes";
 
@@ -207,17 +208,24 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
         <Scene id={2} band="structure" eyebrow="INPUT" title="Bring the knowledge you already have.">
           <p className="lede rv">Upload files, folders or ZIP archives, or connect the system where your knowledge already lives.</p>
           {/*
-            Named formats, not a category.
+            Named formats, not a category, and named by the manifest rather than by this file.
 
             "Office documents" reads as every Office file ever made, and the intake whitelist is
             narrower: DOCX, XLSX, PPTX and the OpenDocument equivalents, but not legacy
             DOC/XLS/PPT. Naming the extensions is the difference between a promise and a
-            rejection at upload. ZIP is listed as a container, because that is what it is.
+            rejection at upload -- which is why the format chips are now derived from the
+            Capability Manifest, the same list the server validates against and /sources
+            publishes. A format this page offers is a format the upload route accepts, by
+            construction rather than by remembering to edit two files.
+
+            The connectors after them are still written here: they are not source formats, and
+            the manifest is scoped to MIME types. ZIP appears because the browser expands it,
+            and /sources says what that means.
           */}
           <ul className="input-formats rv" aria-label="Supported knowledge sources">
             {[
-              "PDF", "DOCX / XLSX / PPTX", "ODT / ODS / ODP", "JPG / PNG / TIFF scans",
-              "Folders", "ZIP archives", "Google Drive", "Dropbox",
+              ...sourceFamilyChips,
+              "Folders", "Google Drive", "Dropbox",
               "OneDrive / SharePoint", "S3 / R2 / MinIO", "SMB / NFS / SFTP",
             ].map((source) => <li key={source}>{source}</li>)}
           </ul>

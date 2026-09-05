@@ -33,6 +33,7 @@ export const RESOURCE_LINKS: readonly SiteLink[] = [
   { href: "/knowledge-compiler", label: "Knowledge Compiler guide" },
   { href: "/docs", label: "Documentation" },
   { href: "/api", label: "API" },
+  { href: "/sources", label: "Supported sources" },
   { href: "/changelog", label: "Changelog" },
   { href: "/research", label: "Research" },
   { href: "/benchmarks", label: "Benchmarks" },

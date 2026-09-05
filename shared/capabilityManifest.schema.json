@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "tavonel.capability_manifest.v1",
+  "title": "TAVONEL Capability Manifest v1 (frozen contract, 2026-09-06)",
+  "description": "The single source of truth for what the deployment can read. The upload whitelist, the website /sources page, the API docs, the reader router and the status page all derive from it; none of them may carry its own list. Honesty rule: a VERIFIED_* status requires a qualification receipt (sha256 of a committed receipt produced by the blueprint §27 qualification suite) and a qualifiedAt date. Without both, the highest allowed status is BEST_EFFORT. Anything not listed is UNSUPPORTED (refused at upload).",
+  "type": "object",
+  "required": ["schemaVersion", "generatedFrom", "defaultStatus", "entries"],
+  "properties": {
+    "schemaVersion": { "const": "tavonel.capability_manifest.v1" },
+    "generatedFrom": { "type": "string", "description": "the code path or receipt set the entries were derived from (never 'hand-written')" },
+    "defaultStatus": { "const": "UNSUPPORTED" },
+    "entries": { "type": "array", "items": { "$ref": "#/$defs/Entry" } }
+  },
+  "$defs": {
+    "Sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "Entry": {
+      "type": "object",
+      "required": ["sourceFamily", "mime", "extensions", "status", "readerPlan", "preserved", "visual", "knownLimitations", "evidenceLocatorKinds", "qualifiedAt", "qualificationReceipt"],
+      "properties": {
+        "sourceFamily": { "enum": ["document", "spreadsheet", "presentation", "image", "email", "structured_data", "web", "code", "cad_2d", "cad_3d", "bim", "audio", "video", "archive", "database", "api", "unknown"] },
+        "mime": { "type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9!#$&^_.+-]{0,126}/[a-zA-Z0-9][a-zA-Z0-9!#$&^_.+-]{0,126}$" },
+        "extensions": { "type": "array", "items": { "type": "string", "pattern": "^[a-z0-9]{1,10}$" }, "minItems": 1 },
+        "status": { "enum": ["VERIFIED_NATIVE", "VERIFIED_HYBRID", "BEST_EFFORT", "METADATA_ONLY", "REVIEW_REQUIRED", "UNSUPPORTED"] },
+        "readerPlan": { "type": "array", "items": { "type": "string", "pattern": "^[a-z0-9_]+_v[0-9]+$" }, "description": "provider ids with revision suffix, in execution order; empty only when status is UNSUPPORTED" },
+        "preserved": { "type": "array", "items": { "type": "string" }, "description": "source-native structures that survive into the canonical IR today (e.g. page, paragraph_text, bbox1000, cell, formula). Derived from what the pipeline actually emits, never aspirational." },
+        "visual": { "type": "array", "items": { "type": "string" } },
+        "knownLimitations": { "type": "array", "items": { "type": "string" } },
+        "evidenceLocatorKinds": { "type": "array", "items": { "enum": ["pdf", "image", "docx", "xlsx", "pptx", "email", "json", "xml", "code", "cad", "media", "database", "api"] } },
+        "qualifiedAt": { "type": ["string", "null"], "format": "date" },
+        "qualificationReceipt": { "anyOf": [ { "$ref": "#/$defs/Sha256" }, { "type": "null" } ] }
+      },
+      "allOf": [
+        { "if": { "properties": { "status": { "enum": ["VERIFIED_NATIVE", "VERIFIED_HYBRID"] } } },
+          "then": { "properties": { "qualifiedAt": { "type": "string" }, "qualificationReceipt": { "$ref": "#/$defs/Sha256" } } } },
+        { "if": { "properties": { "status": { "const": "UNSUPPORTED" } } },
+          "then": { "properties": { "readerPlan": { "maxItems": 0 }, "preserved": { "maxItems": 0 } } },
+          "else": { "properties": { "readerPlan": { "minItems": 1 }, "evidenceLocatorKinds": { "minItems": 1 } } } }
+      ]
+    }
+  }
+}

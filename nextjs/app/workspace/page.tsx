@@ -21,6 +21,7 @@ import {
   type PageEstimateConfidence,
 } from "@/lib/usage-pricing";
 import { collectDroppedWorkspaceFiles, prepareWorkspaceSelection, type WorkspaceSelection, type WorkspaceUploadFile } from "@/lib/workspace-intake";
+import { uploadAcceptAttribute } from "@/lib/qualified-input";
 import { runBounded } from "@/lib/concurrent";
 import { buildPipeline, type LocalUpload } from "@/lib/pipeline";
 import { qualifyProgress, type OcrProgress } from "@/lib/ocr-progress";
@@ -1680,7 +1681,7 @@ export default function WorkspacePage() {
       headerAction={
         activationPolicy.customerIntake.enabled ? (
           <>
-            <input ref={fileRef} type="file" multiple hidden accept=".pdf,.docx,.pptx,.xlsx,.odt,.ods,.odp,.jpg,.jpeg,.png,.tif,.tiff,.gif,.zip" onChange={(event) => { const files = [...(event.target.files ?? [])]; if (files.length > 0) void stageWorkspaceFiles(files); }} />
+            <input ref={fileRef} type="file" multiple hidden accept={uploadAcceptAttribute} onChange={(event) => { const files = [...(event.target.files ?? [])]; if (files.length > 0) void stageWorkspaceFiles(files); }} />
             <input ref={(node) => { folderRef.current = node; node?.setAttribute("webkitdirectory", ""); }} type="file" multiple hidden onChange={(event) => { const files = [...(event.target.files ?? [])]; if (files.length > 0) void stageWorkspaceFiles(files); }} />
             {proofMode ? (
               <div className="proof-actions">
