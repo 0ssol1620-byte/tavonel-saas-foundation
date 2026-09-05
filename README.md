@@ -45,31 +45,37 @@ scaling boundaries (full statement in
 | **Product Platform** | *this repository* | Next.js product and marketing site, auth/workspaces/tenants, billing/credits/entitlements, upload and connector control plane, candidate persistence, active-world pointer, public API/MCP |
 
 That table is the target boundary. What the committed code in this repository actually calls for
-a compile is narrower, and it depends on which of two paths a deployment has configured
-(`nextjs/lib/collection-compile-run.ts` lines 60-62, `if (coreV2) { … } else if (coreV1) { … }`):
+a compile is narrower, and it depends on which of two paths a deployment has configured. In
+`nextjs/lib/collection-compile-run.ts`, lines 61-62 read the two environments —
+`const coreV2 = readProductCoreV2Env();` and `const coreV1 = coreV2 ? null : readCoreRuntimeEnv();`
+— and the branch that acts on them is `if (coreV2) {` at line 98 with a plain `} else {` at line
+122 that dispatches on `coreV1`:
 
 - **`FOUNDATION_CORE_V2_URL` configured** — `dispatchProductCoreV2`
   (`nextjs/lib/core-runtime-v2.ts`) makes an HMAC-signed HTTP call to that URL and relays back the
-  artifact and receipt it returns, including its `equivalence` field (line 104: `"passed" |
-  "failed" | "not_run"`). This is the path the table above describes: a genuinely separate Core
-  service this repository does not contain.
+  artifact and receipt it returns, including the receipt's `equivalence` field (same file, line
+  104: `"passed" | "failed" | "not_run"`). This is the path the table above describes: a genuinely
+  separate Core service this repository does not contain.
 - **`FOUNDATION_CORE_V2_URL` unset** — `collection-compile-run.ts` falls back to
   `readCoreRuntimeEnv` / `dispatchCoreCompile` (`nextjs/lib/core-runtime.ts`), which HTTP-calls
-  `FOUNDATION_CORE_URL/v1/compile`. On this repository's own `core-runtime/vercel.json`, that exact
-  route (`POST /v1/compile`) is served by `core-runtime/api/compile.ts` — whose own second import
-  line pulls `compileCollectionCandidate` straight from `nextjs/lib/collection-compiler.ts`, the
-  same TypeScript compiler that builds the `/explore` sample and that the Compiler Contract table
-  below names as the thing that keys entity identity. The result is labelled `runtime:
-  "tavonel-foundation-core-deterministic-v1"` (`core-runtime.ts` line 17) — the exact string
-  `nextjs/lib/explore-sample.test.ts` (line 88) refuses to attach to the sample, on the stated
-  ground that it "would be a Core execution claim with no Core execution behind it." So on this
+  `FOUNDATION_CORE_URL/v1/compile`. On this repository's own `nextjs/core-runtime/vercel.json`,
+  that exact route (`POST /v1/compile`) is served by `nextjs/core-runtime/api/compile.ts` — the
+  route's `dest` is written `/core-runtime/api/compile.ts` because that deployment's root
+  directory is `nextjs/`, not the repository root. Its own second import line pulls
+  `compileCollectionCandidate` straight from `nextjs/lib/collection-compiler.ts`, the same
+  TypeScript compiler that builds the `/explore` sample and that the Compiler Contract table below
+  names as the thing that keys entity identity. The result is labelled `runtime:
+  "tavonel-foundation-core-deterministic-v1"` (`nextjs/lib/core-runtime.ts` line 17) — a label
+  `nextjs/lib/explore-sample.test.ts` refuses to attach to the sample (line 88 asserts the sample's
+  runtime does not contain `foundation-core-deterministic`), on the ground its own comment states
+  at lines 84-85: it "would be a Core execution claim with no Core execution behind it." So on this
   fallback path, the "Core worker" the platform calls is this repository's own compiler, deployed
   as a second Vercel function rather than reached as a separate service.
 - **Diff, on either path** — `nextjs/lib/world-version-diff.ts` computes the structural diff
   between two compiled World read models entirely in this repository; it is not a call to either
   Core path.
 - **What stays outside this repository on both paths** — dependency-graph impact analysis, and the
-  *computation* of full-rebuild equivalence: `core-runtime-v2.ts` only relays an `equivalence`
+  *computation* of full-rebuild equivalence: `nextjs/lib/core-runtime-v2.ts` only relays an `equivalence`
   value an external response already produced; nothing committed here computes one. The
   `CANDIDATE → ACTIVE` promotion decision is also Product-only, made after checking manifest
   digest, validation receipt, equivalence status and an explicit promotion policy; Core cannot
