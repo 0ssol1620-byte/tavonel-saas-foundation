@@ -46,13 +46,25 @@ test("compilation film is autoplay-first without a blocking play control", async
 });
 
 test("Explore reaches the actual interactive instrument without a hero-length detour", async ({ page }, testInfo) => {
+  /*
+    This looked for the instrument bar of the old console and allowed it to begin about one and
+    a third viewports down. The page is now the instrument: the world settles behind the entry
+    copy and ENTER WORLD lifts the scrim, so there is no hero for the instrument to be below.
+    The reading the old assertion was approximating still holds and is now exact -- the stage is
+    in the first viewport, and it is one click from being interactive.
+  */
+  const STAGE = '[data-visual-world="explore"]';
   await page.goto("/explore");
-  const instrument = page.locator("section").filter({ has: page.locator("[class*='instrumentBar']") }).first();
-  const box = await instrument.boundingBox();
+  const stage = page.locator(STAGE);
+  const box = await stage.boundingBox();
   const height = await page.evaluate(() => window.innerHeight);
   expect(box).not.toBeNull();
-  expect(box!.y, "interactive sample begins too far below the first viewport").toBeLessThan(height * 1.35);
+  expect(box!.y, "the interactive stage begins below the first viewport").toBeLessThan(height);
+  await expect(page.locator(`${STAGE} [data-visual-node]`).first()).toBeVisible();
   await testInfo.attach("explore-fold", { body: await page.screenshot({ fullPage: false }), contentType: "image/png" });
+
+  await page.getByRole("button", { name: "ENTER WORLD" }).click();
+  await expect(stage).toHaveAttribute("data-world-act", "world");
 });
 
 test("product page shows the product path before secondary product surfaces", async ({ page }) => {

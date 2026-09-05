@@ -1,37 +1,75 @@
 import type { Metadata } from "next";
-import ExploreCompiledWorld from "@/components/explore-compiled-world";
-import { exploreSampleAnswers, exploreSampleDocuments, exploreSampleWorld } from "@/lib/explore-sample";
+import ExploreStage from "@/components/explore/explore-stage";
+import { exploreChangeSourceFiles, exploreChangeStory } from "@/lib/explore-change";
+import {
+  EXPLORE_SAMPLE_SOURCE_DIRECTORY,
+  exploreSampleAnswers,
+  exploreSampleArtifact,
+  exploreSampleDocuments,
+  exploreSampleWorld,
+} from "@/lib/explore-sample";
+import {
+  buildExploreAnswerViews,
+  buildExploreChangeView,
+  type ExploreTechnicalRecord,
+} from "@/lib/explore-story";
+import { layoutVisualWorld, toVisualWorldModel } from "@/lib/visual-world-model";
 
 export const metadata: Metadata = {
   title: "Explore a Compiled World | TAVONEL",
-  /*
-    The description follows the page, and the page stopped arguing.
-
-    This read "Inspect a deterministic source-to-world sample", which is the same defensive
-    register the visible copy shed: "deterministic" and "sample" together tell a searcher what
-    the page is *not* before telling them what it does. The page is labelled a sample in its
-    header badge, once, which is where masterplan 13.9 puts it. A description is a sales
-    surface too, and this one now says the thing the hero says.
-  */
-  description: "Follow a compiled result back to the document version, the page and the exact region it came from.",
+  description:
+    "Step inside a compiled World: open any object to the document version, the page and the exact region it came from, and see what one source revision rebuilt.",
   alternates: { canonical: "/explore" },
   openGraph: { url: "/explore" },
 };
 
 /*
-  A server component so the compile happens once, at build time, on the server.
+  A server component, so the compile happens once, at build time, on the server.
 
-  `lib/explore-sample` reads three committed PDFs' extracted text layer, runs the production
-  compiler over them and refuses to load if the result stops matching its frozen digest. Doing
-  that here rather than in the browser keeps `node:crypto` and the compiler off the client
-  bundle, and means the page ships the compiled World as data rather than shipping the compiler.
+  `lib/explore-sample` reads four committed PDFs' extracted text layer, runs the production
+  compiler over two revisions of the corpus and refuses to load if either result stops matching
+  its frozen digest. Doing that here rather than in the browser keeps `node:crypto` and the
+  compiler off the client bundle: what ships is the adapted `VisualWorldModel` and the layout
+  derived from it, not the machinery that produced them.
+
+  The layout is computed here for the same reason it is a pure function -- one composition for
+  every device, and a server-rendered first paint that already has the world in it.
 */
+
+const model = toVisualWorldModel(exploreSampleWorld, exploreSampleDocuments);
+const layout = layoutVisualWorld(model);
+const change = buildExploreChangeView(exploreChangeStory, exploreChangeSourceFiles);
+const answers = buildExploreAnswerViews(exploreSampleAnswers, model.evidence);
+
+const technical: ExploreTechnicalRecord = {
+  worldId: model.worldId,
+  worldStatus: model.status,
+  manifestDigest: model.manifestDigest,
+  runtime: exploreSampleArtifact.coreExecution.runtime,
+  receipt: {
+    requestId: exploreSampleArtifact.coreExecution.receipt.requestId,
+    inputSha256: exploreSampleArtifact.coreExecution.receipt.inputSha256,
+    outputSha256: exploreSampleArtifact.coreExecution.receipt.outputSha256,
+    manifestDigest: exploreSampleArtifact.coreExecution.receipt.manifestDigest,
+  },
+  sourceDirectory: EXPLORE_SAMPLE_SOURCE_DIRECTORY,
+  documents: [...exploreSampleDocuments],
+  revisions: model.revisions,
+  counts: {
+    objects: model.nodes.length,
+    relations: model.edges.length,
+    regions: model.evidence.length,
+  },
+};
+
 export default function ExplorePage() {
   return (
-    <ExploreCompiledWorld
-      world={exploreSampleWorld}
-      documents={exploreSampleDocuments}
-      answers={exploreSampleAnswers}
+    <ExploreStage
+      model={model}
+      layout={layout}
+      change={change}
+      answers={answers}
+      technical={technical}
     />
   );
 }

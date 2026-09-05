@@ -2,13 +2,17 @@ import { createHash } from "node:crypto";
 import { readFileSync as read } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { DOCUMENTS, extractRegions, renderPdf } from "../scripts/build-explore-sample.mjs";
+import { SOURCE_DOCUMENTS, extractRegions, renderPdf } from "../scripts/build-explore-sample.mjs";
 import {
   EXPLORE_SAMPLE_DIGEST,
+  EXPLORE_SAMPLE_REVISION_B_DIGEST,
   exploreSampleAnswers,
   exploreSampleArtifact,
   exploreSampleDocuments,
   exploreSampleInputs,
+  exploreSampleRevisionBArtifact,
+  exploreSampleRevisionBInputs,
+  exploreSampleRevisionBWorld,
   exploreSampleWorld,
 } from "./explore-sample";
 import { validateCollectionOcrInput } from "./collection-compiler";
@@ -35,11 +39,26 @@ function sha256(bytes: Buffer) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
+function filenameOf(input: { sanitizedKey: string }) {
+  return input.sanitizedKey.slice(input.sanitizedKey.lastIndexOf("/") + 1);
+}
+
+/*
+  Every distinct input across both revisions of the corpus.
+
+  Deduplicated by file rather than by document: the manual appears at two revisions under one
+  `documentId`, and the change notice and the service log appear once each in two corpora. The
+  file is what has a sha256 and a geometry, so the file is what these tests iterate.
+*/
+const ALL_INPUTS = [...exploreSampleInputs, ...exploreSampleRevisionBInputs].filter(
+  (input, index, all) => all.findIndex((item) => item.sanitizedKey === input.sanitizedKey) === index,
+);
+
 describe("the committed PDFs are what the generator makes", () => {
-  it.each(DOCUMENTS.map((document: { filename: string }) => document.filename))(
+  it.each(SOURCE_DOCUMENTS.map((document: { filename: string }) => document.filename))(
     "reproduces %s byte for byte",
     (filename) => {
-      const document = DOCUMENTS.find((item: { filename: string }) => item.filename === filename)!;
+      const document = SOURCE_DOCUMENTS.find((item: { filename: string }) => item.filename === filename)!;
       const committed = read(`${sampleDirectory}${filename}`);
       // Byte equality, not "looks similar". A PDF with a creation date in it could not pass
       // this, which is why the generator writes none.
@@ -48,26 +67,37 @@ describe("the committed PDFs are what the generator makes", () => {
   );
 
   it("binds each input to the sha256 of the file on disk", () => {
-    for (const input of exploreSampleInputs) {
-      const filename = input.sanitizedKey.slice(input.sanitizedKey.lastIndexOf("/") + 1);
-      expect(input.inputSha256).toBe(`sha256:${sha256(read(`${sampleDirectory}${filename}`))}`);
+    for (const input of ALL_INPUTS) {
+      expect(input.inputSha256).toBe(`sha256:${sha256(read(`${sampleDirectory}${filenameOf(input)}`))}`);
       expect(input.versionKey).toBe(input.inputSha256.replace("sha256:", ""));
     }
+  });
+
+  it("gives the two revisions of the manual one document identity and two versions", () => {
+    /*
+      The fixture's whole shape. `documentId` is the document, `versionKey` is the revision --
+      the compiler's own model -- and the Change Act is only a change story while the two sides
+      agree on the first and differ on the second. Split the identity and every claim in the
+      manual reads as removed-and-added, which is the opposite of what the Act shows.
+    */
+    const revisions = ALL_INPUTS.filter((input) => filenameOf(input).includes("maintenance-manual"));
+    expect(revisions).toHaveLength(2);
+    expect(new Set(revisions.map((input) => input.documentId)).size).toBe(1);
+    expect(new Set(revisions.map((input) => input.versionKey)).size).toBe(2);
   });
 });
 
 describe("the geometry was read out of the documents, not written down", () => {
-  it.each(exploreSampleInputs.map((input) => input.documentId))("re-extracts %s to the same regions", async (documentId) => {
-    const input = exploreSampleInputs.find((item) => item.documentId === documentId)!;
-    const filename = input.sanitizedKey.slice(input.sanitizedKey.lastIndexOf("/") + 1);
-    const extracted = await extractRegions(read(`${sampleDirectory}${filename}`), documentId);
+  it.each(ALL_INPUTS.map(filenameOf))("re-extracts %s to the same regions", async (filename) => {
+    const input = ALL_INPUTS.find((item) => filenameOf(item) === filename)!;
+    const extracted = await extractRegions(read(`${sampleDirectory}${filename}`), input.documentId);
     const authority = input.regions![0].authority;
     expect(extracted.map((region: object) => ({ ...region, authority }))).toEqual(input.regions);
   }, 15_000);
 
   it("still satisfies the same input contract the compile API enforces", () => {
-    for (const input of exploreSampleInputs) {
-      expect(validateCollectionOcrInput(input), input.documentId).not.toBeNull();
+    for (const input of ALL_INPUTS) {
+      expect(validateCollectionOcrInput(input), filenameOf(input)).not.toBeNull();
     }
   });
 });
@@ -75,6 +105,18 @@ describe("the geometry was read out of the documents, not written down", () => {
 describe("the World is compiled output", () => {
   it("matches the frozen digest", () => {
     expect(exploreSampleArtifact.manifestDigest).toBe(EXPLORE_SAMPLE_DIGEST);
+  });
+
+  it("compiles the earlier revision to its own frozen digest", () => {
+    /*
+      Two frozen digests, because the Change Act compares two worlds and a comparison is only
+      reproducible while both sides are. The revision-B world is not decoration: it is the other
+      half of every count `lib/explore-change.ts` derives.
+    */
+    expect(exploreSampleRevisionBArtifact.manifestDigest).toBe(EXPLORE_SAMPLE_REVISION_B_DIGEST);
+    expect(EXPLORE_SAMPLE_REVISION_B_DIGEST).not.toBe(EXPLORE_SAMPLE_DIGEST);
+    expect(exploreSampleRevisionBWorld.contract.origin).toBe("deterministic_sample");
+    expect(exploreSampleRevisionBWorld.objects.length).toBeGreaterThan(5);
   });
 
   it("names the runtime that actually ran", () => {
@@ -152,25 +194,42 @@ function strip(source: string) {
     .replace(/^[ 	]*\/\/.*$/gm, " ");
 }
 
+/*
+  The page is now a stage in three acts, so "the component" is a directory.
+
+  The regression these tests exist for did not move: a literal digest, box or page number typed
+  into a renderer is a value nothing verified, and it is how `3e118d4e...bf1c` and `p.12` once
+  reached a public page for a file that did not exist. Every file that draws the World is read,
+  not just the one that used to.
+*/
+const RENDERERS = [
+  "../components/explore/explore-stage.tsx",
+  "../components/explore/world-act.tsx",
+  "../components/explore/evidence-act.tsx",
+  "../components/explore/change-act.tsx",
+  "../components/explore/ask-overlay.tsx",
+  "../components/explore/technical-details.tsx",
+  "../components/world-visual/world-canvas.tsx",
+  "../components/world-visual/source-sheet.tsx",
+  "../components/world-visual/page-region.tsx",
+];
+
 describe("the page renders the artifact rather than a copy of it", () => {
-  const component = strip(read(fileURLToPath(new URL("../components/explore-compiled-world.tsx", import.meta.url)), "utf8"));
   const page = read(fileURLToPath(new URL("../app/explore/page.tsx", import.meta.url)), "utf8");
 
   it("takes the World as a prop", () => {
     expect(page).toContain("exploreSampleWorld");
     expect(page).toContain("exploreSampleAnswers");
-    expect(component).toContain("world.evidence");
+    expect(page).toContain("toVisualWorldModel");
+    const canvas = read(fileURLToPath(new URL("../components/world-visual/world-canvas.tsx", import.meta.url)), "utf8");
+    expect(canvas).toContain("model.nodes");
   });
 
-  it("hard-codes no digest, no bbox and no page number", () => {
-    /*
-      The specific regression. Any of these three appearing as a literal in the component means
-      a value is being displayed that nothing verified -- which is how `3e118d4e...bf1c` and
-      `p.12` came to be on a public page for a file that did not exist.
-    */
-    expect(component).not.toMatch(/sha256:[0-9a-f]{8}/);
-    expect(component).not.toMatch(/bbox:\s*"\[/i);
-    expect(component).not.toMatch(/\bp\.\d+\b/);
-    expect(component).not.toMatch(/\[\s*\d{2,},\s*\d{2,},\s*\d{2,},\s*\d{2,}\s*\]/);
+  it.each(RENDERERS)("hard-codes no digest, no bbox and no page number in %s", (renderer) => {
+    const source = strip(read(fileURLToPath(new URL(renderer, import.meta.url)), "utf8"));
+    expect(source).not.toMatch(/sha256:[0-9a-f]{8}/);
+    expect(source).not.toMatch(/bbox:\s*"\[/i);
+    expect(source).not.toMatch(/\bp\.\d+\b/);
+    expect(source).not.toMatch(/\[\s*\d{2,},\s*\d{2,},\s*\d{2,},\s*\d{2,}\s*\]/);
   });
 });

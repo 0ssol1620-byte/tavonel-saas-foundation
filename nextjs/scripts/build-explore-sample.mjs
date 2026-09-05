@@ -7,12 +7,18 @@
  * false about the product, and every provenance value on it was invented -- which is the one
  * thing this codebase says never to do to satisfy a schema.
  *
- * So the sample gets real documents. This script writes three fixture PDFs, reads their text
+ * So the sample gets real documents. This script writes four fixture PDFs, reads their text
  * layer back with pdfjs to get the page geometry, and emits the compiler's input contract with
  * a real sha256 per file and a real bounding box per paragraph. The compile itself is not done
  * here: `lib/explore-sample.ts` runs the production `compileCollectionCandidate` over this
  * output, so the page renders what the compiler produced rather than what a script decided it
  * should look like.
+ *
+ * Four files, two corpora: the maintenance manual exists at revision B and at revision C, and
+ * each corpus is written to its own input set (`explore-sample.inputs.json` and
+ * `explore-sample.revision-b.inputs.json`). Compiling both and comparing them is what the
+ * Change Act shows, and comparing two real compiles is the only way to show it without typing
+ * a count by hand.
  *
  * Deterministic on purpose. No creation date, no document ID, no timestamp anywhere in the
  * emitted PDF, so re-running this produces byte-identical files and `explore-sample.test.ts`
@@ -34,6 +40,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..");
 const pdfDirectory = join(root, "public", "explore-sample");
 const inputsPath = join(root, "lib", "explore-sample.inputs.json");
+const revisionBInputsPath = join(root, "lib", "explore-sample.revision-b.inputs.json");
 
 const PAGE_WIDTH = 595;
 const PAGE_HEIGHT = 842;
@@ -50,40 +57,91 @@ const WRAP_COLUMNS = 78;
   interval, the change notice is why it changed, and the log is the work that was done. That
   disagreement is what a Compiled World is for, and it is the reason the sample has three files
   rather than one.
+
+  The manual exists at two revisions. `documentId` is the same for both, because they are one
+  document: identity across revisions is what `documentId` means here, and the revision is
+  carried by `versionKey` -- the sha256 of the file -- exactly as the compiler models it. Giving
+  revision B its own `documentId` would model the reissue as a second, unrelated document, and
+  every claim in the manual would then read as removed-and-added rather than carried over. That
+  would make the Change Act say the opposite of what happened.
 */
-export const DOCUMENTS = [
-  {
-    documentId: "fp200-maintenance-manual-rev-c",
-    filename: "fp-200-maintenance-manual-revC.pdf",
-    authority: "official",
-    paragraphs: [
-      "Scheduled maintenance for feedwater pump FP-200, revision C.",
-      "Perform the full service procedure every 2,000 operating hours. This interval replaces the 1,500 hour interval published in revision B.",
-      "Before replacing the mechanical seal, isolate the unit and fully depressurise the casing. Confirm zero pressure at gauge PG-11 before removing any fastener.",
-      "The pump is rated for continuous duty at 2.4 MPa discharge pressure, and inspection points are listed in table 12.1.",
-    ],
-  },
-  {
-    documentId: "fp200-change-notice-cn-2026-03",
-    filename: "fp-200-change-notice-CN-2026-03.pdf",
-    authority: "official",
-    paragraphs: [
-      "Change notice CN-2026-03 for feedwater pump FP-200, revision C.",
-      "The service interval moves from 1,500 operating hours to 2,000 operating hours with effect from revision C.",
-      "Revision B is superseded and must not be used to schedule work on this pump.",
-    ],
-  },
-  {
-    documentId: "fp200-service-log-2026",
-    filename: "fp-200-service-log-2026.pdf",
-    authority: "informal",
-    paragraphs: [
-      "Service log for feedwater pump FP-200, January to March 2026.",
-      "The mechanical seal on FP-200 was replaced on 14 February 2026 after the unit was depressurised.",
-      "The next full service falls due at 2,000 operating hours from the February visit.",
-    ],
-  },
-];
+
+const MAINTENANCE_MANUAL_REVISION_C = {
+  documentId: "fp200-maintenance-manual",
+  filename: "fp-200-maintenance-manual-revC.pdf",
+  authority: "official",
+  paragraphs: [
+    "Scheduled maintenance for feedwater pump FP-200, revision C.",
+    "Perform the full service procedure every 2,000 operating hours. This interval replaces the 1,500 hour interval published in revision B.",
+    "Before replacing the mechanical seal, isolate the unit and fully depressurise the casing. Confirm zero pressure at gauge PG-11 before removing any fastener.",
+    "The pump is rated for continuous duty at 2.4 MPa discharge pressure, and inspection points are listed in table 12.1.",
+  ],
+};
+
+/*
+  The same manual before the reissue.
+
+  Three lines of it differ from revision C and no more: the interval it states, the sentence
+  revision C added to explain the interval, and the revision the document calls itself on its
+  own first line. That third one is not decoration. The Change Act puts this page on screen
+  beside the label REVISION B, and a page whose own header read "revision C" while quoting the
+  1,500 hour interval would be a fabricated document -- the one thing a provenance fixture may
+  never be. Everything after the second paragraph is byte-for-byte the text of revision C, which
+  is what makes "unrelated knowledge remained intact" a claim this fixture can support.
+*/
+const MAINTENANCE_MANUAL_REVISION_B = {
+  documentId: "fp200-maintenance-manual",
+  filename: "fp-200-maintenance-manual-revB.pdf",
+  authority: "official",
+  paragraphs: [
+    "Scheduled maintenance for feedwater pump FP-200, revision B.",
+    "Perform the full service procedure every 1,500 operating hours.",
+    "Before replacing the mechanical seal, isolate the unit and fully depressurise the casing. Confirm zero pressure at gauge PG-11 before removing any fastener.",
+    "The pump is rated for continuous duty at 2.4 MPa discharge pressure, and inspection points are listed in table 12.1.",
+  ],
+};
+
+const CHANGE_NOTICE = {
+  documentId: "fp200-change-notice-cn-2026-03",
+  filename: "fp-200-change-notice-CN-2026-03.pdf",
+  authority: "official",
+  paragraphs: [
+    "Change notice CN-2026-03 for feedwater pump FP-200, revision C.",
+    "The service interval moves from 1,500 operating hours to 2,000 operating hours with effect from revision C.",
+    "Revision B is superseded and must not be used to schedule work on this pump.",
+  ],
+};
+
+const SERVICE_LOG = {
+  documentId: "fp200-service-log-2026",
+  filename: "fp-200-service-log-2026.pdf",
+  authority: "informal",
+  paragraphs: [
+    "Service log for feedwater pump FP-200, January to March 2026.",
+    "The mechanical seal on FP-200 was replaced on 14 February 2026 after the unit was depressurised.",
+    "The next full service falls due at 2,000 operating hours from the February visit.",
+  ],
+};
+
+/** The corpus the /explore World is compiled from: the manual as it stands today. */
+export const DOCUMENTS = [MAINTENANCE_MANUAL_REVISION_C, CHANGE_NOTICE, SERVICE_LOG];
+
+/*
+  The same corpus one revision earlier.
+
+  The change notice is in both sets on purpose. It is dated to revision C and it is what caused
+  the reissue, so a world compiled before the manual was reissued is a world that holds the
+  notice and a manual that has not caught up with it -- which is the ordinary state of a
+  document set and the reason the product exists. Holding the other two documents fixed is also
+  what makes the diff readable: exactly one source revision moved, so everything the comparison
+  reports is attributable to it.
+*/
+export const REVISION_B_DOCUMENTS = [MAINTENANCE_MANUAL_REVISION_B, CHANGE_NOTICE, SERVICE_LOG];
+
+/** Every file the generator writes, once each. Two corpora share two of the four. */
+export const SOURCE_DOCUMENTS = [...DOCUMENTS, ...REVISION_B_DOCUMENTS].filter(
+  (document, index, all) => all.findIndex((item) => item.filename === document.filename) === index,
+);
 
 /** PDF literal strings escape exactly three characters. */
 function escapeText(value) {
@@ -225,39 +283,59 @@ export async function extractRegions(bytes, documentId) {
   return regions;
 }
 
+/**
+ * One compiler input, read back out of the file that was just written.
+ *
+ * Keyed by filename rather than by document: the two corpora share the change notice and the
+ * service log, and re-extracting them would be the same work twice with an opportunity for the
+ * two copies to disagree.
+ */
+async function buildInput(document, cache) {
+  const cached = cache.get(document.filename);
+  if (cached) return cached;
+
+  const bytes = renderPdf(document);
+  const path = join(pdfDirectory, document.filename);
+  writeFileSync(path, bytes);
+
+  const stored = readFileSync(path);
+  const digest = createHash("sha256").update(stored).digest("hex");
+  const regions = (await extractRegions(stored, document.documentId)).map((region) => ({
+    ...region,
+    authority: document.authority,
+  }));
+  const key = `public/explore-sample/${document.filename}`;
+
+  const input = {
+    documentId: document.documentId,
+    versionKey: digest,
+    sanitizedKey: key,
+    ocrJsonKey: `public/explore-sample/${document.documentId}/${digest}/text-layer.json`,
+    pageCount: 1,
+    text: regions.map((region) => region.text).join("\n").trim(),
+    inputSha256: `sha256:${digest}`,
+    sourceImmutableKey: key,
+    regions,
+  };
+  cache.set(document.filename, input);
+  console.log(`${document.filename}  ${stored.length} bytes  sha256:${digest.slice(0, 16)}…  ${regions.length} regions`);
+  return input;
+}
+
 async function main() {
   mkdirSync(pdfDirectory, { recursive: true });
+  const cache = new Map();
+
   const inputs = [];
+  for (const document of DOCUMENTS) inputs.push(await buildInput(document, cache));
 
-  for (const document of DOCUMENTS) {
-    const bytes = renderPdf(document);
-    const path = join(pdfDirectory, document.filename);
-    writeFileSync(path, bytes);
-
-    const stored = readFileSync(path);
-    const digest = createHash("sha256").update(stored).digest("hex");
-    const regions = (await extractRegions(stored, document.documentId)).map((region) => ({
-      ...region,
-      authority: document.authority,
-    }));
-    const key = `public/explore-sample/${document.filename}`;
-
-    inputs.push({
-      documentId: document.documentId,
-      versionKey: digest,
-      sanitizedKey: key,
-      ocrJsonKey: `public/explore-sample/${document.documentId}/${digest}/text-layer.json`,
-      pageCount: 1,
-      text: regions.map((region) => region.text).join("\n").trim(),
-      inputSha256: `sha256:${digest}`,
-      sourceImmutableKey: key,
-      regions,
-    });
-    console.log(`${document.filename}  ${stored.length} bytes  sha256:${digest.slice(0, 16)}…  ${regions.length} regions`);
-  }
+  const revisionBInputs = [];
+  for (const document of REVISION_B_DOCUMENTS) revisionBInputs.push(await buildInput(document, cache));
 
   writeFileSync(inputsPath, `${JSON.stringify(inputs, null, 2)}\n`);
   console.log(`wrote ${inputsPath}`);
+  writeFileSync(revisionBInputsPath, `${JSON.stringify(revisionBInputs, null, 2)}\n`);
+  console.log(`wrote ${revisionBInputsPath}`);
 }
 
 /*
