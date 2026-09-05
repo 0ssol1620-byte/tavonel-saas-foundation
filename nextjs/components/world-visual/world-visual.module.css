@@ -366,7 +366,9 @@ button.line:focus-visible { outline: 2px solid #597768; outline-offset: 1px; }
     width: 100%;
   }
 
-  .node[data-node-role="leaf"] { margin-left: 16px; }
+  /* The indent comes out of the width, or a leaf is 16px wider than the field it sits in and
+     the Change act -- whose field is the full stage width -- scrolls sideways by exactly that. */
+  .node[data-node-role="leaf"] { margin-left: 16px; width: calc(100% - 16px); }
 }
 
 @media (prefers-reduced-motion: reduce) {

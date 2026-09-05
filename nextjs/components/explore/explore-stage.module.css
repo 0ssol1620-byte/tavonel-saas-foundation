@@ -758,6 +758,15 @@
   .evidenceAct[data-step="evidence"] .relationList,
   .evidenceAct[data-step="evidence"] .openSource { display: none; }
 
+  /*
+    The two revisions read one above the other on a phone. Side by side, each card kept its
+    desktop minimum and the second one started past the right edge of the viewport -- measured
+    at 155px over at 360 and still 35px over at 600 -- clipping exactly the revision that carries
+    the change. Stacking loses nothing: the before/after order is the reading order anyway.
+  */
+  .revisions { grid-template-columns: minmax(0, 1fr); }
+  .revision { min-width: 0; }
+
   .next { grid-template-columns: 1fr; }
   .next > div { grid-column: 1; }
 
