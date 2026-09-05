@@ -1,13 +1,13 @@
 [
   {
     "documentId": "fp200-maintenance-manual",
-    "versionKey": "e8772bf183ab5bb284ab5da62870609ebd79b4bf5bec51ed70c68e2fe4ee48e4",
-    "sanitizedKey": "public/explore-sample/fp-200-maintenance-manual-revC.pdf",
-    "ocrJsonKey": "public/explore-sample/fp200-maintenance-manual/e8772bf183ab5bb284ab5da62870609ebd79b4bf5bec51ed70c68e2fe4ee48e4/text-layer.json",
+    "versionKey": "1738896a4f79d2dc06930ccccb78940c579b0a91d80487afc56155beb9b11c5a",
+    "sanitizedKey": "public/explore-sample/fp-200-maintenance-manual-revB.pdf",
+    "ocrJsonKey": "public/explore-sample/fp200-maintenance-manual/1738896a4f79d2dc06930ccccb78940c579b0a91d80487afc56155beb9b11c5a/text-layer.json",
     "pageCount": 1,
-    "text": "Scheduled maintenance for feedwater pump FP-200, revision C.\nPerform the full service procedure every 2,000 operating hours. This interval replaces the 1,500 hour interval published in revision B.\nBefore replacing the mechanical seal, isolate the unit and fully depressurise the casing. Confirm zero pressure at gauge PG-11 before removing any fastener.\nThe pump is rated for continuous duty at 2.4 MPa discharge pressure, and inspection points are listed in table 12.1.",
-    "inputSha256": "sha256:e8772bf183ab5bb284ab5da62870609ebd79b4bf5bec51ed70c68e2fe4ee48e4",
-    "sourceImmutableKey": "public/explore-sample/fp-200-maintenance-manual-revC.pdf",
+    "text": "Scheduled maintenance for feedwater pump FP-200, revision B.\nPerform the full service procedure every 1,500 operating hours.\nBefore replacing the mechanical seal, isolate the unit and fully depressurise the casing. Confirm zero pressure at gauge PG-11 before removing any fastener.\nThe pump is rated for continuous duty at 2.4 MPa discharge pressure, and inspection points are listed in table 12.1.",
+    "inputSha256": "sha256:1738896a4f79d2dc06930ccccb78940c579b0a91d80487afc56155beb9b11c5a",
+    "sourceImmutableKey": "public/explore-sample/fp-200-maintenance-manual-revB.pdf",
     "regions": [
       {
         "regionId": "fp200-maintenance-manual-p1-r0",
@@ -15,7 +15,7 @@
         "pageNumber1": 1,
         "order": 0,
         "blockType": "paragraph",
-        "text": "Scheduled maintenance for feedwater pump FP-200, revision C.",
+        "text": "Scheduled maintenance for feedwater pump FP-200, revision B.",
         "bbox1000": [
           111,
           80,
@@ -31,12 +31,12 @@
         "pageNumber1": 1,
         "order": 1,
         "blockType": "paragraph",
-        "text": "Perform the full service procedure every 2,000 operating hours. This interval replaces the 1,500 hour interval published in revision B.",
+        "text": "Perform the full service procedure every 1,500 operating hours.",
         "bbox1000": [
           111,
           131,
-          705,
-          162
+          605,
+          144
         ],
         "confidence": 1,
         "authority": "official"
@@ -50,9 +50,9 @@
         "text": "Before replacing the mechanical seal, isolate the unit and fully depressurise the casing. Confirm zero pressure at gauge PG-11 before removing any fastener.",
         "bbox1000": [
           111,
-          180,
+          162,
           745,
-          210
+          192
         ],
         "confidence": 1,
         "authority": "official"
@@ -66,9 +66,9 @@
         "text": "The pump is rated for continuous duty at 2.4 MPa discharge pressure, and inspection points are listed in table 12.1.",
         "bbox1000": [
           111,
-          229,
+          211,
           692,
-          259
+          241
         ],
         "confidence": 1,
         "authority": "official"

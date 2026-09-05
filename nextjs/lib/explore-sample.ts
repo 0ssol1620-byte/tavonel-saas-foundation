@@ -9,29 +9,38 @@ import {
 import { answerGroundedQuestion, type GroundedAnswer } from "./grounded-ask";
 import { buildWorldReadModel, type WorldReadModel } from "./world-read-model";
 import rawInputs from "./explore-sample.inputs.json";
+import rawRevisionBInputs from "./explore-sample.revision-b.inputs.json";
 
 /*
   The /explore sample, compiled rather than written.
 
-  `explore-sample.inputs.json` is produced by `scripts/build-explore-sample.mjs` from the three
-  PDFs in `public/explore-sample/`: real files, real sha256 per file, real page geometry read
-  back out of each one. This module runs the production compiler over them. Nothing on the
-  Explore page is authored -- the objects, the claims, the relations, the page numbers and the
-  bounding boxes are all what `compileCollectionCandidate` emitted.
+  `explore-sample.inputs.json` is produced by `scripts/build-explore-sample.mjs` from the PDFs
+  in `public/explore-sample/`: real files, real sha256 per file, real page geometry read back
+  out of each one. This module runs the production compiler over them. Nothing on the Explore
+  page is authored -- the objects, the claims, the relations, the page numbers and the bounding
+  boxes are all what `compileCollectionCandidate` emitted.
+
+  Two worlds, not one. The corpus exists at two revisions of the maintenance manual, and both
+  are compiled here: revision C is the World the page shows, revision B is the World it is
+  compared against. `lib/explore-change.ts` derives the comparison; it does not compile, and it
+  does not restate a single number that is not in one of these two artifacts.
 
   Two guarantees, both fail-closed, because a sample that quietly drifts is worse than no
   sample: every input is re-validated through the same `validateCollectionOcrInput` the API
-  uses, and the compiled `manifestDigest` must equal the frozen constant below. Change the
+  uses, and each compiled `manifestDigest` must equal the frozen constant below. Change the
   fixture text, the layout, the extractor or the compiler and this throws at import -- which
   fails the build, not a page view.
 
-  Regenerating: run the script, run `vitest lib/explore-sample`, and paste the digest it
-  reports into EXPLORE_SAMPLE_DIGEST. The digest moving is not a problem; it moving without
+  Regenerating: run the script, run `vitest lib/explore-sample`, and paste the digests it
+  reports into the two constants below. A digest moving is not a problem; it moving without
   anyone noticing is.
 */
 
 /** The compiled World the Explore page shows. Recorded so that it cannot change unobserved. */
-export const EXPLORE_SAMPLE_DIGEST = "sha256:929153d4d0ad1dd6e7a52e3aebdab45747c9792b64869dbb636c969ab1c79abc";
+export const EXPLORE_SAMPLE_DIGEST = "sha256:dff62fcee5954bf5df236ac0e6927d1978e2441eeb7fbdf8608934cefbeabc52";
+
+/** The same corpus one revision earlier: the manual at revision B, the other two files identical. */
+export const EXPLORE_SAMPLE_REVISION_B_DIGEST = "sha256:85a2932b18ea0e418d15adbfcff39c5f29804377ae82da2ab97641db795cfb4d";
 
 export const EXPLORE_SAMPLE_SOURCE_DIRECTORY = "public/explore-sample";
 
@@ -39,10 +48,10 @@ function sha256(value: string) {
   return createHash("sha256").update(value, "utf8").digest("hex");
 }
 
-function readInputs(): CollectionOcrInput[] {
-  const inputs = (rawInputs as unknown[]).map((value) => validateCollectionOcrInput(value));
+function readInputs(raw: unknown, label: string): CollectionOcrInput[] {
+  const inputs = (raw as unknown[]).map((value) => validateCollectionOcrInput(value));
   if (inputs.some((input) => input === null)) {
-    throw new Error("explore_sample_inputs_invalid");
+    throw new Error(`explore_sample_inputs_invalid: ${label}`);
   }
   return inputs as CollectionOcrInput[];
 }
@@ -76,36 +85,44 @@ function withExecutionRecord(artifact: CollectionCandidateArtifact, inputs: Coll
   };
 }
 
-function build() {
-  const inputs = readInputs();
+function build(raw: unknown, label: string, frozenDigest: string) {
+  const inputs = readInputs(raw, label);
   const compiled = compileCollectionCandidate(inputs);
   const artifact = withExecutionRecord(compiled, inputs);
   const world = buildWorldReadModel(artifact, artifact.collectionId, { origin: "deterministic_sample" });
-  if (!world) throw new Error("explore_sample_read_model_invalid");
+  if (!world) throw new Error(`explore_sample_read_model_invalid: ${label}`);
+  if (artifact.manifestDigest !== frozenDigest) {
+    throw new Error(
+      `explore_sample_digest_changed: ${label} expected ${frozenDigest}, compiled ${artifact.manifestDigest}`,
+    );
+  }
   return { inputs, artifact, world };
 }
 
-const sample = build();
-
-if (sample.artifact.manifestDigest !== EXPLORE_SAMPLE_DIGEST) {
-  throw new Error(
-    `explore_sample_digest_changed: expected ${EXPLORE_SAMPLE_DIGEST}, compiled ${sample.artifact.manifestDigest}`,
-  );
+/** The fixture files behind a World, in the order the compiler saw them. */
+function documentsOf(inputs: readonly CollectionOcrInput[]) {
+  return inputs.map((input) => ({
+    documentId: input.documentId,
+    filename: input.sanitizedKey.slice(input.sanitizedKey.lastIndexOf("/") + 1),
+    href: `/${input.sanitizedKey.replace(/^public\//, "")}`,
+    digest: input.inputSha256,
+    pageCount: input.pageCount,
+    regionCount: input.regions?.length ?? 0,
+  }));
 }
+
+const sample = build(rawInputs, "revision C", EXPLORE_SAMPLE_DIGEST);
+const revisionB = build(rawRevisionBInputs, "revision B", EXPLORE_SAMPLE_REVISION_B_DIGEST);
 
 export const exploreSampleInputs: readonly CollectionOcrInput[] = sample.inputs;
 export const exploreSampleArtifact = sample.artifact;
 export const exploreSampleWorld: WorldReadModel = sample.world;
+export const exploreSampleDocuments = documentsOf(sample.inputs);
 
-/** The fixture files behind the World, in the order the compiler saw them. */
-export const exploreSampleDocuments = sample.inputs.map((input) => ({
-  documentId: input.documentId,
-  filename: input.sanitizedKey.slice(input.sanitizedKey.lastIndexOf("/") + 1),
-  href: `/${input.sanitizedKey.replace(/^public\//, "")}`,
-  digest: input.inputSha256,
-  pageCount: input.pageCount,
-  regionCount: input.regions?.length ?? 0,
-}));
+export const exploreSampleRevisionBInputs: readonly CollectionOcrInput[] = revisionB.inputs;
+export const exploreSampleRevisionBArtifact = revisionB.artifact;
+export const exploreSampleRevisionBWorld: WorldReadModel = revisionB.world;
+export const exploreSampleRevisionBDocuments = documentsOf(revisionB.inputs);
 
 /*
   Three questions the page can put to the World, answered by the retriever the workspace uses.
