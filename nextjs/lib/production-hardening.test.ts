@@ -14,6 +14,7 @@ describe("2026-09-05 production hardening", () => {
     expect(server).toContain('readAccessMode() === "self_service"');
     expect(client).toContain("useState(initialLiveCheckout)");
     expect(client).toContain("useState(initialSelfService)");
+    expect(client.indexOf('className="plans rv"')).toBeLessThan(client.indexOf('className="usage-estimator rv"'));
   });
 
   it("keeps the live legal surfaces dynamic and removes the stale pilot statement from privacy", () => {

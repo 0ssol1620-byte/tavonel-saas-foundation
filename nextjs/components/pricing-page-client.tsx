@@ -140,27 +140,6 @@ export default function PricingPageClient({ initialLiveCheckout, initialSelfServ
               Complex pages are escalated only when a page needs it, and never exceed
               <b> $0.06 per page</b> without a new confirmation.
             </p>
-            <section className="usage-estimator rv" aria-labelledby="usage-estimator-title">
-              <div>
-                <p className="slate"><b>RUN ESTIMATE</b><span />BEFORE COMPILE</p>
-                <h3 id="usage-estimator-title">What will this corpus cost?</h3>
-                <label htmlFor="pricing-pages">Processed pages</label>
-                <input
-                  id="pricing-pages"
-                  type="number"
-                  min="1"
-                  max="10000"
-                  step="1"
-                  value={pages}
-                  onChange={(event) => setPages(Number(event.target.value))}
-                />
-              </div>
-              <dl>
-                <div><dt>Standard estimate</dt><dd>{quote ? formatUsd(quote.estimatedUsd) : "—"}</dd></div>
-                <div><dt>Maximum charge</dt><dd>{quote ? formatUsd(quote.maximumUsd) : "—"}</dd></div>
-                <div><dt>Complex-page escalation</dt><dd>Only when required</dd></div>
-              </dl>
-            </section>
             <div className="plans rv">
               {PLANS.map((plan) => (
                 <article className="plan" key={plan.name} data-featured={plan.name === "Developer" ? 1 : 0}>
@@ -190,6 +169,27 @@ export default function PricingPageClient({ initialLiveCheckout, initialSelfServ
                 </article>
               ))}
             </div>
+            <section className="usage-estimator rv" aria-labelledby="usage-estimator-title">
+              <div>
+                <p className="slate"><b>RUN ESTIMATE</b><span />BEFORE COMPILE</p>
+                <h3 id="usage-estimator-title">What will this corpus cost?</h3>
+                <label htmlFor="pricing-pages">Processed pages</label>
+                <input
+                  id="pricing-pages"
+                  type="number"
+                  min="1"
+                  max="10000"
+                  step="1"
+                  value={pages}
+                  onChange={(event) => setPages(Number(event.target.value))}
+                />
+              </div>
+              <dl>
+                <div><dt>Standard estimate</dt><dd>{quote ? formatUsd(quote.estimatedUsd) : "—"}</dd></div>
+                <div><dt>Maximum charge</dt><dd>{quote ? formatUsd(quote.maximumUsd) : "—"}</dd></div>
+                <div><dt>Complex-page escalation</dt><dd>Only when required</dd></div>
+              </dl>
+            </section>
             <p className="fine">
               Institution and custom engagement guidelines are in the{" "}
               <a href="/legal/TAVONEL_ENTERPRISE_PRICING_2026-08-30.pdf">Enterprise pricing sheet</a>.
