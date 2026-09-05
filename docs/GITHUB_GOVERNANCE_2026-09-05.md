@@ -166,7 +166,35 @@ tag (`git config user.signingkey`, `gpg --list-secret-keys`, or an SSH signing k
 GitHub). Confirm that setup separately before running the sequence above — an unsigned tag should
 not be substituted silently if signing fails.
 
-## 5. Verify, after enabling
+## 5. Open follow-up: three public copy files sit outside the enforced copy gate
+
+`nextjs/lib/brand-copy.test.ts` is this repository's enforced barred-phrase and readiness-overclaim
+check. It reads every entry of its `COPY_SURFACES` array with `readFileSync(join(root, surface))`,
+where `root` is the `nextjs/` directory — and a surface path is free to leave that directory, so
+`"../README.md"` resolves to the repository-root README with no change to the test's own logic.
+
+Three files carrying public copy are not in that array:
+
+```
+../README.md
+../RELEASE_POLICY.md
+../.github/PULL_REQUEST_TEMPLATE.md
+```
+
+Adding those three lines and running `pnpm test` in `nextjs/` was tried before this was written:
+the suite goes from 80 to 86 passing tests — the six new ones being each file against `BARRED`
+and against `OVERCLAIMS` — and all 86 pass. The edit was then reverted, because
+`nextjs/lib/brand-copy.test.ts` was outside the scope of the change that created these documents.
+It is not blocked by anything, and it is not the impossibility an earlier note in this repository
+claimed it was.
+
+Until it lands, those three files are covered by a hand check, and a hand check is not a gate:
+nothing stops the next edit from reintroducing a barred phrase, and
+`.github/PULL_REQUEST_TEMPLATE.md` asks every contributor to add new copy surfaces to
+`COPY_SURFACES` — a rule these three files do not yet satisfy themselves. Do it in the next change
+that touches that test.
+
+## 6. Verify, after enabling
 
 ```bash
 gh api repos/0ssol1620-byte/tavonel-saas-foundation/branches/main/protection
