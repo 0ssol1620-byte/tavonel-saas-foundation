@@ -58,6 +58,11 @@ const COPY_SURFACES = [
   "app/product/compiled-world/page.tsx",
   "app/product/continuous-knowledge/page.tsx",
   "lib/compiler-contract.ts",
+  // The drawing is copy, not geometry: ten stage titles, a legend whose stroke weight asserts
+  // what runs in this deployment, and the <desc> paragraph that is the whole of what a screen
+  // reader gets from it. `read` takes a literal path and never follows an import, so a component
+  // the page renders is unguarded until its own row is here.
+  "components/compiler-contract-diagram.tsx",
   "app/enterprise/page.tsx",
 ];
 
