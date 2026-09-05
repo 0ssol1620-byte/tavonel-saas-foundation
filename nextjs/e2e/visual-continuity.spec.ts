@@ -87,6 +87,12 @@ async function goToSceneThree(page: Page) {
 
 test.describe("visual continuity — cut 4 (film side)", () => {
   test("the WORLD stage of the compile film reaches its locked beat", async ({ browser }: { browser: BrowserLike }, testInfo) => {
+    // Default 30s is razor-thin against this test's own 25s sub-waits (hydration + canvas +
+    // seek) once several lanes are building in parallel on this machine (measured: a clean
+    // ~25s run under contention exceeded 30s when all three projects ran together in one
+    // invocation — same cause as the reduced-motion hydration note above). 60s keeps the
+    // real assertions unchanged and only removes the contention-induced false failure.
+    test.setTimeout(60_000);
     const use = testInfo.project.use as ProjectUse;
     const context = await browser.newContext({
       viewport: use.viewport ?? { width: 1440, height: 900 },
