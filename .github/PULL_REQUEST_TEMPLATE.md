@@ -1,6 +1,7 @@
 <!--
 Fill in every section. A checkbox left unchecked is a "no" that must be explained in "Notes",
-not silence. See CLAUDE.md and README.md#development for what each gate covers.
+not silence. The "Development" section of the repository's root README.md describes what each
+gate below covers and how to run it.
 -->
 
 ## What changed and why
@@ -16,7 +17,7 @@ you did not run is left unchecked with a reason in Notes — never checked witho
 - [ ] `pnpm test` (vitest) — pass/fail counts included in Notes
 - [ ] `pnpm build` — succeeds, static page count included in Notes if `nextjs/` changed
 - [ ] Playwright (`pnpm test:e2e` / `pnpm qa:launch`) — projects run and result included in Notes,
-      if this PR touches `app/` or `components/` under `nextjs/`
+      if this PR touches `nextjs/app/` or `nextjs/components/`
 - [ ] A Preview deployment exists for this branch (Vercel comments the PR automatically) and has
       been opened at least once
 - [ ] No fabricated data: every number, hash, count or "PASS" this PR adds is derived from a
@@ -27,11 +28,13 @@ you did not run is left unchecked with a reason in Notes — never checked witho
 ## Notes
 
 <!-- Skipped gates and why. Anything a reviewer should look at closely. Screenshots for visual
-changes. Founder decisions this PR surfaces but does not make (see CLAUDE.md, "What is not an
-agent's call"). -->
+changes. Owner decisions this PR surfaces but does not make — repository settings, branch
+protection, tags and releases, adding a LICENSE, publishing a benchmark or a competitor
+comparison, pricing copy, and anything touching billing, secrets or database migrations. -->
 
 ## Reviewer checklist
 
-- [ ] Files touched are owned by this change (no edit to another lane's/owner's exclusive files
-      without a flagged conflict)
+- [ ] Files touched are in scope for this change; anything edited outside that scope is called out
+      in Notes rather than left for the reviewer to find
+- [ ] Every checked gate box above has a real command and a real exit code behind it in Notes
 - [ ] No PR merges itself: this box is not for the author to check
