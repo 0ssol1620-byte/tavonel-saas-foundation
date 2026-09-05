@@ -149,9 +149,12 @@ export default function ContinuousKnowledgePage() {
             </dl>
             <p className="fine">
               Every path above is written by the same function that compiles a customer&rsquo;s
-              documents. The archive carries a signed file inventory and the public verification
-              key, and <b>pnpm verify:export</b> checks it offline against a fingerprint obtained
-              from somewhere other than the archive.
+              documents. The archive carries a signed file inventory — every listed file checked
+              by sha256, then those exact manifest bytes signed with Ed25519 — and the public key
+              the signature was made with, so <b>the check runs offline</b>, against a key
+              fingerprint taken from somewhere other than the archive. What the archive does not
+              carry is the verifier: it names the algorithm and the two files to compare, and the
+              program that compares them is yours to run.
             </p>
 
             <h3>Interchange standards</h3>

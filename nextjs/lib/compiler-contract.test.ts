@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { readCapabilities } from "./capabilities";
@@ -23,6 +23,13 @@ import {
 */
 
 const read = (path: string) => readFileSync(resolve(import.meta.dirname, path), "utf8");
+
+/** Comments explain what a page may not say and must not themselves count as saying it. */
+const stripComments = (source: string) =>
+  source
+    .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, " ")
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/^[ \t]*\/\/.*$/gm, " ");
 
 describe("compiler contract clauses", () => {
   it("carries the eight clauses of the contract, in contract order", () => {
@@ -227,6 +234,125 @@ describe("compiler contract clauses", () => {
     expect(body).toContain("offline check");
     expect(body, "the clause promises a refusal the emit path does not perform")
       .not.toContain("is not emitted");
+  });
+});
+
+/*
+  The promise line, which nothing was reading.
+
+  Two rounds of review went into the clause *bodies* -- clause 01's evidence rungs and clause 03's
+  edge types are both pinned to `collection-compiler.ts` literal by literal -- while the field
+  above them was held by `promise.length > 20`. That is the field the page renders a step larger
+  than the body, and it is the sentence a reader who reads one sentence per clause reads. Clause
+  01 spent both of those rounds promising that every promoted fact "resolves to a region of a page
+  of a source revision" directly above a paragraph explaining that a document read without regions
+  emits no region at all -- the page contradicting itself, with the false half in the larger type.
+
+  So the eight promises are frozen here. This is a weaker kind of test than the body pins below it
+  and it is worth saying which kind: it does not know whether a promise is true. It makes changing
+  one an edit to this file, where the sentence sits next to the code that has to support it, in a
+  diff a reviewer sees. The clauses whose truth can be pinned are pinned underneath.
+*/
+describe("contract promises", () => {
+  const PROMISES: ReadonlyArray<readonly [string, string]> = [
+    ["evidence-preserving", "Every promoted fact names the exact source version it was read from, and every region names its page and its box."],
+    ["stable-semantic-identity", "The same thing named four ways is one object, or it is left unresolved."],
+    ["typed-dependencies", "The edges between knowledge units are typed and carry their own evidence."],
+    ["temporal-integrity", "A fact that has been replaced cannot be served as current."],
+    ["selective-recompilation", "Two changed pages rebuild what depends on them, not the corpus."],
+    ["full-rebuild-equivalence", "A selective result must match a full rebuild, or it does not publish."],
+    ["multi-model-verification", "A reader's own confidence is not evidence that it read the page correctly."],
+    ["portable-world", "A compiled World leaves as a signed package you can verify without us."],
+  ];
+
+  it("publishes exactly the eight promise lines this file was reviewed with", () => {
+    expect(CONTRACT_CLAUSES.map((entry) => [entry.id, entry.promise])).toEqual(
+      PROMISES.map(([id, promise]) => [id, promise]),
+    );
+  });
+
+  /*
+    Clause 01's promise, against the code that would have to keep it.
+
+    A region is optional twice over. `validateCollectionOcrInput` accepts `regions: undefined` as
+    a valid input, and the caller only ever passes regions for an OCR v2 read -- so a v1 document
+    compiles to Claim nodes and zero region-bound retrieval units. Even where regions exist, a
+    claim is bound to one by substring match, and `input.text` is the region texts joined with a
+    newline while claims are split on sentence punctuation, so a sentence crossing a region
+    boundary matches no region. What is true of *every* promoted fact is the version it was read
+    from: the Claim node's only evidence id is keyed by documentId + versionKey, and versionKey is
+    checked against the sha256 of the bytes. The promise says that, and may not say more.
+  */
+  it("promises a source version for every fact and a region only where one exists", () => {
+    const compiler = read("./collection-compiler.ts");
+    // Regions are optional at validation, and absent entirely from a v1 read.
+    expect(compiler).toContain("if (input.regions !== undefined) {");
+    expect(compiler).toContain("for (const region of input.regions ?? []) {");
+    expect(read("./collection-compile-run.ts"))
+      .toContain('regions: json.schemaVersion === "tavonel.ocr_result.v2" ? json.regions : undefined');
+    // A claim's evidence is a whole document version; the page and box live on the region.
+    expect(compiler).toContain('const evidenceId = stableId("evidence", input.documentId, input.versionKey)');
+    expect(compiler).toContain('nodes.push({ id: claimId, kind: "Claim", label: claim, documentId: input.documentId, evidenceIds: [evidenceId] });');
+    expect(compiler).toContain("pageNumber1: region.pageNumber1");
+    expect(compiler).toContain("bbox1000: region.bbox1000");
+    expect(compiler).toContain("`sha256:${input.versionKey.toLowerCase()}`");
+
+    const promise = clause("evidence-preserving").promise.toLowerCase();
+    for (const overclaim of ["resolves to a region", "region of a page of a source revision"]) {
+      expect(promise, `the promise claims every fact "${overclaim}", which an OCR v1 read does not produce`)
+        .not.toContain(overclaim);
+    }
+    expect(promise, "the promise no longer names the binding that does hold for every fact")
+      .toContain("exact source version");
+  });
+
+  /*
+    No sentence a visitor reads may name a tool only this repository can run.
+
+    The page told a reader to run `pnpm verify:export` against a downloaded archive. That script
+    is `scripts/verify-signed-export.mjs` in the private site repository: it is not in the package,
+    not in `public/developer/`, and not a command in the published CLI. It was the only pnpm script
+    named in the visible copy of any page in this app, so it was not a convention a reader would
+    discount -- it was an instruction that fails. The `evidence` field is exempt on purpose: it is
+    declared as a pointer into this repository, and "WHERE TO CHECK IT" is addressed to someone
+    reading the source, not to someone holding a zip.
+  */
+  it("names no repository-only script in a sentence addressed to a reader", () => {
+    for (const entry of CONTRACT_CLAUSES) {
+      expect(entry.promise, `${entry.name} promises a command a reader cannot run`).not.toMatch(/\bpnpm\s/);
+      expect(entry.body, `${entry.name} tells a reader to run a repository script`).not.toMatch(/\bpnpm\s/);
+    }
+    expect(stripComments(read("../app/product/continuous-knowledge/page.tsx")), "the page names a pnpm script")
+      .not.toMatch(/\bpnpm\s/);
+
+    // And the verifier is still absent from everything a holder receives.
+    const shipped = readdirSync(resolve(import.meta.dirname, "../public/developer"));
+    expect(shipped.filter((file) => file.toLowerCase().includes("verify")), "a verifier now ships to /developer; the portable-world copy can be re-derived")
+      .toEqual([]);
+    expect(read("../public/developer/tavonel-cli.mjs")).not.toContain("verify:export");
+    expect(read("./collection-download.ts"), "the archive no longer writes the README the clause describes")
+      .toContain("Verify manifest/export-manifest.json against signatures/export-manifest.ed25519.json");
+  });
+
+  /*
+    What is left of the portable-world promise once the tool is gone.
+
+    "A signed package you can verify without us" survives only because the archive carries the
+    public key the signature was made with and states the algorithm. Both are asserted here, so
+    the promise fails with the thing that supports it rather than outliving it.
+  */
+  it("keeps the archive self-describing enough for the offline check it promises", () => {
+    const download = read("./collection-download.ts");
+    expect(download).toContain("Every listed file was SHA-256 checked, then the exact export manifest bytes were signed with Ed25519.");
+    expect(download).toContain('entries["signatures/export-manifest.ed25519.json"]');
+    // The signature object carries the key, not only its fingerprint -- otherwise "without us"
+    // would require our endpoint to perform the check at all, rather than to pin the key.
+    expect(read("./export-signing.ts")).toContain("publicKeySpkiDerBase64");
+
+    const body = clause("portable-world").body;
+    expect(body).toContain("Ed25519");
+    expect(body).toContain("EXPORT_SIGNER_NOT_CONFIGURED");
+    expect(read("../app/api/collections/[id]/download/route.ts")).toContain("EXPORT_SIGNER_NOT_CONFIGURED");
   });
 });
 

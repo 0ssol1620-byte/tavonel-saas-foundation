@@ -58,7 +58,16 @@ export type ContractClause = {
   /** Stable slug, used as the DOM id a deep link can address. */
   id: string;
   name: string;
-  /** One line that says what the clause promises, before the paragraph explains it. */
+  /**
+   * One line that says what the clause promises, before the paragraph explains it.
+   *
+   * This is the sentence a skimmer reads instead of the paragraph, and the page renders it a
+   * step larger than the body, so it is the field with the most room to overstate. Clause 01
+   * shipped a round of review promising that every promoted fact "resolves to a region of a
+   * page of a source revision" while its own body conceded, four sentences later, that a read
+   * without regions emits no region at all. A promise may be shorter than the body it
+   * introduces. It may not be stronger than it, and `compiler-contract.test.ts` pins all eight.
+   */
   promise: string;
   body: string;
   state: ContractClauseState;
@@ -87,7 +96,7 @@ export const CONTRACT_CLAUSES: readonly ContractClause[] = [
   {
     id: "evidence-preserving",
     name: "Evidence-preserving",
-    promise: "Every promoted fact resolves to a region of a page of a source revision.",
+    promise: "Every promoted fact names the exact source version it was read from, and every region names its page and its box.",
     body:
       "Every relation is typed and carries the evidence that justifies it, and a claim reaches that evidence through a supported_by relation to one exact document version — identified by the sha256 of the bytes that were read, not by a filename. The coordinates live on the region: each retrieval unit names a bounding box on a numbered page of that version and lists the claims and entities found inside it, so a changed region can be read back to what stands on it. Where an anchor is missing the compiler abstains rather than inventing one — a document version whose regions fail validation stops the compile with OCR_BINDING_INVALID, and a document read without regions emits no retrieval unit rather than a guessed page or box. Resolving every evidence reference in a finished package, and reporting EVIDENCE_DANGLING where one does not, is an offline check anyone holding the package can run — not a gate on the emit path.",
     state: "demonstrated",
@@ -152,9 +161,9 @@ export const CONTRACT_CLAUSES: readonly ContractClause[] = [
     name: "Portable World",
     promise: "A compiled World leaves as a signed package you can verify without us.",
     body:
-      "The canonical model leaves as JSON, the ontology as Turtle and JSON-LD, the graph as CSV, the retrieval corpus and the provenance events as JSON Lines, and the sources as Markdown for reading. The archive carries a signed file inventory and the public verification key, and it is checked offline with pnpm verify:export against a fingerprint obtained from somewhere other than the archive. Knowledge that can only be read inside the tool that made it is not an asset.",
+      "The canonical model leaves as JSON, the ontology as Turtle and JSON-LD, the graph as CSV, the retrieval corpus and the provenance events as JSON Lines, and the sources as Markdown for reading. The archive carries a signed file inventory — every listed file checked by sha256, then those exact manifest bytes signed with Ed25519 — and the public key the signature was made with, so the check is an offline comparison of two files in the archive against a key fingerprint obtained from somewhere other than the archive: GET /api/export/trust publishes that fingerprint, and a download with no signing key configured refuses with EXPORT_SIGNER_NOT_CONFIGURED rather than handing over an unsigned archive. What the package does not carry is the verifier itself. It names the algorithm and the two files to compare, and the program that compares them is written by whoever holds it — the one in this repository runs against a build here, not in a customer's hands. Knowledge that can only be read inside the tool that made it is not an asset.",
     state: "demonstrated",
-    evidence: "lib/collection-download.ts, lib/export-signing.ts, scripts/verify-signed-export.mjs, GET /api/export/trust",
+    evidence: "lib/collection-download.ts (manifest/export-manifest.json and signatures/export-manifest.ed25519.json), lib/export-signing.ts, GET /api/export/trust, and app/api/collections/[id]/download/route.ts — 503 rather than an unsigned archive",
   },
 ];
 
