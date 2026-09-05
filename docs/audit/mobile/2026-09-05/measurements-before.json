@@ -1,0 +1,2019 @@
+{
+ "phase": "before",
+ "base": "http://127.0.0.1:3137",
+ "at": "2026-09-05T13:06:55.945Z",
+ "widths": {
+  "360": {
+   "overflow": {
+    "win": 360,
+    "docW": 360,
+    "clientW": 360,
+    "wide": []
+   },
+   "header": {
+    "wordmark": {
+     "x": 14,
+     "y": 10,
+     "w": 104,
+     "h": 42
+    },
+    "menu": {
+     "x": 126,
+     "y": 14,
+     "w": 62,
+     "h": 34
+    },
+    "cta": {
+     "x": 196,
+     "y": 10,
+     "w": 152,
+     "h": 42
+    },
+    "wordmarkVsMenu": 0,
+    "menuVsCta": 0,
+    "headerH": 63
+   },
+   "menuPanel": {
+    "present": true,
+    "x": -93,
+    "right": 188,
+    "w": 281,
+    "h": 318,
+    "viewport": 360,
+    "offLeft": 93,
+    "offRight": 0,
+    "links": [
+     {
+      "label": "Product",
+      "x": -91,
+      "w": 277,
+      "h": 44
+     },
+     {
+      "label": "Solutions",
+      "x": -91,
+      "w": 277,
+      "h": 44
+     },
+     {
+      "label": "Integrations",
+      "x": -91,
+      "w": 277,
+      "h": 44
+     },
+     {
+      "label": "Developers",
+      "x": -91,
+      "w": 277,
+      "h": 44
+     },
+     {
+      "label": "Security",
+      "x": -91,
+      "w": 277,
+      "h": 44
+     },
+     {
+      "label": "Pricing",
+      "x": -91,
+      "w": 277,
+      "h": 44
+     },
+     {
+      "label": "Resources",
+      "x": -91,
+      "w": 277,
+      "h": 44
+     }
+    ]
+   },
+   "film": {
+    "renderer": "live-canvas",
+    "canvasMounted": true,
+    "videoMounted": false,
+    "stillMounted": false,
+    "canvasCssWidth": 318,
+    "videoSources": [],
+    "videoPoster": null,
+    "frame": {
+     "w": 320,
+     "h": 209,
+     "ratio": 1.533
+    },
+    "stripRows": 1,
+    "buttons": [
+     {
+      "label": "SOURCES",
+      "x": 20,
+      "y": 317,
+      "w": 80,
+      "h": 38,
+      "scrollW": 80,
+      "clientW": 80,
+      "font": "10px"
+     },
+     {
+      "label": "READ",
+      "x": 100,
+      "y": 317,
+      "w": 80,
+      "h": 38,
+      "scrollW": 79,
+      "clientW": 79,
+      "font": "10px"
+     },
+     {
+      "label": "STRUCTURE",
+      "x": 180,
+      "y": 317,
+      "w": 80,
+      "h": 38,
+      "scrollW": 79,
+      "clientW": 79,
+      "font": "10px"
+     },
+     {
+      "label": "WORLD",
+      "x": 260,
+      "y": 317,
+      "w": 80,
+      "h": 38,
+      "scrollW": 79,
+      "clientW": 79,
+      "font": "10px"
+     }
+    ],
+    "captionFont": "13px",
+    "captionText": "Files, folders, archives and connected drives arrive together.",
+    "progressFont": "9px",
+    "progressText": "01 / 04"
+   },
+   "smallTargets": [
+    {
+     "tag": "a",
+     "cls": "skip",
+     "text": "Skip to content",
+     "w": 150,
+     "h": 40
+    },
+    {
+     "tag": "a",
+     "cls": "wordmark",
+     "text": "TAVONEL",
+     "w": 104,
+     "h": 42
+    },
+    {
+     "tag": "summary",
+     "cls": "",
+     "text": "Menu",
+     "w": 62,
+     "h": 34
+    },
+    {
+     "tag": "a",
+     "cls": "btn small",
+     "text": "Request access",
+     "w": 112,
+     "h": 42
+    },
+    {
+     "tag": "a",
+     "cls": "nav-signin",
+     "text": "Sign in",
+     "w": 25,
+     "h": 42
+    },
+    {
+     "tag": "a",
+     "cls": "btn",
+     "text": "Explore a Compiled World",
+     "w": 217,
+     "h": 43
+    },
+    {
+     "tag": "a",
+     "cls": "btn ghost",
+     "text": "Request access",
+     "w": 143,
+     "h": 43
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "text": "SOURCES",
+     "w": 80,
+     "h": 38
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "text": "READ",
+     "w": 80,
+     "h": 38
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "text": "STRUCTURE",
+     "w": 80,
+     "h": 38
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "text": "WORLD",
+     "w": 80,
+     "h": 38
+    },
+    {
+     "tag": "a",
+     "cls": "btn",
+     "text": "Explore a Compiled World",
+     "w": 230,
+     "h": 43
+    },
+    {
+     "tag": "a",
+     "cls": "btn",
+     "text": "Request access",
+     "w": 151,
+     "h": 43
+    },
+    {
+     "tag": "a",
+     "cls": "btn ghost",
+     "text": "Explore a Compiled World",
+     "w": 230,
+     "h": 43
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Product",
+     "w": 320,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Solutions",
+     "w": 320,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Integrations",
+     "w": 320,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Pricing",
+     "w": 320,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Docs",
+     "w": 320,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "API",
+     "w": 320,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "MCP and agents",
+     "w": 320,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Changelog",
+     "w": 320,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Security",
+     "w": 320,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Status",
+     "w": 320,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Subprocessors",
+     "w": 320,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Contact",
+     "w": 320,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Privacy",
+     "w": 320,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Terms",
+     "w": 320,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Refunds",
+     "w": 320,
+     "h": 21
+    },
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 12,
+     "h": 6
+    },
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 12,
+     "h": 6
+    },
+    {
+     "tag": "button",
+     "cls": "bt on",
+     "text": "",
+     "w": 16,
+     "h": 8
+    },
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 12,
+     "h": 6
+    },
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 12,
+     "h": 6
+    },
+    {
+     "tag": "button",
+     "cls": "bar-next",
+     "text": "FOLLOW THE EVIDENCE",
+     "w": 154,
+     "h": 27
+    }
+   ],
+   "consoleErrors": []
+  },
+  "390": {
+   "overflow": {
+    "win": 390,
+    "docW": 390,
+    "clientW": 390,
+    "wide": []
+   },
+   "header": {
+    "wordmark": {
+     "x": 14,
+     "y": 10,
+     "w": 104,
+     "h": 42
+    },
+    "menu": {
+     "x": 140,
+     "y": 14,
+     "w": 62,
+     "h": 34
+    },
+    "cta": {
+     "x": 210,
+     "y": 10,
+     "w": 166,
+     "h": 42
+    },
+    "wordmarkVsMenu": 0,
+    "menuVsCta": 0,
+    "headerH": 63
+   },
+   "menuPanel": {
+    "present": true,
+    "x": -98,
+    "right": 202,
+    "w": 300,
+    "h": 318,
+    "viewport": 390,
+    "offLeft": 98,
+    "offRight": 0,
+    "links": [
+     {
+      "label": "Product",
+      "x": -96,
+      "w": 296,
+      "h": 44
+     },
+     {
+      "label": "Solutions",
+      "x": -96,
+      "w": 296,
+      "h": 44
+     },
+     {
+      "label": "Integrations",
+      "x": -96,
+      "w": 296,
+      "h": 44
+     },
+     {
+      "label": "Developers",
+      "x": -96,
+      "w": 296,
+      "h": 44
+     },
+     {
+      "label": "Security",
+      "x": -96,
+      "w": 296,
+      "h": 44
+     },
+     {
+      "label": "Pricing",
+      "x": -96,
+      "w": 296,
+      "h": 44
+     },
+     {
+      "label": "Resources",
+      "x": -96,
+      "w": 296,
+      "h": 44
+     }
+    ]
+   },
+   "film": {
+    "renderer": "live-canvas",
+    "canvasMounted": true,
+    "videoMounted": false,
+    "stillMounted": false,
+    "canvasCssWidth": 348,
+    "videoSources": [],
+    "videoPoster": null,
+    "frame": {
+     "w": 350,
+     "h": 226,
+     "ratio": 1.547
+    },
+    "stripRows": 1,
+    "buttons": [
+     {
+      "label": "SOURCES",
+      "x": 20,
+      "y": 293,
+      "w": 88,
+      "h": 38,
+      "scrollW": 88,
+      "clientW": 88,
+      "font": "10px"
+     },
+     {
+      "label": "READ",
+      "x": 108,
+      "y": 293,
+      "w": 88,
+      "h": 38,
+      "scrollW": 87,
+      "clientW": 87,
+      "font": "10px"
+     },
+     {
+      "label": "STRUCTURE",
+      "x": 195,
+      "y": 293,
+      "w": 88,
+      "h": 38,
+      "scrollW": 87,
+      "clientW": 87,
+      "font": "10px"
+     },
+     {
+      "label": "WORLD",
+      "x": 283,
+      "y": 293,
+      "w": 88,
+      "h": 38,
+      "scrollW": 87,
+      "clientW": 87,
+      "font": "10px"
+     }
+    ],
+    "captionFont": "13px",
+    "captionText": "Files, folders, archives and connected drives arrive together.",
+    "progressFont": "9px",
+    "progressText": "01 / 04"
+   },
+   "smallTargets": [
+    {
+     "tag": "a",
+     "cls": "skip",
+     "text": "Skip to content",
+     "w": 150,
+     "h": 40
+    },
+    {
+     "tag": "a",
+     "cls": "wordmark",
+     "text": "TAVONEL",
+     "w": 104,
+     "h": 42
+    },
+    {
+     "tag": "summary",
+     "cls": "",
+     "text": "Menu",
+     "w": 62,
+     "h": 34
+    },
+    {
+     "tag": "a",
+     "cls": "btn small",
+     "text": "Request access",
+     "w": 112,
+     "h": 42
+    },
+    {
+     "tag": "a",
+     "cls": "nav-signin",
+     "text": "Sign in",
+     "w": 39,
+     "h": 42
+    },
+    {
+     "tag": "a",
+     "cls": "btn",
+     "text": "Explore a Compiled World",
+     "w": 217,
+     "h": 43
+    },
+    {
+     "tag": "a",
+     "cls": "btn ghost",
+     "text": "Request access",
+     "w": 143,
+     "h": 43
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "text": "SOURCES",
+     "w": 88,
+     "h": 38
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "text": "READ",
+     "w": 88,
+     "h": 38
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "text": "STRUCTURE",
+     "w": 88,
+     "h": 38
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "text": "WORLD",
+     "w": 88,
+     "h": 38
+    },
+    {
+     "tag": "a",
+     "cls": "btn",
+     "text": "Explore a Compiled World",
+     "w": 230,
+     "h": 43
+    },
+    {
+     "tag": "a",
+     "cls": "btn",
+     "text": "Request access",
+     "w": 151,
+     "h": 43
+    },
+    {
+     "tag": "a",
+     "cls": "btn ghost",
+     "text": "Explore a Compiled World",
+     "w": 230,
+     "h": 43
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Product",
+     "w": 350,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Solutions",
+     "w": 350,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Integrations",
+     "w": 350,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Pricing",
+     "w": 350,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Docs",
+     "w": 350,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "API",
+     "w": 350,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "MCP and agents",
+     "w": 350,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Changelog",
+     "w": 350,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Security",
+     "w": 350,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Status",
+     "w": 350,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Subprocessors",
+     "w": 350,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Contact",
+     "w": 350,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Privacy",
+     "w": 350,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Terms",
+     "w": 350,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Refunds",
+     "w": 350,
+     "h": 21
+    },
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 12,
+     "h": 6
+    },
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 12,
+     "h": 6
+    },
+    {
+     "tag": "button",
+     "cls": "bt on",
+     "text": "",
+     "w": 16,
+     "h": 8
+    },
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 12,
+     "h": 6
+    },
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 12,
+     "h": 6
+    },
+    {
+     "tag": "button",
+     "cls": "bar-next",
+     "text": "FOLLOW THE EVIDENCE",
+     "w": 154,
+     "h": 27
+    }
+   ],
+   "consoleErrors": []
+  },
+  "412": {
+   "overflow": {
+    "win": 412,
+    "docW": 412,
+    "clientW": 412,
+    "wide": []
+   },
+   "header": {
+    "wordmark": {
+     "x": 14,
+     "y": 10,
+     "w": 104,
+     "h": 42
+    },
+    "menu": {
+     "x": 162,
+     "y": 14,
+     "w": 62,
+     "h": 34
+    },
+    "cta": {
+     "x": 232,
+     "y": 10,
+     "w": 166,
+     "h": 42
+    },
+    "wordmarkVsMenu": 0,
+    "menuVsCta": 0,
+    "headerH": 63
+   },
+   "menuPanel": {
+    "present": true,
+    "x": -76,
+    "right": 224,
+    "w": 300,
+    "h": 318,
+    "viewport": 412,
+    "offLeft": 76,
+    "offRight": 0,
+    "links": [
+     {
+      "label": "Product",
+      "x": -74,
+      "w": 296,
+      "h": 44
+     },
+     {
+      "label": "Solutions",
+      "x": -74,
+      "w": 296,
+      "h": 44
+     },
+     {
+      "label": "Integrations",
+      "x": -74,
+      "w": 296,
+      "h": 44
+     },
+     {
+      "label": "Developers",
+      "x": -74,
+      "w": 296,
+      "h": 44
+     },
+     {
+      "label": "Security",
+      "x": -74,
+      "w": 296,
+      "h": 44
+     },
+     {
+      "label": "Pricing",
+      "x": -74,
+      "w": 296,
+      "h": 44
+     },
+     {
+      "label": "Resources",
+      "x": -74,
+      "w": 296,
+      "h": 44
+     }
+    ]
+   },
+   "film": {
+    "renderer": "live-canvas",
+    "canvasMounted": true,
+    "videoMounted": false,
+    "stillMounted": false,
+    "canvasCssWidth": 370,
+    "videoSources": [],
+    "videoPoster": null,
+    "frame": {
+     "w": 372,
+     "h": 239,
+     "ratio": 1.557
+    },
+    "stripRows": 1,
+    "buttons": [
+     {
+      "label": "SOURCES",
+      "x": 20,
+      "y": 286,
+      "w": 93,
+      "h": 38,
+      "scrollW": 93,
+      "clientW": 93,
+      "font": "10px"
+     },
+     {
+      "label": "READ",
+      "x": 113,
+      "y": 286,
+      "w": 93,
+      "h": 38,
+      "scrollW": 92,
+      "clientW": 92,
+      "font": "10px"
+     },
+     {
+      "label": "STRUCTURE",
+      "x": 206,
+      "y": 286,
+      "w": 93,
+      "h": 38,
+      "scrollW": 92,
+      "clientW": 92,
+      "font": "10px"
+     },
+     {
+      "label": "WORLD",
+      "x": 299,
+      "y": 286,
+      "w": 93,
+      "h": 38,
+      "scrollW": 92,
+      "clientW": 92,
+      "font": "10px"
+     }
+    ],
+    "captionFont": "13px",
+    "captionText": "Files, folders, archives and connected drives arrive together.",
+    "progressFont": "9px",
+    "progressText": "01 / 04"
+   },
+   "smallTargets": [
+    {
+     "tag": "a",
+     "cls": "skip",
+     "text": "Skip to content",
+     "w": 150,
+     "h": 40
+    },
+    {
+     "tag": "a",
+     "cls": "wordmark",
+     "text": "TAVONEL",
+     "w": 104,
+     "h": 42
+    },
+    {
+     "tag": "summary",
+     "cls": "",
+     "text": "Menu",
+     "w": 62,
+     "h": 34
+    },
+    {
+     "tag": "a",
+     "cls": "btn small",
+     "text": "Request access",
+     "w": 112,
+     "h": 42
+    },
+    {
+     "tag": "a",
+     "cls": "nav-signin",
+     "text": "Sign in",
+     "w": 39,
+     "h": 42
+    },
+    {
+     "tag": "a",
+     "cls": "btn",
+     "text": "Explore a Compiled World",
+     "w": 217,
+     "h": 43
+    },
+    {
+     "tag": "a",
+     "cls": "btn ghost",
+     "text": "Request access",
+     "w": 143,
+     "h": 43
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "text": "SOURCES",
+     "w": 93,
+     "h": 38
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "text": "READ",
+     "w": 93,
+     "h": 38
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "text": "STRUCTURE",
+     "w": 93,
+     "h": 38
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "text": "WORLD",
+     "w": 93,
+     "h": 38
+    },
+    {
+     "tag": "a",
+     "cls": "btn",
+     "text": "Explore a Compiled World",
+     "w": 230,
+     "h": 43
+    },
+    {
+     "tag": "a",
+     "cls": "btn",
+     "text": "Request access",
+     "w": 151,
+     "h": 43
+    },
+    {
+     "tag": "a",
+     "cls": "btn ghost",
+     "text": "Explore a Compiled World",
+     "w": 230,
+     "h": 43
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Product",
+     "w": 372,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Solutions",
+     "w": 372,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Integrations",
+     "w": 372,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Pricing",
+     "w": 372,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Docs",
+     "w": 372,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "API",
+     "w": 372,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "MCP and agents",
+     "w": 372,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Changelog",
+     "w": 372,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Security",
+     "w": 372,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Status",
+     "w": 372,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Subprocessors",
+     "w": 372,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Contact",
+     "w": 372,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Privacy",
+     "w": 372,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Terms",
+     "w": 372,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Refunds",
+     "w": 372,
+     "h": 21
+    },
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 12,
+     "h": 6
+    },
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 12,
+     "h": 6
+    },
+    {
+     "tag": "button",
+     "cls": "bt on",
+     "text": "",
+     "w": 16,
+     "h": 8
+    },
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 12,
+     "h": 6
+    },
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 12,
+     "h": 6
+    },
+    {
+     "tag": "button",
+     "cls": "bar-next",
+     "text": "FOLLOW THE EVIDENCE",
+     "w": 154,
+     "h": 27
+    }
+   ],
+   "consoleErrors": []
+  },
+  "430": {
+   "overflow": {
+    "win": 430,
+    "docW": 430,
+    "clientW": 430,
+    "wide": []
+   },
+   "header": {
+    "wordmark": {
+     "x": 14,
+     "y": 10,
+     "w": 104,
+     "h": 42
+    },
+    "menu": {
+     "x": 180,
+     "y": 14,
+     "w": 62,
+     "h": 34
+    },
+    "cta": {
+     "x": 250,
+     "y": 10,
+     "w": 166,
+     "h": 42
+    },
+    "wordmarkVsMenu": 0,
+    "menuVsCta": 0,
+    "headerH": 63
+   },
+   "menuPanel": {
+    "present": true,
+    "x": -58,
+    "right": 242,
+    "w": 300,
+    "h": 318,
+    "viewport": 430,
+    "offLeft": 58,
+    "offRight": 0,
+    "links": [
+     {
+      "label": "Product",
+      "x": -56,
+      "w": 296,
+      "h": 44
+     },
+     {
+      "label": "Solutions",
+      "x": -56,
+      "w": 296,
+      "h": 44
+     },
+     {
+      "label": "Integrations",
+      "x": -56,
+      "w": 296,
+      "h": 44
+     },
+     {
+      "label": "Developers",
+      "x": -56,
+      "w": 296,
+      "h": 44
+     },
+     {
+      "label": "Security",
+      "x": -56,
+      "w": 296,
+      "h": 44
+     },
+     {
+      "label": "Pricing",
+      "x": -56,
+      "w": 296,
+      "h": 44
+     },
+     {
+      "label": "Resources",
+      "x": -56,
+      "w": 296,
+      "h": 44
+     }
+    ]
+   },
+   "film": {
+    "renderer": "live-canvas",
+    "canvasMounted": true,
+    "videoMounted": false,
+    "stillMounted": false,
+    "canvasCssWidth": 388,
+    "videoSources": [],
+    "videoPoster": null,
+    "frame": {
+     "w": 390,
+     "h": 249,
+     "ratio": 1.564
+    },
+    "stripRows": 1,
+    "buttons": [
+     {
+      "label": "SOURCES",
+      "x": 20,
+      "y": 281,
+      "w": 98,
+      "h": 38,
+      "scrollW": 98,
+      "clientW": 98,
+      "font": "10px"
+     },
+     {
+      "label": "READ",
+      "x": 118,
+      "y": 281,
+      "w": 98,
+      "h": 38,
+      "scrollW": 97,
+      "clientW": 97,
+      "font": "10px"
+     },
+     {
+      "label": "STRUCTURE",
+      "x": 215,
+      "y": 281,
+      "w": 98,
+      "h": 38,
+      "scrollW": 97,
+      "clientW": 97,
+      "font": "10px"
+     },
+     {
+      "label": "WORLD",
+      "x": 313,
+      "y": 281,
+      "w": 98,
+      "h": 38,
+      "scrollW": 97,
+      "clientW": 97,
+      "font": "10px"
+     }
+    ],
+    "captionFont": "13px",
+    "captionText": "Files, folders, archives and connected drives arrive together.",
+    "progressFont": "9px",
+    "progressText": "01 / 04"
+   },
+   "smallTargets": [
+    {
+     "tag": "a",
+     "cls": "skip",
+     "text": "Skip to content",
+     "w": 150,
+     "h": 40
+    },
+    {
+     "tag": "a",
+     "cls": "wordmark",
+     "text": "TAVONEL",
+     "w": 104,
+     "h": 42
+    },
+    {
+     "tag": "summary",
+     "cls": "",
+     "text": "Menu",
+     "w": 62,
+     "h": 34
+    },
+    {
+     "tag": "a",
+     "cls": "btn small",
+     "text": "Request access",
+     "w": 112,
+     "h": 42
+    },
+    {
+     "tag": "a",
+     "cls": "nav-signin",
+     "text": "Sign in",
+     "w": 39,
+     "h": 42
+    },
+    {
+     "tag": "a",
+     "cls": "btn",
+     "text": "Explore a Compiled World",
+     "w": 217,
+     "h": 43
+    },
+    {
+     "tag": "a",
+     "cls": "btn ghost",
+     "text": "Request access",
+     "w": 143,
+     "h": 43
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "text": "SOURCES",
+     "w": 98,
+     "h": 38
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "text": "READ",
+     "w": 98,
+     "h": 38
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "text": "STRUCTURE",
+     "w": 98,
+     "h": 38
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "text": "WORLD",
+     "w": 98,
+     "h": 38
+    },
+    {
+     "tag": "a",
+     "cls": "btn",
+     "text": "Explore a Compiled World",
+     "w": 230,
+     "h": 43
+    },
+    {
+     "tag": "a",
+     "cls": "btn",
+     "text": "Request access",
+     "w": 151,
+     "h": 43
+    },
+    {
+     "tag": "a",
+     "cls": "btn ghost",
+     "text": "Explore a Compiled World",
+     "w": 230,
+     "h": 43
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Product",
+     "w": 390,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Solutions",
+     "w": 390,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Integrations",
+     "w": 390,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Pricing",
+     "w": 390,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Docs",
+     "w": 390,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "API",
+     "w": 390,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "MCP and agents",
+     "w": 390,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Changelog",
+     "w": 390,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Security",
+     "w": 390,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Status",
+     "w": 390,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Subprocessors",
+     "w": 390,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Contact",
+     "w": 390,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Privacy",
+     "w": 390,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Terms",
+     "w": 390,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Refunds",
+     "w": 390,
+     "h": 21
+    },
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 12,
+     "h": 6
+    },
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 12,
+     "h": 6
+    },
+    {
+     "tag": "button",
+     "cls": "bt on",
+     "text": "",
+     "w": 16,
+     "h": 8
+    },
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 12,
+     "h": 6
+    },
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 12,
+     "h": 6
+    },
+    {
+     "tag": "button",
+     "cls": "bar-next",
+     "text": "FOLLOW THE EVIDENCE",
+     "w": 154,
+     "h": 27
+    }
+   ],
+   "consoleErrors": []
+  },
+  "768": {
+   "overflow": {
+    "win": 768,
+    "docW": 768,
+    "clientW": 768,
+    "wide": []
+   },
+   "header": {
+    "wordmark": {
+     "x": 23,
+     "y": 12,
+     "w": 104,
+     "h": 42
+    },
+    "menu": {
+     "x": 0,
+     "y": 0,
+     "w": 0,
+     "h": 0
+    },
+    "cta": {
+     "x": 898,
+     "y": 12,
+     "w": 171,
+     "h": 42
+    },
+    "wordmarkVsMenu": 0,
+    "menuVsCta": 0,
+    "headerH": 67
+   },
+   "menuPanel": {
+    "present": true,
+    "x": 0,
+    "right": 0,
+    "w": 0,
+    "h": 0,
+    "viewport": 768,
+    "offLeft": 0,
+    "offRight": 0,
+    "links": [
+     {
+      "label": "Product",
+      "x": 0,
+      "w": 0,
+      "h": 0
+     },
+     {
+      "label": "Solutions",
+      "x": 0,
+      "w": 0,
+      "h": 0
+     },
+     {
+      "label": "Integrations",
+      "x": 0,
+      "w": 0,
+      "h": 0
+     },
+     {
+      "label": "Developers",
+      "x": 0,
+      "w": 0,
+      "h": 0
+     },
+     {
+      "label": "Security",
+      "x": 0,
+      "w": 0,
+      "h": 0
+     },
+     {
+      "label": "Pricing",
+      "x": 0,
+      "w": 0,
+      "h": 0
+     },
+     {
+      "label": "Resources",
+      "x": 0,
+      "w": 0,
+      "h": 0
+     }
+    ]
+   },
+   "film": {
+    "renderer": "live-canvas",
+    "canvasMounted": true,
+    "videoMounted": false,
+    "stillMounted": false,
+    "canvasCssWidth": 705,
+    "videoSources": [],
+    "videoPoster": null,
+    "frame": {
+     "w": 707,
+     "h": 476,
+     "ratio": 1.484
+    },
+    "stripRows": 1,
+    "buttons": [
+     {
+      "label": "SOURCES",
+      "x": 31,
+      "y": 376,
+      "w": 177,
+      "h": 38,
+      "scrollW": 177,
+      "clientW": 177,
+      "font": "10px"
+     },
+     {
+      "label": "READ",
+      "x": 207,
+      "y": 376,
+      "w": 177,
+      "h": 38,
+      "scrollW": 176,
+      "clientW": 176,
+      "font": "10px"
+     },
+     {
+      "label": "STRUCTURE",
+      "x": 384,
+      "y": 376,
+      "w": 177,
+      "h": 38,
+      "scrollW": 176,
+      "clientW": 176,
+      "font": "10px"
+     },
+     {
+      "label": "WORLD",
+      "x": 561,
+      "y": 376,
+      "w": 177,
+      "h": 38,
+      "scrollW": 176,
+      "clientW": 176,
+      "font": "10px"
+     }
+    ],
+    "captionFont": "13px",
+    "captionText": "Files, folders, archives and connected drives arrive together.",
+    "progressFont": "9px",
+    "progressText": "01 / 04"
+   },
+   "smallTargets": [
+    {
+     "tag": "a",
+     "cls": "skip",
+     "text": "Skip to content",
+     "w": 150,
+     "h": 40
+    },
+    {
+     "tag": "a",
+     "cls": "wordmark",
+     "text": "TAVONEL",
+     "w": 104,
+     "h": 42
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Product",
+     "w": 51,
+     "h": 42
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Solutions",
+     "w": 65,
+     "h": 42
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Integrations",
+     "w": 87,
+     "h": 42
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Developers",
+     "w": 73,
+     "h": 42
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Security",
+     "w": 58,
+     "h": 42
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Pricing",
+     "w": 51,
+     "h": 42
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Resources",
+     "w": 65,
+     "h": 42
+    },
+    {
+     "tag": "a",
+     "cls": "btn small",
+     "text": "Request access",
+     "w": 131,
+     "h": 42
+    },
+    {
+     "tag": "a",
+     "cls": "nav-signin",
+     "text": "Sign in",
+     "w": 25,
+     "h": 42
+    },
+    {
+     "tag": "a",
+     "cls": "btn",
+     "text": "Explore a Compiled World",
+     "w": 230,
+     "h": 43
+    },
+    {
+     "tag": "a",
+     "cls": "btn ghost",
+     "text": "Request access",
+     "w": 151,
+     "h": 43
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "text": "SOURCES",
+     "w": 177,
+     "h": 38
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "text": "READ",
+     "w": 177,
+     "h": 38
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "text": "STRUCTURE",
+     "w": 177,
+     "h": 38
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "text": "WORLD",
+     "w": 177,
+     "h": 38
+    },
+    {
+     "tag": "a",
+     "cls": "btn",
+     "text": "Explore a Compiled World",
+     "w": 230,
+     "h": 43
+    },
+    {
+     "tag": "a",
+     "cls": "btn",
+     "text": "Request access",
+     "w": 151,
+     "h": 43
+    },
+    {
+     "tag": "a",
+     "cls": "btn ghost",
+     "text": "Explore a Compiled World",
+     "w": 230,
+     "h": 43
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Product",
+     "w": 341,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Solutions",
+     "w": 341,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Integrations",
+     "w": 341,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Pricing",
+     "w": 341,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Docs",
+     "w": 341,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "API",
+     "w": 341,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "MCP and agents",
+     "w": 341,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Changelog",
+     "w": 341,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Security",
+     "w": 341,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Status",
+     "w": 341,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Subprocessors",
+     "w": 341,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Contact",
+     "w": 341,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Privacy",
+     "w": 341,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Terms",
+     "w": 341,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "",
+     "text": "Refunds",
+     "w": 341,
+     "h": 21
+    },
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 12,
+     "h": 6
+    },
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 12,
+     "h": 6
+    },
+    {
+     "tag": "button",
+     "cls": "bt on",
+     "text": "",
+     "w": 16,
+     "h": 8
+    },
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 12,
+     "h": 6
+    },
+    {
+     "tag": "button",
+     "cls": "bt",
+     "text": "",
+     "w": 12,
+     "h": 6
+    },
+    {
+     "tag": "button",
+     "cls": "bar-next",
+     "text": "FOLLOW THE EVIDENCE",
+     "w": 154,
+     "h": 27
+    }
+   ],
+   "consoleErrors": []
+  }
+ }
+}
