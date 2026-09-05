@@ -262,9 +262,11 @@ must never reach a browser bundle. Nothing in `nextjs/` accepts document bytes, 
 payment, or promotes a candidate world to active without the checks that file describes.
 
 CI (`.github/workflows/ci.yml`) runs `pnpm check && pnpm test && pnpm build` for both the root
-workspace and `nextjs/` on every pull request and every push to `main`. `.github/workflows/
-launch-qa.yml` runs the Playwright launch suite across Chromium, Firefox and WebKit.
-`.github/workflows/codeql.yml` runs CodeQL static analysis on a schedule and on every PR.
+workspace and `nextjs/` on every pull request and every push to `main`.
+`.github/workflows/launch-qa.yml` runs the Playwright launch suite across Chromium, Firefox and
+WebKit, enforces Lighthouse performance budgets as a separate job, and closes with an aggregate
+job that fails unless all four succeeded. `.github/workflows/codeql.yml` runs CodeQL static
+analysis on every pull request, every push to `main`, and weekly on a schedule.
 
 Pull requests are opened against `main` and reviewed by the owners in
 [`.github/CODEOWNERS`](.github/CODEOWNERS); use
