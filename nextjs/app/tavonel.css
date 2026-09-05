@@ -797,11 +797,31 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
   All four videos are stacked in the same grid cell so the frame never resizes between stages
   and the page below it never shifts. `aspect-ratio` reserves the box before any bytes land, so
   there is no jump when the first frame decodes either.
+
+  1440 was the master's width, not the frame's.
+
+  The cap dates from when this frame showed an MP4 recorded at a 1440 stage, and it stopped
+  being the right number twice over: the shipped cuts are 2880 wide, and the normal path is now
+  a live canvas that lays itself out at `clientWidth × devicePixelRatio` and has no native size
+  at all. What it did in the meantime was hold the film to 1440px on a 1920 screen — 75% of the
+  viewport, where the scene's own frame width (`--compile-film-width`, set on the sequence by
+  ux-120-final.css and already bounded to 94vw and a hard ceiling) offers 1700. Blueprint §13
+  puts the film at 80–85% of this scene; measured before the change it was 94.0% at 1440 and
+  75.0% at 1920, so only the wide end was wrong.
+
+  Deferring to that custom property makes the frame exactly as wide as the sequence it sits in,
+  which is where the centring and the ceilings already live. Below ~1532px, 94vw is under 1440
+  and nothing moves. The literal stays as the fallback for any surface that mounts the player
+  without the landing's width variable.
 */
 .compile-film-viewport {
   position: relative;
   display: grid;
-  width: min(100%, 1440px);
+  /* The stacked media cell is the frame's own height, never the poster's. See the note above
+     `.compile-film-still` below: an `auto` row lets a replaced element with an intrinsic ratio
+     lay itself out taller than the frame, which then clips it. */
+  grid-template-rows: minmax(0, 1fr);
+  width: min(100%, var(--compile-film-width, 1440px));
   margin-inline: auto;
   aspect-ratio: 1440 / 900;
   max-height: calc(100dvh - 300px);
@@ -826,6 +846,35 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
   pointer-events: none;
 }
 /*
+  The poster is shown whole. Reduced motion drops the film, not the frame's contents.
+
+  Two rules were cutting it. The media cell was an `auto` grid row, so an <img> carrying the
+  poster's own 1440x900 ratio laid itself out at its full height and pushed past a frame whose
+  used height comes from `min-height: clamp(430px, 52vw, 850px)` (ux-120-final.css), and the
+  frame's `overflow: hidden` took the difference; `object-fit: cover` then cropped whatever was
+  left. Measured on this branch's preview at 6590dde: the still is 1698x1061 in a 1700x850 frame
+  at 1920 and 20.0% of the poster never reaches the screen -- 11.5% at 1440 and 1280, 12.4% at
+  1024, 6.9% at 768, 2.4% at 390. What sits in the lost band is not margin. In poster-3 it is the
+  tail of the SOURCES diff and the whole `trace  WORLD edge -> NoticePeriod -> handbook-2026.pdf
+  -> §12` line, which is the one sentence in the cut that says the change was traced.
+
+  The still is not a decoration: it is what `prefers-reduced-motion` viewers get, and what every
+  viewer gets before the scene scrolls into view. Deferring the frame to `--compile-film-width`
+  above raised the 1920 loss from 5.7% to 20.0%, so the widening is what turned an old blemish
+  into a regression on the accessibility path.
+
+  `minmax(0, 1fr)` on the frame gives the media box the frame's height rather than the poster's,
+  so it can no longer overflow; `contain` then fits the whole poster inside that box. The frame
+  keeps its measured width and the live canvas still fills it edge to edge on the motion path,
+  which is the normal path. Where the frame is wider than 1.6:1 the still is letterboxed against
+  the frame's own background instead of being cropped -- 170px each side at 1920, 78px at 1440.
+
+  The override carries `.compile-film-viewport` because ux-120-final.css sets
+  `.compile-film-still { object-fit: cover }` and loads last; that file belongs to another lane,
+  so this file has to out-specify it rather than edit it.
+*/
+.compile-film-viewport .compile-film-still { object-fit: contain; }
+/*
   Hidden with opacity rather than `display: none`.
 
   A display-none <video> is not laid out, and Safari will not decode into a box with no size —
@@ -835,12 +884,26 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 */
 .compile-film-video { opacity: 0; visibility: hidden; transition: opacity .28s ease; }
 .compile-film-video[data-active="1"] { opacity: 1; visibility: visible; }
+/*
+  The stage film gives up the transition name; the world field keeps it.
+
+  `view-transition-name` must be unique in a document, and two elements here claim
+  `world-canvas`: the fixed `.world-field` behind the whole page, and `.film-canvas` inside the
+  live stage film (the same component that also serves /film, where it is the only one). A
+  duplicate name makes the browser skip the transition outright — silently — so every Explore
+  CTA on this page would have degraded to a hard cut the moment the compile scene was on screen
+  and rendering live. The field is the right half of the pair to keep: it is what the Explore
+  stage crossfades into. Scoped to the landing embed, so /film is untouched.
+*/
+.compile-film-live .film-canvas { view-transition-name: none; }
+/* The caption is the frame's bottom edge, so it takes the frame's width — including the
+   `--compile-film-width` deference above, or the two would part company on a wide screen. */
 .compile-film-caption {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 16px;
-  width: min(100%, 1440px);
+  width: min(100%, var(--compile-film-width, 1440px));
   margin-inline: auto;
 }
 .compile-film-caption p { margin: 0; color: var(--text-lo); font-size: 13px; }

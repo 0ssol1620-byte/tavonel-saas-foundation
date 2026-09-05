@@ -8,6 +8,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { Fragment, cloneElement, isValidElement, useCallback, useEffect, useRef, useState } from "react";
+import CanvasTransitionLink from "@/components/canvas-transition-link";
 import CompileStagePlayer, { type CompileStage } from "@/components/compile-stage-player";
 import Logomark from "@/components/logomark";
 import MobilePrimaryNav from "@/components/mobile-primary-nav";
@@ -185,9 +186,20 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
               TAVONEL reads difficult sources, reconstructs structure, resolves identities and
               relationships, and compiles a versioned knowledge layer with evidence back to the page.
             </p>
+            {/*
+              Understanding comes before the account.
+
+              The primary action used to be "Request access" — a contact form asked of someone
+              who has been on the page for four seconds and has not yet seen the product do
+              anything. The compiled world at /explore is the argument; the form is what you
+              fill in once the argument has landed. So Explore takes the primary weight and the
+              access action keeps its place beside it, unchanged in destination and wording.
+              Scene 05 still leads with the access action: by then the visitor has watched the
+              whole sequence and starting is the next move.
+            */}
             <div className="actions">
-              <Link className="btn" href={startHref}>{startLabel}</Link>
-              <Link className="btn ghost" href={"/explore" as Route}>Explore a Compiled World</Link>
+              <ExploreLink className="btn" />
+              <Link className="btn ghost" href={startHref}>{startLabel}</Link>
             </div>
           </div>
         </section>
@@ -222,7 +234,7 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
               <Fragment key={step}><span>{step}</span>{index < 4 ? <i aria-hidden="true">→</i> : null}</Fragment>
             ))}
           </div>
-          <div className="actions rv"><Link className="btn" href={"/explore" as Route}>Explore a Compiled World</Link></div>
+          <div className="actions rv"><ExploreLink className="btn" /></div>
         </Scene>
 
         <Scene id={5} band="access" eyebrow="START" title="Compile your own knowledge.">
@@ -234,7 +246,7 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
               state after sign-up, where connecting something is the obvious next move.
             */}
             <Link className="btn" href={startHref}>{startLabel}</Link>
-            <Link className="btn ghost" href={"/explore" as Route}>Explore a Compiled World</Link>
+            <ExploreLink className="btn ghost" />
           </div>
         </Scene>
       </main>
@@ -283,6 +295,35 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
         <button ref={barNextRef} className="bar-next" type="button" onClick={cta("instrument_bar", nextStep.run)}>{nextStep.label}</button>
       </div>
     </div>
+  );
+}
+
+/*
+  One door into the compiled world, and it is the same door every time.
+
+  The landing offers Explore three times — hero, evidence scene, closing scene — and each was a
+  plain <Link>, so leaving cut hard: the world field the reader had been watching vanished and a
+  new page appeared. `CanvasTransitionLink` routes the same navigation through the browser's View
+  Transitions API, which blends the outgoing document into the incoming one rather than swapping
+  them.
+
+  Be precise about what that buys today. The landing's field carries
+  `view-transition-name: world-canvas`; `/explore` carries nothing of the kind yet, so what runs
+  is the browser's root crossfade with the field animating out — a soft arrival, not the
+  canvas-to-canvas morph the pairing is built for. That morph turns on when the Explore stage
+  root takes the same name; nothing here needs to change when it does. Even then the browser
+  blends two bitmaps and carries no state across, which is why this continuity stays a visual cue
+  and never becomes a claim in copy.
+
+  Under reduced motion, or in a browser without the API, this is an ordinary link and the
+  navigation is identical. It is one component so the three call sites cannot drift apart in
+  label or destination.
+*/
+function ExploreLink({ className }: { className: string }) {
+  return (
+    <CanvasTransitionLink className={className} href={"/explore" as Route}>
+      Explore a Compiled World
+    </CanvasTransitionLink>
   );
 }
 

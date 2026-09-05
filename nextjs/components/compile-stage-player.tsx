@@ -11,10 +11,20 @@ export type CompileStage = {
   poster: string;
 };
 
+/*
+  The caption reads the film that is playing, not a generic description of the stage.
+
+  STRUCTURE said "Entities, claims and relations form, each bound to the region that supports
+  it." That is true of cut 3, and it is also true of half the site — it describes a static
+  result. Cut 3 does something narrower and much harder to claim: it changes one clause in one
+  source, shows which documents that clause reaches, and stops. `CHANGED 1 + TOUCHED 3` is on
+  screen. The caption now says the part the viewer is actually watching, which is also the part
+  a RAG index cannot do. Nothing else about the film changes; the films are locked.
+*/
 export const COMPILE_STAGES: readonly CompileStage[] = [
   { id: "sources", label: "SOURCES", line: "Files, folders, archives and connected drives arrive together.", src: "/film/compile-cut.mp4", poster: "/film/poster-1.webp" },
   { id: "read", label: "READ", line: "Pages, regions, tables and layout are recovered with their coordinates.", src: "/film/compile-cut-2.mp4", poster: "/film/poster-2.webp" },
-  { id: "structure", label: "STRUCTURE", line: "Entities, claims and relations form, each bound to the region that supports it.", src: "/film/compile-cut-3.mp4", poster: "/film/poster-3.webp" },
+  { id: "structure", label: "STRUCTURE", line: "Meaning resolves across sources. Changes propagate only where they matter.", src: "/film/compile-cut-3.mp4", poster: "/film/poster-3.webp" },
   { id: "world", label: "WORLD", line: "One compiled world, read by Ask, search, the API and MCP.", src: "/film/compile-cut-4.mp4", poster: "/film/poster-4.webp" },
 ] as const;
 
