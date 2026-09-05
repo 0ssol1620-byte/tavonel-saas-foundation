@@ -51,6 +51,8 @@ const COPY_SURFACES = [
   "app/film/page.tsx",
   "app/research/page.tsx",
   "app/benchmarks/page.tsx",
+  // Most of what /benchmarks says is written in the registry, not in the page that arranges it.
+  "lib/benchmark-registry.ts",
   "app/developers/page.tsx",
   "app/pricing/page.tsx",
   "app/product/page.tsx",

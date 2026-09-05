@@ -232,14 +232,45 @@ describe("the committed registry", () => {
 });
 
 /*
+  The copy gate has to reach the words, not only the file that arranges them.
+
+  A visitor at /benchmarks reads two files. `app/benchmarks/page.tsx` holds the headings and the
+  prose around each block; this file's `BENCHMARK_FAMILIES`, `RECEIPT_FIELDS` and `NORTH_STAR`
+  hold the eight family labels and definitions, the twenty-one field labels and their `pins`
+  sentences, and the North Star definition -- the larger half of the page by word count.
+
+  Neither existing gate crosses that boundary on its own. `brand-copy.test.ts` reads each
+  COPY_SURFACES entry's own bytes (`read(surface)` is a bare readFileSync) and follows no
+  imports; `public-copy-purge.test.ts` follows only `from "@/components/..."`, so the page's
+  single `@/lib/benchmark-registry` import is invisible to it too. Listing the page alone would
+  leave a barred phrase or a readiness overclaim written into a family definition free to ship
+  to an indexed public page with both gates green.
+
+  Both files are on COPY_SURFACES now. The rules themselves are still written once, in
+  brand-copy.test.ts -- a second copy of a brand rule drifts from the first. What is asserted
+  here instead is that the list still names them: if either row is dropped, this goes red and
+  says which file lost its check, rather than the copy shipping unread.
+*/
+describe("the copy gate", () => {
+  const brandCopy = readFileSync(new URL("./brand-copy.test.ts", import.meta.url), "utf8");
+
+  it.each(["app/benchmarks/page.tsx", "lib/benchmark-registry.ts"])(
+    "keeps %s on the COPY_SURFACES list",
+    (surface) => {
+      expect(
+        brandCopy,
+        `${surface} carries copy a visitor reads at /benchmarks; COPY_SURFACES must name it`,
+      ).toContain(`"${surface}",`);
+    },
+  );
+});
+
+/*
   The page, checked as source.
 
-  The barred phrases and the readiness overclaims are not repeated here. `app/benchmarks/page.tsx`
-  is on the COPY_SURFACES list in brand-copy.test.ts, which is the one place those two rules are
-  written, and a second copy of a brand rule drifts from the first. What is left below is what
-  only this page can be asked: that it draws its content from the registry, that it shows no
-  table until a record qualifies, and that it hand-types no digit anyone could mistake for a
-  result.
+  What is left below is what only this page can be asked: that it draws its content from the
+  registry, that it shows no table until a record qualifies, and that it hand-types no digit
+  anyone could mistake for a result.
 */
 describe("the /benchmarks page", () => {
   const page = readFileSync(new URL("../app/benchmarks/page.tsx", import.meta.url), "utf8");
