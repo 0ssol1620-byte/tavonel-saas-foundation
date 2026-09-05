@@ -797,11 +797,27 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
   All four videos are stacked in the same grid cell so the frame never resizes between stages
   and the page below it never shifts. `aspect-ratio` reserves the box before any bytes land, so
   there is no jump when the first frame decodes either.
+
+  1440 was the master's width, not the frame's.
+
+  The cap dates from when this frame showed an MP4 recorded at a 1440 stage, and it stopped
+  being the right number twice over: the shipped cuts are 2880 wide, and the normal path is now
+  a live canvas that lays itself out at `clientWidth × devicePixelRatio` and has no native size
+  at all. What it did in the meantime was hold the film to 1440px on a 1920 screen — 75% of the
+  viewport, where the scene's own frame width (`--compile-film-width`, set on the sequence by
+  ux-120-final.css and already bounded to 94vw and a hard ceiling) offers 1700. Blueprint §13
+  puts the film at 80–85% of this scene; measured before the change it was 94.0% at 1440 and
+  75.0% at 1920, so only the wide end was wrong.
+
+  Deferring to that custom property makes the frame exactly as wide as the sequence it sits in,
+  which is where the centring and the ceilings already live. Below ~1532px, 94vw is under 1440
+  and nothing moves. The literal stays as the fallback for any surface that mounts the player
+  without the landing's width variable.
 */
 .compile-film-viewport {
   position: relative;
   display: grid;
-  width: min(100%, 1440px);
+  width: min(100%, var(--compile-film-width, 1440px));
   margin-inline: auto;
   aspect-ratio: 1440 / 900;
   max-height: calc(100dvh - 300px);
@@ -835,12 +851,26 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 */
 .compile-film-video { opacity: 0; visibility: hidden; transition: opacity .28s ease; }
 .compile-film-video[data-active="1"] { opacity: 1; visibility: visible; }
+/*
+  The stage film gives up the transition name; the world field keeps it.
+
+  `view-transition-name` must be unique in a document, and two elements here claim
+  `world-canvas`: the fixed `.world-field` behind the whole page, and `.film-canvas` inside the
+  live stage film (the same component that also serves /film, where it is the only one). A
+  duplicate name makes the browser skip the transition outright — silently — so every Explore
+  CTA on this page would have degraded to a hard cut the moment the compile scene was on screen
+  and rendering live. The field is the right half of the pair to keep: it is what the Explore
+  stage crossfades into. Scoped to the landing embed, so /film is untouched.
+*/
+.compile-film-live .film-canvas { view-transition-name: none; }
+/* The caption is the frame's bottom edge, so it takes the frame's width — including the
+   `--compile-film-width` deference above, or the two would part company on a wide screen. */
 .compile-film-caption {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 16px;
-  width: min(100%, 1440px);
+  width: min(100%, var(--compile-film-width, 1440px));
   margin-inline: auto;
 }
 .compile-film-caption p { margin: 0; color: var(--text-lo); font-size: 13px; }
