@@ -1,0 +1,9 @@
+{
+  "status": "pending",
+  "reason": "The explore stage root [data-visual-world=\"explore\"] was not found at /explore?act=world. Lane contract §4.2 defines this attribute for the redesigned Explore stage, which the `explore` lane (agent/cl-explore) builds in parallel and had not landed on this branch at capture time. This is expected, not a failure — the screenshot records whatever /explore currently renders on this branch (the pre-redesign page), for reference only; it is not the Interactive Product Film the comparison is meant to check. Re-run this script once the explore lane's markup is merged.",
+  "route": "http://127.0.0.1:3136/explore?act=world",
+  "nodes": [],
+  "edges": [],
+  "compositionBounds": null,
+  "errors": []
+}

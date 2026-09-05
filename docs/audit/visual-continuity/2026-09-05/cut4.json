@@ -1,0 +1,17 @@
+{
+  "route": "http://127.0.0.1:3136/#s3",
+  "stageSelector": "#compile-stage-tab-world",
+  "seekSeconds": 16.8,
+  "canvasFound": true,
+  "canvasBackingSize": {
+    "width": 2704,
+    "height": 1494
+  },
+  "canvasCssSize": {
+    "width": 1351.59375,
+    "height": 746.796875
+  },
+  "drawnGeometryExposed": false,
+  "note": "opening-film-4 exposes window.__filmFreeze (bool) and window.__filmSeek(t) for capture, and window.__filmElapsed for the recorder's own clock, but no drawn-geometry data structure (nodes/edges/labels) on window — recording the PNG and canvas backing size only.",
+  "errors": []
+}
