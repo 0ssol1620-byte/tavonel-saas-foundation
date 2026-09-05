@@ -357,6 +357,42 @@ describe("contract promises", () => {
 });
 
 /*
+  The three surfaces that say whether this route is public, and the one this lane cannot reach.
+
+  The lane specification asks for the page in the sitemap. A previous revision instead withdrew
+  the sitemap row and put `robots: { index: false }` on the page, so that the page would agree
+  with the `Disallow: /product/continuous-knowledge` that `app/robots.ts` has carried since this
+  route was a `notFound()` stub -- and reported that as three surfaces agreeing. Two of the three
+  cannot both act: a crawler that obeys the disallow never fetches the page and never reads its
+  meta tag, while `/product` -- indexed, in the sitemap -- keeps publishing a plain link to the
+  URL, which is how a bare URL with no title lands in a result page.
+
+  This test holds the two surfaces this lane owns. The third, `app/robots.ts`, belongs to no lane
+  in this campaign and is deliberately not asserted here: pinning a line someone else has to
+  delete would make the correct fix fail this file.
+*/
+describe("the crawl surface for the contract route", () => {
+  const ROUTE = "/product/continuous-knowledge";
+
+  it("lists the route in the sitemap, as the lane specification requires", () => {
+    expect(read("../app/sitemap.ts")).toContain(`"${ROUTE}"`);
+  });
+
+  it("makes no noindex claim the crawler that reaches this page could act on", () => {
+    // Stripped, because the comment above the metadata explains the field that used to be here.
+    const page = stripComments(read("../app/product/continuous-knowledge/page.tsx"));
+    expect(page, "the page is in the sitemap and noindex at once")
+      .not.toMatch(/robots:\s*\{[^}]*index:\s*false/);
+    expect(page).toContain(`canonical: "${ROUTE}"`);
+    expect(page).toContain(`openGraph: { url: "${ROUTE}" }`);
+  });
+
+  it("is linked from the product index, which is what makes the disallow line matter", () => {
+    expect(read("../app/product/page.tsx")).toContain(ROUTE);
+  });
+});
+
+/*
   The drawing has to agree with the clause list it illustrates.
 
   A flowchart is the one element a reader looks at instead of reading eight paragraphs, so a

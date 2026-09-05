@@ -21,18 +21,23 @@ export const metadata: Metadata = {
   description:
     "The Compiler Contract: eight clauses that say what a compile guarantees when a source changes, each carrying the state it holds in this deployment.",
   /*
-    Noindex until someone who can approve the copy says the page may be advertised.
+    No `robots` field here, and one line elsewhere is still wrong.
 
-    `app/robots.ts` has disallowed this route since it was a `notFound()` stub, and that file
-    belongs to no lane in this campaign. An earlier revision of this branch removed the disallow
-    so the sitemap and robots.txt would stop contradicting each other; that resolved the
-    contradiction in the direction that publishes eight brand-new claims about what the compiler
-    guarantees, which is not a decision this work gets to make on its own. So it is resolved the
-    other way instead: robots.ts is untouched, the route is not in the sitemap, and the page says
-    the same thing about itself that robots.txt already says. `follow: true` because the links out
-    of here go to pages that are advertised. This is one field to delete when the copy is approved.
+    An earlier revision of this branch declared the page noindex, on the reasoning that
+    `app/robots.ts` has disallowed this route since it was a `notFound()` stub, so the page should
+    agree with it. That was two mistakes. The lane specification asks for this page in the
+    sitemap, which is an instruction to advertise it; and a `noindex` behind a
+    `Disallow` is inert anyway -- a crawler that obeys robots.txt never fetches the page, so it
+    never reads the meta tag, while `/product` goes on publishing an ordinary crawlable link to
+    the URL from a page that is itself indexed. Three surfaces were reported as agreeing when
+    only one of them could act, and it was the weaker one.
+
+    So the two surfaces this lane owns now say the same thing -- the sitemap lists the route and
+    the page makes no `noindex` claim about itself -- and the disallow entry in `app/robots.ts:5`
+    is left as the conflict it is: a file this campaign assigns to no lane, still carrying a line
+    written when this route was a 404. Deleting `"/product/continuous-knowledge"` from that array
+    is the one edit that finishes this, and it is the founder's to make.
   */
-  robots: { index: false, follow: true },
 };
 
 /*
