@@ -2,6 +2,7 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const packageRoot = dirname(fileURLToPath(import.meta.url));
+const localHttpPlaywright = process.env.PLAYWRIGHT_LOCAL_HTTP === "1";
 
 const contentSecurityPolicy = [
   "default-src 'self'",
@@ -17,8 +18,12 @@ const contentSecurityPolicy = [
   "frame-src 'self' https://*.paddle.com https://*.r2.cloudflarestorage.com",
   "worker-src 'self' blob:",
   "manifest-src 'self'",
-  "upgrade-insecure-requests",
-].join("; ");
+  // Production and HTTPS Preview must upgrade insecure subresources. The built-in Playwright
+  // server is intentionally plain HTTP, though, and WebKit applies this directive to localhost
+  // itself, turning same-origin CSS/JS requests into HTTPS requests for a port with no TLS
+  // listener. Omit only in that explicit local test-server process; production never sets it.
+  localHttpPlaywright ? null : "upgrade-insecure-requests",
+].filter(Boolean).join("; ");
 
 const securityHeaders = [
   { key: "Content-Security-Policy", value: contentSecurityPolicy },

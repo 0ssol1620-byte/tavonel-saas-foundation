@@ -27,8 +27,17 @@
 .public-page .lede,
 .public-page .body p { max-width: 68ch; }
 .landing-page .compile-film-sequence {
-  width: min(94vw, 1580px);
-  margin-left: max(calc((100% - min(94vw, 1580px)) / 2 * -1), -110px);
+  --compile-film-width: min(94vw, 1580px);
+  width: var(--compile-film-width);
+  /*
+    The frame is intentionally wider than the shell's padded content column, but it still has
+    to be centred on that column. When the frame is wider, `(100% - frame) / 2` is negative and
+    pulls it left by half the excess. The old rule multiplied that value by -1, pushing the
+    frame right instead; on the 1440px Linux launch runner it landed at x=186..1540 and enlarged
+    the document by exactly 100px. Keep the small negative cap for very wide canvases, but do
+    not invert the centring offset.
+  */
+  margin-left: max(calc((100% - var(--compile-film-width)) / 2), -110px);
 }
 
 /* The film earns a viewport; short claims do not. Forcing every landing scene to 100svh left
@@ -160,7 +169,7 @@
 /* Ultrawide: preserve editorial line length while allowing visual proof to breathe. */
 @media (min-width: 1800px) {
   :root { --shell-wide: 1740px; }
-  .landing-page .compile-film-sequence { width: min(94vw, 1700px); }
+  .landing-page .compile-film-sequence { --compile-film-width: min(94vw, 1700px); }
 }
 
 @media (max-width: 1100px) {

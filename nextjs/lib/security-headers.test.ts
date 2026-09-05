@@ -9,6 +9,7 @@ describe("production security headers", () => {
     expect(config).toContain('key: "Content-Security-Policy"');
     expect(config).toContain("frame-ancestors 'none'");
     expect(config).toContain("object-src 'none'");
+    expect(config).toContain('localHttpPlaywright ? null : "upgrade-insecure-requests"');
     expect(config).toContain('key: "Strict-Transport-Security"');
     expect(config).toContain('key: "Permissions-Policy"');
   });

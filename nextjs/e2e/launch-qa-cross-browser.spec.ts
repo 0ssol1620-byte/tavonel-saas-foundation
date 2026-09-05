@@ -15,13 +15,40 @@ test("renders launch-critical public routes without browser errors", async ({ pa
   page.on("pageerror", error => errors.push(error.message));
 
   for (const route of routes) {
-    const response = await page.goto(route, { waitUntil: "domcontentloaded" });
+    // WebKit can report the DOM as ready before the linked stylesheet has finished applying.
+    // Measuring geometry in that window sees the browser-default 8px body margin and the
+    // poster's intrinsic 1440px width, which is not the rendered product state. The launch
+    // contract is the fully styled page, so wait for the load event before taking geometry.
+    const response = await page.goto(route, { waitUntil: "load" });
     expect(response?.status(), `${route} should be available`).toBe(200);
     await expect(page.locator("main")).toBeVisible();
-    const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-    );
-    expect(overflow, `${route} should not scroll horizontally`).toBeLessThanOrEqual(1);
+    const geometry = await page.evaluate(() => {
+      const viewport = document.documentElement.clientWidth;
+      const overflow = document.documentElement.scrollWidth - viewport;
+      const offenders = [...document.querySelectorAll("body *")]
+        .map(element => {
+          const rect = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          return {
+            tag: element.tagName.toLowerCase(),
+            id: element.id,
+            className: typeof element.className === "string" ? element.className : "",
+            left: Math.round(rect.left),
+            right: Math.round(rect.right),
+            width: Math.round(rect.width),
+            position: style.position,
+            overflowX: style.overflowX,
+          };
+        })
+        .filter(element => element.right > viewport + 1 || element.left < -1)
+        .sort((a, b) => Math.max(b.right - viewport, -b.left) - Math.max(a.right - viewport, -a.left))
+        .slice(0, 12);
+      return { overflow, viewport, offenders };
+    });
+    expect(
+      geometry.overflow,
+      `${route} should not scroll horizontally; viewport=${geometry.viewport}; offenders=${JSON.stringify(geometry.offenders)}`,
+    ).toBeLessThanOrEqual(1);
     /*
       Let the router's prefetches finish before navigating on.
 
@@ -92,6 +119,10 @@ test("ships launch security headers in every browser engine", async ({ request }
   const response = await request.get("/");
   expect(response.status()).toBe(200);
   expect(response.headers()["content-security-policy"]).toContain("frame-ancestors 'none'");
+  if (process.env.PLAYWRIGHT_BASE_URL) {
+    // External Preview/Production runs are HTTPS and must exercise the complete transport CSP.
+    expect(response.headers()["content-security-policy"]).toContain("upgrade-insecure-requests");
+  }
   expect(response.headers()["x-content-type-options"]).toBe("nosniff");
   expect(response.headers()["x-frame-options"]).toBe("DENY");
   expect(response.headers()["referrer-policy"]).toBe("strict-origin-when-cross-origin");

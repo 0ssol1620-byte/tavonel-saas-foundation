@@ -65,6 +65,7 @@ export default defineConfig({
     env: {
       NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
       NEXT_PUBLIC_SUPABASE_ANON_KEY: "foundation-browser-e2e-anon-key",
+      PLAYWRIGHT_LOCAL_HTTP: "1",
     },
   },
 });
