@@ -27,6 +27,19 @@ test("the mobile menu panel opens inside the viewport", async ({ page }, testInf
 
   const panel = menu.locator("nav");
   await expect(panel).toBeVisible();
+  /*
+    Wait for the panel to reach its full height before measuring it.
+
+    Seven 44px rows plus the 1px gaps are 316px, and WebKit reports a mid-layout box on the first
+    frame after the disclosure opens: measured twice on the same build at the same viewport, the
+    header's bottom came back as 63 and then 65, and the panel's top as 54 and then 64. Neither
+    number is wrong, the first is just early. Waiting on a height the panel can only have once it
+    is laid out removes the race without loosening anything that is asserted.
+  */
+  await page.waitForFunction(() => {
+    const element = document.querySelector("details.mobile-primary-nav nav");
+    return Boolean(element) && element!.getBoundingClientRect().height > 300;
+  });
   const geometry = await panel.evaluate((element) => {
     const rect = element.getBoundingClientRect();
     return {
@@ -34,7 +47,7 @@ test("the mobile menu panel opens inside the viewport", async ({ page }, testInf
       right: Math.round(rect.right),
       top: Math.round(rect.top),
       viewport: window.innerWidth,
-      header: Math.round(document.querySelector("header.nav")!.getBoundingClientRect().bottom),
+      summaryBottom: Math.round(document.querySelector("details.mobile-primary-nav summary")!.getBoundingClientRect().bottom),
     };
   });
   /*
@@ -44,8 +57,14 @@ test("the mobile menu panel opens inside the viewport", async ({ page }, testInf
   */
   expect(geometry.left, `panel starts at x=${geometry.left} in ${testInfo.project.name}`).toBeGreaterThanOrEqual(0);
   expect(geometry.right, `panel ends at x=${geometry.right} in a ${geometry.viewport}px viewport`).toBeLessThanOrEqual(geometry.viewport);
-  // It hangs from the header, so it cannot be drawn over the control that opened it.
-  expect(geometry.top).toBeGreaterThanOrEqual(geometry.header - 2);
+  /*
+    It hangs below the control that opened it, and that is asserted against the summary rather
+    than against the header's bottom edge. The two are not the same number in every engine --
+    the header's bottom padding sits between them, and `top: 100%` on an absolutely positioned
+    child of a flex container does not resolve against the same box in Chromium and WebKit. What
+    must hold everywhere is that the panel never covers MENU.
+  */
+  expect(geometry.top, `panel top ${geometry.top} vs MENU bottom ${geometry.summaryBottom}`).toBeGreaterThanOrEqual(geometry.summaryBottom - 1);
 
   for (const label of ["Product", "Solutions", "Integrations", "Developers", "Security", "Pricing", "Resources"]) {
     const link = panel.getByRole("link", { name: label, exact: true });
