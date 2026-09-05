@@ -53,6 +53,7 @@ Campaign `TAVONEL-USKC-P0-20260906-V1`. Contract `USKC_LANE_CONTRACT_2026-09-06.
 | `nextjs/app/sitemap.ts:10` | one route added to `ROUTES` |
 | `nextjs/lib/site-navigation.ts:36` | one row added to `RESOURCE_LINKS` |
 | `nextjs/app/tavonel.css` | one appended block, `/sources` only, no token added and no existing rule changed |
+| `.gitattributes:35-40` | **out of my ownership row — see §5.5.** One rule, `shared/*.schema.json text eol=lf` |
 
 The pinned home-page strings (`evidence back to the page.`, `Object`, `Relation`, `Document page`, `Exact bbox`,
 the hero and the lede) are byte-identical; `brand-copy.test.ts` passes with 116 tests.
@@ -120,6 +121,15 @@ One code change was made in response to a gate: `deriveSourceFamilyChips` used `
 3. **`nextjs/app/api/openapi/route.ts` and `nextjs/lib/brand-copy.test.ts`** are shared files; per seam map X-8 D owns
    the brand-copy edits. The openapi edit is three rows.
 4. **`.zip` is represented as `UNSUPPORTED`, and that is the frozen enums forcing my hand.** See §6, question 2.
+5. **I edited `.gitattributes`, which is not in my ownership row.** One rule:
+   `shared/*.schema.json text eol=lf`. The repository's blanket `* text=auto` means a Windows checkout of
+   `shared/capabilityManifest.schema.json` would carry CRLF, its sha256 would not be the frozen
+   `4795fe89…`, and the verbatim-copy test would fail on Windows and pass on Linux. `.gitattributes` already
+   documents exactly this failure (it happened once with `channel.json`) and states the rule: "Any file whose content
+   is hashed, signed, or served verbatim belongs here." Doing it in the test instead — normalizing line endings before
+   hashing — would have hidden the fact that the working-tree file is genuinely not the frozen artifact, and Lane E's
+   Python copy of a sibling schema has the same exposure in the core repo. The file belongs to no lane; if the
+   orchestrator would rather this were a separate commit, it is the last hunk and reverts cleanly.
 
 ## 6. Open questions for the founder
 
