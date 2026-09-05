@@ -156,9 +156,10 @@ describe("public copy purge", () => {
       const isLegal = reason.startsWith("legal");
       const isNoindex = /robots:\s*\{[^}]*index:\s*false/.test(source);
       const isResearch = reason.includes("research");
+      const isTerminal = /\bnotFound\(\)/.test(source);
       expect(
-        isLegal || isNoindex || isResearch,
-        `/${route} is exempt for "${reason}" but is neither legal text nor noindex`,
+        isLegal || isNoindex || isResearch || isTerminal,
+        `/${route} is exempt for "${reason}" but is neither legal, noindex, research nor terminal`,
       ).toBe(true);
     }
   });

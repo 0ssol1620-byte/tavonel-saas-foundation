@@ -40,7 +40,7 @@ export default function CompiledWorldPage() {
           <div className="body">
             <div className="stack">
               <p className="slate"><b>PRODUCT</b><span />COMPILED WORLD</p>
-              <h2>Not searchable files. A world an AI can reason about.</h2>
+              <h1 className="document-title">Not searchable files. A world an AI can reason about.</h1>
             </div>
             <div className="stack">
               <p className="lede">

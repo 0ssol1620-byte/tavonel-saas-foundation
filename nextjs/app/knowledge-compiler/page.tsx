@@ -95,7 +95,7 @@ export default function KnowledgeCompilerPage() {
         // `/docs/[section]` is a dynamic route, so a literal section needs the cast typedRoutes asks for.
         { href: "/docs/exports" as Route, label: "PACKAGE FORMAT" },
         { href: "/docs/cli" as Route, label: "VERIFIERS" },
-        { href: "/contact", label: "REQUEST ACCESS" },
+        { href: "/login", label: "START WITH YOUR FILES" },
       ],
     },
   ]} />;

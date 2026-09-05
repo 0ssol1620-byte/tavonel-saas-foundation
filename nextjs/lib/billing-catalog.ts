@@ -53,12 +53,12 @@ export const BILLING_OFFERS = {
       card rather than onto a roadmap footnote. Team stays reachable through a conversation
       until the membership flow ships end to end.
     */
-    description: "For teams compiling and reviewing a larger shared corpus.",
+    description: "For larger corpora that need guided review and onboarding.",
     features: [
       "2,500 verified standard pages",
       "Everything in Developer",
       "Review queue and version history",
-      "Shared workspace onboarding",
+      "Guided corpus onboarding",
     ],
   },
 } as const;

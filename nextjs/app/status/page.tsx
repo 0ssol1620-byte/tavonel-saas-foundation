@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   // canonical ("/"), so a crawler was told 22 distinct pages were all the homepage.
   alternates: { canonical: "/status" },
   openGraph: { url: "/status" },
-  title: "Service status - TAVONEL",
+  title: "Service status — TAVONEL",
   description: "Component-by-component state of the active TAVONEL deployment, with the addresses to report service impact and security issues to.",
 };
 export default function StatusPage() { const status=readPublicOperations(); return <PolicyLayout label="SERVICE STATUS" title="TAVONEL service status" intro={<>Last checked {new Date(status.generatedAt).toLocaleString("en-GB", { timeZone: "Asia/Seoul" })} KST from the active production deployment.</>}>

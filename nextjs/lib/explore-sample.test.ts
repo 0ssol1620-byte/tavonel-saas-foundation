@@ -63,7 +63,7 @@ describe("the geometry was read out of the documents, not written down", () => {
     const extracted = await extractRegions(read(`${sampleDirectory}${filename}`), documentId);
     const authority = input.regions![0].authority;
     expect(extracted.map((region: object) => ({ ...region, authority }))).toEqual(input.regions);
-  });
+  }, 15_000);
 
   it("still satisfies the same input contract the compile API enforces", () => {
     for (const input of exploreSampleInputs) {

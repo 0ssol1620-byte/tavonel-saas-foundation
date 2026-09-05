@@ -59,33 +59,36 @@ export default function ContactForm() {
         question answers none of them, and the one who wants a useful first reply answers six
         without typing anything a customer document could end up inside.
       */}
-      <fieldset className="contact-qualify">
-        <legend>About the material</legend>
-        {QUALIFICATION.map((field) => (
-          field.multiple ? (
-            <fieldset className="contact-field" key={field.name}>
-              <legend>{field.label}</legend>
-              {field.hint ? <small>{field.hint}</small> : null}
-              <div className="contact-checks">
-                {field.options.map((option) => (
-                  <label key={option}>
-                    <input type="checkbox" name={field.name} value={option} />
-                    <span>{option}</span>
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-          ) : (
-            <label className="contact-field" key={field.name}>
-              <span>{field.label}</span>
-              <select name={field.name} defaultValue="">
-                <option value="">No answer</option>
-                {field.options.map((option) => <option key={option} value={option}>{option}</option>)}
-              </select>
-            </label>
-          )
-        ))}
-      </fieldset>
+      <details className="contact-qualification-fold">
+        <summary>Help us prepare a better reply <span>Optional</span></summary>
+        <fieldset className="contact-qualify">
+          <legend>About the material</legend>
+          {QUALIFICATION.map((field) => (
+            field.multiple ? (
+              <fieldset className="contact-field" key={field.name}>
+                <legend>{field.label}</legend>
+                {field.hint ? <small>{field.hint}</small> : null}
+                <div className="contact-checks">
+                  {field.options.map((option) => (
+                    <label key={option}>
+                      <input type="checkbox" name={field.name} value={option} />
+                      <span>{option}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            ) : (
+              <label className="contact-field" key={field.name}>
+                <span>{field.label}</span>
+                <select name={field.name} defaultValue="">
+                  <option value="">No answer</option>
+                  {field.options.map((option) => <option key={option} value={option}>{option}</option>)}
+                </select>
+              </label>
+            )
+          ))}
+        </fieldset>
+      </details>
       <label className="contact-field">
         <span>What should we understand?</span>
         <textarea

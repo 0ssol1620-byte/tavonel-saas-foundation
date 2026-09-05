@@ -5,6 +5,7 @@ import type { PipelineRow } from "@/lib/pipeline";
 import type { OcrProgress } from "@/lib/ocr-progress";
 import { displayName, type DocumentNames } from "@/lib/document-names";
 import type { WorldReadModel } from "@/lib/world-read-model";
+import type { CompileState } from "@/lib/compile-job-store";
 
 const AREA_RGB: [number, number, number][] = [
   [242, 166, 90], [80, 210, 170], [90, 170, 230], [180, 130, 255], [255, 120, 170], [120, 220, 110],
@@ -42,15 +43,16 @@ function place(id: string): { x: number; y: number; area: number } {
   return { x: 0.16 + a * 0.68, y: 0.16 + b * 0.68, area: h % AREA_RGB.length };
 }
 
-export default function CompileStage({ rows, reading = {}, names = {}, world = null }: {
+export default function CompileStage({ rows, reading = {}, names = {}, world = null, state = null }: {
   rows: PipelineRow[];
   reading?: Record<string, OcrProgress>;
   names?: DocumentNames;
   world?: WorldReadModel | null;
+  state?: CompileState | null;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const stateRef = useRef({ rows, reading, names, world });
-  stateRef.current = { rows, reading, names, world };
+  const stateRef = useRef({ rows, reading, names, world, state });
+  stateRef.current = { rows, reading, names, world, state };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -170,26 +172,39 @@ export default function CompileStage({ rows, reading = {}, names = {}, world = n
     };
 
     const draw = () => {
-      const { rows: list, reading: read, names: nameMap, world: model } = stateRef.current;
+      const { rows: list, reading: read, names: nameMap, world: model, state: jobState } = stateRef.current;
       context.fillStyle = "#08090a"; context.fillRect(0, 0, width, height);
       const focus = focusOf(list, read);
       const progress = focus ? read[focus.id] : undefined;
       const hasPage = Boolean(progress?.pages?.length);
       const hasStructure = Boolean(progress && ((progress.regionsFound ?? 0) > 0 || progress.pages.some((page) => page.boxes.some((box) => Boolean(box.text)))));
       const hasWorld = Boolean(model && model.objects.length > 0);
-      const panes: Array<"sources" | "read" | "structure" | "world"> = ["sources"];
-      if (hasPage) panes.push("read");
-      if (hasStructure) panes.push("structure");
-      if (hasWorld) panes.push("world");
+      const panes: Array<"sources" | "read" | "structure" | "world"> = ["sources", "read", "structure", "world"];
+      const activeFor = (kind: "read" | "structure" | "world") => {
+        if (!jobState) return "WAITING";
+        if (kind === "read" && ["uploading", "sanitizing", "reading"].includes(jobState)) return jobState === "reading" ? "ACTIVE" : "QUEUED";
+        if (kind === "structure" && ["structuring", "resolving"].includes(jobState)) return "ACTIVE";
+        if (kind === "world" && ["building_world", "review_required", "ready"].includes(jobState)) return jobState === "building_world" ? "ACTIVE" : jobState === "ready" ? "READY" : "REVIEW";
+        return "WAITING";
+      };
 
       const pad = 10; const gap = 10; const colH = height - pad * 2;
       const colW = (width - pad * 2 - gap * (panes.length - 1)) / panes.length;
       panes.forEach((kind, i) => {
         const x = pad + i * (colW + gap);
         if (kind === "sources") drawSources(x, pad, colW, colH, list, focus, nameMap);
-        if (kind === "read" && progress) drawPage(x, pad, colW, colH, progress);
-        if (kind === "structure" && progress) drawExtract(x, pad, colW, colH, progress);
-        if (kind === "world" && model) drawWorld(x, pad, colW, colH, model);
+        if (kind === "read") {
+          if (hasPage && progress) drawPage(x, pad, colW, colH, progress);
+          else pane(x, pad, colW, colH, "READ", activeFor("read"));
+        }
+        if (kind === "structure") {
+          if (hasStructure && progress) drawExtract(x, pad, colW, colH, progress);
+          else pane(x, pad, colW, colH, "STRUCTURE", activeFor("structure"));
+        }
+        if (kind === "world") {
+          if (hasWorld && model) drawWorld(x, pad, colW, colH, model);
+          else pane(x, pad, colW, colH, "WORLD", activeFor("world"));
+        }
       });
     };
 
@@ -197,7 +212,7 @@ export default function CompileStage({ rows, reading = {}, names = {}, world = n
     const onResize = () => { layout(); draw(); };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
-  }, [names, reading, rows, world]);
+  }, [names, reading, rows, state, world]);
 
   const observedPages = Object.values(reading).reduce((sum, item) => sum + (item.pages?.length ?? 0), 0);
   const observedRegions = Object.values(reading).reduce((sum, item) => sum + (item.regionsFound ?? 0), 0);
@@ -208,7 +223,7 @@ export default function CompileStage({ rows, reading = {}, names = {}, world = n
       <p className="sr-only" role="status">
         {world
           ? `${rows.length} sources, ${observedPages} observed pages, ${observedRegions} observed regions, ${world.objects.length} compiled objects, and ${world.relations.length} persisted relations.`
-          : `${rows.length} sources. ${observedPages > 0 ? `${observedPages} pages have been read.` : "Reading has not produced a page yet."}`}
+          : `${rows.length} sources. ${observedPages > 0 ? `${observedPages} pages have been read.` : "Reading has not produced a page yet."}${state ? ` Durable compile state: ${state}.` : ""}`}
       </p>
     </section>
   );

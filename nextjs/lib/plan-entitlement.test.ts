@@ -94,13 +94,13 @@ describe("plan entitlement", () => {
   it("keeps a plan whose product is unfinished off self-serve checkout", () => {
     expect(BILLING_OFFERS.studio_access.saleChannel).toBe("contact");
     expect(BILLING_OFFERS.observer_access.saleChannel).toBe("self_serve");
-    const pricing = readFileSync(new URL("../app/pricing/page.tsx", import.meta.url), "utf8");
+    const pricing = readFileSync(new URL("../components/pricing-page-client.tsx", import.meta.url), "utf8");
     expect(pricing, "the pricing card must derive checkout from saleChannel")
       .toContain('offerCode: offer.saleChannel === "self_serve" ? offerCode : null');
   });
 
   it("does not sell a plan the pricing page invents on its own", () => {
-    const pricing = read("app/pricing/page.tsx");
+    const pricing = read("components/pricing-page-client.tsx");
     expect(pricing, "plans come from the billing catalog").toContain("BILLING_OFFERS");
     expect(pricing, "no second hand-written plan list").not.toMatch(/offerCode: "observer_access"/);
     expect(pricing, "no second hand-written plan list").not.toMatch(/offerCode: "studio_access"/);

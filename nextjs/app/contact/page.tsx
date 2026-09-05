@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import Logomark from "@/components/logomark";
 import ContactForm from "@/components/contact-form";
+import MobilePrimaryNav from "@/components/mobile-primary-nav";
 
 export const metadata: Metadata = {
   // Each page declares its own address. Without this every route inherited the root
@@ -25,6 +26,7 @@ export default function ContactPage() {
           <Link href="/">Back to the compiler</Link>
           <Link href="/security">Security</Link>
         </nav>
+        <MobilePrimaryNav />
         <Link className="btn small" href="/login">Sign in</Link>
       </header>
 

@@ -78,7 +78,8 @@ describe("what 13.11 asked to be added", () => {
       expect(page).toContain(`/docs/${target}`);
     }
     expect(page).toContain("/explore");
-    expect(page).toContain("/contact");
+    expect(page).toContain("/login");
+    expect(page).toContain("START WITH YOUR FILES");
   });
 });
 

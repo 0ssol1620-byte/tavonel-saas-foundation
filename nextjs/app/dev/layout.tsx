@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 
 /**
  * Internal render harnesses. Never indexed, never linked from a public surface.
@@ -12,6 +13,9 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+export const dynamic = "force-dynamic";
+
 export default function DevLayout({ children }: { children: React.ReactNode }) {
+  if (process.env.VERCEL_ENV === "production") notFound();
   return children;
 }

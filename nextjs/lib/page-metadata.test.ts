@@ -156,6 +156,12 @@ function isIndexable(route: string) {
 
 const ALL = routes();
 
+/** A terminal route never renders a document of its own, so it has no independent search identity. */
+function isTerminalRoute(route: string) {
+  const page = readFileSync(path.join(segmentDir(route), "page.tsx"), "utf8");
+  return /\bnotFound\(\)|\bpermanentRedirect\(/.test(page);
+}
+
 /*
   Routes that inherit their metadata from a parent segment, on purpose.
 
@@ -168,7 +174,7 @@ const REEXPORTED = new Set(["/workspace/[surface]", "/workspace/[surface]/[detai
 /** Surfaces that must never be indexed: authenticated, transient or internal. */
 const MUST_BE_NOINDEX = ["/workspace", "/login", "/auth/callback", "/dev"];
 
-const DECLARING = ALL.filter((route) => !REEXPORTED.has(route));
+const DECLARING = ALL.filter((route) => !REEXPORTED.has(route) && !isTerminalRoute(route));
 
 describe("every route carries its own identity", () => {
   it("finds the routes by walking the tree, so a new page cannot opt out by not being listed", () => {

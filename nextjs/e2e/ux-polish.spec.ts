@@ -2,7 +2,7 @@ const playwrightPackage = process.env.PLAYWRIGHT_TEST_PACKAGE ?? "@playwright/te
 const playwrightModule = await import(playwrightPackage);
 const { expect, test } = "test" in playwrightModule ? playwrightModule : playwrightModule.default;
 
-const PUBLIC_PATHS = ["/", "/product", "/product/knowledge-compiler", "/solutions/ai-ready-knowledge", "/explore", "/pricing"];
+const PUBLIC_PATHS = ["/", "/product", "/knowledge-compiler", "/solutions/ai-ready-knowledge", "/explore", "/pricing"];
 
 test("public flagship surfaces never overflow the viewport", async ({ page }) => {
   for (const path of PUBLIC_PATHS) {
