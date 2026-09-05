@@ -1,0 +1,555 @@
+{
+  "capturedAgainst": "http://127.0.0.1:3140",
+  "capturedAt": "2026-09-05T15:10:09.930Z",
+  "note": "Viewport screenshots (not full-page): an off-screen panel does not show in a stitched full-page shot.",
+  "runs": [
+    {
+      "browser": "chromium",
+      "viewport": {
+        "width": 360,
+        "height": 780
+      },
+      "shots": [
+        {
+          "file": "chromium-360x780-top-menu-open.png",
+          "what": "landing top, primary navigation open"
+        },
+        {
+          "file": "chromium-360x780-s3-01-sources.png",
+          "what": "Scene 03 stage sources",
+          "tabFound": true,
+          "painter": {
+            "panel": true,
+            "panelRect": {
+              "width": 320,
+              "height": 209,
+              "top": 341
+            },
+            "canvas": [
+              {
+                "width": 318,
+                "height": 207,
+                "top": 342,
+                "backing": "636x414"
+              }
+            ],
+            "video": [],
+            "img": [],
+            "selectedTabs": [
+              "compile-stage-tab-sources"
+            ]
+          }
+        },
+        {
+          "file": "chromium-360x780-s3-02-read.png",
+          "what": "Scene 03 stage read",
+          "tabFound": true,
+          "painter": {
+            "panel": true,
+            "panelRect": {
+              "width": 320,
+              "height": 209,
+              "top": 341
+            },
+            "canvas": [
+              {
+                "width": 318,
+                "height": 207,
+                "top": 342,
+                "backing": "636x414"
+              }
+            ],
+            "video": [],
+            "img": [],
+            "selectedTabs": [
+              "compile-stage-tab-read"
+            ]
+          }
+        },
+        {
+          "file": "chromium-360x780-s3-03-structure.png",
+          "what": "Scene 03 stage structure",
+          "tabFound": true,
+          "painter": {
+            "panel": true,
+            "panelRect": {
+              "width": 320,
+              "height": 209,
+              "top": 341
+            },
+            "canvas": [
+              {
+                "width": 318,
+                "height": 207,
+                "top": 342,
+                "backing": "636x414"
+              }
+            ],
+            "video": [],
+            "img": [],
+            "selectedTabs": [
+              "compile-stage-tab-structure"
+            ]
+          }
+        },
+        {
+          "file": "chromium-360x780-s3-04-world.png",
+          "what": "Scene 03 stage world",
+          "tabFound": true,
+          "painter": {
+            "panel": true,
+            "panelRect": {
+              "width": 320,
+              "height": 209,
+              "top": 341
+            },
+            "canvas": [
+              {
+                "width": 318,
+                "height": 207,
+                "top": 342,
+                "backing": "636x414"
+              }
+            ],
+            "video": [],
+            "img": [],
+            "selectedTabs": [
+              "compile-stage-tab-world"
+            ]
+          }
+        }
+      ],
+      "errors": [],
+      "menu": {
+        "triggerFound": true,
+        "open": true,
+        "panelRect": {
+          "left": -93,
+          "right": 188,
+          "top": 56,
+          "bottom": 374,
+          "width": 281,
+          "height": 318
+        },
+        "viewport": {
+          "width": 360,
+          "height": 780
+        },
+        "documentScrollWidth": 360,
+        "overflowLeftPx": 93,
+        "overflowRightPx": 0
+      }
+    },
+    {
+      "browser": "chromium",
+      "viewport": {
+        "width": 412,
+        "height": 915
+      },
+      "shots": [
+        {
+          "file": "chromium-412x915-top-menu-open.png",
+          "what": "landing top, primary navigation open"
+        },
+        {
+          "file": "chromium-412x915-s3-01-sources.png",
+          "what": "Scene 03 stage sources",
+          "tabFound": true,
+          "painter": {
+            "panel": true,
+            "panelRect": {
+              "width": 372,
+              "height": 239,
+              "top": 380
+            },
+            "canvas": [
+              {
+                "width": 370,
+                "height": 237,
+                "top": 381,
+                "backing": "740x474"
+              }
+            ],
+            "video": [],
+            "img": [],
+            "selectedTabs": [
+              "compile-stage-tab-sources"
+            ]
+          }
+        },
+        {
+          "file": "chromium-412x915-s3-02-read.png",
+          "what": "Scene 03 stage read",
+          "tabFound": true,
+          "painter": {
+            "panel": true,
+            "panelRect": {
+              "width": 372,
+              "height": 239,
+              "top": 380
+            },
+            "canvas": [
+              {
+                "width": 370,
+                "height": 237,
+                "top": 381,
+                "backing": "740x474"
+              }
+            ],
+            "video": [],
+            "img": [],
+            "selectedTabs": [
+              "compile-stage-tab-read"
+            ]
+          }
+        },
+        {
+          "file": "chromium-412x915-s3-03-structure.png",
+          "what": "Scene 03 stage structure",
+          "tabFound": true,
+          "painter": {
+            "panel": true,
+            "panelRect": {
+              "width": 372,
+              "height": 239,
+              "top": 380
+            },
+            "canvas": [
+              {
+                "width": 370,
+                "height": 237,
+                "top": 381,
+                "backing": "740x474"
+              }
+            ],
+            "video": [],
+            "img": [],
+            "selectedTabs": [
+              "compile-stage-tab-structure"
+            ]
+          }
+        },
+        {
+          "file": "chromium-412x915-s3-04-world.png",
+          "what": "Scene 03 stage world",
+          "tabFound": true,
+          "painter": {
+            "panel": true,
+            "panelRect": {
+              "width": 372,
+              "height": 239,
+              "top": 380
+            },
+            "canvas": [
+              {
+                "width": 370,
+                "height": 237,
+                "top": 381,
+                "backing": "740x474"
+              }
+            ],
+            "video": [],
+            "img": [],
+            "selectedTabs": [
+              "compile-stage-tab-world"
+            ]
+          }
+        }
+      ],
+      "errors": [],
+      "menu": {
+        "triggerFound": true,
+        "open": true,
+        "panelRect": {
+          "left": -76,
+          "right": 224,
+          "top": 56,
+          "bottom": 374,
+          "width": 300,
+          "height": 318
+        },
+        "viewport": {
+          "width": 412,
+          "height": 915
+        },
+        "documentScrollWidth": 412,
+        "overflowLeftPx": 76,
+        "overflowRightPx": 0
+      }
+    },
+    {
+      "browser": "webkit",
+      "viewport": {
+        "width": 360,
+        "height": 780
+      },
+      "shots": [
+        {
+          "file": "webkit-360x780-top-menu-open.png",
+          "what": "landing top, primary navigation open"
+        },
+        {
+          "file": "webkit-360x780-s3-01-sources.png",
+          "what": "Scene 03 stage sources",
+          "tabFound": true,
+          "painter": {
+            "panel": true,
+            "panelRect": {
+              "width": 310,
+              "height": 209,
+              "top": 341
+            },
+            "canvas": [
+              {
+                "width": 308,
+                "height": 207,
+                "top": 342,
+                "backing": "616x414"
+              }
+            ],
+            "video": [],
+            "img": [],
+            "selectedTabs": [
+              "compile-stage-tab-sources"
+            ]
+          }
+        },
+        {
+          "file": "webkit-360x780-s3-02-read.png",
+          "what": "Scene 03 stage read",
+          "tabFound": true,
+          "painter": {
+            "panel": true,
+            "panelRect": {
+              "width": 310,
+              "height": 209,
+              "top": 341
+            },
+            "canvas": [
+              {
+                "width": 308,
+                "height": 207,
+                "top": 342,
+                "backing": "616x414"
+              }
+            ],
+            "video": [],
+            "img": [],
+            "selectedTabs": [
+              "compile-stage-tab-read"
+            ]
+          }
+        },
+        {
+          "file": "webkit-360x780-s3-03-structure.png",
+          "what": "Scene 03 stage structure",
+          "tabFound": true,
+          "painter": {
+            "panel": true,
+            "panelRect": {
+              "width": 310,
+              "height": 209,
+              "top": 341
+            },
+            "canvas": [
+              {
+                "width": 308,
+                "height": 207,
+                "top": 342,
+                "backing": "616x414"
+              }
+            ],
+            "video": [],
+            "img": [],
+            "selectedTabs": [
+              "compile-stage-tab-structure"
+            ]
+          }
+        },
+        {
+          "file": "webkit-360x780-s3-04-world.png",
+          "what": "Scene 03 stage world",
+          "tabFound": true,
+          "painter": {
+            "panel": true,
+            "panelRect": {
+              "width": 310,
+              "height": 209,
+              "top": 341
+            },
+            "canvas": [
+              {
+                "width": 308,
+                "height": 207,
+                "top": 342,
+                "backing": "616x414"
+              }
+            ],
+            "video": [],
+            "img": [],
+            "selectedTabs": [
+              "compile-stage-tab-world"
+            ]
+          }
+        }
+      ],
+      "errors": [],
+      "menu": {
+        "triggerFound": true,
+        "open": true,
+        "panelRect": {
+          "left": -93,
+          "right": 188,
+          "top": 56,
+          "bottom": 374,
+          "width": 281,
+          "height": 318
+        },
+        "viewport": {
+          "width": 360,
+          "height": 780
+        },
+        "documentScrollWidth": 350,
+        "overflowLeftPx": 93,
+        "overflowRightPx": 0
+      }
+    },
+    {
+      "browser": "webkit",
+      "viewport": {
+        "width": 412,
+        "height": 915
+      },
+      "shots": [
+        {
+          "file": "webkit-412x915-top-menu-open.png",
+          "what": "landing top, primary navigation open"
+        },
+        {
+          "file": "webkit-412x915-s3-01-sources.png",
+          "what": "Scene 03 stage sources",
+          "tabFound": true,
+          "painter": {
+            "panel": true,
+            "panelRect": {
+              "width": 362,
+              "height": 239,
+              "top": 394
+            },
+            "canvas": [
+              {
+                "width": 360,
+                "height": 237,
+                "top": 395,
+                "backing": "720x474"
+              }
+            ],
+            "video": [],
+            "img": [],
+            "selectedTabs": [
+              "compile-stage-tab-sources"
+            ]
+          }
+        },
+        {
+          "file": "webkit-412x915-s3-02-read.png",
+          "what": "Scene 03 stage read",
+          "tabFound": true,
+          "painter": {
+            "panel": true,
+            "panelRect": {
+              "width": 362,
+              "height": 239,
+              "top": 394
+            },
+            "canvas": [
+              {
+                "width": 360,
+                "height": 237,
+                "top": 395,
+                "backing": "720x474"
+              }
+            ],
+            "video": [],
+            "img": [],
+            "selectedTabs": [
+              "compile-stage-tab-read"
+            ]
+          }
+        },
+        {
+          "file": "webkit-412x915-s3-03-structure.png",
+          "what": "Scene 03 stage structure",
+          "tabFound": true,
+          "painter": {
+            "panel": true,
+            "panelRect": {
+              "width": 362,
+              "height": 239,
+              "top": 394
+            },
+            "canvas": [
+              {
+                "width": 360,
+                "height": 237,
+                "top": 395,
+                "backing": "720x474"
+              }
+            ],
+            "video": [],
+            "img": [],
+            "selectedTabs": [
+              "compile-stage-tab-structure"
+            ]
+          }
+        },
+        {
+          "file": "webkit-412x915-s3-04-world.png",
+          "what": "Scene 03 stage world",
+          "tabFound": true,
+          "painter": {
+            "panel": true,
+            "panelRect": {
+              "width": 362,
+              "height": 239,
+              "top": 394
+            },
+            "canvas": [
+              {
+                "width": 360,
+                "height": 237,
+                "top": 395,
+                "backing": "720x474"
+              }
+            ],
+            "video": [],
+            "img": [],
+            "selectedTabs": [
+              "compile-stage-tab-world"
+            ]
+          }
+        }
+      ],
+      "errors": [],
+      "menu": {
+        "triggerFound": true,
+        "open": true,
+        "panelRect": {
+          "left": -85,
+          "right": 215,
+          "top": 56,
+          "bottom": 374,
+          "width": 300,
+          "height": 318
+        },
+        "viewport": {
+          "width": 412,
+          "height": 915
+        },
+        "documentScrollWidth": 402,
+        "overflowLeftPx": 85,
+        "overflowRightPx": 0
+      }
+    }
+  ]
+}
