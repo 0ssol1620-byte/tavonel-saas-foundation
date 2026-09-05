@@ -59,6 +59,33 @@ function activationLabel(entry: WorldHistoryEntry) {
   return formatTimestamp(entry.activatedAt.value) ?? entry.activatedAt.value;
 }
 
+/*
+  The compared fields, in words.
+
+  The diff names its fields after the read model's properties, which is right for the diff and
+  wrong for a screen: `sourceVersion` and `bbox` are the shape of a type, not what a reader is
+  looking at. Anything unmapped falls through as it is rather than being hidden, so a field
+  added to the diff later shows up plainly instead of disappearing.
+*/
+const FIELD_LABELS: Record<string, string> = {
+  excerpt: "Text",
+  page: "Page",
+  bbox: "Region on the page",
+  sourceVersion: "Source revision",
+  digest: "Evidence digest",
+  label: "Label",
+  type: "Type",
+  evidence: "Evidence bound",
+  relations: "Relations",
+  predicate: "Predicate",
+  subject: "Subject",
+  object: "Object",
+};
+
+function fieldLabel(field: string) {
+  return FIELD_LABELS[field] ?? field;
+}
+
 function groupLabel(group: ChangeGroupCounts) {
   return [
     group.changed > 0 ? `${formatCount(group.changed)} changed` : null,
@@ -243,7 +270,7 @@ export default function ChangeInbox({ model, collectionId, names }: Props) {
                               <span className={styles.where}>
                                 {displayName(entry.sourceId, names)} · page {entry.page}
                               </span>
-                              <b>{entry.field}</b>
+                              <b>{fieldLabel(entry.field)}</b>
                               <s data-sensitive="content">{entry.before || "—"}</s>
                               <ins data-sensitive="content">{entry.after || "—"}</ins>
                             </li>
@@ -262,7 +289,7 @@ export default function ChangeInbox({ model, collectionId, names }: Props) {
                             <li key={`${entry.kind}:${entry.id}`} data-effect={entry.effect}>
                               <span className={styles.where}>{entry.type} · {entry.effect}</span>
                               <b data-sensitive="content">{entry.label}</b>
-                              {entry.fields.length > 0 ? <small>{entry.fields.join(", ")}</small> : null}
+                              {entry.fields.length > 0 ? <small>{entry.fields.map(fieldLabel).join(", ")}</small> : null}
                             </li>
                           ))}
                         </ul>

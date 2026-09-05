@@ -219,7 +219,7 @@ export function describeChangeImpact(counts: ChangeImpactCounts): string {
     describeGroup("package file", counts.files),
   ].filter((part): part is string => part !== null);
   const revisions = counts.sourceRevisions.added + counts.sourceRevisions.removed;
-  if (revisions > 0) parts.push(`${revisions} source revision${revisions === 1 ? "" : "s"}`);
+  if (revisions > 0) parts.push(`${revisions} source revision${revisions === 1 ? "" : "s"} added or removed`);
   return parts.join(" · ");
 }
 

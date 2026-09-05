@@ -172,6 +172,16 @@ describe("counts derived from two compiled versions", () => {
     expect(sentence).not.toContain("relation");
     expect(sentence).not.toContain("evidence region");
   });
+
+  it("says what happened to a source revision rather than only counting it", () => {
+    const rebound: WorldReadModel = {
+      ...after,
+      objects: after.objects.map((object) => ({ ...object, sourceVersions: ["version-later"] })),
+    };
+    const sentence = describeChangeImpact(summariseChangeImpact(diffWorldVersions(after, rebound)));
+    // "2 source revisions" alone reads as a population, not as a change to one.
+    expect(sentence).toContain("2 source revisions added or removed");
+  });
 });
 
 describe("the two halves of an impact reading", () => {
