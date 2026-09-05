@@ -1,7 +1,7 @@
 /*
   Local to /benchmarks. Everything here is built from the tokens in app/tavonel.css -- no new
-  colour is invented, and the only hue on the page is the one state colour that marks the two
-  places a reader is being told something about state rather than about structure.
+  colour is invented, and the page carries exactly one hue: the --unresolved rule beside the
+  sentence that reports the state of the registry. Everything else is neutrals and hairlines.
 
   The three shapes this page needs and the shared stylesheet does not already have: a definition
   list where the term is an instrument label (the receipt), a panel for a metric that is defined
