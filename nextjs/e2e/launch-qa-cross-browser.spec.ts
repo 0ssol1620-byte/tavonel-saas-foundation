@@ -18,10 +18,33 @@ test("renders launch-critical public routes without browser errors", async ({ pa
     const response = await page.goto(route, { waitUntil: "domcontentloaded" });
     expect(response?.status(), `${route} should be available`).toBe(200);
     await expect(page.locator("main")).toBeVisible();
-    const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-    );
-    expect(overflow, `${route} should not scroll horizontally`).toBeLessThanOrEqual(1);
+    const geometry = await page.evaluate(() => {
+      const viewport = document.documentElement.clientWidth;
+      const overflow = document.documentElement.scrollWidth - viewport;
+      const offenders = [...document.querySelectorAll("body *")]
+        .map(element => {
+          const rect = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          return {
+            tag: element.tagName.toLowerCase(),
+            id: element.id,
+            className: typeof element.className === "string" ? element.className : "",
+            left: Math.round(rect.left),
+            right: Math.round(rect.right),
+            width: Math.round(rect.width),
+            position: style.position,
+            overflowX: style.overflowX,
+          };
+        })
+        .filter(element => element.right > viewport + 1 || element.left < -1)
+        .sort((a, b) => Math.max(b.right - viewport, -b.left) - Math.max(a.right - viewport, -a.left))
+        .slice(0, 12);
+      return { overflow, viewport, offenders };
+    });
+    expect(
+      geometry.overflow,
+      `${route} should not scroll horizontally; viewport=${geometry.viewport}; offenders=${JSON.stringify(geometry.offenders)}`,
+    ).toBeLessThanOrEqual(1);
     /*
       Let the router's prefetches finish before navigating on.
 
