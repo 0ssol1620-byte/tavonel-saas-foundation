@@ -66,13 +66,23 @@ describe("a corpus is never described as one World", () => {
   });
 });
 
+/*
+  The qualifier moved; the assertions followed it.
+
+  Blueprint §49 takes the Entity disclosure off the default Explore surface and puts it in the
+  technical drawer, so the sentence now lives in `lib/explore-story.ts` and is rendered by
+  `components/explore/technical-details.tsx`. What these tests are for is unchanged: the
+  measured figure must still be beside the type it qualifies, and it must still match the
+  evaluation it came from. A disclosure that is allowed to move is not allowed to evaporate,
+  which is why the second test below reads the renderer and not only the string.
+*/
 describe("the entity type is qualified where it is shown", () => {
-  it("carries the measured precision on the page that displays it", () => {
-    const explore = read("../components/explore-compiled-world.tsx");
-    expect(explore).toContain('type === "Entity"');
-    expect(explore).toContain("3 of 15");
-    expect(explore).toContain("Unreviewed");
-    expect(explore).toContain("heuristic");
+  it("carries the measured precision in the copy that ships", () => {
+    const copy = read("./explore-story.ts");
+    expect(copy).toContain("entityDisclaimer");
+    expect(copy).toContain("3 of 15");
+    expect(copy).toContain("Unreviewed");
+    expect(copy).toContain("heuristic");
   });
 
   it("keeps the number in the copy and the number in the evaluation the same", () => {
@@ -81,12 +91,16 @@ describe("the entity type is qualified where it is shown", () => {
     const evaluation = JSON.parse(read("./entity-extraction-eval.json")) as {
       baseline: { truePositives: number; candidates: number };
     };
-    const explore = read("../components/explore-compiled-world.tsx");
-    expect(explore).toContain(`${evaluation.baseline.truePositives} of ${evaluation.baseline.candidates}`);
+    const copy = read("./explore-story.ts");
+    expect(copy).toContain(`${evaluation.baseline.truePositives} of ${evaluation.baseline.candidates}`);
   });
 
   it("does not present the heuristic as a resolver anywhere it is described", () => {
-    const explore = read("../components/explore-compiled-world.tsx");
-    expect(explore).toContain("not by a resolver");
+    expect(read("./explore-story.ts")).toContain("not by a resolver");
+  });
+
+  it("still renders the qualifier where the Explore page keeps its machine detail", () => {
+    const drawer = read("../components/explore/technical-details.tsx");
+    expect(drawer).toContain("EXPLORE_COPY.entityDisclaimer");
   });
 });

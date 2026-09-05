@@ -194,25 +194,42 @@ function strip(source: string) {
     .replace(/^[ 	]*\/\/.*$/gm, " ");
 }
 
+/*
+  The page is now a stage in three acts, so "the component" is a directory.
+
+  The regression these tests exist for did not move: a literal digest, box or page number typed
+  into a renderer is a value nothing verified, and it is how `3e118d4e...bf1c` and `p.12` once
+  reached a public page for a file that did not exist. Every file that draws the World is read,
+  not just the one that used to.
+*/
+const RENDERERS = [
+  "../components/explore/explore-stage.tsx",
+  "../components/explore/world-act.tsx",
+  "../components/explore/evidence-act.tsx",
+  "../components/explore/change-act.tsx",
+  "../components/explore/ask-overlay.tsx",
+  "../components/explore/technical-details.tsx",
+  "../components/world-visual/world-canvas.tsx",
+  "../components/world-visual/source-sheet.tsx",
+  "../components/world-visual/page-region.tsx",
+];
+
 describe("the page renders the artifact rather than a copy of it", () => {
-  const component = strip(read(fileURLToPath(new URL("../components/explore-compiled-world.tsx", import.meta.url)), "utf8"));
   const page = read(fileURLToPath(new URL("../app/explore/page.tsx", import.meta.url)), "utf8");
 
   it("takes the World as a prop", () => {
     expect(page).toContain("exploreSampleWorld");
     expect(page).toContain("exploreSampleAnswers");
-    expect(component).toContain("world.evidence");
+    expect(page).toContain("toVisualWorldModel");
+    const canvas = read(fileURLToPath(new URL("../components/world-visual/world-canvas.tsx", import.meta.url)), "utf8");
+    expect(canvas).toContain("model.nodes");
   });
 
-  it("hard-codes no digest, no bbox and no page number", () => {
-    /*
-      The specific regression. Any of these three appearing as a literal in the component means
-      a value is being displayed that nothing verified -- which is how `3e118d4e...bf1c` and
-      `p.12` came to be on a public page for a file that did not exist.
-    */
-    expect(component).not.toMatch(/sha256:[0-9a-f]{8}/);
-    expect(component).not.toMatch(/bbox:\s*"\[/i);
-    expect(component).not.toMatch(/\bp\.\d+\b/);
-    expect(component).not.toMatch(/\[\s*\d{2,},\s*\d{2,},\s*\d{2,},\s*\d{2,}\s*\]/);
+  it.each(RENDERERS)("hard-codes no digest, no bbox and no page number in %s", (renderer) => {
+    const source = strip(read(fileURLToPath(new URL(renderer, import.meta.url)), "utf8"));
+    expect(source).not.toMatch(/sha256:[0-9a-f]{8}/);
+    expect(source).not.toMatch(/bbox:\s*"\[/i);
+    expect(source).not.toMatch(/\bp\.\d+\b/);
+    expect(source).not.toMatch(/\[\s*\d{2,},\s*\d{2,},\s*\d{2,},\s*\d{2,}\s*\]/);
   });
 });
