@@ -67,6 +67,33 @@ const COPY_SURFACES = [
   // the page renders is unguarded until its own row is here.
   "components/compiler-contract-diagram.tsx",
   "app/enterprise/page.tsx",
+  /*
+    The Explore stage, added at integration rather than by the lane that built it.
+
+    `/explore` was a public route before this campaign and had no row here at all, so the
+    rebuild did not remove a guard -- it inherited a missing one. The rebuild is the moment to
+    fix that, because almost every visible word on the route now lives in `explore-story.ts`
+    and in the six act components, none of which `read` would reach on its own: it takes a
+    literal path and never follows an import. `explore-change.ts` is on the list for one
+    sentence, the equivalence reason the Change Act prints verbatim -- the sentence most likely
+    to be rewritten into a claim later.
+  */
+  "app/explore/page.tsx",
+  "lib/explore-story.ts",
+  "lib/explore-change.ts",
+  "components/explore/explore-stage.tsx",
+  "components/explore/world-act.tsx",
+  "components/explore/evidence-act.tsx",
+  "components/explore/change-act.tsx",
+  "components/explore/ask-overlay.tsx",
+  "components/explore/technical-details.tsx",
+  /*
+    The workspace Change Inbox. `app/workspace/page.tsx` has been on this list since it was
+    written, and the changes surface it now renders puts its own sentences on screen from
+    these two files.
+  */
+  "components/change-inbox.tsx",
+  "lib/change-inbox.ts",
 ];
 
 const BARRED = [

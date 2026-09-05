@@ -72,13 +72,23 @@ test("is reachable from research and from the resources hub", async ({ page }) =
   await expect(page.getByRole("link", { name: "Benchmarks", exact: true }).first()).toHaveAttribute("href", "/benchmarks");
 });
 
-test("asks to be indexed, now that it is a page rather than a 404", async ({ page }) => {
+/*
+  The route is a page, is in the sitemap, and is still withheld from crawlers.
+
+  This lane removed `/benchmarks` from the robots disallow list, which is an indexing decision
+  rather than an implementation one. The orchestrator's 2026-09-05 adjudication reserved it for
+  the founder and set the default back to disallowed, so this assertion now holds the
+  adjudicated state instead of the lane's: the page is built and reachable, and robots.txt says
+  it is not yet offered. When the founder decides to index it, the token comes out of
+  `app/robots.ts` and this expectation flips in the same commit.
+*/
+test("is a real page in the sitemap, with indexing still withheld pending the founder's call", async ({ page }) => {
   const sitemap = await page.request.get("/sitemap.xml");
   expect(sitemap.ok()).toBe(true);
   expect(await sitemap.text()).toContain("https://tavonel.com/benchmarks");
 
   const robots = await page.request.get("/robots.txt");
-  expect(await robots.text()).not.toContain("Disallow: /benchmarks");
+  expect(await robots.text()).toContain("Disallow: /benchmarks");
 
   await page.goto("/benchmarks");
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", "https://tavonel.com/benchmarks");

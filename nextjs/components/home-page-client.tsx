@@ -308,12 +308,14 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
   them.
 
   Be precise about what that buys today. The landing's field carries
-  `view-transition-name: world-canvas`; `/explore` carries nothing of the kind yet, so what runs
-  is the browser's root crossfade with the field animating out — a soft arrival, not the
-  canvas-to-canvas morph the pairing is built for. That morph turns on when the Explore stage
-  root takes the same name; nothing here needs to change when it does. Even then the browser
-  blends two bitmaps and carries no state across, which is why this continuity stays a visual cue
-  and never becomes a claim in copy.
+  `view-transition-name: world-canvas`, and as of this branch so does the Explore stage root in
+  `components/explore/explore-stage.tsx` — so the pair is complete and the browser morphs the
+  field into the stage instead of crossfading the whole document. Nothing here changed to make
+  that happen; the pairing is by name. The sentence this replaces said `/explore` carried no
+  such name, which was true until the stage landed, and a stale comment about a visual contract
+  is how the contract quietly gets dropped. Even paired, the browser blends two bitmaps and
+  carries no state across, which is why this continuity stays a visual cue and never becomes a
+  claim in copy.
 
   Under reduced motion, or in a browser without the API, this is an ordinary link and the
   navigation is identical. It is one component so the three call sites cannot drift apart in

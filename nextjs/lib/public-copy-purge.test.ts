@@ -30,6 +30,10 @@ const SALES_SURFACES = [
   "benchmarks",
   "product",
   "product/compiled-world",
+  // `product/continuous-knowledge` stopped being a stub in this campaign: it is in the sitemap,
+  // its own test forbids `index: false` on it, and it is linked from /product. That makes it a
+  // sales surface, and a sales surface that is on no list is a page nobody checks.
+  "product/continuous-knowledge",
   "product/document-understanding",
   "product/knowledge-compiler",
   "solutions/[slug]",
