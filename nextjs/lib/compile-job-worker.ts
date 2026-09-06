@@ -4,8 +4,10 @@ import {
   type CompileBlocker,
   type CompileJob,
   type CompileState,
+  countCompileJobDeferrals,
   isRestingCompileState,
   readOpenCompileJobs,
+  recordCompileJobDeferral,
 } from "./compile-job-store";
 import { groupImmutableDocuments } from "./immutable-keys";
 import { listImmutableWorkspaceObjects } from "./r2-objects";
@@ -37,6 +39,26 @@ const STALL_AFTER_MS = 15 * 60 * 1_000;
  * the job in `structuring` forever.
  */
 const COMPILE_LEASE_MS = 5 * 60 * 1_000;
+
+/**
+ * The compiler's own listing disagreed with the worker's about whether a document has been read.
+ *
+ * A terminal outcome, not a blocker: it is not one document a customer can drop, it is the two
+ * views of the workspace failing to agree, and no answer the customer gives changes it.
+ */
+const READING_LISTING_DISAGREEMENT = "READING_LISTING_DISAGREEMENT";
+
+/**
+ * How many turns may end in that disagreement before the job settles.
+ *
+ * Having a bound is what matters; the number is a judgement, not a measurement. A listing that
+ * is merely catching up agrees on the next turn, so ten consecutive disagreements -- each one a
+ * fresh pair of listings -- are evidence of a permanent one. The sibling queue bounds attempts
+ * at five (0024:74) and the quarantine queue retries ten times; a turn here is two listings and
+ * no GPU, so this takes the looser of the two. It lives in the worker because it is policy: the
+ * row has no attempt column to hold it until the migration that gives it one.
+ */
+const MAX_READING_DEFERRALS = 10;
 
 export type CompileJobTurn = {
   jobId: string;
@@ -204,8 +226,53 @@ export async function runCompileJobTurn(job: CompileJob): Promise<CompileJobTurn
   const run = await runCollectionCompile(job.workspaceKey, classified.ready);
   if (!run.ok) {
     if (isCompileWaitingOnReading(run.code)) {
-      // The listing said ready and the compiler disagreed. Believe the compiler, go back to
-      // watching, and let the next turn look again.
+      /*
+        The listing said ready and the compiler, listing again, said it was not.
+
+        Believing the compiler is right; saying nothing about it was not. Nothing was written,
+        so `updated_at` stayed where it was and the job kept its place at the head of the
+        oldest-first window, re-listing the workspace twice a turn for ever. Nothing counted the
+        disagreement either, so a permanent one -- the two views deriving "read" differently --
+        could never end.
+
+        Every deferral is therefore recorded and moves the job to the back of the queue, and a
+        disagreement that survives `MAX_READING_DEFERRALS` turns is settled rather than retried:
+        at that point it is not a listing catching up, and a job that cannot finish should say so.
+        A count that cannot be read does not settle anything -- the ledger keeps the evidence and
+        the bound applies again as soon as the store answers.
+      */
+      const seen = await countCompileJobDeferrals(
+        job.workspaceKey,
+        job.jobId,
+        READING_LISTING_DISAGREEMENT,
+        MAX_READING_DEFERRALS + 1,
+      );
+      const attempt = (seen.ok ? seen.value : 0) + 1;
+      if (attempt > MAX_READING_DEFERRALS) {
+        await advanceCompileJob({
+          workspaceKey: job.workspaceKey,
+          jobId: job.jobId,
+          state: "failed",
+          documentsReady: classified.ready.length,
+          errorCode: READING_LISTING_DISAGREEMENT,
+          blocked: classified.blocked,
+        });
+        return rest("failed", "failed", classified.ready.length, classified.blocked);
+      }
+      await recordCompileJobDeferral({
+        job,
+        state: "structuring",
+        documentsReady: classified.ready.length,
+        blocked: classified.blocked,
+        reason: READING_LISTING_DISAGREEMENT,
+        attempt,
+      });
+      await advanceCompileJob({
+        workspaceKey: job.workspaceKey,
+        jobId: job.jobId,
+        state: "structuring",
+        documentsReady: classified.ready.length,
+      });
       return rest("waiting", "structuring", classified.ready.length, classified.blocked);
     }
     await advanceCompileJob({
