@@ -1,69 +1,134 @@
 /**
- * Frozen Universal Source Knowledge Compiler vocabulary.
+ * USKC contract v1 (2026-09-06) — frozen enumerations.
  *
- * Transliterated verbatim from `contract/enums.v1.json` of campaign
- * TAVONEL-USKC-P0-20260906-V1 (sha256
- * 3c668dc9c22289b27a7d0dd8b072cf23fa0511fd8fe888875770171e664f11d1). Both repositories carry the
- * same value lists so that a receipt written by the Python core and an audit row written by the
- * site name the same thing with the same string.
+ * Transliterated verbatim from `USKC_LANE_CONTRACT_2026-09-06.md`'s `contract/enums.v1.json`
+ * (sha256 3c668dc9c22289b27a7d0dd8b072cf23fa0511fd8fe888875770171e664f11d1). Both repositories
+ * carry the same value lists: this file on the site, `akc_readers/enums.py` and
+ * `akc_cir/evidence_locator.py` in the core.
  *
- * Lane AB defines this file; lanes D and F carry identical copies so their branches compile on
- * their own, and the integration merge keeps one. A lane that needs a new value writes the
- * proposal in its report -- it does not add the value here.
+ * The values and their order are the contract, not an implementation detail. A lane that needs a
+ * new value writes the proposal in its report; it does not add the value here.
+ * `server/foundation/uskcEnums.test.ts` pins every list against the frozen literals.
  */
+export const USKC_ENUMS_CONTRACT = "tavonel.uskc.enums.v1" as const;
 
-export const SOURCE_FAMILIES = [
-  "document", "spreadsheet", "presentation", "image", "email", "structured_data", "web", "code",
-  "cad_2d", "cad_3d", "bim", "audio", "video", "archive", "database", "api", "unknown",
+export const sourceFamilies = [
+  "document",
+  "spreadsheet",
+  "presentation",
+  "image",
+  "email",
+  "structured_data",
+  "web",
+  "code",
+  "cad_2d",
+  "cad_3d",
+  "bim",
+  "audio",
+  "video",
+  "archive",
+  "database",
+  "api",
+  "unknown",
 ] as const;
-export type SourceFamily = (typeof SOURCE_FAMILIES)[number];
+export type SourceFamily = (typeof sourceFamilies)[number];
 
-export const CAPABILITY_STATUSES = [
-  "VERIFIED_NATIVE", "VERIFIED_HYBRID", "BEST_EFFORT", "METADATA_ONLY", "REVIEW_REQUIRED", "UNSUPPORTED",
+export const capabilityStatuses = [
+  "VERIFIED_NATIVE",
+  "VERIFIED_HYBRID",
+  "BEST_EFFORT",
+  "METADATA_ONLY",
+  "REVIEW_REQUIRED",
+  "UNSUPPORTED",
 ] as const;
-export type CapabilityStatus = (typeof CAPABILITY_STATUSES)[number];
+export type CapabilityStatus = (typeof capabilityStatuses)[number];
 
-export const CAPABILITY_STATUSES_ACCEPTED_AT_UPLOAD = [
-  "VERIFIED_NATIVE", "VERIFIED_HYBRID", "BEST_EFFORT", "METADATA_ONLY",
+/** The subset a file may be accepted at upload with. Everything else is refused at intake. */
+export const capabilityStatusesAcceptedAtUpload = [
+  "VERIFIED_NATIVE",
+  "VERIFIED_HYBRID",
+  "BEST_EFFORT",
+  "METADATA_ONLY",
 ] as const;
-export type CapabilityStatusAcceptedAtUpload = (typeof CAPABILITY_STATUSES_ACCEPTED_AT_UPLOAD)[number];
+export type CapabilityStatusAcceptedAtUpload = (typeof capabilityStatusesAcceptedAtUpload)[number];
 
-export const REPRESENTATION_KINDS = [
-  "original", "native", "rendered", "ocr", "visual", "normalized", "canonical_ir",
+export const representationKinds = [
+  "original",
+  "native",
+  "rendered",
+  "ocr",
+  "visual",
+  "normalized",
+  "canonical_ir",
 ] as const;
-export type RepresentationKind = (typeof REPRESENTATION_KINDS)[number];
+export type RepresentationKind = (typeof representationKinds)[number];
 
-export const READER_FEATURES = [
-  "native_text", "layout", "tables", "formula", "comments", "track_changes", "chart_data",
-  "geometry", "assembly", "acl", "thread", "timestamp", "ast", "dependency_graph",
+export const readerFeatures = [
+  "native_text",
+  "layout",
+  "tables",
+  "formula",
+  "comments",
+  "track_changes",
+  "chart_data",
+  "geometry",
+  "assembly",
+  "acl",
+  "thread",
+  "timestamp",
+  "ast",
+  "dependency_graph",
 ] as const;
-export type ReaderFeature = (typeof READER_FEATURES)[number];
+export type ReaderFeature = (typeof readerFeatures)[number];
 
-export const LOCATOR_KINDS = [
-  "pdf", "image", "docx", "xlsx", "pptx", "email", "json", "xml", "code", "cad", "media", "database", "api",
+export const locatorKinds = [
+  "pdf",
+  "image",
+  "docx",
+  "xlsx",
+  "pptx",
+  "email",
+  "json",
+  "xml",
+  "code",
+  "cad",
+  "media",
+  "database",
+  "api",
 ] as const;
-export type LocatorKind = (typeof LOCATOR_KINDS)[number];
+export type LocatorKind = (typeof locatorKinds)[number];
 
-export const READER_REGISTRY_STATUSES = ["candidate", "qualified", "retired"] as const;
-export type ReaderRegistryStatus = (typeof READER_REGISTRY_STATUSES)[number];
+export const readerRegistryStatuses = ["candidate", "qualified", "retired"] as const;
+export type ReaderRegistryStatus = (typeof readerRegistryStatuses)[number];
 
-export const FAILURE_CLASSES = [
-  "UNSUPPORTED_FORMAT", "ENCRYPTED_SOURCE", "CORRUPT_SOURCE", "MALWARE_QUARANTINED", "PARSER_TIMEOUT",
-  "PARSER_OOM", "EMPTY_OUTPUT", "NATIVE_VISUAL_DISAGREEMENT", "LAYOUT_FAILURE", "TABLE_FAILURE",
-  "FORMULA_FAILURE", "TEXT_OMISSION", "IDENTITY_UNRESOLVED", "EVIDENCE_BROKEN", "ACL_UNRESOLVED",
-  "SOURCE_DELETED", "RECEIPT_MISMATCH", "PRESERVATION_FAILED", "EQUIVALENCE_FAILED", "PROVIDER_UNAVAILABLE",
+export const failureClasses = [
+  "UNSUPPORTED_FORMAT",
+  "ENCRYPTED_SOURCE",
+  "CORRUPT_SOURCE",
+  "MALWARE_QUARANTINED",
+  "PARSER_TIMEOUT",
+  "PARSER_OOM",
+  "EMPTY_OUTPUT",
+  "NATIVE_VISUAL_DISAGREEMENT",
+  "LAYOUT_FAILURE",
+  "TABLE_FAILURE",
+  "FORMULA_FAILURE",
+  "TEXT_OMISSION",
+  "IDENTITY_UNRESOLVED",
+  "EVIDENCE_BROKEN",
+  "ACL_UNRESOLVED",
+  "SOURCE_DELETED",
+  "RECEIPT_MISMATCH",
+  "PRESERVATION_FAILED",
+  "EQUIVALENCE_FAILED",
+  "PROVIDER_UNAVAILABLE",
 ] as const;
-export type FailureClass = (typeof FAILURE_CLASSES)[number];
+export type FailureClass = (typeof failureClasses)[number];
 
-export const PRIVACY_POLICIES = ["foundation_synthetic_only", "approved_customer_data"] as const;
-export type PrivacyPolicy = (typeof PRIVACY_POLICIES)[number];
+export const privacyPolicies = ["foundation_synthetic_only", "approved_customer_data"] as const;
+export type PrivacyPolicy = (typeof privacyPolicies)[number];
 
-/**
- * The seventeen preconditions that, all satisfied with evidence, are the only path to
- * `approved_customer_data`. The list is closed on purpose: a gate that could be satisfied by a
- * subset chosen at the call site is not a gate.
- */
-export const CUSTOMER_DATA_PRECONDITIONS = [
+export const customerDataPreconditions = [
   "tenant_isolation_suite_passed",
   "encryption_at_rest_verified",
   "encryption_in_transit_verified",
@@ -82,4 +147,4 @@ export const CUSTOMER_DATA_PRECONDITIONS = [
   "per_source_acl_preserved",
   "founder_approval_receipt_recorded",
 ] as const;
-export type CustomerDataPrecondition = (typeof CUSTOMER_DATA_PRECONDITIONS)[number];
+export type CustomerDataPrecondition = (typeof customerDataPreconditions)[number];

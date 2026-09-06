@@ -7,7 +7,7 @@ import {
   type CustomerDataGateDecision,
   type PreconditionEvidence,
 } from "../../shared/customerDataGate";
-import { CUSTOMER_DATA_PRECONDITIONS, PRIVACY_POLICIES } from "../../shared/uskcEnums";
+import { customerDataPreconditions, privacyPolicies } from "../../shared/uskcEnums";
 import {
   COMPILE_JOB_SCHEMA,
   validateCompileJobEnvelope,
@@ -23,7 +23,7 @@ const NOW = "2026-09-06T00:00:00.000Z";
  * a gate whose true branch is never tested is a gate nobody has read.
  */
 function satisfiedEvidence(): PreconditionEvidence[] {
-  return CUSTOMER_DATA_PRECONDITIONS.map((precondition) => ({
+  return customerDataPreconditions.map((precondition) => ({
     precondition,
     satisfied: true,
     evidence: `fixture://${precondition}`,
@@ -72,7 +72,7 @@ function allowedGate(overrides: Partial<Extract<CustomerDataGateDecision, { allo
 
 describe("customer-data gate vocabulary", () => {
   it("carries the seventeen frozen preconditions in the frozen order", () => {
-    expect([...CUSTOMER_DATA_PRECONDITIONS]).toEqual([
+    expect([...customerDataPreconditions]).toEqual([
       "tenant_isolation_suite_passed",
       "encryption_at_rest_verified",
       "encryption_in_transit_verified",
@@ -91,7 +91,7 @@ describe("customer-data gate vocabulary", () => {
       "per_source_acl_preserved",
       "founder_approval_receipt_recorded",
     ]);
-    expect([...PRIVACY_POLICIES]).toEqual(["foundation_synthetic_only", "approved_customer_data"]);
+    expect([...privacyPolicies]).toEqual(["foundation_synthetic_only", "approved_customer_data"]);
   });
 });
 
@@ -104,7 +104,7 @@ describe("customer-data gate evaluation", () => {
       now: NOW,
     });
     expect(decision.allowed).toBe(false);
-    expect(decision.allowed === false && decision.missing).toEqual([...CUSTOMER_DATA_PRECONDITIONS]);
+    expect(decision.allowed === false && decision.missing).toEqual([...customerDataPreconditions]);
   });
 
   it("refuses sixteen of seventeen and names the one that is missing", () => {
@@ -202,7 +202,7 @@ describe("customer-data gate evaluation", () => {
       now: "0",
     });
     expect(decision.allowed).toBe(false);
-    expect(decision.allowed === false && decision.missing).toEqual([...CUSTOMER_DATA_PRECONDITIONS]);
+    expect(decision.allowed === false && decision.missing).toEqual([...customerDataPreconditions]);
     expect(decision.evaluatedAt).toBe("1970-01-01T00:00:00.000Z");
   });
 
@@ -213,7 +213,7 @@ describe("customer-data gate evaluation", () => {
       evidence: satisfiedEvidence(),
       now: NOW,
     });
-    expect(decision.allowed === false && decision.missing).toEqual([...CUSTOMER_DATA_PRECONDITIONS]);
+    expect(decision.allowed === false && decision.missing).toEqual([...customerDataPreconditions]);
   });
 
   it("allows only a complete, evidenced set, and binds a receipt digest to it", () => {
@@ -358,7 +358,7 @@ describe("compile envelope, customer-data branch", () => {
   );
 
   it("accepts only the two values the frozen vocabulary spells", () => {
-    for (const privacyPolicy of PRIVACY_POLICIES) {
+    for (const privacyPolicy of privacyPolicies) {
       const input = envelope();
       input.route.privacyPolicy = privacyPolicy;
       expect(validateCompileJobEnvelope(input, allowedGate()).accepted).toBe(true);

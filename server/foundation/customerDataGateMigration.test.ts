@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { customerDataEvidenceReceiptSha256 } from "../../shared/customerDataGate";
-import { CUSTOMER_DATA_PRECONDITIONS } from "../../shared/uskcEnums";
+import { customerDataPreconditions } from "../../shared/uskcEnums";
 
 const migration = readFileSync(
   resolve(process.cwd(), "supabase/migrations/0050_customer_data_gate_acl.sql"),
@@ -26,7 +26,7 @@ describe("customer-data gate migration", () => {
   });
 
   it("constrains `missing` to the seventeen frozen precondition names", () => {
-    for (const precondition of CUSTOMER_DATA_PRECONDITIONS) {
+    for (const precondition of customerDataPreconditions) {
       expect(migration).toContain(`'${precondition}'`);
     }
   });
@@ -92,7 +92,7 @@ describe("customer-data gate migration", () => {
     expect(migration).toContain("evidence jsonb not null");
     expect(migration).toContain("receipt_sha256 text check (receipt_sha256 ~ '^sha256:[a-f0-9]{64}$')");
 
-    const evidence = CUSTOMER_DATA_PRECONDITIONS.map((precondition) => ({
+    const evidence = customerDataPreconditions.map((precondition) => ({
       precondition,
       satisfied: true,
       evidence: `fixture://${precondition}`,

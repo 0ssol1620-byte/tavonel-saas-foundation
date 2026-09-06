@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { CUSTOMER_DATA_PRECONDITIONS, type CustomerDataPrecondition } from "./uskcEnums";
+import { customerDataPreconditions, type CustomerDataPrecondition } from "./uskcEnums";
 
 /**
  * The customer-data gate.
@@ -68,7 +68,7 @@ function isInstant(value: string): boolean {
 export function customerDataEvidenceReceiptSha256(evidence: readonly PreconditionEvidence[]): string {
   const byPrecondition = new Map(evidence.map((entry) => [entry.precondition, entry]));
   const canonical = JSON.stringify(
-    [...CUSTOMER_DATA_PRECONDITIONS]
+    [...customerDataPreconditions]
       .filter((precondition) => byPrecondition.has(precondition))
       .map((precondition) => {
         const entry = byPrecondition.get(precondition) as PreconditionEvidence;
@@ -102,10 +102,10 @@ export function evaluateCustomerDataGate(input: {
   // An unidentified subject cannot be approved, and an evaluation stamped with a time nobody can
   // read is not auditable. Both refuse everything rather than approve something unattributable.
   if (!input.tenantId.trim() || !input.workspaceId.trim() || !isInstant(input.now)) {
-    return refuse([...CUSTOMER_DATA_PRECONDITIONS]);
+    return refuse([...customerDataPreconditions]);
   }
 
-  const missing = CUSTOMER_DATA_PRECONDITIONS.filter((precondition) => {
+  const missing = customerDataPreconditions.filter((precondition) => {
     const entries = input.evidence.filter((entry) => entry.precondition === precondition);
     // Two rows for one precondition is a disagreement, not a stronger claim.
     if (entries.length !== 1) return true;
