@@ -1,3 +1,10 @@
+import { execFile } from "node:child_process";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { promisify } from "node:util";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   LARGE_DOCUMENT_POLICY,
@@ -339,3 +346,67 @@ describe("operations alert delivery", () => {
   });
 });
 
+describe("production smoke failure routing", () => {
+  const script = path.join(
+    import.meta.dirname,
+    "..",
+    "scripts",
+    "operations-smoke.mjs"
+  );
+
+  async function runSmoke(failingPath: string | null) {
+    const server = createServer((request, response) => {
+      response.writeHead(request.url === failingPath ? 503 : 200, {
+        "content-type": "text/plain",
+      });
+      response.end("ok");
+    });
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", () => resolve())
+    );
+    const { port } = server.address() as AddressInfo;
+    const outputFile = path.join(
+      await mkdtemp(path.join(tmpdir(), "operations-smoke-")),
+      "github-output"
+    );
+    await writeFile(outputFile, "");
+    const exitCode = await promisify(execFile)("node", [script], {
+      env: {
+        ...process.env,
+        TAVONEL_ORIGIN: `http://127.0.0.1:${port}`,
+        GITHUB_OUTPUT: outputFile,
+      },
+    }).then(
+      () => 0,
+      (error: { code?: number }) => error.code
+    );
+    server.close();
+    return { exitCode, output: (await readFile(outputFile, "utf8")).trim() };
+  }
+
+  it("names the failed checks so the alert step can carry them", async () => {
+    expect(await runSmoke("/status")).toEqual({
+      exitCode: 1,
+      output: "failed=status",
+    });
+    expect(await runSmoke(null)).toEqual({ exitCode: 0, output: "failed=" });
+  }, 60_000);
+
+  it("keeps the workflow's failure page wired to the alert receiver", async () => {
+    const workflow = await readFile(
+      path.join(
+        import.meta.dirname,
+        "..",
+        "..",
+        ".github",
+        "workflows",
+        "operations-smoke.yml"
+      ),
+      "utf8"
+    );
+    expect(workflow).toContain("if: failure()");
+    expect(workflow).toContain("secrets.OPERATIONS_ALERT_WEBHOOK_URL");
+    expect(workflow).toContain("steps.probe.outputs.failed");
+    expect(workflow).toContain("ALERT_RECEIVER_UNCONFIGURED");
+  });
+});
