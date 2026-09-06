@@ -15,7 +15,16 @@ import fitz
 from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 os.environ.setdefault("TAVONEL_CDR_HMAC", "fixture-cdr-hmac-secret-that-is-long-enough-123")
+
+from clamd_stub import FakeClamd  # noqa: E402
+
+# This suite is about rendering, not scanning, but the service refuses without a scanner and
+# has no bypass flag. So it gets a real socket speaking the real protocol. `setdefault`, so a
+# job that already exports CLAMD_HOST points this suite at that clamd instead.
+for _name, _value in FakeClamd("clean").start().env().items():
+    os.environ.setdefault(_name, _value)
 
 from app import (  # noqa: E402
     MAX_RENDER_PIXELS_PER_PAGE,

@@ -1,0 +1,101 @@
+# TAVONEL PDF-raster CDR with a ClamAV sidecar — declarative Cloud Run service definition.
+#
+# Not applied by any agent. `gcloud run services replace` against this file is a production
+# deploy and belongs to the founder; see README "Deploying this definition".
+#
+# Two placeholders must be replaced before it is applied, and nothing else:
+#   PROJECT_ID                     the Foundation project
+#   REPLACE_WITH_BUILT_CDR_DIGEST  the digest of the image built from this directory
+# No secret value appears here. TAVONEL_CDR_HMAC is a Secret Manager reference.
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: tavonel-pdf-raster-cdr
+  labels:
+    cloud.googleapis.com/location: asia-northeast3
+  annotations:
+    run.googleapis.com/ingress: internal
+    run.googleapis.com/ingress-status: internal
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "1"
+        run.googleapis.com/execution-environment: gen1
+        # The CDR container is not started until clamd passes its startup probe, so a
+        # request can never arrive at an instance whose scanner is still loading.
+        run.googleapis.com/container-dependencies: '{"cdr":["clamd"]}'
+        # Egress "none": all outbound traffic is pinned to a VPC with no Cloud NAT and no
+        # default internet route. The network and connector are created by the founder;
+        # until they exist, this annotation must be removed AND the signature-refresh note
+        # in the README applies. See README "Egress, signatures and the sidecar tag".
+        run.googleapis.com/network-interfaces: '[{"network":"tavonel-cdr","subnetwork":"tavonel-cdr-asia-northeast3"}]'
+        run.googleapis.com/vpc-access-egress: all-traffic
+    spec:
+      containerConcurrency: 1
+      timeoutSeconds: 120
+      serviceAccountName: tavonel-cdr-runtime@PROJECT_ID.iam.gserviceaccount.com
+      containers:
+        - name: cdr
+          image: asia-northeast3-docker.pkg.dev/PROJECT_ID/tavonel-cdr/tavonel-pdf-raster-cdr@sha256:REPLACE_WITH_BUILT_CDR_DIGEST
+          ports:
+            - name: http1
+              containerPort: 8080
+          env:
+            - name: CLAMD_HOST
+              value: "127.0.0.1"
+            - name: CLAMD_PORT
+              value: "3310"
+            # Fail closed: with no reachable clamd, /v1/disarm refuses and /health is 503.
+            - name: MALWARE_SCAN_REQUIRED
+              value: "1"
+            - name: CLAMD_CONNECT_TIMEOUT_SECONDS
+              value: "3"
+            # Below the 120 s request timeout, so a hung scanner is reported as SCAN_TIMEOUT
+            # by this service rather than as an infrastructure timeout by Cloud Run.
+            - name: CLAMD_READ_TIMEOUT_SECONDS
+              value: "20"
+            - name: TAVONEL_CDR_HMAC
+              valueFrom:
+                secretKeyRef:
+                  name: tavonel-cdr-hmac
+                  key: latest
+          # Cloud Run allocates by limits; the v1 API does not honour resources.requests.
+          resources:
+            limits:
+              cpu: "2"
+              memory: 4Gi
+          startupProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 12
+            timeoutSeconds: 5
+        - name: clamd
+          # Pinned by tag AND digest, observed 2026-09-06. ClamAV 1.5.4, GPL-2.0-only with an
+          # OpenSSL exception: a separate process reached over its documented socket, never
+          # linked into this service. Re-pin deliberately; see the README.
+          image: clamav/clamav:1.5.4@sha256:f0954d679017eb6d48221e2b2be3ac5457bf278a844f39b672376f55a085f591
+          env:
+            # Signature database is baked into this tag. With no egress, freshclam cannot
+            # refresh it, so it is stopped rather than left to fail every two hours.
+            - name: CLAMAV_NO_FRESHCLAMD
+              value: "true"
+            - name: CLAMD_STARTUP_TIMEOUT
+              value: "180"
+          resources:
+            limits:
+              cpu: "2"
+              memory: 4Gi
+          startupProbe:
+            tcpSocket:
+              port: 3310
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 18
+            timeoutSeconds: 5
+  traffic:
+    - percent: 100
+      latestRevision: true

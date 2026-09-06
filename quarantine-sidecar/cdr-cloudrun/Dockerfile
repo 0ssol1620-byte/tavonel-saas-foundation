@@ -21,7 +21,7 @@ RUN useradd --system --uid 10001 --create-home --home-dir /home/cdr cdr
 WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
-COPY app.py ./
+COPY app.py malware.py ./
 RUN chown -R cdr:cdr /app /home/cdr
 USER cdr
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import json
 import math
 import os
 import re
@@ -19,6 +20,24 @@ from typing import Final
 import fitz
 from fastapi import BackgroundTasks, FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
+
+from malware import (
+    MalwareDetectedError,
+    MalwareScanError,
+    require_scanning_enabled,
+    scan_stream,
+    scanner_ready,
+)
+
+try:
+    # Refuse to boot rather than serve a single request with scanning disarmed. This service
+    # has no bypass flag: MALWARE_SCAN_REQUIRED may only be "1" (or be unset), and anything
+    # else is a configuration error reported here, before uvicorn binds a port.
+    require_scanning_enabled()
+except MalwareScanError as exc:
+    raise RuntimeError(
+        "MALWARE_SCAN_REQUIRED must be unset or exactly '1'; this service has no scan bypass"
+    ) from exc
 
 APP_NAME: Final = "tavonel-pdf-raster-cdr"
 SIGNATURE_TTL_SECONDS: Final = 300
@@ -193,6 +212,68 @@ def copy_and_digest(upload: UploadFile, target: Path) -> tuple[str, int]:
     return f"sha256:{digest.hexdigest()}", total
 
 
+# Every adapter refusal is a 503 with no output and no promotion. antivirus_required is a
+# configuration failure, which is still an unavailable scanner from the caller's side, and
+# antivirus_scan_error is a reply that carried no verdict.
+MALWARE_REFUSAL: Final = {
+    "antivirus_unavailable": "SCANNER_UNAVAILABLE",
+    "antivirus_required": "SCANNER_UNAVAILABLE",
+    "antivirus_timeout": "SCAN_TIMEOUT",
+    "antivirus_invalid_response": "SCANNER_INVALID_RESPONSE",
+    "antivirus_scan_error": "SCANNER_INVALID_RESPONSE",
+}
+
+
+def scan_or_refuse(source: Path, input_sha256: str) -> dict[str, object]:
+    """Scan the stored input before anything parses or converts it.
+
+    The returned record binds the verdict to the digest the caller authenticated, so the
+    Worker can tie it to the SourceVersion. A scan error never returns; it raises.
+    """
+    try:
+        with source.open("rb") as stream:
+            result = scan_stream(stream)
+    except MalwareDetectedError as exc:
+        raise HTTPException(
+            422,
+            {
+                "code": "MALWARE_DETECTED",
+                "signature": str(exc),
+                "scannedSha256": input_sha256,
+                "message": "CDR source was rejected by the malware scanner",
+            },
+        ) from exc
+    except MalwareScanError as exc:
+        raise HTTPException(
+            503,
+            {
+                "code": MALWARE_REFUSAL.get(str(exc), "SCANNER_UNAVAILABLE"),
+                "reason": str(exc),
+                "message": "CDR malware scan produced no verdict",
+            },
+            headers={"retry-after": "60"},
+        ) from exc
+    if result.verdict != "clean":
+        # `scan_stream` cannot return anything else today. This is the belt on the braces:
+        # if a future verdict is ever added, it refuses here instead of being promoted.
+        raise HTTPException(
+            503,
+            {
+                "code": "SCANNER_INVALID_RESPONSE",
+                "reason": f"unpromotable_verdict:{result.verdict}",
+                "message": "CDR malware scan produced no clean verdict",
+            },
+            headers={"retry-after": "60"},
+        )
+    return {
+        "engine": result.engine,
+        "signatureVersion": result.signature_version,
+        "scannedSha256": input_sha256,
+        "verdict": result.verdict,
+        "durationMs": result.duration_ms,
+    }
+
+
 def convert_to_pdf(source: Path, source_mime: str, work_dir: Path) -> Path:
     if source_mime not in LIBREOFFICE_MIMES:
         return source
@@ -309,8 +390,17 @@ def healthz() -> JSONResponse:
             content={"status": "unavailable", "reason": "CDR renderer is unavailable"},
             headers={"cache-control": "no-store", "retry-after": "60"},
         )
+    scanner_is_ready = scanner_ready()
+    if not scanner_is_ready:
+        # Reported, not decorative: the scanner is always required, so a scanner that cannot
+        # be reached means every /v1/disarm call would refuse and the instance is not healthy.
+        return JSONResponse(
+            status_code=503,
+            content={"status": "unavailable", "reason": "CDR malware scanner is unavailable", "scannerReady": False},
+            headers={"cache-control": "no-store", "retry-after": "60"},
+        )
     return JSONResponse(
-        content={"status": "ok", "mode": "pdf-raster", "service": APP_NAME},
+        content={"status": "ok", "mode": "pdf-raster", "service": APP_NAME, "scannerReady": scanner_is_ready},
         headers={"cache-control": "no-store"},
     )
 
@@ -337,6 +427,9 @@ def disarm(
         actual_digest, _ = copy_and_digest(source, input_path)
         if not hmac.compare_digest(expected_digest, actual_digest):
             raise HTTPException(422, "CDR source digest does not match the uploaded body")
+        # Scanned before this process parses the bytes as anything: the package guard,
+        # LibreOffice and the renderer all run after a verdict exists.
+        malware_scan = scan_or_refuse(input_path, actual_digest)
         reject_risky_office_package(input_path, mime_type)
         pdf_source = convert_to_pdf(input_path, mime_type, work_dir)
         output_path = work_dir / "sanitized.pdf"
@@ -360,6 +453,7 @@ def disarm(
             "x-tavonel-input-sha256": expected_digest,
             "x-tavonel-cdr-output-mime": "application/pdf",
             "x-tavonel-cdr-output-sha256": output_digest,
+            "x-tavonel-malware-scan": json.dumps(malware_scan, separators=(",", ":")),
         },
         background=background_tasks,
     )
