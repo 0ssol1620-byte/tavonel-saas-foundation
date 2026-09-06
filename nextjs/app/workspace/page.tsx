@@ -5,7 +5,7 @@ import Logomark from "@/components/logomark";
 import WorldExplorer from "@/components/world-explorer";
 import { Download, FileText, LockKeyhole, ShieldCheck, UploadCloud } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { activationPolicy } from "@/lib/activation-policy";
+import { activationPolicy, type ActivationCapability } from "@/lib/activation-policy";
 import type { DocumentListItem } from "@/lib/immutable-keys";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { useCheckout } from "@/lib/use-checkout";
@@ -153,13 +153,21 @@ function bytesToHex(bytes: Uint8Array) {
   return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-/** Human labels for the activation-policy keys, so no camelCase reaches the screen. */
-const GATE_LABELS = {
+/**
+ * Human labels for the activation-policy keys, so no camelCase reaches the screen.
+ *
+ * Typed against `ActivationCapability` rather than left to the `?? key` fallback below: the
+ * fallback is what let a new policy key ship to the screen as the literal `customerData`. A key
+ * added to `lib/activation-policy.ts` without a label now fails `tsc`, which is the check that
+ * catches it before a page renders it.
+ */
+const GATE_LABELS: Record<ActivationCapability, string> = {
   customerIntake: "Document intake",
   cdr: "Content disarm",
   ocrGpu: "OCR on scans",
   candidatePromotion: "Promotion to the live world",
-} as const;
+  customerData: "Customer-data compilation",
+};
 
 type WorkspaceTab = "overview" | "knowledge" | "connections" | "developers" | "billing" | "integrity";
 
@@ -2392,15 +2400,18 @@ export default function WorkspacePage() {
           {tab === "integrity" ? (
           <section className="card gates">
             <p className="eyebrow">PROCESSING INTEGRITY</p>
-            <h2>Four gates</h2>
+            <h2>Processing gates</h2>
             {/* Written labels, not the policy keys: "ocrGpu" split on capitals rendered as
                 "ocr Gpu" in the UI. The state marker is the same pill the public capability
                 grid uses, and it had the glyphs the wrong way round -- an open circle for an
-                *open* gate and a filled one for a closed gate reads as the opposite. */}
+                *open* gate and a filled one for a closed gate reads as the opposite.
+                The heading counted the gates in words ("Four gates") and went stale the moment a
+                fifth policy key was added; a heading that cannot drift is the smaller fix than a
+                number nobody updates. */}
             <div className="gate-list">
               {Object.entries(activationPolicy).map(([key, value]) => (
                 <article key={key}>
-                  <strong>{GATE_LABELS[key as keyof typeof GATE_LABELS] ?? key}</strong>
+                  <strong>{GATE_LABELS[key as ActivationCapability]}</strong>
                   <span className="pill" data-v={value.enabled ? "current" : "held"}>{value.enabled ? "OPEN" : "CLOSED"}</span>
                   <p>{value.reason}</p>
                 </article>
