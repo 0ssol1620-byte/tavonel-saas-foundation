@@ -124,9 +124,15 @@ export function validateCompileJobEnvelope(
   if (!Number.isSafeInteger(input.route.maxLatencyMs) || input.route.maxLatencyMs < 1_000 || input.route.maxLatencyMs > 90_000) {
     return { accepted: false, code: "LATENCY_BOUND_INVALID" };
   }
+  // An allowlist, not a denylist. Written as `!== "foundation_synthetic_only" && !gate` this
+  // admitted every other string a deserialized JSON body can carry -- an unknown policy, the empty
+  // string, or any value added to the union later -- as long as a gate object was present.
   if (
     input.route.privacyPolicy !== "foundation_synthetic_only" &&
-    !gateAdmitsCustomerData(gate, input.tenantId, input.workspaceId)
+    !(
+      input.route.privacyPolicy === "approved_customer_data" &&
+      gateAdmitsCustomerData(gate, input.tenantId, input.workspaceId)
+    )
   ) {
     return { accepted: false, code: "PRIVACY_POLICY_NOT_ALLOWED" };
   }

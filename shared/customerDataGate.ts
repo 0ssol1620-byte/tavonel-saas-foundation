@@ -49,8 +49,15 @@ export type CustomerDataGateDecision =
       evaluatedAt: string;
     };
 
+/**
+ * An instant, not merely something `Date.parse` tolerates. `Date.parse` accepts "2026", "0" and
+ * "Sat Sep 6 2026"; a gate stamped with any of those is not auditable to a moment, so the shape is
+ * pinned to an ISO-8601 instant with an explicit offset and the value must also be a real date.
+ */
+const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?(Z|[+-]\d{2}:\d{2})$/;
+
 function isInstant(value: string): boolean {
-  return typeof value === "string" && value.trim() !== "" && Number.isFinite(Date.parse(value));
+  return typeof value === "string" && ISO_INSTANT.test(value) && Number.isFinite(Date.parse(value));
 }
 
 /**

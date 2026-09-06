@@ -174,6 +174,38 @@ describe("customer-data gate evaluation", () => {
     expect(decision.allowed === false && decision.missing).toEqual(["retention_controls_configured"]);
   });
 
+  /**
+   * `Date.parse` accepts all of these. A gate stamped "2026" or "0" is not auditable to a moment,
+   * and the earlier check -- non-blank plus `Date.parse` -- let every one of them through.
+   */
+  it.each(["2026", "0", "Sat Sep 6 2026", "2026-09-06", "now"])(
+    "refuses evidence stamped %j, which Date.parse tolerates but is not an instant",
+    (checkedAt) => {
+      const evidence = satisfiedEvidence().map((entry) =>
+        entry.precondition === "audit_log_active" ? { ...entry, checkedAt } : entry,
+      );
+      const decision = evaluateCustomerDataGate({
+        tenantId: "tenant_01",
+        workspaceId: "workspace_01",
+        evidence,
+        now: NOW,
+      });
+      expect(decision.allowed === false && decision.missing).toEqual(["audit_log_active"]);
+    },
+  );
+
+  it("refuses everything when `now` is not an instant, and never stamps a decision with it", () => {
+    const decision = evaluateCustomerDataGate({
+      tenantId: "tenant_01",
+      workspaceId: "workspace_01",
+      evidence: satisfiedEvidence().map((entry) => ({ ...entry, checkedAt: "0" })),
+      now: "0",
+    });
+    expect(decision.allowed).toBe(false);
+    expect(decision.allowed === false && decision.missing).toEqual([...CUSTOMER_DATA_PRECONDITIONS]);
+    expect(decision.evaluatedAt).toBe("1970-01-01T00:00:00.000Z");
+  });
+
   it("refuses an unidentified subject even with complete evidence", () => {
     const decision = evaluateCustomerDataGate({
       tenantId: "  ",
@@ -302,5 +334,51 @@ describe("compile envelope, customer-data branch", () => {
     input.route.privacyPolicy = "foundation_synthetic_only";
     expect(validateCompileJobEnvelope(input).accepted).toBe(true);
     expect(validateCompileJobEnvelope(input, allowedGate()).accepted).toBe(true);
+  });
+
+  /**
+   * The check is an allowlist. Written as `!== "foundation_synthetic_only" && !gate` it admitted
+   * every other string behind an allowed gate -- the envelope is the Product-to-Core wire contract,
+   * so its input is a deserialized JSON body and the union does not close it at runtime.
+   */
+  it.each(["raw_customer_pii_no_redaction", "", "approved_customer_dataX", "APPROVED_CUSTOMER_DATA"])(
+    "refuses privacyPolicy %j even behind an allowed gate",
+    (privacyPolicy) => {
+      const input = envelope();
+      (input.route as { privacyPolicy: string }).privacyPolicy = privacyPolicy;
+      expect(validateCompileJobEnvelope(input, allowedGate())).toEqual({
+        accepted: false,
+        code: "PRIVACY_POLICY_NOT_ALLOWED",
+      });
+      expect(validateCompileJobEnvelope(input)).toEqual({
+        accepted: false,
+        code: "PRIVACY_POLICY_NOT_ALLOWED",
+      });
+    },
+  );
+
+  it("accepts only the two values the frozen vocabulary spells", () => {
+    for (const privacyPolicy of PRIVACY_POLICIES) {
+      const input = envelope();
+      input.route.privacyPolicy = privacyPolicy;
+      expect(validateCompileJobEnvelope(input, allowedGate()).accepted).toBe(true);
+    }
+  });
+
+  /**
+   * The ceiling, pinned so that closing it later breaks a test rather than passing silently: the
+   * digest is checked for SHAPE, never re-derived. The frozen decision type carries no evidence, so
+   * re-derivation from the decision alone is not possible; the durable record is what closes it,
+   * and `customerDataGateMigration.test.ts` re-derives from a stored row.
+   */
+  it("admits a sha256-SHAPED receipt digest that derives from nothing (known ceiling)", () => {
+    const forged = allowedGate({ receiptSha256: `sha256:${"0".repeat(64)}` });
+    expect(gateAdmitsCustomerData(forged, "tenant_01", "workspace_01")).toBe(true);
+    expect(validateCompileJobEnvelope(envelope(), forged).accepted).toBe(true);
+    // What is actually refused is a digest that is not sha256-shaped, and a wrong subject.
+    expect(gateAdmitsCustomerData(forged, "tenant_02", "workspace_01")).toBe(false);
+    expect(
+      gateAdmitsCustomerData(allowedGate({ receiptSha256: "trust me" }), "tenant_01", "workspace_01"),
+    ).toBe(false);
   });
 });
