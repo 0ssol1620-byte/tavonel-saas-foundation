@@ -348,6 +348,22 @@ h3 { font-size: 17px; letter-spacing: -0.012em; font-variation-settings: "wght" 
   letter-spacing: 0.005em;
 }
 .fine b { color: var(--text-lo); font-weight: 500; }
+/*
+   A link in fine print was not identifiable as one.
+
+   The global reset is `a { color: inherit; text-decoration: none }`, and `.fine` never restored
+   either, so every link inside fine print rendered as plain muted mono -- distinguishable from
+   the sentence around it by nothing at all, which is WCAG 1.4.1 as well as simply invisible.
+   The landing page now depends on one of these to send a reader from the evidence claim to the
+   capability manifest, so it stops being cosmetic. Same treatment `.policy-copy a` already uses.
+*/
+.fine a {
+  color: var(--text-lo);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+.fine a:hover { color: var(--text-hi); }
 
 .slate {
   margin: 0;

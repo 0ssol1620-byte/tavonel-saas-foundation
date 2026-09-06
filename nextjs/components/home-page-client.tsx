@@ -283,10 +283,6 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
               <p>S3-compatible buckets and SMB, NFS or SFTP paths are imported by an agent you run inside your own network. Set up with you, not self-serve.</p>
             </article>
           </div>
-          <p className="fine rv">
-            <Link href={"/integrations" as Route}>What each label means</Link> ·{" "}
-            <Link href={"/sources" as Route}>which formats are read here</Link>
-          </p>
         </Scene>
 
         <Scene id={3} film band="change" eyebrow="COMPILE FILM" title="Watch knowledge take shape.">
@@ -310,12 +306,23 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
               <Fragment key={step}><span>{step}</span>{index < 4 ? <i aria-hidden="true">→</i> : null}</Fragment>
             ))}
           </div>
+          {/*
+            The pointer to /sources is a button, not a link in fine print.
+
+            It was written as an inline link inside this sentence and `mobile-landing.spec.ts`
+            caught it: on a touch phone the tap target was 33px tall against a 44px floor. A
+            sentence can carry the nuance; the thing a thumb has to hit belongs in the actions
+            row, where every other control on this page already meets the floor.
+          */}
           <p className="fine rv">
             What a location is depends on the source — a page and a region in a PDF, a sheet and
-            a cell in a spreadsheet, a slide and a shape in a deck.{" "}
-            <Link href={"/sources" as Route}>See which representations this deployment reads today</Link>.
+            a cell in a spreadsheet, a slide and a shape in a deck. Which of those this
+            deployment reads today is published, in full, as its capability manifest.
           </p>
-          <div className="actions rv"><ExploreLink className="btn" /></div>
+          <div className="actions rv">
+            <ExploreLink className="btn" />
+            <Link className="btn ghost" href={"/sources" as Route}>What this deployment reads</Link>
+          </div>
         </Scene>
 
         <Scene id={5} band="access" eyebrow="START" title="Compile your own knowledge.">
