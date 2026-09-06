@@ -64,6 +64,11 @@ key therefore renders as the literal `customerData` under a heading that now und
 file is lane D's row-only file, so this lane did not touch it. **Two lines for the integrator or for
 lane D:** a `GATE_LABELS` row, and "Four gates" → "Five gates".
 
+*(First-pass text, kept as the record and superseded by R2.3: §8.1 authorised F to close this seam,
+so the file **is** edited on this branch — a `GATE_LABELS` row, `GATE_LABELS` typed
+`Record<ActivationCapability, string>`, and the heading changed to "Processing gates" rather than to
+another number that goes stale.)*
+
 ## 3. Gates
 
 All run from the worktree. Root `node_modules` was **absent** on arrival (only `nextjs/node_modules`
@@ -136,19 +141,25 @@ Every one the lane spec names, plus the ones the shape of the decision object ma
 - **`connector-oauth-adapters.ts` — the Drive `trashed = false` query is at line 79, not line 80** as the seam map states. The gap itself is real and verified: Drive drops trashed files silently while Dropbox (`:114`) and Graph (`:154`) emit `kind: "deleted"`.
 - **`nextjs/lib/capabilities.ts` has no page consumer.** Its module comment calls it "the one table on the marketing page that makes factual assertions about what this deployment can actually do", and `nextjs/lib/capabilities.test.ts:95` describes a landing-page summary printing "N of 9 controls are open". Neither is true in this build: the only importers of `readCapabilities` are `lib/compiler-contract.ts` (which reads one word) and tests, and `brand-copy.test.ts:161` actively asserts the landing page does **not** import it. The grid is real code with no surface. Recorded, not fixed — the fix is a founder/UI decision.
 - **`docs/SECURITY_BOUNDARIES.md` was stale**, as the seam map said: it forbids accepting customer document bytes while `nextjs/lib/activation-policy.ts` has had intake, CDR and GPU OCR enabled since 2026-08-29. Appended a dated current-state section under §7 R-6; the old text stays.
-- **Contract §4.3's `isImmutableScopedObjectKey` interaction is worth a note, not a change.** `shared/productCoreCompileEnvelope.ts:82` requires `immutable/<tenantId>/<workspaceId>/`, while the live key layout is `immutable/<workspaceId>/<workspaceId>/` (`nextjs/lib/immutable-keys.ts`). Those agree only because `buildProductCoreV2Request` sets `tenantId: workspaceId` (`core-runtime-v2.ts:157`). The gate inherits that identity assumption; seam-map O-4 (is `workspaceId` the tenant boundary?) is still the open question, and it is lane AB's and the founder's, not F's.
+- **Contract §4.3's `isImmutableScopedObjectKey` interaction is worth a note, not a change.** `shared/productCoreCompileEnvelope.ts:82` requires `immutable/<tenantId>/<workspaceId>/`, while the live key layout is `immutable/<workspaceId>/<workspaceId>/` (`nextjs/lib/immutable-keys.ts`). Those agree only because `buildProductCoreV2Request` sets `tenantId: workspaceId` (`core-runtime-v2.ts:157`). The gate inherits that identity assumption, and it is a decided one: RESOLVED B-2 keeps tenant and workspace separate concepts, contract §8.1 ("AB tenant shim") accepts recording `tenantId = workspaceId` as the P0 shim because the wire carries one value, and the v2 key layout is a later migration and ADR. Seam-map O-4 is answered by those two; the ADR is lane AB's record, not F's.
 
-## 8. Open questions for the founder
+## 8. Open questions for the founder — none; the nine below are closed and cited
 
-1. **Audit table.** `enterprise_audit_events` is chosen for gate events. Its `organization_id` is `NOT NULL`, so a pilot workspace with no enterprise organization row cannot record one and therefore cannot be approved. Confirm that fail-closed direction, or say gate events belong somewhere every workspace can write.
-2. **`/subprocessors` omits Dropbox and Microsoft** while live connector code exists for both. A disclosure that understates who touches customer content is the defect direction that matters. Not edited here.
-3. **No DPA is published.** Precondition 15 cannot close without one; its content is a legal decision.
-4. **Microsoft Graph scopes** are `Files.Read.All` + `Sites.Read.All` — tenant-wide read, not least privilege for one workspace. Narrowing them changes what the connector can do.
-5. **Google Drive tombstones** (`connector-oauth-adapters.ts:79`): accepted limitation, or fix before P2 connectors? Seam-map O-6, still open.
-6. **Retention has no enforcement job.** Building one is a delete path and needs its own canary and its own approval.
-7. **Rewrite or append in `docs/SECURITY_BOUNDARIES.md`?** I appended a dated section rather than editing statements that are now false, on the reasoning that historical text is not overwritten. Say if the stale paragraph should be struck instead.
-8. **Nobody may record precondition 17.** Stated for the record: an agent will not create a founder approval receipt. A gate that can be closed by the thing it gates is not a gate.
-9. ~~**Should the receipt digest bind the subject?**~~ **ANSWERED by contract §8.1 and implemented in repair round 2 (R2.5).** §4.3 is amended: the digest covers `tenantId` and `workspaceId` together with the preconditions, so a receipt is not portable between tenants. No longer a founder question.
+Repair round 3 rewrote this section as required by contract §8.2 ("F — cite, do not re-ask"). Every
+item was a question in the first pass and is now a statement of the standing decision with the item
+that closed it: `USKC_FOUNDER_DECISIONS_RESOLVED_2026-09-06.md` or contract §8.1 / §8.2. The same
+rewrite is in `docs/CUSTOMER_DATA_GATE_2026-09-06.md` §6, which is the version that survives this
+report. This lane opens no new founder question.
+
+1. **Audit table, and the `organization_id` consequence — decided.** RESOLVED B-6: `enterprise_audit_events` is the canonical log for customer source/data security events, `foundation_developer_audit_events` keeps developer/API/configuration acts, and there is no third table. Contract §8.2 rules that its `organization_id NOT NULL` — a workspace with no enterprise organization row cannot record a gate event and therefore cannot be approved — is the intended fail-closed direction. Built that way; nothing changes.
+2. **`/subprocessors` — decided, no change.** RESOLVED A-5: source providers are not TAVONEL subprocessors; Dropbox and Microsoft are not added because connector code exists, only after the production customer-data architecture delegates processing to them and legal review confirms. The gap-matrix row for precondition 15 records their absence as an architectural fact, not a disclosure defect.
+3. **DPA — open until legal, by decision.** RESOLVED B-10 lists DPA and privacy disclosures among the prerequisites for allowlisted-beta enablement; contract §8.2 records precondition 15 as open until legal. It stays PARTIAL until a DPA is published, which is a legal act.
+4. **Microsoft Graph scopes → P2.** `Files.Read.All` + `Sites.Read.All` is tenant-wide read (precondition 13). Contract §8.2 assigns the narrowing to P2, with the connector work RESOLVED §D sequencing item 6 places there.
+5. **Google Drive tombstones — a blocker, decided.** RESOLVED B-7: the `trashed = false` gap (`connector-oauth-adapters.ts:79`) is not an acceptable production limitation. P0 records it; connector qualification is `BLOCKED` and no connector is `VERIFIED` until tombstone, delete, permission-change and move/rename semantics are implemented and verified. Precondition 9 stays MISSING; seam-map O-6 is answered by B-7.
+6. **Retention enforcement → P2/P3, with its own approval.** Contract §8.2. Precondition 10 stays PARTIAL — policy stored, nothing enforcing it — and the sweeper ships with its own canary and its own approval, not in this lane.
+7. **`docs/SECURITY_BOUNDARIES.md` — appended, not struck.** Contract §8.1 settles it: the stale statements stay, the dated "Current state" section stands beside them, historical text is not overwritten. What this lane did is what the ruling requires.
+8. **Precondition 17 — a fact, not a question.** Contract §8.2: the founder approval receipt is recorded only by the founder. No agent creates one; a gate that can be closed by the thing it gates is not a gate. Row 17 is `MISSING by design`.
+9. ~~**Should the receipt digest bind the subject?**~~ **DONE per contract §8.1, implemented in repair round 2 (R2.5).** §4.3 is amended: the digest covers `tenantId` and `workspaceId` together with the preconditions, so a receipt is not portable between tenants.
 
 ---
 
@@ -542,4 +553,6 @@ strictly fewer strings, and the workspace panel prints one more written label. N
 
 Still open, unchanged, and not this lane's to close: C-F-5 (root `node_modules` absent on arrival),
 C-F-6 (no `av_scan_verdict_present` in the frozen precondition list), and every founder question in
-§8 except number 9, which §8.1 answered and R2.5 implements.
+§8 except number 9, which §8.1 answered and R2.5 implements. *(Superseded by §8.2 and repair round
+3: the §8 items were not open questions at all — the founder and the orchestrator had already closed
+all nine, and §8 now states them as decisions.)*
