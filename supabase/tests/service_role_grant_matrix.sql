@@ -105,7 +105,7 @@ $$, 'service_role holds no column privilege its table row does not already carry
 -- every table created after it. 0053 revokes it, so the next migration's table arrives with
 -- nothing rather than with everything.
 select is_empty($$
-  select pg_get_userbyid(d.defaclrole) || ':' || d.defaclobjtype
+  select pg_get_userbyid(d.defaclrole) || ':' || d.defaclobjtype::text
     from pg_default_acl d
     join pg_namespace n on n.oid = d.defaclnamespace
    where n.nspname = 'public'
