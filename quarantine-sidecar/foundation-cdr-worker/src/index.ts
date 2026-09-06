@@ -1,7 +1,8 @@
 import { PermanentReject, isRetryable } from "./errors";
 import { evaluateHealth } from "./guards";
 import { extractObjectKey, isQuarantineSourceKey } from "./keys";
-import { sanitizeObject } from "./sanitize";
+import { ocrFailureKind } from "./ocr";
+import { asSourceRefusal, sanitizeObject, writeCdrRejectReceipt, type SanitizeResult } from "./sanitize";
 import { dispatchComputeSettlement } from "./settlement";
 
 export interface Env {
@@ -29,6 +30,58 @@ function authorizeManualTrigger(request: Request, token: string | undefined): "o
   let difference = 0;
   for (let index = 0; index < expected.length; index += 1) difference |= provided[index] ^ expected[index];
   return difference === 0 ? "ok" : "denied";
+}
+
+/**
+ * Refuse durably, or do not refuse at all.
+ *
+ * The old order was: throw, release the billing reservation, acknowledge the message. Nothing was
+ * written, so a refused document was indistinguishable from one still being prepared -- for the
+ * customer, for support, and for anyone trying to count how often this happens.
+ *
+ * The order is now receipt first, settlement second, acknowledgement last, and any of the three
+ * failing leaves the message on the queue. A refusal with no class produces no receipt (see
+ * `writeCdrRejectReceipt`) and therefore no acknowledgement either: it retries and dead-letters
+ * rather than being recorded under a guessed reason.
+ */
+async function settleRefusal(
+  env: Env,
+  objectKey: string,
+  error: PermanentReject,
+  fetcher: typeof fetch,
+): Promise<"recorded" | "retry"> {
+  const refusal = asSourceRefusal(error);
+  if (!refusal) return "retry";
+  const receipt = await writeCdrRejectReceipt(env, objectKey, refusal);
+  if (!receipt) return "retry";
+  try {
+    await dispatchComputeSettlement(env, objectKey, "released", 0, "CDR_PERMANENT_REJECT", fetcher, undefined, undefined, {
+      terminalReason: refusal.message,
+      failureClass: refusal.failureClass,
+    });
+  } catch {
+    return "retry";
+  }
+  return "recorded";
+}
+
+async function settleSanitized(env: Env, objectKey: string, result: SanitizeResult, fetcher: typeof fetch) {
+  const outcome = result.ocr.computeCredits === 0
+    ? "released"
+    : result.ocr.status === "failed" ? "operator_review" : "settled";
+  await dispatchComputeSettlement(
+    env,
+    objectKey,
+    outcome,
+    result.ocr.computeCredits,
+    result.ocr.reasonCode ?? (outcome === "settled" ? "OCR_COMPLETED" : "GPU_NOT_DISPATCHED"),
+    fetcher,
+    undefined,
+    undefined,
+    // The digest over the bytes this worker read. The application server never reads them, so
+    // this is the only place a source digest can come from without re-downloading the object.
+    { sourceSha256: result.inputSha256 },
+  );
 }
 
 export function jsonResponse(status: number, body: Record<string, unknown>): Response {
@@ -63,30 +116,16 @@ export async function handleRequest(request: Request, env: Env, fetcher: typeof 
     }
     try {
       const result = await sanitizeObject(env, objectKey, fetcher);
-      const outcome = result.ocr.computeCredits === 0
-        ? "released"
-        : result.ocr.status === "failed" ? "operator_review" : "settled";
-      await dispatchComputeSettlement(
-        env,
-        objectKey,
-        outcome,
-        result.ocr.computeCredits,
-        result.ocr.reasonCode ?? (outcome === "settled" ? "OCR_COMPLETED" : "GPU_NOT_DISPATCHED"),
-        fetcher,
-      );
+      await settleSanitized(env, objectKey, result, fetcher);
       return jsonResponse(200, result);
     } catch (error) {
       const message = error instanceof Error ? error.message : "sanitize failed";
       if (error instanceof PermanentReject) {
-        if (!isQuarantineSourceKey(objectKey)) {
-          return jsonResponse(message.includes("5 MiB") ? 413 : 400, { error: message });
-        }
-        try {
-          await dispatchComputeSettlement(env, objectKey, "released", 0, "CDR_PERMANENT_REJECT", fetcher);
-          return jsonResponse(message.includes("5 MiB") ? 413 : 400, { error: message });
-        } catch {
-          return jsonResponse(503, { error: "compute release failed" });
-        }
+        const status = message.includes("5 MiB") ? 413 : 400;
+        if (!isQuarantineSourceKey(objectKey)) return jsonResponse(status, { error: message });
+        return await settleRefusal(env, objectKey, error, fetcher) === "recorded"
+          ? jsonResponse(status, { error: message })
+          : jsonResponse(503, { error: "refusal could not be recorded" });
       }
       return jsonResponse(503, { error: message });
     }
@@ -98,9 +137,15 @@ export async function handleRequest(request: Request, env: Env, fetcher: typeof 
  * How long a redelivered message waits before the OCR endpoint is asked again.
  *
  * The GPU endpoint scales to zero and its cold start outruns a single OCR request, so the first
- * upload after an idle period times out on infrastructure rather than on the document. Attempts 1
- * and 2 give the endpoint time to boot; attempt 3 is terminal and settles for operator review
- * exactly as before, so nothing is lost. `max_retries` in wrangler.jsonc stays the outer bound.
+ * upload after an idle period fails on infrastructure rather than on the document. `ocr.ts` calls
+ * that class of failure `transport`; this is how long the message waits before the next attempt.
+ *
+ * Attempts 1 and 2 give the endpoint time to boot: nothing is written and nothing is settled, so
+ * a redelivery costs the customer nothing. Attempt 3 is terminal -- the endpoint has now been
+ * unreachable for three minutes, which is no longer a cold start -- and records the failure the
+ * ordinary way so an operator can see the document instead of watching it dead-letter in silence.
+ * A transport failure still carries zero credits, so that settlement releases the reservation
+ * rather than charging for a reader that never ran. `max_retries` stays the outer bound.
  */
 const OCR_COLD_START_RETRY_DELAYS_S = [60, 120] as const;
 
@@ -119,35 +164,27 @@ export async function handleQueue(batch: MessageBatch<unknown>, env: Env, fetche
       }
       const retryDelaySeconds = coldStartRetryDelay(message.attempts);
       const result = await sanitizeObject(env, objectKey, fetcher, undefined, undefined, {
-        deferReviewOnTimeout: retryDelaySeconds !== undefined,
+        onTransportFailure: retryDelaySeconds === undefined ? "record" : "defer",
       });
-      if (retryDelaySeconds !== undefined && result.ocr.reasonCode === "OCR_TIMEOUT_OR_NETWORK") {
-        // No review record and no settlement: the reservation stays open for the next attempt,
-        // which is what keeps a credit from being charged for a boot that never produced OCR.
+      if (retryDelaySeconds !== undefined && result.ocr.status === "failed"
+        && ocrFailureKind(result.ocr.reasonCode) === "transport") {
+        // Nothing written and nothing settled: the reservation stays open for the next attempt,
+        // which is what keeps a credit from being charged for a boot that produced no OCR.
         message.retry({ delaySeconds: retryDelaySeconds });
         continue;
       }
-      const outcome = result.ocr.computeCredits === 0
-        ? "released"
-        : result.ocr.status === "failed" ? "operator_review" : "settled";
-      await dispatchComputeSettlement(
-        env,
-        objectKey,
-        outcome,
-        result.ocr.computeCredits,
-        result.ocr.reasonCode ?? (outcome === "settled" ? "OCR_COMPLETED" : "GPU_NOT_DISPATCHED"),
-        fetcher,
-      );
+      await settleSanitized(env, objectKey, result, fetcher);
       message.ack();
     } catch (error) {
       if (error instanceof PermanentReject) {
-        try {
-          const objectKey = extractObjectKey(message.body);
-          if (objectKey) await dispatchComputeSettlement(env, objectKey, "released", 0, "CDR_PERMANENT_REJECT", fetcher);
+        const objectKey = extractObjectKey(message.body);
+        if (!objectKey || !isQuarantineSourceKey(objectKey)) {
+          // Not a customer source object at all; there is nothing to refuse and nobody to tell.
           message.ack();
-        } catch {
-          message.retry();
+          continue;
         }
+        if (await settleRefusal(env, objectKey, error, fetcher) === "recorded") message.ack();
+        else message.retry();
         continue;
       }
       if (isRetryable(error)) {

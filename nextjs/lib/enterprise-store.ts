@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { aggregateEnterpriseMetrics, type EnterpriseDailyMetric } from "./enterprise-dashboard";
 import type { EnterpriseIdentityInput, EnterpriseOrgRole, EnterprisePolicyInput, EnterpriseRegion, EnterpriseWorkspaceRole, IdentityProtocol } from "./enterprise-contracts";
 import { identityProviderRuntimeReady } from "./enterprise-contracts";
@@ -149,6 +150,82 @@ export async function readDashboard(organizationId: string, from: string) {
   if (!rows) return { ok: false as const, code: "ENTERPRISE_DASHBOARD_UNAVAILABLE" };
   const metrics: EnterpriseDailyMetric[] = rows.map((row) => ({ date: String(row.metric_date), activeUsers: Number(row.active_users), documentsProcessed: Number(row.documents_processed), gpuSeconds: Number(row.gpu_seconds), gpuCostMicros: Number(row.gpu_cost_micros), revenueMicros: Number(row.revenue_micros), creditsConsumed: Number(row.credits_consumed), jobFailures: Number(row.job_failures) }));
   return { ok: true as const, metrics, totals: aggregateEnterpriseMetrics(metrics) };
+}
+
+/**
+ * The same id every time the same thing is reported.
+ *
+ * Queue delivery is at-least-once, so the settlement that reports a refusal can arrive twice. A
+ * read-then-insert would race; deriving the primary key from the facts does not. The bytes are
+ * shaped as a version-4 UUID so the column, the RLS policies and every regex in this repository
+ * accept it, and `Prefer: resolution=ignore-duplicates` turns the second arrival into a no-op.
+ */
+export function deterministicAuditEventId(parts: readonly string[]): string {
+  const bytes = createHash("sha256").update(parts.join("\u0000"), "utf8").digest();
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = bytes.subarray(0, 16).toString("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+}
+
+export type ServiceAuditEvent = {
+  workspaceKey: string;
+  action: string;
+  targetType: string;
+  targetId: string;
+  outcome: "succeeded" | "denied" | "failed";
+  details: Record<string, unknown>;
+};
+
+/**
+ * Appends one audit row for something the platform did, with no person behind it.
+ *
+ * `record_enterprise_audit_event` insists on `auth.uid()`, so it cannot record the CDR worker's
+ * acts: there is no session, and inventing one would be worse than not recording. This writes the
+ * same table -- `enterprise_audit_events`, the canonical log for customer source and data
+ * security events (founder B-6) -- with `actor_kind = 'service'` and no actor user, which is what
+ * the table's own `(actor_kind = 'user') = (actor_user_id is not null)` check asks for.
+ *
+ * It fails closed. A refusal that cannot be recorded is reported as a failure to its caller so the
+ * work is retried, because the whole point of the row is that the failure stops being invisible.
+ */
+export async function appendServiceAuditEvent(event: ServiceAuditEvent) {
+  const config = readSupabaseAdminConfig();
+  if (!config) return { ok: false as const, code: "ENTERPRISE_STORE_UNAVAILABLE" };
+  const workspaceQuery = new URLSearchParams({
+    select: "organization_id",
+    workspace_key: `eq.${event.workspaceKey}`,
+    limit: "1",
+  });
+  const rows = await readRows(`/rest/v1/enterprise_workspaces?${workspaceQuery}`);
+  const organizationId = typeof rows?.[0]?.organization_id === "string" ? rows[0].organization_id : null;
+  if (!organizationId || !UUID.test(organizationId)) {
+    return { ok: false as const, code: rows ? "ENTERPRISE_WORKSPACE_UNKNOWN" : "ENTERPRISE_STORE_UNAVAILABLE" };
+  }
+  const eventId = deterministicAuditEventId([
+    organizationId, event.workspaceKey, event.action, event.targetType, event.targetId,
+  ]);
+  try {
+    const response = await supabaseAdminRequest(config, "/rest/v1/enterprise_audit_events?on_conflict=event_id", {
+      method: "POST",
+      headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
+      body: JSON.stringify({
+        event_id: eventId,
+        organization_id: organizationId,
+        workspace_key: event.workspaceKey,
+        action: event.action,
+        target_type: event.targetType,
+        target_id: event.targetId,
+        actor_kind: "service",
+        outcome: event.outcome,
+        details: event.details,
+      }),
+    });
+    if (!response.ok) return { ok: false as const, code: "ENTERPRISE_AUDIT_WRITE_FAILED" };
+    return { ok: true as const, eventId };
+  } catch {
+    return { ok: false as const, code: "ENTERPRISE_AUDIT_WRITE_FAILED" };
+  }
 }
 
 export function normalizeRegion(value: unknown): EnterpriseRegion | null {

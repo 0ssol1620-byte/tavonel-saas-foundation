@@ -792,23 +792,52 @@ export default function WorkspacePage() {
         return null;
       }
       if (json.documentId) {
+        /*
+         * The digest travels with the confirmation, taken by SubtleCrypto over the very bytes the
+         * transfer sent. It is what lets the server compare the stored object against the
+         * capability it issued without downloading the source back onto the application server --
+         * which is how free evaluation used to be fingerprinted, through a 5 MiB-capped read that
+         * refused every larger trial upload with a 503 the board showed as "needs review".
+         *
+         * A page served without a secure context has no SubtleCrypto and reports null; the server
+         * records that as absent rather than inventing one, and refuses the trial gate outright
+         * instead of quietly skipping it.
+         */
         const confirmed = await fetch("/api/uploads/confirm", {
           method: "POST",
           headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-          body: JSON.stringify({ documentId: json.documentId }),
+          body: JSON.stringify({
+            documentId: json.documentId,
+            ...(result.sourceSha256 ? { sourceSha256: result.sourceSha256 } : {}),
+          }),
         });
         if (!confirmed.ok) {
-          patchUpload(localId, { phase: "failed", reason: "upload stored; source confirmation needs review" });
-          setNotice("The file was stored, but source confirmation needs review. No automatic retry was attempted.");
+          // "Needs review" was the wrong word for every one of these: confirmation refuses with a
+          // typed code, and calling that a review invented a queue nobody is working. Say the
+          // code, and say that the source stops here until it succeeds.
+          const failure = await confirmed.json().catch(() => null) as { code?: string } | null;
+          const code = failure?.code ?? `HTTP ${confirmed.status}`;
+          patchUpload(localId, { phase: "failed", reason: `source confirmation refused (${code})` });
+          setNotice(`${file.name} reached storage but was not confirmed (${code}). It is not queued for processing.`);
           await loadDocuments();
           return json.documentId;
         }
       }
       patchUpload(localId, { phase: "stored", loaded: file.size });
 
+      /*
+       * What finished is the transfer, and that is all this may claim.
+       *
+       * It used to announce that TAVONEL was preparing and reading the source the moment the PUT
+       * returned -- before the CDR worker had seen the object, and regardless of whether it would
+       * refuse it seconds later. For everything above the processing ceiling that sentence was
+       * simply false, and it was the last thing the customer was told before the row went quiet.
+       * The board is now the place an outcome appears, because it is the only place that reads
+       * one, so this points there instead of guessing.
+       */
       setNotice(activationPolicy.cdr.enabled && activationPolicy.ocrGpu.enabled
-        ? `${file.name} uploaded securely. TAVONEL is preparing and reading the source.`
-        : `${file.name} uploaded securely. This source needs operator review before reading can continue.`);
+        ? `${file.name} reached quarantine storage. Preparation has started; the source pipeline shows whether it is accepted or refused.`
+        : `${file.name} reached quarantine storage. This source needs operator review before reading can continue.`);
       await loadDocuments();
       return json.documentId ?? null;
     } finally {
