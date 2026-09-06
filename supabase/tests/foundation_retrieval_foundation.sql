@@ -64,6 +64,7 @@ select throws_ok(
     'sha256:4444444444444444444444444444444444444444444444444444444444444444',
     '55555555-5555-5555-5555-555555555555'
   )$$,
+  '23514', null,
   'retrieval profile fusion algorithm is locked to rrf for v1'
 );
 
@@ -76,6 +77,7 @@ insert into public.foundation_retrieval_compile_runs (
 select throws_ok(
   $$update public.foundation_retrieval_compile_runs set status = 'completed'
     where run_id = 'retrieval-run-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'$$,
+  '23514', null,
   'a completed run must record its completion time and unit count'
 );
 update public.foundation_retrieval_compile_runs
@@ -99,6 +101,7 @@ select throws_ok(
   ) values (
     'pilot-retrievtest01', 'retrieval-unit-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'bge-m3-v1', 3, '[0.1,0.2]'::vector
   )$$,
+  '23514', null,
   'an embedding whose vector length disagrees with its declared dimension is rejected'
 );
 insert into public.foundation_retrieval_embeddings (
