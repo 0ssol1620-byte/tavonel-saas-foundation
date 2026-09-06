@@ -418,3 +418,36 @@ describe("a manifest that breaks the contract is refused", () => {
     expect(() => assertDistinctMimes(CAPABILITY_MANIFEST)).not.toThrow();
   });
 });
+
+/*
+  The list is derived or it is not the list.
+
+  Five hard-coded copies were replaced and a sixth survived four lines under the `accept`
+  attribute -- `PDF · DOCX · PPTX · XLSX · ODF · JPG / PNG / TIFF · ZIP` in the workspace drop
+  zone, which said "ODF" (a label no MIME row uses) and omitted GIF, which the upload route
+  accepts. /sources tells a visitor the surfaces "cannot disagree, because they are the same
+  list", so a seventh copy has to fail a test rather than a reader's trust.
+
+  The scan is deliberately crude: two format names joined by a separator. It fires on a restated
+  list and not on a single format named in prose, which is what a page is still allowed to do.
+*/
+describe("no surface restates the format list", () => {
+  const derivedSurfaces = [
+    "nextjs/app/workspace/page.tsx",
+    "nextjs/components/pipeline-board.tsx",
+    "nextjs/components/home-page-client.tsx",
+    "nextjs/lib/docs-content.ts",
+    "nextjs/app/sources/page.tsx",
+    "nextjs/components/source-capability-table.tsx",
+  ];
+  const names = [
+    ...new Set(CAPABILITY_MANIFEST.entries.flatMap((item) => item.extensions).map((ext) => ext.toUpperCase())),
+    "ODF", // the label the drop-zone hint invented; no MIME row uses it.
+  ];
+  const restated = new RegExp(`\\b(${names.join("|")})\\b\\s*[·/,]\\s*\\b(${names.join("|")})\\b`);
+
+  it.each(derivedSurfaces)("%s names no format list of its own", (relativePath) => {
+    const source = readFileSync(join(root, relativePath), "utf8");
+    expect(restated.exec(source)?.[0] ?? null, `${relativePath} restates the format list`).toBeNull();
+  });
+});

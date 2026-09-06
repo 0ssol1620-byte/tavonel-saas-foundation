@@ -21,7 +21,7 @@ import {
   type PageEstimateConfidence,
 } from "@/lib/usage-pricing";
 import { collectDroppedWorkspaceFiles, prepareWorkspaceSelection, type WorkspaceSelection, type WorkspaceUploadFile } from "@/lib/workspace-intake";
-import { uploadAcceptAttribute } from "@/lib/qualified-input";
+import { sourceFamilyChips, uploadAcceptAttribute } from "@/lib/qualified-input";
 import { runBounded } from "@/lib/concurrent";
 import { buildPipeline, type LocalUpload } from "@/lib/pipeline";
 import { qualifyProgress, type OcrProgress } from "@/lib/ocr-progress";
@@ -1782,7 +1782,13 @@ export default function WorkspacePage() {
                   <button type="button" onClick={() => folderRef.current?.click()}>Choose folder</button>
                   <button type="button" onClick={() => navigateSurface("connections")}>Connect a source</button>
                 </div>
-                <small>PDF · DOCX · PPTX · XLSX · ODF · JPG / PNG / TIFF · ZIP</small>
+                {/*
+                  The sixth copy of the format list, four lines under the `accept` attribute
+                  derived from the manifest -- and already wrong: it said "ODF" (a label no MIME
+                  row uses) and omitted GIF, which the upload route accepts. Derived now, so the
+                  hint under the drop zone and the picker above it cannot disagree.
+                */}
+                <small>{sourceFamilyChips.join(" · ")}</small>
                 {/*
                   The limits belong here, before anything is chosen.
 

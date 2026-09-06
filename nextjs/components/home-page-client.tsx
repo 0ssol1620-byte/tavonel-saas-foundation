@@ -211,7 +211,7 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
             Named formats, not a category, and named by the manifest rather than by this file.
 
             "Office documents" reads as every Office file ever made, and the intake whitelist is
-            narrower: DOCX, XLSX, PPTX and the OpenDocument equivalents, but not legacy
+            narrower: the OOXML and OpenDocument formats the manifest lists, but not legacy
             DOC/XLS/PPT. Naming the extensions is the difference between a promise and a
             rejection at upload -- which is why the format chips are now derived from the
             Capability Manifest, the same list the server validates against and /sources
