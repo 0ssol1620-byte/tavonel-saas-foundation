@@ -358,3 +358,183 @@ Manual check against the running server, since a passing selector is not a rende
 paragraph and carries two `/sources` links (the desktop row and the phone disclosure, both from `PRIMARY_NAV`);
 `/resources` contains no "Supported sources" text and exactly the same two header links, i.e. the hub no longer
 lists the page.
+
+---
+
+## 10. Repair round 2 (2026-09-06, after the second adversarial review)
+
+Findings from `REPAIR2_FINDINGS_2026-09-06.json`, key `D`: one blocker, three majors and nine
+report-level contradictions. All four code findings are fixed; every contradicted claim is corrected
+below rather than quietly edited above, because a report that rewrites its own history is worth less
+than one that records it. Five commits on top of `c0650df`, one per finding:
+
+| Commit | Finding |
+|---|---|
+| `7d10031` | major — `shared/uskcEnums.ts` was a third variant, not AB's bytes |
+| `426e29e` | major — nothing refused a manifest that declared one MIME twice |
+| `bc5d05f` | major — a sixth hard-coded format list, four lines under the derived `accept` |
+| `d2d4395` | blocker — `e2e/mobile-landing.spec.ts` pinned the mobile menu at seven links |
+| `38b0951` | report — the route comment misdescribed what `contentSha256` digests |
+
+### 10.1 Findings fixed
+
+**R2-1 (blocker) — the eighth primary nav link broke a committed spec.**
+`nextjs/e2e/mobile-landing.spec.ts:196` asserted `toHaveCount(7)` on the mobile menu panel. Adding
+`{ href: "/sources", label: "Sources" }` to `PRIMARY_NAV` in repair round 1 made it 8, and the spec
+failed at 360, 390 and 768. §9.1 F1 said "It passes in all three projects; the eighth link fits" —
+that was true of the *desktop* 1080px header test this lane added and was never true of the mobile
+menu, which the lane never ran. The structured gates reported Playwright on `e2e/sources.spec.ts`
+only and claimed zero regressions on unit tests alone. Both halves are corrected here.
+
+Per ruling §8.1 ("`nextjs/e2e/mobile-landing.spec.ts` is updated from seven to eight links with a
+comment citing RESOLVED A-3, and the mobile menu is re-checked at 360, 390 and 768"): the count is
+8, "Sources" is in the label list, and the comment cites RESOLVED A-3. The count stays a literal —
+a spec that read `PRIMARY_NAV.length` would agree with the header whatever the header said, and this
+spec exists to notice when that list changes. The panel-geometry assertions two lines above it
+(`left >= 0`, `right <= viewport`) are the overflow re-check, and they pass at all three widths
+(gate 6 below: 33 passed).
+
+**R2-2 (major) — `shared/uskcEnums.ts` was a third variant of a file that must be one file.**
+Contract §3 requires D's copy to be byte-identical to AB's; §5 conflict 1 of this report said the
+identity "is unverifiable from here" and proposed integration keep AB's file and delete D's. Both
+statements were wrong. It was verifiable in one command (`git show
+origin/agent/uskc-ab-source-domain:shared/uskcEnums.ts`), the files differed (D `4ba9782d…`,
+AB `6dceb231…`), and the proposed deduplication would not have compiled: AB exports
+`capabilityStatuses` and `capabilityStatusesAcceptedAtUpload`, which are exactly the names D's
+`shared/capabilityManifest.ts` and `nextjs/components/source-capability-table.tsx` imported under
+other spellings.
+
+Per ruling §8.1 C-AB-3, D now carries AB's bytes. `git hash-object shared/uskcEnums.ts` and
+`git rev-parse origin/agent/uskc-ab-source-domain:shared/uskcEnums.ts` both give
+`e31eccbb6d6236e8a60da1ac578316500b606370` — the same blob, so the integration merge sees one file.
+The four consumers are rewritten to the camelCase names; the local `locatorKinds` inside
+`violations()` became `schemaLocatorKinds` so it no longer shadows the import it now collides with.
+The value lists are unchanged, and `server/foundation/capabilityManifest.test.ts` still compares all
+seven of them against literals transcribed from `contract/enums.v1.json`, so the swap could not have
+silently changed a value.
+
+**R2-3 (major) — a duplicate MIME collapsed silently into the server whitelist.**
+`deriveUploadWhitelist` uses `Object.fromEntries`, so two entries for one MIME kept the last. The
+reviewer's probes reproduce both consequences: two `image/tiff` rows (`.tif`, `.tiff`) give the
+whitelist `{"image/tiff":[".tiff"]}` while `deriveUploadAccept` still offers `.tif` and the table
+still prints both rows — our own picker hands the user a file our own route answers
+`FILENAME_MIME_MISMATCH` — and a `BEST_EFFORT` row appended after an `UNSUPPORTED` one for the same
+MIME overrides a refusal the page still describes.
+
+`assertDistinctMimes` throws, per ruling §8.1 ("the manifest validator refuses a duplicate MIME").
+It runs at module load and again inside `deriveUploadWhitelist`, so the shipped manifest and any
+manifest handed to the whitelist derivation are both covered. Throwing is the fail-closed choice and
+is not a request-path risk: a manifest is static data, the check runs at import, and a duplicate
+fails `pnpm check`, `pnpm test` and `pnpm build` before a deployment exists.
+
+**R2-4 (major) — a sixth hard-coded format list, in the file this lane had already edited.**
+`nextjs/app/workspace/page.tsx:1785`, `PDF · DOCX · PPTX · XLSX · ODF · JPG / PNG / TIFF · ZIP`, sat
+four lines under the `accept` attribute the lane derived at `:1684`. It was already inconsistent with
+the manifest: it omitted GIF, which the upload route accepts, and collapsed ODT/ODS/ODP into "ODF", a
+label no MIME row uses. The seam map named five lists; there were six, and §4.2's framing "All five
+now read this" plus the `/sources` sentence "They cannot disagree, because they are the same list"
+were both false while it stood. Contract §5 D also required a list that could not be removed to be
+reported with a reason, and this one was in neither the row-only edits nor `not_done`.
+
+It renders `sourceFamilyChips` now — the same derivation the landing page uses — per ruling §8.1.
+
+The failure path is a scan rather than another assertion about this one line: `no surface restates
+the format list` reads the six derived surfaces and fires on any two manifest format names joined by
+`·`, `/` or `,`. Writing it found a seventh restatement immediately — an explanatory comment in
+`home-page-client.tsx` that named three OOXML extensions — which now points at the manifest instead.
+A single format named in prose still passes; a list does not.
+
+**R2-5 (report) — `contentSha256` did not digest what its comment said.**
+`nextjs/app/api/v1/capabilities/route.ts:13` said the digest is "over the manifest exactly as
+serialized below", which reads as the served body. Measured on the running handler (throwaway vitest
+probe, written, run and deleted): sha256 of the served body is
+`ef0a28e54d513a18a0b2812ba816eb8d47cba63daabe9c733706d461547db394`, the served `contentSha256` is
+`sha256:de98fd92e7cf39b926a62318fa2537c7b67b7cd1b43fb23d31d25aa7d4f3acc7` — the reviewer's two
+values reproduce exactly. The code is right and the sentence was not: a document cannot carry the
+digest of a document that contains it.
+
+The comment now states that and gives the recompute — drop `contentSha256`, which is the last key,
+and re-serialize with the key order unchanged — and the new test performs that procedure against the
+response *bytes*, then asserts the result is **not** the digest of the whole body. The claim that was
+false is now the assertion that would fail.
+
+### 10.2 Contradicted claims from the earlier sections, corrected
+
+Nothing above §10 is edited. These are the corrections:
+
+1. **§2 row-only edits and §4.2's "All five now read this"** — there were six. The sixth is
+   `nextjs/app/workspace/page.tsx:1785`, now derived (R2-4). The row-only edit table gains that line
+   and its import at `:24` (`sourceFamilyChips`, folded into the existing one-line import).
+2. **The `/sources` copy, "They cannot disagree, because they are the same list"** — true now, false
+   when it was published. It stays as written because it is true of the shipped tree, and the scan
+   test in §10.3 is what keeps it true.
+3. **§5 conflict 1, "byte-identity with AB is unverifiable from here"** — withdrawn entirely. It was
+   verifiable in one command, the copies were not identical, and the proposed integration ("keep AB's
+   file, delete D's and F's") would not have compiled. D carries AB's blob `e31eccbb…`. The conflict
+   is closed, not proposed.
+4. **§2 "Created" table, the `shared/uskcEnums.ts` row** — "AB's copy and this one can be deduplicated
+   at integration" was wrong for the same reason. There is nothing left to deduplicate: it is AB's file.
+5. **§9.1 F1 and §9.3, "It passes in all three projects; the eighth link fits"** — true of the 1080px
+   header test this lane added, and never measured for the mobile menu, which a committed spec pinned
+   at seven links (R2-1).
+6. **The structured gates of the first pass** — the Playwright row covered `e2e/sources.spec.ts` only,
+   and no gate line, conflict or `not_done` entry disclosed that a global header list had changed.
+   `nextjs/e2e/mobile-landing.spec.ts` is a gate for this lane and is run at every mobile project below.
+7. **`conflicts[1]` tail, "Unchanged in the repair."** — accurate about the file and wrong as a
+   decision: contract §3 byte-identity was left unmet through two passes instead of being escalated as
+   a blocking cross-lane conflict. It is met now.
+8. **`failure_paths_tested`** — it implied the manifest's fail-closed rules were covered end to end.
+   No test and no schema rule stopped two entries for one MIME. Three tests do now (R2-3).
+9. **§2 test counts** — `server/foundation/capabilityManifest.test.ts` is **35** tests, not the 26 the
+   §2 table says; `nextjs/lib/capability-manifest-route.test.ts` is **5**, not 4. The gate totals in
+   §10.4 are the authority.
+10. **The build gate.** The reviewer's note is recorded as they wrote it: they reproduced two distinct
+    failures (`.next/types/…/route.ts` not found, then `PageNotFoundError: /_document`) and then exit 0
+    on a serialized clean run, and separately watched `.next` be emptied mid-session by another lane's
+    build. The explanation in §9.2 stands and the gate is green run alone — twice more, below.
+
+Nothing in this round is a stop-the-line escalation; the withdrawn one in §8.1 belongs to lanes C and
+E, and this lane never raised one.
+
+### 10.3 Failure paths added
+
+| Test | What it would have caught |
+|---|---|
+| `capabilityManifest.test.ts` — "refuses two rows for one MIME instead of keeping the last" | R2-3's first probe: `assertDistinctMimes` and `deriveUploadWhitelist` both throw on the duplicated `image/tiff`. |
+| `capabilityManifest.test.ts` — "refuses an accepted row that would override a refused row for the same MIME" | R2-3's second probe: a `BEST_EFFORT` `application/x-hwp` row silently overriding an `UNSUPPORTED` one. |
+| `capabilityManifest.test.ts` — "ships a manifest whose MIME types are already distinct" | The guard being satisfied only by fixtures, never by the manifest anyone is actually served. |
+| `capabilityManifest.test.ts` — "no surface restates the format list" (6 cases) | R2-4, and the next one: any two manifest format names joined by a separator in the six derived surfaces. It caught a seventh restatement while being written. |
+| `capability-manifest-route.test.ts` — "recomputes from the served bytes by dropping contentSha256 and re-serializing" | R2-5. Runs the documented procedure on the response bytes and asserts the digest is not the digest of the whole body. |
+| `e2e/mobile-landing.spec.ts` — 8 links, "Sources" among the labels | R2-1. Not new, but re-pinned: the next change to `PRIMARY_NAV` fails here instead of shipping. |
+
+### 10.4 Gates, re-run in full for repair round 2
+
+Every command from `<worktree>` or `<worktree>/nextjs` as noted. `pnpm start` on 3142 served the
+Playwright runs; the `webServer` form is still not used, for the reason in §9.2.
+
+| # | Command | Exit | Output tail |
+|---|---|---|---|
+| 1 | `pnpm check` (root, `tsc --noEmit`) | 0 | `> tsc --noEmit` then nothing |
+| 2 | `pnpm test` (root vitest) | 0 | `Test Files 23 passed (23) / Tests 97 passed (97) / Duration 3.06s` — 88 in repair 1, +9 here |
+| 3 | `pnpm check` (nextjs, `tsc --noEmit && eslint app components lib`) | 0 | no diagnostics |
+| 4 | `pnpm test` (nextjs vitest) | 0 | `Test Files 164 passed (164) / Tests 1594 passed (1594) / Duration 16.90s` — 1593 in repair 1, +1 here |
+| 5 | `pnpm build` (nextjs) | 0 | `✓ Generating static pages (71/71)`; `○ /sources 1.28 kB 108 kB`; run twice, both exit 0 |
+| 6 | `PLAYWRIGHT_BASE_URL=http://127.0.0.1:3142 pnpm exec playwright test --project=360 --project=390 --project=768 e2e/mobile-landing.spec.ts` | 0 | `1 flaky / 11 skipped / 33 passed (1.1m)` — the flaky one is `the four stage tabs sit on one line…` at 390, passed on retry; not a nav test and not touched by this lane |
+| 7 | `PLAYWRIGHT_BASE_URL=http://127.0.0.1:3142 pnpm exec playwright test --project=1440 --project=390 --project=reduced-motion e2e/sources.spec.ts` | 0 | `18 passed (42.8s)` |
+| 8 | `git status --short` | 0 | empty |
+| 9 | `git push origin agent/uskc-d-capability-manifest` | 0 | `git rev-parse origin/agent/uskc-d-capability-manifest` is the authority; the SHA is in the structured report |
+
+Production deploy 안 함. Git push로 Preview deployment는 자동 생성됨. Preview not verified through the
+Vercel MCP.
+
+### 10.5 Still open, and not this lane's to close
+
+- **Founder questions 1 (tier wording), 2 (a container tier for ZIP), 3 (the §30.2 copy change) and 6
+  (every row's identical `preserved` list)** are unanswered and unchanged. None blocks the merge; all
+  four are copy or vocabulary decisions.
+- **`shared/uskcEnums.ts` is AB's blob `e31eccbb…` as of `origin/agent/uskc-ab-source-domain` at
+  `0626f34`.** If AB's own repair round 2 changes that file, D's copy must be refreshed from it before
+  the integration merge — the byte-identity is pinned to a commit, not maintained by a test in this
+  worktree. Lane F still carried a third variant (`ce2cf1c4…`) with SCREAMING_SNAKE exports when this
+  round started; that swap is F's to make.
+- **`.gitattributes`** stays as §5.5 records: one rule, outside the ownership row, disclosed.
