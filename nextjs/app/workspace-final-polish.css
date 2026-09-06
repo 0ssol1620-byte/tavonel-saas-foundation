@@ -26,6 +26,28 @@
   padding: 7px 10px;
 }
 
+/* The compact intake still takes drops, so it still has to look like it does.
+
+   Compacting it here and in `ux-polish.css:137` cost it both of its drop affordances at once:
+   the plain hairline made it read as a heading rule rather than a target, and the drag
+   highlight stopped applying, because `.workspace:has(.document-meta li) .workspace-intake` is
+   more specific than the `.workspace-intake[data-active="true"]` rule in `tavonel.css` that
+   turns the border green. The founder saw the full drop zone on first paint -- documents are
+   still null then -- and watched it disappear as soon as the first source loaded, with no way
+   left to tell that the bar he was looking at was where files go.
+
+   Dashed, not the 330px hero: the hierarchy pass above is right that intake stops owning half
+   a screen once sources exist. A dashed edge is the cheapest thing that still says "target",
+   and restoring the highlight at a specificity that wins means the feedback returns on drag. */
+.workspace:has(.document-meta li) .workspace-intake {
+  border: 1px dashed var(--text-xlo);
+}
+.workspace:has(.document-meta li) .workspace-intake[data-active="true"] {
+  border-style: solid;
+  border-color: var(--verified);
+  background: var(--verified);
+}
+
 /* Home already has the exception-first queue. The complete inventory belongs on Sources. */
 .workspace:has(button[title^="Home"][aria-current="page"]) .document-card {
   display: none;

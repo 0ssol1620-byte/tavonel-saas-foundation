@@ -67,6 +67,25 @@ describe("2026-09-05 production hardening", () => {
     expect(nav).toContain('aria-label="Mobile sections"');
   });
 
+  /*
+    The compact intake keeps a drop affordance. Founder report, 2026-09-06.
+
+    The hierarchy pass shrank `.workspace-intake` to a one-row bar as soon as a source exists,
+    and the toolbar rule in `ux-polish.css` gave it the plain hairline and a transparent ground.
+    The section still accepts drops, so what it lost was only the ability to say so: the founder
+    saw the full drop zone while documents were still null and could not find where files went
+    once the first one loaded. The `[data-active="true"]` highlight went with it, outranked by
+    the more specific toolbar selector, so dragging over the bar gave no feedback either.
+
+    Both halves are asserted, because either one alone leaves the bar unreadable as a target.
+  */
+  it("keeps the compact workspace intake readable as a drop target", () => {
+    // Newlines are normalised: this repository checks CSS out with CRLF on Windows and LF in CI.
+    const css = read("app/workspace-final-polish.css").replace(/\r\n/g, "\n");
+    expect(css).toContain(".workspace:has(.document-meta li) .workspace-intake {\n  border: 1px dashed var(--text-xlo);\n}");
+    expect(css).toContain('.workspace:has(.document-meta li) .workspace-intake[data-active="true"] {\n  border-style: solid;\n  border-color: var(--verified);');
+  });
+
   it("removes the full-viewport floor from short landing scenes but keeps the film immersive", () => {
     const css = read("app/ux-120-final.css");
     expect(css).toContain(".landing-page .scene:not(.film)");
