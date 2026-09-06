@@ -41,6 +41,7 @@ const CAPABILITY_LABELS = {
   cdr: "Content disarm and reconstruction",
   ocrGpu: "Isolated GPU document reading",
   candidatePromotion: "Candidate promotion into a live world",
+  customerData: "Compiling customer data",
 } as const;
 
 const PATH = [

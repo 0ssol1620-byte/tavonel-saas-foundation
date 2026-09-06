@@ -10,6 +10,7 @@
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "test": "vitest run",
+    "security:suite": "vitest run server/foundation/rlsMatrixContract.test.ts server/foundation/tenantAuthorization.test.ts server/foundation/supabaseHardeningMigration.test.ts server/foundation/creditLedgerRlsMigration.test.ts server/foundation/productCoreCompileEnvelope.test.ts server/foundation/customerDataGate.test.ts server/foundation/customerDataGateMigration.test.ts server/foundation/aclSnapshot.test.ts",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"
   },
   "dependencies": {
