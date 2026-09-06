@@ -33,7 +33,7 @@ const VALUE = [
   ],
   [
     "Source-level evidence",
-    "Every qualified claim and relation carries the document version, page and region it came from. Reviewers and auditors open the actual page, not a paraphrase of it.",
+    "Every compiled fact stays traceable to its exact source location: a qualified claim or relation carries the source version and the address of the place inside it. Reviewers and auditors open that place, not a paraphrase of it.",
   ],
   [
     "Governed activation",
@@ -76,7 +76,7 @@ export default function EnterprisePage() {
               <p className="lede">
                 Technical manuals, specifications, contracts, policies and reports become one
                 versioned world that your search, your agents and your applications all read from
-                — with every result traceable to the page it came from, and activation in the
+                — with every result traceable to its exact source location, and activation in the
                 hands of your own reviewers.
               </p>
 

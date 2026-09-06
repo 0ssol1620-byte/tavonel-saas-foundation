@@ -250,13 +250,28 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
           <CompileStagePlayer onStageChange={handleStageChange} />
         </Scene>
 
+        {/*
+          The path ends at a location, not at a page.
+
+          It used to read "Object → relation → evidence → document page → exact bounding box",
+          which is what a PDF locator looks like and was written as though it were what evidence
+          is. A cell in a spreadsheet, a shape on a slide and a MIME part in an email are exact
+          locations too, and none of them has a page. RESOLVED A-1 names the abstraction; the
+          per-source forms it covers are set out once, on /evidence, rather than repeated on
+          every surface, and /sources stays the answer to what is read here today.
+        */}
         <Scene id={4} band="answer" eyebrow="EVIDENCE" title="Follow grounded results back to the source.">
-          <p className="lede rv">Object → relation → evidence → document page → exact bounding box. Ask citations open the same source evidence.</p>
+          <p className="lede rv">Every compiled fact stays traceable to its exact source location. Ask citations open that same location.</p>
           <div className="evidence-path rv" aria-label="Evidence path">
-            {['Object', 'Relation', 'Evidence', 'Document page', 'Exact bbox'].map((step, index) => (
+            {['Object', 'Relation', 'Evidence', 'Source version', 'Exact location'].map((step, index) => (
               <Fragment key={step}><span>{step}</span>{index < 4 ? <i aria-hidden="true">→</i> : null}</Fragment>
             ))}
           </div>
+          <p className="fine rv">
+            What a location is depends on the source — a page and a region in a PDF, a sheet and
+            a cell in a spreadsheet, a slide and a shape in a deck.{" "}
+            <Link href={"/sources" as Route}>See which representations this deployment reads today</Link>.
+          </p>
           <div className="actions rv"><ExploreLink className="btn" /></div>
         </Scene>
 

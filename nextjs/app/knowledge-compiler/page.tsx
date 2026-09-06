@@ -23,7 +23,7 @@ export default function KnowledgeCompilerPage() {
     { title: "The compile contract", body: "The unit of value is not a chat response. It is a Compiled World with immutable inputs, structured objects, exact evidence, review state, retrieval material and portable files.", rows: [
       { key: "INPUT", description: "Versioned source files and connector cursors.", state: "IMMUTABLE" },
       { key: "STRUCTURE", description: "Directory, ontology, entities, claims and relations.", state: "REVIEWABLE" },
-      { key: "EVIDENCE", description: "Source version, page, bounding box, excerpt and digest.", state: "TRACEABLE" },
+      { key: "EVIDENCE", description: "Source version, the exact location inside it, excerpt and digest.", state: "TRACEABLE" },
       { key: "WORLD", description: "Candidate and active revisions separated by a human decision.", state: "VERSIONED" },
     ] },
     {
@@ -59,7 +59,7 @@ export default function KnowledgeCompilerPage() {
       { key: "COMPILED WORLD", description: "The output of one compile: objects, relations, evidence, retrieval material and a validation report, addressed by a digest.", state: "THE ARTIFACT" },
       { key: "CANDIDATE", description: "A compiled result that has not been promoted. It can be read, downloaded and reviewed; nothing answers from it.", state: "LIFECYCLE" },
       { key: "ACTIVE", description: "The one revision a workspace answers from. It changes only when a person promotes a candidate or rolls back to a prior revision.", state: "LIFECYCLE" },
-      { key: "EVIDENCE REGION", description: "A source version, a page, a bounding box in thousandths of the page, an excerpt and a digest. What a citation resolves to.", state: "PROVENANCE" },
+      { key: "EVIDENCE REGION", description: "A source version, an exact location inside it, an excerpt and a digest. What a citation resolves to. The location takes whatever form the source has; in a PDF it is a page and a box measured in thousandths of it.", state: "PROVENANCE" },
       { key: "STABLE ID", description: "An identifier derived from content, so recompiling the same source lands on the same object rather than a new one.", state: "IDENTITY" },
       { key: "MANIFEST DIGEST", description: "The sha256 of the canonical form of a World. Two Worlds with the same digest are the same World.", state: "IDENTITY" },
       { key: "ABSTENTION", description: "The answer given when the sources do not support one. It is a result, not a failure.", state: "BEHAVIOUR" },

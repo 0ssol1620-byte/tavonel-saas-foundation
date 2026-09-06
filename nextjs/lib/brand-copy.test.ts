@@ -103,6 +103,28 @@ const COPY_SURFACES = [
   "app/sources/page.tsx",
   "components/source-capability-table.tsx",
   "../shared/capabilityManifest.ts",
+  /*
+    The surfaces the positioning pass (RESOLVED A-1, A-4, A-6) rewrote, none of which had a row.
+
+    Every one of them carries a claim of the exact kind this file exists to guard -- what
+    evidence is bound to, which connectors are reachable, and what state a service is in -- and
+    each was edited in this pass without any check that the edit stayed inside the rules.
+
+    The two lib files are here because their strings are public copy that no page contains:
+    `activation-policy.ts` is served verbatim from /api/status and rendered on /security, and
+    `operations.ts` writes the detail line under every row on /status. The share card is here
+    for the same reason: it repeats the hero, and a barred phrase reaching it would be the one
+    place a reader sees before the page loads.
+  */
+  "app/evidence/page.tsx",
+  "app/knowledge-compiler/page.tsx",
+  "app/resources/page.tsx",
+  "app/integrations/page.tsx",
+  "app/security/page.tsx",
+  "app/status/page.tsx",
+  "app/opengraph-image.tsx",
+  "lib/activation-policy.ts",
+  "lib/operations.ts",
 ];
 
 const BARRED = [
@@ -401,8 +423,14 @@ describe("public copy", () => {
     expect(page).toContain('id="s1"');
     expect(page).toContain("Object");
     expect(page).toContain("Relation");
-    expect(page).toContain("Document page");
-    expect(page).toContain("Exact bbox");
+    /*
+      The path ends at a source location, not a page (RESOLVED A-1). "Document page" and
+      "Exact bbox" were the last two steps; they describe a PDF locator, and the landing page
+      may not present one locator as the shape of all evidence.
+    */
+    expect(page).toContain("Source version");
+    expect(page).toContain("Exact location");
+    expect(page).not.toContain("Exact bbox");
   });
 
   it("stages a customer's own upload in the workspace, not a fixture world", () => {

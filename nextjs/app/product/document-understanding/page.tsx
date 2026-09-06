@@ -25,7 +25,7 @@ export const metadata: Metadata = {
 */
 const PARTS = [
   ["READ", "Text, tables and figures", "Native text layers, and scans read as images rather than skipped. Tables keep their cell structure instead of collapsing into a paragraph."],
-  ["GEOMETRY", "Coordinates, kept", "Every region keeps its page number and bounding box. This is what later lets a compiled claim open the exact place on the page it came from."],
+  ["LOCATION", "The place, kept", "Every region keeps the address of where it was read — in a PDF, the page and the region on it. This is what later lets every compiled fact stay traceable to its exact source location."],
   ["LAYOUT", "Structure recovery", "Headings, sections, columns and reading order are recovered, so a fact attaches to a place in the document rather than an offset in a blob of text."],
   ["UNCERTAINTY", "Doubt is carried forward", "Low-confidence regions stay marked and arrive in review instead of being quietly resolved. A reader that never reports doubt cannot be believed later."],
 ] as const;
