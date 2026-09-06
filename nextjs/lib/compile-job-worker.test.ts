@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { CompileJob, CompileState } from "./compile-job-store";
+import type { CompileJob, CompileJobResult, CompileState } from "./compile-job-store";
 
 /*
   What the worker must never do on its own.
@@ -18,9 +18,15 @@ const runCompile = vi.fn();
 const listObjects = vi.fn();
 const group = vi.fn();
 
+const openJobs = vi.fn(async (): Promise<CompileJobResult<CompileJob[]>> => ({ ok: true, value: [] }));
+
 vi.mock("./compile-job-store", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./compile-job-store")>();
-  return { ...actual, advanceCompileJob: advance, readOpenCompileJobs: vi.fn() };
+  return {
+    ...actual,
+    advanceCompileJob: advance,
+    readOpenCompileJobs: openJobs,
+  };
 });
 vi.mock("./collection-compile-run", () => ({
   runCollectionCompile: (...args: unknown[]) => runCompile(...args),
@@ -33,7 +39,15 @@ vi.mock("./immutable-keys", async (importOriginal) => {
   return { ...actual, groupImmutableDocuments: (...args: unknown[]) => group(...args) };
 });
 
-const { runCompileJobTurn } = await import("./compile-job-worker");
+/*
+  Imported after the mocks are built, and that is not a style choice: a value import of a module
+  `vi.mock` replaces is evaluated together with the hoisted factory, before the `const`s the
+  factory closes over exist, and the file fails to load at all. The two lists read here are the
+  real ones -- the factory spreads the actual module -- so reading them late is what makes them
+  readable.
+*/
+const { runCompileJobBatch, runCompileJobTurn } = await import("./compile-job-worker");
+const { RESTING_COMPILE_STATES, SCHEDULER_EXCLUDED_STATES } = await import("./compile-job-store");
 
 const DOCUMENT = (id: string, state: "ocr_ready" | "sanitized" | "operator_review") => ({
   documentId: id,
@@ -76,6 +90,8 @@ beforeEach(() => {
   runCompile.mockReset();
   listObjects.mockReset();
   group.mockReset();
+  openJobs.mockReset();
+  openJobs.mockResolvedValue({ ok: true, value: [] });
   listObjects.mockResolvedValue({ ok: true, objects: [] });
 });
 
@@ -126,6 +142,47 @@ describe("the durable compile worker", () => {
     const turn = await runCompileJobTurn(job({ state: "review_required" }));
     expect(turn.note).toBe("resting");
     expect(listObjects).not.toHaveBeenCalled();
+  });
+
+  it("gives a waiting job its turn even behind a batch of parked reviews", async () => {
+    /*
+      The starvation, end to end. Five review packages are the oldest open rows and the batch is
+      five wide, so before the scheduler stopped asking for them the sixth job -- somebody's
+      compile, waiting -- was never reached at all. Here they are handed over anyway, to assert
+      the worker spends none of the batch on them and still advances the one job that can move.
+    */
+    group.mockReturnValue([DOCUMENT("doc-a", "ocr_ready"), DOCUMENT("doc-b", "sanitized")]);
+    const fresh = "cjob-" + "b".repeat(32);
+    openJobs.mockResolvedValue({
+      ok: true,
+      value: [
+        ...Array.from({ length: 5 }, () => job({ state: "review_required" })),
+        job({ jobId: fresh }),
+      ],
+    });
+
+    const turns = await runCompileJobBatch(5);
+
+    expect(openJobs).toHaveBeenCalledWith(5);
+    expect(turns.map((turn) => turn.note)).toEqual(["resting", "resting", "resting", "resting", "resting", "waiting"]);
+    expect(advance).toHaveBeenCalledWith(expect.objectContaining({ jobId: fresh }));
+    expect(listObjects).toHaveBeenCalledTimes(1);
+  });
+
+  it("rests on every state the scheduler refuses to hand out", async () => {
+    /*
+      The two halves of the starvation fix are one list. A state this worker cannot move must be
+      one the scheduler skips, or it holds a slot in the open-job window for ever; a state the
+      scheduler skips must be one this worker declines, because the events route nudges this
+      function directly for any job that is not terminal.
+    */
+    for (const state of RESTING_COMPILE_STATES) {
+      expect(SCHEDULER_EXCLUDED_STATES).toContain(state);
+      listObjects.mockClear();
+      const turn = await runCompileJobTurn(job({ state }));
+      expect(turn.note).toBe("resting");
+      expect(listObjects).not.toHaveBeenCalled();
+    }
   });
 
   it("settles as failed when nothing in the batch could be read", async () => {

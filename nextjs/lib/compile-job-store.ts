@@ -38,6 +38,33 @@ export function isTerminalCompileState(state: CompileState) {
   return TERMINAL_COMPILE_STATES.includes(state);
 }
 
+/*
+  Unfinished, and yet there is nothing a worker can do about it.
+
+  `review_required` is the compile handing the decision back to a person. The job is genuinely
+  not finished -- it is not terminal, and the customer's list is right to keep showing it -- but
+  no turn moves it, so a worker that picks it up puts it straight back down without touching
+  `updated_at`.
+
+  Two meanings of "open" were conflated and the scheduler took the customer's one: it asked for
+  everything not settled, oldest `updated_at` first, and took the first few. A resting job never
+  bumps that column, so it holds its place in that window permanently, and five of them -- in any
+  workspaces at all -- stop every compile in the deployment: accepted, credited, still reporting
+  `reading`, never looked at again. The two lists are kept apart here rather than filtered after
+  the fetch, so a state added to one is visibly missing from the other.
+*/
+export const RESTING_COMPILE_STATES: readonly CompileState[] = ["review_required"];
+
+export function isRestingCompileState(state: CompileState) {
+  return RESTING_COMPILE_STATES.includes(state);
+}
+
+/** What a worker's queue excludes: settled, or waiting on somebody who is not a worker. */
+export const SCHEDULER_EXCLUDED_STATES: readonly CompileState[] = [
+  ...TERMINAL_COMPILE_STATES,
+  ...RESTING_COMPILE_STATES,
+];
+
 export type CompileBlocker = {
   documentId: string;
   /*
@@ -472,10 +499,28 @@ export async function resolveCompileJobBlockers(input: {
   };
 }
 
-/** Every job a worker could still move, oldest first so nothing starves. */
+/*
+  Every job a worker could still move, oldest first so nothing starves.
+
+  "Could still move" is the scheduler's question, not the customer's: `SCHEDULER_EXCLUDED_STATES`
+  drops the settled states and the resting ones together, because a job nobody can advance in a
+  window ordered by `updated_at` is a slot nothing ever leaves.
+
+  The partial index behind this query still names only the terminal three
+  (`foundation_compile_jobs_open_idx`, migration 0038:113), so it no longer matches the predicate
+  exactly and the resting rows are filtered rather than skipped. That is correct but not free.
+  The index this wants is the same one over `SCHEDULER_EXCLUDED_STATES` --
+
+    create index foundation_compile_jobs_runnable_idx
+      on public.foundation_compile_jobs (state, updated_at)
+      where state not in ('ready', 'failed', 'cancelled', 'review_required');
+
+  -- and it belongs in the migration that owns this table's chain, not here. Recorded rather than
+  written: this lane writes no migration, and the query is correct without it.
+*/
 export async function readOpenCompileJobs(limit = 20): Promise<CompileJobResult<CompileJob[]>> {
   const query = new URLSearchParams({
-    state: "not.in.(ready,failed,cancelled)",
+    state: `not.in.(${SCHEDULER_EXCLUDED_STATES.join(",")})`,
     order: "updated_at.asc",
     limit: String(Math.min(Math.max(1, limit), 100)),
     select: "*",

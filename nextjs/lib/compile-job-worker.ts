@@ -4,6 +4,7 @@ import {
   type CompileBlocker,
   type CompileJob,
   type CompileState,
+  isRestingCompileState,
   readOpenCompileJobs,
 } from "./compile-job-store";
 import { groupImmutableDocuments } from "./immutable-keys";
@@ -111,12 +112,16 @@ export async function runCompileJobTurn(job: CompileJob): Promise<CompileJobTurn
   ): CompileJobTurn => ({ jobId: job.jobId, state, note, documentsReady, blocked });
 
   /*
-    `review_required` is a resting state, not an unfinished one.
+    A resting state is not an unfinished one.
 
     The compile produced a package a person has to look at. Nothing the worker can do moves it
     along, and picking it up again would recompile the same sources on every turn forever.
+
+    The scheduler no longer offers these at all (`SCHEDULER_EXCLUDED_STATES`), so this is a
+    second reader of one list rather than a second opinion: the events route nudges this
+    function for any non-terminal job, a watched review package included.
   */
-  if (job.state === "review_required") return rest("resting", job.state, job.documentsReady, job.blocked);
+  if (isRestingCompileState(job.state)) return rest("resting", job.state, job.documentsReady, job.blocked);
 
   const signer = readR2SignerEnv();
   if (!signer) return rest("skipped", job.state, job.documentsReady, job.blocked);
