@@ -7,11 +7,11 @@ Campaign `TAVONEL-USKC-P0-20260906-V1`. Contract `USKC_LANE_CONTRACT_2026-09-06.
 
 - Repo: `0ssol1620-byte/tavonel-saas-foundation`, worktree `D:\CodexProjects\uskc-lanes\site-d-capability-manifest`
 - Branch: `agent/uskc-d-capability-manifest`, based on `4c18e86`
-- Pushed SHA: **`ed2eadc63c26833af510527d33dc34824f7096aa`** — the tip at first push, carrying the whole lane.
-  Three commits on top of `4c18e86`:
+- Pushed SHA: **see §9 "Repair"** — the tip moved twice after this section was first written, and naming a
+  superseded commit in bold here was itself a review finding. Four commits on top of `4c18e86`:
   `9f3ba19` (the manifest and the six surfaces derived from it), `ed2eadc` (the `.gitattributes` LF pin and this
-  report), and one follow-up commit that fills this line in with the SHA above — its own SHA is printed by
-  `git log --oneline origin/main..HEAD` and is the branch tip a reviewer should check out.
+  report), `247a4f5` (this line, as first written), and the repair commit whose SHA §9 records. `git rev-parse
+  origin/agent/uskc-d-capability-manifest` is the authority; this file is not.
 - Production deploy 안 함. Git push로 Preview deployment는 자동 생성됨. Preview not verified through the Vercel MCP.
 
 ## 2. Files created and modified
@@ -23,23 +23,26 @@ Campaign `TAVONEL-USKC-P0-20260906-V1`. Contract `USKC_LANE_CONTRACT_2026-09-06.
 | `shared/capabilityManifest.schema.json` | The frozen contract artifact, copied verbatim. sha256 `4795fe89bf72a60684f9fb28f54ebc39a57d7c867fcd7c33a177369eed1378a4`, verified byte-identical to `contract/capability-manifest.v1.schema.json`. |
 | `shared/uskcEnums.ts` | The frozen `enums.v1.json` vocabulary transliterated to TS `const` arrays plus union types. All ten lists, not only the four D uses, so AB's copy and this one can be deduplicated at integration. |
 | `shared/capabilityManifest.ts` | `CAPABILITY_MANIFEST` (12 entries) plus `deriveUploadWhitelist`, `deriveUploadAccept`, `offeredAtUpload`, `describeAcceptedFormats`, `deriveSourceFamilyChips`, `isAcceptedAtUpload`. |
-| `server/foundation/capabilityManifest.test.ts` | 19 tests: frozen-artifact digest, enum transliteration, schema validation, honesty rules, the five derivations, and six failure paths. |
+| `server/foundation/capabilityManifest.test.ts` | 26 tests: frozen-artifact digest, enum transliteration, schema validation, honesty rules, the five derivations, six manifest failure paths and seven intake refusals (§9.3). |
 | `nextjs/app/api/v1/capabilities/route.ts` | `GET /api/v1/capabilities` — the manifest, `Cache-Control`, `ETag`, `contentSha256`. |
 | `nextjs/lib/capability-manifest-route.test.ts` | 4 tests: the payload is the manifest unmodified, the digest is reproducible, the response is public and tenant-free, and it advertises no capability the deployment cannot support. |
 | `nextjs/app/sources/page.tsx` | The §33 support matrix page. |
 | `nextjs/components/source-capability-table.tsx` | The table and the six-tier legend, with the tier → status-token and tier → `claim-state` mappings. |
-| `nextjs/e2e/sources.spec.ts` | 5 specs × 3 projects = 15 Playwright tests. |
+| `nextjs/e2e/sources.spec.ts` | 6 specs × 3 projects = 18 Playwright tests. |
 
 ### Modified — full-file ownership
 
 - `shared/qualifiedDocumentInputs.ts` — the 11-entry literal became `deriveUploadWhitelist(CAPABILITY_MANIFEST)`.
-  `validateQualifiedDocumentInput`'s body, its return union and `QualifiedDocumentMime`'s literal narrowing are unchanged;
-  the mime union is now derived at the type level with `Extract<entries[number], { status: CapabilityStatusAcceptedAtUpload }>`.
+  Its return union and `QualifiedDocumentMime`'s literal narrowing are unchanged; the mime union is now derived at the
+  type level with `Extract<entries[number], { status: CapabilityStatusAcceptedAtUpload }>`. One line of the validator's
+  body **did** change in the repair: the membership test is `Object.hasOwn`, not `in` (§9.1 F2), and the whitelist's
+  value type is `readonly string[]`, which the `as const` literal had and the first derived version had lost.
 - `nextjs/lib/qualified-input.ts` — the hand-duplicated copy is gone. The file re-exports the shared validator and adds
   the three derived UI strings (`uploadAcceptAttribute`, `acceptedFormatSentence`, `sourceFamilyChips`).
 - `nextjs/lib/docs-content.ts` — the `files-and-formats` prose is derived, and a manifest-driven support table plus a
   qualification note were added to the section.
-- `nextjs/lib/brand-copy.test.ts` — three `COPY_SURFACES` rows and six §42 phrases appended to `BARRED`.
+- `nextjs/lib/brand-copy.test.ts` — three `COPY_SURFACES` rows and seven §42 phrases appended to `BARRED`
+  (six in the first pass; `"all files"` added in the repair, §9.1 F3).
 
 ### Modified — row-only edits (one line or one contiguous block each)
 
@@ -55,7 +58,7 @@ Campaign `TAVONEL-USKC-P0-20260906-V1`. Contract `USKC_LANE_CONTRACT_2026-09-06.
 | `nextjs/app/api/openapi/route.ts:39-52` | one new path, `GET /capabilities` |
 | `nextjs/app/api/openapi/route.ts:59` | `declaredMimeType` gains `enum: Object.keys(qualifiedDocumentInputs)` |
 | `nextjs/app/sitemap.ts:10` | one route added to `ROUTES` |
-| `nextjs/lib/site-navigation.ts:36` | one row added to `RESOURCE_LINKS` |
+| `nextjs/lib/site-navigation.ts:27` | one row added to `PRIMARY_NAV` (RESOLVED A-3/B-5). It was in `RESOURCE_LINKS` in the first pass — see §9.1 F1 |
 | `nextjs/app/tavonel.css` | one appended block, `/sources` only, no token added and no existing rule changed |
 | `.gitattributes:35-40` | **out of my ownership row — see §5.5.** One rule, `shared/*.schema.json text eol=lf` |
 
@@ -152,11 +155,14 @@ One code change was made in response to a gate: `deriveSourceFamilyChips` used `
    "…and compiles a versioned knowledge layer with evidence bound to an exact source location." The landing scene-4
    labels `Object / Relation / Document page / Exact bbox` would become `Object / Relation / Source unit / Exact
    locator`. Both are pinned by `brand-copy.test.ts`; not changed.
-4. **Indexing `/sources`.** It is in the sitemap and, unlike `/benchmarks`, is **not** in `app/robots.ts`'s disallow
-   list — that file belongs to no lane and I did not edit it, so the default `allow: "/"` applies and crawlers may
-   index the page. If it should be withheld until the wording is approved, one token goes into `robots.ts`.
-5. **Navigation placement.** `/sources` is one row in `RESOURCE_LINKS`, so it appears on `/resources`. §41 calls it a
-   trust surface; the footer's "Trust" group or the primary nav would give it more weight. One row either way.
+4. **Indexing `/sources`.** Two things make it indexable and only one of them was stated here at first: it is in the
+   sitemap, it is **not** in `app/robots.ts`'s disallow list (that file belongs to no lane and I did not edit it), and
+   `app/sources/page.tsx:29` declares `robots: { index: true, follow: true }` itself — an in-lane choice, matching the
+   other public pages, not a passive default. If the page should be withheld until the wording is approved, that line
+   flips and one token goes into `robots.ts`.
+5. ~~**Navigation placement.**~~ **Withdrawn — this was already resolved and should never have been asked.** Contract
+   §4.2 records RESOLVED A-3/B-5: `/sources` is a primary product surface and its row goes in the **primary**
+   navigation group. The first pass put it in `RESOURCE_LINKS` and then re-opened the question here. Fixed in §9.
 6. **Every row says the same three preserved fields.** That is what the pipeline emits, and it is the strongest
    argument in the blueprint for Lane C: the moment a native XLSX reader lands, the spreadsheet rows say `cell`,
    `formula`, `sheet` and the tier can move. Publishing the weak version now is deliberate; confirm that is wanted
@@ -184,9 +190,10 @@ One code change was made in response to a gate: `deriveSourceFamilyChips` used `
    `100% accurate` and (as `never hallucinates`) the second were in `BARRED`. Six phrases added, including
    `industry-leading` as a bare substring — it appears nowhere in `nextjs/app`, `nextjs/components`, `nextjs/lib` or
    `shared/` today, so the unqualified form can be barred outright.
-   **`all files` was NOT added**, and this is a contract deviation worth naming: contract §1 lists it, but it is a
-   common English substring (an archive that expands "all files in the archive") and barring it would fail on innocent
-   prose. `supports every file` covers the claim the rule is aimed at.
+   **`all files` was NOT added** in the first pass, and the reason given — that it is a common English substring
+   ("all files in the archive") and would fire on innocent prose — was wrong. A reviewer ran the probe instead of
+   arguing: a copy of `brand-copy.test.ts` with the phrase in `BARRED` passes all 116 assertions. It is in `BARRED`
+   as of §9; the deviation is withdrawn, not defended.
 6. **Seam map, LANE D "Must not touch": `nextjs/lib/claim-state.ts` "currently with zero production consumers".**
    Confirmed at `4c18e86`, and this lane is its first: `nextjs/components/source-capability-table.tsx` imports
    `CLAIM_STATE` and prints the claim label beside each tier. The file itself is unmodified, per contract §7 R-4.
@@ -250,3 +257,104 @@ Sources for every field, so a reviewer can check rather than trust:
 - **`nextjs/lib/source-import.ts:28` and `connector-oauth-adapters.ts:179`** — Google Workspace export-format mappings
   (`application/vnd.google-apps.spreadsheet` → xlsx). They translate *into* the manifest's vocabulary rather than
   restating it, and they belong to connector code F and P2 own.
+
+---
+
+## 9. Repair (2026-09-06, after adversarial review)
+
+Two reviewers returned `GO_WITH_CONDITIONS` with four `major` findings between them (two of them the same
+finding). All four are fixed in `79e1b2b`, "Put /sources in the primary nav, and refuse a prototype key instead of
+throwing". That commit is the code; the commit on top of it is this section and changes no code. The branch tip is
+whatever `git rev-parse origin/agent/uskc-d-capability-manifest` prints — this file no longer claims to be the
+authority on it, because claiming that wrongly is what earned the finding.
+
+### 9.1 Findings fixed
+
+**F1 (both reviewers, major) — `/sources` was in `RESOURCE_LINKS`, not the primary nav.** Confirmed, and worse than
+a placement mistake: contract §4.2 records it as founder-**resolved** (A-3, B-5), contract §8 says a lane that
+believes a resolution is impossible reports evidence and stops rather than re-opening it, and the first pass
+re-opened it as founder question 5. `nextjs/lib/site-navigation.ts` now carries `{ href: "/sources", label:
+"Sources" }` in `PRIMARY_NAV`, between Pricing and Resources, and the row is gone from `RESOURCE_LINKS`. Still one
+row in the file, as the ownership row allows. The label is "Sources", not "Supported sources": the primary row is a
+fixed-width header, not a hub listing.
+
+An eighth primary link is a header measurement, not a data change. `tavonel.css:2704-2721` records why the section
+row is hidden below 1080px — with seven links the header's content ended at x≈1076 and the primary action and Sign
+in were laid out past the right edge, clipped invisibly by `overflow-x: hidden`, so a document-overflow check could
+not see it. The new e2e case sets the viewport to 1080px (the first width that shows the row) and asserts the
+action group's right edge is inside it. It passes in all three projects; the eighth link fits. If a ninth is ever
+added and does not, this test fails instead of the header silently clipping again.
+
+**F2 (fail-closed reviewer, major) — a prototype key crashed the intake validator.**
+`shared/qualifiedDocumentInputs.ts:50` tested membership with `in`, which walks the prototype chain, so
+`declaredMimeType: "constructor"` (or `"__proto__"`) passed the guard and then called `.some` on `Object`'s
+constructor: `TypeError: qualifiedDocumentInputs[qualifiedMimeType].some is not a function`. The caller
+`nextjs/app/api/uploads/capability/route.ts:54` has no `try`/`catch`, so a request the contract classifies as
+`UNQUALIFIED_MIME` answered 500. The reviewer's own refutation attempt is accepted in full: this is byte-for-byte
+the logic at `4c18e86`, so it is pre-existing rather than a lane regression, and it sits behind
+`authorizeFoundationRequest("documents:intake")`, so it needs an authenticated principal. It was still this lane's
+line to leave. Fixed with `Object.hasOwn`, which is what `nextjs/lib/explore-story.ts:53-55` already uses with the
+same comment — no new helper, no new dependency.
+
+The whitelist's value type also went back to `readonly`. The reviewer's third contradiction is correct: the
+hand-written literal was `as const`, the derived record was typed `Record<QualifiedDocumentMime, string[]>`, and
+`qualifiedDocumentInputs["application/pdf"].push(".exe")` type-checked where it used to be TS2339. It is
+`Record<QualifiedDocumentMime, readonly string[]>` now. (`Readonly<Record<K, readonly string[]>>` does not work as
+a cast target — `tsc` rejects it with TS2352 against `deriveUploadWhitelist`'s `Record<string, string[]>`; the
+annotation form compiles and gives the same guarantee.)
+
+**F3 (honesty reviewer, major) — `"all files"` was missing from `BARRED`.** The stated reason was that it is
+ordinary English and would fire on innocent prose. The reviewer tested the prediction instead of arguing with it: a
+copy of `brand-copy.test.ts` with the phrase inserted passes 116/116. The phrase is in `BARRED` now, and the
+comment above the block records both the wrong theory and the escape hatch ("every file in the archive") for a
+surface that ever needs the innocent reading. `pnpm test` in `nextjs/` passes 1593/1593 with it.
+
+**C-3 (contradiction, not a numbered finding) — legacy binary HWP was unlisted and unexplained.** Contract §4.2
+requires HWP to be listed `REVIEW_REQUIRED` *only if* the upload path can accept and hold it for review today, and
+otherwise "the doc says why". It cannot: `server/foundation/quarantineUploadCompletion.ts:36` re-runs
+`validateQualifiedDocumentInput` on the way into quarantine, so an unlisted MIME is refused before any object is
+stored — the review tier would describe a queue that does not exist. `/sources` now names `application/x-hwp`,
+`.hwp` and says exactly that, and `application/x-hwp` is one of the seven cases in the new refusal test.
+
+### 9.2 Findings and contradictions NOT fixed, with evidence
+
+- **"Gate 4 as written is not reliably reproducible on this machine."** Accepted, and the gate table below reports
+  the command that actually works. `playwright.config.ts`'s `webServer` runs `pnpm build && pnpm start`, whose
+  prebuild re-runs 1593 unit tests, and on a machine with other lanes building concurrently that exceeds even the
+  900s override. The suite itself is not flaky: built once, started on 3142, and pointed at with
+  `PLAYWRIGHT_BASE_URL`, it passes 18/18 in 14.3s.
+- **"`/sources` does render VERIFIED_NATIVE and VERIFIED_HYBRID chips in the legend."** Correct and deliberate, and
+  `e2e/sources.spec.ts:72` asserts it. The failure path is scoped to the table — the legend explains the six tiers
+  including the two nothing has reached, and the state line above it says no format carries a receipt. The
+  `failure_paths_tested` line said "anywhere in the table" and meant it; nothing changed.
+- **"Gate 3 (`pnpm build`) could not be reproduced — two ENOENT reruns."** The reviewer diagnosed it as a
+  concurrent `next build` by another agent in the same `.next` directory and recorded it as inconclusive rather
+  than a contradiction. Re-run alone for this repair: exit 0, 71/71 static pages, `/sources` and
+  `/api/v1/capabilities` both present.
+
+### 9.3 Failure paths added
+
+| Test | What it would have caught |
+|---|---|
+| `server/foundation/capabilityManifest.test.ts` — 7 cases, `it.each(["constructor", "__proto__", "prototype", "toString", "hasOwnProperty", "valueOf", "application/x-hwp"])` | F2. Verified by putting the `in` line back: 2 failed / 24 passed, `TypeError: qualifiedDocumentInputs[qualifiedMimeType].some is not a function`. With `Object.hasOwn`: 26 passed. |
+| `nextjs/e2e/sources.spec.ts` — "is in the primary navigation and listed in the sitemap" | F1. Asserts one `/sources` link in `header.nav nav[aria-label="Sections"]`, one in `.mobile-primary-nav nav`, and **zero** in `.site-footer-groups`. The old case asserted the resources hub, which pinned the wrong placement with a passing test. |
+| `nextjs/e2e/sources.spec.ts` — "keeps the header's primary action reachable at the width the section row appears" | The regression F1's fix could have introduced: an eighth link pushing the CTA past the right edge between 1080px and the next breakpoint, where `overflow-x: hidden` hides it from the overflow check. |
+| `nextjs/lib/brand-copy.test.ts` — `"all files"` in `BARRED` | F3. Every `COPY_SURFACE`, including the three this lane added, is now scanned for it. |
+
+### 9.4 Gates, re-run in full for the repair
+
+| # | Command | Exit | Output tail |
+|---|---|---|---|
+| 1 | `cd <worktree> && pnpm check` (root `tsc --noEmit`) | 0 | `> tsc --noEmit` then nothing. First attempt exit 2: `shared/qualifiedDocumentInputs.ts(24,40): error TS2352` from the `Readonly<...>` cast target — replaced with a type annotation. |
+| 2 | `cd <worktree> && pnpm test` (root vitest) | 0 | `Test Files 23 passed (23) / Tests 88 passed (88) / Duration 3.08s` — 81 before, +7 prototype-key cases. |
+| 3 | `cd <worktree>/nextjs && pnpm check` (`tsc --noEmit && eslint app components lib`) | 0 | no diagnostics |
+| 4 | `cd <worktree>/nextjs && pnpm test` (vitest) | 0 | `Test Files 164 passed (164) / Tests 1593 passed (1593) / Duration 16.80s` — with `"all files"` barred. |
+| 5 | `cd <worktree>/nextjs && pnpm build` | 0 | `✓ Generating static pages (71/71)`, `├ ○ /sources 1.28 kB 108 kB`, `├ ○ /api/v1/capabilities 363 B 103 kB` |
+| 6 | `cd <worktree>/nextjs && PORT=3142 pnpm start` (background) then `PLAYWRIGHT_BASE_URL=http://127.0.0.1:3142 pnpm exec playwright test --project=1440 --project=390 --project=reduced-motion e2e/sources.spec.ts` | 0 | `18 passed (14.3s)` — 6 specs × 3 projects. The `webServer` form of this command is not used; see §9.2. |
+| 7 | `cd <worktree> && git status --short` | 0 | empty |
+| 8 | `cd <worktree> && git push -u origin agent/uskc-d-capability-manifest` | 0 | `247a4f5..79e1b2b`, plus this report on top. Production deploy 안 함. Git push로 Preview deployment는 자동 생성됨. Preview not verified through the Vercel MCP. |
+
+Manual check against the running server, since a passing selector is not a rendered page: `/sources` prints the HWP
+paragraph and carries two `/sources` links (the desktop row and the phone disclosure, both from `PRIMARY_NAV`);
+`/resources` contains no "Supported sources" text and exactly the same two header links, i.e. the hub no longer
+lists the page.
