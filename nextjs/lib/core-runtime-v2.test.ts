@@ -49,6 +49,14 @@ function inputs(): CollectionOcrInput[] {
   });
 }
 
+/** The validation record the Core sends and the projection now has to read rather than replace. */
+const CORE_CHECKS = {
+  deterministicMaterialization: true,
+  sourceCoverage: true,
+  evidenceCoverage: true,
+  immutableInputsOnly: true,
+};
+
 function canonicalize(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(canonicalize).join(",")}]`;
@@ -105,7 +113,7 @@ async function candidateFixture() {
     artifactHashes: { "canonical/model": sha("b") },
     directoryPlan: [{ path: "Sources", kind: "root", sourceIds: [] }],
     package: { roots: ["ontology", "graph", "rag", "provenance", "validation"], files, signatureStatus: "external_signer_required" as const },
-    validation: { status: "passed" },
+    validation: { status: "passed", ...CORE_CHECKS },
     diff: {},
     impact: {},
     recompilation: {},
@@ -323,7 +331,7 @@ describe("Python Product-Core v2 dispatch", () => {
     const candidate = {
       ...baseCandidate,
       lifecycle: "review_required" as const,
-      validation: { status: "review_required" },
+      validation: { status: "review_required", ...CORE_CHECKS },
       reviewReasons,
       package: {
         ...baseCandidate.package,
@@ -371,5 +379,89 @@ describe("Python Product-Core v2 dispatch", () => {
     };
     expect(validateDownloadableCollectionArtifact(stored, projected?.collectionId ?? "")).not.toBeNull();
     expect(validatePromotableCollectionArtifact(stored, projected?.collectionId ?? "")).toBeNull();
+  });
+});
+
+/*
+  D7-05. The Core's verdict survives the projection.
+
+  `projectProductCoreV2Candidate` used to write four `true` literals here and never read
+  `result.candidate.validation` at all -- so if the Core had detected incomplete source coverage
+  or non-deterministic materialisation, the customer's downloadable package still asserted four
+  green checks. The projection was structurally incapable of reporting a Core-detected integrity
+  problem; the only signals that survived were the coarse status and the review-reason list.
+*/
+describe("the Core's validation record is projected rather than replaced", () => {
+  async function reviewRequiredResponse(validation: Record<string, unknown>) {
+    const baseCandidate = await candidateFixture();
+    const reviewReasons = ["SOURCE_COVERAGE_INCOMPLETE"];
+    const validationContent = `${JSON.stringify({ status: "review_required", reviewReasons })}\n`;
+    return {
+      schemaVersion: PRODUCT_CORE_RESPONSE_SCHEMA,
+      status: "review_required" as const,
+      runtime: "tavonel-python-core-v2" as const,
+      candidate: {
+        ...baseCandidate,
+        lifecycle: "review_required" as const,
+        validation,
+        reviewReasons,
+        package: {
+          ...baseCandidate.package,
+          files: await Promise.all(baseCandidate.package.files.map(async (file) => file.path === "validation/report.json" ? {
+            ...file,
+            content: validationContent,
+            sizeBytes: Buffer.byteLength(validationContent, "utf8"),
+            sha256: await digest(validationContent),
+          } : file)),
+        },
+      },
+      artifacts: [],
+      receipt: {
+        requestId: "request-projection",
+        inputSha256: sha("1"),
+        outputSha256: sha("2"),
+        coreReleaseDigest: sha("3"),
+        matchingPolicy: "legacy" as const,
+        candidatePromotion: false as const,
+        equivalence: "not_run" as const,
+        totalArtifacts: 0,
+        rebuiltArtifacts: 0,
+        workAvoidedArtifacts: 0,
+      },
+    };
+  }
+
+  it("carries a false check through to the artifact and refuses to promote it", async () => {
+    const result = await reviewRequiredResponse({ status: "review_required", ...CORE_CHECKS, sourceCoverage: false });
+    const projected = projectProductCoreV2Candidate(result, inputs());
+
+    expect(projected?.validation.sourceCoverage).toBe(false);
+    expect(projected?.validation.evidenceCoverage).toBe(true);
+    const stored = {
+      ...projected,
+      coreExecution: { status: "review_required", runtime: result.runtime, receipt: result.receipt },
+    };
+    expect(validatePromotableCollectionArtifact(stored, projected?.collectionId ?? "")).toBeNull();
+  });
+
+  it("refuses the projection when a check is missing instead of defaulting it true", async () => {
+    const { evidenceCoverage: _absent, ...incomplete } = CORE_CHECKS;
+    const result = await reviewRequiredResponse({ status: "review_required", ...incomplete });
+    expect(projectProductCoreV2Candidate(result, inputs())).toBeNull();
+  });
+
+  it("refuses the projection when a check is not a boolean", async () => {
+    const result = await reviewRequiredResponse({ status: "review_required", ...CORE_CHECKS, evidenceCoverage: "true" });
+    expect(projectProductCoreV2Candidate(result, inputs())).toBeNull();
+  });
+
+  it("refuses a completed compile whose own record says a check failed", async () => {
+    const base = await reviewRequiredResponse({ status: "passed", ...CORE_CHECKS, evidenceCoverage: false });
+    const contradictory = {
+      ...base,
+      status: "completed" as const,
+      candidate: { ...base.candidate, lifecycle: "candidate" as const, reviewReasons: [] },
+    };
+    expect(projectProductCoreV2Candidate(contradictory, inputs())).toBeNull();
   });
 });

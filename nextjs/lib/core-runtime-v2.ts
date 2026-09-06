@@ -1,5 +1,5 @@
 import { createHash, createHmac, randomUUID } from "node:crypto";
-import { regionsOrNone } from "../../shared/compiledWorldValidation";
+import { readCompiledWorldValidationChecks, regionsOrNone } from "../../shared/compiledWorldValidation";
 import {
   GENERIC_MIXED_CORPUS_BLUEPRINT,
   type CollectionCandidateArtifact,
@@ -229,6 +229,26 @@ export function projectProductCoreV2Candidate(
     (result.status === "completed" && result.candidate.lifecycle !== "candidate") ||
     (result.status === "review_required" && result.candidate.lifecycle !== "review_required")
   ) return null;
+  /*
+    The Core is the authority on integrity, so its verdict is read rather than replaced.
+
+    This function used to write four `true` literals here and never touch
+    `result.candidate.validation` at all. If the Core had detected incomplete source coverage or
+    non-deterministic materialisation, the customer's downloadable package still asserted four
+    green checks -- the projection was structurally incapable of reporting a Core-detected
+    problem. A missing or non-boolean field is a refusal (`CORE_V2_PROJECTION_INVALID` at
+    collection-compile-run.ts), never a default: an unreported check and a passed one must not
+    look the same.
+  */
+  const coreChecks = readCompiledWorldValidationChecks(result.candidate.validation);
+  if (!coreChecks) return null;
+  /*
+    A completed compile whose own record says a check failed contradicts itself, and the site is
+    not the place to decide which half to believe. Refusing keeps `passed` meaning passed: the
+    alternative is an artifact the promote gate accepts because its status says `passed` while a
+    boolean beside it says the source was not fully covered.
+  */
+  if (result.status === "completed" && Object.values(coreChecks).some((check) => !check)) return null;
   const model = result.candidate.canonicalKnowledgeModel;
   const collectionId = typeof model.collectionId === "string" ? model.collectionId : "";
   const objects = Array.isArray(model.objects) ? model.objects as Array<Record<string, unknown>> : [];
@@ -303,10 +323,7 @@ export function projectProductCoreV2Candidate(
     },
     validation: {
       status: result.status === "completed" ? "passed" : "review_required",
-      deterministicMaterialization: true,
-      sourceCoverage: true,
-      evidenceCoverage: true,
-      immutableInputsOnly: true,
+      ...coreChecks,
       fullRebuildEquivalence: result.receipt.equivalence,
       reviewReasons: [...result.candidate.reviewReasons],
       counts,
