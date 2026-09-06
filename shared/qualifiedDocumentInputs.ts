@@ -21,10 +21,10 @@ type AcceptedEntry = Extract<
 
 export type QualifiedDocumentMime = AcceptedEntry["mime"];
 
-export const qualifiedDocumentInputs = deriveUploadWhitelist(CAPABILITY_MANIFEST) as Record<
-  QualifiedDocumentMime,
-  string[]
->;
+// The value type is `readonly` because the hand-written literal was `as const`: pushing an
+// extension onto the intake whitelist at runtime was a type error before and stays one.
+export const qualifiedDocumentInputs: Record<QualifiedDocumentMime, readonly string[]> =
+  deriveUploadWhitelist(CAPABILITY_MANIFEST) as Record<QualifiedDocumentMime, string[]>;
 
 export type QualifiedInputDecision =
   | { valid: true; normalizedMimeType: QualifiedDocumentMime; originalFilename: string }
@@ -47,7 +47,11 @@ export function validateQualifiedDocumentInput({
     return { valid: false, code: "INVALID_FILENAME" };
   }
   const normalizedMimeType = normalizeDocumentMimeType(declaredMimeType);
-  if (!(normalizedMimeType in qualifiedDocumentInputs)) return { valid: false, code: "UNQUALIFIED_MIME" };
+  // `Object.hasOwn`, not `in`: `in` walks the prototype, so a declared MIME of "constructor" or
+  // "__proto__" passed this guard and then threw on `.some`, turning a refusal into a 500.
+  if (!Object.hasOwn(qualifiedDocumentInputs, normalizedMimeType)) {
+    return { valid: false, code: "UNQUALIFIED_MIME" };
+  }
   const qualifiedMimeType = normalizedMimeType as QualifiedDocumentMime;
   const lowerFilename = filename.toLowerCase();
   if (!qualifiedDocumentInputs[qualifiedMimeType].some((extension) => lowerFilename.endsWith(extension))) {

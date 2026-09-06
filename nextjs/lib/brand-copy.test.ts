@@ -118,8 +118,13 @@ const BARRED = [
     A support matrix is exactly where "supports every file" gets written, and it is the one
     sentence this product may never say: the architecture is meant to accept any source, the
     deployment reads eleven MIME types, and collapsing that distinction is how a page becomes a
-    promise the upload route refuses. The other four are the same shape -- each asserts an
+    promise the upload route refuses. The other five are the same shape -- each asserts an
     absolute no evidence here reaches.
+
+    "all files" was left out of the first version of this list on the theory that it is ordinary
+    English ("all files in the archive") and would fire on innocent prose. It does not: no copy
+    surface in this repository contains it. The contract lists it, the check is cheap, and a
+    surface that one day needs the innocent reading can say "every file in the archive".
 
     "industry-leading" is barred outright rather than "without evidence". The qualified version
     is not testable, and the unqualified version has never appeared in this repository; if a
@@ -127,6 +132,7 @@ const BARRED = [
     cites the receipt, the way "better than RAG" is meant to leave.
   */
   "supports every file",
+  "all files",
   "perfect parsing",
   "best ocr",
   "never stale",

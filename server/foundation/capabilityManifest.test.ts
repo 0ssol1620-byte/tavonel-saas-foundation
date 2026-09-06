@@ -307,6 +307,26 @@ describe("the derivations that replaced the hard-coded lists", () => {
     expect(validateQualifiedDocumentInput({ originalFilename: "../escape.pdf", declaredMimeType: "application/pdf" }))
       .toEqual({ valid: false, code: "INVALID_FILENAME" });
   });
+
+  /*
+    A prototype key is an unknown MIME, not an exception.
+
+    The whitelist is a plain object, so `"constructor" in qualifiedDocumentInputs` was true and
+    the next line called `.some` on `Object`'s constructor -- a TypeError that reached the
+    intake route with no catch above it and answered a refusable upload with a 500. The contract
+    says an unknown MIME is UNSUPPORTED, never a crash and never a silent pass-through, and the
+    crash was the half that was wrong. `Object.hasOwn` restores the refusal.
+
+    HWP is here for the same reason from the other direction: it is not in the manifest, so the
+    upload route refuses it, which is what /sources says about it.
+  */
+  it.each(["constructor", "__proto__", "prototype", "toString", "hasOwnProperty", "valueOf", "application/x-hwp"])(
+    "refuses %s as an unknown MIME instead of throwing",
+    (declaredMimeType) => {
+      expect(validateQualifiedDocumentInput({ originalFilename: "payload.pdf", declaredMimeType }))
+        .toEqual({ valid: false, code: "UNQUALIFIED_MIME" });
+    },
+  );
 });
 
 /*

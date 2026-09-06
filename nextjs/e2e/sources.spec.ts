@@ -108,13 +108,43 @@ test("carries no empty structural cell and never overflows its viewport", async 
   expect(result.empty, "/sources contains an empty structural cell").toBe(0);
 });
 
-test("is reachable from the resources hub and listed in the sitemap", async ({ page }) => {
-  await page.goto("/resources");
-  await expect(page.getByRole("link", { name: "Supported sources" }).first()).toHaveAttribute("href", "/sources");
+/*
+  An eighth primary link is a header measurement, not a data change.
+
+  `tavonel.css` swaps the section row for the phone disclosure at 1079px because the seven-link
+  row pushed the primary action past the right edge up to 1076px, and `overflow-x: hidden` hid
+  it from every document-overflow check. 1080px is the first width that shows the row, so it is
+  where a link added to `PRIMARY_NAV` gets measured. This test fails if the row stops fitting,
+  which is the only honest way to add to it.
+*/
+test("keeps the header's primary action reachable at the width the section row appears", async ({ page }) => {
+  await page.setViewportSize({ width: 1080, height: 900 });
+  await page.goto("/sources");
+  const actions = page.locator("header.nav .nav-actions");
+  await expect(actions).toBeVisible();
+  const box = await actions.boundingBox();
+  expect(box, "the header's action group has no box").not.toBeNull();
+  expect(
+    (box?.x ?? 0) + (box?.width ?? 0),
+    "the header's primary action is laid out past the right edge and clipped",
+  ).toBeLessThanOrEqual(1080);
+});
+
+/*
+  Primary navigation, not the resources hub.
+
+  The founder resolved this (contract 4.2, RESOLVED A-3/B-5): what a deployment can read is a
+  product surface, so the row lives in `PRIMARY_NAV`. Both chromes render that list -- the
+  desktop row and the phone disclosure -- and this asserts both, because the first version of
+  this page was reachable only from a hub two clicks in.
+*/
+test("is in the primary navigation and listed in the sitemap", async ({ page }) => {
+  await page.goto("/sources");
+  await expect(page.locator('header.nav nav[aria-label="Sections"] a[href="/sources"]')).toHaveCount(1);
+  await expect(page.locator('.mobile-primary-nav nav a[href="/sources"]')).toHaveCount(1);
+  await expect(page.locator('.site-footer-groups a[href="/sources"]')).toHaveCount(0);
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", "https://tavonel.com/sources");
 
   const sitemap = await page.request.get("/sitemap.xml");
   expect(await sitemap.text()).toContain("https://tavonel.com/sources");
-
-  await page.goto("/sources");
-  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", "https://tavonel.com/sources");
 });

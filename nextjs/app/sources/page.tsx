@@ -88,6 +88,22 @@ export default function SourcesPage() {
                 run produces a receipt. That is a measurement, not a decision, and this page
                 changes when the measurement does.
               </p>
+              {/*
+                Named because a Korean reader will look for it and find silence otherwise.
+
+                The review tier is not a waiting room: an upload is held for review only if the
+                upload route accepts it, and both the capability issue and the quarantine
+                completion re-run the same whitelist (`completeQuarantineUpload` calls
+                `validateQualifiedDocumentInput`). A format with no reader and no review path is
+                a refusal, so it is written as one rather than given a tier it cannot occupy.
+              */}
+              <p className="src-para">
+                <b>Legacy binary HWP</b> (<i>application/x-hwp</i>, .hwp) is not in the table. It
+                has no reader here, and this deployment cannot hold an unlisted format for
+                review: the upload route refuses it before any file is stored. Listing it under
+                review would describe a queue that does not exist, so it is refused with
+                everything else that is absent, and it appears here instead.
+              </p>
 
               <div className="actions">
                 <Link className="btn" href={"/docs/files-and-formats" as Route}>Files and formats</Link>
