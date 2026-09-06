@@ -46,11 +46,18 @@ create table if not exists public.source_acl_snapshots (
 
   -- Principal identities only. A principal id is an address, never a credential, and the guard
   -- below is the same one 0012 and 0014 use to keep secrets out of an audit body.
+  --
+  -- Every element carries a kind and a permission from the frozen vocabulary. Without this, a row
+  -- written by a connector could carry `"permission":"admin"`, and a value `intersectAcl` cannot
+  -- rank is a value it must refuse rather than compare -- the storage boundary refuses it too, so
+  -- the vocabulary is not enforced in only one place.
   principals jsonb not null check (
     jsonb_typeof(principals) = 'array'
     and jsonb_array_length(principals) <= 2000
     and octet_length(principals::text) <= 262144
     and principals::text !~* '"(secret|password|token|credential|access[_-]?key|private[_-]?key)"[[:space:]]*:'
+    and not (principals @? '$[*] ? (!(@.kind == "user" || @.kind == "group" || @.kind == "domain" || @.kind == "anyone"))')
+    and not (principals @? '$[*] ? (!(@.permission == "read" || @.permission == "write" || @.permission == "owner"))')
   ),
   snapshot_sha256 text not null check (snapshot_sha256 ~ '^sha256:[a-f0-9]{64}$'),
   captured_at timestamptz not null,

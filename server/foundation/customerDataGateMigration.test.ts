@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { customerDataEvidenceReceiptSha256 } from "../../shared/customerDataGate";
 import { CUSTOMER_DATA_PRECONDITIONS } from "../../shared/uskcEnums";
 
 const migration = readFileSync(
@@ -66,6 +67,43 @@ describe("customer-data gate migration", () => {
     expect(migration).not.toMatch(/\bupdate\s+public\./i);
     // The header comment names the policy it exists to gate; no SQL literal enables it.
     expect(migration).not.toMatch(/'approved_customer_data'/);
+  });
+
+  /**
+   * `intersectAcl` drops a grant it cannot rank; the column refuses to store one, so the frozen
+   * vocabulary is enforced at the storage boundary too and not in exactly one place.
+   */
+  it("constrains every stored principal to the frozen kind and permission vocabulary", () => {
+    expect(migration).toContain(
+      `not (principals @? '$[*] ? (!(@.kind == "user" || @.kind == "group" || @.kind == "domain" || @.kind == "anyone"))')`,
+    );
+    expect(migration).toContain(
+      `not (principals @? '$[*] ? (!(@.permission == "read" || @.permission == "write" || @.permission == "owner"))')`,
+    );
+  });
+
+  /**
+   * The `evidence` column comment promises that "a later reader can re-derive receipt_sha256
+   * instead of trusting it". `gateAdmitsCustomerData` checks the digest's shape only, so this is
+   * where the promise has to be executable: evidence and digest sit side by side in the row, and
+   * the exported derivation reproduces the digest from the evidence and detects a tampered row.
+   */
+  it("stores the evidence a reader re-derives receipt_sha256 from", () => {
+    expect(migration).toContain("evidence jsonb not null");
+    expect(migration).toContain("receipt_sha256 text check (receipt_sha256 ~ '^sha256:[a-f0-9]{64}$')");
+
+    const evidence = CUSTOMER_DATA_PRECONDITIONS.map((precondition) => ({
+      precondition,
+      satisfied: true,
+      evidence: `fixture://${precondition}`,
+      checkedAt: "2026-09-06T00:00:00.000Z",
+    }));
+    const storedDigest = customerDataEvidenceReceiptSha256(evidence);
+    expect(customerDataEvidenceReceiptSha256([...evidence].reverse())).toBe(storedDigest);
+    const tampered = evidence.map((entry, index) =>
+      index === 0 ? { ...entry, satisfied: false } : entry,
+    );
+    expect(customerDataEvidenceReceiptSha256(tampered)).not.toBe(storedDigest);
   });
 
   it("is one transaction, appended after 0049 and never altering an earlier table", () => {
