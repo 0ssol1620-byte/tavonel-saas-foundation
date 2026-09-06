@@ -1,5 +1,6 @@
 import { normalizeDocumentMimeType } from "./qualifiedDocumentInputs";
 import type { DocumentMetadata } from "./tenantDomain";
+import { representationKinds, sourceFamilies } from "./uskcEnums";
 import type { RepresentationKind, SourceFamily } from "./uskcEnums";
 
 /**
@@ -42,7 +43,22 @@ function isInstant(value: string): boolean {
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value.slice(0, 10);
 }
 
-export type SourceOriginKind = "upload" | "connector" | "api" | "database" | "repository";
+/**
+ * `contract/enums.v1.json` has no `OriginKind` list, so the runtime tuple lives here, spelled
+ * exactly as contract §4.1 spells the union. The frozen file is not edited to add it.
+ */
+export const sourceOriginKinds = ["upload", "connector", "api", "database", "repository"] as const;
+export type SourceOriginKind = (typeof sourceOriginKinds)[number];
+
+/*
+  The vocabularies are consulted at run time, not only by the compiler.
+  `validateSourceLedger` is reached across JSON boundaries — a PostgREST row, another lane, the
+  Python core — where a string is a string and TypeScript's unions are gone. A value no reader has
+  been qualified for must be refused here, or it enters the ledger vocabulary as if it belonged.
+*/
+const ORIGIN_KINDS: ReadonlySet<string> = new Set(sourceOriginKinds);
+const SOURCE_FAMILIES: ReadonlySet<string> = new Set(sourceFamilies);
+const REPRESENTATION_KINDS: ReadonlySet<string> = new Set(representationKinds);
 
 export type Source = {
   sourceId: string;
@@ -94,6 +110,7 @@ export type SourceLedger = {
 
 export type SourceLedgerViolation =
   | "SOURCE_IDENTIFIER_INVALID"
+  | "SOURCE_VOCABULARY_INVALID"
   | "SOURCE_DIGEST_INVALID"
   | "SOURCE_TIMESTAMP_INVALID"
   | "SOURCE_VERSION_NOT_BOUND"
@@ -201,6 +218,10 @@ function checkSource(source: Source): SourceLedgerDecision {
   if (!IDENTIFIER.test(source.sourceId) || !IDENTIFIER.test(source.workspaceId) || !IDENTIFIER.test(source.tenantId)) {
     return invalid("SOURCE_IDENTIFIER_INVALID", source.sourceId);
   }
+  if (!ORIGIN_KINDS.has(source.originKind)) return invalid("SOURCE_VOCABULARY_INVALID", source.originKind);
+  if (!SOURCE_FAMILIES.has(source.sourceFamily)) {
+    return invalid("SOURCE_VOCABULARY_INVALID", source.sourceFamily);
+  }
   if (!isInstant(source.createdAt)) return invalid("SOURCE_TIMESTAMP_INVALID", source.createdAt);
   if (source.tombstonedAt !== undefined && !isInstant(source.tombstonedAt)) {
     return invalid("SOURCE_TIMESTAMP_INVALID", source.tombstonedAt);
@@ -221,6 +242,11 @@ function checkVersion(source: Source, version: SourceVersion): SourceLedgerDecis
   }
   if (!version.immutableObjectKey) return invalid("SOURCE_IDENTIFIER_INVALID", "immutableObjectKey");
   if (!isInstant(version.observedAt)) return invalid("SOURCE_TIMESTAMP_INVALID", version.observedAt);
+  // The source's own modification time is written to a timestamptz column like the others; it was
+  // the one timestamp field nothing checked.
+  if (version.sourceModifiedAt !== undefined && !isInstant(version.sourceModifiedAt)) {
+    return invalid("SOURCE_TIMESTAMP_INVALID", version.sourceModifiedAt);
+  }
   if (version.parentVersionId !== undefined && !IDENTIFIER.test(version.parentVersionId)) {
     return invalid("SOURCE_IDENTIFIER_INVALID", version.parentVersionId);
   }
@@ -238,6 +264,9 @@ function checkRepresentations(
   for (const representation of representations) {
     const where = representation.representationId;
     if (!IDENTIFIER.test(where)) return invalid("SOURCE_IDENTIFIER_INVALID", where);
+    if (!REPRESENTATION_KINDS.has(representation.kind)) {
+      return invalid("SOURCE_VOCABULARY_INVALID", representation.kind);
+    }
     if (representation.sourceVersionId !== version.sourceVersionId) {
       return invalid("REPRESENTATION_LINEAGE_BROKEN", `${where} is not bound to ${version.sourceVersionId}`);
     }

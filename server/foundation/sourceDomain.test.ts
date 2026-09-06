@@ -17,6 +17,9 @@ import {
 } from "../../shared/sourceDomain";
 import type { DocumentMetadata } from "../../shared/tenantDomain";
 
+/** A field that crossed a JSON boundary: the union is gone and the value is whatever was stored. */
+const asStored = <T,>(value: string): T => value as unknown as T;
+
 const DIGEST_A = `sha256:${"a".repeat(64)}`;
 const DIGEST_B = `sha256:${"b".repeat(64)}`;
 const DIGEST_C = `sha256:${"c".repeat(64)}`;
@@ -159,6 +162,33 @@ describe("Universal Source domain — refusals", () => {
       .toMatchObject({ valid: false, code: "SOURCE_DIGEST_INVALID" });
     expect(validateSourceLedger(ledger({ version: version({ byteLength: 1.5 }) })))
       .toMatchObject({ valid: false, code: "SOURCE_DIGEST_INVALID" });
+  });
+
+  it("refuses a value outside the frozen vocabularies", () => {
+    // The union is a compile-time thing; a row read back from PostgREST, sent by another lane or
+    // written by the Python core is a string. Consulting the enums at run time is the only reason
+    // to have frozen them.
+    expect(validateSourceLedger(ledger({ source: source({ originKind: asStored("smuggled_origin") }) })))
+      .toMatchObject({ valid: false, code: "SOURCE_VOCABULARY_INVALID" });
+    expect(validateSourceLedger(ledger({ source: source({ sourceFamily: asStored("not_a_family") }) })))
+      .toMatchObject({ valid: false, code: "SOURCE_VOCABULARY_INVALID" });
+    expect(validateSourceLedger(ledger({
+      representations: [representation({ kind: asStored("smuggled_kind"), derivedFrom: [], lossy: false })],
+    }))).toMatchObject({ valid: false, code: "SOURCE_VOCABULARY_INVALID" });
+    // And a prototype member is a string like any other, not a member of anything.
+    expect(validateSourceLedger(ledger({ source: source({ sourceFamily: asStored("constructor") }) })))
+      .toMatchObject({ valid: false, code: "SOURCE_VOCABULARY_INVALID" });
+  });
+
+  it("refuses a sourceModifiedAt that is not an instant", () => {
+    // It is written to a timestamptz column like observedAt and createdAt, and it was the one
+    // timestamp field in the frozen §4.1 shapes that nothing checked.
+    expect(validateSourceLedger(ledger({ version: version({ sourceModifiedAt: "not-a-date-at-all" }) })))
+      .toMatchObject({ valid: false, code: "SOURCE_TIMESTAMP_INVALID" });
+    expect(validateSourceLedger(ledger({ version: version({ sourceModifiedAt: "2026-13-45T99:99:99Z" }) })))
+      .toMatchObject({ valid: false, code: "SOURCE_TIMESTAMP_INVALID" });
+    expect(validateSourceLedger(ledger({ version: version({ sourceModifiedAt: "2026-09-05T23:59:59Z" }) })))
+      .toEqual({ valid: true });
   });
 
   it("refuses a timestamp that is not an ISO-8601 instant, and a tombstone reason with no time", () => {
