@@ -106,7 +106,7 @@ describe("corpus identity", () => {
 });
 
 describe("what a corpus reports while it runs", () => {
-  const part = (index: number, state: string, ready = 12) => ({
+  const part = (index: number, state: string, ready = 12, batchCount: number | null = 2) => ({
     jobId: `cjob-${String(index).padStart(32, "0")}`,
     batchIndex: index,
     state,
@@ -114,6 +114,7 @@ describe("what a corpus reports while it runs", () => {
     documentsTotal: 12,
     documentsReady: ready,
     errorCode: null,
+    batchCount,
   });
 
   it("is running until every part has settled", () => {
@@ -140,6 +141,60 @@ describe("what a corpus reports while it runs", () => {
 
   it("calls a run where nothing compiled failed", () => {
     expect(summariseCorpus("corpus-" + "a".repeat(32), [part(0, "failed", 0), part(1, "cancelled", 0)]).state).toBe("failed");
+  });
+
+  /*
+    The one fact a summary computed from the parts cannot derive from the parts present: how
+    many parts there should have been. Every row declares it -- 0040's
+    `foundation_compile_jobs_corpus_is_whole` makes `batch_count` mandatory on a part -- so
+    counting the rows that answered the read and calling that the part count turns three
+    missing parts into a green tick over thirty-six sources nobody was told about.
+  */
+  it("does not call a corpus ready when parts it declared are missing", () => {
+    const parts = Array.from({ length: 8 }, (_, index) => part(index, "ready", 12, 11));
+    const summary = summariseCorpus("corpus-" + "a".repeat(32), parts);
+    expect(summary.state).toBe("incomplete");
+    expect(summary.batchCount).toBe(11);
+    expect(summary.partsPresent).toBe(8);
+    expect(summary.missingBatchIndexes).toEqual([8, 9, 10]);
+    expect(summary.incompleteCode).toBe("PARTS_MISSING");
+  });
+
+  it("is still incomplete when the missing part sits between the ones that are there", () => {
+    const summary = summariseCorpus("corpus-" + "a".repeat(32), [
+      part(0, "ready", 12, 3),
+      part(2, "ready", 12, 3),
+    ]);
+    expect(summary.state).toBe("incomplete");
+    expect(summary.missingBatchIndexes).toEqual([1]);
+  });
+
+  it("takes the largest declared count when the parts disagree", () => {
+    // Adversarial: a row whose batch_count disagrees with its siblings. Believing the smaller
+    // number would let a corpus argue itself back to whole.
+    const summary = summariseCorpus("corpus-" + "a".repeat(32), [
+      part(0, "ready", 12, 2),
+      part(1, "ready", 12, 4),
+    ]);
+    expect(summary.batchCount).toBe(4);
+    expect(summary.state).toBe("incomplete");
+    expect(summary.missingBatchIndexes).toEqual([2, 3]);
+  });
+
+  it("fails closed when a part does not declare how many parts there are", () => {
+    const summary = summariseCorpus("corpus-" + "a".repeat(32), [
+      part(0, "ready", 12, null),
+      part(1, "ready", 12, null),
+    ]);
+    expect(summary.state).toBe("incomplete");
+    expect(summary.incompleteCode).toBe("BATCH_COUNT_UNDECLARED");
+  });
+
+  it("says nothing is missing when every declared part is present", () => {
+    const summary = summariseCorpus("corpus-" + "a".repeat(32), [part(0, "ready"), part(1, "ready")]);
+    expect(summary.missingBatchIndexes).toEqual([]);
+    expect(summary.incompleteCode).toBeNull();
+    expect(summary.partsPresent).toBe(2);
   });
 });
 
@@ -205,6 +260,12 @@ describe("where the corpus path is wired in", () => {
   it("computes the corpus summary from its parts rather than storing one", () => {
     expect(corpusRoute).toContain("summariseCorpus");
     expect(corpusRoute).toContain("readCorpusParts");
+  });
+
+  it("hands the summary the part count each row declared", () => {
+    // The summary can count the rows it was given. What it cannot derive is how many rows
+    // there should have been, so the route has to carry that column through.
+    expect(corpusRoute).toContain("batchCount: part.batchCount");
   });
 
   it("lets the workspace select more than one compile's worth", () => {

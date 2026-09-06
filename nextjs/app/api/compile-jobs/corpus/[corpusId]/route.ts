@@ -44,6 +44,12 @@ export async function GET(request: Request, context: { params: Promise<{ corpusI
     documentsTotal: part.documentsTotal,
     documentsReady: part.documentsReady,
     errorCode: part.errorCode,
+    /*
+      The part count the row declares. It is the one input the summary cannot derive from the
+      rows it was handed, and dropping it here is what let a corpus missing three parts report
+      that all of its parts had compiled.
+    */
+    batchCount: part.batchCount,
   })));
 
   return NextResponse.json({ code: "OK", ...summary, parts: parts.value }, { headers: HEADERS });

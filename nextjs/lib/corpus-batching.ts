@@ -107,40 +107,82 @@ export type CorpusPart = {
   documentsTotal: number;
   documentsReady: number;
   errorCode: string | null;
+  /*
+    How many parts this row says the corpus has. Required, and nullable rather than optional,
+    because it is the one thing the summary cannot work out from the rows in front of it: a
+    caller that has not looked it up has to say so and be refused, not leave it out and be
+    told the corpus is whole.
+  */
+  batchCount: number | null;
 };
 
 export type CorpusProgress = {
   corpusId: string;
+  /** How many parts the corpus should have, as its own rows declare it. */
   batchCount: number;
+  /** How many of them were actually read. */
+  partsPresent: number;
+  /** The positions the corpus declared and does not have, in order. */
+  missingBatchIndexes: number[];
   documentsTotal: number;
   documentsReady: number;
   partsReady: number;
   partsFailed: number;
+  /** Why the corpus cannot be called whole; null when every declared part is present. */
+  incompleteCode: "PARTS_MISSING" | "BATCH_COUNT_UNDECLARED" | null;
   /*
     A corpus is only `ready` when every part is. `partial` is a real resting state and not a
     softened failure: some parts compiled, at least one did not, and the Worlds that exist are
     usable. Reporting that as `ready` would hide missing sources behind a green tick, and
     reporting it as `failed` would throw away work the customer can already use.
+
+    `incomplete` outranks all three, because it is the only one that is not about the parts.
+    A part that failed is a part that answered; a part that is not there says nothing, and no
+    count taken over the parts present can notice it.
   */
-  state: "running" | "ready" | "partial" | "failed";
+  state: "running" | "ready" | "partial" | "failed" | "incomplete";
 };
 
 export function summariseCorpus(corpusId: string, parts: readonly CorpusPart[]): CorpusProgress {
-  const batchCount = parts.length;
+  /*
+    The declared count, not the row count.
+
+    Taking the largest declared value rather than asserting they agree is the fail-closed
+    reading of a disagreement: the corpus is short of the largest number any of its own rows
+    claims, whichever row is wrong. A row that declares nothing cannot be checked at all, so
+    the summary refuses instead of falling back to the row count -- which is exactly the
+    substitution that reported eight parts of eleven as ready.
+  */
+  const undeclared = parts.some((part) => typeof part.batchCount !== "number");
+  const declared = parts.reduce((max, part) => Math.max(max, part.batchCount ?? 0), 0);
+  const batchCount = Math.max(declared, parts.length);
+
+  const present = new Set(parts.map((part) => part.batchIndex));
+  const missingBatchIndexes = Array.from({ length: batchCount }, (_, index) => index)
+    .filter((index) => !present.has(index));
+
   const partsReady = parts.filter((part) => part.state === "ready").length;
   const partsFailed = parts.filter((part) => part.state === "failed" || part.state === "cancelled").length;
   const settled = partsReady + partsFailed;
+  const incompleteCode = missingBatchIndexes.length > 0 ? "PARTS_MISSING"
+    : undeclared ? "BATCH_COUNT_UNDECLARED"
+      : null;
+
   return {
     corpusId,
     batchCount,
+    partsPresent: parts.length,
+    missingBatchIndexes,
     documentsTotal: parts.reduce((sum, part) => sum + part.documentsTotal, 0),
     documentsReady: parts.reduce((sum, part) => sum + part.documentsReady, 0),
     partsReady,
     partsFailed,
+    incompleteCode,
     state:
-      settled < batchCount ? "running"
-        : partsFailed === 0 ? "ready"
-          : partsReady === 0 ? "failed"
-            : "partial",
+      incompleteCode !== null ? "incomplete"
+        : settled < batchCount ? "running"
+          : partsFailed === 0 ? "ready"
+            : partsReady === 0 ? "failed"
+              : "partial",
   };
 }
