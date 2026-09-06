@@ -130,6 +130,15 @@ describe("legacy document adapter", () => {
     expect(sourceFamilyForMimeType("model/step")).toBe("unknown");
     expect(sourceFamilyForMimeType("")).toBe("unknown");
   });
+
+  it("answers a prototype key with unknown like any other unrecognised MIME type", () => {
+    // An object literal would answer these with Object.prototype and the Object constructor, and
+    // that value would then reach Source.sourceFamily, which no validator and no check constraint
+    // would recognise as a family at all.
+    for (const mime of ["__proto__", "constructor", "toString", "valueOf", "hasOwnProperty"]) {
+      expect(sourceFamilyForMimeType(mime)).toBe("unknown");
+    }
+  });
 });
 
 describe("Universal Source domain — refusals", () => {
@@ -155,6 +164,17 @@ describe("Universal Source domain — refusals", () => {
   it("refuses a timestamp that is not an ISO-8601 instant, and a tombstone reason with no time", () => {
     expect(validateSourceLedger(ledger({ source: source({ createdAt: "2026-09-06" }) })))
       .toMatchObject({ valid: false, code: "SOURCE_TIMESTAMP_INVALID" });
+    // Instant-shaped but not an instant: month 13, day 45, hour 99. It orders against nothing.
+    expect(validateSourceLedger(ledger({ source: source({ createdAt: "2026-13-45T99:99:99Z" }) })))
+      .toMatchObject({ valid: false, code: "SOURCE_TIMESTAMP_INVALID" });
+    expect(validateSourceLedger(ledger({ version: version({ observedAt: "2026-02-30T00:00:00Z" }) })))
+      .toMatchObject({ valid: false, code: "SOURCE_TIMESTAMP_INVALID" });
+    expect(validateSourceLedger(ledger({
+      representations: [representation({ createdAt: "2026-09-06T24:00:01Z" })],
+    }))).toMatchObject({ valid: false, code: "SOURCE_TIMESTAMP_INVALID" });
+    expect(validateSourceLedger(ledger({
+      source: source({ tombstonedAt: "2026-00-06T00:00:00Z", tombstoneReason: "customer deletion" }),
+    }))).toMatchObject({ valid: false, code: "SOURCE_TIMESTAMP_INVALID" });
     expect(validateSourceLedger(ledger({ source: source({ tombstoneReason: "customer deletion" }) })))
       .toMatchObject({ valid: false, code: "SOURCE_TIMESTAMP_INVALID" });
   });
@@ -176,6 +196,54 @@ describe("Universal Source domain — refusals", () => {
     expect(validateSourceLedger(ledger({
       representations: [representation(), { ...ocr, derivedFrom: [ocr.representationId] }],
     }))).toMatchObject({ valid: false, code: "REPRESENTATION_LINEAGE_BROKEN" });
+  });
+
+  it("refuses a lineage that is rooted in itself", () => {
+    // Each of these two satisfies "my parent exists and shares my source version". Together they
+    // are a provenance that never reaches any bytes: there is no original, and each artifact is
+    // explained by the other. A one-hop existence check calls this whole chain valid.
+    const normalized = representation({
+      representationId: "rep-00000000000000000000000000000011",
+      kind: "normalized",
+      contentSha256: DIGEST_B,
+      objectKey: "immutable/pilot-alpha/pilot-alpha/doc_01/aaaa/sanitized.pdf",
+      lossy: true,
+      derivedFrom: ["rep-00000000000000000000000000000012"],
+    });
+    const scanned = representation({
+      representationId: "rep-00000000000000000000000000000012",
+      kind: "ocr",
+      contentSha256: DIGEST_C,
+      objectKey: "immutable/pilot-alpha/pilot-alpha/doc_01/aaaa/ocr.json",
+      lossy: true,
+      derivedFrom: ["rep-00000000000000000000000000000011"],
+    });
+    expect(validateSourceLedger(ledger({ representations: [normalized, scanned] })))
+      .toMatchObject({ valid: false, code: "REPRESENTATION_LINEAGE_BROKEN" });
+    // A derived artifact hanging off that cycle is refused with it, not rescued by it.
+    expect(validateSourceLedger(ledger({
+      representations: [
+        representation(),
+        normalized,
+        scanned,
+        representation({
+          representationId: "rep-00000000000000000000000000000013",
+          kind: "canonical_ir",
+          contentSha256: DIGEST_C,
+          objectKey: "immutable/pilot-alpha/pilot-alpha/doc_01/aaaa/canonical.json",
+          lossy: true,
+          derivedFrom: ["rep-00000000000000000000000000000012"],
+        }),
+      ],
+    }))).toMatchObject({ valid: false, code: "REPRESENTATION_LINEAGE_BROKEN" });
+    // The same chain rooted in the original is what a real derivation looks like, and it passes.
+    expect(validateSourceLedger(ledger({
+      representations: [
+        representation(),
+        { ...normalized, derivedFrom: ["rep-00000000000000000000000000000001"] },
+        scanned,
+      ],
+    }))).toEqual({ valid: true });
   });
 
   it("refuses a parent that belongs to another source version", () => {

@@ -34,7 +34,9 @@ import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin"
 export type SourceDomainFailure =
   | "SOURCE_DOMAIN_STORE_NOT_CONFIGURED"
   | "SOURCE_DOMAIN_STORE_READ_FAILED"
-  | "SOURCE_DOMAIN_STORE_WRITE_FAILED";
+  | "SOURCE_DOMAIN_STORE_WRITE_FAILED"
+  /** A row is already stored under this key and it does not say what this caller is presenting. */
+  | "SOURCE_DOMAIN_STORE_CONFLICT";
 
 export type SourceLedgerProjectionFailure =
   | SourceLedgerViolation
@@ -75,17 +77,6 @@ export type RepresentationObservation = {
   derivedFromKind: RepresentationKind | null;
   createdAt: string;
 };
-
-/** Parents are inserted before children, so a lineage row never points at a row that is not there yet. */
-const REPRESENTATION_ORDER: readonly RepresentationKind[] = [
-  "original",
-  "normalized",
-  "native",
-  "rendered",
-  "ocr",
-  "visual",
-  "canonical_ir",
-];
 
 function sha256Hex(value: string) {
   return createHash("sha256").update(value, "utf8").digest("hex");
@@ -167,19 +158,40 @@ export function projectSourceLedger(
     }
     idByKind.set(observation.kind, representationIdFor(sourceVersionId, observation.kind, observation.objectKey));
   }
-
-  const projected: SourceRepresentation[] = [];
-  for (const observation of [...representations].sort(
-    (left, right) => REPRESENTATION_ORDER.indexOf(left.kind) - REPRESENTATION_ORDER.indexOf(right.kind),
-  )) {
-    const parentId = observation.derivedFromKind === null ? null : idByKind.get(observation.derivedFromKind) ?? null;
-    if (observation.derivedFromKind !== null && parentId === null) {
+  for (const observation of representations) {
+    if (observation.derivedFromKind !== null && !idByKind.has(observation.derivedFromKind)) {
       return {
         ok: false,
         code: "REPRESENTATION_LINEAGE_BROKEN",
         detail: `${observation.kind} -> ${observation.derivedFromKind} is not in this observation`,
       };
     }
+  }
+
+  /*
+    Parents before children, whatever order the caller listed them in and whatever the kinds are.
+    A lineage row that names a row not yet inserted is refused by the database, and the chain -- not
+    the vocabulary -- is what says which artifact came first, so this is a topological pass and not
+    a fixed list of kinds. A set of observations that never runs out of unemitted parents derives
+    from itself, and a provenance rooted in itself is refused here rather than written.
+  */
+  const projected: SourceRepresentation[] = [];
+  const emitted = new Set<RepresentationKind>();
+  const pending = [...representations];
+  while (pending.length > 0) {
+    const next = pending.findIndex(
+      (item) => item.derivedFromKind === null || emitted.has(item.derivedFromKind),
+    );
+    if (next === -1) {
+      return {
+        ok: false,
+        code: "REPRESENTATION_LINEAGE_BROKEN",
+        detail: `${pending.map((item) => item.kind).join(", ")} derive from each other`,
+      };
+    }
+    const observation = pending.splice(next, 1)[0]!;
+    const parentId = observation.derivedFromKind === null ? null : idByKind.get(observation.derivedFromKind) ?? null;
+    emitted.add(observation.kind);
     projected.push({
       representationId: idByKind.get(observation.kind)!,
       sourceVersionId,
@@ -238,21 +250,58 @@ async function admin(path: string, init?: RequestInit): Promise<Response | null>
   }
 }
 
-/*
-  `resolution=ignore-duplicates` and never `merge-duplicates`.
+/** PostgREST returns a timestamptz normalised ("+00:00"), so compare instants and not spellings. */
+function storedValueAgrees(column: string, sent: unknown, stored: unknown): boolean {
+  if (sent === null) return stored === null;
+  if (column.endsWith("_at") && typeof sent === "string" && typeof stored === "string") {
+    return Date.parse(sent) === Date.parse(stored);
+  }
+  if (typeof sent === "number") return Number(stored) === sent;
+  return JSON.stringify(stored) === JSON.stringify(sent);
+}
 
-  Delivery is at-least-once, so the same observation arrives twice and the second write must be a
-  no-op. Merging would make it an overwrite instead -- and an overwrite here is a stored digest
-  being replaced by whatever the later caller believed, which is the one thing this ledger exists
-  to make impossible. A genuine disagreement is caught before the write, by reading first.
+/*
+  Insert one row, then prove that what is stored is what this caller presented.
+
+  `resolution=ignore-duplicates` and never `merge-duplicates`: delivery is at-least-once, so the
+  same observation arrives twice and the second write must be a no-op. Merging would make it an
+  overwrite instead -- a stored digest replaced by whatever the later caller believed, which is the
+  one thing this ledger exists to make impossible.
+
+  But an ignored duplicate answers 201 exactly like a fresh insert, so a caller presenting a
+  DIFFERENT digest under a key that is already taken would be told "recorded" while the stored row
+  said something else. Nothing else catches that: both immutability triggers in migration 0049 fire
+  on UPDATE, and this path only ever inserts. So when nothing came back, the kept row is read and
+  compared column by column, and a disagreement is a conflict to report rather than a success.
 */
-async function insertIgnoringDuplicates(table: string, rows: unknown[]): Promise<boolean> {
+async function insertVerified(
+  table: string,
+  keyColumn: string,
+  row: Record<string, unknown>,
+): Promise<SourceDomainResult<"written">> {
+  const key = String(row[keyColumn]);
+  const where = `${table}:${key}`;
   const response = await admin(`/rest/v1/${table}`, {
     method: "POST",
-    headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
-    body: JSON.stringify(rows),
+    headers: { Prefer: "resolution=ignore-duplicates,return=representation" },
+    body: JSON.stringify([row]),
   });
-  return Boolean(response?.ok);
+  if (!response?.ok) return { ok: false, code: "SOURCE_DOMAIN_STORE_WRITE_FAILED", detail: where };
+  const inserted = (await response.json().catch(() => null)) as unknown;
+  if (Array.isArray(inserted) && inserted.length > 0) return { ok: true, value: "written" };
+
+  const stored = await admin(`/rest/v1/${table}?${keyColumn}=eq.${encodeURIComponent(key)}&limit=1`);
+  if (!stored?.ok) return { ok: false, code: "SOURCE_DOMAIN_STORE_READ_FAILED", detail: where };
+  const rows = (await stored.json().catch(() => null)) as Array<Record<string, unknown>> | null;
+  const kept = Array.isArray(rows) ? rows[0] : undefined;
+  // Nothing inserted and nothing stored: the write did not happen and no row explains why.
+  if (!kept) return { ok: false, code: "SOURCE_DOMAIN_STORE_WRITE_FAILED", detail: where };
+  for (const [column, value] of Object.entries(row)) {
+    if (!storedValueAgrees(column, value, kept[column])) {
+      return { ok: false, code: "SOURCE_DOMAIN_STORE_CONFLICT", detail: `${table}.${column}:${key}` };
+    }
+  }
+  return { ok: true, value: "written" };
 }
 
 export async function readSourceVersion(sourceVersionId: string): Promise<SourceDomainResult<SourceVersion | null>> {
@@ -270,8 +319,15 @@ export async function readSourceVersion(sourceVersionId: string): Promise<Source
  * Record one source, its version and that version's representations.
  *
  * Read first, then write: a stored version bound to a different digest is reported as a conflict
- * and nothing is written. Representations go in parent-before-child order so a lineage row never
- * references a row that does not exist yet.
+ * before anything is written. Every row is then written through `insertVerified`, so a key that
+ * turns out to be taken by a row saying something else -- a source re-claimed for another tenant, a
+ * derived artifact re-presented at a second digest -- is `SOURCE_DOMAIN_STORE_CONFLICT` and not a
+ * silent success. A conflict on a representation can leave the source and version rows durable:
+ * they were compared against what is stored and agreed with it, so nothing wrong was written; the
+ * chain is simply incomplete, which is what a refused write is supposed to leave behind.
+ *
+ * Representations go in parent-before-child order so a lineage row never references a row that
+ * does not exist yet.
  */
 export async function recordSourceLedger(ledger: SourceLedger): Promise<SourceDomainResult<"recorded">> {
   const structural = validateSourceLedger(ledger);
@@ -285,58 +341,50 @@ export async function recordSourceLedger(ledger: SourceLedger): Promise<SourceDo
   if (!rebinding.valid) return { ok: false, code: rebinding.code, detail: rebinding.detail };
 
   const source = ledger.source;
-  const wroteSource = await insertIgnoringDuplicates("sources", [
-    {
-      source_id: source.sourceId,
-      tenant_id: source.tenantId,
-      workspace_id: source.workspaceId,
-      origin_kind: source.originKind,
-      origin_provider: source.originProvider ?? null,
-      canonical_uri: source.canonicalUri ?? null,
-      source_family: source.sourceFamily,
-      created_at: source.createdAt,
-      tombstoned_at: source.tombstonedAt ?? null,
-      tombstone_reason: source.tombstoneReason ?? null,
-    },
-  ]);
-  if (!wroteSource) return { ok: false, code: "SOURCE_DOMAIN_STORE_WRITE_FAILED", detail: "sources" };
+  const wroteSource = await insertVerified("sources", "source_id", {
+    source_id: source.sourceId,
+    tenant_id: source.tenantId,
+    workspace_id: source.workspaceId,
+    origin_kind: source.originKind,
+    origin_provider: source.originProvider ?? null,
+    canonical_uri: source.canonicalUri ?? null,
+    source_family: source.sourceFamily,
+    created_at: source.createdAt,
+    tombstoned_at: source.tombstonedAt ?? null,
+    tombstone_reason: source.tombstoneReason ?? null,
+  });
+  if (!wroteSource.ok) return wroteSource;
 
   const version = ledger.version;
-  const wroteVersion = await insertIgnoringDuplicates("source_versions", [
-    {
-      source_version_id: version.sourceVersionId,
-      source_id: version.sourceId,
-      immutable_object_key: version.immutableObjectKey,
-      content_sha256: version.contentSha256,
-      byte_length: version.byteLength,
-      mime_type: version.mimeType,
-      source_modified_at: version.sourceModifiedAt ?? null,
-      observed_at: version.observedAt,
-      parent_version_id: version.parentVersionId ?? null,
-      tombstoned: version.tombstoned,
-      security_classification: version.securityClassification ?? null,
-    },
-  ]);
-  if (!wroteVersion) return { ok: false, code: "SOURCE_DOMAIN_STORE_WRITE_FAILED", detail: "source_versions" };
+  const wroteVersion = await insertVerified("source_versions", "source_version_id", {
+    source_version_id: version.sourceVersionId,
+    source_id: version.sourceId,
+    immutable_object_key: version.immutableObjectKey,
+    content_sha256: version.contentSha256,
+    byte_length: version.byteLength,
+    mime_type: version.mimeType,
+    source_modified_at: version.sourceModifiedAt ?? null,
+    observed_at: version.observedAt,
+    parent_version_id: version.parentVersionId ?? null,
+    tombstoned: version.tombstoned,
+    security_classification: version.securityClassification ?? null,
+  });
+  if (!wroteVersion.ok) return wroteVersion;
 
   for (const representation of ledger.representations) {
-    const wrote = await insertIgnoringDuplicates("source_representations", [
-      {
-        representation_id: representation.representationId,
-        source_version_id: representation.sourceVersionId,
-        kind: representation.kind,
-        provider_id: representation.providerId,
-        provider_revision: representation.providerRevision,
-        content_sha256: representation.contentSha256,
-        object_key: representation.objectKey,
-        lossy: representation.lossy,
-        derived_from: representation.derivedFrom,
-        created_at: representation.createdAt,
-      },
-    ]);
-    if (!wrote) {
-      return { ok: false, code: "SOURCE_DOMAIN_STORE_WRITE_FAILED", detail: representation.representationId };
-    }
+    const wrote = await insertVerified("source_representations", "representation_id", {
+      representation_id: representation.representationId,
+      source_version_id: representation.sourceVersionId,
+      kind: representation.kind,
+      provider_id: representation.providerId,
+      provider_revision: representation.providerRevision,
+      content_sha256: representation.contentSha256,
+      object_key: representation.objectKey,
+      lossy: representation.lossy,
+      derived_from: representation.derivedFrom,
+      created_at: representation.createdAt,
+    });
+    if (!wrote.ok) return wrote;
   }
   return { ok: true, value: "recorded" };
 }

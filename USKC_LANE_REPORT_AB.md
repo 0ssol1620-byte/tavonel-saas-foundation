@@ -26,7 +26,9 @@ Commits (`git log --oneline origin/main..HEAD`):
 
 ## 2. Files
 
-Created (all nine are inside the lane's exclusive ownership row):
+Created: ten files — the nine below, all inside the lane's exclusive ownership row, plus this
+report, which the campaign asks for and which is not an owned-row file. (First pass said "nine" and
+listed nine; the diff has ten. Corrected.)
 
 | File | What it is |
 |---|---|
@@ -61,9 +63,11 @@ Run from the worktree. `D:\CodexProjects\uskc-lanes\install-site-ab-source-domai
 | 5 | `git status` | 0 | clean except the intended files; `origin/main..HEAD` = the four commits above |
 | 6 | `git push -u origin agent/uskc-ab-source-domain` | 0 | new branch created on `0ssol1620-byte/tavonel-saas-foundation` |
 
-New tests: `uskcEnums` 4, `sourceDomain` 17, `sourceDomainMigration` 8, `source-domain-store` 15 —
-44 in total, 20 of them failure paths. Zero regressions: root was 25/25 files before and after
-(the two new root files raise the count from 23), nextjs 1,594 passing.
+New tests (first pass): `uskcEnums` 4, `sourceDomain` 17, `sourceDomainMigration` 8,
+`source-domain-store` 15 — 44 in total, 20 of them failure paths. Zero regressions: the root suite
+went from **22 test files to 25** (three added here) and nextjs from 163 to 164, with every
+pre-existing test still passing. (First pass said "25 before and after … from 23"; both numbers
+were wrong and mutually inconsistent. Corrected. §8 carries the repair-pass counts.)
 
 Failure paths covered: version bound to another source · bare-hex, truncated and mismatched digests
 · zero and fractional byte length · non-instant timestamp · tombstone reason with no time · original
@@ -122,9 +126,27 @@ produced by a reader. The convention used here is that for `kind: "original"` th
 that *delivered* the bytes (`foundation_r2_intake_v1` / the intake-contract migration id). Lane C
 owns provider identity; if it wants a different convention, this is the one place to change.
 
-**No file conflict with another lane.** Every file created is exclusive to AB. `shared/uskcEnums.ts`
-is defined here; D and F carry byte-identical copies per §3 and the integration keeps one.
-Migration number 0049 is claimed and 0050 is left free for F.
+**No file conflict with another lane.** Every file created is exclusive to AB. Migration number
+0049 is claimed and 0050 is left free for F.
+
+**C-AB-3 — `shared/uskcEnums.ts` is NOT byte-identical across the three site worktrees.** The first
+pass asserted it was, on the strength of contract §3 rather than a measurement. Measured
+(`sha256sum`, 2026-09-06):
+
+```
+6dceb23128bb902c554006fde8255c90b2f686a3688fe1617c440084c7ac1c9f  AB/shared/uskcEnums.ts
+4ba9782df0ed9a41afa2f3cb98381bbbe5e8c6b817dcb298212aa65f7b1818c7  D/shared/uskcEnums.ts
+ce2cf1c43fa794cd7677048df04ea383610a302b99676b82ca265ff97ad0f90f  F/shared/uskcEnums.ts
+```
+
+Three files, three digests. The *values* agree with `contract/enums.v1.json` in all three; the
+exported const names do not (AB `sourceFamilies` / `capabilityStatusesAcceptedAtUpload`; D
+`SOURCE_FAMILIES` / `CAPABILITY_STATUS_ACCEPTED_AT_UPLOAD`; F `SOURCE_FAMILIES` /
+`CAPABILITY_STATUSES_ACCEPTED_AT_UPLOAD`). Whichever file the integration keeps, the other two
+lanes' imports break. AB is the definer, but D's and F's copies are D's and F's files and this lane
+does not edit another lane's files (§1), so it is reported, not fixed. The integration merge needs
+one decision — keep AB's file and rename the imports in D and F, or have AB re-export the
+SCREAMING_SNAKE aliases.
 
 ## 6. Open questions for the founder
 
@@ -186,3 +208,113 @@ Contradicting a statement in the contract or the seam map:
   overrides that and the contract wins. Recorded here so the difference is not read as an omission.
 - **The install log's `exit=0` does not mean the worktree is installable.** `install-site-*.log`
   covers `nextjs/` only, and gate 0 needs root `node_modules`. See §3.
+
+---
+
+## 8. Repair pass (2026-09-06)
+
+Two adversarial reviewers examined the branch. Every confirmed blocker and major below was real; all
+are fixed, each with the failure-path test that would have caught it. Nothing was widened beyond the
+findings.
+
+### 8.1 Blocker — a stored representation could disagree and still be reported "recorded"
+
+`recordSourceLedger` read `source_versions` before writing and nothing else. `Prefer:
+resolution=ignore-duplicates` makes PostgREST keep the stored row and answer `201`, so a derived
+artifact re-presented at a **different digest** under the same `representationId` was answered
+`{ok: true, value: "recorded"}` while the stored row said something else — and no database trigger
+could catch it, because both immutability triggers are `BEFORE UPDATE` and this path only inserts.
+The same hole existed on `sources` (a re-claim of a `sourceId` for a different `tenantId`,
+`workspaceId`, `sourceFamily` or `createdAt`) — the second confirmed major.
+
+Fixed once, where both go through: `insertVerified(table, keyColumn, row)`
+(`nextjs/lib/source-domain-store.ts`) posts with `return=representation`, and when nothing comes
+back — the row was kept, not inserted — reads the kept row and compares it column by column.
+A disagreement is the new `SOURCE_DOMAIN_STORE_CONFLICT`, never a success. Timestamps are compared
+as instants, because PostgREST returns a `timestamptz` normalised to `+00:00` and a string
+comparison would refuse a legitimate redelivery.
+
+This also closes the concurrency window the migration header claimed the database covered: two
+writers presenting the same version at once no longer produce a silent success for the loser. The
+migration's header comment overstated what the triggers do (`BEFORE UPDATE` only) and now says
+what they actually cover — reviewer contradiction, corrected in the SQL.
+
+Consequence stated plainly: a conflict found on a representation can leave the `sources` and
+`source_versions` rows durable. Both were compared against what is stored and agreed with it, so
+nothing wrong was written; the chain is left incomplete, which is what a refused write should leave.
+
+Tests (`nextjs/lib/source-domain-store.test.ts`): a derived artifact stored under another digest is
+refused and the read-back is asserted to have happened; a source id stored for another tenant is
+refused and **no** `source_versions` write follows; a redelivery whose stored rows agree — including
+`+00:00` vs `Z` timestamps — is still `recorded`.
+
+### 8.2 Major — a prototype key escaped the fail-closed MIME default
+
+`sourceFamilyForMimeType` indexed an object literal, so the MIME type `__proto__` returned
+`Object.prototype` and `constructor` returned a function; neither is a `SourceFamily`, and `??` can
+never fire on them. The value flowed into `Source.sourceFamily`, past `validateSourceLedger`, and
+would have been caught only by a check constraint in a migration that is not applied anywhere.
+Fixed by holding the table in a `Map`, where those are keys like any other. Test: every prototype
+key answers `unknown`.
+
+### 8.3 Major — a lineage cycle validated as a whole chain
+
+`validateSourceLedger` checked each parent one hop: exists, same `sourceVersionId`, not itself. Two
+representations naming each other satisfied all three with no `original` anywhere — a provenance
+rooted in itself, certified valid by the lane's own fail-closed checker, and refused only later by
+the database trigger, after `sources` and `source_versions` were already durable. Now the chain must
+reduce to a root: mark the roots, repeatedly mark whoever's parents are all marked, refuse anything
+still unmarked. `projectSourceLedger` gained the same property for free by emitting representations
+in **topological** order instead of a fixed list of kinds — which also fixes the reviewer's other
+contradiction, that "parents are inserted before children" held only for chains that happened to run
+in the listed order (an `ocr → visual` chain was emitted child-first). `REPRESENTATION_ORDER` is
+gone. Tests: a two-node cycle, a derived artifact hanging off one, the same chain rooted in the
+original still valid, a projected cycle refused, and `ocr → visual` emitted parent-first.
+
+### 8.4 Major — the doc omitted text §4.1 orders it to carry
+
+Contract §4.1 ends "Say exactly this in `docs/UNIVERSAL_SOURCE_DOMAIN_2026-09-06.md`". The
+founder-resolved B-2 / B-1 paragraph was not there in any form. It is now the first thing in §3 of
+that doc, word for word. The section's own `tenantId = workspaceId` bullet, which stated the
+opposite emphasis to B-2, was rewritten to say what it actually means: two columns and two fields,
+carrying one value today because the live layout has no second axis to read — a fact about storage,
+not a rule that tenant is the workspace.
+
+### 8.5 Contradicted claim — `SOURCE_TIMESTAMP_INVALID` did not refuse a fake instant
+
+The reviewer is right and the first pass's failure-path list was wrong: `2026-13-45T99:99:99Z`
+matched the shape pattern and validated. `Date.parse` alone is not enough either — `2026-02-30`
+parses silently as 2 March, which would store a date nobody observed. `isInstant` now requires the
+pattern, a parse, and that the parsed date spells its own day back. Tests cover month 13 / day 45 /
+hour 99, 30 February, hour 24, and month 00 on a tombstone.
+
+### 8.6 Findings answered without a code change
+
+- **`documentToSource`'s second parameter** (major, both reviewers) — the reviewers verified the
+  reasoning and rate it a contract-text change the orchestrator must ratify, not a lane defect.
+  C-AB-1 in §5 stands unchanged; no other lane calls the function.
+- **`shared/uskcEnums.ts` diverges across worktrees** (major) — measured, confirmed, and now C-AB-3
+  in §5. D's and F's copies belong to D and F; §1 forbids editing them, so this lane reports it.
+- **`pnpm build` not reproduced by a reviewer** — it is green here, three times, most recently with
+  the exit code captured (§8.7). Worth one clean-CI run rather than trust in either machine.
+- **Pushed-SHA drift in §1** — the report is committed after the code it describes, so the SHA in §1
+  is always one commit behind. The structured record carries the final SHA.
+
+### 8.7 Gates, rerun after the repair
+
+| # | Command | Exit | Output tail |
+|---|---|---|---|
+| 0a | `pnpm check` (root) | 0 | `> tavonel-saas-foundation@1.0.0 check` / `> tsc --noEmit` (no diagnostics) |
+| 0b | `pnpm test` (root) | 0 | `Test Files 25 passed (25)` · `Tests 93 passed (93)` · `Duration 2.64s` |
+| 1 | `pnpm check` (nextjs) | 0 | `> tsc --noEmit && eslint app components lib` (no diagnostics) |
+| 2 | `pnpm test` (nextjs) | 0 | `Test Files 164 passed (164)` · `Tests 1599 passed (1599)` · `Duration 16.13s` |
+| 3 | `pnpm build` (nextjs) | 0 | `EXIT=0` · `✓ Compiled successfully in 12.9s` · `✓ Generating static pages (69/69)` · `+ First Load JS shared by all 103 kB` |
+| 4 | Playwright | — | **Skipped**, same reason: no page or route added or changed. Nothing this lane ships renders. |
+| 5 | `git status --short` | 0 | clean except the intended files |
+| 6 | `git push -u origin agent/uskc-ab-source-domain` | 0 | see §1 for the SHA |
+
+Counts moved by the repair: root 91 → 93 tests (three new assertions grouped into the existing
+timestamp test, plus the prototype-key and cycle tests), nextjs 1,594 → 1,599 (five new store
+tests). No pre-existing test was changed to make anything pass; the two store mocks that returned a
+bodyless `201` now return the inserted rows, which is what PostgREST does with
+`return=representation`.

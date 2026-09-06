@@ -9,11 +9,17 @@
 -- where that answer is written down, beside the live flow rather than in place of it. No table,
 -- policy, key layout or worker behaviour changes in this migration.
 --
--- The invariants are enforced here, not only in TypeScript, because at-least-once delivery means
--- two writers can present the same version at once and only the database sees both:
---   * a source_version_id is bound to one digest and one object key for ever,
---   * an `original` representation is never rewritten,
---   * a derived representation names parents that exist under the same source version.
+-- The invariants are enforced here as well as in TypeScript, because at-least-once delivery means
+-- two writers can present the same version at once. What the database contributes on the insert
+-- path is the keys: the primary keys and the partial unique index on kind = 'original' keep the row
+-- that was written first, and `nextjs/lib/source-domain-store.ts` reads that kept row back and
+-- refuses when it disagrees with what it was presenting. The triggers below fire BEFORE UPDATE, so
+-- they cover the other writer -- one that edits a stored row rather than re-presenting it -- and
+-- the lineage trigger fires on insert too:
+--   * a source_version_id is bound to one digest and one object key for ever (update),
+--   * an `original` representation is never rewritten (update),
+--   * a derived representation names parents that exist under the same source version (insert and
+--     update).
 -- There is no DELETE grant. A source leaves service by being tombstoned, because deleting a row
 -- here is deleting the record that a compile ever read those bytes.
 begin;

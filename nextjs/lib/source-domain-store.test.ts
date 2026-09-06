@@ -142,6 +142,31 @@ describe("source ledger projection", () => {
     expect(projectSourceLedger(observation, [{ ...original, providerRevision: "" }]))
       .toMatchObject({ ok: false, code: "REPRESENTATION_LINEAGE_BROKEN" });
   });
+
+  it("refuses two artifacts that derive from each other", () => {
+    // Both parents resolve inside the observation, so neither one-hop check fires; the chain still
+    // reaches no bytes. Projecting it would emit a lineage row before the row it points at.
+    expect(projectSourceLedger(observation, [
+      { ...normalized, derivedFromKind: "ocr" },
+      { ...ocr, derivedFromKind: "normalized" },
+    ])).toMatchObject({ ok: false, code: "REPRESENTATION_LINEAGE_BROKEN" });
+  });
+
+  it("emits a parent before its child whatever the kinds are", () => {
+    // ocr -> visual is the reverse of the usual chain, and the order follows the chain, not a list
+    // of kinds: the database refuses a lineage row that names a row not yet inserted.
+    const visual: RepresentationObservation = {
+      ...ocr,
+      kind: "visual",
+      objectKey: `${PREFIX}/ocr.json`,
+      derivedFromKind: "ocr",
+    };
+    const scanned: RepresentationObservation = { ...ocr, derivedFromKind: "original" };
+    const projected = projectSourceLedger(observation, [visual, scanned, original]);
+    expect(projected.ok).toBe(true);
+    if (!projected.ok) return;
+    expect(projected.ledger.representations.map((item) => item.kind)).toEqual(["original", "ocr", "visual"]);
+  });
 });
 
 describe("source ledger store", () => {
@@ -163,12 +188,14 @@ describe("source ledger store", () => {
     vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const url = String(input);
       if (init?.method !== "POST") return Response.json([]);
+      const body = JSON.parse(String(init.body)) as unknown;
       posted.push({
         table: url.split("/rest/v1/")[1]?.split("?")[0] ?? "",
         prefer: new Headers(init.headers).get("Prefer"),
-        body: JSON.parse(String(init.body)) as unknown,
+        body,
       });
-      return new Response(null, { status: 201 });
+      // PostgREST with `return=representation` answers with the rows it actually inserted.
+      return Response.json(body, { status: 201 });
     }));
 
     expect(await recordSourceLedger(ledger())).toEqual({ ok: true, value: "recorded" });
@@ -225,10 +252,142 @@ describe("source ledger store", () => {
     vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       if (init?.method !== "POST") return Response.json([]);
       if (String(input).includes("source_representations")) return new Response(null, { status: 500 });
-      return new Response(null, { status: 201 });
+      return Response.json(JSON.parse(String(init.body)) as unknown, { status: 201 });
     }));
     expect(await recordSourceLedger(ledger()))
       .toMatchObject({ ok: false, code: "SOURCE_DOMAIN_STORE_WRITE_FAILED" });
+  });
+
+  /**
+   * The duplicate-ignoring write is a no-op with a 201, so "the row was kept" and "the row I sent
+   * was stored" are different statements. These three assert the second one is the one answered.
+   */
+  it("refuses a derived artifact already stored under a different digest, and never reports it recorded", async () => {
+    configure();
+    const requests: string[] = [];
+    const scanned = ledger().representations[2]!;
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      const table = url.split("/rest/v1/")[1]?.split("?")[0] ?? "";
+      requests.push(`${init?.method ?? "GET"} ${table}`);
+      if (init?.method === "POST") {
+        // The OCR key is taken by a row this caller cannot see; PostgREST keeps it and inserts none.
+        const rows = JSON.parse(String(init.body)) as Array<{ kind?: string }>;
+        return Response.json(rows[0]?.kind === "ocr" ? [] : rows, { status: 201 });
+      }
+      if (table === "source_representations") {
+        return Response.json([{
+          representation_id: scanned.representationId,
+          source_version_id: scanned.sourceVersionId,
+          kind: "ocr",
+          provider_id: scanned.providerId,
+          provider_revision: scanned.providerRevision,
+          content_sha256: `sha256:${"e".repeat(64)}`,
+          object_key: scanned.objectKey,
+          lossy: true,
+          derived_from: scanned.derivedFrom,
+          created_at: "2026-09-06T00:00:03+00:00",
+        }]);
+      }
+      return Response.json([]);
+    }));
+
+    expect(await recordSourceLedger(ledger())).toMatchObject({
+      ok: false,
+      code: "SOURCE_DOMAIN_STORE_CONFLICT",
+      detail: expect.stringContaining("source_representations.content_sha256"),
+    });
+    // The stored row was read back; the answer is not derived from the status code alone.
+    expect(requests).toContain("GET source_representations");
+  });
+
+  it("refuses a source id already stored for another tenant, and writes no version", async () => {
+    configure();
+    const requests: string[] = [];
+    const source = ledger().source;
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const table = String(input).split("/rest/v1/")[1]?.split("?")[0] ?? "";
+      requests.push(`${init?.method ?? "GET"} ${table}`);
+      if (init?.method === "POST") return Response.json([], { status: 201 });
+      if (table === "sources") {
+        return Response.json([{
+          source_id: source.sourceId,
+          tenant_id: "pilot-otherotherotherot",
+          workspace_id: source.workspaceId,
+          origin_kind: "upload",
+          origin_provider: null,
+          canonical_uri: null,
+          source_family: "document",
+          created_at: source.createdAt,
+          tombstoned_at: null,
+          tombstone_reason: null,
+        }]);
+      }
+      return Response.json([]);
+    }));
+
+    expect(await recordSourceLedger(ledger())).toMatchObject({
+      ok: false,
+      code: "SOURCE_DOMAIN_STORE_CONFLICT",
+      detail: expect.stringContaining("sources.tenant_id"),
+    });
+    expect(requests).not.toContain("POST source_versions");
+  });
+
+  it("records a redelivery whose stored rows agree, timestamp spelling included", async () => {
+    configure();
+    const stored = ledger();
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const table = String(input).split("/rest/v1/")[1]?.split("?")[0] ?? "";
+      // Every row is already there: nothing is inserted anywhere.
+      if (init?.method === "POST") return Response.json([], { status: 201 });
+      if (table === "sources") {
+        return Response.json([{
+          source_id: stored.source.sourceId,
+          tenant_id: stored.source.tenantId,
+          workspace_id: stored.source.workspaceId,
+          origin_kind: "upload",
+          origin_provider: null,
+          canonical_uri: null,
+          source_family: "document",
+          // PostgREST returns a timestamptz normalised; the same instant, spelled differently.
+          created_at: "2026-09-06T00:00:00+00:00",
+          tombstoned_at: null,
+          tombstone_reason: null,
+        }]);
+      }
+      if (table === "source_versions") {
+        return Response.json([{
+          source_version_id: stored.version.sourceVersionId,
+          source_id: stored.version.sourceId,
+          immutable_object_key: stored.version.immutableObjectKey,
+          content_sha256: stored.version.contentSha256,
+          byte_length: stored.version.byteLength,
+          mime_type: stored.version.mimeType,
+          source_modified_at: null,
+          observed_at: "2026-09-06T00:00:01+00:00",
+          parent_version_id: null,
+          tombstoned: false,
+          security_classification: null,
+        }]);
+      }
+      const rows = stored.representations.map((item) => ({
+        representation_id: item.representationId,
+        source_version_id: item.sourceVersionId,
+        kind: item.kind,
+        provider_id: item.providerId,
+        provider_revision: item.providerRevision,
+        content_sha256: item.contentSha256,
+        object_key: item.objectKey,
+        lossy: item.lossy,
+        derived_from: item.derivedFrom,
+        created_at: item.createdAt.replace("Z", "+00:00"),
+      }));
+      const wanted = String(input).split("representation_id=eq.")[1]?.split("&")[0] ?? "";
+      return Response.json(rows.filter((row) => row.representation_id === decodeURIComponent(wanted)));
+    }));
+
+    expect(await recordSourceLedger(ledger())).toEqual({ ok: true, value: "recorded" });
   });
 
   it("reports a read failure rather than treating it as an absent row", async () => {

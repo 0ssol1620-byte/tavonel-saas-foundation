@@ -61,7 +61,7 @@ writers can race, an enforcement in SQL:
 | One digest and one object key per source version, for ever | `SOURCE_VERSION_DIGEST_CONFLICT` | `validateSourceVersionRebinding` | trigger `source_versions_digest_immutable` |
 | `original` has no derivation and loses nothing | `REPRESENTATION_LINEAGE_BROKEN` | `validateSourceLedger` | `check ((kind = 'original') = (cardinality(derived_from) = 0))`, `check (kind <> 'original' or lossy = false)` |
 | The original is the version's own bytes | `SOURCE_VERSION_DIGEST_CONFLICT` | `validateSourceLedger` | — (the store refuses before the write) |
-| A derived artifact names parents that exist under the same version | `REPRESENTATION_LINEAGE_BROKEN` | `validateSourceLedger` | trigger `source_representations_lineage_resolves` |
+| A derived artifact names parents that exist under the same version, and the chain reduces to a root rather than to itself | `REPRESENTATION_LINEAGE_BROKEN` | `validateSourceLedger` | trigger `source_representations_lineage_resolves` |
 | The original's key and digest are never rewritten | `ORIGINAL_IMMUTABLE` | `validateRepresentationRewrite` | trigger `source_representations_original_immutable`, unique partial index on `kind = 'original'` |
 | A tombstoned source is readable for audit and never compiled | `SOURCE_TOMBSTONED` | `assertSourceCompilable` | — (a read-time question, not a write constraint) |
 | A representation without a producing revision is refused | `REPRESENTATION_LINEAGE_BROKEN` | `validateSourceLedger` | `provider_revision text not null` |
@@ -74,8 +74,17 @@ revision does not record the representation.
 
 ## 3. Interim identity rules (reversible; founder list)
 
-These are decisions this campaign takes so that the ledger can exist. Each is reversible and each
-is listed for the founder in the lane report.
+**Founder-resolved (2026-09-06):** `tenantId` and `workspaceId` are distinct concepts (Tenant =
+organization / security / billing / policy; Workspace = working knowledge boundary) — keep two
+columns and two fields, never derive one from the other in code, even though today's object keys
+carry only the workspace (RESOLVED B-2). The `sourceId = documents.id`, one-version-per-row rule is
+a **compatibility shim** (status `IMPLEMENTED_NOT_MERGED`, shim), not canonical semantics; P1-A
+builds real lineage from connector stable ids / canonical URIs / explicit replace operations, and
+**a filename alone never identifies the same Source** (RESOLVED B-1).
+
+That paragraph is the contract's (§4.1), carried here word for word. Everything in this section is
+the shim it describes: decisions this campaign takes so that the ledger can exist. Each is
+reversible and each is listed for the founder in the lane report.
 
 - **`sourceId = documents.id`.** `legacyDocumentIdToSourceId` is the identity function and the one
   place that changes when a logical source outlives a file replacement. §48 P0-A's "old document
@@ -89,7 +98,11 @@ is listed for the founder in the lane report.
   identifier pattern accepts. Deterministic, so an at-least-once redelivery recomputes it.
 - **`representationId = "rep-" + sha256(sourceVersionId \n kind \n objectKey)[0:32]`.** Also
   deterministic, for the same reason.
-- **`tenantId = workspaceId`**, per §1 above.
+- **Two fields, one value today.** `sources.tenant_id` and `sources.workspace_id` are two columns
+  and `Source.tenantId` / `Source.workspaceId` are two fields, per B-2 above. Today's writer puts
+  the same value in both because §1's live layout carries no second axis to read — that is what the
+  storage says now, not a rule that tenant is the workspace. When a tenant axis exists, `tenant_id`
+  is where it lands and no code has to be un-derived first.
 
 ---
 
@@ -163,6 +176,12 @@ it cannot audit. `recordSourceLedger` reads the stored version first, refuses a 
 version that is already bound, and then inserts with `Prefer: resolution=ignore-duplicates` —
 never `merge-duplicates`, because a merge here is a stored digest being overwritten by whatever a
 later caller believed.
+
+An ignored duplicate answers `201` exactly like a fresh insert, so every insert reads back the row
+that was actually kept and compares it column by column. A key that is already taken by a row
+saying something else — a source id re-claimed for a second tenant, a derived artifact re-presented
+at a second digest — is `SOURCE_DOMAIN_STORE_CONFLICT`, never `recorded`. Nothing else would catch
+it: both immutability triggers in `0049` fire on `UPDATE`, and this path only ever inserts.
 
 **Nothing calls it on the live path yet, and that is the seam this lane reports rather than
 crosses.** Recording from inside `runCollectionCompile` means carrying representations into the

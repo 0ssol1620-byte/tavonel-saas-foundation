@@ -30,6 +30,18 @@ const SHA256 = /^sha256:[a-f0-9]{64}$/;
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/;
 
+/**
+ * The shape AND a real instant. The pattern alone accepts `2026-13-45T99:99:99Z`, which is a string
+ * shaped like a time and orders against nothing. Parsing alone is not enough either: `2026-02-30`
+ * does not fail to parse, it silently becomes 2 March — a ledger row would then carry a date its
+ * writer never observed. So the parsed date must spell itself the same way back.
+ */
+function isInstant(value: string): boolean {
+  if (!ISO_INSTANT.test(value)) return false;
+  const parsed = new Date(value);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value.slice(0, 10);
+}
+
 export type SourceOriginKind = "upload" | "connector" | "api" | "database" | "repository";
 
 export type Source = {
@@ -107,23 +119,26 @@ const VALID: SourceLedgerDecision = { valid: true };
  * else is `unknown`. Guessing a family from a prefix would put a source into a routing class no
  * reader has been qualified for, which is the "fail closed-open" this lane is warned about.
  */
-const SOURCE_FAMILY_BY_MIME: Readonly<Record<string, SourceFamily>> = {
-  "application/pdf": "document",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "document",
-  "application/vnd.oasis.opendocument.text": "document",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "spreadsheet",
-  "application/vnd.oasis.opendocument.spreadsheet": "spreadsheet",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation": "presentation",
-  "application/vnd.oasis.opendocument.presentation": "presentation",
-  "image/jpeg": "image",
-  "image/png": "image",
-  "image/tiff": "image",
-  "image/gif": "image",
-  "application/zip": "archive",
-};
+const SOURCE_FAMILY_BY_MIME: ReadonlyMap<string, SourceFamily> = new Map<string, SourceFamily>([
+  ["application/pdf", "document"],
+  ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", "document"],
+  ["application/vnd.oasis.opendocument.text", "document"],
+  ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "spreadsheet"],
+  ["application/vnd.oasis.opendocument.spreadsheet", "spreadsheet"],
+  ["application/vnd.openxmlformats-officedocument.presentationml.presentation", "presentation"],
+  ["application/vnd.oasis.opendocument.presentation", "presentation"],
+  ["image/jpeg", "image"],
+  ["image/png", "image"],
+  ["image/tiff", "image"],
+  ["image/gif", "image"],
+  ["application/zip", "archive"],
+]);
 
 export function sourceFamilyForMimeType(mimeType: string): SourceFamily {
-  return SOURCE_FAMILY_BY_MIME[normalizeDocumentMimeType(mimeType)] ?? "unknown";
+  // A Map and not an object literal: an object literal answers the MIME type `__proto__` with
+  // `Object.prototype` and `constructor` with a function, neither of which is a SourceFamily and
+  // neither of which the `?? "unknown"` default can catch. In a Map they are keys like any other.
+  return SOURCE_FAMILY_BY_MIME.get(normalizeDocumentMimeType(mimeType)) ?? "unknown";
 }
 
 /**
@@ -186,8 +201,8 @@ function checkSource(source: Source): SourceLedgerDecision {
   if (!IDENTIFIER.test(source.sourceId) || !IDENTIFIER.test(source.workspaceId) || !IDENTIFIER.test(source.tenantId)) {
     return invalid("SOURCE_IDENTIFIER_INVALID", source.sourceId);
   }
-  if (!ISO_INSTANT.test(source.createdAt)) return invalid("SOURCE_TIMESTAMP_INVALID", source.createdAt);
-  if (source.tombstonedAt !== undefined && !ISO_INSTANT.test(source.tombstonedAt)) {
+  if (!isInstant(source.createdAt)) return invalid("SOURCE_TIMESTAMP_INVALID", source.createdAt);
+  if (source.tombstonedAt !== undefined && !isInstant(source.tombstonedAt)) {
     return invalid("SOURCE_TIMESTAMP_INVALID", source.tombstonedAt);
   }
   // A reason without a time is a tombstone nothing can order against a compile.
@@ -205,7 +220,7 @@ function checkVersion(source: Source, version: SourceVersion): SourceLedgerDecis
     return invalid("SOURCE_DIGEST_INVALID", `byteLength:${String(version.byteLength)}`);
   }
   if (!version.immutableObjectKey) return invalid("SOURCE_IDENTIFIER_INVALID", "immutableObjectKey");
-  if (!ISO_INSTANT.test(version.observedAt)) return invalid("SOURCE_TIMESTAMP_INVALID", version.observedAt);
+  if (!isInstant(version.observedAt)) return invalid("SOURCE_TIMESTAMP_INVALID", version.observedAt);
   if (version.parentVersionId !== undefined && !IDENTIFIER.test(version.parentVersionId)) {
     return invalid("SOURCE_IDENTIFIER_INVALID", version.parentVersionId);
   }
@@ -232,7 +247,7 @@ function checkRepresentations(
       // An unrecorded provider revision makes the artifact unreproducible; it is not a default.
       return invalid("REPRESENTATION_LINEAGE_BROKEN", `${where} has no provider revision`);
     }
-    if (!ISO_INSTANT.test(representation.createdAt)) return invalid("SOURCE_TIMESTAMP_INVALID", representation.createdAt);
+    if (!isInstant(representation.createdAt)) return invalid("SOURCE_TIMESTAMP_INVALID", representation.createdAt);
     if (representation.kind === "original") {
       if (representation.derivedFrom.length > 0 || representation.lossy) {
         return invalid("REPRESENTATION_LINEAGE_BROKEN", `${where} is an original with a derivation`);
@@ -256,6 +271,28 @@ function checkRepresentations(
   }
   if (representations.filter((item) => item.kind === "original").length > 1) {
     return invalid("ORIGINAL_IMMUTABLE", "more than one original representation");
+  }
+  // Every derived artifact must reduce to a root — a representation that derives from nothing,
+  // which by the rule above is the `original`. "My parent exists" is satisfied by two artifacts
+  // naming each other, and that chain never reaches the bytes it claims to descend from. Reduce
+  // instead of checking one hop: mark the roots, then repeatedly mark whoever's parents are all
+  // marked; anything still unmarked is in a cycle or hangs off one.
+  const rooted = new Set(
+    representations.filter((item) => item.derivedFrom.length === 0).map((item) => item.representationId),
+  );
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const item of representations) {
+      if (rooted.has(item.representationId)) continue;
+      if (item.derivedFrom.every((parentId) => rooted.has(parentId))) {
+        rooted.add(item.representationId);
+        grew = true;
+      }
+    }
+  }
+  const unrooted = representations.find((item) => !rooted.has(item.representationId));
+  if (unrooted) {
+    return invalid("REPRESENTATION_LINEAGE_BROKEN", `${unrooted.representationId} derives from no root`);
   }
   return VALID;
 }
