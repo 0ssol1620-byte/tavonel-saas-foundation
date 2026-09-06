@@ -54,8 +54,8 @@ describe("a corpus is never described as one World", () => {
       compiled, and "ready" must not acquire a "your World is ready" reading anywhere.
     */
     const progress = summariseCorpus("corpus-" + "a".repeat(32), [
-      { jobId: "cjob-1", batchIndex: 0, state: "ready", collectionId: "c1", documentsTotal: 12, documentsReady: 12, errorCode: null },
-      { jobId: "cjob-2", batchIndex: 1, state: "ready", collectionId: "c2", documentsTotal: 12, documentsReady: 12, errorCode: null },
+      { jobId: "cjob-1", batchIndex: 0, state: "ready", collectionId: "c1", documentsTotal: 12, documentsReady: 12, errorCode: null, batchCount: 2 },
+      { jobId: "cjob-2", batchIndex: 1, state: "ready", collectionId: "c2", documentsTotal: 12, documentsReady: 12, errorCode: null, batchCount: 2 },
     ]);
     expect(progress.state).toBe("ready");
 
