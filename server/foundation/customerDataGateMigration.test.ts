@@ -87,23 +87,32 @@ describe("customer-data gate migration", () => {
    * instead of trusting it". `gateAdmitsCustomerData` checks the digest's shape only, so this is
    * where the promise has to be executable: evidence and digest sit side by side in the row, and
    * the exported derivation reproduces the digest from the evidence and detects a tampered row.
+   *
+   * The row carries `tenant_id` and `workspace_id`, and since contract §8.1 amended §4.3 the digest
+   * carries them too, so re-deriving a row's digest also proves the row was not lifted from another
+   * tenant's approval.
    */
   it("stores the evidence a reader re-derives receipt_sha256 from", () => {
     expect(migration).toContain("evidence jsonb not null");
     expect(migration).toContain("receipt_sha256 text check (receipt_sha256 ~ '^sha256:[a-f0-9]{64}$')");
 
+    const row = { tenantId: "tenant_01", workspaceId: "workspace_01" };
     const evidence = customerDataPreconditions.map((precondition) => ({
       precondition,
       satisfied: true,
       evidence: `fixture://${precondition}`,
       checkedAt: "2026-09-06T00:00:00.000Z",
     }));
-    const storedDigest = customerDataEvidenceReceiptSha256(evidence);
-    expect(customerDataEvidenceReceiptSha256([...evidence].reverse())).toBe(storedDigest);
+    const storedDigest = customerDataEvidenceReceiptSha256(row, evidence);
+    expect(customerDataEvidenceReceiptSha256(row, [...evidence].reverse())).toBe(storedDigest);
     const tampered = evidence.map((entry, index) =>
       index === 0 ? { ...entry, satisfied: false } : entry,
     );
-    expect(customerDataEvidenceReceiptSha256(tampered)).not.toBe(storedDigest);
+    expect(customerDataEvidenceReceiptSha256(row, tampered)).not.toBe(storedDigest);
+    // The same evidence stored under another tenant does not re-derive this row's digest.
+    expect(customerDataEvidenceReceiptSha256({ ...row, tenantId: "tenant_02" }, evidence)).not.toBe(
+      storedDigest,
+    );
   });
 
   it("is one transaction, appended after 0049 and never altering an earlier table", () => {

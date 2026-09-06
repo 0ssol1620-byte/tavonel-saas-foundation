@@ -75,9 +75,12 @@ this document builds one, and §5 says exactly what it does and does not prove.
 when every one of the seventeen has exactly one evidence row, `satisfied === true`, non-blank
 evidence, and a `checkedAt` that is an ISO-8601 instant. (`Date.parse` alone was not enough: it
 accepts `"2026"`, `"0"` and `"Sat Sep 6 2026"`, and a gate stamped with any of those is not auditable
-to a moment, so the shape is pinned.) Anything else is `{ allowed: false, missing: [...] }` naming
-the rows that failed. `receiptSha256` is sha256 over the canonical JSON of the evidence list in frozen
-precondition order, so it is a function of the evidence and not of the order the caller assembled it.
+to a moment, so the shape is pinned. The shape alone was not enough either: `Date.parse` range-checks
+an ISO day against 31 rather than against its month, so `"2026-02-30T00:00:00Z"` is instant-shaped,
+parses finite and silently means 2026-03-02 — the day must now spell itself back.) Anything else is
+`{ allowed: false, missing: [...] }` naming the rows that failed. `receiptSha256` is sha256 over the
+canonical JSON of the tenant, the workspace and the evidence list in frozen precondition order, so it
+is a function of what was approved and not of the order the caller assembled it.
 
 Deliberate fail-closed choices, each with a test:
 
@@ -94,9 +97,16 @@ costs is bounded — a caller able to fabricate a decision object in process can
 the durable record. `customer_data_gate_receipts` stores the `evidence` array beside
 `receipt_sha256`, and `customerDataEvidenceReceiptSha256` is exported so a reader of a row re-derives
 the digest instead of trusting it (`customerDataGateMigration.test.ts` exercises exactly that on a
-row-shaped fixture). Contract §4.3 also fixes the digest as being over the evidence list alone, so
-two tenants with identical evidence share a digest by design; a row is attributed by its `tenant_id`
-and `workspace_id` columns, never by its digest.
+row-shaped fixture).
+
+The related hole is closed rather than stated: contract §4.3 originally fixed the digest as being
+over the evidence list alone, which made a digest portable between tenants — the evidence rows are
+paths, receipt digests and test ids, none of them tenant-specific, so two tenants with the same
+evidence produced the same digest and one copied from an approved tenant re-derived true for an
+unapproved one. §8.1 amends §4.3: the digest now covers `tenantId` and `workspaceId` together with
+the preconditions, and re-deriving a stored row's digest therefore also proves the row was not
+lifted from another tenant's approval. A row is still attributed by its `tenant_id` and
+`workspace_id` columns as well.
 
 `validateCompileJobEnvelope(input, gate?)` gained one optional parameter. Called without it — which
 is every call site in this repository — the behaviour is byte-for-byte what it was:

@@ -57,18 +57,42 @@ export type CustomerDataGateDecision =
 const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?(Z|[+-]\d{2}:\d{2})$/;
 
 function isInstant(value: string): boolean {
-  return typeof value === "string" && ISO_INSTANT.test(value) && Number.isFinite(Date.parse(value));
+  if (typeof value !== "string" || !ISO_INSTANT.test(value) || !Number.isFinite(Date.parse(value))) {
+    return false;
+  }
+  // "and the value must also be a real date" was not true of the shape plus `Date.parse` alone:
+  // `Date.parse("2026-02-30T00:00:00Z")` is finite because the ISO parser range-checks the day
+  // against 31 rather than against the month, and then rolls it forward -- a gate stamped on a day
+  // that does not exist was admitted and silently re-read as 2026-03-02. So the day must spell
+  // itself back. Hours, minutes and seconds need no such check: `Date.parse` returns NaN for
+  // "T99:99:99Z", which the finiteness test above already refuses.
+  const [year, month, day] = value.slice(0, 10).split("-").map(Number);
+  const rendered = new Date(Date.UTC(year, month - 1, day));
+  return (
+    rendered.getUTCFullYear() === year && rendered.getUTCMonth() === month - 1 && rendered.getUTCDate() === day
+  );
 }
 
 /**
- * Canonical form of the evidence list: the seventeen rows in frozen order, each object written with
- * its keys in sorted order, so the digest is a function of the evidence and not of the order the
- * caller happened to build the array in.
+ * Canonical form of the subject and its evidence: the seventeen rows in frozen order, each object
+ * written with its keys in sorted order, so the digest is a function of what was approved and not
+ * of the order the caller happened to build the array in.
+ *
+ * The subject is inside the digest, not beside it. Contract §4.3 first defined the digest over the
+ * evidence list alone, which made a stored receipt digest portable: two tenants whose evidence
+ * happens to read the same -- and the evidence rows are paths, receipt digests and test ids, which
+ * are not tenant-specific -- produced the identical digest, so a digest copied from an approved
+ * tenant verified for an unapproved one. §8.1 amends §4.3 to bind `tenantId` and `workspaceId` into
+ * it. A receipt is now a statement about one workspace of one tenant and re-derives to a different
+ * value anywhere else.
  */
-export function customerDataEvidenceReceiptSha256(evidence: readonly PreconditionEvidence[]): string {
+export function customerDataEvidenceReceiptSha256(
+  subject: { tenantId: string; workspaceId: string },
+  evidence: readonly PreconditionEvidence[],
+): string {
   const byPrecondition = new Map(evidence.map((entry) => [entry.precondition, entry]));
-  const canonical = JSON.stringify(
-    [...customerDataPreconditions]
+  const canonical = JSON.stringify({
+    evidence: [...customerDataPreconditions]
       .filter((precondition) => byPrecondition.has(precondition))
       .map((precondition) => {
         const entry = byPrecondition.get(precondition) as PreconditionEvidence;
@@ -79,7 +103,10 @@ export function customerDataEvidenceReceiptSha256(evidence: readonly Preconditio
           satisfied: entry.satisfied,
         };
       }),
-  );
+    schemaVersion: CUSTOMER_DATA_GATE_SCHEMA,
+    tenantId: subject.tenantId,
+    workspaceId: subject.workspaceId,
+  });
   return `sha256:${createHash("sha256").update(canonical, "utf8").digest("hex")}`;
 }
 
@@ -119,7 +146,7 @@ export function evaluateCustomerDataGate(input: {
     schemaVersion: CUSTOMER_DATA_GATE_SCHEMA,
     tenantId: input.tenantId,
     workspaceId: input.workspaceId,
-    receiptSha256: customerDataEvidenceReceiptSha256(input.evidence),
+    receiptSha256: customerDataEvidenceReceiptSha256(input, input.evidence),
     evaluatedAt,
   };
 }

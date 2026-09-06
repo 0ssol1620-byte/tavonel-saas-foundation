@@ -15,6 +15,7 @@ import {
 } from "../../shared/productCoreCompileEnvelope";
 
 const NOW = "2026-09-06T00:00:00.000Z";
+const SUBJECT = { tenantId: "tenant_01", workspaceId: "workspace_01" } as const;
 
 /**
  * A complete, satisfied evidence set. It is a fixture and only a fixture: several of these
@@ -178,7 +179,20 @@ describe("customer-data gate evaluation", () => {
    * `Date.parse` accepts all of these. A gate stamped "2026" or "0" is not auditable to a moment,
    * and the earlier check -- non-blank plus `Date.parse` -- let every one of them through.
    */
-  it.each(["2026", "0", "Sat Sep 6 2026", "2026-09-06", "now"])(
+  it.each([
+    "2026",
+    "0",
+    "Sat Sep 6 2026",
+    "2026-09-06",
+    "now",
+    // Instant-SHAPED, and `Date.parse` returns a finite number for each: the ISO parser
+    // range-checks the day against 31 rather than against the month, then rolls it forward, so
+    // "2026-02-30" was admitted and silently re-read as 2026-03-02. A gate stamped on a day that
+    // does not exist is not auditable to a moment either.
+    "2026-02-30T00:00:00Z",
+    "2027-02-29T12:00:00.000Z",
+    "2026-04-31T00:00:00+09:00",
+  ])(
     "refuses evidence stamped %j, which Date.parse tolerates but is not an instant",
     (checkedAt) => {
       const evidence = satisfiedEvidence().map((entry) =>
@@ -228,7 +242,7 @@ describe("customer-data gate evaluation", () => {
       schemaVersion: CUSTOMER_DATA_GATE_SCHEMA,
       tenantId: "tenant_01",
       workspaceId: "workspace_01",
-      receiptSha256: customerDataEvidenceReceiptSha256(satisfiedEvidence()),
+      receiptSha256: customerDataEvidenceReceiptSha256(SUBJECT, satisfiedEvidence()),
       evaluatedAt: NOW,
     });
   });
@@ -236,15 +250,42 @@ describe("customer-data gate evaluation", () => {
   it("digests the evidence, not the order it was assembled in", () => {
     const forward = satisfiedEvidence();
     const reversed = [...forward].reverse();
-    expect(customerDataEvidenceReceiptSha256(reversed)).toBe(
-      customerDataEvidenceReceiptSha256(forward),
+    expect(customerDataEvidenceReceiptSha256(SUBJECT, reversed)).toBe(
+      customerDataEvidenceReceiptSha256(SUBJECT, forward),
     );
     const altered = forward.map((entry) =>
       entry.precondition === "audit_log_active" ? { ...entry, evidence: "somewhere else" } : entry,
     );
-    expect(customerDataEvidenceReceiptSha256(altered)).not.toBe(
-      customerDataEvidenceReceiptSha256(forward),
+    expect(customerDataEvidenceReceiptSha256(SUBJECT, altered)).not.toBe(
+      customerDataEvidenceReceiptSha256(SUBJECT, forward),
     );
+  });
+
+  /**
+   * Contract §8.1 amends §4.3: the digest covers `tenantId` and `workspaceId` together with the
+   * preconditions. Over the evidence list alone it was portable -- the evidence rows are paths,
+   * receipt digests and test ids, none of them tenant-specific, so two tenants with the same
+   * evidence produced the same digest and a digest copied out of an approved tenant re-derived
+   * true for an unapproved one.
+   */
+  it("binds the receipt digest to one tenant and one workspace", () => {
+    const evidence = satisfiedEvidence();
+    const mine = customerDataEvidenceReceiptSha256(SUBJECT, evidence);
+    expect(customerDataEvidenceReceiptSha256({ ...SUBJECT, tenantId: "tenant_02" }, evidence)).not.toBe(mine);
+    expect(customerDataEvidenceReceiptSha256({ ...SUBJECT, workspaceId: "workspace_02" }, evidence)).not.toBe(mine);
+  });
+
+  it("stamps an allowed decision with the digest of its own subject, not of the evidence alone", () => {
+    const evidence = satisfiedEvidence();
+    const mine = evaluateCustomerDataGate({ ...SUBJECT, evidence, now: NOW });
+    const theirs = evaluateCustomerDataGate({
+      tenantId: "tenant_02",
+      workspaceId: "workspace_01",
+      evidence,
+      now: NOW,
+    });
+    expect(mine.allowed && theirs.allowed && mine.receiptSha256 === theirs.receiptSha256).toBe(false);
+    expect(mine.allowed && mine.receiptSha256).toBe(customerDataEvidenceReceiptSha256(SUBJECT, evidence));
   });
 });
 
