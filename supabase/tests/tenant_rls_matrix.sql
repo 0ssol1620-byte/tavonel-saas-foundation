@@ -21,7 +21,7 @@
 -- has written yet. The runtime blocks below then prove the same thing as the role itself,
 -- because a grant table is evidence about privileges and not about behaviour.
 begin;
-select plan(49);
+select plan(51);
 
 -- Fixture seeding runs as the migration role. Every client assertion below runs under an
 -- explicit `set local role`, and the whole transaction is rolled back.
@@ -207,22 +207,22 @@ select throws_ok($$select 1 from public.enterprise_organizations$$, '42501', nul
 select ok(public.enterprise_has_permission('a0000000-0000-0000-0000-0000000000a1'::uuid, null::text, 'organization:read'), 'A reads its own organization');
 select ok(not public.enterprise_has_permission('b0000000-0000-0000-0000-0000000000b1'::uuid, null::text, 'organization:read'), 'cross-organization read is refused');
 select ok(not public.enterprise_has_permission('a0000000-0000-0000-0000-0000000000a1'::uuid, null::text, 'audit:read'), 'a viewer cannot read its own organization audit log');
-select throws_ok($$select public.append_enterprise_audit_event('b0000000-0000-0000-0000-0000000000b1'::uuid, 'pilot-b1', 'compile.complete', 'corpus', 'corpus-b', '11111111-1111-1111-1111-111111111111'::uuid, 'succeeded', null, '{}'::jsonb)$$, 'P0001', 'enterprise_access_denied', 'A cannot append into another organization audit log');
-select throws_ok($$select public.append_enterprise_audit_event('a0000000-0000-0000-0000-0000000000a1'::uuid, 'pilot-a1', 'compile.complete', 'corpus', 'corpus-a', '22222222-2222-2222-2222-222222222222'::uuid, 'succeeded', null, '{}'::jsonb)$$, 'P0001', 'enterprise_audit_actor_invalid', 'A cannot append as another actor');
-
--- L-4, held as the contract rather than as the defect. `compile.complete` is a system event, and a
--- read-only viewer can write one into its own organization's audit log because the RPC checks
--- `organization:read` (0014:208) and `p_action` is free text. An auditor cannot then tell a system
--- event from a fabricated one. The gap matrix's own acceptance test for L-4 is "read-only member
--- appends system action -> refused", so that is what this asserts; a results_eq pinning the leak
--- would have gone green on a defect. The repair is a migration -- revoke EXECUTE from
--- `authenticated`, or constrain `p_action` and stamp a source -- and migrations are the P1-A lane's
--- to write, so it runs under todo: `not ok ... # TODO` today, and pgTAP reports it as unexpectedly
--- passing the moment that migration lands, which is what makes the todo get removed rather than
--- forgotten.
-select todo_start('L-4: audit RPC accepts a system action from a viewer; repair is a P1-A migration');
-select throws_ok($$select public.append_enterprise_audit_event('a0000000-0000-0000-0000-0000000000a1'::uuid, 'pilot-a1', 'compile.complete', 'corpus', 'corpus-a', '11111111-1111-1111-1111-111111111111'::uuid, 'succeeded', null, '{}'::jsonb)$$, 'P0001', 'enterprise_access_denied', 'a read-only member cannot append a system action to its own audit log');
-select todo_end();
+-- The three audit-RPC cells below all raise 42501 after 0054, and they used to raise the
+-- function's own P0001s. That is the repair, not drift: 0014:352 granted `execute` to
+-- `authenticated`, so a browser session reached the function body and was turned away by its
+-- guards -- for the first two. For the third it was not turned away at all. `compile.complete` is
+-- a system event, and a read-only viewer could write one into its own organization's audit log
+-- because the RPC checks `organization:read` (0014:208) and `p_action` is free text, so an auditor
+-- could not tell a system event from a fabricated one (gap matrix L-4). That assertion is the gap
+-- matrix's own acceptance test, it ran under `todo` from the first rehearsal until 0054, and it was
+-- never edited to pass. 0054 revokes `execute` from `authenticated`, so all three are now refused
+-- before the body runs and the todo wrapper is gone.
+--
+-- The two guards those first two cells used to prove are not dropped: section 7 asserts them on the
+-- service-role path, which is the only path left.
+select throws_ok($$select public.append_enterprise_audit_event('b0000000-0000-0000-0000-0000000000b1'::uuid, 'pilot-b1', 'compile.complete', 'corpus', 'corpus-b', '11111111-1111-1111-1111-111111111111'::uuid, 'succeeded', null, '{}'::jsonb)$$, '42501', null, 'A cannot append into another organization audit log');
+select throws_ok($$select public.append_enterprise_audit_event('a0000000-0000-0000-0000-0000000000a1'::uuid, 'pilot-a1', 'compile.complete', 'corpus', 'corpus-a', '22222222-2222-2222-2222-222222222222'::uuid, 'succeeded', null, '{}'::jsonb)$$, '42501', null, 'A cannot append as another actor');
+select throws_ok($$select public.append_enterprise_audit_event('a0000000-0000-0000-0000-0000000000a1'::uuid, 'pilot-a1', 'compile.complete', 'corpus', 'corpus-a', '11111111-1111-1111-1111-111111111111'::uuid, 'succeeded', null, '{}'::jsonb)$$, '42501', null, 'a read-only member cannot append a system action to its own audit log');
 
 -- ---------------------------------------------------------------------------
 -- 6. Authenticated, with no subject and therefore no organization context. `auth.uid()` is null,
@@ -250,7 +250,19 @@ set local role service_role;
 
 select throws_ok($$select 1 from public.documents$$, '42501', null, 'service role holds no grant on the browser-owned document table');
 select results_eq('select count(*)::integer from public.enterprise_organizations', array[2], 'service role reads every organization');
+
 select results_eq($$select count(*)::integer from public.enterprise_audit_events where organization_id = 'b0000000-0000-0000-0000-0000000000b1'$$, array[1], 'service role reads an audit log it never joined');
+
+-- After 0054 the audit RPC is server-only, so its two internal guards are the only thing standing
+-- between the server credential and a forged audit row. Section 5 proved them while `authenticated`
+-- could still reach the body; these two keep that coverage on the path that remains. The claims are
+-- set while the role is service_role because `auth.uid()` reads the JWT claim, not the database
+-- role: the server calls the function on behalf of a user, and the guards compare against that.
+select set_config('request.jwt.claims', '{"role":"authenticated","sub":"11111111-1111-1111-1111-111111111111"}', true);
+select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+
+select throws_ok($$select public.append_enterprise_audit_event('b0000000-0000-0000-0000-0000000000b1'::uuid, 'pilot-b1', 'compile.complete', 'corpus', 'corpus-b', '11111111-1111-1111-1111-111111111111'::uuid, 'succeeded', null, '{}'::jsonb)$$, 'P0001', 'enterprise_access_denied', 'the audit RPC still refuses a cross-organization append on the server path');
+select throws_ok($$select public.append_enterprise_audit_event('a0000000-0000-0000-0000-0000000000a1'::uuid, 'pilot-a1', 'compile.complete', 'corpus', 'corpus-a', '22222222-2222-2222-2222-222222222222'::uuid, 'succeeded', null, '{}'::jsonb)$$, 'P0001', 'enterprise_audit_actor_invalid', 'the audit RPC still refuses a mismatched actor on the server path');
 
 select * from finish();
 rollback;
