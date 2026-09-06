@@ -38,6 +38,33 @@ export function isTerminalCompileState(state: CompileState) {
   return TERMINAL_COMPILE_STATES.includes(state);
 }
 
+/*
+  Unfinished, and yet there is nothing a worker can do about it.
+
+  `review_required` is the compile handing the decision back to a person. The job is genuinely
+  not finished -- it is not terminal, and the customer's list is right to keep showing it -- but
+  no turn moves it, so a worker that picks it up puts it straight back down without touching
+  `updated_at`.
+
+  Two meanings of "open" were conflated and the scheduler took the customer's one: it asked for
+  everything not settled, oldest `updated_at` first, and took the first few. A resting job never
+  bumps that column, so it holds its place in that window permanently, and five of them -- in any
+  workspaces at all -- stop every compile in the deployment: accepted, credited, still reporting
+  `reading`, never looked at again. The two lists are kept apart here rather than filtered after
+  the fetch, so a state added to one is visibly missing from the other.
+*/
+export const RESTING_COMPILE_STATES: readonly CompileState[] = ["review_required"];
+
+export function isRestingCompileState(state: CompileState) {
+  return RESTING_COMPILE_STATES.includes(state);
+}
+
+/** What a worker's queue excludes: settled, or waiting on somebody who is not a worker. */
+export const SCHEDULER_EXCLUDED_STATES: readonly CompileState[] = [
+  ...TERMINAL_COMPILE_STATES,
+  ...RESTING_COMPILE_STATES,
+];
+
 export type CompileBlocker = {
   documentId: string;
   /*
@@ -104,6 +131,8 @@ export type CompileJobResult<T> = { ok: true; value: T } | { ok: false; code: Co
 
 const WORKSPACE_KEY = /^pilot-[A-Za-z0-9]{1,16}$/;
 const COMPILE_JOB_ID = /^cjob-[a-f0-9]{32}$/;
+/** The machine-code shape the job row's own `error_code` check enforces (0038:62). */
+const ERROR_CODE = /^[A-Z][A-Z0-9_]{2,63}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function newCompileJobId() {
@@ -371,6 +400,108 @@ export async function readCompileJobEvents(
   return { ok: true, value: events };
 }
 
+/*
+  A turn that ended where it started, written down.
+
+  The ledger is filled by a trigger on the job row, and that trigger writes nothing when an
+  update changes none of the columns it watches (0038:140-167). A deferral -- the worker looked,
+  could not proceed, and left the job in the state it was already in -- moves `updated_at` and
+  nothing else, so it left no trace at all. That is how a compile could re-list and re-read every
+  turn for ever behind an empty history, with nothing to count and therefore nothing to bound.
+
+  So the deferral is appended here, to the same table: `service_role` holds `insert` on it
+  (0038:427) and the append-only trigger refuses update and delete, not insert. The row it writes
+  is the trigger's row -- same columns, same `detail` keys, all of them taken from the job -- with
+  the reason and the attempt number added, so the ledger records how long a disagreement has been
+  running rather than only that it happened once. Mirroring matters because this table is read as
+  a stream: the workspace rebuilds its panel from each frame (`app/workspace/page.tsx:838-848`),
+  so a frame missing `detail.blocked` would blank the list of documents a customer has already
+  been shown.
+
+  `error_code` is deliberately left null for the same reason. That field is copied straight onto
+  the panel, and a deferral is not a failure: a code there would report an error on a compile that
+  is still running. The job's own `error_code` is written once, by the advance that settles it.
+
+  The type must be one of the eight the table's check constraint allows, and `state_changed` is
+  the one that describes the write that did happen: a state write to the state the row is already
+  in. A `deferred` type -- and an attempt counter on the row itself -- belong to the migration
+  that gives this table the bound its sibling queue has (0024), which is not this lane's to write.
+*/
+export async function recordCompileJobDeferral(input: {
+  /** The row as the turn read it: the ledger's own columns come from here, never from a guess. */
+  job: CompileJob;
+  /** Where the row is now -- the lease may have moved it after `job` was read. */
+  state: CompileState;
+  /** What this turn observed. */
+  documentsReady: number;
+  blocked: CompileBlocker[];
+  reason: string;
+  attempt: number;
+}): Promise<CompileJobResult<{ recorded: true }>> {
+  const { job } = input;
+  if (!WORKSPACE_KEY.test(job.workspaceKey) || !COMPILE_JOB_ID.test(job.jobId)) {
+    return fail("COMPILE_JOB_SCOPE_INVALID");
+  }
+  if (!ERROR_CODE.test(input.reason)) return fail("COMPILE_JOB_SCOPE_INVALID");
+  if (!readSupabaseAdminConfig()) return fail("COMPILE_JOB_STORE_NOT_CONFIGURED");
+
+  const response = await admin("/rest/v1/foundation_compile_job_events", {
+    method: "POST",
+    body: JSON.stringify({
+      job_id: job.jobId,
+      workspace_key: job.workspaceKey,
+      event_type: "state_changed",
+      state: input.state,
+      documents_total: job.documentsTotal,
+      documents_ready: input.documentsReady,
+      detail: {
+        collectionId: job.collectionId,
+        blocked: input.blocked,
+        blockedResolution: job.blockedResolution,
+        reason: input.reason,
+        attempt: input.attempt,
+      },
+    }),
+  });
+  if (!response || !response.ok) return fail("COMPILE_JOB_STORE_WRITE_FAILED");
+  return { ok: true, value: { recorded: true } };
+}
+
+/**
+ * How many deferrals this job has recorded for `reason`, counted no further than `limit`.
+ *
+ * Capped on purpose: the caller wants to know whether a bound has been reached, not the total,
+ * and asking for one row more than the bound answers that in a single small read.
+ *
+ * The filter is jsonb containment on `detail`, which is the same machine code the writer put
+ * there; `ERROR_CODE` is what keeps the value a bare code rather than anything that has to be
+ * escaped into the JSON this builds.
+ */
+export async function countCompileJobDeferrals(
+  workspaceKey: string,
+  jobId: string,
+  reason: string,
+  limit = 32,
+): Promise<CompileJobResult<number>> {
+  if (!WORKSPACE_KEY.test(workspaceKey) || !COMPILE_JOB_ID.test(jobId)) {
+    return fail("COMPILE_JOB_SCOPE_INVALID");
+  }
+  if (!ERROR_CODE.test(reason)) return fail("COMPILE_JOB_SCOPE_INVALID");
+  const query = new URLSearchParams({
+    job_id: `eq.${jobId}`,
+    workspace_key: `eq.${workspaceKey}`,
+    detail: `cs.{"reason":"${reason}"}`,
+    select: "event_sequence",
+    limit: String(Math.min(Math.max(1, limit), 500)),
+  });
+  const response = await admin(`/rest/v1/foundation_compile_job_events?${query}`);
+  if (!response) return fail("COMPILE_JOB_STORE_NOT_CONFIGURED");
+  if (!response.ok) return fail("COMPILE_JOB_STORE_READ_FAILED");
+  const rows = await response.json().catch(() => null) as unknown[] | null;
+  if (!Array.isArray(rows)) return fail("COMPILE_JOB_STORE_READ_FAILED");
+  return { ok: true, value: rows.length };
+}
+
 export async function advanceCompileJob(input: {
   workspaceKey: string;
   jobId: string;
@@ -472,10 +603,28 @@ export async function resolveCompileJobBlockers(input: {
   };
 }
 
-/** Every job a worker could still move, oldest first so nothing starves. */
+/*
+  Every job a worker could still move, oldest first so nothing starves.
+
+  "Could still move" is the scheduler's question, not the customer's: `SCHEDULER_EXCLUDED_STATES`
+  drops the settled states and the resting ones together, because a job nobody can advance in a
+  window ordered by `updated_at` is a slot nothing ever leaves.
+
+  The partial index behind this query still names only the terminal three
+  (`foundation_compile_jobs_open_idx`, migration 0038:114), so it no longer matches the predicate
+  exactly and the resting rows are filtered rather than skipped. That is correct but not free.
+  The index this wants is the same one over `SCHEDULER_EXCLUDED_STATES` --
+
+    create index foundation_compile_jobs_runnable_idx
+      on public.foundation_compile_jobs (state, updated_at)
+      where state not in ('ready', 'failed', 'cancelled', 'review_required');
+
+  -- and it belongs in the migration that owns this table's chain, not here. Recorded rather than
+  written: this lane writes no migration, and the query is correct without it.
+*/
 export async function readOpenCompileJobs(limit = 20): Promise<CompileJobResult<CompileJob[]>> {
   const query = new URLSearchParams({
-    state: "not.in.(ready,failed,cancelled)",
+    state: `not.in.(${SCHEDULER_EXCLUDED_STATES.join(",")})`,
     order: "updated_at.asc",
     limit: String(Math.min(Math.max(1, limit), 100)),
     select: "*",
