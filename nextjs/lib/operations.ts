@@ -40,13 +40,26 @@ export function readPublicOperations() {
         state: auth ? "operational" : "not_configured",
         detail: "Google OAuth through the dedicated Supabase project",
       },
+      /*
+        "restricted" said nothing and covered two different situations. RESOLVED A-6.
+
+        A reader of /status was given the same word for a processing gate that policy holds shut
+        and for a billing integration that is fully configured and deliberately not charging
+        anyone yet. Neither is a degraded service, and "restricted" reads like one.
+
+        They are now named by what this function actually knows about each. The pipeline row is
+        `closed`: an activation gate in `activation-policy.ts` is false, and a closed gate is a
+        decision rather than a fault. The billing row is `disabled`: every check passes and the
+        live-charge switch is off. No branch may produce an empty state -- `operations.test.ts`
+        holds that -- so no row on /status renders without a word.
+      */
       documentPipeline: {
         state:
           activationPolicy.customerIntake.enabled &&
           activationPolicy.cdr.enabled &&
           activationPolicy.ocrGpu.enabled
             ? "operational"
-            : "restricted",
+            : "closed",
         detail: "Quarantine, CDR and GPU OCR candidate processing",
       },
       billing: {
@@ -55,7 +68,7 @@ export function readPublicOperations() {
             ? "test_only"
             : billingLaunchApproved
               ? "operational"
-              : "restricted"
+              : "disabled"
           : "not_configured",
         detail: sandbox
           ? "Paddle sandbox; no real charge"
