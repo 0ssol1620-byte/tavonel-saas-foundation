@@ -21,7 +21,7 @@
 -- has written yet. The runtime blocks below then prove the same thing as the role itself,
 -- because a grant table is evidence about privileges and not about behaviour.
 begin;
-select plan(46);
+select plan(49);
 
 -- Fixture seeding runs as the migration role. Every client assertion below runs under an
 -- explicit `set local role`, and the whole transaction is rolled back.
@@ -188,6 +188,12 @@ select is_empty($$select * from public.paddle_subscriptions where workspace_id =
 select is_empty($$select * from public.profiles where id = '22222222-2222-2222-2222-222222222222'$$, 'cross-tenant profile query is empty');
 select is_empty($$select * from public.sanitization_proofs where document_id = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'$$, 'cross-tenant proof query is empty');
 select is_empty($$select * from public.knowledge_graph_candidates where workspace_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'$$, 'cross-tenant candidate query is empty');
+-- Section 3 asks these three with isnt_empty because the auth trigger gives every user a personal
+-- workspace as well, so a count is not fixed. isnt_empty is the allow half only: without the three
+-- below, a policy that returned every workspace to every session would still pass this file.
+select is_empty($$select * from public.workspaces where id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'$$, 'cross-tenant workspace query is empty');
+select is_empty($$select * from public.workspace_memberships where workspace_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'$$, 'cross-tenant membership query is empty');
+select is_empty($$select * from public.workspace_entitlements where workspace_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'$$, 'cross-tenant entitlement query is empty');
 select is_empty($$update public.profiles set display_name = 'taken over' where id = '22222222-2222-2222-2222-222222222222' returning id$$, 'A cannot rename B');
 select results_eq($$update public.profiles set display_name = 'renamed by owner' where id = '11111111-1111-1111-1111-111111111111' returning display_name$$, $$select 'renamed by owner'::text$$, 'A renames its own profile');
 
@@ -204,14 +210,19 @@ select ok(not public.enterprise_has_permission('a0000000-0000-0000-0000-00000000
 select throws_ok($$select public.append_enterprise_audit_event('b0000000-0000-0000-0000-0000000000b1'::uuid, 'pilot-b1', 'compile.complete', 'corpus', 'corpus-b', '11111111-1111-1111-1111-111111111111'::uuid, 'succeeded', null, '{}'::jsonb)$$, 'P0001', 'enterprise_access_denied', 'A cannot append into another organization audit log');
 select throws_ok($$select public.append_enterprise_audit_event('a0000000-0000-0000-0000-0000000000a1'::uuid, 'pilot-a1', 'compile.complete', 'corpus', 'corpus-a', '22222222-2222-2222-2222-222222222222'::uuid, 'succeeded', null, '{}'::jsonb)$$, 'P0001', 'enterprise_audit_actor_invalid', 'A cannot append as another actor');
 
--- TODO(L-4): this documents what the schema does today, not what it should do. `compile.complete`
--- is a system event, and a read-only viewer can write one into its own organization's audit log
--- because the RPC checks `organization:read` and the `action` column takes any string matching a
--- regex. An auditor cannot then tell a system event from a fabricated one. The repair is a
--- migration -- revoke EXECUTE from `authenticated`, or constrain `p_action` and stamp a source --
--- and migrations are the P1-A lane's to write, so this asserts the current behaviour rather than
--- pretending it is already fixed. When that migration lands, this assertion becomes a throws_ok.
-select results_eq($$select public.append_enterprise_audit_event('a0000000-0000-0000-0000-0000000000a1'::uuid, 'pilot-a1', 'compile.complete', 'corpus', 'corpus-a', '11111111-1111-1111-1111-111111111111'::uuid, 'succeeded', null, '{}'::jsonb) is not null$$, $$select true$$, 'L-4 current behaviour: a read-only member appends a system action to its own audit log');
+-- L-4, held as the contract rather than as the defect. `compile.complete` is a system event, and a
+-- read-only viewer can write one into its own organization's audit log because the RPC checks
+-- `organization:read` (0014:208) and `p_action` is free text. An auditor cannot then tell a system
+-- event from a fabricated one. The gap matrix's own acceptance test for L-4 is "read-only member
+-- appends system action -> refused", so that is what this asserts; a results_eq pinning the leak
+-- would have gone green on a defect. The repair is a migration -- revoke EXECUTE from
+-- `authenticated`, or constrain `p_action` and stamp a source -- and migrations are the P1-A lane's
+-- to write, so it runs under todo: `not ok ... # TODO` today, and pgTAP reports it as unexpectedly
+-- passing the moment that migration lands, which is what makes the todo get removed rather than
+-- forgotten.
+select todo_start('L-4: audit RPC accepts a system action from a viewer; repair is a P1-A migration');
+select throws_ok($$select public.append_enterprise_audit_event('a0000000-0000-0000-0000-0000000000a1'::uuid, 'pilot-a1', 'compile.complete', 'corpus', 'corpus-a', '11111111-1111-1111-1111-111111111111'::uuid, 'succeeded', null, '{}'::jsonb)$$, 'P0001', 'enterprise_access_denied', 'a read-only member cannot append a system action to its own audit log');
+select todo_end();
 
 -- ---------------------------------------------------------------------------
 -- 6. Authenticated, with no subject and therefore no organization context. `auth.uid()` is null,
