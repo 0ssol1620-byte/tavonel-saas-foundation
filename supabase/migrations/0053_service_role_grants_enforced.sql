@@ -149,12 +149,21 @@ $$;
 -- and migrations run as it, so this statement is the one that matters and it is not guarded.
 alter default privileges for role postgres in schema public revoke all on tables from service_role;
 
--- `supabase_admin` owns nothing in `public` on a database built from these files, but it is the
--- superuser on a hosted project and could hold a default ACL there. Revoking needs membership in
--- the role, which `postgres` may not have on a hosted project, so this half is attempted and not
--- assumed. It is not a silent fallback: supabase/tests/service_role_grant_matrix.sql asserts the
--- *effect* -- that no default ACL in `public` grants a future table to service_role -- so if this
--- were skipped where it was needed, the suite goes red rather than quiet.
+-- MEASURED, and it is a finding: `supabase_admin` holds the same default privilege in `public`
+-- (`grant all on tables to service_role`). It is not in the schema dump -- pg_dump --schema public
+-- does not emit it -- and the rehearsal found it only because the test below asked the catalog
+-- (run 34022126727). This migration CANNOT revoke it: `alter default privileges for role X` needs
+-- membership in X, migrations run as `postgres`, and `postgres` is not a member of `supabase_admin`
+-- on the Supabase image. So the branch below is attempted and, on this stack, does not fire.
+--
+-- Why that is not a hole today: a default ACL applies only to tables the role itself creates, and
+-- `supabase_admin` creates none in `public` -- all 58 tables are owned by `postgres`. What
+-- `supabase_admin` can do on the hosted project is a Layer B question and a founder-owned one; it
+-- is named here rather than left for the next reader to rediscover.
+--
+-- Not a silent fallback: supabase/tests/service_role_grant_matrix.sql asserts the *effect* -- that
+-- no role which owns a table in `public` still re-grants future tables to service_role -- so the
+-- day supabase_admin owns one, the suite goes red instead of going quiet.
 do $$
 begin
   if exists (select 1 from pg_roles where rolname = 'supabase_admin')

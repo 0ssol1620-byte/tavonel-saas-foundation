@@ -104,14 +104,26 @@ $$, 'service_role holds no column privilege its table row does not already carry
 -- The default privilege is the reason R-2 existed at all: it re-grants ALL to service_role on
 -- every table created after it. 0053 revokes it, so the next migration's table arrives with
 -- nothing rather than with everything.
+--
+-- Asked of the roles that own tables here rather than of every role holding a default ACL, because
+-- the rehearsal measured a fact the schema dump does not show (run 34022126727): `supabase_admin`
+-- ALSO holds `grant all on tables to service_role` as a default privilege in `public`, and a
+-- migration cannot revoke it -- migrations run as `postgres`, `alter default privileges for role X`
+-- needs membership in X, and `postgres` is not a member of `supabase_admin` on this image. It is
+-- inert on a database built from these files, because a default ACL applies only to tables its own
+-- role creates and `supabase_admin` creates none here (all 58 are owned by `postgres`). Reported as
+-- a finding rather than quietly excluded: this assertion goes red the day supabase_admin owns a
+-- table in public, and what that role can reach on the hosted project is a Layer B question.
 select is_empty($$
-  select pg_get_userbyid(d.defaclrole) || ':' || d.defaclobjtype::text
-    from pg_default_acl d
-    join pg_namespace n on n.oid = d.defaclnamespace
+  select distinct pg_get_userbyid(d.defaclrole) || ' owns ' || c.relname::text
+    from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+    join pg_default_acl d
+      on d.defaclrole = c.relowner and d.defaclnamespace = n.oid and d.defaclobjtype = 'r'
    where n.nspname = 'public'
-     and d.defaclobjtype = 'r'
+     and c.relkind in ('r', 'p')
      and exists (select 1 from unnest(d.defaclacl) as entry where entry::text like 'service_role=%')
-$$, 'no default privilege in public re-grants a future table to service_role');
+$$, 'no role that owns a table in public still re-grants future tables to service_role');
 
 select * from finish();
 rollback;
