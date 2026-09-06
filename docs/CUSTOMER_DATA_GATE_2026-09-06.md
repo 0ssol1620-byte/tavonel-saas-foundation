@@ -60,7 +60,8 @@ exists, with a named hole), or **MISSING** (no implementation in this repository
 | 16 | `per_source_acl_preserved` | MISSING | This lane defines `shared/aclSnapshot.ts` and `public.source_acl_snapshots`. No connector captures an ACL at ingestion, and no retrieval path filters by one — `nextjs/lib/retrieval-store.ts` and `nextjs/lib/retrieval-pipeline.ts` filter by tenant and workspace only. Storage is not enforcement. |
 | 17 | `founder_approval_receipt_recorded` | MISSING by design | No receipt exists. Recording one is not an agent's act, in this campaign or any other. |
 
-Two rows EXIST, seven are PARTIAL, eight are MISSING. Blueprint §48 P0-F's acceptance — "no customer
+Two rows EXIST (4, 7), eight are PARTIAL (1, 3, 5, 6, 10, 12, 13, 15) and seven are MISSING
+(2, 8, 9, 11, 14, 16, 17). Blueprint §48 P0-F's acceptance — "no customer
 traffic enabled until the security suite passes" — has, before this lane, no suite to point at; §2 of
 this document builds one, and §5 says exactly what it does and does not prove.
 
@@ -72,7 +73,9 @@ this document builds one, and §5 says exactly what it does and does not prove.
 
 `evaluateCustomerDataGate({ tenantId, workspaceId, evidence, now })` returns an allowed decision only
 when every one of the seventeen has exactly one evidence row, `satisfied === true`, non-blank
-evidence, and a parseable `checkedAt`. Anything else is `{ allowed: false, missing: [...] }` naming
+evidence, and a `checkedAt` that is an ISO-8601 instant. (`Date.parse` alone was not enough: it
+accepts `"2026"`, `"0"` and `"Sat Sep 6 2026"`, and a gate stamped with any of those is not auditable
+to a moment, so the shape is pinned.) Anything else is `{ allowed: false, missing: [...] }` naming
 the rows that failed. `receiptSha256` is sha256 over the canonical JSON of the evidence list in frozen
 precondition order, so it is a function of the evidence and not of the order the caller assembled it.
 
@@ -82,10 +85,26 @@ Deliberate fail-closed choices, each with a test:
 - A blank tenant or workspace, or an unparseable `now`, refuses all seventeen rather than approving something unattributable.
 - `gateAdmitsCustomerData` re-checks the schema version, the receipt digest shape, and that the tenant and workspace equal the envelope's. A decision for another tenant is not an approval.
 
+**Known ceiling on the receipt digest, stated exactly.** `gateAdmitsCustomerData` checks that
+`receiptSha256` *matches* `^sha256:[a-f0-9]{64}$`. It does not re-derive it, and it cannot: the
+decision type frozen in contract §4.3 carries no evidence, so a hand-built
+`{ allowed: true, …, receiptSha256: "sha256:" + "0".repeat(64) }` is admitted by shape. What that
+costs is bounded — a caller able to fabricate a decision object in process can equally call
+`evaluateCustomerDataGate` with fabricated evidence — and what closes it is not code in this file:
+the durable record. `customer_data_gate_receipts` stores the `evidence` array beside
+`receipt_sha256`, and `customerDataEvidenceReceiptSha256` is exported so a reader of a row re-derives
+the digest instead of trusting it (`customerDataGateMigration.test.ts` exercises exactly that on a
+row-shaped fixture). Contract §4.3 also fixes the digest as being over the evidence list alone, so
+two tenants with identical evidence share a digest by design; a row is attributed by its `tenant_id`
+and `workspace_id` columns, never by its digest.
+
 `validateCompileJobEnvelope(input, gate?)` gained one optional parameter. Called without it — which
 is every call site in this repository — the behaviour is byte-for-byte what it was:
 `PRIVACY_POLICY_NOT_ALLOWED`. The pre-existing tests in
-`server/foundation/productCoreCompileEnvelope.test.ts` were not touched and still pass.
+`server/foundation/productCoreCompileEnvelope.test.ts` were not touched and still pass. The
+condition is an **allowlist**: `foundation_synthetic_only` passes, `approved_customer_data` passes
+only behind a matching allowed gate, and every other value — an unknown policy, the empty string, a
+value added to the union later — is refused whether or not a gate is present.
 
 ### `shared/aclSnapshot.ts`
 
@@ -94,6 +113,13 @@ governing source evidence": a principal survives only if it appears in every sna
 permissive permission any of them granted. No snapshots yields no principals — an empty argument list
 means "nobody", never "everybody", because a caller that forgot to pass its snapshots must not
 thereby publish.
+
+A grant whose `kind` or `permission` is outside the frozen vocabulary is dropped before any
+comparison, so the principal is *absent* from that snapshot rather than unranked. Ranking it
+`undefined` widened: `undefined < 2` is false, so `owner ∩ "admin"` kept `owner` and `"admin" ∩ read`
+emitted `"admin"`. These values cross the type boundary at runtime — connector JSON, and the
+`principals` jsonb column — so the same vocabulary is now also a check constraint in migration 0050;
+a value the intersection cannot rank is one the table will not store.
 
 **Known ceiling, stated rather than smoothed over:** containment between principal kinds (`anyone`
 covers a `domain` covers a `group` covers a `user`) is not implemented. Expanding a group to its
@@ -179,11 +205,11 @@ that reason. Two consequences worth recording rather than discovering later:
 **A green suite is necessary and not sufficient.** What it proves is narrow and worth spelling out:
 
 - It reads SQL as text. It does not execute a single policy against Postgres. `tenant_rls_matrix.sql` still has no runner (precondition 1).
-- It covers eight MISSING preconditions with nothing, because there is nothing to cover them with.
+- It covers the seven MISSING preconditions with nothing, because there is nothing to cover them with.
 - It cannot observe the deployed platform: encryption at rest, TLS on the R2 and RunPod legs, and the actual scopes a consent screen granted are all outside it.
 
 Green means the code in this repository behaves as its authors intended. Approving customer data
-needs the eight MISSING rows implemented, the seven PARTIAL rows closed, an executed isolation suite,
+needs the seven MISSING rows implemented, the eight PARTIAL rows closed, an executed isolation suite,
 and a founder receipt. Only the last of those is a decision; the rest is work.
 
 ---
