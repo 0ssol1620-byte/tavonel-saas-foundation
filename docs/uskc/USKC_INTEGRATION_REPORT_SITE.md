@@ -227,3 +227,214 @@ projects.
 3. **Customer data stays off.** `approved_customer_data` needs a gate decision, and seven of the
    seventeen preconditions are MISSING (`docs/CUSTOMER_DATA_GATE_2026-09-06.md`). Enabling it is a
    founder act with a recorded receipt, per RESOLVED B-10, and beta-tenant allowlisted first.
+
+---
+
+# Lane G — public positioning (RESOLVED A-1 … A-6)
+
+Appended by Lane G on the same branch, on top of `5d05617`. Four surface commits plus one
+follow-up the phone gates forced. No PR, no merge, no production deploy, no alias change, no
+migration applied, no new dependency.
+
+**Production deploy 안 함. Git push로 Preview deployment는 자동 생성됨.**
+
+## G.1 What each resolution asked for, and what landed
+
+### A-2 — the hero, re-derived (`78f69a8`)
+
+The headline is now **"Your AI needs more than searchable files. It needs a current, traceable
+world."** The lede says TAVONEL compiles the customer's own sources into that world and defines
+both adjectives rather than leaving them as adjectives: *current* is recompiled when those sources
+change, *traceable* is every compiled fact staying traceable to its exact source location.
+
+`brand-copy.test.ts` locked the old hero **and** the old lede, which ended "evidence back to the
+page." That is why the lock moved rather than being deleted: a lock is a claim that a string does
+not drift without a decision, and this is that decision. The commit says so and cites RESOLVED A-2.
+The new lock also asserts the retired wording cannot come back by hand.
+
+Barred phrases added: `every file supported`, `lossless for every format`, `fully autonomous truth`.
+`100% accurate` and `never hallucinates` were already on the list. Nothing was removed from it.
+
+Two supporting surfaces followed the headline so they do not keep quoting the retired one:
+`app/layout.tsx` metadata and `app/opengraph-image.tsx`. "code" came off both descriptions in the
+same edit — no reader in this deployment reads a repository, and the upload route refuses one.
+
+### A-1 — "exact source location" (`703cda4`)
+
+Base wording, on the landing page, `/evidence`, `/enterprise`,
+`/product/document-understanding`, `/knowledge-compiler` and `/resources`:
+
+> Every compiled fact stays traceable to its exact source location.
+
+The locator **model** is published once, on `/evidence`, as eight forms the evidence contract is
+built to hold — PDF page + region · spreadsheet sheet + cell/range · slide + shape · message +
+attachment/MIME part · JSON/XML pointer · commit + file + symbol span · CAD/BIM object GUID · media
+timestamp/frame — followed immediately by the sentence that keeps it honest: this is a model, not a
+support list; exactly one of them is read here today, PDF page and region through the
+sanitize-to-PDF path; and `/sources` is the truth about which representations this deployment
+reads. Nothing on the page may be read as a locator that has been qualified. The landing page
+carries the base sentence, the path `Object → Relation → Evidence → Source version → Exact
+location`, and a button to `/sources`.
+
+**Kept, deliberately:** `components/pdf-evidence-viewer.tsx` (the `Evidence bounding box …`
+aria-label) and `components/world-studio-ultimate.tsx` (the `PAGE` / `BBOX` inspector rows). Both
+read back the actual PDF locator of the actual region being drawn on screen. That is product UI
+printing a real value, not a claim about what evidence is in general; generalizing those labels
+would make them less accurate, not more.
+
+### A-3 — `/sources` in primary navigation
+
+Verified, not changed. `lib/site-navigation.ts` already carries `{ href: "/sources", label:
+"Sources" }` in `PRIMARY_NAV` — the integrator's one navigation change. The page states in its own
+first paragraph that it prints `shared/capabilityManifest.ts`, the same list the upload route
+validates against, and that formats not listed are refused at upload. It is written as deployment
+capability truth and shows no roadmap format. No edit was needed.
+
+### A-4 — connectors (`49c2ec9`)
+
+The homepage flat list — `Folders · Google Drive · Dropbox · OneDrive / SharePoint · S3 / R2 /
+MinIO · SMB / NFS / SFTP` as one row of equal chips — is gone. Four rows replace it, each with the
+word that says where it stands:
+
+| Row | Status word | Why that word |
+|---|---|---|
+| Upload and folders | AVAILABLE TODAY | The upload path that exists; every file checked against the manifest before storage. |
+| ZIP archive | AVAILABLE TODAY | Written as what it is: expanded in the browser, each file inside compiled individually, **the archive itself never compiled**. |
+| Google Drive · Dropbox · OneDrive / SharePoint | BETA | `lib/connector-oauth-adapters.ts` implements list and download for exactly these three. Never "qualified": RESOLVED B-7 makes Drive deletion semantics a blocker. |
+| Object storage and mounted shares | ON REQUEST | Not a connector. See below. |
+
+The format chips stay separate and stay derived from the Capability Manifest.
+
+**S3-compatible / MinIO / SMB / NFS / SFTP are not shown as connectors anywhere.** A grep over
+`nextjs/lib/connector-*` and `lib/source-import.ts` finds no adapter for any of them; the only
+providers in the codebase are `google_drive`, `dropbox`, `microsoft_graph`. What does exist is
+`nextjs/public/developer/tavonel-source-agent.py` — real code that scans a mounted directory
+(`--root`) or an S3-compatible bucket (`--s3-bucket`, boto3) and posts to
+`/api/v1/uploads/capability` and `/api/v1/connections/{id}/sync`, both of which exist as routes in
+this repository. The customer runs it inside their own network and it pushes outward; TAVONEL
+connects to nothing. So:
+
+- `/integrations` keeps those rows and renames the level from **Enterprise** to
+  **Enterprise-assisted**, with a lede saying outright that nothing under it is a self-serve
+  connector and nothing under it is qualified. Four rows collapse to two (mounted file server;
+  S3-compatible object storage) because R2 and MinIO are the same S3 path.
+- `/developers` **keeps** the Source agent tile — the linked agent is real and named above — and
+  stops calling it an "SMB, NFS, SFTP and S3-compatible connector agent", which put four connectors
+  on a page that has none.
+- The workspace source picker takes the same word, so there is one vocabulary.
+
+**One claim was false, not merely vague.** The Google Drive row said trashed files "are surfaced as
+source removal on sync". The adapter lists with `q=trashed = false` and emits no deleted entry,
+unlike Dropbox and Microsoft Graph which both do. A trashed file simply stops appearing —
+indistinguishable from one deleted outright, moved, renamed, or no longer visible to the account.
+The row now says that, and names it as a reason no connector here is qualified (RESOLVED B-7).
+
+### A-6 — `/trust` and `/status` (`b212a58`)
+
+`/trust` is a `permanentRedirect` to `/security`, and the evidence mention the copy audit found is
+not in a page at all: it is in `lib/activation-policy.ts`, whose `reason` strings `/security`
+renders and `/api/status` serves verbatim. Two cited an internal receipt — intake "approved after
+synthetic R2 qualification", GPU OCR "release-qualified from the recorded 2026-08-29 full-sequence
+evidence".
+
+Both records exist in this repository (`docs/FOUNDATION_R2_SYNTHETIC_CANARY_2026-08-29.md`,
+`docs/evidence/ocr/FOUNDATION_GPU_OCR_FULL_SEQUENCE_2026-08-29.md` and its `.json`) and **neither is
+servable as it stands**: between them they carry a Vercel deployment id, a RunPod endpoint id, an
+account balance, a committer's email address and the internal FOLYNTA name. A-6 gives two options —
+link it, or remove the mention rather than leave it unlinked — and only the second was available
+without a founder decision about a redacted public evidence page. So the citations are gone and the
+controls they were attached to are still stated. `activation-policy.test.ts` had pinned the
+citation in place, so its rule is inverted rather than deleted: no reason may carry a date, and
+none may assert a qualification the reader cannot reach.
+
+`/status` renders a value on every row today — no branch of `readPublicOperations` can produce an
+empty state, every one assigns a literal — but one word carried two meanings. `restricted` covered
+both a processing gate that policy holds shut and a billing integration that is fully configured
+and deliberately not charging, and reads like a degraded service when neither is. They become
+`closed` and `disabled`, from the founder's vocabulary, chosen from what the function actually
+knows. The source cannot yield "nothing", so `NOT CONFIGURED` was not needed as a fallback; the new
+`lib/operations.test.ts` closes the vocabulary and asserts every component carries a state and a
+detail, which is what keeps a future branch from adding a blank row.
+
+One long-standing gap came with it: `.status-list h3` had no CSS rule, so `/status` rendered its row
+names unstyled while `/security`, which uses `h2` in the same grid, did not.
+
+### G.2 The follow-up the phone gates forced (`d862260`)
+
+`e2e/mobile-landing.spec.ts:296` measures every control on the landing page against a 44px touch
+floor, and the three inline links this lane had just written came in at 14px, 14px and 33px. Scene
+4's pointer to `/sources` became a ghost button beside Explore; scene 2's two links were removed
+outright — the connector rows already carry their status words, and `/integrations` is one tap away
+in the nav and the footer.
+
+That exposed an older, wider defect. The global reset is `a { color: inherit; text-decoration:
+none }` and `.fine` restored neither, so **every** link in fine print on this site rendered as plain
+muted mono, distinguishable from the sentence around it by nothing at all — WCAG 1.4.1, and simply
+invisible. Survivable while fine print was only prose; not survivable once an evidence claim
+depends on a reader reaching the capability manifest from it. `.fine a` now takes the underline
+`.policy-copy a` already used.
+
+## G.3 Gates
+
+Run from `D:\CodexProjects\uskc-lanes\site-integration`, logs beside it in
+`D:\CodexProjects\uskc-lanes\lane-g-*.log`.
+
+| # | Command | Exit | Result |
+|---|---|---|---|
+| 1 | `pnpm check` (root) | 0 | `tsc --noEmit`, clean |
+| 2 | `pnpm test` (root) | 0 | 29 files, **208 passed** |
+| 3 | `nextjs/ pnpm check` | 0 | `tsc --noEmit && eslint app components lib`, clean |
+| 4 | `nextjs/ pnpm test` | 0 | 167 files, **1,640 passed** (baseline 166 / 1,637; the extra file and three tests are `lib/operations.test.ts` and the inverted activation-policy rule) |
+| 5 | `nextjs/ pnpm build` | 0 | 140 route rows, 42 statically prerendered |
+| 6 | Playwright `--project=1440 --project=390 --project=reduced-motion` | 1 | **22 failed · 57 skipped · 185 passed** — the same 22 names as the integration baseline in `pw-integration3.log` (§5 above). `comm` over both sorted lists: nothing new, nothing fixed. |
+| 7 | Phone screenshots + overflow, 360/390/430 × chromium+webkit, `/` and `/sources` | 0 | **ALL WIDTHS CLEAN** — `document.documentElement.scrollWidth <= innerWidth` at every one of the twelve views |
+
+Gate 6 exits 1 on the pre-existing 22. Nothing was patched to make it green.
+
+Screenshots (outside the repo): `D:\CodexProjects\uskc-lanes\lane-g-screens\` — twelve full-page
+shots plus eight scrolled shots of the two scenes this lane rewrote, at 360 and 430 in both engines.
+
+### A harness trap worth recording
+
+The first phone run reported six overflowing views and an unstyled page in WebKit. It was not a
+defect. `next.config.mjs` omits `upgrade-insecure-requests` only when `PLAYWRIGHT_LOCAL_HTTP=1`, and
+`headers()` is compiled into the route manifest **at build time** — so a build made without that
+variable, served over plain HTTP, makes WebKit upgrade its own same-origin CSS request to a port
+with no TLS listener and render the site with no stylesheet at all. Chromium exempts localhost and
+looked fine. The same build-time rule applies to `NEXT_PUBLIC_SUPABASE_URL`: a build without it
+inlines nothing, the browser Supabase client is absent, and 26 authenticated-surface specs fail
+against `/login`. Both are properties of the build, not of the branch. Any future run must build
+with `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `PLAYWRIGHT_LOCAL_HTTP=1` set,
+exactly as `playwright.config.ts`'s own `webServer` does, before serving it externally.
+
+## G.4 Copy surfaces added to the lock
+
+`COPY_SURFACES` in `brand-copy.test.ts` gains nine rows, every one of them a surface this lane
+edited that had no guard: `app/evidence`, `app/knowledge-compiler`, `app/resources`,
+`app/integrations`, `app/security`, `app/status`, `app/opengraph-image`, plus
+`lib/activation-policy.ts` and `lib/operations.ts` — the two library files whose strings are public
+copy that no page contains.
+
+## G.5 Not done, and why
+
+- **The 22 pre-existing Playwright failures stay.** They are §5's list, they belong to lane D's and
+  the integrator's surfaces or to fixtures this lane did not touch, and the contract says record
+  rather than patch.
+- **The two release receipts are not published.** Removing the citation was the available half of
+  A-6. Publishing a redacted `/evidence` artifact for the 2026-08-29 GPU OCR run and the R2 canary
+  is a founder decision about what may be disclosed, not a copy decision.
+- **`/docs/files-and-formats` still under-describes the manifest** (copy audit item 5, an
+  under-claim). It is a docs surface driven by `lib/docs-content.ts` and outside A-1…A-6.
+- **`lib/compiler-contract.ts` and `lib/docs-content.ts` keep "bounding box"** where they describe
+  the compile contract and the Ask response as they actually work today on the PDF path. Neither is
+  a marketing generalization; both were left for the release that integrates EvidenceLocator v2,
+  which is when the underlying record changes.
+- **The Preview deployment is not verified.** The push creates one automatically; this session did
+  not consult the Vercel MCP.
+
+## G.6 For the founder — real-world acts only
+
+1. **Open and merge the PR** for `agent/uskc-integration`. Lane G does not.
+2. **Decide whether a redacted public evidence artifact should exist** for the 2026-08-29 GPU OCR
+   full-sequence run and the R2 synthetic canary. Until then `/security` states its controls and
+   cites no receipt, which is the honest position but not the strongest one.
