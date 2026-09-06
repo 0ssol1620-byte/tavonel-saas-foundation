@@ -1,0 +1,76 @@
+# Does 0001 to 0050 still apply to an empty database, and does the RLS matrix hold?
+#
+# Neither question has ever been answered. Production's migration history records 0001,
+# 0020-0023 and 0038-0048 only, while tables from 0002-0037 exist (gap matrix L-2), so the
+# schema cannot be derived from the history, and `supabase/tests/*.sql` has never executed
+# anywhere because the build machine has no Docker (customer-data gate, precondition 1).
+#
+# A GitHub runner has Docker. That is the whole trick: `supabase db start` applies every file
+# under supabase/migrations in filename order to a throwaway Postgres 17, so a job log here is
+# the rehearsal receipt, and a failure in that step IS the finding rather than a broken build.
+#
+# No secret, no project ref, no access token, no db URL. This job must never be able to reach
+# the live project -- it proves what the files say, not what production happens to contain.
+name: DB rehearsal
+
+on:
+  pull_request:
+  push:
+    branches: [main, "agent/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: db-rehearsal-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  db-rehearsal:
+    name: db-rehearsal
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pinned to the version the repository already runs locally. `latest` would let a CLI
+      # release change what this receipt means without a commit saying so.
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.116.0
+
+      # The repository carries migrations and tests but no config.toml, because the CLI's
+      # config is local-stack tooling rather than schema. `init` writes it and needs no Docker.
+      # The grep is the assertion: Postgres 17 is what production runs, so a rehearsal on any
+      # other major version proves nothing about it.
+      - name: Create the local stack config
+        run: |
+          test -f supabase/config.toml || supabase init
+          grep -qx 'major_version = 17' supabase/config.toml
+
+      - name: Apply every migration to a clean database
+        run: supabase db start
+
+      - name: Print the resulting migration history
+        run: supabase migration list --local
+
+      # Dumped and uploaded before the tests run, so a red pgTAP suite still leaves the
+      # orchestrator the schema it needs for the read-only diff against production (L-2).
+      - name: Dump the schema the migrations produced
+        run: supabase db dump --local --schema public -f schema-after-0050.sql
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: schema-after-0050
+          path: schema-after-0050.sql
+          retention-days: 30
+          if-no-files-found: error
+
+      # pgTAP is what every fixture's plan()/ok() lives in. Creating it is idempotent and the
+      # official docs never confirmed the local image ships it enabled, so this asks rather
+      # than assumes -- and it is a CLI call, not a new dependency.
+      - name: Run the pgTAP suite
+        run: |
+          supabase db query --local "create extension if not exists pgtap with schema extensions;"
+          supabase test db
