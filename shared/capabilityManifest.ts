@@ -279,12 +279,40 @@ export const CAPABILITY_MANIFEST = {
   ],
 } as const satisfies CapabilityManifest;
 
+/**
+ * A MIME type appears at most once, or the manifest is refused.
+ *
+ * `deriveUploadWhitelist` builds the server's whitelist with `Object.fromEntries`, so two rows
+ * for one MIME collapse to the last one silently: the table, the docs and the file picker print
+ * both rows while the server accepts only one set of extensions, and an accepted row appended
+ * after an `UNSUPPORTED` one overrides the refusal without changing a word of the page that says
+ * the format is refused. Losing a rule to a key collision is the "website says yes, backend says
+ * no" failure this manifest exists to remove, so it throws instead.
+ *
+ * Throwing is safe because a manifest is static data, not a request: the check runs when this
+ * module loads, so a duplicate fails `pnpm check`, `pnpm test` and the build rather than reaching
+ * a deployment. Nothing a user sends can reach it.
+ */
+export function assertDistinctMimes(manifest: CapabilityManifest): void {
+  const seen = new Set<string>();
+  for (const entry of manifest.entries) {
+    if (seen.has(entry.mime)) {
+      throw new Error(`capability manifest declares ${entry.mime} more than once`);
+    }
+    seen.add(entry.mime);
+  }
+}
+
+assertDistinctMimes(CAPABILITY_MANIFEST);
+
 export function isAcceptedAtUpload(status: CapabilityStatus): boolean {
   return (capabilityStatusesAcceptedAtUpload as readonly string[]).includes(status);
 }
 
 /** The server-side intake whitelist: `{ mime: [".ext"] }` for every tier accepted at upload. */
 export function deriveUploadWhitelist(manifest: CapabilityManifest): Record<string, string[]> {
+  // The collapsing step re-checks whatever manifest it is handed, not only the shipped one.
+  assertDistinctMimes(manifest);
   return Object.fromEntries(
     manifest.entries
       .filter((entry) => isAcceptedAtUpload(entry.status))

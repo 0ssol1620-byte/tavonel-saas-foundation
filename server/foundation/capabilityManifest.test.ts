@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
+  assertDistinctMimes,
   CAPABILITY_MANIFEST,
   CAPABILITY_MANIFEST_SCHEMA,
   type CapabilityManifest,
@@ -386,5 +387,34 @@ describe("a manifest that breaks the contract is refused", () => {
   it("refuses a manifest that will not say where its entries came from", () => {
     const broken = { ...manifestOf(entry()), generatedFrom: "hand-written" };
     expect(violations(broken)).toContain("generatedFrom must name the code the entries were derived from");
+  });
+
+  /*
+    Two rows for one MIME used to be a silent overwrite, not an error.
+
+    `Object.fromEntries` keeps the last pair, so the page, the docs table and the file picker
+    printed both rows while the server accepted one -- a user offered `.tif` by the picker got
+    FILENAME_MIME_MISMATCH from the route. Worse in the second case below: a BEST_EFFORT row
+    appended after an UNSUPPORTED one for the same MIME silently overrode a documented refusal.
+  */
+  it("refuses two rows for one MIME instead of keeping the last", () => {
+    const duplicated = manifestOf(
+      entry({ mime: "image/tiff", sourceFamily: "image", extensions: ["tif"] }),
+      entry({ mime: "image/tiff", sourceFamily: "image", extensions: ["tiff"] }),
+    );
+    expect(() => assertDistinctMimes(duplicated)).toThrow(/image\/tiff more than once/);
+    expect(() => deriveUploadWhitelist(duplicated)).toThrow(/image\/tiff more than once/);
+  });
+
+  it("refuses an accepted row that would override a refused row for the same MIME", () => {
+    const overridden = manifestOf(
+      entry({ mime: "application/x-hwp", extensions: ["hwp"], status: "UNSUPPORTED", readerPlan: [], preserved: [], evidenceLocatorKinds: [] }),
+      entry({ mime: "application/x-hwp", extensions: ["hwp"], status: "BEST_EFFORT" }),
+    );
+    expect(() => deriveUploadWhitelist(overridden)).toThrow(/application\/x-hwp more than once/);
+  });
+
+  it("ships a manifest whose MIME types are already distinct", () => {
+    expect(() => assertDistinctMimes(CAPABILITY_MANIFEST)).not.toThrow();
   });
 });
