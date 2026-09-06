@@ -556,3 +556,77 @@ C-F-6 (no `av_scan_verdict_present` in the frozen precondition list), and every 
 §8 except number 9, which §8.1 answered and R2.5 implements. *(Superseded by §8.2 and repair round
 3: the §8 items were not open questions at all — the founder and the orchestrator had already closed
 all nine, and §8 now states them as decisions.)*
+
+---
+
+# Repair round 3 (2026-09-06, final)
+
+One item, and it is a documentation item: contract §8.2 rules that lane F cites the closed decisions
+rather than re-asking them. Nothing about the gate's behaviour was wrong, so nothing in the gate
+changed. No new test ships with this round because no code path changed — the round's whole content
+is the removal of eight questions that had already been answered.
+
+## R3.1 Major — founder questions 2–8 were re-asked after §8.1 closed them
+
+`USKC_LANE_REPORT_F.md` §8 and `docs/CUSTOMER_DATA_GATE_2026-09-06.md` §6 both listed eight items as
+open founder questions. Every one had already been decided, and §8.2 names the decision for each.
+Both sections are rewritten as statements, in the same order, each carrying the item that closed it:
+
+| # | Was asked as | Now states | Closed by |
+|---|---|---|---|
+| 1 | "Confirm that fail-closed direction, or say gate events belong somewhere every workspace can write" | `enterprise_audit_events` is the canonical log; `organization_id NOT NULL` is the intended fail-closed direction and stays | RESOLVED B-6 + contract §8.2 |
+| 2 | "`/subprocessors` omits Dropbox and Microsoft … the defect direction that matters" | Source providers are not TAVONEL subprocessors; neither is added until the production architecture delegates processing and legal confirms. Not a disclosure defect, no change | RESOLVED A-5 |
+| 3 | "No DPA is published … its content is a legal decision" | Precondition 15 stays PARTIAL and open until legal publishes a DPA; it is one of B-10's enablement prerequisites | RESOLVED B-10 + §8.2 |
+| 4 | "Narrowing them changes what the connector can do" | Graph scope narrowing is P2, with the rest of the connector work | Contract §8.2 + RESOLVED §D item 6 |
+| 5 | "accepted limitation, or fix before P2 connectors?" | Not an acceptable production limitation. Connector qualification is `BLOCKED`; no connector is `VERIFIED` until tombstone, delete, permission-change and move/rename semantics are verified | RESOLVED B-7 |
+| 6 | "Building one … needs its own canary and its own approval" | Retention enforcement is P2/P3 and ships with its own approval; precondition 10 stays PARTIAL | Contract §8.2 |
+| 7 | "Say if the stale paragraph should be struck instead" | Appended, not struck — historical text is not overwritten. What this lane did is what the ruling requires | Contract §8.1 |
+| 8 | "Stated for the record …" (framed as a question by its position in the list) | Precondition 17 is recorded only by the founder. A fact, and row 17 is `MISSING by design` | Contract §8.2 |
+| 9 | Already struck in round 2 | The receipt digest binds `tenantId` and `workspaceId`; implemented in R2.5. **DONE** | Contract §8.1 |
+
+§8's heading now says there are no open founder questions, because there are none: this lane opened
+no new one in any round.
+
+## R3.2 Three statements that had gone false, corrected in the same pass
+
+A document that cites a ruling and then contradicts it elsewhere is worse than one that asks, so the
+three places where the prose still described a superseded state are fixed:
+
+1. `docs/…GATE…md` gap-matrix row 9 (`deletion_tombstone_propagation_verified`) recorded the Drive
+   `trashed = false` gap with no status. It now carries B-7's ruling: connector qualification
+   `BLOCKED`, no connector `VERIFIED`, P2.
+2. Row 15 (`dpa_and_privacy_notice_published`) named Dropbox and Microsoft as missing from
+   `/subprocessors` in a way that read as a defect. It now cites A-5, which is why they are absent,
+   and B-10 for the DPA itself.
+3. `docs/…GATE…md` §4 still said `app/workspace/page.tsx` "was **not** edited … two lines for
+   whoever merges". §8.1 authorised the edit and round 2 made it; the bullet now describes what the
+   file actually contains, including `GATE_LABELS` typed `Record<ActivationCapability, string>` and
+   the heading "Processing gates". The first-pass claim in report §2 is marked superseded rather
+   than deleted, as is R2.9's closing line about §8.
+
+Report §7's note on seam-map O-4 also stopped calling the tenant/workspace identity "still the open
+question": RESOLVED B-2 keeps the two concepts separate and §8.1 accepts `tenantId = workspaceId` as
+the P0 shim, with the key layout deferred to a later migration and ADR — lane AB's record.
+
+## R3.3 Gates — all rerun at round 3, real exit codes
+
+| # | Command (cwd) | Exit | Output tail |
+|---|---|---|---|
+| 0a | `pnpm check` (worktree root) | **0** | `> tsc --noEmit` — no diagnostics |
+| 0b | `pnpm test` (worktree root) | **0** | `Test Files 25 passed (25)` · `Tests 140 passed (140)` · Duration 3.12s |
+| 1 | `pnpm check` (`nextjs/`) | **0** | `> tsc --noEmit && eslint app components lib` — no diagnostics |
+| 2 | `pnpm test` (`nextjs/`) | **0** | `Test Files 164 passed (164)` · `Tests 1583 passed (1583)` — unchanged from round 2, zero regressions |
+| 3 | `pnpm build` (`nextjs/`) | **0** | `✓ Compiled successfully in 39.7s` · `✓ Generating static pages (69/69)` · `First Load JS shared by all 103 kB`. **69 static pages**, unchanged. Run twice on the same tree, both exit 0 |
+| 5 | `pnpm security:suite` (worktree root) | **0** | `Test Files 8 passed (8)` · `Tests 90 passed (90)` |
+| 6 | `pnpm security:suite` (`nextjs/`) | **0** | `Test Files 9 passed (9)` · `Tests 62 passed (62)` |
+| 4 | Playwright | **not rerun** | Round 3 changed two Markdown files and no page, route, component or style. R2.8 row 4 stands, including its proof that the two `e2e/pipeline-board.spec.ts` failures are pre-existing on the base — which contract §8.2 has since recorded for the integration report as not any lane's to fix |
+| — | `supabase/tests/tenant_rls_matrix.sql` | **skipped** | Unchanged reason: no wired runner, and neither Docker nor the Supabase CLI is on this machine. That absence *is* precondition 1's PARTIAL status |
+
+## R3.4 What round 3 did not change
+
+No code, no test, no migration, no schema. No PR, no merge, no deploy, no migration applied, no
+third-party dependency, nothing under `research/model_arena_20260903/**`, no Protected Core path, no
+other lane's file. `activationPolicy.customerData.enabled` is still `false`, the live request builder
+still writes the `foundation_synthetic_only` literal, and seven preconditions are still MISSING — so
+no evidence set that exists today produces an allowed decision. Production deploy 안 함. Git push로
+Preview deployment는 자동 생성됨.
