@@ -1,11 +1,20 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
+import { failureClasses } from "../../../shared/uskcEnums";
 import { PermanentReject, RetryableError } from "./errors";
 import { cdrRequestSignature, sha256DigestHeader } from "./hmac";
 import { handleQueue, handleRequest, type Env } from "./index";
 import { cdrReceiptSiblingKey, immutableObjectKey, ocrReviewSiblingKey, ocrSiblingKey } from "./keys";
-import { sanitizeObject, type R2BucketLike, type R2ObjectLike } from "./sanitize";
+import {
+  CDR_DETAIL_FAILURE_CLASS,
+  cdrRefusalFailureClass,
+  cdrRejectSiblingKey,
+  sanitizeObject,
+  type R2BucketLike,
+  type R2ObjectLike,
+} from "./sanitize";
 
 const FIXTURE_SECRET = "foundation-cdr-hmac-fixture-secret-ok";
 const SYNTHETIC_URL = "https://tavonel-cdr-synthetic-317850201666.asia-northeast3.run.app/v1/disarm";
@@ -220,8 +229,10 @@ describe("sanitizeObject", () => {
     const result = await sanitizeObject(
       envFor(r2, { FOUNDATION_OCR_URL: FOUNDATION_OCR }),
       SOURCE_KEY,
+      // 422, not 503: a reader that refused this document is a verdict and earns the receipt.
+      // An unavailable endpoint is covered separately, and now earns nothing.
       async (input, init) => String(input).includes("/v1/ocr")
-        ? new Response("capacity unavailable", { status: 503 })
+        ? new Response("this document was refused", { status: 422 })
         : cleanCdrFetch(input, init),
       () => new Date("2026-08-29T00:00:00Z"),
       () => "fixture-review-request",
@@ -248,7 +259,7 @@ describe("sanitizeObject", () => {
       async (input, init) => {
         if (String(input).includes("/v1/ocr")) {
           retriedOcrCalls += 1;
-          return new Response("capacity unavailable", { status: 503 });
+          return new Response("this document was refused", { status: 422 });
         }
         return cleanCdrFetch(input, init);
       },
@@ -256,6 +267,54 @@ describe("sanitizeObject", () => {
     assert.equal(message.ackCount, 1);
     assert.equal(message.retryCount, 0);
     assert.equal(retriedOcrCalls, 0);
+  });
+
+  it("charges nothing and writes no review receipt when OCR is merely unavailable", async () => {
+    for (const unavailable of [
+      async () => { throw new TypeError("socket closed"); },
+      async () => new Response("capacity unavailable", { status: 503 }),
+      async () => new Response("slow down", { status: 429 }),
+    ]) {
+      const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
+      await assert.rejects(
+        () => sanitizeObject(
+          envFor(r2, { FOUNDATION_OCR_URL: FOUNDATION_OCR }),
+          SOURCE_KEY,
+          async (input, init) => String(input).includes("/v1/ocr")
+            ? await unavailable()
+            : cleanCdrFetch(input, init),
+        ),
+        RetryableError,
+      );
+      // The CDR half is done and stays done; only the reading is unfinished.
+      const immutableKey = immutableObjectKey("ws_pilot", "doc_1", outputSha256());
+      assert.equal(r2.objects.has(immutableKey), true);
+      assert.equal(r2.objects.has(ocrReviewSiblingKey(immutableKey)), false);
+      assert.equal(r2.puts.some((entry) => entry.key.endsWith("ocr-review.json")), false);
+    }
+  });
+
+  it("leaves an unavailable OCR on the queue instead of settling it", async () => {
+    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
+    const message = { ackCount: 0, retryCount: 0, body: { object: { key: SOURCE_KEY } } };
+    const settlements: unknown[] = [];
+    await handleQueue(
+      { messages: [{
+        body: message.body,
+        ack: () => { message.ackCount += 1; },
+        retry: () => { message.retryCount += 1; },
+      }] } as never,
+      envFor(r2, { FOUNDATION_OCR_URL: FOUNDATION_OCR }),
+      async (input, init) => {
+        if (String(input) === SETTLEMENT_URL) settlements.push(init?.body);
+        if (String(input).includes("/v1/ocr")) return new Response("capacity unavailable", { status: 503 });
+        return cleanCdrFetch(input, init);
+      },
+    );
+    assert.equal(message.retryCount, 1);
+    assert.equal(message.ackCount, 0);
+    // Nothing was charged, released or parked: the attempt simply has not finished yet.
+    assert.deepEqual(settlements, []);
   });
 
   it("refuses oversized objects before calling CDR", async () => {
@@ -418,5 +477,167 @@ describe("Worker HTTP and queue surface", () => {
     );
     assert.equal(failed.retryCount, 1);
     assert.equal(failed.ackCount, 0);
+  });
+});
+
+/*
+ * A refusal is evidence, and evidence has to exist.
+ *
+ * Everything below is one rule seen from four sides: a source the CDR will never process ends in
+ * a durable, typed, single record -- or the message stays on the queue. Never an acknowledgement
+ * with nothing written, never a second receipt, never a class somebody guessed.
+ */
+describe("permanent refusals leave a receipt", () => {
+  function oversizedR2() {
+    const r2 = new FakeR2();
+    r2.objects.set(SOURCE_KEY, { bytes: SOURCE_BYTES, contentType: "application/pdf" });
+    const originalGet = r2.get.bind(r2);
+    r2.get = async (key: string) => {
+      const object = await originalGet(key);
+      return object ? { ...object, size: 6 * 1024 * 1024 } : null;
+    };
+    return r2;
+  }
+
+  function queueMessage() {
+    const counters = { ackCount: 0, retryCount: 0 };
+    return {
+      counters,
+      batch: { messages: [{
+        body: { object: { key: SOURCE_KEY } },
+        ack: () => { counters.ackCount += 1; },
+        retry: () => { counters.retryCount += 1; },
+      }] } as never,
+    };
+  }
+
+  function readReceipt(r2: FakeR2) {
+    const key = cdrRejectSiblingKey(SOURCE_KEY);
+    assert.ok(key);
+    const stored = r2.objects.get(key);
+    return stored ? JSON.parse(new TextDecoder().decode(stored.bytes)) : null;
+  }
+
+  it("writes exactly one create-once receipt, carrying no filename and no content", async () => {
+    const r2 = oversizedR2();
+    const first = queueMessage();
+    await handleQueue(first.batch, envFor(r2), cleanCdrFetch);
+    assert.equal(first.counters.ackCount, 1);
+    assert.equal(first.counters.retryCount, 0);
+
+    const receipt = readReceipt(r2);
+    assert.equal(receipt.schemaVersion, "tavonel.cdr_reject_receipt.v1");
+    assert.equal(receipt.sourceKey, SOURCE_KEY);
+    assert.equal(receipt.reasonCode, "PARSER_OOM");
+    assert.equal(receipt.observedBytes, 6 * 1024 * 1024);
+    assert.equal(receipt.declaredBytes, null);
+    assert.equal(receipt.provider, "tavonel_pdf_raster");
+    assert.ok(Number.isFinite(Date.parse(receipt.occurredAt)));
+    assert.deepEqual(
+      Object.keys(receipt).sort(),
+      ["declaredBytes", "observedBytes", "occurredAt", "provider", "reasonCode", "schemaVersion", "sourceKey"],
+    );
+  });
+
+  it("does not write a second receipt or change the first when the message is redelivered", async () => {
+    const r2 = oversizedR2();
+    await handleQueue(queueMessage().batch, envFor(r2), cleanCdrFetch);
+    const first = readReceipt(r2);
+
+    const redelivered = queueMessage();
+    const settlements: string[] = [];
+    await handleQueue(redelivered.batch, envFor(r2), async (input, init) => {
+      if (String(input) === SETTLEMENT_URL) settlements.push(String(init?.body));
+      return cleanCdrFetch(input, init);
+    });
+    assert.equal(redelivered.counters.ackCount, 1);
+    // Byte-identical, timestamp included: the second delivery did not overwrite the first.
+    assert.deepEqual(readReceipt(r2), first);
+    const rejectKey = cdrRejectSiblingKey(SOURCE_KEY);
+    const attempts = r2.puts.filter((entry) => entry.key === rejectKey);
+    assert.equal(attempts.length, 2, "both deliveries attempt the write");
+    // Create-once is what turns the second attempt into a no-op rather than a second receipt.
+    assert.ok(attempts.every((entry) => entry.options.onlyIf?.etagDoesNotMatch === "*"));
+    // The redelivery still settles, because the first delivery may have died between the receipt
+    // and the settlement. It settles identically -- released, nothing charged -- so the ledger's
+    // own idempotency has the same facts to recognise.
+    const body = JSON.parse(settlements[0]);
+    assert.equal(body.outcome, "released");
+    assert.equal(body.actualCredits, 0);
+    assert.equal(body.reasonCode, "CDR_PERMANENT_REJECT");
+    assert.equal(body.failureClass, "PARSER_OOM");
+    assert.equal(body.terminalReason, "quarantine source exceeds the 5 MiB Foundation CDR cap");
+  });
+
+  it("keeps the message retryable when the settlement cannot record the refusal", async () => {
+    const r2 = oversizedR2();
+    const message = queueMessage();
+    await handleQueue(message.batch, envFor(r2), async (input, init) => String(input) === SETTLEMENT_URL
+      ? new Response(JSON.stringify({ code: "INTAKE_STATE_WRITE_FAILED" }), { status: 503 })
+      : cleanCdrFetch(input, init));
+    assert.equal(message.counters.retryCount, 1);
+    assert.equal(message.counters.ackCount, 0);
+    // The receipt is still written first: it is the record, and it is create-once, so the retry
+    // that follows re-uses it rather than writing a second one.
+    assert.equal(readReceipt(r2)?.reasonCode, "PARSER_OOM");
+  });
+
+  it("never acknowledges a refusal it could not record", async () => {
+    const r2 = oversizedR2();
+    r2.put = async () => { throw new Error("r2 unavailable"); };
+    const message = queueMessage();
+    const settlements: string[] = [];
+    await handleQueue(message.batch, envFor(r2), async (input, init) => {
+      if (String(input) === SETTLEMENT_URL) settlements.push(String(init?.body));
+      return cleanCdrFetch(input, init);
+    });
+    assert.equal(message.counters.retryCount, 1);
+    assert.equal(message.counters.ackCount, 0);
+    assert.deepEqual(settlements, []);
+  });
+
+  it("gives every refusal the CDR service can raise exactly one frozen failure class", () => {
+    const app = readFileSync(new URL("../../cdr-cloudrun/app.py", import.meta.url), "utf8");
+    const raised = [...app.matchAll(/HTTPException\(\s*(\d{3})\s*,\s*"([^"]+)"/g)]
+      .map(([, status, detail]) => ({ status: Number(status), detail }));
+    assert.ok(raised.length >= 15, "the CDR service raises fewer refusals than expected");
+
+    for (const { status, detail } of raised) {
+      // 401/403 is our own credential problem and 5xx is the service being down. Neither is a
+      // statement about the customer's document, so neither may be recorded as one.
+      if (status < 400 || status === 401 || status === 403 || status >= 500) {
+        assert.equal(
+          detail in CDR_DETAIL_FAILURE_CLASS,
+          false,
+          `${detail} is an operational failure and must not carry a source failure class`,
+        );
+        continue;
+      }
+      assert.equal(
+        detail in CDR_DETAIL_FAILURE_CLASS,
+        true,
+        `app.py raises "${detail}" and no frozen failure class is mapped to it`,
+      );
+    }
+
+    for (const value of Object.values(CDR_DETAIL_FAILURE_CLASS)) {
+      assert.equal((failureClasses as readonly string[]).includes(value), true, `${value} is not a frozen FailureClass`);
+    }
+  });
+
+  it("does not invent a class for a refusal it has never seen", () => {
+    assert.equal(cdrRefusalFailureClass(422, "CDR something nobody has written yet"), "CORRUPT_SOURCE");
+    assert.equal(cdrRefusalFailureClass(422, null), "CORRUPT_SOURCE");
+    assert.equal(cdrRefusalFailureClass(413, null), "PARSER_OOM");
+    assert.equal(cdrRefusalFailureClass(415, null), "UNSUPPORTED_FORMAT");
+  });
+
+  it("retries rather than refusing the source when the CDR rejects this worker's credentials", async () => {
+    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
+    await assert.rejects(
+      () => sanitizeObject(envFor(r2), SOURCE_KEY, async () => new Response("nope", { status: 401 })),
+      RetryableError,
+    );
+    assert.equal(r2.objects.has(cdrRejectSiblingKey(SOURCE_KEY) as string), false);
   });
 });
