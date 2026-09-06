@@ -65,9 +65,14 @@ class FakeClamd:
         self.host, self.port = self._server.getsockname()
         self._thread = threading.Thread(target=self._serve, daemon=True)
 
-    def __enter__(self) -> FakeClamd:
+    def start(self) -> FakeClamd:
+        """Serve until the process exits — for a suite that needs a scanner for its whole run."""
+
         self._thread.start()
         return self
+
+    def __enter__(self) -> FakeClamd:
+        return self.start()
 
     def __exit__(
         self,

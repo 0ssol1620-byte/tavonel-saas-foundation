@@ -125,17 +125,20 @@ and hence to the SourceVersion the Worker records — rather than being a claim 
 `/health` reports `scannerReady`, and returns 503 when scanning is required and the scanner cannot be
 pinged, because an instance that would refuse every request is not healthy.
 
-There is no path from a scanner error to a clean verdict. Once a host is configured, every error
-raises, whatever `MALWARE_SCAN_REQUIRED` says; the flag only decides what happens when **no** scanner
-is configured at all — refuse (`1`, the default and the production value) or return the explicit
-non-verdict `{"verdict":"not_scanned","engine":"none"}` (`0`, local development and the suites that
-have no clamd). `not_scanned` is never reported as `clean`.
+**There is no opt-out and no bypass.** Core's `allow_development_antivirus_bypass` is deliberately
+not ported. `scan_stream` has exactly one non-raising outcome — a clean verdict from a reachable
+engine — so no caller holds a branch that could promote anything else: an unreachable scanner, an
+unconfigured one, a hung one and an undecodable reply all raise, and `/v1/disarm` turns each into a
+refusal that writes nothing. `MALWARE_SCAN_REQUIRED` states the invariant rather than switching it:
+unset or exactly `1` is the only accepted state, and any other value is a configuration error that
+refuses at import (the process does not start), on every request, and on `/health`. A suite with no
+clamd uses a fake socket speaking the real protocol (`tests/clamd_stub.py`), never a flag.
 
 ### Configuration
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `MALWARE_SCAN_REQUIRED` | `1` | Anything but the exact string `0` means required |
+| `MALWARE_SCAN_REQUIRED` | `1` | Must be unset or exactly `1`; anything else refuses at startup and on every request |
 | `CLAMD_HOST` / `CLAMD_PORT` | — / `3310` | TCP clamd; localhost in the sidecar deployment |
 | `CLAMD_SOCKET` | — | Unix socket path; takes precedence over host/port |
 | `CLAMD_CONNECT_TIMEOUT_SECONDS` | `3` | Connect budget; exceeded ⇒ `SCANNER_UNAVAILABLE` |
@@ -161,24 +164,37 @@ The intake ceiling is `MAX_INPUT_BYTES` = 5 MiB, enforced by `copy_and_digest` a
 sidecar before an upload URL is minted. The stock `clamd.conf` shipped in the image is above it by
 two orders of magnitude, so no override is deployed:
 
-| Option | ClamAV default | Intake ceiling | Headroom |
-|---|---:|---:|---|
-| `StreamMaxLength` | 100 MB | 5 MiB | 19× — the INSTREAM connection is never closed for size |
-| `MaxFileSize` | 100 MB | 5 MiB | 19× — no member of an accepted package goes unscanned for size |
-| `MaxScanSize` | 400 MB | 5 MiB | 76× — total recursively extracted data |
-| `MaxRecursion` | 17 | ≤ 2 (PDF, or one OOXML/ODF ZIP layer) | 8× |
+| Option | ClamAV default | Compared against | Margin | Tested? |
+|---|---:|---|---|---|
+| `StreamMaxLength` | 100 MB | 5 MiB of posted input | 19× on input size | yes — the 4.9 MiB scan |
+| `MaxFileSize` | 100 MB | 5 MiB of posted input | 19× on input size | no |
+| `MaxScanSize` | 400 MB | data *extracted* while scanning, not the input | 76× **input size vs extracted-data budget**, not a like-for-like margin | no |
+| `MaxRecursion` | 17 | ≤ 2 layers (PDF, or one OOXML/ODF ZIP) | 8× on nesting depth | no |
 
-This is asserted empirically, not assumed: the qualification job scans a 4.9 MiB fixture — just under
-the ceiling — and requires a clean verdict, which fails loudly if any stream limit is ever lowered
-beneath the intake ceiling. **If the 5 MiB ceiling is ever raised past 100 MB, or archive inputs are
-ever qualified, `StreamMaxLength`, `MaxFileSize` and `MaxRecursion` must be set explicitly in a
-mounted `clamd.conf` before the raise ships** — otherwise a crafted container can pass unscanned data
-through silently, which is the exact failure the research receipt flags.
+One row of that table is measured: the qualification job scans a 4.9 MiB fixture — just under the
+ceiling — and requires a clean verdict, which is the empirical check on `StreamMaxLength` only, because
+a stream that exceeds it is refused by clamd (`INSTREAM size limit exceeded. ERROR` ⇒
+`antivirus_scan_error`). The other three rows are documented defaults, not test results.
+
+**Residual, and it is not small.** `MaxScanSize`, `MaxFileSize` and `MaxRecursion` are *silent-stop*
+limits under the image's shipped default `AlertExceedsMax no`: clamd stops scanning past them and
+replies `OK` for what it did scan, flagging `Heuristics.Limits.Exceeded` only when `AlertExceedsMax
+yes` is set (ClamAV `rel/1.5` `clamd.conf.sample`). So a ≤5 MiB input whose nested containers or
+streams inflate past 400 MB receives a `clean` verdict covering only the scanned portion, and this
+adapter cannot see the difference: clamd reports `OK` either way. `service.yaml` mounts no
+`clamd.conf` today, so the deployed configuration carries this residual. Closing it means mounting a
+`clamd.conf` with `AlertExceedsMax yes` (and then treating `Heuristics.Limits.Exceeded` as a refusal,
+not a detection) — a change with its own false-positive cost, so it is recorded rather than assumed.
+
+**If the 5 MiB ceiling is ever raised past 100 MB, or archive inputs are ever qualified,
+`StreamMaxLength`, `MaxFileSize`, `MaxScanSize` and `MaxRecursion` must be set explicitly in a mounted
+`clamd.conf` before the raise ships** — otherwise a crafted container passes unscanned data through
+silently, which is the exact failure the research receipt flags.
 
 ### Egress, signatures and the sidecar tag
 
 The signature database is baked into the pinned tag, and `service.yaml` disables `freshclam`
-(`CLAMAV_NO_FRESHCLAMD`) because the revision is deployed with all traffic pinned to a VPC with no
+(`CLAMAV_NO_FRESHCLAMD`) because the definition pins all of the revision's traffic to a VPC with no
 Cloud NAT: a daemon that cannot reach `database.clamav.net` would fail every two hours and log noise
 instead of refreshing anything. The consequence is explicit and must not be described away:
 

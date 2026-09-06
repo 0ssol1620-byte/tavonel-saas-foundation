@@ -21,7 +21,23 @@ import fitz
 from fastapi import BackgroundTasks, FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 
-from malware import MalwareDetectedError, MalwareScanError, scan_required, scan_stream, scanner_ready
+from malware import (
+    MalwareDetectedError,
+    MalwareScanError,
+    require_scanning_enabled,
+    scan_stream,
+    scanner_ready,
+)
+
+try:
+    # Refuse to boot rather than serve a single request with scanning disarmed. This service
+    # has no bypass flag: MALWARE_SCAN_REQUIRED may only be "1" (or be unset), and anything
+    # else is a configuration error reported here, before uvicorn binds a port.
+    require_scanning_enabled()
+except MalwareScanError as exc:
+    raise RuntimeError(
+        "MALWARE_SCAN_REQUIRED must be unset or exactly '1'; this service has no scan bypass"
+    ) from exc
 
 APP_NAME: Final = "tavonel-pdf-raster-cdr"
 SIGNATURE_TTL_SECONDS: Final = 300
@@ -237,6 +253,18 @@ def scan_or_refuse(source: Path, input_sha256: str) -> dict[str, object]:
             },
             headers={"retry-after": "60"},
         ) from exc
+    if result.verdict != "clean":
+        # `scan_stream` cannot return anything else today. This is the belt on the braces:
+        # if a future verdict is ever added, it refuses here instead of being promoted.
+        raise HTTPException(
+            503,
+            {
+                "code": "SCANNER_INVALID_RESPONSE",
+                "reason": f"unpromotable_verdict:{result.verdict}",
+                "message": "CDR malware scan produced no clean verdict",
+            },
+            headers={"retry-after": "60"},
+        )
     return {
         "engine": result.engine,
         "signatureVersion": result.signature_version,
@@ -363,9 +391,9 @@ def healthz() -> JSONResponse:
             headers={"cache-control": "no-store", "retry-after": "60"},
         )
     scanner_is_ready = scanner_ready()
-    if scan_required() and not scanner_is_ready:
-        # Reported, not decorative: a required scanner that cannot be reached means every
-        # /v1/disarm call would refuse, so the instance is not healthy.
+    if not scanner_is_ready:
+        # Reported, not decorative: the scanner is always required, so a scanner that cannot
+        # be reached means every /v1/disarm call would refuse and the instance is not healthy.
         return JSONResponse(
             status_code=503,
             content={"status": "unavailable", "reason": "CDR malware scanner is unavailable", "scannerReady": False},
