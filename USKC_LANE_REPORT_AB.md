@@ -39,7 +39,7 @@ listed nine; the diff has ten. Corrected.)
 | `supabase/migrations/0049_universal_source_domain.sql` | `sources`, `source_versions`, `source_representations` |
 | `server/foundation/sourceDomainMigration.test.ts` | Pins the SQL, in the style of `trial-source-digest-migration.test.ts` |
 | `nextjs/lib/source-domain-store.ts` | Projection (pure) + record/read through PostgREST |
-| `nextjs/lib/source-domain-store.test.ts` | 20 tests, 10 of them failure paths (9 named "refuses …") — count as of repair round 2 |
+| `nextjs/lib/source-domain-store.test.ts` | 21 tests, 11 of them failure paths (10 named "refuses …") — count as of repair round 3 |
 | `docs/UNIVERSAL_SOURCE_DOMAIN_2026-09-06.md` | What exists, the alias rule, the backfill, the seam, what is deferred |
 
 Modified **against `origin/main`: none** — every file above is net-new, which is why
@@ -461,3 +461,87 @@ Counts moved by this round: root 93 → 95 tests (the two new refusal tests), ne
 Production deploy 안 함. Git push로 Preview deployment는 자동 생성됨 — not verified through the
 Vercel MCP. The pushed SHA is recorded in the campaign's structured record; as in both earlier
 passes, writing it into this file would itself be a later commit.
+
+---
+
+## 10. Repair round 3 (2026-09-06, final)
+
+Two items, both from contract §8.2 ("AB — one write path"). Both closed. Nothing was disputed.
+
+### 10.1 Major — `recordSourceLedger` skipped the workspace-scope check
+
+`projectSourceLedger` refused an object key outside the workspace (the version key and every
+representation key); `recordSourceLedger` did not run that check at all. Structural validation
+(`validateSourceLedger`) cannot see it — it knows an object key is a non-empty string and nothing
+about the R2 layout — so a ledger that reached the store by any path other than projection (an
+adapter's rows, a replayed observation, a future caller) could carry a version or representation key
+pointing into **another workspace's** immutable prefix, have it written, and be answered
+`{ ok: true, value: "recorded" }`. A cross-tenant pointer stored under this workspace's audit trail,
+reported as success.
+
+Fixed as §8.2 requires: one validator, both entry points.
+
+```ts
+export function ledgerObjectKeyOutOfScope(ledger: SourceLedger): string | null
+```
+
+returns the first key that is not inside the ledger's own workspace, or `null`. It reads
+`ledger.source.workspaceId` and `ledger.source.sourceId` — the document id in this campaign, because
+`legacyDocumentIdToSourceId` is the identity function; the comment says so, and that function and
+this line change together when it stops being true. `projectSourceLedger` no longer carries its two
+inline checks (`:147`, `:156` before this round) and calls the validator on the assembled ledger;
+`recordSourceLedger` calls the same function after `assertSourceCompilable` and **before the first
+request**, so an out-of-scope ledger costs no read and no write.
+
+Failure-path test (`nextjs/lib/source-domain-store.test.ts`): "refuses an object key outside the
+workspace in either position, before any request" — a representation key moved to
+`immutable/other-workspace/other-workspace/…`, then a version key moved to
+`quarantine/other-workspace/…`, both refused with `REPRESENTATION_OBJECT_KEY_OUT_OF_SCOPE`, and
+`expect(calls).toEqual([])` proving no fetch was made. Verified to fail without the guard: with the
+`recordSourceLedger` check removed it reports `SOURCE_DOMAIN_STORE_WRITE_FAILED` at line 260 (the
+stub's empty-array answer), i.e. it had already started writing.
+
+The projection's ordering moved slightly and is stated rather than hidden: the scope check now runs
+after the lineage/topological pass instead of before it, so an observation that is *both*
+out-of-scope and lineage-broken now reports `REPRESENTATION_LINEAGE_BROKEN`. Both codes are refusals,
+no ledger changes class, and the existing "refuses an object key outside the workspace, in either
+position" projection test is unchanged and green.
+
+Commit `e9293ca`.
+
+### 10.2 Major — the doc did not name the record for the tenant/workspace conflation
+
+`docs/UNIVERSAL_SOURCE_DOMAIN_2026-09-06.md` §3 ("Two fields, one value today") said a tenant axis
+would land in `tenant_id` without naming where that decision gets made. It now names it:
+**ADR-008 (working title: v2 object-key layout)** — the record that decides where a tenant segment
+goes in the object key and what that does to `immutable-keys.ts` — and states that until it is
+written the two values coincide and neither is derived from the other in code (RESOLVED B-2,
+contract §8.1). Wording is §8.2's, verbatim for the ADR name.
+
+Commit `60133f1`.
+
+### 10.3 Gates, rerun after repair round 3
+
+All from `D:\CodexProjects\uskc-lanes\site-ab-source-domain`; nextjs gates from `nextjs/`.
+
+| # | Command | Exit | Output tail |
+|---|---|---|---|
+| 0a | `pnpm check` (root) | 0 | `> tavonel-saas-foundation@1.0.0 check` / `> tsc --noEmit` — no diagnostics |
+| 0b | `pnpm test` (root) | 0 | `Test Files 25 passed (25)` · `Tests 95 passed (95)` · `Duration 3.19s` |
+| 1 | `pnpm check` (nextjs) | 0 | `> tsc --noEmit && eslint app components lib` — no diagnostics |
+| 2 | `pnpm test` (nextjs) | 0 | `Test Files 164 passed (164)` · `Tests 1600 passed (1600)` · `Duration 17.69s` |
+| 3 | `pnpm build` (nextjs) | 0 | `Test Files 164 passed (164)` · `Tests 1600 passed (1600)` (the `prebuild` gate) · `✓ Compiled successfully in 31.0s` · `✓ Generating static pages (69/69)` · `+ First Load JS shared by all 103 kB` |
+| 4 | Playwright | — | **Skipped, unchanged reason.** No page, route, component or style is touched by this round or by this lane at all; `git diff origin/main..HEAD --name-only` still contains no file under `nextjs/app/**` or `nextjs/components/**`. |
+| 5 | `git status --short` | 0 | clean except the intended files |
+| 6 | `git push origin agent/uskc-ab-source-domain` | 0 | see §10.4 |
+
+Counts moved by this round: nextjs 1,599 → 1,600 (the one new refusal test); root unchanged at 95
+(no `shared/*` behaviour changed). `source-domain-store.test.ts` is 21 tests, 11 failure paths — §2's
+row is updated to match rather than left stale. No pre-existing test was edited to make anything pass.
+
+### 10.4 Push
+
+Production deploy 안 함. Git push로 Preview deployment는 자동 생성됨 — not verified through the
+Vercel MCP. The pushed SHA is in the campaign's structured record; as in every earlier pass, the
+commit that carries this section is itself the last one, so the branch head is one commit past the
+SHA any line inside this file could name.
