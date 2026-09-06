@@ -142,3 +142,18 @@ jobs:
         run: |
           supabase db query --local "create extension if not exists pgtap with schema extensions;"
           supabase test db
+
+      # The repair migrations are required to be re-runnable (USKC DB qualification contract,
+      # expand/contract discipline). "Idempotent by construction" is a claim; applying them a second
+      # time to the finished database and re-running the whole suite is the measurement. A migration
+      # that is not re-runnable errors here, and one that is re-runnable but changes state turns the
+      # suite red on the second pass. Only the repair files are replayed: 0001-0051 predate this
+      # rule and several of them are deliberately create-once.
+      - name: Apply the repair migrations a second time and re-run the suite
+        run: |
+          eval "$(supabase status --output env | grep '^DB_URL=')"
+          for file in supabase/migrations/005[234]_*.sql; do
+            echo "replaying $file"
+            psql "$DB_URL" -v ON_ERROR_STOP=1 -q -f "$file"
+          done
+          supabase test db
