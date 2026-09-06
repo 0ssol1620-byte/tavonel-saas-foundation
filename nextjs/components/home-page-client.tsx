@@ -179,13 +179,28 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
         <section className="scene hero" id="s1" data-scene="1" data-band="scatter">
           <div className="shell">
             <p className="slate"><b>TAVONEL</b><span /> KNOWLEDGE COMPILER</p>
+            {/*
+              The headline names the gap the buyer arrives with, not the machinery.
+
+              "Turn documents and connected systems into a source-grounded world your AI can
+              use" described what the product does to files. What a buyer already has is an
+              assistant that can search those files and still answers from stale or
+              unattributable material, so the headline states that gap and the lede states the
+              two properties that close it. Neither adjective is left to mean whatever the
+              reader wants: current is defined as recompiled when the sources change, traceable
+              as every fact pointing at the place it came from.
+
+              Deliberate re-derivation of a locked string under RESOLVED A-2 (2026-09-06).
+              `brand-copy.test.ts` locks the new wording in the same commit.
+            */}
             <h1>
-              <span className="line"><i>Turn documents and connected systems</i></span>
-              <span className="line dim"><i>into a source-grounded world your AI can use.</i></span>
+              <span className="line"><i>Your AI needs more than searchable files.</i></span>
+              <span className="line dim"><i>It needs a current, traceable world.</i></span>
             </h1>
             <p className="lede">
-              TAVONEL reads difficult sources, reconstructs structure, resolves identities and
-              relationships, and compiles a versioned knowledge layer with evidence back to the page.
+              TAVONEL compiles your own sources into that world: current, because it is
+              recompiled when those sources change, and traceable, because every compiled fact
+              stays traceable to its exact source location.
             </p>
             {/*
               Understanding comes before the account.

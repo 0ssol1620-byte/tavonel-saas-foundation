@@ -138,6 +138,18 @@ const BARRED = [
   "never stale",
   "always current",
   "industry-leading",
+  /*
+    RESOLVED A-2 (2026-09-06), added with the re-derived hero.
+
+    "100% accurate" and "never hallucinates" were already here; these three are the rest of
+    that decision's list. Each is the absolute form of something this deployment does at best
+    effort: the reader is a converted-to-PDF OCR path, so "every file supported" and "lossless
+    for every format" are contradicted by the manifest on /sources, and "fully autonomous
+    truth" is contradicted by the promotion gate that requires a person.
+  */
+  "every file supported",
+  "lossless for every format",
+  "fully autonomous truth",
 ];
 
 /**
@@ -207,12 +219,27 @@ describe("public copy", () => {
     }
   });
 
-  it("keeps the locked source-grounded hero and concise lede", () => {
+  /*
+    The lock, re-derived. RESOLVED A-2 (2026-09-06).
+
+    The previous lock pinned "Turn documents and connected systems / into a source-grounded
+    world your AI can use." and a lede ending "evidence back to the page." That lede is the
+    reason this test changes rather than the headline alone: "back to the page" is only true
+    while every accepted format is converted to PDF before reading, and it is the wording
+    RESOLVED A-1 retires across the site. A lock is not a claim that the string is right
+    forever; it is a claim that the string does not drift without a decision. This is that
+    decision, so the lock moves with it instead of being deleted.
+  */
+  it("keeps the locked current-and-traceable hero and its two definitions", () => {
     const page = landingSource();
-    expect(page).toContain("Turn documents and connected systems");
-    expect(page).toContain("into a source-grounded world your AI can use.");
-    expect(page).toContain("TAVONEL reads difficult sources");
-    expect(page).toContain("evidence back to the page.");
+    expect(page).toContain("Your AI needs more than searchable files.");
+    expect(page).toContain("It needs a current, traceable world.");
+    expect(page).toContain("TAVONEL compiles your own sources into that world");
+    // Both adjectives are defined on the page, not left as adjectives.
+    expect(page).toContain("recompiled when those sources change");
+    expect(page).toContain("stays traceable to its exact source location");
+    // The retired wording must not come back by hand.
+    expect(page).not.toContain("evidence back to the page");
   });
 
   it("puts the locked hero proof and three motion cuts on the landing page", () => {

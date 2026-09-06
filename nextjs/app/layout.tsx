@@ -32,15 +32,22 @@ export const metadata: Metadata = {
   */
   metadataBase: new URL("https://tavonel.com"),
   title: "Knowledge Compiler for AI — TAVONEL",
+  /*
+    "code" came off both descriptions with the RESOLVED A-2 hero.
+
+    No reader in this deployment reads a repository: the manifest on /sources lists eleven
+    document and image MIME types and the upload route refuses everything else, so a search
+    result promising compiled code advertised a source family that is rejected at intake.
+  */
   description:
-    "Compile documents, scans, code and connected systems into source-grounded, AI-ready knowledge with structured relationships, provenance and reusable retrieval artifacts.",
+    "Compile the documents, scans and connected systems you already have into a current, traceable world your AI can use, with structured relationships, provenance and reusable retrieval artifacts.",
   alternates: {
     canonical: "/",
   },
   openGraph: {
     title: "Your knowledge already exists. Compile it.",
     description:
-      "TAVONEL compiles documents, scans, code and connected systems into a source-grounded world AI can reason about.",
+      "TAVONEL compiles your own sources into a current, traceable world your AI can use.",
     type: "website",
     url: "/",
   },
