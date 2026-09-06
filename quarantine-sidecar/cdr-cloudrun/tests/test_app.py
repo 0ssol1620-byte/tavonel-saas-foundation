@@ -16,6 +16,8 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 os.environ.setdefault("TAVONEL_CDR_HMAC", "fixture-cdr-hmac-secret-that-is-long-enough-123")
+# No clamd in this suite. CI overrides both to run it against the real scanner.
+os.environ.setdefault("MALWARE_SCAN_REQUIRED", "0")
 
 from app import (  # noqa: E402
     MAX_RENDER_PIXELS_PER_PAGE,
