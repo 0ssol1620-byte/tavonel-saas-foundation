@@ -128,14 +128,21 @@ type GroundedAnswer = {
   receipt: { manifestDigest: string; retrieval: string; outputSha256: string };
 };
 
+/*
+  One vocabulary with /integrations, which renamed the level it was overstating (RESOLVED A-4).
+
+  "Enterprise" beside "Beta" reads as a higher tier of the same self-serve thing. There is no
+  adapter for any of the last four; they are imported by an agent the customer runs, which is
+  why the label now says assisted rather than implying a switch that is waiting on a plan.
+*/
 const WORKSPACE_SOURCE_CHOICES = [
   { name: "Google Drive", availability: "Beta" },
   { name: "Dropbox", availability: "Beta" },
   { name: "OneDrive", availability: "Beta" },
-  { name: "File Server", availability: "Enterprise" },
-  { name: "Amazon S3", availability: "Enterprise" },
-  { name: "Cloudflare R2", availability: "Enterprise" },
-  { name: "MinIO", availability: "Enterprise" },
+  { name: "File Server", availability: "Enterprise-assisted" },
+  { name: "Amazon S3", availability: "Enterprise-assisted" },
+  { name: "Cloudflare R2", availability: "Enterprise-assisted" },
+  { name: "MinIO", availability: "Enterprise-assisted" },
 ] as const;
 
 type BillingAccount = {

@@ -221,29 +221,72 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
         </section>
 
         <Scene id={2} band="structure" eyebrow="INPUT" title="Bring the knowledge you already have.">
-          <p className="lede rv">Upload files, folders or ZIP archives, or connect the system where your knowledge already lives.</p>
+          <p className="lede rv">Upload files, folders or a ZIP archive, or connect a cloud document system.</p>
           {/*
             Named formats, not a category, and named by the manifest rather than by this file.
 
             "Office documents" reads as every Office file ever made, and the intake whitelist is
             narrower: the OOXML and OpenDocument formats the manifest lists, but not legacy
             DOC/XLS/PPT. Naming the extensions is the difference between a promise and a
-            rejection at upload -- which is why the format chips are now derived from the
-            Capability Manifest, the same list the server validates against and /sources
-            publishes. A format this page offers is a format the upload route accepts, by
-            construction rather than by remembering to edit two files.
-
-            The connectors after them are still written here: they are not source formats, and
-            the manifest is scoped to MIME types. ZIP appears because the browser expands it,
-            and /sources says what that means.
+            rejection at upload -- which is why the format chips are derived from the Capability
+            Manifest, the same list the server validates against and /sources publishes. A
+            format this page offers is a format the upload route accepts, by construction rather
+            than by remembering to edit two files.
           */}
-          <ul className="input-formats rv" aria-label="Supported knowledge sources">
-            {[
-              ...sourceFamilyChips,
-              "Folders", "Google Drive", "Dropbox",
-              "OneDrive / SharePoint", "S3 / R2 / MinIO", "SMB / NFS / SFTP",
-            ].map((source) => <li key={source}>{source}</li>)}
+          <ul className="input-formats rv" aria-label="Formats this deployment reads">
+            {sourceFamilyChips.map((source) => <li key={source}>{source}</li>)}
           </ul>
+          {/*
+            The flat connector list is gone. RESOLVED A-4 (2026-09-06).
+
+            It read "Folders · Google Drive · Dropbox · OneDrive / SharePoint · S3 / R2 / MinIO ·
+            SMB / NFS / SFTP" as one row of equal chips. Three of those are OAuth adapters that
+            exist and are labelled Beta on /integrations; two were not connectors at all. A
+            reader could not tell which half of the row they could actually use, and the
+            homepage was the one surface that dropped the distinction /integrations makes.
+
+            What is left is code-backed and reachable, each with the word that says how far it
+            has got. The OAuth three stay `beta` and not `qualified`: the adapters exist
+            (`connector-oauth-adapters.ts`, three providers, list and download), and RESOLVED
+            B-7 makes Google Drive's deletion semantics a blocker on connector qualification, so
+            no connector here is verified.
+
+            S3-compatible storage and mounted SMB/NFS/SFTP paths are not listed. There is no
+            import adapter for either in `lib/connector-*`; what exists is a local agent the
+            customer runs themselves, which belongs on /integrations and /developers where it
+            can be described as the assisted route it is, not on a homepage row that reads as a
+            connector you can switch on.
+
+            ZIP says what actually happens to it. The archive is expanded in the browser and its
+            members are validated and compiled one at a time; the archive itself is never
+            compiled, and writing "ZIP" beside "PDF" implied it was.
+          */}
+          <div className="chain rv" aria-label="How sources reach TAVONEL">
+            <article className="link">
+              <span className="st">AVAILABLE TODAY</span>
+              <h3>Upload and folders</h3>
+              <p>Drop files or a whole folder. Every file is checked against the manifest before it is stored.</p>
+            </article>
+            <article className="link">
+              <span className="st">AVAILABLE TODAY</span>
+              <h3>ZIP archive</h3>
+              <p>Expanded in your browser; each file inside is compiled individually. The archive itself is not compiled.</p>
+            </article>
+            <article className="link">
+              <span className="st">BETA</span>
+              <h3>Google Drive · Dropbox · OneDrive / SharePoint</h3>
+              <p>Read-only discovery and import, built and contract-tested. Not qualified: deletion and permission semantics are still being settled, so verify a connection before depending on it.</p>
+            </article>
+            <article className="link">
+              <span className="st">ON REQUEST</span>
+              <h3>Object storage and mounted shares</h3>
+              <p>S3-compatible buckets and SMB, NFS or SFTP paths are imported by an agent you run inside your own network. Set up with you, not self-serve.</p>
+            </article>
+          </div>
+          <p className="fine rv">
+            <Link href={"/integrations" as Route}>What each label means</Link> ·{" "}
+            <Link href={"/sources" as Route}>which formats are read here</Link>
+          </p>
         </Scene>
 
         <Scene id={3} film band="change" eyebrow="COMPILE FILM" title="Watch knowledge take shape.">

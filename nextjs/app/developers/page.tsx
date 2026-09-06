@@ -68,7 +68,19 @@ export default function DevelopersPage() {
                     <article className="tile"><h3>OpenAPI</h3><p>Machine-readable v1 HTTP contract.</p><a href="/openapi.json">Open schema</a></article>
                     <article className="tile"><h3>CLI</h3><p>Node.js 20+ client with immutable version and update check.</p><a href="/developer/tavonel-cli.mjs" download>Download CLI</a></article>
                     <article className="tile"><h3>MCP</h3><p>Eight stdio tools: sources, World, search, Ask, objects, relations, evidence, package. No write tool, and it refuses to start if one is added.</p><a href="/developer/tavonel-mcp.mjs" download>Download MCP server</a></article>
-                    <article className="tile"><h3>Source agent</h3><p>Local-first SMB, NFS, SFTP and S3-compatible connector agent.</p><a href="/developer/tavonel-source-agent.py" download>Download source agent</a></article>
+                    {/*
+                      The tile stays because the agent is real; its wording changes because
+                      "connector agent" is not what it is. RESOLVED A-4 (2026-09-06).
+
+                      `public/developer/tavonel-source-agent.py` is in this repository, scans a
+                      mounted directory or an S3-compatible bucket, and posts to two endpoints
+                      that also exist here (`app/api/v1/uploads/capability` and
+                      `app/api/v1/connections/[id]/sync`). But the customer runs it and it
+                      pushes outward; TAVONEL connects to nothing. Describing it as an "SMB,
+                      NFS, SFTP and S3-compatible connector" put four connectors on a page that
+                      has none.
+                    */}
+                    <article className="tile"><h3>Source agent</h3><p>Runs inside your network and pushes to TAVONEL, which reaches into nothing. Reads a mounted directory — an SMB, NFS or SFTP mount included — or an S3-compatible bucket. An assisted import route, not a self-serve connector.</p><a href="/developer/tavonel-source-agent.py" download>Download source agent</a></article>
                   </div>
                   <p className="fine">Verify versions and SHA-256 values against <a href="/developer/channel.json">the public distribution channel</a>. The <a href="/developer/README.md">setup and safety contract</a> documents scopes, secret handling and fail-closed behavior.</p>
                 </div>

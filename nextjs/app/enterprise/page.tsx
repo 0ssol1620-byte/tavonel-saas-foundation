@@ -29,7 +29,7 @@ export const metadata: Metadata = {
 const VALUE = [
   [
     "Connected sources",
-    "Compile what you already have. Files, folders and archives, or the systems your knowledge lives in — shared drives, object storage and a file-server agent for what never leaves your network.",
+    "Compile what you already have. Upload files, folders and archives, or connect Google Drive, Dropbox and OneDrive/SharePoint in beta. Object storage and mounted shares are imported by an agent that runs inside your network, configured with you rather than switched on.",
   ],
   [
     "Source-level evidence",

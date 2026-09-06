@@ -10,10 +10,21 @@ export const metadata: Metadata = {
   openGraph: { url: "/integrations" },
 };
 
+/*
+  Four labels, and the one that was doing the most work now says what it means.
+
+  "Enterprise" read as a higher tier of the same thing -- the connector you get if you pay more
+  -- when what sits under it is not a connector at all: there is no S3, MinIO, SMB, NFS or SFTP
+  adapter in `lib/connector-*`, and nothing in the product connects to one. What exists is
+  `public/developer/tavonel-source-agent.py`, a local agent the customer runs inside their own
+  network against a mounted path or an S3-compatible bucket, talking to two real endpoints
+  (`/api/v1/uploads/capability` and `/api/v1/connections/{id}/sync`). That is an assisted import
+  route, and RESOLVED A-4 (2026-09-06) says it may be described only as one.
+*/
 const SUPPORT_LEVELS = [
   ["Available", "Set it up yourself."],
-  ["Beta", "Built and contract-tested. Verify the connection in your workspace before depending on it."],
-  ["Enterprise", "Configured with you when credentials or network access belong outside the browser."],
+  ["Beta", "Built and contract-tested. Verify the connection in your workspace before depending on it. Not qualified."],
+  ["Enterprise-assisted", "Not a self-serve connector. An import route we configure with you, run by an agent inside your own network."],
   ["Planned", "Not built yet."],
 ] as const;
 
@@ -23,7 +34,18 @@ const OAUTH = [
     provider: "google_drive",
     level: "Beta",
     description: "Discover and import Drive files read-only, tracking the file checksum as its revision.",
-    deletion: "Trashed files disappear from the next listing and are surfaced as source removal on sync.",
+    /*
+      What the adapter does, not what a deletion contract should do. RESOLVED B-7.
+
+      The listing query is `trashed = false`, and the Drive adapter emits no deleted entry --
+      unlike Dropbox and Graph, which both do. So a trashed file simply stops appearing, and
+      that is indistinguishable from a file that was moved, renamed, hard-deleted, or that the
+      account can no longer see. The row used to claim it was "surfaced as source removal on
+      sync", which is the contract, not the code. B-7 calls this gap unacceptable for a
+      production connector and makes closing it a precondition of qualification, so it is
+      written here rather than smoothed over.
+    */
+    deletion: "A trashed file stops appearing in the listing. It is not distinguished from a file that was deleted outright, moved, renamed, or whose permissions changed — a known gap, and one reason no connector here is qualified.",
     cursor: "nextPageToken, stored per connection.",
   },
   {
@@ -45,10 +67,8 @@ const OAUTH = [
 ] as const;
 
 const INFRA = [
-  ["Mounted file server", "Enterprise", "SMB, NFS or SFTP-backed paths stay customer-controlled until selected files are imported."],
-  ["Amazon S3", "Enterprise", "Bucket and prefix configuration with secret references kept outside the browser."],
-  ["Cloudflare R2", "Enterprise", "S3-compatible source import with tenant-scoped connection records."],
-  ["MinIO", "Enterprise", "Self-hosted S3-compatible storage through the same bounded connection contract."],
+  ["Mounted file server", "Enterprise-assisted", "SMB, NFS or SFTP-backed paths are read by the agent as an ordinary mounted directory. TAVONEL never reaches into your network; the files stay customer-controlled until the agent imports the ones you selected."],
+  ["S3-compatible object storage", "Enterprise-assisted", "Amazon S3, Cloudflare R2 and MinIO through one bucket-and-prefix configuration, with credentials held by the agent and never in the browser."],
 ] as const;
 
 export default function IntegrationsPage() {
@@ -89,7 +109,11 @@ export default function IntegrationsPage() {
           <div className="chain">{SUPPORT_LEVELS.map(([level, meaning]) => <article className="link" key={level}><span className="st">{level}</span><p>{meaning}</p></article>)}</div>
         </div>
 
-        <div className="body"><div className="stack"><p className="slate"><b>LOCAL / INFRASTRUCTURE</b><span />CUSTOMER-CONTROLLED</p><h2>File and object storage.</h2></div><div className="chain">{INFRA.map(([name, level, description]) => <article className="link" key={name}><span className="st">{level}</span><h3>{name}</h3><p>{description}</p></article>)}</div></div>
+        <div className="body">
+          <div className="stack"><p className="slate"><b>LOCAL / INFRASTRUCTURE</b><span />ASSISTED IMPORT, NOT A CONNECTOR</p><h2>File and object storage.</h2></div>
+          <p className="lede">These are not connectors you switch on. They are imported by <a href="/developer/tavonel-source-agent.py" download>a local source agent</a> you run inside your own network, configured with you. Nothing below is a self-serve connection, and nothing below is qualified.</p>
+          <div className="chain">{INFRA.map(([name, level, description]) => <article className="link" key={name}><span className="st">{level}</span><h3>{name}</h3><p>{description}</p></article>)}</div>
+        </div>
 
         <div className="actions"><Link className="btn" href="/login">Connect a source</Link><Link className="btn ghost" href="/developers">Developer setup</Link></div>
       </div></section>
