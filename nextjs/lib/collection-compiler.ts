@@ -1,4 +1,10 @@
 import { createHash } from "node:crypto";
+import {
+  regionsOrNone,
+  validationCheckReviewReasons,
+  type CompiledWorldValidationChecks,
+} from "../../shared/compiledWorldValidation";
+import { validateCompiledWorldPackage } from "../scripts/compiled-world/validate.mjs";
 import { judgeCompileSet } from "./compile-limits";
 
 export const COLLECTION_CANDIDATE_SCHEMA = "tavonel.collection_candidate.v1" as const;
@@ -23,7 +29,25 @@ const PACKAGE_ROOTS = [
   "provenance",
   "validation",
 ] as const;
-const MAX_TEXT_CHARS = 50_000;
+
+/**
+ * The most knowledge objects one compile may emit, and the reason it is this number.
+ *
+ * Not a quality judgement about how much a document contains -- it is the package ceiling read
+ * backwards. `collection-download.ts` refuses a package over MAX_UNCOMPRESSED_BYTES (16 MiB), and
+ * a claim label of the maximum 500 characters is materialised into four graph serialisations plus
+ * a directory entry, so roughly 2.5 KiB of package per object. 5,000 objects is what fits with
+ * room for the source text that sits beside them.
+ *
+ * The point of the constant is not its value. It is that going past it is *reported*: the artifact
+ * carries `counts.candidatesConsidered`, the reason `EXTRACTION_BUDGET_REACHED`, and lifecycle
+ * `review_required`. The caps it replaces (3 topics, 8 entities, 4 claims per document) were sized
+ * for a three-document, 470-character fixture and dropped the rest in silence.
+ */
+export const EXTRACTION_CANDIDATE_BUDGET = 5_000;
+
+/** Named so the reason a customer sees and the reason a test asserts are one string. */
+export const EXTRACTION_BUDGET_REACHED = "EXTRACTION_BUDGET_REACHED" as const;
 
 export type CollectionOcrInput = {
   documentId: string;
@@ -34,6 +58,15 @@ export type CollectionOcrInput = {
   text: string;
   inputSha256: string;
   sourceImmutableKey: string;
+  /*
+    Optional on the wire, and `regionsOrNone` is the only reading of "absent" either path takes.
+
+    A document read before region capture existed carries none. This compiler abstains -- no
+    retrieval unit, and D7-04's computed `evidenceCoverage` then reports the gap instead of
+    hiding it. The v2 wire used to invent a page-1 region covering the whole document to satisfy
+    the Core's mandatory `regions`, which is the drift the shared helper exists to prevent. The
+    production route refuses such a document outright, with OCR_REGIONS_REQUIRED.
+  */
   regions?: CollectionOcrRegion[];
 };
 
@@ -98,12 +131,17 @@ export type CollectionCandidateArtifact = {
     }>;
     signatureStatus: "external_signer_required";
   };
-  validation: {
+  /*
+    The four checks are `boolean`, and they are computed.
+
+    They used to be the literal type `true`, written as four `as const` literals with no check
+    behind them, which is how a World with a dangling evidence reference could ship a
+    `validation/report.json` asserting four integrity properties nobody had tested. The literal
+    type was also why the v2 projection dropped the Core's own record: a record that can say
+    `false` had nowhere to go. Widening it is what lets the authority's verdict survive.
+  */
+  validation: CompiledWorldValidationChecks & {
     status: "passed" | "review_required";
-    deterministicMaterialization: true;
-    sourceCoverage: true;
-    evidenceCoverage: true;
-    immutableInputsOnly: true;
     fullRebuildEquivalence?: "passed" | "failed" | "not_run";
     reviewReasons?: string[];
     counts: {
@@ -114,6 +152,14 @@ export type CollectionCandidateArtifact = {
       evidence: number;
       relations: number;
       packageFiles: number;
+      /*
+        Every distinct object the extractor derived, including the ones the budget refused.
+
+        Optional because the Python Core does not report it, and the v2 projection will not
+        invent a number to fill the field. Absent means "not reported", which says something
+        different from "equal to what was emitted" -- and only the second one would be a lie.
+      */
+      candidatesConsidered?: number;
     };
   };
   reviewReasons?: string[];
@@ -135,8 +181,20 @@ export function stableId(prefix: string, ...parts: string[]) {
   return `${prefix}-${sha256(parts.join("\0")).slice(0, 32)}`;
 }
 
+/*
+  No slice.
+
+  This used to end in `.slice(0, 50_000)`, applied to the whole document before any extraction
+  ran, and nothing downstream was told. Regions were never truncated, so a long source produced
+  retrieval chunks covering all of it and a knowledge graph covering its first twenty pages --
+  the compiler stopped reading and reported `passed`. Extraction now runs a region at a time, so
+  the string this normalises is one region and there is nothing for a whole-document bound to do.
+  The DoS guards that bound was standing in for are still in force and are the right ones: the
+  50,000-region ceiling in validateCollectionOcrInput and the 8 MiB chunk-file ceiling in
+  grounded-ask.ts, both of which refuse rather than silently keeping a prefix.
+*/
 function normalizeText(value: string) {
-  return value.normalize("NFKC").replace(/\s+/g, " ").trim().slice(0, MAX_TEXT_CHARS);
+  return value.normalize("NFKC").replace(/\s+/g, " ").trim();
 }
 
 function documentTitle(text: string, documentId: string) {
@@ -155,14 +213,27 @@ const TOPIC_RULES: Array<{ topic: string; pattern: RegExp }> = [
   { topic: "Research", pattern: /\b(research|experiment|method|result|evaluation)\b|연구|실험|방법|평가/i },
 ];
 
+/*
+  Three extractors, none of them capped any more.
+
+  They returned `.slice(0, 3)`, `.slice(0, 8)` and `.slice(0, 4)`, so a hundred-page manual and a
+  one-paragraph memo both compiled to at most fifteen objects and both reported `passed`. What was
+  dropped was not recorded anywhere, which made the loss unrepresentable rather than merely
+  unreported. The bound that remains is EXTRACTION_CANDIDATE_BUDGET, spent across the whole
+  compile and named in the artifact when it binds.
+
+  Not changed here: the extractors themselves are still a keyword table and a capitalised-token
+  regex, and lib/entity-extraction-eval.json is what they are worth on a reviewed set. Removing a
+  cap makes them emit everything they find; it does not make them better at finding.
+*/
 function topicsFor(text: string) {
   const matched = TOPIC_RULES.filter((rule) => rule.pattern.test(text)).map((rule) => rule.topic);
-  return matched.length > 0 ? matched.slice(0, 3) : ["General"];
+  return matched.length > 0 ? matched : ["General"];
 }
 
 function entitiesFor(text: string) {
   const values = text.match(/\b[A-Z][A-Za-z0-9&.-]{2,}(?:\s+[A-Z][A-Za-z0-9&.-]{2,}){0,3}\b/g) ?? [];
-  return [...new Set(values.map((item) => item.trim()).filter((item) => item.length <= 80))].slice(0, 8);
+  return [...new Set(values.map((item) => item.trim()).filter((item) => item.length <= 80))];
 }
 
 function claimsFor(text: string) {
@@ -171,15 +242,11 @@ function claimsFor(text: string) {
       .split(/(?<=[.!?。])\s+/)
       .map((item) => item.trim())
       .filter((item) => item.length >= 20 && item.length <= 500),
-  )].slice(0, 4);
+  )];
 }
 
 function csvCell(value: string) {
   return `"${value.replaceAll('"', '""')}"`;
-}
-
-function normalizeForMatch(value: string) {
-  return value.normalize("NFKC").replace(/\s+/g, " ").trim();
 }
 
 function mediaType(path: string) {
@@ -286,6 +353,12 @@ export function validateCollectionOcrInput(value: unknown): CollectionOcrInput |
   ) {
     return null;
   }
+  /*
+    A `regions` key that is present must be a real region list; absent means the reader recorded
+    none, which `runCollectionCompile` refuses with OCR_REGIONS_REQUIRED before a compile starts.
+    The 50,000-region ceiling is one of the two real DoS guards that the deleted 50,000-character
+    content slice was standing in for -- and unlike the slice, it refuses instead of truncating.
+  */
   if (input.regions !== undefined) {
     if (!Array.isArray(input.regions) || input.regions.length < 1 || input.regions.length > 50_000) return null;
     const ids = new Set<string>();
@@ -381,6 +454,23 @@ export function compileCollectionCandidate(inputs: CollectionOcrInput[]): Collec
     entityNames: string[];
   }> = [];
 
+  /*
+    The budget, spent in document order and reported either way.
+
+    `candidatesConsidered` counts every distinct object the extractors derived; `candidatesEmitted`
+    counts the ones that fit. They differ only when the budget binds, and when they differ the
+    artifact says so -- `EXTRACTION_BUDGET_REACHED`, lifecycle `review_required`, and the two
+    numbers side by side in `validation.counts`. Silence about the gap is the defect this replaces.
+  */
+  let candidatesConsidered = 0;
+  let candidatesEmitted = 0;
+  const admitCandidate = () => {
+    candidatesConsidered += 1;
+    if (candidatesEmitted >= EXTRACTION_CANDIDATE_BUDGET) return false;
+    candidatesEmitted += 1;
+    return true;
+  };
+
   for (const input of sorted) {
     const text = normalizeText(input.text);
     const title = documentTitle(text, input.documentId);
@@ -393,8 +483,10 @@ export function compileCollectionCandidate(inputs: CollectionOcrInput[]): Collec
     sourceMarkdown.push({ documentId: input.documentId, title, text });
 
     for (const topic of topicsFor(text)) {
-      const topicId = topicIds.get(topic) ?? stableId("topic", topic);
-      if (!topicIds.has(topic)) {
+      let topicId = topicIds.get(topic);
+      if (topicId === undefined) {
+        if (!admitCandidate()) continue;
+        topicId = stableId("topic", topic);
         topicIds.set(topic, topicId);
         nodes.push({ id: topicId, kind: "Topic", label: topic, evidenceIds: [evidenceId] });
         directoryPlan.push({ path: `Topics/${topic}.md`, kind: "topic", sourceIds: [input.documentId] });
@@ -413,47 +505,82 @@ export function compileCollectionCandidate(inputs: CollectionOcrInput[]): Collec
       });
     }
 
-    const documentEntities: Array<{ id: string; text: string }> = [];
-    for (const entity of entitiesFor(text)) {
-      const entityId = entityIds.get(entity) ?? stableId("entity", entity.toLowerCase());
-      if (!entityIds.has(entity)) {
-        entityIds.set(entity, entityId);
-        nodes.push({ id: entityId, kind: "Entity", label: entity, evidenceIds: [evidenceId] });
-        directoryPlan.push({ path: `Entities/${entityId}.md`, kind: "entity", sourceIds: [input.documentId] });
-      }
-      edges.push({
-        id: stableId("relation", documentNodeId, "mentions_entity", entityId),
-        type: "mentions_entity",
-        from: documentNodeId,
-        to: entityId,
-        evidenceIds: [evidenceId],
-      });
-      documentEntities.push({ id: entityId, text: entity });
-    }
+    /*
+      Entities and claims are read a region at a time, and bound to the region that said them.
 
-    const documentClaims: Array<{ id: string; text: string }> = [];
-    for (const claim of claimsFor(text)) {
-      const claimId = stableId("claim", input.documentId, claim);
-      nodes.push({ id: claimId, kind: "Claim", label: claim, documentId: input.documentId, evidenceIds: [evidenceId] });
-      directoryPlan.push({ path: `Claims/${claimId}.md`, kind: "claim", sourceIds: [input.documentId] });
-      edges.push({
-        id: stableId("relation", claimId, "supported_by", evidenceId),
-        type: "supported_by",
-        from: claimId,
-        to: evidenceId,
-        evidenceIds: [evidenceId],
-      });
-      documentClaims.push({ id: claimId, text: claim });
+      Two defects went out together here. Extraction ran over the whole document, truncated at
+      50,000 characters, so nothing past roughly page 20 existed in the graph while
+      rag/chunks.jsonl still covered the whole file. And each region then re-derived its own
+      claims by scanning every claim in the document for a substring match -- O(claims x regions)
+      work whose cost the per-document caps of 4 and 8 were hiding, and which could bind a claim
+      to a region it was not read from because the words happened to appear there too.
+
+      Reading the region gives both back for free: the claim is bound where it was found, and the
+      pass is linear. `seen*` deduplicates within the document, because one sentence in two
+      regions is one claim with one stable id, and two nodes sharing an id is what the package
+      validator calls ID_DUPLICATE -- while both regions still list it, which is why the per-region
+      arrays are collected rather than the `seen` sets reused.
+    */
+    const seenEntities = new Set<string>();
+    const seenClaims = new Set<string>();
+    const emittedClaims = new Set<string>();
+    const regionClaims = new Map<string, string[]>();
+    const regionEntities = new Map<string, Array<{ id: string; text: string }>>();
+    for (const region of regionsOrNone(input)) {
+      const regionText = normalizeText(region.text);
+      const entitiesHere: Array<{ id: string; text: string }> = [];
+      const claimsHere: string[] = [];
+      for (const entity of entitiesFor(regionText)) {
+        let entityId = entityIds.get(entity);
+        if (entityId === undefined) {
+          if (!admitCandidate()) continue;
+          entityId = stableId("entity", entity.toLowerCase());
+          entityIds.set(entity, entityId);
+          nodes.push({ id: entityId, kind: "Entity", label: entity, evidenceIds: [evidenceId] });
+          directoryPlan.push({ path: `Entities/${entityId}.md`, kind: "entity", sourceIds: [input.documentId] });
+        }
+        if (!seenEntities.has(entity)) {
+          seenEntities.add(entity);
+          edges.push({
+            id: stableId("relation", documentNodeId, "mentions_entity", entityId),
+            type: "mentions_entity",
+            from: documentNodeId,
+            to: entityId,
+            evidenceIds: [evidenceId],
+          });
+        }
+        entitiesHere.push({ id: entityId, text: entity });
+      }
+      for (const claim of claimsFor(regionText)) {
+        const claimId = stableId("claim", input.documentId, claim);
+        if (!seenClaims.has(claimId)) {
+          seenClaims.add(claimId);
+          if (!admitCandidate()) continue;
+          emittedClaims.add(claimId);
+          nodes.push({ id: claimId, kind: "Claim", label: claim, documentId: input.documentId, evidenceIds: [evidenceId] });
+          directoryPlan.push({ path: `Claims/${claimId}.md`, kind: "claim", sourceIds: [input.documentId] });
+          edges.push({
+            id: stableId("relation", claimId, "supported_by", evidenceId),
+            type: "supported_by",
+            from: claimId,
+            to: evidenceId,
+            evidenceIds: [evidenceId],
+          });
+        }
+        // A claim the budget refused is not in the model, so no chunk may cite it.
+        if (emittedClaims.has(claimId)) claimsHere.push(claimId);
+      }
+      regionEntities.set(region.regionId, entitiesHere);
+      regionClaims.set(region.regionId, claimsHere);
     }
 
     // Grounded retrieval requires page/bbox evidence per chunk (see GroundedChunk in
-    // grounded-ask.ts). Only OCR v2 regions carry that evidence, so a document compiled
-    // without regions produces zero rag chunks (honest abstention) rather than a
-    // fabricated page/bbox.
-    for (const region of input.regions ?? []) {
-      const regionText = normalizeForMatch(region.text);
-      const regionClaimIds = documentClaims.filter((claim) => regionText.includes(normalizeForMatch(claim.text))).map((claim) => claim.id);
-      const regionEntities = documentEntities.filter((entity) => regionText.includes(normalizeForMatch(entity.text)));
+    // grounded-ask.ts). Only OCR v2 regions carry that evidence, so a document compiled without
+    // regions produces zero rag chunks -- honest abstention rather than a fabricated page/bbox,
+    // and `evidenceCoverage` below reports the gap instead of asserting there is none.
+    for (const region of regionsOrNone(input)) {
+      const regionClaimIds = regionClaims.get(region.regionId) ?? [];
+      const regionEntityRefs = regionEntities.get(region.regionId) ?? [];
       groundedChunks.push({
         chunkId: stableId("chunk", input.documentId, input.versionKey, region.regionId),
         logicalId: stableId("chunk-logical", input.documentId, region.regionId),
@@ -465,8 +592,8 @@ export function compileCollectionCandidate(inputs: CollectionOcrInput[]): Collec
         bbox1000: region.bbox1000,
         authority: region.authority,
         claimIds: regionClaimIds,
-        entityIds: regionEntities.map((entity) => entity.id),
-        entityNames: regionEntities.map((entity) => entity.text),
+        entityIds: regionEntityRefs.map((entity) => entity.id),
+        entityNames: regionEntityRefs.map((entity) => entity.text),
       });
     }
   }
@@ -501,13 +628,53 @@ export function compileCollectionCandidate(inputs: CollectionOcrInput[]): Collec
     evidence: nodes.filter((node) => node.kind === "Evidence").length,
     relations: edges.length,
     packageFiles: files.length + 1,
+    candidatesConsidered,
   };
-  files.push(packageFile("validation/report.json", JSON.stringify({ status: "passed", counts, checks: { deterministicMaterialization: true, sourceCoverage: true, evidenceCoverage: true, immutableInputsOnly: true } }, null, 2) + "\n"));
+
+  /*
+    The validation record is computed here, over the package that was just built.
+
+    It used to be four `true as const` literals and a hardcoded `passed`, written into both the
+    artifact and the customer's `validation/report.json`. The one real checker in the repository,
+    `scripts/compiled-world/validate.mjs`, was imported by a test and by nothing on the emit path
+    -- so a package with a dangling evidence reference or four graph serialisations that disagreed
+    shipped with a green report, and the reviewer approving it before promotion was looking at a
+    constant. It is the same checker a customer can run over the package they downloaded, which is
+    the point: the emitter and the auditor answer the same question the same way.
+
+    Any error code at all forces `review_required`, including one this code does not name. A
+    validator finding something the compiler did not anticipate is exactly when a person should
+    look, and the download and promote gates in collection-download.ts already refuse that state.
+  */
+  const probePackage = new Map(files.map((file) => [file.path, file.content] as const));
+  probePackage.set("validation/report.json", JSON.stringify({ counts }));
+  const checked = validateCompiledWorldPackage(probePackage);
+  const errorCodes = [...new Set(checked.errors.map((error: { code: string }) => String(error.code)))].sort();
+  const raised = (...codes: string[]) => codes.some((code) => errorCodes.includes(code));
+  const groundedDocuments = new Set(groundedChunks.map((chunk) => chunk.sourceId));
+  const checks: CompiledWorldValidationChecks = {
+    deterministicMaterialization: !raised("GRAPH_DISAGREEMENT", "GRAPH_CSV_HEADER_WRONG", "FILE_NOT_PARSEABLE", "COUNTS_DISAGREE"),
+    sourceCoverage: sorted.every((item) => nodes.some((node) => node.kind === "Document" && node.documentId === item.documentId))
+      && !raised("MODEL_EMPTY", "SOURCE_UNBOUND", "SOURCE_VERSION_INVALID", "SOURCE_DIGEST_INVALID"),
+    // A ratio, not an assertion: the share of documents that produced at least one anchored unit.
+    evidenceCoverage: groundedDocuments.size === sorted.length
+      && !raised("EVIDENCE_DANGLING", "COORDINATE_MALFORMED", "COORDINATE_OUT_OF_RANGE", "COORDINATE_DEGENERATE", "PAGE_OUT_OF_RANGE"),
+    immutableInputsOnly: sorted.every((item) =>
+      item.sourceImmutableKey === item.sanitizedKey
+      && item.inputSha256.toLowerCase() === `sha256:${item.versionKey.toLowerCase()}`),
+  };
+  const reviewReasons = [...new Set([
+    ...(candidatesConsidered > candidatesEmitted ? [EXTRACTION_BUDGET_REACHED] : []),
+    ...validationCheckReviewReasons(checks),
+    ...errorCodes,
+  ])].sort();
+  const status = reviewReasons.length === 0 ? "passed" as const : "review_required" as const;
+  files.push(packageFile("validation/report.json", JSON.stringify({ status, counts, checks, reviewReasons }, null, 2) + "\n"));
 
   const withoutDigest = {
     schemaVersion: COLLECTION_CANDIDATE_SCHEMA,
     executionAuthority: "tavonel-foundation-core-runtime-v1" as const,
-    lifecycle: "candidate" as const,
+    lifecycle: status === "passed" ? "candidate" as const : "review_required" as const,
     candidatePromotion: false as const,
     collectionId,
     blueprint: GENERIC_MIXED_CORPUS_BLUEPRINT,
@@ -523,14 +690,17 @@ export function compileCollectionCandidate(inputs: CollectionOcrInput[]): Collec
     directoryPlan,
     ontology: { nodes, edges },
     package: { roots: PACKAGE_ROOTS, files, signatureStatus: "external_signer_required" as const },
-    validation: {
-      status: "passed" as const,
-      deterministicMaterialization: true as const,
-      sourceCoverage: true as const,
-      evidenceCoverage: true as const,
-      immutableInputsOnly: true as const,
-      counts,
-    },
+    validation: { status, ...checks, reviewReasons, counts },
   };
-  return { ...withoutDigest, manifestDigest: `sha256:${sha256(canonicalize(withoutDigest))}` };
+  /*
+    `reviewReasons` sits outside the digest, as `coreExecution` always has, because
+    collection-patch.ts hashes the same field list and a patched candidate has to land on the
+    digest a direct compile would. It is not unhashed in substance: it is a copy of
+    `validation.reviewReasons`, which is inside.
+  */
+  return {
+    ...withoutDigest,
+    manifestDigest: `sha256:${sha256(canonicalize(withoutDigest))}`,
+    reviewReasons,
+  };
 }

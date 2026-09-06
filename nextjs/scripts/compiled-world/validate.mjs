@@ -26,7 +26,6 @@
 
 import { readFile, readdir, stat } from "node:fs/promises";
 import { basename, join, resolve, sep } from "node:path";
-import { unzipSync } from "fflate";
 
 export const CANONICAL_MODEL_SCHEMA = "akc.canonical-knowledge-model.v1";
 export const SUPPORTED_BLUEPRINTS = new Set(["generic-mixed-corpus@1.0.0"]);
@@ -88,8 +87,17 @@ async function readDirectoryPackage(root) {
   return files;
 }
 
-function readZipPackage(bytes) {
+/*
+  The zip decoder is loaded only when a zip is actually opened.
+
+  `lib/collection-compiler.ts` now imports `validateCompiledWorldPackage` on the emit path, so
+  everything this module pulls in at load time is pulled into the compile path too. Reading an
+  archive is a CLI concern; the checker itself is pure. Importing fflate here keeps the emitter
+  free of an archive decoder it never runs.
+*/
+async function readZipPackage(bytes) {
   if (bytes.byteLength > MAX_ARCHIVE_BYTES) throw new Error("archive exceeds the 64 MiB validation limit");
+  const { unzipSync } = await import("fflate");
   const entries = unzipSync(bytes);
   const files = new Map();
   for (const [path, content] of Object.entries(entries)) {
@@ -115,7 +123,7 @@ export async function readPackage(target) {
   const info = await stat(path);
   if (info.isDirectory()) return { files: await readDirectoryPackage(path), source: basename(path) };
   const bytes = await readFile(path);
-  if (path.endsWith(".zip")) return { files: readZipPackage(bytes), source: basename(path) };
+  if (path.endsWith(".zip")) return { files: await readZipPackage(bytes), source: basename(path) };
   const parsed = JSON.parse(bytes.toString("utf8"));
   if (!parsed?.package?.files) throw new Error("JSON input is not a candidate artifact with an inline package");
   return { files: filesFromArtifact(parsed), source: basename(path), artifact: parsed };
@@ -453,6 +461,18 @@ async function main() {
   process.exitCode = result.ok ? 0 : 1;
 }
 
+/*
+  Awaited inside the branch, not at the top level.
+
+  This was `await main()`, which makes the whole module async for anyone who imports it. That was
+  harmless while the only importer was a test; `lib/collection-compiler.ts` now calls
+  `validateCompiledWorldPackage` on the emit path, so this module is reached from a Next.js
+  server bundle and a top-level await there is a bundler setting away from a build failure. The
+  CLI behaviour is unchanged: exit code 0 or 1, set by main.
+*/
 if (process.argv[1] && resolve(process.argv[1]).split(sep).join("/").endsWith("scripts/compiled-world/validate.mjs")) {
-  await main();
+  main().catch((error) => {
+    process.stderr.write(`TAVONEL package validation failed: ${error instanceof Error ? error.message : String(error)}\n`);
+    process.exitCode = 1;
+  });
 }
