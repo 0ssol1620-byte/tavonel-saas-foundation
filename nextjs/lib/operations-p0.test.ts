@@ -1,11 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   LARGE_DOCUMENT_POLICY,
+  OPERATIONS_ALERT_DEDUPE_WINDOW_MS,
   buildCreditRelease,
   buildOperationsAlert,
+  deliverOperationsAlert,
   issueDeletionEvidence,
   issueRestoreEvidence,
+  operationsAlertCounters,
   planLargeDocumentAdmission,
+  resetOperationsAlertDelivery,
   validateHumanChangeEvidence,
 } from "./operations-p0";
 
@@ -230,3 +234,108 @@ describe("P0 operational contracts", () => {
     ).toBe(false);
   });
 });
+
+describe("operations alert delivery", () => {
+  const alert = {
+    alertId: id,
+    kind: "incident" as const,
+    severity: "critical" as const,
+    service: "web" as const,
+    summary: "Public readiness has been false for five minutes",
+    observedAt: "2026-09-06T00:00:00Z",
+    runbookUrl: "https://tavonel.com/runbooks/incident",
+  };
+  const startedAt = Date.parse("2026-09-06T00:00:00Z");
+
+  beforeEach(() => {
+    resetOperationsAlertDelivery();
+    delete process.env.OPERATIONS_ALERT_WEBHOOK_URL;
+    vi.restoreAllMocks();
+  });
+
+  it("refuses loudly and counts the refusal when no receiver is configured", async () => {
+    const post = vi.fn();
+    vi.stubGlobal("fetch", post);
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await deliverOperationsAlert(alert, startedAt);
+
+    expect(result).toMatchObject({ ok: false, code: "ALERT_RECEIVER_UNCONFIGURED" });
+    expect(post).not.toHaveBeenCalled();
+    expect(operationsAlertCounters()).toMatchObject({ unconfigured: 1, delivered: 0 });
+    expect(logged.mock.calls[0]?.[0]).toContain("ALERT_RECEIVER_UNCONFIGURED");
+    vi.unstubAllGlobals();
+  });
+
+  it("posts the envelope once and suppresses a repeat inside the dedupe window", async () => {
+    process.env.OPERATIONS_ALERT_WEBHOOK_URL = "https://hooks.example.test/T/B/X";
+    const post = vi.fn(
+      async (_url: string, _init: RequestInit) =>
+        new Response("ok", { status: 200 })
+    );
+    vi.stubGlobal("fetch", post);
+
+    const first = await deliverOperationsAlert(alert, startedAt);
+    const repeat = await deliverOperationsAlert(alert, startedAt + 60_000);
+    const afterWindow = await deliverOperationsAlert(
+      alert,
+      startedAt + OPERATIONS_ALERT_DEDUPE_WINDOW_MS
+    );
+
+    expect(first).toMatchObject({ ok: true, code: "ALERT_DELIVERED" });
+    expect(repeat).toMatchObject({ ok: true, code: "ALERT_SUPPRESSED_DUPLICATE" });
+    expect(afterWindow).toMatchObject({ ok: true, code: "ALERT_DELIVERED" });
+    expect(post).toHaveBeenCalledTimes(2);
+    expect(operationsAlertCounters()).toMatchObject({ delivered: 2, suppressed: 1 });
+
+    const body = JSON.parse(String(post.mock.calls[0]?.[1]?.body));
+    expect(body).toMatchObject({
+      schemaVersion: "tavonel.operations_alert.v1",
+      containsCredentials: false,
+      dedupeKey: expect.any(String),
+    });
+    expect(body.text).toContain(alert.summary);
+    vi.unstubAllGlobals();
+  });
+
+  it("reports a rejected or unreachable receiver as a failure that can be retried", async () => {
+    process.env.OPERATIONS_ALERT_WEBHOOK_URL = "https://hooks.example.test/T/B/X";
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const post = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("no_service", { status: 500 }))
+      .mockRejectedValueOnce(new Error("network down"))
+      .mockResolvedValueOnce(new Response("ok", { status: 200 }));
+    vi.stubGlobal("fetch", post);
+
+    expect(await deliverOperationsAlert(alert, startedAt)).toMatchObject({
+      ok: false,
+      code: "ALERT_DELIVERY_FAILED",
+    });
+    expect(await deliverOperationsAlert(alert, startedAt + 1_000)).toMatchObject({
+      ok: false,
+      code: "ALERT_DELIVERY_FAILED",
+    });
+    expect(await deliverOperationsAlert(alert, startedAt + 2_000)).toMatchObject({
+      ok: true,
+      code: "ALERT_DELIVERED",
+    });
+    expect(operationsAlertCounters()).toMatchObject({ failed: 2, delivered: 1 });
+    vi.unstubAllGlobals();
+  });
+
+  it("never treats an invalid payload as delivered", async () => {
+    process.env.OPERATIONS_ALERT_WEBHOOK_URL = "https://hooks.example.test/T/B/X";
+    const post = vi.fn();
+    vi.stubGlobal("fetch", post);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    expect(
+      await deliverOperationsAlert({ ...alert, kind: "cost" }, startedAt)
+    ).toEqual({ ok: false, code: "ALERT_PAYLOAD_INVALID" });
+    expect(post).not.toHaveBeenCalled();
+    expect(operationsAlertCounters()).toMatchObject({ invalid: 1, delivered: 0 });
+    vi.unstubAllGlobals();
+  });
+});
+
