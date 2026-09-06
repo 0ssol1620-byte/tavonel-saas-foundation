@@ -17,13 +17,13 @@ import {
 } from "../../shared/capabilityManifest";
 import { qualifiedDocumentInputs, validateQualifiedDocumentInput } from "../../shared/qualifiedDocumentInputs";
 import {
-  CAPABILITY_STATUS_ACCEPTED_AT_UPLOAD,
-  CAPABILITY_STATUSES,
-  FAILURE_CLASSES,
-  LOCATOR_KINDS,
-  READER_FEATURES,
-  REPRESENTATION_KINDS,
-  SOURCE_FAMILIES,
+  capabilityStatuses,
+  capabilityStatusesAcceptedAtUpload,
+  failureClasses,
+  locatorKinds,
+  readerFeatures,
+  representationKinds,
+  sourceFamilies,
 } from "../../shared/uskcEnums";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -138,7 +138,7 @@ function violations(manifest: CapabilityManifest): string[] {
   const readerPattern = new RegExp(String(at(entryDef, "properties", "readerPlan", "items", "pattern")));
   const families = strings(at(entryDef, "properties", "sourceFamily", "enum"));
   const statuses = strings(at(entryDef, "properties", "status", "enum"));
-  const locatorKinds = strings(at(entryDef, "properties", "evidenceLocatorKinds", "items", "enum"));
+  const schemaLocatorKinds = strings(at(entryDef, "properties", "evidenceLocatorKinds", "items", "enum"));
 
   for (const entry of manifest.entries) {
     const where = entry.mime || "(entry with no mime)";
@@ -156,7 +156,7 @@ function violations(manifest: CapabilityManifest): string[] {
       if (!readerPattern.test(provider)) found.push(`${where} reader "${provider}" carries no revision suffix`);
     }
     for (const kind of entry.evidenceLocatorKinds) {
-      if (!locatorKinds.includes(kind)) found.push(`${where} has an unknown evidence locator kind`);
+      if (!schemaLocatorKinds.includes(kind)) found.push(`${where} has an unknown evidence locator kind`);
     }
 
     // allOf[0]: a verified tier requires both halves of its receipt.
@@ -215,18 +215,18 @@ describe("frozen contract artifacts", () => {
   });
 
   it("transliterates every frozen enumeration value for value", () => {
-    expect([...SOURCE_FAMILIES]).toEqual(FROZEN.SourceFamily);
-    expect([...CAPABILITY_STATUSES]).toEqual(FROZEN.CapabilityStatus);
-    expect([...CAPABILITY_STATUS_ACCEPTED_AT_UPLOAD]).toEqual(FROZEN.CapabilityStatusAcceptedAtUpload);
-    expect([...REPRESENTATION_KINDS]).toEqual(FROZEN.RepresentationKind);
-    expect([...READER_FEATURES]).toEqual(FROZEN.ReaderFeature);
-    expect([...LOCATOR_KINDS]).toEqual(FROZEN.LocatorKind);
-    expect([...FAILURE_CLASSES]).toEqual(FROZEN.FailureClass);
+    expect([...sourceFamilies]).toEqual(FROZEN.SourceFamily);
+    expect([...capabilityStatuses]).toEqual(FROZEN.CapabilityStatus);
+    expect([...capabilityStatusesAcceptedAtUpload]).toEqual(FROZEN.CapabilityStatusAcceptedAtUpload);
+    expect([...representationKinds]).toEqual(FROZEN.RepresentationKind);
+    expect([...readerFeatures]).toEqual(FROZEN.ReaderFeature);
+    expect([...locatorKinds]).toEqual(FROZEN.LocatorKind);
+    expect([...failureClasses]).toEqual(FROZEN.FailureClass);
   });
 
   it("agrees with the schema about which statuses exist", () => {
-    expect(strings(at(schema, "$defs", "Entry", "properties", "status", "enum"))).toEqual([...CAPABILITY_STATUSES]);
-    expect(strings(at(schema, "$defs", "Entry", "properties", "sourceFamily", "enum"))).toEqual([...SOURCE_FAMILIES]);
+    expect(strings(at(schema, "$defs", "Entry", "properties", "status", "enum"))).toEqual([...capabilityStatuses]);
+    expect(strings(at(schema, "$defs", "Entry", "properties", "sourceFamily", "enum"))).toEqual([...sourceFamilies]);
   });
 });
 

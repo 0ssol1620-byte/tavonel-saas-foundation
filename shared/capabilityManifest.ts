@@ -1,5 +1,5 @@
 import {
-  CAPABILITY_STATUS_ACCEPTED_AT_UPLOAD,
+  capabilityStatusesAcceptedAtUpload,
   type CapabilityStatus,
   type LocatorKind,
   type SourceFamily,
@@ -280,7 +280,7 @@ export const CAPABILITY_MANIFEST = {
 } as const satisfies CapabilityManifest;
 
 export function isAcceptedAtUpload(status: CapabilityStatus): boolean {
-  return (CAPABILITY_STATUS_ACCEPTED_AT_UPLOAD as readonly string[]).includes(status);
+  return (capabilityStatusesAcceptedAtUpload as readonly string[]).includes(status);
 }
 
 /** The server-side intake whitelist: `{ mime: [".ext"] }` for every tier accepted at upload. */

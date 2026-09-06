@@ -1,6 +1,6 @@
 import { CLAIM_STATE, type ClaimStateKey } from "@/lib/claim-state";
 import type { CapabilityManifest, CapabilityManifestEntry } from "../../shared/capabilityManifest";
-import { CAPABILITY_STATUSES, type CapabilityStatus } from "../../shared/uskcEnums";
+import { capabilityStatuses, type CapabilityStatus } from "../../shared/uskcEnums";
 
 /*
   The support matrix, printed from the manifest.
@@ -118,7 +118,7 @@ export default function SourceCapabilityTable({ manifest }: { manifest: Capabili
       </div>
 
       <dl className="src-legend">
-        {CAPABILITY_STATUSES.map((status) => (
+        {capabilityStatuses.map((status) => (
           <div key={status}>
             <dt>
               <span className="src-tier" data-token={TIERS[status].token}>{status}</span>
