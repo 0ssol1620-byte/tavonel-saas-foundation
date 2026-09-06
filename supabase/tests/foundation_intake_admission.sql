@@ -66,15 +66,23 @@ select is(
   'a retry after confirmation is an idempotent replay'
 );
 
-select throws_ok(
-  $$select public.reserve_foundation_intake_admission(
+-- 0008:72-76 raised `foundation_intake_idempotency_conflict` when the byte count differed. 0026
+-- deliberately dropped that comparison -- "Provider-native exports can be byte-variant while
+-- retaining the same immutable revision. Treat that case as an existing admission ... Identity,
+-- owner, object key and MIME remain strict" (0026:1-3) -- and 0048:52-56, the definition the chain
+-- ends on, still compares only user, object key and MIME. So the byte count is no longer part of the
+-- admission identity, and this asserts the contract the chain actually ends on rather than the one
+-- 0008 opened with. What is still strict is asserted below and by the row count above: identity is
+-- unchanged, and a replay reserves nothing twice.
+select is(
+  public.reserve_foundation_intake_admission(
     'pilot-intaketest000', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     '44444444-4444-4444-8444-444444444444',
     'quarantine/pilot-intaketest000/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/source',
     2048, 'application/pdf'
-  )$$,
-  'foundation_intake_idempotency_conflict',
-  'same identity cannot be rebound to different bytes'
+  )->>'idempotentReplay',
+  'true',
+  'a byte-variant retry of the same identity is a replay, not a rebinding (0026:1-3)'
 );
 select throws_ok(
   $$select public.reserve_foundation_intake_admission(
