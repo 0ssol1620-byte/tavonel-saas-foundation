@@ -6,6 +6,7 @@ import { MAX_FILES } from "./archive-expand";
 import { corpusIdFor } from "./corpus-id";
 import {
   CORPUS_ID_PATTERN,
+  describeCorpusStart,
   judgeCorpusSet,
   needsCorpusCompile,
   planCorpusBatches,
@@ -198,6 +199,50 @@ describe("what a corpus reports while it runs", () => {
   });
 });
 
+/*
+  A partial enqueue is a normal outcome of `enqueueCorpusCompile`, and the browser announced
+  it as a complete one: the response carries `incompleteReason` and `partsEnqueued`, and the
+  workspace printed the planned part count instead. The sentence and the compensating action
+  are decided here so both are tested.
+*/
+describe("what the customer is told when a corpus is submitted", () => {
+  it("names the parts that started, not the parts that were planned", () => {
+    const told = describeCorpusStart({
+      documentsTotal: 128,
+      batchCount: 11,
+      partsEnqueued: 7,
+      incompleteReason: "COMPILE_JOB_STORE_WRITE_FAILED",
+    });
+    expect(told.notice).toContain("7 of 11 parts started");
+    expect(told.notice).toContain("COMPILE_JOB_STORE_WRITE_FAILED");
+    expect(told.notice).not.toContain("in 11 parts.");
+    expect(told.resume).toBe(true);
+  });
+
+  it("offers the resume even when the store did not say why it stopped", () => {
+    const told = describeCorpusStart({
+      documentsTotal: 128,
+      batchCount: 11,
+      partsEnqueued: 7,
+      incompleteReason: null,
+    });
+    expect(told.notice).toContain("7 of 11 parts started");
+    expect(told.resume).toBe(true);
+  });
+
+  it("says the plain thing when every part started", () => {
+    const told = describeCorpusStart({
+      documentsTotal: 128,
+      batchCount: 11,
+      partsEnqueued: 11,
+      incompleteReason: null,
+    });
+    expect(told.notice).toContain("Compiling 128 sources in 11 parts");
+    expect(told.notice).toContain("you can close this page");
+    expect(told.resume).toBe(false);
+  });
+});
+
 describe("the schema behind it", () => {
   const migration = readFileSync(
     resolve(import.meta.dirname, "../../supabase/migrations/0040_foundation_corpus_compile.sql"),
@@ -266,6 +311,15 @@ describe("where the corpus path is wired in", () => {
     // The summary can count the rows it was given. What it cannot derive is how many rows
     // there should have been, so the route has to carry that column through.
     expect(corpusRoute).toContain("batchCount: part.batchCount");
+  });
+
+  it("tells the customer how many parts actually started, and offers the rest", () => {
+    expect(workspace).toContain("describeCorpusStart(");
+    expect(workspace).toContain("incompleteReason: json.incompleteReason ?? null");
+    expect(workspace).toContain("setResumeCorpus(");
+    // The resume is the same submission again: enqueue is idempotent and the corpus id is
+    // derived from the document set, so a resubmission fills only the empty slots.
+    expect(workspace).toContain("void startDurableCompile(resumeCorpus)");
   });
 
   it("lets the workspace select more than one compile's worth", () => {

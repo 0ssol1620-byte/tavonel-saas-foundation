@@ -99,6 +99,43 @@ export function planCorpusBatches(documentIds: readonly string[]): CorpusBatch[]
   return batches.map((batch) => ({ ...batch, count: batches.length }));
 }
 
+/*
+  What the customer is told at submission, and whether there is anything left to do about it.
+
+  Enqueueing a corpus can stop half way -- the store treats that as a normal outcome and
+  returns how far it got -- and the browser announced the number of parts it had *planned*.
+  The sentence lives here, next to the partitioning it describes, so the partial case is a
+  tested string rather than an interpolation inside a click handler.
+*/
+export function describeCorpusStart(start: {
+  documentsTotal: number;
+  batchCount: number;
+  partsEnqueued: number;
+  incompleteReason: string | null;
+}): { notice: string; resume: boolean } {
+  /*
+    Fail closed on the count, not on the reason. Fewer parts than planned is the fact that
+    matters; a missing reason is a store that did not explain itself, never evidence that the
+    run is whole.
+  */
+  if (start.partsEnqueued >= start.batchCount && start.incompleteReason === null) {
+    return {
+      notice:
+        `Compiling ${start.documentsTotal} sources in ${start.batchCount} parts. `
+        + "This runs on our servers; you can close this page.",
+      resume: false,
+    };
+  }
+  return {
+    notice:
+      `${start.partsEnqueued} of ${start.batchCount} parts started`
+      + `${start.incompleteReason ? ` (${start.incompleteReason})` : ""}. `
+      + "The parts that did not start are not compiling, and no source in them is in a World. "
+      + "Resume to start them; the parts already running are not repeated.",
+    resume: true,
+  };
+}
+
 export type CorpusPart = {
   jobId: string;
   batchIndex: number;

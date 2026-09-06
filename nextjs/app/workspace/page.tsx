@@ -38,7 +38,7 @@ import ChangeInbox from "@/components/change-inbox";
 import OperationsUltimate from "@/components/operations-ultimate";
 import type { WorldReadModel } from "@/lib/world-read-model";
 import { compileLimitsNotice, judgeCompileSet } from "@/lib/compile-limits";
-import { judgeCorpusSet, type CorpusProgress } from "@/lib/corpus-batching";
+import { describeCorpusStart, judgeCorpusSet, type CorpusProgress } from "@/lib/corpus-batching";
 import { CompileJobPanel, type CompileJobView } from "@/components/compile-job-panel";
 import { observeCompileJob } from "@/lib/compile-job-client";
 import { measureSelection, type PageCountResult } from "@/lib/page-count";
@@ -256,6 +256,15 @@ export default function WorkspacePage() {
   const [corpus, setCorpus] = useState<
     (CorpusProgress & { parts: Array<{ jobId: string; batchIndex: number | null; state: CompileJobView["state"] }> }) | null
   >(null);
+  /*
+    The selection to send again when a corpus was only partly enqueued.
+
+    Held rather than recomputed because the resume has to be the *identical* document set: the
+    corpus id and every part's idempotency key are derived from it, so the same list lands in
+    the same corpus and fills only the empty slots, while a re-picked list would open a second
+    run beside the first.
+  */
+  const [resumeCorpus, setResumeCorpus] = useState<string[] | null>(null);
   /*
     One observer at a time, and it must be stoppable.
 
@@ -953,6 +962,8 @@ export default function WorkspacePage() {
       corpusId?: string;
       batchCount?: number;
       partsEnqueued?: number;
+      /* Set when the server wrote some parts and not the rest. Reading it is the whole point. */
+      incompleteReason?: string | null;
       parts?: Array<{ jobId: string; batchIndex: number }>;
     };
     /*
@@ -966,10 +977,24 @@ export default function WorkspacePage() {
       url.searchParams.delete("job");
       url.searchParams.set("corpus", json.corpusId);
       window.history.replaceState(null, "", url);
-      setNotice(
-        `Compiling ${documentIds.length} sources in ${json.batchCount ?? json.parts.length} parts. `
-        + "This runs on our servers; you can close this page.",
-      );
+      /*
+        What started, not what was planned.
+
+        `enqueueCorpusCompile` treats a partial enqueue as a normal outcome and returns how far
+        it got; this handler printed the planned part count and dropped that, so a run in which
+        seven of eleven parts were written was announced as eleven parts compiling, and the four
+        that were never enqueued were never mentioned again. The sentence is built in
+        `corpus-batching` so the wording is tested rather than interpolated here.
+      */
+      const started = describeCorpusStart({
+        documentsTotal: documentIds.length,
+        batchCount: json.batchCount ?? json.parts.length,
+        partsEnqueued: json.partsEnqueued ?? json.parts.length,
+        incompleteReason: json.incompleteReason ?? null,
+      });
+      setNotice(started.notice);
+      /* The identical selection, so a resume lands in the same corpus and fills only the gaps. */
+      setResumeCorpus(started.resume ? documentIds : null);
       void followCorpus(json.corpusId);
       return;
     }
@@ -978,6 +1003,7 @@ export default function WorkspacePage() {
       return;
     }
     setCorpus(null);
+    setResumeCorpus(null);
     setCompileJob({
       jobId: json.jobId,
       state: "preflight",
@@ -1712,7 +1738,20 @@ export default function WorkspacePage() {
         )
       }
     >
-          {notice ? <p className="notice static" role="status"><strong>Activity.</strong> {notice}</p> : null}
+          {notice ? (
+            <p className="notice static" role="status">
+              <strong>Activity.</strong> {notice}
+              {/*
+                The compensating action for a partly enqueued corpus, beside the sentence that
+                reports it. It re-submits the identical document set: enqueue is idempotent and
+                the corpus id is derived from the set, so the parts that exist come back
+                unchanged and only the empty slots are written.
+              */}
+              {resumeCorpus ? (
+                <> <button type="button" onClick={() => void startDurableCompile(resumeCorpus)}>Resume the missing parts</button></>
+              ) : null}
+            </p>
+          ) : null}
 
           {tab === "overview" && collectionResult ? (
             /*
