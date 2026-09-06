@@ -114,6 +114,28 @@ function isWorkspaceScopedObjectKey(workspaceId: string, documentId: string, key
 }
 
 /**
+ * The first object key this ledger names that is not inside its own workspace, or `null`.
+ *
+ * One validator, both entry points. Projection is not the only way a ledger is built — an adapter,
+ * a replayed observation, another lane's caller can hand `recordSourceLedger` rows nothing has
+ * checked — and a row whose key points into another workspace's immutable prefix is a cross-tenant
+ * pointer stored under this workspace's audit trail. Structural validation cannot see it: it knows
+ * the key is non-empty and nothing about the layout. So the check lives here, where the layout is
+ * known, and every path runs it.
+ *
+ * `sourceId` is the document id in this campaign (`legacyDocumentIdToSourceId` is the identity
+ * function); when that stops being true, that function and this line change together.
+ */
+export function ledgerObjectKeyOutOfScope(ledger: SourceLedger): string | null {
+  const { workspaceId, sourceId } = ledger.source;
+  return (
+    [ledger.version.immutableObjectKey, ...ledger.representations.map((item) => item.objectKey)].find(
+      (key) => !isWorkspaceScopedObjectKey(workspaceId, sourceId, key),
+    ) ?? null
+  );
+}
+
+/**
  * Turn one observation into the ledger rows, or refuse.
  *
  * Refusing is the point. A representation whose parent is not in the same observation, an object
@@ -144,17 +166,11 @@ export function projectSourceLedger(
     observedAt: version.observedAt,
     tombstoned: false,
   };
-  if (!isWorkspaceScopedObjectKey(version.workspaceId, version.documentId, version.immutableObjectKey)) {
-    return { ok: false, code: "REPRESENTATION_OBJECT_KEY_OUT_OF_SCOPE", detail: version.immutableObjectKey };
-  }
 
   const idByKind = new Map<RepresentationKind, string>();
   for (const observation of representations) {
     if (idByKind.has(observation.kind)) {
       return { ok: false, code: "REPRESENTATION_LINEAGE_BROKEN", detail: `two ${observation.kind} representations` };
-    }
-    if (!isWorkspaceScopedObjectKey(version.workspaceId, version.documentId, observation.objectKey)) {
-      return { ok: false, code: "REPRESENTATION_OBJECT_KEY_OUT_OF_SCOPE", detail: observation.objectKey };
     }
     idByKind.set(observation.kind, representationIdFor(sourceVersionId, observation.kind, observation.objectKey));
   }
@@ -207,6 +223,10 @@ export function projectSourceLedger(
   }
 
   const ledger: SourceLedger = { source, version: sourceVersion, representations: projected };
+  const outOfScope = ledgerObjectKeyOutOfScope(ledger);
+  if (outOfScope !== null) {
+    return { ok: false, code: "REPRESENTATION_OBJECT_KEY_OUT_OF_SCOPE", detail: outOfScope };
+  }
   const decision = validateSourceLedger(ledger);
   if (!decision.valid) return { ok: false, code: decision.code, detail: decision.detail };
   return { ok: true, ledger };
@@ -318,11 +338,13 @@ export async function readSourceVersion(sourceVersionId: string): Promise<Source
 /**
  * Record one source, its version and that version's representations.
  *
- * Read first, then write: a stored version bound to a different digest is reported as a conflict
- * before anything is written. Every row is then written through `insertVerified`, so a key that
- * turns out to be taken by a row saying something else -- a source re-claimed for another tenant, a
- * derived artifact re-presented at a second digest -- is `SOURCE_DOMAIN_STORE_CONFLICT` and not a
- * silent success. A conflict on a representation can leave the source and version rows durable:
+ * Check first, then read, then write: every object key runs through `ledgerObjectKeyOutOfScope`
+ * before a request is made, so a ledger built anywhere but `projectSourceLedger` cannot record a
+ * pointer into another workspace. A stored version bound to a different digest is then reported as
+ * a conflict before anything is written. Every row is then written through `insertVerified`, so a
+ * key that turns out to be taken by a row saying something else -- a source re-claimed for another
+ * tenant, a derived artifact re-presented at a second digest -- is `SOURCE_DOMAIN_STORE_CONFLICT`
+ * and not a silent success. A conflict on a representation can leave the source and version rows durable:
  * they were compared against what is stored and agreed with it, so nothing wrong was written; the
  * chain is simply incomplete, which is what a refused write is supposed to leave behind.
  *
@@ -334,6 +356,10 @@ export async function recordSourceLedger(ledger: SourceLedger): Promise<SourceDo
   if (!structural.valid) return { ok: false, code: structural.code, detail: structural.detail };
   const compilable = assertSourceCompilable(ledger.source, ledger.version);
   if (!compilable.valid) return { ok: false, code: compilable.code, detail: compilable.detail };
+  const outOfScope = ledgerObjectKeyOutOfScope(ledger);
+  if (outOfScope !== null) {
+    return { ok: false, code: "REPRESENTATION_OBJECT_KEY_OUT_OF_SCOPE", detail: outOfScope };
+  }
 
   const existing = await readSourceVersion(ledger.version.sourceVersionId);
   if (!existing.ok) return existing;

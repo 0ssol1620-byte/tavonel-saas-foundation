@@ -239,6 +239,34 @@ describe("source ledger store", () => {
     expect(writes).toEqual([]);
   });
 
+  /**
+   * A ledger that never went through `projectSourceLedger` — an adapter's rows, a replay — reaches
+   * this function with keys nothing has checked. A key inside another workspace's immutable prefix
+   * is a cross-tenant pointer, and it must be refused before the first request, not written and
+   * answered `ok`.
+   */
+  it("refuses an object key outside the workspace in either position, before any request", async () => {
+    configure();
+    const calls: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
+      calls.push(String(input));
+      return Response.json([]);
+    }));
+
+    const smuggledRepresentation = ledger();
+    smuggledRepresentation.representations[1]!.objectKey =
+      `immutable/other-workspace/other-workspace/${DOCUMENT}/${SANITIZED}/sanitized.pdf`;
+    expect(await recordSourceLedger(smuggledRepresentation))
+      .toMatchObject({ ok: false, code: "REPRESENTATION_OBJECT_KEY_OUT_OF_SCOPE" });
+
+    const smuggledVersion = ledger();
+    smuggledVersion.version.immutableObjectKey = `quarantine/other-workspace/${DOCUMENT}/source`;
+    expect(await recordSourceLedger(smuggledVersion))
+      .toMatchObject({ ok: false, code: "REPRESENTATION_OBJECT_KEY_OUT_OF_SCOPE" });
+
+    expect(calls).toEqual([]);
+  });
+
   it("never records a tombstoned source", async () => {
     configure();
     vi.stubGlobal("fetch", vi.fn(async () => Response.json([])));
