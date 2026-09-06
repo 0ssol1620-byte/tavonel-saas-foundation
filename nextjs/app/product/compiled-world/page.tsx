@@ -26,7 +26,14 @@ export const metadata: Metadata = {
 const PARTS = [
   ["OBJECTS", "The things themselves", "Entities, topics and claims with stable identities that survive a source being revised, so the same thing named in two documents is one thing in the world."],
   ["RELATIONS", "What connects to what", "Typed edges between objects: what supports, supersedes, depends on or contradicts what, each carrying the source region that justifies it."],
-  ["EVIDENCE", "Where a fact came from", "Every qualified claim points at a document version, page and region. A world holding an unresolved link is not emitted at all."],
+  /*
+    RESOLVED A-1 (2026-09-06), applied here in the repair pass rather than in the pass that
+    changed the other eight surfaces. This row published the PDF locator -- "a document version,
+    page and region" -- as the general shape of all evidence, which is the wording A-1 retires.
+    A cell in a spreadsheet and a MIME part in an email are exact locations with no page. The
+    per-source forms are set out once, on /evidence, rather than repeated here.
+  */
+  ["EVIDENCE", "Where a fact came from", "Every qualified claim points at a source version and its exact location inside it. A world holding an unresolved link is not emitted at all."],
   ["VERSIONS", "What changed, and when", "A compile produces a candidate version. A person activates it, and the version it replaced stays intact and readable."],
   ["PROJECTIONS", "How it is consumed", "Ontology, graph, retrieval corpus, directory and validation artifacts. One world, read by Ask, search, the API and MCP."],
   ["PACKAGE", "What you can take", "A signed package, hash-verified on the way out. The public key is published at /api/export/trust, so a recipient can verify it without asking us."],

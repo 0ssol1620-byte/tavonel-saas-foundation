@@ -251,11 +251,11 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
             B-7 makes Google Drive's deletion semantics a blocker on connector qualification, so
             no connector here is verified.
 
-            S3-compatible storage and mounted SMB/NFS/SFTP paths are not listed. There is no
-            import adapter for either in `lib/connector-*`; what exists is a local agent the
-            customer runs themselves, which belongs on /integrations and /developers where it
-            can be described as the assisted route it is, not on a homepage row that reads as a
-            connector you can switch on.
+            S3-compatible storage and mounted SMB/NFS/SFTP paths are not listed as connectors.
+            There is no import adapter for either in `lib/connector-*`; what exists is a local
+            agent the customer runs themselves, so the row sits outside the connector list and
+            below it, described as the assisted route it is rather than as something you switch
+            on. /integrations and /developers carry the full description.
 
             ZIP says what actually happens to it. The archive is expanded in the browser and its
             members are validated and compiled one at a time; the archive itself is never
@@ -291,10 +291,23 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
               <h3>Google Drive · Dropbox · OneDrive / SharePoint</h3>
               <p>Read-only discovery and import, built and contract-tested. Not qualified: deletion and permission semantics are still being settled, so verify a connection before depending on it.</p>
             </article>
+          </div>
+          {/*
+            Out of the connector list, because it is not a connector. Repair, 2026-09-06.
+
+            The block above argues at length that S3-compatible storage and mounted shares are an
+            agent route rather than something you switch on, and then rendered them as the second
+            row of a list whose accessible name is "Connectors". A screen reader was told the
+            opposite of what the page says in prose, which is the one reading that cannot be
+            argued with. The word stays ENTERPRISE-ASSISTED -- it is A-4's, and it is the word
+            /integrations and /workspace print for the same route -- and the row moves to a list
+            of its own that says what it is.
+          */}
+          <div className="chain rv" aria-label="Assisted import route, not a connector">
             <article className="link">
               <span className="st">ENTERPRISE-ASSISTED</span>
               <h3>Object storage and mounted shares</h3>
-              <p>S3-compatible buckets and SMB, NFS or SFTP paths are imported by an agent you run inside your own network. Set up with you, not self-serve.</p>
+              <p>S3-compatible buckets and SMB, NFS or SFTP paths are imported by an agent you run inside your own network — not a connector you switch on here. Set up with you, not self-serve.</p>
             </article>
           </div>
         </Scene>

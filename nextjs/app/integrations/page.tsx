@@ -20,12 +20,19 @@ export const metadata: Metadata = {
   network against a mounted path or an S3-compatible bucket, talking to two real endpoints
   (`/api/v1/uploads/capability` and `/api/v1/connections/{id}/sync`). That is an assisted import
   route, and RESOLVED A-4 (2026-09-06) says it may be described only as one.
+
+  Repair, 2026-09-06: this legend is the definition of A-4's vocabulary and was using two words
+  from outside it. "Available" and "Planned" are not among the four -- and "Available — set it up
+  yourself" was the stronger claim of the two, because it promised a self-serve level for which
+  the page's own B-7 note says nothing here qualifies. The four words are the four words, on the
+  surface that defines them as much as on the landing page, and `brand-copy.test.ts` now reads
+  this file's vocabulary rather than only the landing page's chips.
 */
 const SUPPORT_LEVELS = [
-  ["Available", "Set it up yourself."],
+  ["Qualified", "Verified against a real account and safe to depend on. No connector here has reached this level."],
   ["Beta", "Built and contract-tested. Verify the connection in your workspace before depending on it. Not qualified."],
   ["Enterprise-assisted", "Not a self-serve connector. An import route we configure with you, run by an agent inside your own network."],
-  ["Planned", "Not built yet."],
+  ["Unsupported", "Not built. Nothing in the product connects to it today."],
 ] as const;
 
 const OAUTH = [

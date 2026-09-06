@@ -474,6 +474,32 @@ describe("public copy", () => {
   });
 
   /*
+    Repair, 2026-09-06: the guard above read the landing page only, and the surface that defines
+    the vocabulary was the one drifting from it. /integrations printed a four-level legend whose
+    first and last words -- "Available" and "Planned" -- are not A-4's, so the page teaching the
+    reader what the labels mean taught two labels the rest of the site does not use. The words
+    live in three places in that file (the legend, `level:` on each OAuth connector, and the
+    middle column of INFRA) and all three are read here.
+  */
+  it("uses only RESOLVED A-4's four words as the support vocabulary on /integrations", () => {
+    const source = read("app/integrations/page.tsx").replace(/\/\*[\s\S]*?\*\//g, " ");
+    const block = (name: string) => {
+      const match = source.match(new RegExp(`const ${name} = \\[([\\s\\S]*?)\\n\\] as const;`));
+      expect(match, `${name} is still declared in app/integrations/page.tsx`).not.toBeNull();
+      return match![1]!;
+    };
+    const legend = [...block("SUPPORT_LEVELS").matchAll(/\["([^"]+)",/g)].map((match) => match[1]!);
+    expect(legend.length, "the support-level legend still has four entries").toBe(4);
+    const infra = [...block("INFRA").matchAll(/\["[^"]+",\s*"([^"]+)",/g)].map((match) => match[1]!);
+    expect(infra.length, "the infrastructure rows still carry a support word").toBeGreaterThan(0);
+    const connectors = [...source.matchAll(/\blevel:\s*"([^"]+)"/g)].map((match) => match[1]!);
+    expect(connectors.length, "the OAuth connectors still carry a support word").toBeGreaterThan(0);
+    for (const word of [...legend, ...infra, ...connectors]) {
+      expect(A4_WORDS, `"${word}" is not one of RESOLVED A-4's connector support words`).toContain(word.toUpperCase());
+    }
+  });
+
+  /*
     RESOLVED A-1: one locator shape may not be published as the shape of all evidence.
     Repair, 2026-09-06.
 
@@ -496,9 +522,13 @@ describe("public copy", () => {
     "page-level citation",
     "evidence back to the page",
     "page number and bounding box",
+    // Repair, 2026-09-06: /product/compiled-world published "a document version, page and
+    // region" as what every qualified claim points at. Retired for the same reason as the rest.
+    "version, page and region",
   ];
   const A1_SURFACES = [
     "components/home-page-client.tsx",
+    "app/product/compiled-world/page.tsx",
     "app/solutions/[slug]/page.tsx",
     "app/api/page.tsx",
     "app/evidence/page.tsx",
