@@ -31,6 +31,24 @@ describe("GET /api/v1/capabilities", () => {
     expect(GET().headers.get("ETag")).toBe(`"sha256:${expected}"`);
   });
 
+  /*
+    The digest a caller can actually reproduce, run the way the route's comment says to run it.
+
+    A reviewer measured sha256 of the served body, found it was not `contentSha256`, and was
+    right to: the field cannot be inside the document it measures. The recompute is "drop the
+    last key, re-serialize", and this test performs it on the response bytes rather than on the
+    manifest object, so the documented procedure is the thing under test.
+  */
+  it("recomputes from the served bytes by dropping contentSha256 and re-serializing", async () => {
+    const served = await GET().text();
+    const { contentSha256, ...manifest } = JSON.parse(served) as Payload;
+    const recomputed = createHash("sha256").update(JSON.stringify(manifest), "utf8").digest("hex");
+    expect(contentSha256).toBe(`sha256:${recomputed}`);
+    // And it is not the digest of the body it rides in -- saying so would be the false claim.
+    const ofTheWholeBody = createHash("sha256").update(served, "utf8").digest("hex");
+    expect(contentSha256).not.toBe(`sha256:${ofTheWholeBody}`);
+  });
+
   it("is cacheable and public, because it carries no tenant", async () => {
     const cacheControl = GET().headers.get("Cache-Control") ?? "";
     expect(cacheControl).toContain("public");

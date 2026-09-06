@@ -10,10 +10,18 @@ import { CAPABILITY_MANIFEST } from "../../../../../shared/capabilityManifest";
   integrator deciding whether to send us a file should not need a key to find out that we will
   refuse it.
 
-  `contentSha256` is over the manifest exactly as serialized below, so a caller can pin the
-  answer it built against and notice when the deployment's capabilities changed. It is a digest
-  of the payload, not a qualification receipt -- a format's receipt lives in its own entry, and
-  is null everywhere until a qualification run produces one.
+  `contentSha256` is the digest of the manifest WITHOUT that field: a document cannot carry the
+  digest of a document that contains it, so the earlier wording here ("over the manifest exactly
+  as serialized below") was read as the served body and measured a different value.
+
+  To recompute it from a response: delete `contentSha256` -- it is the last key -- and
+  `JSON.stringify` what is left with the key order unchanged. That is the pin a caller keeps, so
+  it notices when the deployment's capabilities changed. `nextjs/lib/capability-manifest-route.
+  test.ts` runs exactly that procedure against the served bytes, so this paragraph cannot drift
+  from the code under it.
+
+  It is a digest of the payload, not a qualification receipt -- a format's receipt lives in its
+  own entry, and is null everywhere until a qualification run produces one.
 */
 export const dynamic = "force-static";
 export const runtime = "nodejs";
