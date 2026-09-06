@@ -29,6 +29,10 @@ class FakeR2 implements R2BucketLike {
     }
   }
 
+  async list({ prefix }: { prefix: string }): Promise<{ objects: Array<{ key: string }> }> {
+    return { objects: [...this.objects.keys()].filter((key) => key.startsWith(prefix)).map((key) => ({ key })) };
+  }
+
   async get(key: string): Promise<R2ObjectLike | null> {
     const found = this.objects.get(key);
     if (!found) {
@@ -126,6 +130,56 @@ async function cleanCdrFetch(input: RequestInfo | URL, init?: RequestInit): Prom
       "x-tavonel-cdr-output-sha256": outputSha256(),
     },
   });
+}
+
+/** What a scale-to-zero GPU endpoint looks like from the worker: the request never answers. */
+async function ocrTimeout(): Promise<Response> {
+  throw new Error("The operation was aborted due to timeout");
+}
+
+type QueueAttempt = {
+  acks: number;
+  retries: Array<number | undefined>;
+  settlements: Array<Record<string, unknown>>;
+  cdrCalls: number;
+  ocrCalls: number;
+};
+
+async function runQueueAttempt(
+  r2: FakeR2,
+  attempts: number,
+  ocrFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
+): Promise<QueueAttempt> {
+  const run: QueueAttempt = { acks: 0, retries: [], settlements: [], cdrCalls: 0, ocrCalls: 0 };
+  await handleQueue(
+    {
+      messages: [{
+        attempts,
+        body: { object: { key: SOURCE_KEY } },
+        ack: () => {
+          run.acks += 1;
+        },
+        retry: (options?: { delaySeconds?: number }) => {
+          run.retries.push(options?.delaySeconds);
+        },
+      }],
+    } as never,
+    envFor(r2, { FOUNDATION_OCR_URL: FOUNDATION_OCR }),
+    async (input, init) => {
+      const url = String(input);
+      if (url === SETTLEMENT_URL) {
+        run.settlements.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+        return new Response(JSON.stringify({ code: "SETTLEMENT_APPLIED" }), { status: 200 });
+      }
+      if (url.includes("/v1/ocr")) {
+        run.ocrCalls += 1;
+        return ocrFetch(input, init);
+      }
+      run.cdrCalls += 1;
+      return cleanCdrFetch(input, init);
+    },
+  );
+  return run;
 }
 
 describe("sanitizeObject", () => {
@@ -373,6 +427,65 @@ describe("Worker HTTP and queue surface", () => {
     const invalid = await handleRequest(request("Bearer invalid"), envFor(r2), cleanCdrFetch);
     assert.equal(invalid.status, 401);
     assert.equal(r2.puts.length, 0);
+  });
+
+  it("retries a cold-start OCR timeout instead of settling the document for review", async () => {
+    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
+    const run = await runQueueAttempt(r2, 1, ocrTimeout);
+    const reviewKey = ocrReviewSiblingKey(immutableObjectKey("ws_pilot", "doc_1", outputSha256()));
+    assert.deepEqual(run.retries, [60]);
+    assert.equal(run.acks, 0);
+    assert.deepEqual(run.settlements, []);
+    assert.equal(r2.objects.has(reviewKey), false);
+
+    const second = await runQueueAttempt(r2, 2, ocrTimeout);
+    assert.deepEqual(second.retries, [120]);
+    assert.equal(r2.objects.has(reviewKey), false);
+  });
+
+  it("settles for operator review when the OCR timeout outlives the retry bound", async () => {
+    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
+    const run = await runQueueAttempt(r2, 3, ocrTimeout);
+    const reviewKey = ocrReviewSiblingKey(immutableObjectKey("ws_pilot", "doc_1", outputSha256()));
+    assert.deepEqual(run.retries, []);
+    assert.equal(run.acks, 1);
+    assert.equal(run.settlements.length, 1);
+    assert.equal(run.settlements[0]?.outcome, "operator_review");
+    assert.equal(run.settlements[0]?.actualCredits, 2);
+    assert.equal(run.settlements[0]?.reasonCode, "OCR_TIMEOUT_OR_NETWORK");
+    const review = JSON.parse(new TextDecoder().decode(r2.objects.get(reviewKey)?.bytes));
+    assert.equal(review.status, "operator_review");
+    assert.equal(review.reasonCode, "OCR_TIMEOUT_OR_NETWORK");
+  });
+
+  it("sends an HTTP-rejected OCR to review on the first attempt", async () => {
+    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
+    const run = await runQueueAttempt(r2, 1, async () => new Response("capacity unavailable", { status: 503 }));
+    const reviewKey = ocrReviewSiblingKey(immutableObjectKey("ws_pilot", "doc_1", outputSha256()));
+    assert.deepEqual(run.retries, []);
+    assert.equal(run.acks, 1);
+    assert.equal(run.settlements[0]?.outcome, "operator_review");
+    assert.equal(run.settlements[0]?.reasonCode, "OCR_HTTP_REJECTED");
+    assert.equal(r2.objects.has(reviewKey), true);
+  });
+
+  it("settles once when the retried attempt succeeds, without redoing the disarm", async () => {
+    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
+    const immutableKey = immutableObjectKey("ws_pilot", "doc_1", outputSha256());
+    const first = await runQueueAttempt(r2, 1, ocrTimeout);
+    assert.deepEqual(first.retries, [60]);
+
+    const second = await runQueueAttempt(r2, 2, cleanCdrFetch);
+    assert.equal(second.acks, 1);
+    assert.deepEqual(second.retries, []);
+    assert.equal(second.cdrCalls, 0, "the immutable PDF already exists, so the CDR must not run again");
+    assert.equal(second.settlements.length, 1);
+    assert.equal(second.settlements[0]?.outcome, "settled");
+    assert.equal(second.settlements[0]?.actualCredits, 2);
+    assert.equal(r2.objects.has(ocrReviewSiblingKey(immutableKey)), false);
+    assert.equal(r2.objects.has(ocrSiblingKey(immutableKey)), true);
+    assert.equal(r2.puts.filter((entry) => entry.key === immutableKey).length, 1);
+    assert.equal(r2.puts.filter((entry) => entry.key === cdrReceiptSiblingKey(immutableKey)).length, 1);
   });
 
   it("queue skips non-source keys and retries CDR 5xx", async () => {

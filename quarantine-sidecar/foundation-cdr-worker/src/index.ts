@@ -94,6 +94,21 @@ export async function handleRequest(request: Request, env: Env, fetcher: typeof 
   return jsonResponse(404, { error: "not found" });
 }
 
+/**
+ * How long a redelivered message waits before the OCR endpoint is asked again.
+ *
+ * The GPU endpoint scales to zero and its cold start outruns a single OCR request, so the first
+ * upload after an idle period times out on infrastructure rather than on the document. Attempts 1
+ * and 2 give the endpoint time to boot; attempt 3 is terminal and settles for operator review
+ * exactly as before, so nothing is lost. `max_retries` in wrangler.jsonc stays the outer bound.
+ */
+const OCR_COLD_START_RETRY_DELAYS_S = [60, 120] as const;
+
+function coldStartRetryDelay(attempts: unknown): number | undefined {
+  const attempt = Number.isInteger(attempts) && (attempts as number) > 0 ? (attempts as number) : 1;
+  return OCR_COLD_START_RETRY_DELAYS_S[attempt - 1];
+}
+
 export async function handleQueue(batch: MessageBatch<unknown>, env: Env, fetcher: typeof fetch = fetch): Promise<void> {
   for (const message of batch.messages) {
     try {
@@ -102,7 +117,16 @@ export async function handleQueue(batch: MessageBatch<unknown>, env: Env, fetche
         message.ack();
         continue;
       }
-      const result = await sanitizeObject(env, objectKey, fetcher);
+      const retryDelaySeconds = coldStartRetryDelay(message.attempts);
+      const result = await sanitizeObject(env, objectKey, fetcher, undefined, undefined, {
+        deferReviewOnTimeout: retryDelaySeconds !== undefined,
+      });
+      if (retryDelaySeconds !== undefined && result.ocr.reasonCode === "OCR_TIMEOUT_OR_NETWORK") {
+        // No review record and no settlement: the reservation stays open for the next attempt,
+        // which is what keeps a credit from being charged for a boot that never produced OCR.
+        message.retry({ delaySeconds: retryDelaySeconds });
+        continue;
+      }
       const outcome = result.ocr.computeCredits === 0
         ? "released"
         : result.ocr.status === "failed" ? "operator_review" : "settled";

@@ -51,6 +51,12 @@ const OCR_RESULT_SCHEMA = "tavonel.ocr_result.v2";
 const AUTHORITY_CLASSES = new Set(["unknown", "informal", "official", "contractual"]);
 // RunPod cold starts have been observed at roughly 30 seconds. Keep the request below the
 // approved 90-second execution ceiling while leaving enough room for startup and one-page OCR.
+//
+// It stays at 85 s even though a queue consumer may run for 15 minutes of wall time. A longer
+// single request would hold the invocation open while a scaled-to-zero GPU boots and would still
+// have no answer when the boot is slower than the guess. The consumer redelivers the message
+// after a delay instead (OCR_COLD_START_RETRY_DELAYS_S in index.ts), which costs nothing while
+// it waits and keeps the request inside the approved ceiling.
 export const OCR_REQUEST_TIMEOUT_MS = 85_000;
 /** One JSON document per line. Matches the worker's `tavonel.ocr_progress.v1` stream. */
 const OCR_PROGRESS_SCHEMA = "tavonel.ocr_progress.v1";
