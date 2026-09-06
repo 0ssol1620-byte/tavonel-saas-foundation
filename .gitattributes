@@ -31,3 +31,9 @@ supabase/tests/*.sql text eol=lf
 # would fail on one platform and pass on the other, and a visitor opening the PDF would be
 # checking a file the page no longer describes.
 nextjs/public/explore-sample/*.pdf binary
+
+# The frozen USKC contract schemas are copied verbatim into both repositories and pinned by
+# sha256 against the contract artifact. Same rule as above: through core.autocrlf a Windows
+# checkout would hash differently from the Linux one, and the two repositories would be
+# validating against files that are no longer the same bytes.
+shared/*.schema.json text eol=lf

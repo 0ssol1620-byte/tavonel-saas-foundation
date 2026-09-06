@@ -94,6 +94,15 @@ const COPY_SURFACES = [
   */
   "components/change-inbox.tsx",
   "lib/change-inbox.ts",
+  /*
+    The support matrix. `../shared/capabilityManifest.ts` is on the list because most of the
+    words on /sources are in it -- the tiers, the preserved lists and every limitation are data,
+    and a barred phrase written into a manifest entry would render on the page while the page's
+    own source stayed clean.
+  */
+  "app/sources/page.tsx",
+  "components/source-capability-table.tsx",
+  "../shared/capabilityManifest.ts",
 ];
 
 const BARRED = [
@@ -103,6 +112,32 @@ const BARRED = [
   "never hallucinates",
   "better than rag",
   "ai brain",
+  /*
+    The 2026-09-06 blueprint's §42 guardrails, added by the lane that built /sources.
+
+    A support matrix is exactly where "supports every file" gets written, and it is the one
+    sentence this product may never say: the architecture is meant to accept any source, the
+    deployment reads eleven MIME types, and collapsing that distinction is how a page becomes a
+    promise the upload route refuses. The other five are the same shape -- each asserts an
+    absolute no evidence here reaches.
+
+    "all files" was left out of the first version of this list on the theory that it is ordinary
+    English ("all files in the archive") and would fire on innocent prose. It does not: no copy
+    surface in this repository contains it. The contract lists it, the check is cheap, and a
+    surface that one day needs the innocent reading can say "every file in the archive".
+
+    "industry-leading" is barred outright rather than "without evidence". The qualified version
+    is not testable, and the unqualified version has never appeared in this repository; if a
+    receipt ever supports the claim the right move is to delete this entry in the commit that
+    cites the receipt, the way "better than RAG" is meant to leave.
+  */
+  "supports every file",
+  "all files",
+  "perfect parsing",
+  "best ocr",
+  "never stale",
+  "always current",
+  "industry-leading",
 ];
 
 /**

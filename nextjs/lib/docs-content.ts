@@ -2,6 +2,7 @@ import { API_VERSION } from "./api-version";
 import { COMPILE_MAX_DOCUMENTS, COMPILE_MIN_DOCUMENTS, CORPUS_MAX_DOCUMENTS } from "./compile-limits";
 import { MAX_FILES, MAX_SYNC_ARCHIVE_BYTES, MAX_WORKER_ARCHIVE_BYTES } from "./archive-expand";
 import { DEVELOPER_SCOPES } from "./developer-contracts";
+import { CAPABILITY_MANIFEST, describeAcceptedFormats } from "../../shared/capabilityManifest";
 
 /*
   The documentation, as data.
@@ -143,7 +144,27 @@ export const DOCS_SECTIONS: DocsSection[] = [
     group: "Operations",
     summary: "What can be uploaded, what is expanded in the browser, and the ceilings on both.",
     blocks: [
-      { kind: "prose", text: "PDF, common office documents and images are accepted. A ZIP archive is expanded before upload so its contents arrive as individual sources, which is why the archive ceilings below are browser limits rather than server ones." },
+      { kind: "prose", text: `${describeAcceptedFormats(CAPABILITY_MANIFEST)} are accepted, and nothing else is. A ZIP archive is expanded before upload so its contents arrive as individual sources, which is why the archive ceilings below are browser limits rather than server ones.` },
+      /*
+        The support table is the manifest, not a description of it.
+
+        `shared/capabilityManifest.ts` is what the upload route validates against and what
+        /sources publishes; printing it here keeps the documentation from being the one copy
+        that fell behind. The tier and the preserved list are deliberately unglamorous -- every
+        source is sanitized to PDF and read by OCR today, so every row says the same three
+        things, and a reader planning an integration needs to know that before they send us a
+        spreadsheet expecting cells.
+      */
+      {
+        kind: "table",
+        head: ["Format", "Support tier", "What is preserved"],
+        rows: CAPABILITY_MANIFEST.entries.map((entry) => [
+          entry.extensions.map((extension) => `.${extension}`).join(" "),
+          entry.status,
+          entry.preserved.length > 0 ? entry.preserved.join(", ") : "nothing — not compiled",
+        ]),
+      },
+      { kind: "note", text: "A verified tier requires a qualification receipt and the date it was produced. No format carries one on this deployment, so no format claims more than best effort. /sources prints the same manifest with every limitation attached." },
       {
         kind: "table",
         head: ["Limit", "Value", "Why it is that number"],

@@ -3282,3 +3282,155 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
   .resolve-row { grid-template-columns: minmax(0, 1fr); }
   .resolve-join { display: none; }
 }
+
+/*
+  /sources — the capability matrix.
+
+  An instrument table, not a feature grid: hairlines, one weight of type, and colour only where
+  it carries state. The six support tiers map onto the four status tokens declared at the top of
+  this file rather than introducing a fifth hue; the rule and its reason are in
+  `components/source-capability-table.tsx`, beside the mapping it applies.
+
+  Below 760px the table stops being a table. Six columns of tokens on a 360px phone is a
+  horizontal scroll nobody finds, so each row becomes a stacked card and each cell prints its
+  column name from the `data-label` the component already writes for accessibility.
+*/
+.src-scroll { overflow-x: auto; margin: 0 -2px; }
+
+.src-matrix {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.src-matrix caption {
+  caption-side: bottom;
+  padding-top: 12px;
+  text-align: left;
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  color: var(--text-xlo);
+  word-break: break-word;
+}
+.src-matrix th, .src-matrix td {
+  padding: 12px 14px 12px 0;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--hairline);
+}
+.src-matrix thead th {
+  border-bottom-color: var(--hairline-hi);
+  font-family: var(--f-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-lo);
+  white-space: nowrap;
+}
+.src-matrix tbody th { font-weight: 400; min-width: 15ch; }
+.src-matrix tbody th b {
+  display: block;
+  font-family: var(--f-mono);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-hi);
+}
+.src-matrix tbody th i, .src-matrix td > i {
+  display: block;
+  margin-top: 3px;
+  font-style: normal;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--text-xlo);
+  word-break: break-word;
+}
+
+/* The tier chip. One border, one dot of colour; the tier's name is the label. */
+.src-tier {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 8px;
+  border: 1px solid var(--hairline-hi);
+  border-radius: 2px;
+  background: var(--g1);
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--text-mid);
+  white-space: nowrap;
+}
+.src-tier::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--reused);
+  flex: none;
+}
+.src-tier[data-token="verified"]::before { background: var(--verified); }
+.src-tier[data-token="unresolved"]::before { background: var(--unresolved); }
+.src-tier[data-token="changed"]::before { background: var(--changed); }
+.src-tier[data-token="reused"]::before { background: var(--reused); }
+
+.src-tokens { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+.src-tokens li { color: var(--text-mid); }
+.src-none { color: var(--text-xlo); font-family: var(--f-mono); font-size: 11px; letter-spacing: 0.08em; }
+
+.src-legend { margin: 0; display: grid; gap: 10px; max-width: 78ch; }
+.src-legend > div { display: grid; grid-template-columns: 20ch minmax(0, 1fr); gap: 14px; align-items: baseline; }
+.src-legend dt { margin: 0; }
+.src-legend dd { margin: 0; font-size: 13px; line-height: 1.65; color: var(--text-mid); }
+
+.src-state {
+  margin: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--hairline-hi);
+  /* --unresolved: nothing regressed, the question is simply still open. */
+  border-left: 2px solid var(--unresolved);
+  background: var(--g1);
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--text-mid);
+  max-width: 76ch;
+}
+.src-state b { color: var(--text-hi); font-weight: 500; }
+
+.src-refusal {
+  margin: 0;
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-lo);
+}
+
+.src-section { font-variation-settings: "wght" 500; text-wrap: initial; }
+.src-para { margin: 0; max-width: 72ch; font-size: 13.5px; line-height: 1.66; color: var(--text-mid); }
+.src-para b { color: var(--text-hi); font-weight: 500; }
+
+@media (max-width: 760px) {
+  .src-matrix thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .src-matrix tr {
+    display: block;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--hairline-hi);
+  }
+  .src-matrix th, .src-matrix td { display: block; padding: 0; border: 0; }
+  .src-matrix tbody th { min-width: 0; }
+  .src-matrix td { margin-top: 10px; }
+  .src-matrix td::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 4px;
+    font-family: var(--f-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-xlo);
+  }
+  .src-legend > div { grid-template-columns: minmax(0, 1fr); gap: 5px; }
+}

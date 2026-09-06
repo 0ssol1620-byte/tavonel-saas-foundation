@@ -6,6 +6,9 @@ import type { OcrProgress } from "@/lib/ocr-progress";
 import ReadingView from "./reading-view";
 import { displayName, type DocumentNames } from "@/lib/document-names";
 import { trackFunnel } from "@/lib/funnel-events";
+// The rejection sentence names the formats the server actually accepts, so it cannot fall
+// behind the whitelist that produced the rejection. Both come from the Capability Manifest.
+import { acceptedFormatSentence } from "@/lib/qualified-input";
 
 type Filter = "all" | "attention" | "processing" | "ready" | "failed";
 function statusOf(row: PipelineRow): Exclude<Filter, "all"> { if (row.stages.some((stage) => stage.state === "failed")) return "failed"; if (row.needsPerson) return "attention"; if (row.transfer || row.stages.some((stage) => stage.state === "active")) return "processing"; return "ready"; }
@@ -13,7 +16,7 @@ function statusLabel(row: PipelineRow, reading: Record<string, OcrProgress>): st
 function failureCopy(detail: string) {
   if (detail.includes("TRIAL_FILE_TOO_LARGE")) return "Free Evaluation accepts files up to 50 MB. Use a smaller source or upgrade for larger manuals.";
   if (detail.includes("FILE_TOO_LARGE") || detail.includes("INTAKE_FILE_TOO_LARGE")) return "This file exceeds the 250 MB direct-upload limit. Connect the source system instead of uploading it directly.";
-  if (detail.includes("UNQUALIFIED_MIME")) return "This file type is not supported yet. Use PDF, DOCX, XLSX, PPTX, OpenDocument, JPG, PNG, TIFF or GIF.";
+  if (detail.includes("UNQUALIFIED_MIME")) return `This file type is not supported yet. Use ${acceptedFormatSentence}.`;
   if (detail.includes("FILENAME_MIME_MISMATCH")) return "The file extension and detected browser type disagree. Export the source again with its correct format and retry.";
   if (detail.includes("TRIAL_ARCHIVE_NOT_INCLUDED")) return "ZIP archives are not included in Free Evaluation. Upload the files directly or use Developer access.";
   if (detail.includes("UNQUALIFIED_INPUT")) return "This source was rejected by the previous intake contract. Re-add it now; the direct-upload ceiling has been raised.";
