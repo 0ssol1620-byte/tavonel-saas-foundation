@@ -3,17 +3,23 @@ const playwrightModule = await import(playwrightPackage);
 const { expect, test } = "test" in playwrightModule ? playwrightModule : playwrightModule.default;
 
 /*
-  The two capability-truth routes, probed where a deployment is what answers.
+  The two capability-truth routes, probed against a deployment when PLAYWRIGHT_BASE_URL is set.
 
   Gap matrix L-1: production serves neither `/sources` nor `/api/v1/capabilities` -- both 404 --
   while the integration Preview serves both, and the homepage already promises the surface. A
   route that exists in the repository and not in the deployment is invisible to every unit test
-  in it, so the probe belongs in the launch suite, which runs against `PLAYWRIGHT_BASE_URL` when
-  one is set and is therefore the only check that can be pointed at Preview or production.
+  in it, so the probe belongs in the launch suite: it is the only suite that can be pointed at a
+  deployment at all.
+
+  What that means for what a green run proves. `.github/workflows/launch-qa.yml` sets no
+  PLAYWRIGHT_BASE_URL, so in CI `playwright.config.ts` starts `pnpm build && pnpm start` and this
+  file probes that local server -- it says the routes are served by a production build of these
+  files, and nothing whatever about tavonel.com. Only a run with PLAYWRIGHT_BASE_URL pointed at a
+  deployment answers L-1, and until such a run exists L-1 stays IMPLEMENTED_NOT_LIVE.
 
   `e2e/sources.spec.ts` already holds the page's editorial and layout contract. This file is
   deliberately narrower: are the routes served, does the manifest carry the frozen schema
-  version, and are the page and the API the same list of MIME types. Nothing else.
+  version, and are the page and the API the same list of MIME types and statuses. Nothing else.
 */
 
 const SCHEMA_VERSION = "tavonel.capability_manifest.v1";
@@ -66,4 +72,14 @@ test("prints exactly the MIME rows the manifest serves", async ({ page }) => {
     .allInnerTexts()).map((mime) => mime.trim());
 
   expect(printed).toEqual(manifest.entries.map((entry) => entry.mime));
+
+  // The status column too, or the page can print the right format under the wrong tier -- which
+  // is the same lie in a quieter place: BEST_EFFORT rendered as VERIFIED_NATIVE promises a
+  // fidelity the deployment does not have. `tbody` keeps this off the legend's own .src-tier
+  // chips.
+  const tiers = (await page
+    .locator("table.src-matrix tbody .src-tier")
+    .allInnerTexts()).map((status) => status.trim());
+
+  expect(tiers).toEqual(manifest.entries.map((entry) => entry.status));
 });
