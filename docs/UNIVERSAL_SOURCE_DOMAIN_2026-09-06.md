@@ -65,6 +65,13 @@ writers can race, an enforcement in SQL:
 | The original's key and digest are never rewritten | `ORIGINAL_IMMUTABLE` | `validateRepresentationRewrite` | trigger `source_representations_original_immutable`, unique partial index on `kind = 'original'` |
 | A tombstoned source is readable for audit and never compiled | `SOURCE_TOMBSTONED` | `assertSourceCompilable` | — (a read-time question, not a write constraint) |
 | A representation without a producing revision is refused | `REPRESENTATION_LINEAGE_BROKEN` | `validateSourceLedger` | `provider_revision text not null` |
+| `originKind`, `sourceFamily` and a representation `kind` are members of the frozen vocabularies | `SOURCE_VOCABULARY_INVALID` | `validateSourceLedger` | `check (… in (…))` on each column |
+| Every timestamp field — `createdAt`, `tombstonedAt`, `observedAt`, `sourceModifiedAt`, a representation's `createdAt` — is a real instant | `SOURCE_TIMESTAMP_INVALID` | `validateSourceLedger` | `timestamptz not null` |
+
+The vocabularies are consulted at run time and not only by the compiler: `validateSourceLedger` is
+reached across JSON boundaries — a PostgREST row, another lane, the Python core (contract §4.1) —
+where the TypeScript unions are gone and a family is whatever string was stored. A value no reader
+has been qualified for is refused there, not admitted into the ledger vocabulary.
 
 The last one is the rule that keeps this ledger honest: an artifact whose producing revision is
 unknown cannot be reproduced, so there is no default value for it. A caller that does not know the
@@ -147,8 +154,25 @@ granted to `service_role` only. **There is no `delete` grant.** A source leaves 
 tombstoned; deleting a row here deletes the record that a compile ever read those bytes, which is
 the "historical evidence overwritten" stop-the-line condition.
 
-Three triggers make the invariants real under concurrency, because at-least-once delivery means two
-writers can present the same version at once and only the database sees both.
+What the database contributes under concurrency — at-least-once delivery means two writers can
+present the same version at once — is the **keys**, not the triggers: the primary keys and the
+partial unique index on `kind = 'original'` keep whichever row was written first, and
+`nextjs/lib/source-domain-store.ts` reads that kept row back and refuses
+(`SOURCE_DOMAIN_STORE_CONFLICT`) when it disagrees with what it was presenting.
+
+Two of the three triggers are `BEFORE UPDATE`, and the store only ever inserts, so on the live
+write path they never fire. They cover the other writer — one that edits a stored row rather than
+re-presenting it:
+
+- `source_versions_digest_immutable` (update): a `source_version_id` keeps one digest and one
+  object key for ever.
+- `source_representations_original_immutable` (update): an `original` representation is never
+  rewritten.
+- `source_representations_lineage_resolves` (**insert and update**): a derived representation names
+  parents that exist under the same source version. This is the one that fires on the live path.
+
+The first pass said "three triggers make the invariants real under concurrency … only the database
+sees both". That was an overclaim; it is retracted here as it was in the SQL header.
 
 ### The backfill, and why it fills only one table
 
