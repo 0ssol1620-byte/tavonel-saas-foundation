@@ -158,6 +158,11 @@ select throws_ok(
       (tenant_id, workspace_id, allowed, satisfied_count, receipt_sha256, missing, evidence, evaluated_at)
     values ('t1', 'pilot-ceiling000000', true, 17, 'sha256:' || repeat('a', 64), '{}', '[]'::jsonb, now())$$,
   '23514',
+  -- Four arguments, not three. With a SQLSTATE in the second position pgTAP reads the third as
+  -- the expected message, so the three-argument form compared this test's own description against
+  -- Postgres's constraint-violation text and failed the rehearsal. The message is left null
+  -- because its wording is Postgres's to change; the code and the constraint name are the claim.
+  null::text,
   'an approval whose digest cannot be re-derived is refused at the column'
 );
 
