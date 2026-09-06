@@ -237,13 +237,18 @@ select is_empty($$select id from public.workspaces$$, 'a session with no subject
 select ok(not public.enterprise_has_permission('a0000000-0000-0000-0000-0000000000a1'::uuid, null::text, 'organization:read'), 'a null organization context grants nothing');
 
 -- ---------------------------------------------------------------------------
--- 7. service_role. The server's own credential reads across every tenant, which is what makes
---    the application layer the only isolation boundary the 40 policy-less tables have (L-3).
+-- 7. service_role. On the tables it is granted, the server's own credential still reads across
+--    every tenant -- which is what makes the application layer the only isolation boundary those
+--    policy-less tables have (L-3). What changed with 0053 is the size of that set: the credential
+--    now holds exactly the verbs the migrations wrote, so the fourteen browser-owned tables no
+--    migration ever granted it -- `documents` among them -- are refused at the grant, not filtered
+--    by a policy. The whole matrix is asserted in supabase/tests/service_role_grant_matrix.sql;
+--    the first assertion here is the one cell of it this file's own fixture can prove at runtime.
 -- ---------------------------------------------------------------------------
 
 set local role service_role;
 
-select results_eq('select count(*)::integer from public.documents', array[2], 'service role reads both tenants');
+select throws_ok($$select 1 from public.documents$$, '42501', null, 'service role holds no grant on the browser-owned document table');
 select results_eq('select count(*)::integer from public.enterprise_organizations', array[2], 'service role reads every organization');
 select results_eq($$select count(*)::integer from public.enterprise_audit_events where organization_id = 'b0000000-0000-0000-0000-0000000000b1'$$, array[1], 'service role reads an audit log it never joined');
 
