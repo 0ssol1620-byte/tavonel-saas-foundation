@@ -34,6 +34,15 @@ def clean_pdf(pad_to_bytes: int = 0) -> bytes:
     return pdf
 
 
+def sized_clean_bytes(size: int) -> bytes:
+    """Deterministic harmless bytes of an exact size, for latency measurement."""
+
+    head = b"%PDF-1.7\n% TAVONEL harmless synthetic scan fixture\n"
+    if size < len(head):
+        raise ValueError("fixture size is below the fixture header")
+    return (head + bytes(range(256)) * (size // 256 + 1))[:size]
+
+
 def eicar_pdf() -> bytes:
     """A readable PDF that carries the EICAR pattern after %%EOF."""
 
