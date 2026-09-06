@@ -311,7 +311,7 @@ hour 99, 30 February, hour 24, and month 00 on a tombstone.
 | 3 | `pnpm build` (nextjs) | 0 | `EXIT=0` · `✓ Compiled successfully in 12.9s` · `✓ Generating static pages (69/69)` · `+ First Load JS shared by all 103 kB` |
 | 4 | Playwright | — | **Skipped**, same reason: no page or route added or changed. Nothing this lane ships renders. |
 | 5 | `git status --short` | 0 | clean except the intended files |
-| 6 | `git push -u origin agent/uskc-ab-source-domain` | 0 | see §1 for the SHA |
+| 6 | `git push -u origin agent/uskc-ab-source-domain` | 0 | `d1db946..f178836` — `f178836` carries the whole repair (code, tests, doc, §8). Recording that SHA is this line, so the branch head is one commit later again; the structured record carries the final one. Production deploy 안 함. Git push로 Preview deployment는 자동 생성됨 (not verified through the Vercel MCP). |
 
 Counts moved by the repair: root 91 → 93 tests (three new assertions grouped into the existing
 timestamp test, plus the prototype-key and cycle tests), nextjs 1,594 → 1,599 (five new store
