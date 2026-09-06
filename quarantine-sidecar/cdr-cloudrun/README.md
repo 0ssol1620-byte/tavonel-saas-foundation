@@ -42,6 +42,7 @@ The service recomputes the streamed upload digest before rendering. A mismatch, 
 | `x-tavonel-input-sha256` | Exact original input digest |
 | `x-tavonel-cdr-output-mime` | `application/pdf` |
 | `x-tavonel-cdr-output-sha256` | Exact digest of returned reconstructed PDF |
+| `x-tavonel-malware-scan` | Scanner verdict bound to the input digest, see "Malware scanning" |
 | `cache-control` | `no-store` |
 
 The sidecar independently verifies every header, computes the output digest again, scans the reconstructed PDF with ClamAV, and only then stores the sanitized bytes under the immutable tenant prefix. It records both original and sanitized MIME/digest metadata. Candidate OCR output is still not an active knowledge world.
@@ -91,6 +92,119 @@ Before configuring the Cloudflare sidecar with the production CDR URL, verify al
 5. Every test fixture and temporary immutable/quarantine object is deleted after evidence is recorded.
 
 After this synthetic qualification, add `TAVONEL_CDR_PROVIDER=tavonel_pdf_raster`, `TAVONEL_CDR_URL`, `TAVONEL_CDR_HEALTH_URL`, and the separate CDR HMAC as server-only Worker secrets. Vercel direct intake remains disabled until the full R2/sidecar synthetic path succeeds. RunPod remains disabled until independently approved release evidence, endpoint qualification, and callback tests succeed.
+
+## Malware scanning
+
+CDR is not antivirus: rasterizing a document removes active content, but it never says whether the
+source was malicious. The service therefore scans the source with ClamAV **after** the authenticated
+digest is confirmed and **before** anything parses it — the Office package guard, LibreOffice and the
+renderer all run only once a verdict exists.
+
+`malware.py` is a port of the Core API adapter `services/api/src/akc_api/malware.py` (SHA `e03d5bf`),
+so both services refuse with the same vocabulary. It uses the standard library only; clamd's INSTREAM
+protocol is four socket writes and a client library would add a dependency to the hostile-data path.
+
+### Outcomes
+
+| Condition | HTTP | `detail.code` | Written |
+|---|---:|---|---|
+| Signature hit | 422 | `MALWARE_DETECTED` (with `signature`, `scannedSha256`) | nothing |
+| clamd unreachable, or required and unconfigured | 503 | `SCANNER_UNAVAILABLE` | nothing |
+| clamd took the bytes and did not answer inside the read budget | 503 | `SCAN_TIMEOUT` | nothing |
+| Reply undecodable, or carried no verdict | 503 | `SCANNER_INVALID_RESPONSE` | nothing |
+| Clean | 200 | — | sanitized PDF |
+
+A clean response adds one header to the existing set:
+
+| Response header | Required value |
+|---|---|
+| `x-tavonel-malware-scan` | Compact JSON `{"engine","signatureVersion","scannedSha256","verdict","durationMs"}` |
+
+`scannedSha256` is the digest the caller authenticated, so the verdict is bound to the exact bytes —
+and hence to the SourceVersion the Worker records — rather than being a claim that floats beside them.
+`/health` reports `scannerReady`, and returns 503 when scanning is required and the scanner cannot be
+pinged, because an instance that would refuse every request is not healthy.
+
+There is no path from a scanner error to a clean verdict. Once a host is configured, every error
+raises, whatever `MALWARE_SCAN_REQUIRED` says; the flag only decides what happens when **no** scanner
+is configured at all — refuse (`1`, the default and the production value) or return the explicit
+non-verdict `{"verdict":"not_scanned","engine":"none"}` (`0`, local development and the suites that
+have no clamd). `not_scanned` is never reported as `clean`.
+
+### Configuration
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `MALWARE_SCAN_REQUIRED` | `1` | Anything but the exact string `0` means required |
+| `CLAMD_HOST` / `CLAMD_PORT` | — / `3310` | TCP clamd; localhost in the sidecar deployment |
+| `CLAMD_SOCKET` | — | Unix socket path; takes precedence over host/port |
+| `CLAMD_CONNECT_TIMEOUT_SECONDS` | `3` | Connect budget; exceeded ⇒ `SCANNER_UNAVAILABLE` |
+| `CLAMD_READ_TIMEOUT_SECONDS` | `20` | Reply budget; exceeded ⇒ `SCAN_TIMEOUT` |
+| `CLAMD_CHUNK_BYTES` | `1048576` | INSTREAM chunk size |
+
+A value that cannot be a positive number is a refusal, not a silently restored default.
+
+### The sidecar image and its licence
+
+`service.yaml` pins `clamav/clamav:1.5.4` by tag **and** by index digest
+`sha256:f0954d679017eb6d48221e2b2be3ac5457bf278a844f39b672376f55a085f591`, observed 2026-09-06.
+ClamAV 1.5.4 is **GPL-2.0-only with an OpenSSL linking exception**. It runs as a separate process and
+is reached over its documented socket protocol; `libclamav` is not linked into any TAVONEL binary.
+That is the ClamAV project's own daemon architecture, not a workaround — but note that no official
+ClamAV or FSF statement endorsing this reading for this use case was found, so the licence-scope
+conclusion itself is recorded as unconfirmed in
+`research/RECEIPT_MALWARE_SCANNING_2026-09-06.md`, which is the source for every fact in this section.
+
+### Scan limits against the intake ceiling
+
+The intake ceiling is `MAX_INPUT_BYTES` = 5 MiB, enforced by `copy_and_digest` and by the Cloudflare
+sidecar before an upload URL is minted. The stock `clamd.conf` shipped in the image is above it by
+two orders of magnitude, so no override is deployed:
+
+| Option | ClamAV default | Intake ceiling | Headroom |
+|---|---:|---:|---|
+| `StreamMaxLength` | 100 MB | 5 MiB | 19× — the INSTREAM connection is never closed for size |
+| `MaxFileSize` | 100 MB | 5 MiB | 19× — no member of an accepted package goes unscanned for size |
+| `MaxScanSize` | 400 MB | 5 MiB | 76× — total recursively extracted data |
+| `MaxRecursion` | 17 | ≤ 2 (PDF, or one OOXML/ODF ZIP layer) | 8× |
+
+This is asserted empirically, not assumed: the qualification job scans a 4.9 MiB fixture — just under
+the ceiling — and requires a clean verdict, which fails loudly if any stream limit is ever lowered
+beneath the intake ceiling. **If the 5 MiB ceiling is ever raised past 100 MB, or archive inputs are
+ever qualified, `StreamMaxLength`, `MaxFileSize` and `MaxRecursion` must be set explicitly in a
+mounted `clamd.conf` before the raise ships** — otherwise a crafted container can pass unscanned data
+through silently, which is the exact failure the research receipt flags.
+
+### Egress, signatures and the sidecar tag
+
+The signature database is baked into the pinned tag, and `service.yaml` disables `freshclam`
+(`CLAMAV_NO_FRESHCLAMD`) because the revision is deployed with all traffic pinned to a VPC with no
+Cloud NAT: a daemon that cannot reach `database.clamav.net` would fail every two hours and log noise
+instead of refreshing anything. The consequence is explicit and must not be described away:
+
+- **Signature freshness equals the age of the pinned image.** A redeploy with a newly observed digest
+  is the only refresh mechanism in this configuration. The alternative — allowing egress to the
+  ClamAV mirrors — is a network decision for the founder, and even then the project default is 12
+  checks a day, i.e. up to ~2 h of signature lag.
+- The engine and signature version of the running sidecar are reported on every clean scan
+  (`signatureVersion`), so a stale scanner is visible in the receipt rather than invisible.
+- If the VPC network and connector do not exist yet, the two network annotations must be removed
+  before applying, and the revision then has ordinary Cloud Run egress.
+
+### Deploying this definition
+
+Not an agent action. Applying it is a production deploy, and it belongs to the founder:
+
+```bash
+# Build and push the CDR image first, then substitute both placeholders.
+gcloud run services replace service.yaml \
+  --project "<PROJECT_ID>" --region asia-northeast3
+```
+
+The definition is `IMPLEMENTED_NOT_LIVE`: it has never been applied, so nothing here is qualified on a
+real Cloud Run revision. The evidence that exists is the container qualification job
+`.github/workflows/malware-scan-qualification.yml`, which runs the same adapter against a real
+`clamd` of the pinned tag on every push.
 
 ## References
 
