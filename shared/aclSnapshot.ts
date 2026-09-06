@@ -35,19 +35,41 @@ export type AclSnapshot = {
   snapshotSha256: string;
 };
 
-/** Ascending permissiveness. The intersection takes the minimum, never the maximum. */
-const PERMISSION_RANK: Record<string, number | undefined> = { read: 0, write: 1, owner: 2 };
+/**
+ * Ascending permissiveness. The intersection takes the minimum, never the maximum.
+ *
+ * A `Map`, not an object literal, because a literal answers for keys nobody put in it:
+ * `({read:0,write:1,owner:2})["constructor"]` is a function, not `undefined`. A permission spelled
+ * `__proto__`, `constructor`, `toString`, `valueOf` or `hasOwnProperty` was therefore ranked as
+ * truthy garbage, survived every `<` comparison, preserved another snapshot's `owner` grant and was
+ * emitted verbatim as the intersected permission -- a value outside the frozen vocabulary, which is
+ * invented data. A `Map` has no prototype chain to inherit an answer from.
+ */
+const PERMISSION_RANK = new Map<string, number>([
+  ["read", 0],
+  ["write", 1],
+  ["owner", 2],
+]);
 const PRINCIPAL_KINDS: readonly string[] = ["user", "group", "domain", "anyone"];
 
 /**
- * A grant this code cannot rank is not a weaker grant; it is an unreadable one, and it is dropped.
- * These values cross the type boundary at runtime -- connector JSON, and the `principals` jsonb of
- * `source_acl_snapshots` -- so an out-of-vocabulary permission is reachable from stored data. Left
- * unranked it WIDENED: `PERMISSION_RANK["admin"]` is `undefined`, every `<` against it is false, so
- * the intersection kept the more permissive side instead of refusing.
+ * A grant this code cannot rank is not a weaker grant and not a droppable one: it is evidence that
+ * the ACL being intersected is not the ACL that was captured. These values cross the type boundary
+ * at runtime -- connector JSON, and the `principals` jsonb of `source_acl_snapshots` -- so an
+ * out-of-vocabulary permission is reachable from stored data, and the answer to it is to refuse the
+ * whole intersection rather than to compute a permission set from a vocabulary that has already
+ * been violated (contract section 8.1, "F ACL and pages"). Dropping the principal was the previous
+ * behaviour; it returned a plausible answer over corrupt input, which is the shape of a leak nobody
+ * reviews.
  */
-function rankOf(principal: AclPrincipal): number | undefined {
-  return PRINCIPAL_KINDS.includes(principal.kind) ? PERMISSION_RANK[principal.permission] : undefined;
+function rankOf(principal: AclPrincipal): number {
+  const rank = PERMISSION_RANK.get(principal.permission);
+  if (rank === undefined || !PRINCIPAL_KINDS.includes(principal.kind)) {
+    throw new Error(
+      `ACL_VOCABULARY_UNKNOWN: kind ${JSON.stringify(principal.kind)}, permission ${JSON.stringify(principal.permission)}`,
+    );
+  }
+  return rank;
 }
 
 /**
@@ -88,8 +110,9 @@ export function aclSnapshotSha256(
  * permissive permission any snapshot gave it. No governing evidence at all yields no principals:
  * an empty list is "nobody", never "everybody", because the caller that forgot to pass its
  * snapshots must not thereby publish. A grant whose kind or permission is outside the frozen
- * vocabulary is dropped before any comparison, so it makes the principal absent rather than
- * unranked -- an unreadable grant must not be able to preserve a readable one.
+ * vocabulary refuses the whole intersection by throwing: it never widens and never invents, and the
+ * caller learns that the stored ACL is corrupt instead of receiving a narrower-looking answer that
+ * was computed from a vocabulary violation.
  *
  * Deliberately not implemented: containment between kinds (`anyone` covers a `domain` covers a
  * `group` covers a `user`). Expanding a group to its members needs a directory lookup this
@@ -105,7 +128,6 @@ export function intersectAcl(snapshots: readonly AclSnapshot[]): AclPrincipal[] 
     const byKey: Record<string, { principal: AclPrincipal; rank: number }> = {};
     for (const principal of snapshot.principals) {
       const rank = rankOf(principal);
-      if (rank === undefined) continue;
       const key = principalKey(principal);
       const held = byKey[key];
       // A snapshot that lists one principal twice disagrees with itself; keep the weaker grant.

@@ -91,30 +91,60 @@ describe("intersectAcl", () => {
 
 /**
  * These values arrive from connector JSON and from the `principals` jsonb column, so they are not
- * closed by the TypeScript union at runtime. Ranked as `undefined` they WIDENED -- `undefined < 2`
- * is false, so the comparison kept the more permissive side.
+ * closed by the TypeScript union at runtime. Ranked through an object literal they WIDENED twice
+ * over: an unknown permission ranked `undefined` and `undefined < 2` is false, so the comparison
+ * kept the more permissive side; and a permission spelled like an `Object.prototype` member ranked
+ * as a *function*, which is not `undefined` at all, so it was neither refused nor dropped and rode
+ * out as the emitted permission. Contract §8.1 ("F ACL and pages"): an unknown permission refuses
+ * the whole intersection -- never widens, never invents.
  */
 describe("intersectAcl with a grant outside the frozen vocabulary", () => {
   const junk = { principalId: "ana@example.com", kind: "user", permission: "admin" } as unknown as AclPrincipal;
   const junkKind = { principalId: "ana@example.com", kind: "service", permission: "read" } as unknown as AclPrincipal;
+  const outOfVocabulary = [
+    "admin",
+    "__proto__",
+    "constructor",
+    "toString",
+    "valueOf",
+    "hasOwnProperty",
+    "isPrototypeOf",
+    "propertyIsEnumerable",
+    "toLocaleString",
+    "",
+  ];
 
-  it("does not let an unrankable permission preserve another snapshot's owner grant", () => {
-    expect(intersectAcl([snapshot("sv_1", [ana]), snapshot("sv_2", [junk])])).toEqual([]);
+  it.each(outOfVocabulary)(
+    "refuses the intersection rather than let the permission %j preserve an owner grant",
+    (permission) => {
+      const smuggled = { ...ana, permission } as unknown as AclPrincipal;
+      expect(() => intersectAcl([snapshot("sv_1", [ana]), snapshot("sv_2", [smuggled])])).toThrow(
+        /ACL_VOCABULARY_UNKNOWN/,
+      );
+    },
+  );
+
+  it.each(outOfVocabulary)("never emits %j as an intersected permission", (permission) => {
+    const smuggled = { ...bo, permission } as unknown as AclPrincipal;
+    expect(() => intersectAcl([snapshot("sv_1", [smuggled]), snapshot("sv_2", [smuggled])])).toThrow(
+      /ACL_VOCABULARY_UNKNOWN/,
+    );
   });
 
-  it("never emits an invented permission value", () => {
-    const junkBo = { ...bo, permission: "admin" } as unknown as AclPrincipal;
-    expect(intersectAcl([snapshot("sv_1", [junkBo]), snapshot("sv_2", [bo])])).toEqual([]);
+  it("refuses even when the unrankable row duplicates a principal that would otherwise survive", () => {
+    expect(() => intersectAcl([snapshot("sv_1", [junk, ana]), snapshot("sv_2", [ana])])).toThrow(
+      /ACL_VOCABULARY_UNKNOWN/,
+    );
   });
 
-  it("does not let an unrankable duplicate row survive as the snapshot's grant", () => {
-    expect(intersectAcl([snapshot("sv_1", [junk, ana]), snapshot("sv_2", [ana])])).toEqual([
-      { principalId: "ana@example.com", kind: "user", permission: "owner" },
-    ]);
+  it("refuses a principal whose kind is outside the frozen vocabulary", () => {
+    expect(() => intersectAcl([snapshot("sv_1", [junkKind]), snapshot("sv_2", [junkKind])])).toThrow(
+      /ACL_VOCABULARY_UNKNOWN/,
+    );
   });
 
-  it("drops a principal whose kind is outside the frozen vocabulary", () => {
-    expect(intersectAcl([snapshot("sv_1", [junkKind]), snapshot("sv_2", [junkKind])])).toEqual([]);
+  it("names the value it refused, so a corrupt stored ACL is diagnosable", () => {
+    expect(() => intersectAcl([snapshot("sv_1", [junk])])).toThrow(/"admin"/);
   });
 });
 
