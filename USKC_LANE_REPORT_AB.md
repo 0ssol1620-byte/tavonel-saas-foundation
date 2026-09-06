@@ -35,14 +35,20 @@ listed nine; the diff has ten. Corrected.)
 | `shared/uskcEnums.ts` | The frozen contract-v1 vocabularies, transliterated from `contract/enums.v1.json` |
 | `shared/sourceDomain.ts` | The §4.1 shapes, the adapter, and the invariants as pure functions |
 | `server/foundation/uskcEnums.test.ts` | Pins every list against the frozen literals |
-| `server/foundation/sourceDomain.test.ts` | 17 tests, of which 11 are refusals |
+| `server/foundation/sourceDomain.test.ts` | 21 tests, 15 of them failure paths (13 named "refuses …") — count as of repair round 2 |
 | `supabase/migrations/0049_universal_source_domain.sql` | `sources`, `source_versions`, `source_representations` |
 | `server/foundation/sourceDomainMigration.test.ts` | Pins the SQL, in the style of `trial-source-digest-migration.test.ts` |
 | `nextjs/lib/source-domain-store.ts` | Projection (pure) + record/read through PostgREST |
-| `nextjs/lib/source-domain-store.test.ts` | 15 tests, of which 9 are refusals |
+| `nextjs/lib/source-domain-store.test.ts` | 20 tests, 10 of them failure paths (9 named "refuses …") — count as of repair round 2 |
 | `docs/UNIVERSAL_SOURCE_DOMAIN_2026-09-06.md` | What exists, the alias rule, the backfill, the seam, what is deferred |
 
-Modified: **none.** Row-only edits: **none taken** — see §4.
+Modified **against `origin/main`: none** — every file above is net-new, which is why
+`git diff origin/main..HEAD --stat` shows only additions. *Within the branch* the two repair passes
+modified seven of them (`shared/sourceDomain.ts`, `nextjs/lib/source-domain-store.ts` and its test,
+`server/foundation/sourceDomain.test.ts`, the migration header, the doc, this report); §8 and §9 say
+what changed in each. The unqualified "Modified: none" the first pass wrote here was true only
+against main, and a reader who stopped at this table was told something false about the branch.
+Row-only edits: **none taken** — see §4.
 
 ## 3. Gates
 
@@ -101,14 +107,23 @@ failure mid-chain · tombstoned source refused before any write.
   exist; nothing yet writes one, because the deletion signal (a Drive trash, a customer request)
   is lane F and P2 connector work.
 - **§48 P0-A "existing PDF/Office upload regression 0" is not verifiable locally.** Nothing in the
-  upload, CDR or compile path was touched and all 1,641 pre-existing tests still pass (1,685 total
-  minus the 44 added here), which is the strongest
+  upload, CDR or compile path was touched and all 1,641 pre-existing tests still pass (1,694 total
+  at repair round 2, minus the 53 this lane adds: root `uskcEnums` 4 + `sourceDomain` 21 +
+  `sourceDomainMigration` 8, nextjs `source-domain-store` 20 — each counted by running that file
+  alone). The first pass's "1,685 total minus the 44 added here" was the count at that pass and was
+  left stale by both repairs; only the 1,641 survives. That is the strongest
   statement the repository supports. Migration 0049 has not been applied anywhere — no Supabase
   CLI, no Docker, and applying it is a founder action.
 
 ## 5. Conflicts and proposed contract changes (not edits)
 
-**C-AB-1 — `documentToSource`'s frozen signature cannot be honoured as written.** Contract §4.1
+**C-AB-1 — RATIFIED (contract §8.1, 2026-09-06).** The orchestrator adopted the second parameter:
+§4.1 now reads `documentToSource(document: DocumentMetadata, observed: SourceObservation)`, with
+`SourceObservation` carrying the byte length, immutable key and timestamps the adapter may not
+invent. The shipped code and the contract text agree; nothing changes in this lane. The original
+reasoning is kept below as the record of why.
+
+**C-AB-1 (as first raised) — `documentToSource`'s frozen signature cannot be honoured as written.** Contract §4.1
 gives `documentToSource(document: DocumentMetadata): { source: Source; version: SourceVersion }`
 and calls it "adapter, pure". `DocumentMetadata` (`shared/tenantDomain.ts:42-51`) has eight fields:
 `id`, `workspaceId`, `createdBy`, `originalFilename`, `declaredMimeType`, `quarantineObjectKey`,
@@ -147,6 +162,15 @@ lanes' imports break. AB is the definer, but D's and F's copies are D's and F's 
 does not edit another lane's files (§1), so it is reported, not fixed. The integration merge needs
 one decision — keep AB's file and rename the imports in D and F, or have AB re-export the
 SCREAMING_SNAKE aliases.
+
+**C-AB-3 — RESOLVED (contract §8.1, 2026-09-06).** The orchestrator ruled that AB's file — camelCase
+exports plus `USKC_ENUMS_CONTRACT` — is the one copy, and that lanes D and F replace theirs with
+AB's bytes (`git show origin/agent/uskc-ab-source-domain:shared/uskcEnums.ts`) and rewrite their
+imports. AB's copy is unchanged by that ruling and stays at sha256
+`6dceb23128bb902c554006fde8255c90b2f686a3688fe1617c440084c7ac1c9f`; no alias re-export is added
+here, because two spellings of one frozen vocabulary is the thing the ruling removes. The
+divergence therefore remains open in D's and F's worktrees until they land it, and it is not AB's
+edit to make (§1).
 
 ## 6. Open questions for the founder
 
@@ -318,3 +342,122 @@ timestamp test, plus the prototype-key and cycle tests), nextjs 1,594 → 1,599 
 tests). No pre-existing test was changed to make anything pass; the two store mocks that returned a
 bodyless `201` now return the inserted rows, which is what PostgREST does with
 `return=representation`.
+
+---
+
+## 9. Repair round 2 (2026-09-06)
+
+The findings in `REPAIR2_FINDINGS_2026-09-06.json` under key `AB`, each closed as contract §8.1
+rules it. Two majors were code; one major was a doc retraction; two majors were closed by the
+orchestrator's own rulings and needed no edit here. Every contradicted report claim below is
+corrected in place, above, rather than only argued about here.
+
+### 9.1 Major — the frozen vocabularies were never consulted at run time
+
+`validateSourceLedger` type-checked and nothing more: a `Source` with `originKind`
+`"smuggled_origin"` and `sourceFamily` `"not_a_family"`, and a `SourceRepresentation` with `kind`
+`"smuggled_kind"`, all returned `{valid: true}`. The unions in `shared/uskcEnums.ts` are a
+compile-time artifact, and contract §4.1 names PostgREST rows, other lanes and the Python core as
+consumers — every one of them reaches this module across a JSON boundary where a family is whatever
+string was stored. §8.1 (*AB validator*): "runtime membership checks against the frozen vocabularies
+… are required — the enums exist to be consulted."
+
+Fixed in `shared/sourceDomain.ts`: `sourceOriginKinds` is now a runtime tuple (the frozen
+`enums.v1.json` has no `OriginKind` list, so it is spelled here exactly as §4.1 spells the union,
+and the frozen file is not edited), and `checkSource` / `checkRepresentations` test membership in
+three `Set`s built from `sourceOriginKinds`, `sourceFamilies` and `representationKinds`. The new
+code is `SOURCE_VOCABULARY_INVALID`; `SourceLedgerProjectionFailure` in the store already widens
+with `SourceLedgerViolation`, so the store surfaces it with no change.
+
+Test (`server/foundation/sourceDomain.test.ts`, "refuses a value outside the frozen vocabularies"):
+a smuggled origin kind, a smuggled family, a smuggled representation kind, and `"constructor"` as a
+family — the last because a prototype member is a string like any other here, not a member of
+anything. Each asserts `SOURCE_VOCABULARY_INVALID`, and the representation case is discriminating:
+before the fix it was refused as `REPRESENTATION_LINEAGE_BROKEN`, for the wrong reason.
+
+### 9.2 Major — `sourceModifiedAt` was the one timestamp nothing checked
+
+`checkVersion` validated `observedAt` and `parentVersionId`; `checkSource` validated `createdAt` and
+`tombstonedAt`; `SourceVersion.sourceModifiedAt` was validated nowhere, so
+`"2026-13-45T99:99:99Z"` — the exact string §8.5 says `isInstant` now refuses — passed
+`validateSourceLedger` and `recordSourceLedger` wrote it (`source-domain-store.ts:366`) into a
+`timestamptz` column. Fixed with the same `isInstant` the other four fields use.
+
+Test: "refuses a sourceModifiedAt that is not an instant" — garbage, an instant-shaped non-instant,
+and a real instant that must still validate.
+
+**§8.5's scope claim is corrected by this.** "`isInstant` now requires the pattern, a parse, and that
+the parsed date spells its own day back" was true of the predicate and oversold as coverage: the
+failure path *"an instant-shaped string that is not an instant"* did not hold for every timestamp
+field in the frozen §4.1 shapes until this round. It does now — `createdAt`, `tombstonedAt`,
+`observedAt`, `sourceModifiedAt` and a representation's `createdAt` are all checked.
+
+**§8.2's framing is corrected too.** Holding the MIME table in a `Map` closed prototype keys, but the
+stated consequence — "the value flowed into `Source.sourceFamily`, past `validateSourceLedger`" —
+stayed true for any non-prototype garbage until §9.1. The `Map` was the narrow half of that fix; the
+membership check is the rest of it.
+
+### 9.3 Major — the doc still carried the retracted trigger overclaim
+
+`docs/UNIVERSAL_SOURCE_DOMAIN_2026-09-06.md:150-151` still said "Three triggers make the invariants
+real under concurrency, because at-least-once delivery means two writers can present the same
+version at once and only the database sees both" — the identical sentence §8.1 of this report claims
+was retracted. The first repair corrected the **SQL header only**; the founder-facing deliverable,
+which is the one a reader reads, was left standing. The reviewer is right, and §8.1's wording
+("corrected in the SQL") described a narrower act than the claim it retracted.
+
+The doc now says what is true: the concurrency guarantee comes from the primary keys and the partial
+unique index on `kind = 'original'` plus the store's read-back (`SOURCE_DOMAIN_STORE_CONFLICT`); two
+of the three triggers are `BEFORE UPDATE` and never fire on the insert-only write path; only
+`source_representations_lineage_resolves` fires there. Each trigger is listed with what it covers,
+and the retracted sentence is named as retracted rather than silently deleted.
+
+### 9.4 Majors closed by §8.1 without a code change
+
+- **`documentToSource`'s two-parameter signature** — ratified as C-AB-1. §4.1 now carries the second
+  parameter; the code and the contract text agree. §5 rewritten.
+- **`shared/uskcEnums.ts` differs across the three site worktrees** — §8.1 (*C-AB-3*) makes AB's file
+  the one copy and puts the replacement in D's and F's hands. AB's copy is unchanged, still sha256
+  `6dceb231…`, and still equals `contract/enums.v1.json` value-for-value. AB does not add
+  SCREAMING_SNAKE aliases: two spellings of one frozen vocabulary is exactly what the ruling removes.
+  It stays a cross-lane item, not an AB defect. §5 updated.
+
+### 9.5 Report claims the reviewer contradicted, and what they now say
+
+| Claim (first/repair pass) | Status | Where corrected |
+|---|---|---|
+| §8.1 "corrected in the SQL" implied the retraction was complete | **Contradicted, true only of the SQL** | §9.3; doc rewritten |
+| §2 "`sourceDomain.test.ts` — 17 tests, 11 refusals" | **Stale** (21 tests, 15 failure paths) | §2 table |
+| §2 "`source-domain-store.test.ts` — 15 tests, 9 refusals" | **Stale** (20 tests, 10 failure paths) | §2 table |
+| §4 "1,641 pre-existing … 1,685 total minus the 44 added" | **Partly stale**: 1,641 survives; the totals are 1,694 and 53 | §4 |
+| §2 "Modified: **none.**" | **False without its qualifier** — true against `origin/main`, false within the branch | §2 |
+| §8.5 "isInstant … " read as full timestamp coverage | **Oversold until this round** | §9.2 |
+| §8.2 "the value flowed … past `validateSourceLedger`" | **Still true after §8.2's fix**, for non-prototype values | §9.2 |
+| §3 / §8.7 `pnpm build` exit 0, "a reviewer could not reproduce it" | **Confirmed true**: this round's reviewer reproduced exit 0, 69/69 static pages, and so did this run | §9.6 gate 3 |
+
+Nothing in the findings file was disputed: every AB finding reproduced, and the two that §8.1 closes
+are closed by ruling rather than by a probe of mine.
+
+### 9.6 Gates, rerun after repair round 2
+
+All from `D:\CodexProjects\uskc-lanes\site-ab-source-domain`; nextjs gates from `nextjs/`.
+
+| # | Command | Exit | Output tail |
+|---|---|---|---|
+| 0a | `pnpm check` (root) | 0 | `> tavonel-saas-foundation@1.0.0 check` / `> tsc --noEmit` — no diagnostics |
+| 0b | `pnpm test` (root) | 0 | `Test Files 25 passed (25)` · `Tests 95 passed (95)` · `Duration 2.75s` |
+| 1 | `pnpm check` (nextjs) | 0 | `> tsc --noEmit && eslint app components lib` — no diagnostics |
+| 2 | `pnpm test` (nextjs) | 0 | `Test Files 164 passed (164)` · `Tests 1599 passed (1599)` · `Duration 17.44s` |
+| 3 | `pnpm build` (nextjs) | 0 | `Test Files 164 passed (164)` · `Tests 1599 passed (1599)` (the `prebuild` gate) · `✓ Compiled successfully in 13.6s` · `✓ Generating static pages (69/69)` · `+ First Load JS shared by all 103 kB` |
+| 4 | Playwright | — | **Skipped, unchanged reason.** This lane adds no page and no route; `git diff origin/main..HEAD --name-only` contains no file under `nextjs/app/**` or `nextjs/components/**`, so no Playwright project has anything of this lane's to exercise. (The mobile-menu link-count spec belongs to lane D's `PRIMARY_NAV` row, not to AB.) |
+| 5 | `git status --short` | 0 | clean except the intended files |
+| 6 | `git push origin agent/uskc-ab-source-domain` | 0 | see §9.7 |
+
+Counts moved by this round: root 93 → 95 tests (the two new refusal tests), nextjs unchanged at
+1,599 (no store behaviour changed). No pre-existing test was edited.
+
+### 9.7 Push
+
+Production deploy 안 함. Git push로 Preview deployment는 자동 생성됨 — not verified through the
+Vercel MCP. The pushed SHA is recorded in the campaign's structured record; as in both earlier
+passes, writing it into this file would itself be a later commit.
