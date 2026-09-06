@@ -20,10 +20,50 @@ export type OcrFailureCode =
   | "OCR_SOURCE_MISSING"
   | "OCR_SOURCE_EMPTY"
   | "OCR_TIMEOUT_OR_NETWORK"
+  | "OCR_HTTP_UNAVAILABLE"
   | "OCR_HTTP_REJECTED"
   | "OCR_RESPONSE_NOT_JSON"
   | "OCR_RESPONSE_INVALID"
   | "OCR_RESULT_WRITE_FAILED";
+
+/**
+ * A pod that died and a model that was wrong are different problems.
+ *
+ * Every failure above used to end the same way: two credits charged, a create-once
+ * `explicit_operator_only` receipt written, and the document parked forever. That is right for a
+ * reader that answered wrongly and wrong for a socket that closed -- and since the receipt is
+ * create-once, the first cold start slower than the request budget parked the document
+ * permanently and billed the customer for it.
+ *
+ * So each code says which kind it is. `transport` costs nothing, writes no receipt, and is left
+ * to the queue's own bounded retry (`wrangler.jsonc`: max_retries 10 with backoff); `semantic`
+ * keeps the receipt and the operator gate, because the reader did run and its answer did not
+ * hold. The category names are the ones the scheduler already uses --
+ * `core-integration/services/scheduler/src/akc_scheduler/retry_policy.py` -- so the two trees
+ * classify a failure the same way instead of inventing a second taxonomy.
+ */
+export type OcrFailureKind = "transport" | "semantic";
+/** The subset of `retry_policy.RetryCategory` that OCR dispatch can actually produce. */
+export type OcrRetryCategory = "download_timeout" | "provider_5xx" | "invalid_output" | "unsupported_file";
+
+export const OCR_FAILURE_CATEGORY: Record<OcrFailureCode, { kind: OcrFailureKind; retryCategory: OcrRetryCategory }> = {
+  // The request never produced an answer: no reader ran, so nothing is owed and nothing is known.
+  OCR_TIMEOUT_OR_NETWORK: { kind: "transport", retryCategory: "download_timeout" },
+  OCR_HTTP_UNAVAILABLE: { kind: "transport", retryCategory: "provider_5xx" },
+  OCR_SOURCE_MISSING: { kind: "transport", retryCategory: "download_timeout" },
+  OCR_RESULT_WRITE_FAILED: { kind: "transport", retryCategory: "provider_5xx" },
+  // The reader answered, or the source itself is the problem. A person decides what happens next.
+  OCR_HTTP_REJECTED: { kind: "semantic", retryCategory: "unsupported_file" },
+  OCR_SOURCE_EMPTY: { kind: "semantic", retryCategory: "unsupported_file" },
+  OCR_RESPONSE_NOT_JSON: { kind: "semantic", retryCategory: "invalid_output" },
+  OCR_RESPONSE_INVALID: { kind: "semantic", retryCategory: "invalid_output" },
+  OCR_REVIEW_ALREADY_EXISTS: { kind: "semantic", retryCategory: "invalid_output" },
+};
+
+/** Unknown codes are semantic on purpose: never silently free, never silently retried. */
+export function ocrFailureKind(code: OcrFailureCode | undefined): OcrFailureKind {
+  return code ? OCR_FAILURE_CATEGORY[code]?.kind ?? "semantic" : "semantic";
+}
 
 export type OcrDispatchResult = {
   status: OcrDispatchStatus;
@@ -366,10 +406,14 @@ export async function dispatchOcrAfterSanitize(
       signal: AbortSignal.timeout(timeoutMs),
     });
   } catch {
-    return { status: "failed", key: ocrKey, reasonCode: "OCR_TIMEOUT_OR_NETWORK", reason: "OCR request timed out or failed", requestId, inputSha256, computeCredits: 2 };
+    return { status: "failed", key: ocrKey, reasonCode: "OCR_TIMEOUT_OR_NETWORK", reason: "OCR request timed out or failed", requestId, inputSha256, computeCredits: 0 };
   }
   if (!response.ok) {
-    return { status: "failed", key: ocrKey, reasonCode: "OCR_HTTP_REJECTED", reason: `OCR returned HTTP ${response.status}`, requestId, inputSha256, computeCredits: 2 };
+    // 5xx and 429 are the endpoint being unavailable, not an answer about this document.
+    const unavailable = response.status >= 500 || response.status === 429;
+    return unavailable
+      ? { status: "failed", key: ocrKey, reasonCode: "OCR_HTTP_UNAVAILABLE", reason: `OCR returned HTTP ${response.status}`, requestId, inputSha256, computeCredits: 0 }
+      : { status: "failed", key: ocrKey, reasonCode: "OCR_HTTP_REJECTED", reason: `OCR returned HTTP ${response.status}`, requestId, inputSha256, computeCredits: 2 };
   }
 
   /*
@@ -413,7 +457,7 @@ export async function dispatchOcrAfterSanitize(
         await writeProgress();
       });
     } catch {
-      return { status: "failed", key: ocrKey, reasonCode: "OCR_TIMEOUT_OR_NETWORK", reason: "OCR stream ended before a result", requestId, inputSha256, computeCredits: 2 };
+      return { status: "failed", key: ocrKey, reasonCode: "OCR_TIMEOUT_OR_NETWORK", reason: "OCR stream ended before a result", requestId, inputSha256, computeCredits: 0 };
     }
     progress.state = "read";
     await writeProgress();
@@ -450,7 +494,7 @@ export async function dispatchOcrAfterSanitize(
     if (/precondition|already exists|conflict/iu.test(message)) {
       return { status: "exists", key: ocrKey, computeCredits: 2 };
     }
-    return { status: "failed", key: ocrKey, reasonCode: "OCR_RESULT_WRITE_FAILED", reason: "ocr.json write failed", requestId, inputSha256, computeCredits: 2 };
+    return { status: "failed", key: ocrKey, reasonCode: "OCR_RESULT_WRITE_FAILED", reason: "ocr.json write failed", requestId, inputSha256, computeCredits: 0 };
   }
   return { status: "written", key: ocrKey, requestId, inputSha256, computeCredits: 2 };
 }
