@@ -172,27 +172,41 @@ here, because two spellings of one frozen vocabulary is the thing the ruling rem
 divergence therefore remains open in D's and F's worktrees until they land it, and it is not AB's
 edit to make (§1).
 
-## 6. Open questions for the founder
+## 6. Decided, not asked (rewritten at integration)
 
-1. **Is `workspaceId` the tenant boundary, or is a multi-workspace tenant planned?** (seam map O-4)
-   Everything shipped here sets `tenantId = workspaceId` because no other value exists anywhere in
-   storage or on the wire. If a real tenant axis is coming, `sources.tenant_id` is where it lands
-   and the backfill needs a source for it.
-2. **Does a re-upload of the same file become a new `SourceVersion` of one `Source`?** (O-5) That
-   is new product behaviour and needs a rule for "the same logical file" before any code writes
-   `parentVersionId`.
-3. **Is the quarantine original actually retained?** No code in this repository deletes it, but an
-   R2 bucket lifecycle rule would, and that is bucket configuration nobody in this campaign can
-   read. Until someone checks, "original preserved where policy allows" is unconfirmed and this
-   lane says so rather than claiming it.
-4. **May `nextjs/lib/source-domain-store.ts` be wired at the CDR receipt write?** That is a change
-   to a deployed Cloudflare worker and to what the pipeline records for real uploads. Not an
-   agent's call, and not schedulable before the two missing digests in doc §6 have producers.
-5. **Which schema does the ledger belong to long-term?** It is created in `public` alongside the
-   `foundation_*` tables, service-role only. The `foundation_` prefix was not used because these
-   are contract-v1 names shared with the core repo, but the naming is worth one decision.
-6. **`documentToSource`'s second parameter** (C-AB-1) — accept the amendment, or specify a
-   different split.
+This section listed six open questions. Every one of them was already closed by RESOLVED B-1 / B-2
+or by contract §8.1, so each is restated below as the statement it is. Nothing here is for the
+founder to answer again.
+
+1. **Tenant and Workspace are two concepts, and the ledger keeps two fields.** RESOLVED B-2: Tenant
+   is organization / security / billing / policy; Workspace is the working knowledge boundary; the
+   new domain model must not fuse them. `sources.tenant_id` and `sources.workspace_id` are two
+   columns and `Source.tenantId` / `Source.workspaceId` two fields. Contract §8.1 ("AB tenant
+   shim") ratifies recording the same value in both today, because the wire carries one value —
+   the ledger keeps two, the doc says the values coincide today, and the object-key separation is
+   the first item of ADR-008 (`docs/UNIVERSAL_SOURCE_DOMAIN_2026-09-06.md` §3). The ledger does not
+   refuse to record on that ground.
+2. **A re-upload does not become a new `SourceVersion` in P0, and a filename never decides it.**
+   RESOLVED B-1: the final model is `Source ├ SourceVersion 1 ├ 2 ├ 3 …`; P0's `sourceId =
+   documents.id` with one version per row is a **compatibility shim**, not canonical. P1-A builds
+   real lineage from connector stable object ids, canonical URIs / provider object keys, explicit
+   replace/update operations and reliable lineage evidence. **A filename alone never identifies the
+   same Source**; where identity is undecidable the result is a new Source or an unresolved
+   identity, never a guessed merge. `parentVersionId` stays null until P1-A.
+3. **Quarantine retention after CDR is `UNCONFIRMED`, and that is the recorded state.** Contract
+   §8.1: the R2 lifecycle is not readable from here, so the doc says `UNCONFIRMED` rather than
+   claiming retention. RESOLVED B-8 supplies the rest: the pre-CDR bytes are the original, the
+   sanitized PDF is `normalized` and never `original`, and if retention deletes the original the
+   digest, tombstone and provenance are kept and the reduced reprocessing capability for that
+   Source is recorded (doc §4).
+4. **Wiring the store at the CDR receipt write is P1-A.** Contract §8.1 schedules it there. This
+   lane records the seam and the two digests that have no producer today; it does not change the
+   deployed worker.
+5. **The ledger stays in `public`.** Contract §8.1. Service-role only, no `delete` grant.
+6. **`documentToSource(document, observed)` is ratified.** Contract §8.1 C-AB-1: §4.1 now reads
+   `documentToSource(document: DocumentMetadata, observed: SourceObservation)`, with
+   `SourceObservation` carrying the byte length, immutable key and timestamps the adapter may not
+   invent. Implemented as ratified.
 
 ## 7. Contradictions found on disk
 
@@ -202,7 +216,8 @@ Confirmed, with paths:
   §25's `document_version_id → source_version_id` migration line has no left-hand side.
 - **Seam map C-2 confirmed.** `nextjs/lib/immutable-keys.ts:9` builds
   `immutable/${workspaceId}/${workspaceId}/`. The compile envelope's own check expects
-  `immutable/${tenantId}/${workspaceId}/` (`shared/productCoreCompileEnvelope.ts:85`) and the live
+  `immutable/${tenantId}/${workspaceId}/` (`shared/productCoreCompileEnvelope.ts:85` on this lane's
+  branch; `:87` in the integrated tree, after lane F's row-only edit above it) and the live
   builder satisfies it by passing the workspace id as both
   (`nextjs/lib/core-runtime-v2.ts:156-157`). There is no tenant segment.
 - **Seam map C-4 confirmed.** `nextjs/lib/collection-compiler.ts:284` asserts

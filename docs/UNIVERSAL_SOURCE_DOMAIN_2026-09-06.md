@@ -25,7 +25,7 @@ Three facts bind every design decision in this lane.
 **There is no tenant segment anywhere.** `immutableWorkspacePrefix` builds
 `immutable/${workspaceId}/${workspaceId}/` — the same workspace id twice
 (`nextjs/lib/immutable-keys.ts:9`), and the compile envelope's own key check expects
-`immutable/${tenantId}/${workspaceId}/` (`shared/productCoreCompileEnvelope.ts:85`), which the live
+`immutable/${tenantId}/${workspaceId}/` (`shared/productCoreCompileEnvelope.ts:87`), which the live
 builder satisfies by passing the workspace id as both (`nextjs/lib/core-runtime-v2.ts:156-157`).
 The workspace is the tenancy boundary in code. `Source.tenantId` carries the same value, and says
 so rather than pretending to a second axis that has no storage anywhere.
@@ -109,10 +109,26 @@ reversible and each is listed for the founder in the lane report.
   and `Source.tenantId` / `Source.workspaceId` are two fields, per B-2 above. Today's writer puts
   the same value in both because §1's live layout carries no second axis to read — that is what the
   storage says now, not a rule that tenant is the workspace. When a tenant axis exists, `tenant_id`
-  is where it lands and no code has to be un-derived first. Separating the two in the object key is
-  the first item of **ADR-008 (working title: v2 object-key layout)** — the record that decides
-  where a tenant segment goes and what it does to `immutable-keys.ts`. Until that ADR is written the
-  two values coincide, and neither is derived from the other in code (RESOLVED B-2, contract §8.1).
+  is where it lands and no code has to be un-derived first. Until that axis exists the two values
+  coincide, and neither is derived from the other in code (RESOLVED B-2, contract §8.1). Separating
+  them in the object key is **ADR-008 (working title: v2 object-key layout)**, below.
+
+### ADR-008 — item 1, recorded here and not changed by this campaign
+
+The compile envelope's key check expects `immutable/${tenantId}/${workspaceId}/`
+(`shared/productCoreCompileEnvelope.ts:87`), while the live key builder writes
+`immutable/${workspaceId}/${workspaceId}/` (`nextjs/lib/immutable-keys.ts:9`). The check passes only
+because the live request builder sets `tenantId = workspaceId`
+(`nextjs/lib/core-runtime-v2.ts:156-157`). The envelope therefore already has a two-segment key
+shape and a tenant parameter; what the deployment does not have is a second value to put in it, so
+the shape proves nothing about tenant isolation today.
+
+That is the **first item of ADR-008**: the record has to decide where a real tenant segment goes,
+what moving it does to `immutable-keys.ts`, to every key already stored, and to this check — and
+whether the check becomes an isolation boundary or stays a shape assertion. Until ADR-008 is
+written, nothing here is loosened: the check stays as it is, the builder is untouched, and the
+ledger records `tenant_id` and `workspace_id` as two columns rather than collapsing them to the one
+value the wire carries.
 
 ---
 
@@ -142,6 +158,24 @@ worker writes the immutable PDF and its receipt and deletes nothing —
 `r2.deleted.length === 0`. Whether an R2 bucket lifecycle rule expires the quarantine prefix is
 infrastructure configuration and cannot be verified from the repository; until someone reads the
 bucket policy, "original preserved where policy allows" is **unconfirmed**, not a claim.
+
+**The pre-CDR bytes are the original; the sanitized PDF never is (RESOLVED B-8).** The quarantine
+object is the immutable original where it is available, and the CDR output is recorded as
+`normalized` — sanitized, rendered-derived — never as `original`
+(`nextjs/lib/source-domain-store.ts:104`). The original is kept encrypted, isolated,
+non-executable, policy-controlled and access-audited; that is the storage policy B-8 sets, and it
+is P1-A work, not something this ledger implements.
+
+**If retention deletes the original.** The `SourceVersion` row and its `original` representation
+stay: the digest, the object key, the byte length, the observation time and the producing
+provenance are the record that those bytes existed and what they were. What is lost is the bytes,
+so the row is a **tombstone plus provenance**, and the consequence is recorded rather than hidden —
+**reprocessing capability for that Source is reduced**: no re-read at a higher fidelity, no
+re-derivation with a better reader, no independent re-verification of any derived representation
+against the source it came from. Every claim already compiled from it keeps its evidence chain and
+its digest; nothing new can be derived from bytes that no longer exist. Migration `0049` grants no
+`delete` on the ledger for exactly this reason (§5), so a retention job removing an object can
+never remove the record of it.
 
 ---
 
