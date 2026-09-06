@@ -99,14 +99,21 @@ insert into public.foundation_retrieval_profiles (
   '77777777-7777-7777-7777-777777777777'
 );
 
+-- 0020 constrains a completed run to carry completed_at and unit_count
+-- (0020_retrieval_foundation.sql: check (status <> 'completed' or (completed_at is not null
+-- and unit_count is not null))). The counts below are the ones this fixture goes on to
+-- create: three units and three embeddings for tenant 1, one of each for tenant 2.
 insert into public.foundation_retrieval_compile_runs (
-  run_id, workspace_key, collection_id, world_manifest_digest, retrieval_profile_id, status
+  run_id, workspace_key, collection_id, world_manifest_digest, retrieval_profile_id, status,
+  completed_at, unit_count, embedding_count
 ) values (
   'retrieval-run-' || repeat('a', 32), 'pilot-searchrpc1', 'collection-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-  'sha256:1111111111111111111111111111111111111111111111111111111111111111', 'bge-m3-v1', 'completed'
+  'sha256:1111111111111111111111111111111111111111111111111111111111111111', 'bge-m3-v1', 'completed',
+  now(), 3, 3
 ),(
   'retrieval-run-' || repeat('b', 32), 'pilot-searchrpc2', 'collection-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-  'sha256:3131313131313131313131313131313131313131313131313131313131313131', 'bge-m3-v1', 'completed'
+  'sha256:3131313131313131313131313131313131313131313131313131313131313131', 'bge-m3-v1', 'completed',
+  now(), 1, 1
 );
 
 -- Tenant 1: three units. Unit 1 and 2 both carry 'payment'; unit 2 carries it twice so
