@@ -109,7 +109,10 @@ reversible and each is listed for the founder in the lane report.
   and `Source.tenantId` / `Source.workspaceId` are two fields, per B-2 above. Today's writer puts
   the same value in both because §1's live layout carries no second axis to read — that is what the
   storage says now, not a rule that tenant is the workspace. When a tenant axis exists, `tenant_id`
-  is where it lands and no code has to be un-derived first.
+  is where it lands and no code has to be un-derived first. Separating the two in the object key is
+  the first item of **ADR-008 (working title: v2 object-key layout)** — the record that decides
+  where a tenant segment goes and what it does to `immutable-keys.ts`. Until that ADR is written the
+  two values coincide, and neither is derived from the other in code (RESOLVED B-2, contract §8.1).
 
 ---
 
