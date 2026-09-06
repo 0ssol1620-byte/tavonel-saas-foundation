@@ -1,3 +1,4 @@
+import { PROCESSING_CEILING_LIMITATIONS } from "./intakeCeiling";
 import {
   capabilityStatusesAcceptedAtUpload,
   type CapabilityStatus,
@@ -75,11 +76,21 @@ const LIVE_READER_PLAN = ["cdr_sanitizer_v1", "foundation_ocr_gpu_v1"] as const;
 */
 const LIVE_PRESERVED = ["page", "paragraph_text", "bbox1000"] as const;
 
-/* True of every row, and the reason none of them is qualified. */
+/*
+  True of every row, and the reason none of them is qualified.
+
+  The last two come from `shared/intakeCeiling.ts` rather than being typed out here: they are
+  the ceilings the deployed processors actually enforce, and they were this deployment's
+  largest undisclosed limit. Intake admitted 250 MB, the CDR refused above 5 MB and 80 pages,
+  and an ordinary 200-page manual was accepted and then dropped with nothing said. A limit that
+  stays for now is disclosed where the customer meets it, and /sources is where they meet it
+  before they spend an upload finding out.
+*/
 const LIVE_LIMITS = [
   "no_native_structure_reader_yet",
   "no_table_or_formula_extraction",
   "no_visual_native_reconciliation",
+  ...PROCESSING_CEILING_LIMITATIONS,
 ] as const;
 
 export const CAPABILITY_MANIFEST = {
