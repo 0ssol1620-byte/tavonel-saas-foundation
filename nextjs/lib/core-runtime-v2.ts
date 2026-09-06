@@ -1,4 +1,5 @@
 import { createHash, createHmac, randomUUID } from "node:crypto";
+import { regionsOrNone } from "../../shared/compiledWorldValidation";
 import {
   GENERIC_MIXED_CORPUS_BLUEPRINT,
   type CollectionCandidateArtifact,
@@ -176,7 +177,18 @@ export function buildProductCoreV2Request(
         title: `Document ${document.documentId.slice(0, 8)}`,
         sourceFilename: `${document.documentId}.pdf`,
         pageCount: document.pageCount,
-        regions: document.regions?.map((region) => ({
+        /*
+          Regions are copied, never conjured.
+
+          This used to end in `?? [{ regionId: "ocr-full-document-…", pageNumber1: 1, text:
+          <the whole document> }]` -- a region the input did not contain, invented so a
+          legacy-OCR document would satisfy the Core's "at least one region" schema. Every
+          citation from such a document then pointed at page 1, and the customer who followed
+          one landed on the cover page and found the fact was not there. `regionsOrNone` is the
+          one reading of "absent" both compile paths take, and the compile is refused before
+          dispatch anyway (OCR_REGIONS_REQUIRED in collection-compile-run.ts).
+        */
+        regions: regionsOrNone(document).map((region) => ({
           regionId: region.regionId,
           pageIndex0: region.pageIndex0,
           pageNumber1: region.pageNumber1,
@@ -186,15 +198,7 @@ export function buildProductCoreV2Request(
           bbox1000: region.bbox1000,
           confidence: region.confidence,
           authority: region.authority,
-        })) ?? [{
-          regionId: `ocr-full-document-${document.documentId}`,
-          pageIndex0: 0,
-          pageNumber1: 1,
-          order: 0,
-          blockType: "paragraph" as const,
-          text: document.text,
-          authority: "unclassified" as const,
-        }],
+        })),
       })),
   };
 }
