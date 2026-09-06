@@ -100,8 +100,15 @@ describe("the baseline", () => {
       improvement. Any change to the extractor breaks this assertion and has to arrive with a
       re-measured set and a reviewer -- which is the only thing that makes "it got better"
       mean anything.
+
+      It broke, and the number went down. Gap-matrix row D7-01 removed `entitiesFor`'s
+      `.slice(0, 8)`, and the manual's ninth candidate -- MPa, a pressure unit -- appeared. The
+      0.2 recorded on 2026-09-04 was measured through that cap, so it was a measurement of
+      truncated output that reported the extractor as slightly better than it is. The regex did
+      not change; what changed is that all of its output is now visible. The MPa label is
+      recorded in the eval file as awaiting an independent reviewer.
     */
-    expect(precision).toBe(0.2);
+    expect(precision).toBe(0.1875);
   });
 });
 

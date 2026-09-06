@@ -27,6 +27,24 @@ function input(documentId: string, versionKey: string, text: string): Collection
     text,
     inputSha256: `sha256:${versionKey}`,
     sourceImmutableKey: sanitizedKey,
+    /*
+      Anchored, because a downloadable candidate has to be one the gates accept.
+
+      `evidenceCoverage` is computed from the package now rather than written as a literal, so a
+      document contributing no region-anchored retrieval unit compiles to `review_required` --
+      correctly, and not what these tests are about. One page-bound block over the same text.
+    */
+    regions: [{
+      regionId: `${documentId}-p1-b1`,
+      pageIndex0: 0,
+      pageNumber1: 1,
+      order: 0,
+      blockType: "paragraph" as const,
+      text,
+      bbox1000: [80, 120, 920, 320] as [number, number, number, number],
+      confidence: 0.99,
+      authority: "contractual" as const,
+    }],
   };
 }
 

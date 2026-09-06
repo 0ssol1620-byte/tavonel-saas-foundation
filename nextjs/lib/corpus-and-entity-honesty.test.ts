@@ -80,7 +80,9 @@ describe("the entity type is qualified where it is shown", () => {
   it("carries the measured precision in the copy that ships", () => {
     const copy = read("./explore-story.ts");
     expect(copy).toContain("entityDisclaimer");
-    expect(copy).toContain("3 of 15");
+    // 3 of 15 until 2026-09-06, when gap-matrix row D7-01 removed the extractor's eight-entity
+    // cap and a sixteenth candidate appeared. The number moved down; the test moved with it.
+    expect(copy).toContain("3 of 16");
     expect(copy).toContain("Unreviewed");
     expect(copy).toContain("heuristic");
   });

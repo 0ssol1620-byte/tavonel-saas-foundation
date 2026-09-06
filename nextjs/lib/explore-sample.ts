@@ -36,11 +36,27 @@ import rawRevisionBInputs from "./explore-sample.revision-b.inputs.json";
   anyone noticing is.
 */
 
+/*
+  Re-derived 2026-09-06 for gap-matrix rows D7-01, D7-02 and D7-04, deliberately and with the
+  measurement that moved them.
+
+  The compiler no longer caps extraction at 3 topics, 8 entities and 4 claims per document, no
+  longer slices document text at 50,000 characters, and computes its four validation booleans
+  rather than asserting them. On this corpus the caps were binding: the manual's ninth entity
+  ("MPa") and two of its claims were being dropped in silence, and revision B lost one claim.
+  Both worlds still compile to `passed` with all four checks true, so what moved is coverage, not
+  correctness. `lib/entity-extraction-eval.json` was re-measured in the same commit.
+
+  Previous values, kept so the move is traceable rather than merely different:
+    revision C  sha256:dff62fcee5954bf5df236ac0e6927d1978e2441eeb7fbdf8608934cefbeabc52
+    revision B  sha256:85a2932b18ea0e418d15adbfcff39c5f29804377ae82da2ab97641db795cfb4d
+*/
+
 /** The compiled World the Explore page shows. Recorded so that it cannot change unobserved. */
-export const EXPLORE_SAMPLE_DIGEST = "sha256:dff62fcee5954bf5df236ac0e6927d1978e2441eeb7fbdf8608934cefbeabc52";
+export const EXPLORE_SAMPLE_DIGEST = "sha256:3b41edaecc2cf20fcf1062c07983f1f3bf16369b68d544ea6abfa0bf1d882ada";
 
 /** The same corpus one revision earlier: the manual at revision B, the other two files identical. */
-export const EXPLORE_SAMPLE_REVISION_B_DIGEST = "sha256:85a2932b18ea0e418d15adbfcff39c5f29804377ae82da2ab97641db795cfb4d";
+export const EXPLORE_SAMPLE_REVISION_B_DIGEST = "sha256:9ce95781c1954c0916c7e3e690d7082966621ba7aa5dba8a46b4c87e47f2227c";
 
 export const EXPLORE_SAMPLE_SOURCE_DIRECTORY = "public/explore-sample";
 

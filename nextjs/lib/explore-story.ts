@@ -97,9 +97,15 @@ export const EXPLORE_COPY = {
     It reads as it always did, word for word, because two tests read it word for word: the
     measured figure has to match `entity-extraction-eval.json`, and the heuristic must never be
     described as a resolver. Moving a disclosure is allowed; softening one on the way is not.
+
+    The figure moved from "3 of 15" to "3 of 16" on 2026-09-06, and it moved down. Gap-matrix row
+    D7-01 removed the extractor's per-document cap of eight entities, so the manual's ninth
+    candidate -- MPa, a pressure unit -- reached the label set for the first time. The heuristic
+    did not change; the 15 was measured through the cap. Re-deriving the published number from
+    its receipt is the rule, and it applies in the direction that flatters nothing.
   */
   entityDisclaimer:
-    "Entity labels in this fixed sample come from a simple capitalised-token heuristic, not by a resolver. In the recorded evaluation, 3 of 15 baseline labels were true positives. Unreviewed entities are shown only as sample structure; Claims and page-bound evidence are the parts to judge here.",
+    "Entity labels in this fixed sample come from a simple capitalised-token heuristic, not by a resolver. In the recorded evaluation, 3 of 16 baseline labels were true positives. Unreviewed entities are shown only as sample structure; Claims and page-bound evidence are the parts to judge here.",
   closeLabel: "Leave the sample",
   endHeading: "Try the same path with your own knowledge.",
   endActions: [

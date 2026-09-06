@@ -1,7 +1,13 @@
 {
   "note": "A reviewed evaluation set for the compiler's entity extractor. Labels are a person's judgement, recorded so a change to the extractor is measured rather than asserted. Read lib/entity-extraction-quality.test.ts before editing.",
-  "reviewedOn": "2026-09-04",
+  "reviewedOn": "2026-09-06",
   "reviewedBy": "implementation session, unblinded — see limitations in the test file",
+  "reMeasured": {
+    "on": "2026-09-06",
+    "why": "Gap-matrix row D7-01 removed the per-document caps (3 topics, 8 entities, 4 claims). The 2026-09-04 baseline of 15 candidates was measured through the 8-entity cap, so it was a measurement of truncated output: the manual's ninth candidate, MPa, was being dropped before anyone could label it. Sixteen is what the extractor actually produces on this corpus.",
+    "changed": "One added candidate (MPa), one added false-positive taxonomy code (UNIT_OF_MEASURE), candidates 15 -> 16, falsePositives 12 -> 13, precision 0.2 -> 0.1875. Recall is unchanged at 1.0: no gold entity was affected.",
+    "awaitingReview": "The MPa label is this session's judgement and has not been confirmed by an independent reviewer. It is a pressure unit that appears in the manual's torque line, and the corpus gold exclusions already exclude quantities ('2,000 operating hours') on the same ground."
+  },
   "corpus": {
     "name": "explore-sample",
     "documents": 3,
@@ -53,6 +59,11 @@
       "code": "HEADING_FRAGMENT",
       "description": "A capitalised fragment of a heading or table label. None observed in this corpus; kept because it is the failure a document with headings produces and the corpus has none.",
       "examples": []
+    },
+    {
+      "code": "UNIT_OF_MEASURE",
+      "description": "A unit symbol whose capitalisation is orthographic rather than referential. A real token in the text and the wrong type: it belongs to the quantity it measures, the way 'operating hours' does in the gold exclusions, not to the entity set. Added 2026-09-06 when removing the extractor's 8-entity cap surfaced the first one.",
+      "examples": ["MPa"]
     }
   ],
   "observed": {
@@ -71,19 +82,27 @@
       { "value": "Service", "verdict": "false-positive", "code": "SENTENCE_INITIAL" },
       { "value": "January", "verdict": "false-positive", "code": "TEMPORAL_EXPRESSION" },
       { "value": "March", "verdict": "false-positive", "code": "TEMPORAL_EXPRESSION" },
-      { "value": "February", "verdict": "false-positive", "code": "TEMPORAL_EXPRESSION" }
+      { "value": "February", "verdict": "false-positive", "code": "TEMPORAL_EXPRESSION" },
+      { "value": "MPa", "verdict": "false-positive", "code": "UNIT_OF_MEASURE" }
     ]
   },
   "baseline": {
-    "measuredOn": "2026-09-04",
+    "measuredOn": "2026-09-06",
     "extractor": "capitalised-token regex in lib/collection-compiler.ts, entitiesFor",
-    "candidates": 15,
+    "candidates": 16,
     "truePositives": 3,
-    "falsePositives": 12,
+    "falsePositives": 13,
     "goldMissed": 0,
-    "precision": 0.2,
+    "precision": 0.1875,
     "recall": 1.0,
-    "reading": "On this corpus the extractor finds every identifier that is there and four false ones for each. Recall 1.0 is not evidence of a good extractor: the gold entities are all uppercase alphanumeric identifiers, which is the easiest possible case, and a corpus of person or organisation names would not behave like this."
+    "reading": "On this corpus the extractor finds every identifier that is there and roughly four false ones for each. Recall 1.0 is not evidence of a good extractor: the gold entities are all uppercase alphanumeric identifiers, which is the easiest possible case, and a corpus of person or organisation names would not behave like this.",
+    "supersedes": {
+      "measuredOn": "2026-09-04",
+      "candidates": 15,
+      "falsePositives": 12,
+      "precision": 0.2,
+      "why": "Measured while entitiesFor still ended in .slice(0, 8), so the manual's ninth candidate never reached the label set. The figure was not wrong about the labels it had; it was measuring a truncated output and therefore reported the extractor as slightly better than it is."
+    }
   },
   "identityCases": [
     {
