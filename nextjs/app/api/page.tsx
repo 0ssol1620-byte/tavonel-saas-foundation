@@ -12,7 +12,11 @@ export const metadata: Metadata = {
 const OPERATIONS = [
   ["Compile", "Create an immutable collection from qualified source documents."],
   ["Read World", "Read persisted objects, relations, evidence, versions, and package files."],
-  ["Ask", "Ask the active World and receive page-and-bbox-bound citations or an abstention."],
+  // RESOLVED A-1 (2026-09-06): a citation is bound to an exact source location, whatever form
+  // that source has. The OpenAPI description in app/api/openapi/route.ts still names page and
+  // bbox on purpose -- it documents the literal `pageNumber1` / `bbox1000` fields the response
+  // carries today, which is a field list rather than a statement about what evidence is.
+  ["Ask", "Ask the active World and receive citations bound to their exact source location, or an abstention."],
   ["Download", "Retrieve the signed, hash-verifiable knowledge package."],
 ] as const;
 

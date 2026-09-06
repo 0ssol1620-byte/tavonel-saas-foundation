@@ -125,6 +125,15 @@ const COPY_SURFACES = [
   "app/opengraph-image.tsx",
   "lib/activation-policy.ts",
   "lib/operations.ts",
+  /*
+    Repair, 2026-09-06. Two surfaces a reader reaches from the primary nav that the positioning
+    pass neither edited nor disclosed: /solutions still published "Citations back to page
+    regions", "Page and bbox provenance" and "Page-level citation inspection", and /api
+    "page-and-bbox-bound citations" -- the abstraction A-1 retires, on pages the nav points at.
+    Neither had a row here, so nothing would have caught the drift on the way in either.
+  */
+  "app/solutions/[slug]/page.tsx",
+  "app/api/page.tsx",
 ];
 
 const BARRED = [
@@ -441,5 +450,68 @@ describe("public copy", () => {
     // the demo world, and no census figure. (The file may name them in prose to say so.)
     expect(stage).not.toMatch(/from ["']@\/lib\/demo-world["']/);
     expect(stage).not.toContain("SOURCE_CENSUS");
+  });
+
+  /*
+    RESOLVED A-4's four words, and no fifth. Repair, 2026-09-06.
+
+    The landing page shipped "AVAILABLE TODAY" on two rows and "ON REQUEST" on a third. None of
+    those is one of A-4's words, and the third named the same S3/SMB agent route that reads
+    "Enterprise-assisted" on /integrations and /workspace, so the one surface A-4 is actually
+    about was the one surface using its own vocabulary. This reads the status chips out of the
+    source, which is where the drift happened: a hand-written chip fails here the moment it is
+    written, whether or not anyone remembers the decision.
+  */
+  const A4_WORDS = ["QUALIFIED", "BETA", "ENTERPRISE-ASSISTED", "UNSUPPORTED"];
+
+  it("labels every connector on the landing page with one of RESOLVED A-4's four words", () => {
+    const source = read("components/home-page-client.tsx");
+    const chips = [...source.matchAll(/<span className="st">([^<{}]+)<\/span>/g)].map((match) => match[1]!.trim());
+    expect(chips.length, "the landing page still prints connector status chips").toBeGreaterThan(0);
+    for (const chip of chips) {
+      expect(A4_WORDS, `"${chip}" is not one of RESOLVED A-4's connector support words`).toContain(chip.toUpperCase());
+    }
+  });
+
+  /*
+    RESOLVED A-1: one locator shape may not be published as the shape of all evidence.
+    Repair, 2026-09-06.
+
+    The positioning pass applied A-1 to six pages and left /solutions -- a PRIMARY_NAV
+    destination -- and /api carrying "Citations back to page regions", "Page and bbox
+    provenance", "Page-level citation inspection" and "page-and-bbox-bound citations". A guard
+    over the pages A-1 governs is what makes the decision stick past the commit that made it.
+
+    Block comments are stripped first, deliberately: a file is allowed to quote the wording it
+    retired in order to explain why, and `app/evidence/page.tsx` does exactly that. Product
+    surfaces that print a real locator value are not on this list and are not meant to be --
+    `/sources` states what the manifest preserves (page, paragraph text, bbox1000), the workspace
+    and the evidence viewer read back the actual region on screen, and the OpenAPI description
+    names the literal response fields. Those are values, not claims about what evidence is.
+  */
+  const RETIRED_LOCATOR_WORDING = [
+    "page and bbox",
+    "page-and-bbox",
+    "page regions",
+    "page-level citation",
+    "evidence back to the page",
+    "page number and bounding box",
+  ];
+  const A1_SURFACES = [
+    "components/home-page-client.tsx",
+    "app/solutions/[slug]/page.tsx",
+    "app/api/page.tsx",
+    "app/evidence/page.tsx",
+    "app/enterprise/page.tsx",
+    "app/product/document-understanding/page.tsx",
+    "app/knowledge-compiler/page.tsx",
+    "app/resources/page.tsx",
+  ];
+
+  it.each(A1_SURFACES)("publishes no retired PDF-locator wording in %s", (surface) => {
+    const copy = read(surface).replace(/\/\*[\s\S]*?\*\//g, " ").toLowerCase();
+    for (const phrase of RETIRED_LOCATOR_WORDING) {
+      expect(copy, `RESOLVED A-1 retires "${phrase}"`).not.toContain(phrase);
+    }
   });
 });

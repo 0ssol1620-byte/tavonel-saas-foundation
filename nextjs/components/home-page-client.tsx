@@ -260,25 +260,39 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
             ZIP says what actually happens to it. The archive is expanded in the browser and its
             members are validated and compiled one at a time; the archive itself is never
             compiled, and writing "ZIP" beside "PDF" implied it was.
+
+            Repair, 2026-09-06. The first version of this block kept four cards and gave two of
+            them status words of their own -- "AVAILABLE TODAY" for upload and for ZIP, "ON
+            REQUEST" for the agent route. Three faults in that. A-4 names four words --
+            qualified, beta, enterprise-assisted, unsupported -- and none of those three is one
+            of them; the same agent route reads "Enterprise-assisted" on /integrations and
+            /workspace, so the homepage was again the odd surface out; and "ZIP archive --
+            AVAILABLE TODAY" printed the opposite word to the one the Capability Manifest and
+            /sources print for `application/zip`, which is UNSUPPORTED and is refused by
+            `validateQualifiedDocumentInput` at upload.
+
+            The two axes were the cause: upload is not a connector, so it has no place in a list
+            whose every row must carry a connector support word, and forcing one on it produced a
+            word from outside the vocabulary. Direct upload and ZIP move into the sentence above
+            the list -- where the ZIP truth is stated in full, including the manifest's word for
+            it -- and the list holds only what A-4 governs: the connectors, each with one of
+            A-4's words. `brand-copy.test.ts` now fails if any other word appears in a status
+            chip on this page.
           */}
-          <div className="chain rv" aria-label="How sources reach TAVONEL">
-            <article className="link">
-              <span className="st">AVAILABLE TODAY</span>
-              <h3>Upload and folders</h3>
-              <p>Drop files or a whole folder. Every file is checked against the manifest before it is stored.</p>
-            </article>
-            <article className="link">
-              <span className="st">AVAILABLE TODAY</span>
-              <h3>ZIP archive</h3>
-              <p>Expanded in your browser; each file inside is compiled individually. The archive itself is not compiled.</p>
-            </article>
+          <p className="fine rv">
+            Files and folders you upload go in directly: each one is checked against the manifest
+            above before it is stored. A ZIP is expanded in your browser and every file inside it
+            is checked the same way — the archive itself is never compiled, and the Capability
+            Manifest published on /sources lists ZIP as UNSUPPORTED.
+          </p>
+          <div className="chain rv" aria-label="Connectors, and how far each has got">
             <article className="link">
               <span className="st">BETA</span>
               <h3>Google Drive · Dropbox · OneDrive / SharePoint</h3>
               <p>Read-only discovery and import, built and contract-tested. Not qualified: deletion and permission semantics are still being settled, so verify a connection before depending on it.</p>
             </article>
             <article className="link">
-              <span className="st">ON REQUEST</span>
+              <span className="st">ENTERPRISE-ASSISTED</span>
               <h3>Object storage and mounted shares</h3>
               <p>S3-compatible buckets and SMB, NFS or SFTP paths are imported by an agent you run inside your own network. Set up with you, not self-serve.</p>
             </article>

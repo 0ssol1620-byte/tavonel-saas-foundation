@@ -384,7 +384,7 @@ Run from `D:\CodexProjects\uskc-lanes\site-integration`, logs beside it in
 | 1 | `pnpm check` (root) | 0 | `tsc --noEmit`, clean |
 | 2 | `pnpm test` (root) | 0 | 29 files, **208 passed** |
 | 3 | `nextjs/ pnpm check` | 0 | `tsc --noEmit && eslint app components lib`, clean |
-| 4 | `nextjs/ pnpm test` | 0 | 167 files, **1,640 passed** (baseline 166 / 1,637; the extra file and three tests are `lib/operations.test.ts` and the inverted activation-policy rule) |
+| 4 | `nextjs/ pnpm test` | 0 | 167 files, **1,640 passed** (~~baseline 166 / 1,637; the extra file and three tests are `lib/operations.test.ts` and the inverted activation-policy rule~~ — **wrong, corrected in G.7**: the baseline is 166 / **1,619**, the figure §4 records for `5d05617`, and the delta is **+21**) |
 | 5 | `nextjs/ pnpm build` | 0 | 140 route rows, 42 statically prerendered |
 | 6 | Playwright `--project=1440 --project=390 --project=reduced-motion` | 1 | **22 failed · 57 skipped · 185 passed** — the same 22 names as the integration baseline in `pw-integration3.log` (§5 above). `comm` over both sorted lists: nothing new, nothing fixed. |
 | 7 | Phone screenshots + overflow, 360/390/430 × chromium+webkit, `/` and `/sources` | 0 | **ALL WIDTHS CLEAN** — `document.documentElement.scrollWidth <= innerWidth` at every one of the twelve views |
@@ -438,3 +438,134 @@ copy that no page contains.
 2. **Decide whether a redacted public evidence artifact should exist** for the 2026-08-29 GPU OCR
    full-sequence run and the R2 synthetic canary. Until then `/security` states its controls and
    cites no receipt, which is the honest position but not the strongest one.
+
+---
+
+## G.7 Repair — adversarial review of `7c8b1e1`
+
+Two independent lenses (integration correctness; founder resolutions and honesty) returned
+`GO_WITH_CONDITIONS` with three confirmed **major** findings and no blocker. All three are fixed
+below. Each fix carries the failure-path test that would have caught it, and each of those tests
+was checked against the pre-repair string before the fix went in — a guard written after the fact
+that cannot fail on the thing it is meant to catch is decoration.
+
+**Production deploy 안 함. Git push로 Preview deployment는 자동 생성됨.**
+
+### R-1 (major) — the homepage used status words from outside RESOLVED A-4's vocabulary
+
+`components/home-page-client.tsx:266,271,281`. Four connector rows carried `AVAILABLE TODAY`,
+`AVAILABLE TODAY`, `BETA`, `ON REQUEST`. A-4 names four words — `qualified` · `beta` ·
+`enterprise-assisted` · `unsupported` — and three of those four chips were not among them. Two
+consequences the lane reported as fixed and had not fixed:
+
+- The S3 / SMB agent route reads **Enterprise-assisted** on `/integrations` and `/workspace`, so
+  §G.1's claim that the vocabulary was made consistent "everywhere" was contradicted by the one
+  surface A-4 is actually about.
+- **`ZIP archive — AVAILABLE TODAY` printed the opposite word to the manifest.**
+  `shared/capabilityManifest.ts` marks `application/zip` `UNSUPPORTED`, `/sources` renders that as
+  "Refused. Nothing about the source is compiled.", and
+  `validateQualifiedDocumentInput({ declaredMimeType: "application/zip" })` answers
+  `{ valid: false, code: "UNQUALIFIED_MIME" }`. The row's prose was accurate; its status word said
+  the reverse of the capability truth surface.
+
+The cause was two axes in one list. Upload and ZIP are not connectors, so forcing a connector
+support word onto them produced a word from outside the vocabulary. **The direct-upload route moves
+into the sentence above the list** — where the ZIP truth is now stated in full, including the
+manifest's own word for it — **and the list holds only what A-4 governs**: Google Drive · Dropbox ·
+OneDrive/SharePoint at `BETA`, object storage and mounted shares at `ENTERPRISE-ASSISTED`.
+
+*Failure-path test:* `brand-copy.test.ts` — "labels every connector on the landing page with one of
+RESOLVED A-4's four words" reads the `<span className="st">` literals out of the source and rejects
+any word outside the four. Against the pre-repair chips it rejects `AVAILABLE TODAY` (twice) and
+`ON REQUEST`.
+
+### R-2 (major) — A-6 was reported as met; half of one citation survived, reworded
+
+`lib/activation-policy.ts:24`. The lane reported that "the two receipt citations were REMOVED
+rather than linked". Only the intake one was. The GPU OCR one became *"The record that qualified it
+is an internal release record and is not published here."* — which is the shape A-6 removes, one
+step worse than the original: it tells the reader a qualifying record exists and then withholds it,
+so it can be neither checked nor argued with. The string is not a comment; `app/security/page.tsx`
+renders `{value.reason}` verbatim and `/api/status` serves it.
+
+The lane's own inverted guard was written narrowly enough to pass it: it banned
+`/\d{4}-\d{2}-\d{2}/` and `/release-qualified|full-sequence/i` — the two strings that had just been
+deleted — and nothing else. The sentence is now **gone**, not reworded. The reason states the two
+controls that are actually enforced and nothing else.
+
+*Failure-path test:* `activation-policy.test.ts` gains two general rules — no reason may say a
+supporting record exists and is withheld (`not published`, `internal release record`, `held
+internally`, `on file`, …), and any reason that mentions a qualification must carry something the
+reader can open. Both fail on the pre-repair string; neither is satisfiable by renaming the receipt.
+
+### R-3 (major) — A-1 was applied to six pages and skipped `/solutions` and `/api`, undisclosed
+
+`app/solutions/[slug]/page.tsx:14,27,53` and `app/api/page.tsx:15` still published the retired
+PDF-shaped abstraction as the general one — "Citations back to page regions", "Page and bbox
+provenance", "Page-level citation inspection", "page-and-bbox-bound citations" — and `/solutions/…`
+is a `PRIMARY_NAV` destination (`lib/site-navigation.ts:22`). §G.5 named only
+`lib/compiler-contract.ts` and `lib/docs-content.ts` as deliberate holdouts, so this was an
+omission, not a disclosed deferral. Neither file was in `COPY_SURFACES`, so nothing would have
+caught a future drift there either.
+
+The four claim-shaped lines take the base wording. Both files join `COPY_SURFACES`. The
+document-intelligence lede and flow steps keep "pages and regions": they describe what the
+sanitize-to-PDF reading path literally does today, and generalizing them would make them less true,
+not more.
+
+*Failure-path test:* `brand-copy.test.ts` — "publishes no retired PDF-locator wording in %s" over
+the eight A-1 surfaces. Block comments are stripped first, deliberately: a file may quote the
+wording it retired in order to explain why, and `app/evidence/page.tsx` does exactly that. Against
+the pre-repair sources it fires three times on `/solutions` and once on `/api`.
+
+### Corrections to the previous report and to the submitted summary
+
+| Claim | Correction |
+|---|---|
+| Gate 4: "baseline 166 / 1,637 … +1 file and +3 tests" | Wrong. §4 records **1,619** for `5d05617`; the delta was **+21** — 3 new `it()` blocks plus 18 from the two `it.each(COPY_SURFACES)` blocks once `COPY_SURFACES` grew from 52 to 61 rows. The gate-6 table row is annotated in place. |
+| Submitted summary: the 22 Playwright failures span "change-inbox, pipeline-board, ultimate-mobile-a11y, ux-polish, visual-continuity, world-lifecycle" | Wrong in the summary only; §5's committed table is right. The 22 span **four** specs: `pipeline-board`, `ux-polish`, `world-lifecycle`, `visual-continuity`. No `change-inbox` or `ultimate-mobile-a11y` test is among them. |
+| §G.4: the nine new `COPY_SURFACES` rows are "every one of them a surface this lane edited" | `app/security/page.tsx` and `app/status/page.tsx` are not in `git diff 5d05617..7c8b1e1`. They were added because they render `activation-policy.ts` and `operations.ts`, which the lane *did* edit — the right reason, stated wrongly. |
+| §G.1 A-4: the Enterprise-assisted vocabulary makes the labels "consistent everywhere" | Still not literally everywhere after R-1. `components/connections-panel.tsx:273-277`, the authenticated create-a-connection form, lists Mounted SMB / NFS / SFTP share, Amazon S3, Cloudflare R2 and MinIO with no availability word. Left as is: it is the configuration form for the agent route and says so in its own help text ("The local agent reads that mount"), it is behind sign-in rather than public positioning, and A-4 governs how connectors are *shown*, not the `<option>` values of the form that configures one. Recorded here rather than smoothed over. |
+| `resolution_fixes` A-1: base wording "applied on … `app/knowledge-compiler/page.tsx`" | That page took "the exact location inside it", not the base sentence verbatim. Same decision, imprecisely reported. |
+
+### Left standing, deliberately
+
+- **`app/api/openapi/route.ts:164`** still says "exact page and bbox citations". It documents the
+  literal `pageNumber1` / `bbox1000` fields the Ask response carries today — a field list, not a
+  claim about what evidence is. Same category as the evidence viewer and the workspace inspector.
+- **The `ZIP` format chip on the landing page.** `deriveSourceFamilyChips` derives it from
+  `offeredAtUpload`, which includes ZIP because the picker offers `.zip` and hiding it would break
+  a working path — Lane D's decision, argued at `shared/capabilityManifest.ts:242-255`. The chip
+  now sits directly above the sentence that says what actually happens to an archive and that the
+  manifest lists it `UNSUPPORTED`, which is where a reader needs it.
+
+### Gates, rerun in full
+
+Logs in `D:\CodexProjects\uskc-lanes\repair-*.log`.
+
+| # | Command | Exit | Result |
+|---|---|---|---|
+| 1 | `pnpm check` (root) | 0 | `tsc --noEmit`, clean |
+| 2 | `pnpm test` (root) | 0 | 29 files, **208 passed** |
+| 3 | `nextjs/ pnpm check` | 0 | `tsc --noEmit && eslint app components lib`, clean |
+| 4 | `nextjs/ pnpm test` | 0 | 167 files, **1,653 passed** (+13 on `7c8b1e1`'s 1,640: 1 A-4 chip test, 8 A-1 surface rows, and 4 from `COPY_SURFACES` growing by two rows across the two `it.each` blocks) |
+| 5 | `nextjs/ pnpm build` | 0 | 140 route rows, 42 statically prerendered; prebuild reran check + test, both 0 |
+| 6 | Playwright `--project=1440 --project=390 --project=reduced-motion` | 1 | **23 failed · 57 skipped · 184 passed** — the 22 baseline names plus one, analysed below |
+| 7 | Phone screenshots + overflow, 360/390/430 × chromium+webkit, `/` and `/` scrolled to scene 2 | 0 | `scrollWidth - innerWidth` = **0** in chromium and **−10** in webkit at every width; ten shots re-taken in `lane-g-screens\` |
+
+**The 23rd failure is not a regression, and is not an assertion failure.**
+`[reduced-motion] e2e/ux-polish.spec.ts:7 public flagship surfaces never overflow the viewport`
+fails with `Tearing down "context" exceeded the test timeout of 30000ms` — the teardown, not the
+body. Three pieces of evidence:
+
+1. With `--timeout=90000` the same test **passes** (37.0s): no overflow, no empty structural panel.
+2. The six `page.goto` calls it makes take **0.7s in total** under `reducedMotion: "reduce"`
+   (measured directly against the same server); the time is machine, not page.
+3. It fails **identically on the pre-repair tree**: `git stash` of every repair edit,
+   `pnpm exec next build` with the same env, `pnpm start` on 3153, then the same single-test
+   command — `✘ 30.8s`, `✘ 44.3s (retry #1)`, same teardown message. The tree at `7c8b1e1` fails it
+   too on this machine right now, so the repair did not cause it.
+
+The same machine load also timed out two `lib/supabase-browser.test.ts` cases at 5s during a
+pre-repair prebuild while the full `nextjs/ pnpm test` gate above was green — the same signature.
+Nothing was patched to make gate 6 green, and no timeout was raised in the repository.
