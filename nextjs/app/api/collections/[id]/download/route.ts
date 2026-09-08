@@ -5,7 +5,8 @@ import { readExportSignerEnv } from "@/lib/export-signing";
 import { loadPreferredCollectionCandidate } from "@/lib/collection-storage";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
-import { WORKSPACE_EXPORT_CONCURRENCY, acquireWorkspaceSlot } from "@/lib/workspace-cost-guard";
+import { WORKSPACE_EXPORT_CONCURRENCY } from "@/lib/workspace-cost-guard";
+import { acquireWorkspaceOperation } from "@/lib/workspace-operation-guard";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -35,11 +36,11 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
 
   // Taken after the cheap refusals and before the first expensive one: a malformed id or an
   // unconfigured signer costs nothing and must not consume a workspace's export slot.
-  const lease = acquireWorkspaceSlot("export", auth.principal.workspaceKey, WORKSPACE_EXPORT_CONCURRENCY);
+  const lease = await acquireWorkspaceOperation("export", auth.principal.workspaceKey);
   if (!lease.ok) {
     return NextResponse.json(
       { code: lease.code, concurrencyLimit: WORKSPACE_EXPORT_CONCURRENCY },
-      { status: 429, headers: { ...NO_STORE, "Retry-After": "10" } },
+      { status: lease.status, headers: { ...NO_STORE, "Retry-After": "10" } },
     );
   }
   try {
@@ -89,6 +90,6 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   } finally {
     // The archive is fully built and in memory by the time the Response is constructed, so the
     // slot is genuinely free here rather than merely returned from.
-    lease.release();
+    if (!lease.replay) await lease.release();
   }
 }

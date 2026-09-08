@@ -13,13 +13,9 @@ import {
   createProductionRerankerAdapter,
   readRetrievalRuntimeEnv,
 } from "@/lib/retrieval-runtime-config";
-import { getFoundationActiveWorld } from "@/lib/world-store";
-import {
-  WORKSPACE_ASK_CONCURRENCY,
-  acquireWorkspaceSlot,
-  checkIdempotency,
-  rememberIdempotent,
-} from "@/lib/workspace-cost-guard";
+import { getFoundationActiveWorld, type ActiveWorld } from "@/lib/world-store";
+import { WORKSPACE_ASK_CONCURRENCY } from "@/lib/workspace-cost-guard";
+import { acquireWorkspaceOperation } from "@/lib/workspace-operation-guard";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -63,14 +59,7 @@ type Answered = { status: number; body: Record<string, unknown> };
  * carries the same idempotency key. Neither is possible while every branch returns from the
  * handler directly. The branches, their codes and their statuses are unchanged.
  */
-async function answerQuestion(workspaceKey: string, id: string, question: string): Promise<Answered> {
-  const active = await getFoundationActiveWorld(workspaceKey, id);
-  if (!active.ok) {
-    return {
-      status: active.code === "ACTIVE_WORLD_NOT_FOUND" ? 409 : 503,
-      body: { code: active.code },
-    };
-  }
+async function answerQuestion(workspaceKey: string, id: string, question: string, active: { world: ActiveWorld }): Promise<Answered> {
 
   const activeWorld = {
     manifestDigest: active.world.manifestDigest,
@@ -168,8 +157,8 @@ export async function POST(
     { code: parsed.code === "REQUEST_TOO_LARGE" ? "QUESTION_TOO_LARGE" : "INVALID_JSON" },
     { status: parsed.status, headers: NO_STORE }
   );
-  const body = parsed.value as { question?: unknown };
-  const question = typeof body.question === "string" ? body.question : "";
+  const body = parsed.value as { question?: unknown } | null;
+  const question = typeof body?.question === "string" ? body.question : "";
   if (
     question.normalize("NFKC").replace(/\s+/g, " ").trim().length < 3 ||
     question.length > 500
@@ -180,46 +169,47 @@ export async function POST(
     );
   }
 
-  /*
-   * Idempotency before concurrency, deliberately.
-   *
-   * A retry storm is the common way this route gets expensive, and a replay costs no slot at
-   * all. Taking the slot first would let the storm exhaust the workspace's concurrency with
-   * requests that were never going to do any work.
-   */
+  // Resolve the current World before consulting a cache. A previous user's answer or a
+  // superseded World must never be returned merely because the HTTP key was reused.
   const workspaceKey = auth.principal.workspaceKey;
   const idempotencyKey = request.headers.get("idempotency-key");
   const requestDigest = `${id}\n${question}`;
-  const idempotency = checkIdempotency<Answered>("ask", workspaceKey, idempotencyKey, requestDigest);
-  if (!idempotency.ok) {
-    return NextResponse.json(
-      { code: idempotency.code },
-      { status: idempotency.code === "IDEMPOTENCY_CONFLICT" ? 409 : 400, headers: NO_STORE },
-    );
-  }
-  if (idempotency.replay) {
-    return NextResponse.json(idempotency.value.body, {
-      status: idempotency.value.status,
-      headers: { ...NO_STORE, "X-Tavonel-Idempotent-Replay": "true" },
-    });
-  }
-
-  const lease = acquireWorkspaceSlot("ask", workspaceKey, WORKSPACE_ASK_CONCURRENCY);
+  const active = await getFoundationActiveWorld(workspaceKey, id);
+  if (!active.ok) return NextResponse.json({ code: active.code }, {
+    status: active.code === "ACTIVE_WORLD_NOT_FOUND" ? 409 : 503, headers: NO_STORE,
+  });
+  const identity = JSON.stringify([auth.principal.kind, auth.principal.userId,
+    auth.principal.keyId ?? null, [...auth.principal.scopes].sort(), id,
+    active.world.manifestDigest, active.world.worldStateId, active.world.revision]);
+  const lease = await acquireWorkspaceOperation("ask", workspaceKey, {
+    key: idempotencyKey, identity, body: requestDigest,
+  });
   if (!lease.ok) {
     return NextResponse.json(
-      { code: lease.code, concurrencyLimit: WORKSPACE_ASK_CONCURRENCY },
-      { status: 429, headers: { ...NO_STORE, "Retry-After": "5" } },
+      { code: lease.code, ...(lease.code === "WORKSPACE_CONCURRENCY_LIMIT"
+        ? { concurrencyLimit: WORKSPACE_ASK_CONCURRENCY } : {}) },
+      { status: lease.status, headers: { ...NO_STORE, "Retry-After": "5" } },
     );
   }
   try {
-    const answered = await answerQuestion(workspaceKey, id, question);
+    const answered = lease.replay ? lease.value : await answerQuestion(workspaceKey, id, question, active);
+    if (answered.status === 200) {
+      const current = await getFoundationActiveWorld(workspaceKey, id);
+      if (!current.ok) return NextResponse.json({ code: current.code }, { status: 503, headers: NO_STORE });
+      if (current.world.manifestDigest !== active.world.manifestDigest
+          || current.world.worldStateId !== active.world.worldStateId
+          || current.world.revision !== active.world.revision) {
+        return NextResponse.json({ code: "ACTIVE_WORLD_CHANGED_RETRY" }, { status: 409, headers: NO_STORE });
+      }
+    }
     // Only a completed answer is remembered. Replaying a 503 would turn a transient outage into
     // a ten-minute one for every client that retried politely with the same key.
-    if (answered.status === 200) {
-      rememberIdempotent("ask", workspaceKey, idempotencyKey, requestDigest, answered);
+    if (answered.status === 200 && !lease.replay) {
+      await lease.complete(answered);
     }
-    return NextResponse.json(answered.body, { status: answered.status, headers: NO_STORE });
+    return NextResponse.json(answered.body, { status: answered.status, headers: lease.replay
+      ? { ...NO_STORE, "X-Tavonel-Idempotent-Replay": "true" } : NO_STORE });
   } finally {
-    lease.release();
+    if (!lease.replay) await lease.release();
   }
 }

@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 
 import { parseQualification, qualificationLines } from "@/lib/contact-qualification";
 import { isAllowedFormOrigin } from "@/lib/public-form-origin";
+import { consumeDurableContactLimit } from "@/lib/contact-durable-guard";
+import { readBoundedJson } from "@/lib/enterprise-http";
 
 export const runtime = "nodejs";
 
@@ -39,7 +41,10 @@ const buckets = new Map<string, number[]>();
 const KEY_SALT = randomBytes(32);
 
 /*
-  ponytail: per-process in-memory limiter, one dimension short of durable.
+  Local/preview-only fallback. Production uses the atomic two-dimension RPC
+  introduced in migration 0055 and fails closed when that store is unavailable.
+  The historical design note below explains why developer API-key limits were
+  not reused for a public contact form.
 
   Blueprint §30 asks for a distributed limit across IP AND account/domain, and §31 names this
   Map as the P0 gap. Reusing lib/developer-store.ts consumeDeveloperApiRateLimit is not
@@ -82,12 +87,12 @@ export async function POST(request: Request) {
     return error("The request is too large.", 413);
   }
 
-  let raw: unknown;
-  try {
-    raw = await request.json();
-  } catch {
-    return error("Check the request format and try again.", 400);
-  }
+  // Bound the actual stream as well as the claimed Content-Length. A chunked
+  // request must not allocate arbitrary memory before input validation starts.
+  const parsed = await readBoundedJson(request, 16_384);
+  if (!parsed.ok) return error(parsed.status === 413
+    ? "The request is too large." : "Check the request format and try again.", parsed.status);
+  const raw: unknown = parsed.value;
 
   const contact = parseContact(raw);
   if (!contact) return error("Check the required fields and input lengths.", 400);
@@ -97,7 +102,13 @@ export async function POST(request: Request) {
     return accepted();
   }
 
-  if (isRateLimitedMultiDimensional(request, contact.email)) {
+  const admission = process.env.VERCEL_ENV === "production" || process.env.TAVONEL_DURABLE_WORKSPACE_GUARDS === "1"
+    ? await consumeDurableContactLimit(request, contact.email)
+    : isRateLimitedMultiDimensional(request, contact.email) ? "limited" : "allowed";
+  if (admission === "unavailable") {
+    return error("The inquiry channel is temporarily unavailable. Please try again shortly.", 503);
+  }
+  if (admission === "limited") {
     return error("Too many requests. Please try again in 10 minutes.", 429);
   }
 
