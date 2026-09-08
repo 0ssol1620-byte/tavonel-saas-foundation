@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { TRUST_SEQUENCE } from "@/components/trust-next";
+import { activationPolicy } from "@/lib/activation-policy";
 
 const read = (path: string) => readFileSync(resolve(import.meta.dirname, "..", path), "utf8");
 
@@ -71,6 +72,87 @@ describe("§17 trust chain", () => {
     expect(TRUST_SEQUENCE.slice(0, 5).map((step) => step.href)).toEqual([
       "/security", "/evidence", "/benchmarks", "/reproducibility", "/research",
     ]);
+  });
+
+  /*
+    E-21. The category guide is not a step in the funnel, it is the page a reader arrives on
+    before the funnel, and it used to end without offering either of the two pages that answer
+    what it provokes. Held here rather than in a page test because the chain is the thing being
+    protected: the guide is where a cold reader joins it.
+  */
+  it("hands the category guide's reader on to evidence and to benchmarks", () => {
+    const guide = read("app/knowledge-compiler/page.tsx");
+    expect(guide).toContain('href: "/evidence"');
+    expect(guide).toContain('href: "/benchmarks"');
+  });
+});
+
+/*
+  T-13. `/trust` was a 308 to `/security` for as long as there was one security page, and a
+  procurement reader was handed one of six URLs with no way to find the other five.
+
+  These hold the index together in the only two ways that matter. A destination that stops being
+  linked silently stops being reachable -- the page still renders, so nothing else fails -- and a
+  Trust Center is the exact surface where "certified" gets written by someone who means "careful".
+*/
+describe("/trust indexes the six published surfaces", () => {
+  const page = read("app/trust/page.tsx");
+
+  it.each([
+    "/security",
+    "/subprocessors",
+    "/status",
+    "/privacy",
+    "/terms",
+    "/.well-known/security.txt",
+  ])("links %s", (href) => {
+    expect(page).toContain(href);
+  });
+
+  it("says which §45 elements are not published, without promising them", () => {
+    // The three §45 elements no page answers. Each has to stay named and stay a "no".
+    for (const missing of ["Backup and recovery", "Data processing agreement", "Incident response process"]) {
+      expect(page).toContain(missing);
+    }
+    const absent = page.match(/const NOT_PUBLISHED[\s\S]*?\];/)?.[0] ?? "";
+    expect(absent).not.toBe("");
+    for (const promise of ["coming soon", "will be published", "shortly", "in progress", "roadmap"]) {
+      expect(absent.toLowerCase(), `"${promise}" turns a missing answer into a commitment`).not.toContain(promise);
+    }
+  });
+
+  it("claims no certification, audit or attestation", () => {
+    for (const claim of ["soc 2", "soc2", "iso 27001", "iso27001", "pen test", "penetration test", "attestation", "certified", "compliant"]) {
+      expect(page.toLowerCase(), `"${claim}" is a claim this deployment cannot make`).not.toContain(claim);
+    }
+  });
+});
+
+/*
+  C-13 / K-07. `activationPolicy.cdr.reason` is served verbatim from /api/status and rendered on
+  /security, so it is the deployment's own statement about which sanitizer is running.
+
+  What is deployed is the synthetic qualification image. The pypdfium2 service the licensing and
+  fail-closed tests were written against has never been deployed, and until a deployed image
+  digest can be compared with the one those tests ran on, this string may not imply otherwise.
+  The check is written as "pdfium may appear only where the sentence also says it is not
+  deployed", because the failure to catch is not a bare word -- it is the confident half-sentence
+  somebody adds after a deploy that did not happen.
+*/
+describe("§37 the CDR row names the build that is actually running", () => {
+  const reason = activationPolicy.cdr.reason;
+
+  it("names the deployed synthetic qualification build", () => {
+    expect(reason).toContain("tavonel-cdr-synthetic");
+    expect(reason.toLowerCase()).toContain("not deployed");
+  });
+
+  it("cannot claim the PDFium service before a deployed-digest check exists", () => {
+    const claimingSentences = reason
+      .split(/(?<=\.)\s+/)
+      .filter((sentence) => /pdfium/i.test(sentence))
+      .filter((sentence) => !/not deployed/i.test(sentence));
+    expect(claimingSentences, "a PDFium claim needs a deployed image digest, and there is none").toEqual([]);
   });
 });
 
