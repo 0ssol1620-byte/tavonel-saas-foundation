@@ -25,6 +25,7 @@
     "app/api/connections/[id]/route.ts": { "type": "A-bearer", "methods": ["DELETE"], "credential": "bearer:api-key-or-supabase-jwt" },
     "app/api/connections/route.ts": { "type": "A-bearer", "methods": ["GET", "POST"], "credential": "bearer:api-key-or-supabase-jwt" },
     "app/api/contact/route.ts": { "type": "P-public", "methods": ["POST"], "credential": "none", "note": "Same-origin allowlist, application/json only, 16KB cap, honeypot, per-process IP+domain rate limit. Durable limit blocked on a migration; see the ponytail note in the route." },
+    "app/api/csp-report/route.ts": { "type": "P-public", "methods": ["POST"], "credential": "none", "note": "CSP Report-Only collector (trust lane). Unauthenticated by design: 8KB declared+actual cap, at most 8 reports per POST, only four sanitized fields logged, never the body. Edge rate limit is backlog with the other public endpoints." },
     "app/api/developer/keys/[id]/rotate/route.ts": { "type": "A-bearer", "methods": ["POST"], "credential": "bearer:supabase-jwt", "note": "Re-export of app/api/v1/developer/keys/[id]/rotate/route.ts." },
     "app/api/developer/keys/[id]/route.ts": { "type": "A-bearer", "methods": ["DELETE"], "credential": "bearer:supabase-jwt" },
     "app/api/developer/keys/route.ts": { "type": "A-bearer", "methods": ["GET", "POST"], "credential": "bearer:supabase-jwt" },

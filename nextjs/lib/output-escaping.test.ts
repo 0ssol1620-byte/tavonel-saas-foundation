@@ -30,15 +30,19 @@ const SOURCES = [...sourceFiles("app"), ...sourceFiles("components")].map((path)
 }));
 
 describe("raw HTML injection", () => {
-  it("has exactly one dangerouslySetInnerHTML, and it renders a constant", () => {
+  it("has exactly two dangerouslySetInnerHTML sinks, and both render JSON-LD from literals", () => {
     const users = SOURCES.filter((file) => file.text.includes("dangerouslySetInnerHTML"));
     expect(
-      users.map((file) => file.path),
-      "a second raw-HTML sink is a design decision, not a refactor: justify it here or do not add it",
-    ).toEqual(["app/layout.tsx"]);
-    // The one that exists serialises an object literal declared inline, so no value reaches it
+      users.map((file) => file.path).sort(),
+      "a further raw-HTML sink is a design decision, not a refactor: justify it here or do not add it",
+    ).toEqual(["app/layout.tsx", "components/breadcrumb-json-ld.tsx"]);
+    // Both serialise JSON-LD only. layout.tsx inlines an object literal; the breadcrumb component
+    // (2026-09-08 exposure lane) serialises `breadcrumbList(trail)`, whose trail is a page-declared
+    // literal and whose origin/root come from lib/structured-data.ts. No value reaches either sink
     // from a request, a document or a model.
-    expect(users[0]!.text).toMatch(/__html: JSON\.stringify\(\{\s*\n\s*"@context": "https:\/\/schema\.org"/);
+    const byPath = new Map(users.map((file) => [file.path, file.text]));
+    expect(byPath.get("app/layout.tsx")).toMatch(/__html: JSON\.stringify\(\{\s*\n\s*"@context": "https:\/\/schema\.org"/);
+    expect(byPath.get("components/breadcrumb-json-ld.tsx")).toMatch(/__html: JSON\.stringify\(breadcrumbList\(trail\)\)/);
   });
 });
 
