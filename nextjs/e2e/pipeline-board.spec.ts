@@ -46,8 +46,20 @@ async function mockWorkspace(page: Page) {
   await page.route("**/api/billing/status", route => route.fulfill({ json: { account: { accessPlan: null, subscriptionStatus: "inactive", creditBalance: 0, lifetimeCreditsPurchased: 0, lifetimeCreditsReversed: 0, billingHold: false, paddleCustomerId: null, subscriptionCancelAt: null, updatedAt: null } } }));
 }
 
+/*
+  The board lives on the Sources surface now, not on the workspace landing.
+
+  `75ff505` split /workspace into named surfaces (`app/workspace/[surface]`) and put the source
+  queue behind `surface === "sources"`; /workspace itself opens on Home, which leads with the
+  getting-started guide and the needs-attention queue. These three tests are about what the board
+  does with a set of sources, not about which surface it sits on, so they open it where it now
+  is. `empty workspace does not render an empty processing panel` below deliberately stays on
+  /workspace: it asserts the absence of a panel, which Home must honour too.
+*/
+const BOARD_URL = "/workspace/sources";
+
 test("source queue opens on exceptions instead of dumping every document", async ({ page }, testInfo) => {
-  await installSession(page); await mockWorkspace(page); await page.goto("/workspace");
+  await installSession(page); await mockWorkspace(page); await page.goto(BOARD_URL);
   const board = page.locator(".board");
   await expect(board).toBeVisible();
   await expect(board).toContainText("3 sources");
@@ -63,7 +75,7 @@ test("source queue opens on exceptions instead of dumping every document", async
 });
 
 test("processing detail appears only when the user asks for it", async ({ page }) => {
-  await installSession(page); await mockWorkspace(page); await page.goto("/workspace");
+  await installSession(page); await mockWorkspace(page); await page.goto(BOARD_URL);
   await page.getByRole("button", { name: "Processing 1" }).first().click();
   const readingRow = page.locator('[data-document-id="doc-reading"]');
   await expect(readingRow).toBeVisible();
@@ -78,10 +90,20 @@ test("processing detail appears only when the user asks for it", async ({ page }
 });
 
 test("ready sources are searchable without lengthening the whole page", async ({ page }) => {
-  await installSession(page); await mockWorkspace(page); await page.goto("/workspace");
+  await installSession(page); await mockWorkspace(page); await page.goto(BOARD_URL);
   await page.getByRole("button", { name: "All 3" }).click();
   await expect(page.locator(".board-rows > li")).toHaveCount(3);
-  await page.getByPlaceholder("Search sources…").fill("doc-read");
+  /*
+    Search what the board prints, which is not the immutable id.
+
+    `5b1e381` ("Call a document what the customer called it") made a `doc-*` identifier something
+    receipts carry and product copy does not: with no filename remembered in this browser — and
+    this mock remembers none — `displayName` falls back to `shortHandle`, so `doc-read` and
+    `doc-reading` are both listed as "Source DOCREA" and the filter reads that. Typing the raw id
+    matched nothing and this test has asserted an empty board against an expected 2 since it was
+    written. The two rows it means are still the two rows it gets.
+  */
+  await page.getByPlaceholder("Search sources…").fill("docrea");
   await expect(page.locator(".board-rows > li")).toHaveCount(2);
   const scrollMode = await page.locator(".board-list-wrap").evaluate(element => getComputedStyle(element).overflowY);
   expect(["auto", "scroll"]).toContain(scrollMode);

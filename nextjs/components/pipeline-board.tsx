@@ -11,7 +11,18 @@ import { trackFunnel } from "@/lib/funnel-events";
 import { acceptedFormatSentence } from "@/lib/qualified-input";
 
 type Filter = "all" | "attention" | "processing" | "ready" | "failed";
-function statusOf(row: PipelineRow): Exclude<Filter, "all"> { if (row.stages.some((stage) => stage.state === "failed")) return "failed"; if (row.needsPerson) return "attention"; if (row.transfer || row.stages.some((stage) => stage.state === "active")) return "processing"; return "ready"; }
+/*
+  "Ready for compilation" is a resting state, not a running one.
+
+  `compileStage` in `lib/pipeline.ts` marks the COMPILE stage `active` for every source that
+  finished reading and has not been compiled yet — its detail is literally "ready for
+  compilation" — so counting all four stages filed a finished source under Processing while
+  `statusLabel` two lines down was already calling the same row "Ready to compile". The Ready
+  bucket could not reach it and the Processing count was the number of sources plus the number
+  waiting to be chosen. `17b3883` made this correction for the workspace's own state hero
+  (`stages.slice(0, 3)` in app/workspace/page.tsx); the board is the sibling it missed.
+*/
+function statusOf(row: PipelineRow): Exclude<Filter, "all"> { if (row.stages.some((stage) => stage.state === "failed")) return "failed"; if (row.needsPerson) return "attention"; if (row.transfer || row.stages.slice(0, 3).some((stage) => stage.state === "active")) return "processing"; return "ready"; }
 function statusLabel(row: PipelineRow, reading: Record<string, OcrProgress>): string { const status = statusOf(row); if (status === "attention") return "Needs review"; if (status === "failed") return "Failed"; if (row.transfer) return "Uploading"; if (row.stages[2].state === "active") return reading[row.id]?.pagesRead ? `Reading page ${reading[row.id].pagesRead}` : "Reading"; if (row.stages[1].state === "active") return "Preparing"; if (row.stages[3].state === "active") return "Ready to compile"; if (row.stages[3].state === "done") return "Compiled"; return status === "processing" ? "Processing" : "Ready"; }
 function failureCopy(detail: string) {
   if (detail.includes("TRIAL_FILE_TOO_LARGE")) return "Free Evaluation accepts files up to 50 MB. Use a smaller source or upgrade for larger manuals.";
