@@ -73,12 +73,22 @@ export default function SourceSheet({
               {region.excerpt}
             </>
           );
+          /*
+            The region's own id, published on the line that carries it.
+
+            `?evidence=<regionId>` links a claim to the exact region it was compiled from, and
+            the id has to be readable from the page for that link to be constructible or
+            checkable at all. It is the compiler's id, which is machine detail -- but it is a DOM
+            attribute rather than something the reader is shown, and the excerpt beside it is
+            already the region's own text.
+          */
           return onSelectRegion ? (
             <button
               key={region.id}
               type="button"
               className={styles.line}
               data-active={isActive ? "1" : "0"}
+              data-region-id={region.id}
               {...(isActive ? { "data-active-region": "" } : {})}
               onClick={() => onSelectRegion(region.id)}
             >
@@ -89,6 +99,7 @@ export default function SourceSheet({
               key={region.id}
               className={styles.line}
               data-active={isActive ? "1" : "0"}
+              data-region-id={region.id}
               {...(isActive ? { "data-active-region": "" } : {})}
             >
               {content}

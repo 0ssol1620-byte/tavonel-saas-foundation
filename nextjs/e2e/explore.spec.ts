@@ -482,12 +482,46 @@ test("the deep links land on the acts they name", async ({ page }) => {
     ["?act=evidence", "evidence"],
     ["?act=change", "change_compare"],
     ["?act=constructor", "entry"],
+    // §28 P0's other half is a region, not an act. An id no compiled World holds cannot be
+    // honoured, and it lands on the entry rather than on an empty source sheet.
+    ["?evidence=region-that-never-existed", "entry"],
+    ["?evidence=constructor", "entry"],
     ["", "entry"],
   ] as const) {
     await page.goto(`/explore${query}`);
     const expected = act === "evidence" && isNarrow(page) ? "evidence" : act;
     await expect(page.locator(STAGE), query || "(no query)").toHaveAttribute("data-world-act", expected);
   }
+});
+
+test("a deep link lands on the exact region it names, not only on the act", async ({ page }) => {
+  /*
+    §28 P0. `?act=evidence` opens the act on whichever region the stage would have opened anyway,
+    which is not a citation: a claim quoted somewhere else has to be linkable back to the one
+    source region it was compiled from. This walks to a region that is deliberately *not* the
+    default, then re-enters the page cold by that region's id.
+  */
+  test.skip(isNarrow(page));
+  await enterWorld(page);
+  await page.locator(`${STAGE} ${NODE}[data-node-kind="Document"]`).first().click();
+  await page.getByRole("button", { name: "Open source evidence" }).click();
+  const sheet = page.locator("[data-source-sheet]");
+  const opening = await sheet.locator("[data-active-region]").getAttribute("data-region-id");
+  expect(opening, "the source sheet publishes the id of the region it is showing").toBeTruthy();
+
+  await page.getByRole("group", { name: "Source regions for this object" })
+    .getByRole("button", { name: "NEXT →" }).click();
+  const target = await sheet.locator("[data-active-region]").getAttribute("data-region-id");
+  expect(target, "NEXT must reach a different region, or the link proves nothing").not.toBe(opening);
+
+  await page.goto(`/explore?evidence=${target}`);
+  await expect(page.locator(STAGE)).toHaveAttribute("data-world-act", "evidence");
+  await expect(sheet.locator("[data-active-region]")).toHaveAttribute("data-region-id", target!);
+
+  // A region link is an Evidence request whatever else the URL asks for; the act cannot win.
+  await page.goto(`/explore?act=change&evidence=${target}`);
+  await expect(page.locator(STAGE)).toHaveAttribute("data-world-act", "evidence");
+  await expect(sheet.locator("[data-active-region]")).toHaveAttribute("data-region-id", target!);
 });
 
 test("the closing action offers the reader their own sources", async ({ page }) => {
