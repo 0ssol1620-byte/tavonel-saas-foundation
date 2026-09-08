@@ -2810,6 +2810,14 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
 @media (max-width: 400px) {
   .nav { gap: 6px; padding: 10px 12px; }
   .nav-actions { gap: 8px; }
+  /*
+    The 194..352 measurement above was taken with IBM Plex Mono already painted. The face is
+    `display: swap`, so until it arrives the label is set in the platform's fallback monospace,
+    which is wider: in the product-qa job (Linux, DejaVu Sans Mono) the same row ends at 361 in a
+    360px viewport -- one pixel past the edge for the swap period, on a real phone too. 5px less
+    padding on each side of the action pays for the widest fallback and changes nothing above 400px.
+  */
+  .nav-actions .btn { padding-left: 14px; padding-right: 14px; }
 }
 
 @media (max-width: 520px) {
