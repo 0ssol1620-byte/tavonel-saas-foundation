@@ -15,14 +15,23 @@ import { AI_PACKAGE_CONTENTS, AI_PACKAGE_SUMMARY, AI_USE_JOURNEY } from "@/lib/a
 export default function WorkspaceUseWithAi({
   open = false,
   onDownload,
+  onOpen,
   downloading = false,
 }: {
   open?: boolean;
   onDownload?: () => void;
+  /** Fired when the reader opens the guide. The workspace has no connect dialog; this
+   *  disclosure is the only MCP/API intent signal it actually has. */
+  onOpen?: () => void;
   downloading?: boolean;
 }) {
   return (
-    <details className="workspace-ai-use-guide" data-testid="workspace-ai-use-guide" open={open}>
+    <details
+      className="workspace-ai-use-guide"
+      data-testid="workspace-ai-use-guide"
+      open={open}
+      onToggle={(event) => { if (event.currentTarget.open) onOpen?.(); }}
+    >
       <summary>Use with AI</summary>
       <div>
         <p>{AI_PACKAGE_SUMMARY}</p>
