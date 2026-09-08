@@ -1,0 +1,76 @@
+TAVONEL Cloud Run PDF-Raster CDR — third-party notices
+======================================================
+
+Scope: the container built by `quarantine-sidecar/cdr-cloudrun/Dockerfile` and the ClamAV
+sidecar pinned in `service.yaml`. TAVONEL's own source in this directory is proprietary and
+is not covered by any licence below.
+
+Every Python row is the licence string in the *installed* distribution's own metadata
+(`importlib.metadata`: `License-Expression`, else `License`, else the OSI classifier),
+read on 2026-09-08 from the pinned versions in `requirements.txt`. Nothing here is inferred
+from a project's website or from memory.
+
+
+Direct Python dependencies (pinned in requirements.txt)
+-------------------------------------------------------
+
+| Distribution     | Version | Licence (from package metadata)                | Source                                        |
+|------------------|---------|------------------------------------------------|-----------------------------------------------|
+| fastapi          | 0.116.1 | MIT (OSI classifier; no License field)          | https://github.com/fastapi/fastapi            |
+| httpx            | 0.28.1  | BSD-3-Clause                                    | https://github.com/encode/httpx               |
+| uvicorn[standard]| 0.35.0  | BSD-3-Clause                                    | https://www.uvicorn.org/                      |
+| python-multipart | 0.0.20  | Apache-2.0                                      | https://github.com/Kludex/python-multipart    |
+| pypdfium2        | 5.13.0  | "BSD-3-Clause, Apache-2.0, dependency licenses" | https://github.com/pypdfium2-team/pypdfium2   |
+| Pillow           | 12.3.0  | MIT-CMU                                         | https://github.com/python-pillow/Pillow       |
+
+`pypdfium2` bundles a prebuilt PDFium. PDFium is BSD-3-Clause and carries its own bundled
+dependency notices; the wheel ships them under
+`.../site-packages/pypdfium2_raw/` and `pypdfium2*.dist-info/licenses/`. Those files must stay
+present in the image distribution — do not strip licence files from site-packages.
+
+PyMuPDF / MuPDF (import name `fitz`) is **not** used and must not be reintroduced: it is
+AGPL-3.0 unless separately licensed, which is incompatible with this proprietary hosted
+service. `tests/test_renderer_licensing.py` fails if it re-enters requirements.txt, the
+sources, the Dockerfile, the deploy YAML, or the installed environment.
+
+
+Base image and system packages
+------------------------------
+
+| Component                         | Pin                                              | Licence                                    |
+|-----------------------------------|--------------------------------------------------|--------------------------------------------|
+| python:3.13-slim-bookworm         | sha256:b6bd71b0dd3811ddbcbc523ec2965fd1e1bcfdf7a20ab24679273d3bee726129 | Python-2.0 (CPython) over Debian bookworm; per-package licences in /usr/share/doc/*/copyright |
+| libreoffice-writer/-calc/-impress | Debian bookworm                                  | MPL-2.0 (LibreOffice), plus bundled components |
+| fonts-dejavu-core                 | Debian bookworm                                  | Bitstream Vera Fonts Licence                |
+| fontconfig, ca-certificates, tini | Debian bookworm                                  | MIT (tini); fontconfig licence; MPL-2.0 (ca-certificates / Mozilla CA bundle) |
+
+LibreOffice runs as a separate `soffice` process invoked over argv; no LibreOffice code is
+linked into a TAVONEL binary.
+
+
+Scanner sidecar
+---------------
+
+| Component | Pin                                                                                       | Licence                                    |
+|-----------|-------------------------------------------------------------------------------------------|--------------------------------------------|
+| ClamAV    | clamav/clamav:1.5.4@sha256:f0954d679017eb6d48221e2b2be3ac5457bf278a844f39b672376f55a085f591 | GPL-2.0-only with an OpenSSL linking exception |
+
+ClamAV runs as its own container process and is reached over the documented clamd socket
+protocol; `libclamav` is not linked into any TAVONEL binary. The licence-scope reading for
+this deployment is recorded as **unconfirmed** in
+`research/RECEIPT_MALWARE_SCANNING_2026-09-06.md` — no ClamAV or FSF statement endorsing it
+for this use case was found.
+
+
+Known limits of this NOTICE
+---------------------------
+
+- Only the six direct dependencies are pinned. Their transitive dependencies (starlette,
+  pydantic, anyio, h11, click, httptools, uvloop, websockets, watchfiles, python-dotenv,
+  PyYAML, certifi, idna, typing-extensions, …) are resolved at `pip install` time and are
+  **not** pinned, so two builds of the same Dockerfile can differ. Their licences are not
+  enumerated here.
+- Debian package licences above are the upstream project licences, not a per-file audit of
+  `/usr/share/doc/*/copyright` in the built image.
+- No SBOM has been generated from a built image. A machine-readable SBOM (CycloneDX/SPDX) of
+  the exact deployed digest is still outstanding and is required by §29.1 before release.

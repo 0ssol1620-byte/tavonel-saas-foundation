@@ -27,6 +27,24 @@ function input(documentId: string, versionKey: string, text: string): Collection
     text,
     inputSha256: `sha256:${versionKey}`,
     sourceImmutableKey: sanitizedKey,
+    /*
+      Anchored, because a downloadable candidate has to be one the gates accept.
+
+      `evidenceCoverage` is computed from the package now rather than written as a literal, so a
+      document contributing no region-anchored retrieval unit compiles to `review_required` --
+      correctly, and not what these tests are about. One page-bound block over the same text.
+    */
+    regions: [{
+      regionId: `${documentId}-p1-b1`,
+      pageIndex0: 0,
+      pageNumber1: 1,
+      order: 0,
+      blockType: "paragraph" as const,
+      text,
+      bbox1000: [80, 120, 920, 320] as [number, number, number, number],
+      confidence: 0.99,
+      authority: "contractual" as const,
+    }],
   };
 }
 
@@ -73,10 +91,23 @@ describe("Foundation collection package download", () => {
       "rag/chunks.jsonl",
       "manifest/candidate-world.json",
       "manifest/DOWNLOAD_README.txt",
+      "README.md",
+      "AGENTS.md",
+      "manifest/ai-entrypoint.json",
       "manifest/export-manifest.json",
       "signatures/export-manifest.ed25519.json",
     ]));
     expect(strFromU8(entries["manifest/DOWNLOAD_README.txt"])).toContain("candidatePromotion=false");
+    expect(strFromU8(entries["README.md"])).toContain("Read AGENTS.md in this folder first");
+    expect(strFromU8(entries["README.md"])).toContain("A filesystem path by itself does not grant an AI access");
+    expect(strFromU8(entries["AGENTS.md"])).toContain("validation/report.json");
+    const aiEntrypoint = JSON.parse(strFromU8(entries["manifest/ai-entrypoint.json"]));
+    expect(aiEntrypoint).toEqual(expect.objectContaining({
+      schemaVersion: "tavonel.ai_entrypoint.v1",
+      collectionId: source.collectionId,
+      lifecycle: "candidate",
+      authoritativeUse: "verify_active_world_status",
+    }));
     expect(JSON.parse(strFromU8(entries["manifest/candidate-world.json"])).collectionId).toBe(source.collectionId);
     const exportManifest = JSON.parse(strFromU8(entries["manifest/export-manifest.json"]));
     const signature = JSON.parse(strFromU8(entries["signatures/export-manifest.ed25519.json"]));
@@ -156,6 +187,9 @@ describe("Foundation collection package download", () => {
     const entries = unzipSync(signed.archive);
     expect(signed.exportManifest.lifecycle).toBe("review_required");
     expect(strFromU8(entries["manifest/DOWNLOAD_README.txt"])).toContain("Lifecycle: review_required");
+    expect(JSON.parse(strFromU8(entries["manifest/ai-entrypoint.json"]))).toEqual(expect.objectContaining({
+      authoritativeUse: "blocked_pending_review",
+    }));
   });
 
   it("rejects traversal paths, altered bytes, non-Core artifacts and the wrong tenant collection", () => {

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { API_VERSION } from "@/lib/api-version";
 import { DEVELOPER_SCOPES } from "../../../lib/developer-contracts";
 import { resolveOpenApiOrigin } from "../../../lib/openapi-origin";
+import { qualifiedDocumentInputs } from "../../../lib/qualified-input";
 
 // The published server URL must be the origin the caller actually reached, and this route
 // used to be force-static: Next.js evaluated the handler once at build time, so
@@ -36,12 +37,26 @@ export function GET(request: Request) {
     servers: [{ url: `${origin}/api/v1` }],
     security: [{ TavonelApiKey: [] }],
     paths: {
+      /*
+        The capability manifest, unauthenticated, because deciding whether to send us a file
+        should not require a key. It is the same list `/uploads/capability` validates against —
+        the enum below is generated from it — so the spec cannot advertise a MIME type the
+        upload route refuses.
+      */
+      "/capabilities": {
+        get: {
+          operationId: "getCapabilityManifest",
+          security: [],
+          description: "Every source format this deployment can read, with its support tier, what survives into the compiled world, its known limitations and its qualification receipt when one exists. A verified tier without a receipt is not representable. Anything absent from the manifest is refused at upload.",
+          responses: { "200": { description: "The capability manifest and the sha256 of its serialized form" } },
+        },
+      },
       "/uploads/capability": {
         post: {
           operationId: "createDirectUploadCapability",
           "x-tavonel-scope": "documents:intake",
           description: "Returns a short-lived browser/agent-direct R2 PUT URL. Document bytes never pass through the application server.",
-          requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["originalFilename", "declaredMimeType", "requestedBytes"], properties: { originalFilename: { type: "string", maxLength: 512 }, declaredMimeType: { type: "string" }, requestedBytes: { type: "integer", minimum: 1, maximum: 524288000 } }, additionalProperties: false } } } },
+          requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["originalFilename", "declaredMimeType", "requestedBytes"], properties: { originalFilename: { type: "string", maxLength: 512 }, declaredMimeType: { type: "string", enum: Object.keys(qualifiedDocumentInputs) }, requestedBytes: { type: "integer", minimum: 1, maximum: 524288000 } }, additionalProperties: false } } } },
           responses: { "200": { description: "Qualified direct upload capability and immutable document ID" }, "400": errorResponse, "401": errorResponse, "402": errorResponse, "429": errorResponse },
         },
       },

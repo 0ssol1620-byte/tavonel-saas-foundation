@@ -24,6 +24,7 @@ export const PRIMARY_NAV: readonly SiteLink[] = [
   { href: "/developers", label: "Developers" },
   { href: "/security", label: "Security" },
   { href: "/pricing", label: "Pricing" },
+  { href: "/sources", label: "Sources" },
   { href: "/resources", label: "Resources" },
 ] as const;
 

@@ -3,13 +3,13 @@
 /*
   Act 3 -- CHANGE.
 
-  The maintenance manual was reissued. One line of it moved, and this act shows what that cost
-  the World: which objects the revision reached, which were carried over, and -- the part that
-  is easiest to get wrong and most tempting to fake -- what has *not* been established.
+  Four 2026 filings landed on top of Apple's 2025 Form 10-K, and this act shows how the two
+  complete compiled Worlds differ and -- the part that is easiest to get wrong and most tempting
+  to fake -- what has *not* been established.
 
   Every figure below arrives as a prop from `lib/explore-change.ts`, which read it out of two
-  complete compiles of the same corpus. None of them is written here, and the module that
-  produces them refuses to load if either compile's digest moves.
+  complete compiles. None of them is written here, and the module that produces them refuses to
+  load if either compile's digest moves.
 
   There is no PASS. Full-rebuild equivalence is a check the compiler core runs over a selective
   rebuild; both sides of this comparison are full compiles, so the act states the comparison it
@@ -21,21 +21,34 @@ import type { Route } from "next";
 import WorldCanvas from "@/components/world-visual/world-canvas";
 import PageRegion from "@/components/world-visual/page-region";
 import styles from "./explore-stage.module.css";
-import { EXPLORE_COPY, type ExploreChangeSide, type ExploreChangeView } from "@/lib/explore-story";
+import { EXPLORE_COPY, type ExploreChangeArrivalView, type ExploreChangeView } from "@/lib/explore-story";
 import type { VisualLayout, VisualState, VisualWorldModel } from "@/lib/visual-world-model";
 
-function RevisionCard({ side, tone }: { side: ExploreChangeSide; tone: "before" | "after" }) {
+/*
+  One arriving filing, opened on a region of itself.
+
+  REFERENCE RENDER is printed rather than implied. The 2026 filings' acquired originals are SEC
+  EDGAR HTML documents; the committed PDF beside each one is a deterministic render of it, and
+  calling that "the source PDF" here would be the most convenient untruth available on this page
+  (§11.3).
+*/
+function ArrivalCard({ arrival }: { arrival: ExploreChangeArrivalView }) {
+  const rendered = arrival.representationKind === "reference_render";
   return (
-    <article className={styles.revision} data-tone={tone}>
+    <article className={styles.revision} data-tone="after" data-arrival="">
       <header>
-        <b>{side.label.toUpperCase()}</b>
-        <span>{side.filename}</span>
+        <b>{arrival.label.toUpperCase()}</b>
+        <span>{arrival.filename}</span>
       </header>
-      <p className={styles.revisionText}>{side.excerpt}</p>
-      <PageRegion bbox1000={side.bbox1000} page={side.page} pageCount={side.pageCount} tone="changed" />
+      <p className={styles.revisionMeta}>
+        {rendered ? "REFERENCE RENDER" : "ORIGINAL"} · PERIOD ENDED {arrival.reportDate} · ACCESSION{" "}
+        {arrival.accession}
+      </p>
+      <p className={styles.revisionText}>{arrival.excerpt}</p>
+      <PageRegion bbox1000={arrival.bbox1000} page={arrival.page} pageCount={arrival.pageCount} tone="changed" />
       <footer>
-        <Link className={styles.sourceLink} href={side.href as Route} target="_blank" rel="noreferrer">
-          Open source PDF ↗
+        <Link className={styles.sourceLink} href={arrival.href as Route} target="_blank" rel="noreferrer">
+          {rendered ? "Open reference render ↗" : "Open committed PDF ↗"}
         </Link>
       </footer>
     </article>
@@ -71,10 +84,31 @@ export default function ChangeAct({
     <div className={styles.changeAct}>
       <div className={styles.revisions}>
         <p className={styles.paneLabel}>
-          {change.before.label.toUpperCase()} → {change.after.label.toUpperCase()}
+          {change.baseline.label.toUpperCase()} → {change.after.label.toUpperCase()}
         </p>
-        <RevisionCard side={change.before} tone="before" />
-        <RevisionCard side={change.after} tone="after" />
+        <article className={styles.revision} data-tone="before">
+          <header>
+            <b>{change.baseline.label.toUpperCase()}</b>
+            <span>{change.baseline.filename}</span>
+          </header>
+          <p className={styles.revisionMeta}>
+            THE WORLD THE {change.arrivals.length} FILINGS ARRIVED INTO · {change.baseline.pageCount} PAGES
+          </p>
+          <footer>
+            <Link
+              className={styles.sourceLink}
+              href={change.baseline.href as Route}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Open committed PDF ↗
+            </Link>
+          </footer>
+        </article>
+        <p className={styles.paneLabel}>{EXPLORE_COPY.changeArrivalsHeading}</p>
+        {change.arrivals.map((arrival) => (
+          <ArrivalCard key={arrival.documentId} arrival={arrival} />
+        ))}
       </div>
 
       <div className={styles.changeWorld}>
@@ -87,7 +121,7 @@ export default function ChangeAct({
           onOpen={onOpen}
           reduced={reduced}
           settled={settled}
-          label="Compiled World after the revision, with the objects the revision reached"
+          label="Compiled World after the 2026 filings arrived, with the objects they reached"
         />
         <p className={styles.changeCaption}>{EXPLORE_COPY.changeCaption}</p>
 
@@ -108,26 +142,26 @@ export default function ChangeAct({
             <dd data-tone="changed">{change.reached}</dd>
           </div>
           <div>
-            <dt>Carried over untouched</dt>
+            <dt>Unchanged object identities</dt>
             <dd>{change.counts.untouched}</dd>
           </div>
         </dl>
 
-        <p className={styles.changeBreakdown}>
+        <p className={styles.changeBreakdown} data-change-breakdown="">
           {change.counts.added} added · {change.counts.removed} removed ·{" "}
           {change.counts.rebuilt} rebuilt in place
           <br />
           {change.relations.added} relations added · {change.relations.removed} removed ·{" "}
           {change.evidenceRegions.added} source regions added · {change.evidenceRegions.removed} removed
           <br />
-          {change.sourceRevisions.added} source document
-          {change.sourceRevisions.added === 1 ? "" : "s"} reissued ·{" "}
-          {change.sourceRevisions.unchanged} unchanged
+          {change.sourceRevisions.added} source version
+          {change.sourceRevisions.added === 1 ? "" : "s"} added · {change.sourceRevisions.removed} removed ·{" "}
+          {change.sourceRevisions.unchanged} carried unchanged
         </p>
         <p className={styles.changeNote}>{EXPLORE_COPY.changeCountsNote}</p>
         <p className={styles.changeNote}>
-          In the composition above, {shownAffected} of the {inFocus.size} objects on screen were
-          reached and {shownUntouched} were carried over.
+          In the composition above, {shownAffected} of the {inFocus.size} objects on screen are
+          named by the diff and {shownUntouched} retain the same compiled identity across both Worlds.
         </p>
 
         <section className={styles.equivalence}>

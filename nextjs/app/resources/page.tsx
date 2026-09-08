@@ -22,14 +22,14 @@ export const metadata: Metadata = {
 */
 
 const DESCRIPTIONS: Record<string, string> = {
-  "/explore": "Follow a result from an answer back to the page and region it came from, without signing in.",
+  "/explore": "Follow a result from an answer back to the exact source location it came from, without signing in.",
   "/knowledge-compiler": "What a knowledge compiler is, and how it differs from a parser, a RAG pipeline and a graph database.",
   "/docs": "Quickstart, concepts, supported files, compiling, review, and using a world through Ask, the API and MCP.",
   "/api": "Endpoints, authentication, errors and limits, with the machine-readable OpenAPI document alongside.",
   "/changelog": "What changed, in the order it changed, written for the people using it.",
   "/research": "The open problems in compiling documents into evidence-bound, versioned knowledge.",
   "/benchmarks": "The eight metric families, the receipt a result must carry, and the rules that decide whether it may be compared.",
-  "/evidence": "How a result stays bound to a document version, page and region, and how to verify a signed package.",
+  "/evidence": "What an exact source location is for each kind of source, how a result stays bound to one, and how to verify a signed package.",
   "/reproducibility": "Fixture identity and the material needed to reproduce a published run.",
 };
 

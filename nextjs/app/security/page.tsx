@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { Route } from "next";
 import { PublicSitePage } from "@/components/public-site-chrome";
+import { TrustNext } from "@/components/trust-next";
 import { BOUNDARY } from "@/lib/evidence-record";
 import { activationPolicy } from "@/lib/activation-policy";
 
@@ -41,6 +42,7 @@ const CAPABILITY_LABELS = {
   cdr: "Content disarm and reconstruction",
   ocrGpu: "Isolated GPU document reading",
   candidatePromotion: "Candidate promotion into a live world",
+  customerData: "Compiling customer data",
 } as const;
 
 const PATH = [
@@ -56,6 +58,16 @@ const CONTROLS = [
   ["AI training", "Your documents are not used to train shared models. Models read your sources to compile your world, and for nothing else."],
   ["Retention and deletion", "Source material, derived artifacts and compiled packages can be deleted on request. The categories, purposes and retention are set out in the privacy notice."],
   ["Reliability", "A control opens only after the one before it is qualified, so a partial failure stops the pipeline rather than emitting an incomplete world. There is no best-effort path that publishes anyway."],
+  /*
+    §17.1 asks "who can access it" and "audit", and this page answered neither.
+
+    Written from `lib/developer-store.ts`, which posts an append-only row to
+    `foundation_developer_audit_events` for each key act with the workspace, the action, the
+    target and the actor -- a user id, or a key id when a key acted. Nothing broader is claimed:
+    there is no published customer-facing audit export and no SSO or role model in this
+    deployment, and a security page is the last place to imply either.
+  */
+  ["Access and audit", "Access is a workspace membership checked server-side on every request; there are no roles, no SSO and no seat model in this deployment, so the account that owns a workspace is the account that reaches it. Creating, rotating and revoking a developer key writes an append-only audit row naming the workspace, the action, the target and whether a person or a key acted."],
 ] as const;
 
 export default function SecurityPage() {
@@ -123,11 +135,12 @@ export default function SecurityPage() {
               </p>
 
               <div className="actions">
-                <Link className="btn" href="/evidence">How evidence works</Link>
                 <Link className="btn ghost" href={"/subprocessors" as Route}>Subprocessors</Link>
+                <Link className="btn ghost" href={"/privacy" as Route}>Data handling and retention</Link>
                 <Link className="btn ghost" href={"/contact" as Route}>Security contact</Link>
               </div>
             </div>
+            <TrustNext from="/security" />
           </div>
         </div>
       </section>

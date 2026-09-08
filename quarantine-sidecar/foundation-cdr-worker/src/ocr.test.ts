@@ -5,10 +5,13 @@ import {
   dispatchOcrAfterSanitize,
   isForbiddenOcrUrl,
   looksLikeFoundationOcrUrl,
+  OCR_FAILURE_CATEGORY,
   OCR_REQUEST_TIMEOUT_MS,
+  ocrFailureKind,
   qualifyOcrResult,
   shouldDispatchOcr,
   type OcrDispatchEnv,
+  type OcrFailureCode,
 } from "./ocr";
 
 const FOUNDATION_OCR = "https://tavonel-foundation-ocr.example/v1/ocr";
@@ -434,5 +437,97 @@ describe("dispatchOcrAfterSanitize · streamed reading", () => {
     );
     assert.equal(result.status, "exists");
     assert.equal(fetched, 0);
+  });
+});
+
+/*
+ * Operational failure and semantic failure are different problems.
+ *
+ * The rule under test is one sentence: a request that never produced an answer costs nothing and
+ * decides nothing. Everything else here is that sentence applied to each way a request can fail.
+ */
+describe("OCR failure taxonomy", () => {
+  it("classifies every failure code, and borrows the scheduler's category names", () => {
+    const codes: OcrFailureCode[] = [
+      "OCR_REVIEW_ALREADY_EXISTS",
+      "OCR_SOURCE_MISSING",
+      "OCR_SOURCE_EMPTY",
+      "OCR_TIMEOUT_OR_NETWORK",
+      "OCR_HTTP_UNAVAILABLE",
+      "OCR_HTTP_REJECTED",
+      "OCR_RESPONSE_NOT_JSON",
+      "OCR_RESPONSE_INVALID",
+      "OCR_RESULT_WRITE_FAILED",
+    ];
+    assert.deepEqual(Object.keys(OCR_FAILURE_CATEGORY).sort(), [...codes].sort());
+
+    /*
+     * The category names are not ours to invent.
+     *
+     * 'core-integration/services/scheduler/src/akc_scheduler/retry_policy.py:8-24' already names
+     * every category a provider or worker failure can fall into, with a strategy and a bounded
+     * backoff for each. They are transliterated here rather than read from that tree, the same
+     * way 'shared/uskcEnums.ts' transliterates the frozen contract: the two repositories deploy
+     * separately and this test has to run in a checkout of one of them.
+     */
+    const SCHEDULER_RETRY_CATEGORIES = [
+      "provider_429", "provider_5xx", "download_timeout", "gpu_oom", "invalid_output",
+      "unsupported_file", "default",
+    ];
+    for (const { retryCategory } of Object.values(OCR_FAILURE_CATEGORY)) {
+      assert.equal(
+        SCHEDULER_RETRY_CATEGORIES.includes(retryCategory),
+        true,
+        String(retryCategory) + " is not a category retry_policy.py defines",
+      );
+    }
+  });
+
+  it("treats an unavailable endpoint as transport: nothing charged, nothing decided", async () => {
+    for (const [status, code] of [[503, "OCR_HTTP_UNAVAILABLE"], [429, "OCR_HTTP_UNAVAILABLE"], [500, "OCR_HTTP_UNAVAILABLE"]] as const) {
+      const r2 = new FakeR2({ [IMMUTABLE]: PDF_BYTES });
+      const result = await dispatchOcrAfterSanitize(
+        envFor(r2, { FOUNDATION_OCR_URL: FOUNDATION_OCR }),
+        IMMUTABLE,
+        async () => new Response("no", { status }),
+      );
+      assert.equal(result.reasonCode, code);
+      assert.equal(result.computeCredits, 0);
+      assert.equal(ocrFailureKind(result.reasonCode), "transport");
+    }
+  });
+
+  it("charges nothing when the request never reached the reader", async () => {
+    const r2 = new FakeR2({ [IMMUTABLE]: PDF_BYTES });
+    const result = await dispatchOcrAfterSanitize(
+      envFor(r2, { FOUNDATION_OCR_URL: FOUNDATION_OCR }),
+      IMMUTABLE,
+      async () => { throw new DOMException("The operation was aborted.", "TimeoutError"); },
+    );
+    assert.equal(result.reasonCode, "OCR_TIMEOUT_OR_NETWORK");
+    assert.equal(result.computeCredits, 0);
+    assert.equal(ocrFailureKind(result.reasonCode), "transport");
+  });
+
+  it("still charges, and still stops, when the reader answered and the answer did not hold", async () => {
+    const refused = new FakeR2({ [IMMUTABLE]: PDF_BYTES });
+    const rejected = await dispatchOcrAfterSanitize(
+      envFor(refused, { FOUNDATION_OCR_URL: FOUNDATION_OCR }),
+      IMMUTABLE,
+      async () => new Response("this document was refused", { status: 422 }),
+    );
+    assert.equal(rejected.reasonCode, "OCR_HTTP_REJECTED");
+    assert.equal(rejected.computeCredits, 2);
+    assert.equal(ocrFailureKind(rejected.reasonCode), "semantic");
+
+    const malformed = new FakeR2({ [IMMUTABLE]: PDF_BYTES });
+    const invalid = await dispatchOcrAfterSanitize(
+      envFor(malformed, { FOUNDATION_OCR_URL: FOUNDATION_OCR }),
+      IMMUTABLE,
+      async () => Response.json({ schemaVersion: "tavonel.ocr_result.v2", status: "ok" }),
+    );
+    assert.equal(invalid.reasonCode, "OCR_RESPONSE_INVALID");
+    assert.equal(invalid.computeCredits, 2);
+    assert.equal(ocrFailureKind(invalid.reasonCode), "semantic");
   });
 });

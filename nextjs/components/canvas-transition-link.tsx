@@ -34,14 +34,25 @@ export default function CanvasTransitionLink<T extends string>({
   href,
   className,
   children,
+  onActivate,
 }: {
   href: Route<T> | T;
   className?: string;
   children: ReactNode;
+  /**
+   * Fired on every activation, before the transition decision.
+   *
+   * Deliberately not named `onClick`: the handler below owns that name and returns early on
+   * four separate paths (modified click, non-primary button, no View Transitions API, reduced
+   * motion), so a caller's side effect placed inside it would fire on some navigations and not
+   * others. This runs first and unconditionally, whichever branch the navigation then takes.
+   */
+  onActivate?: () => void;
 }) {
   const router = useRouter();
 
   const onClick = (event: MouseEvent<HTMLAnchorElement>) => {
+    onActivate?.();
     if (event.defaultPrevented || event.button !== 0) return;
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     const doc = document as ViewTransitionDocument;

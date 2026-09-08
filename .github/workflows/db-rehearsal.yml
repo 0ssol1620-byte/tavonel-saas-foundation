@@ -1,0 +1,159 @@
+# Does 0001 to the head migration still apply to an empty database, and does the RLS matrix hold?
+#
+# Neither question had ever been answered. Production's migration history records 0001,
+# 0020-0023 and 0038-0048 only, while tables from 0002-0037 exist (gap matrix L-2), so the
+# schema cannot be derived from the history, and `supabase/tests/*.sql` had never executed
+# anywhere because the build machine has no Docker (customer-data gate, precondition 1).
+#
+# A GitHub runner has Docker. That is the whole trick: `supabase db start` applies every file
+# under supabase/migrations in filename order to a throwaway Postgres 17, so a job log here is
+# the rehearsal receipt, and a failure in that step IS the finding rather than a broken build.
+#
+# No secret, no project ref, no access token, no db URL of the live project. This job must never
+# be able to reach it -- it proves what the files say, not what production happens to contain.
+name: DB rehearsal
+
+on:
+  pull_request:
+  push:
+    branches: [main, "agent/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: db-rehearsal-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The last version production's own migration history records (gap matrix L-2). Fingerprinting
+  # the chain truncated here is the half of the G-9 condition-2 comparison that can be produced
+  # from the files; production supplies the other half, read-only, later. It is a boundary fact
+  # about production, not a count of this folder -- which is why it is pinned and the head is not.
+  HISTORY_BOUNDARY: "0048"
+
+jobs:
+  db-rehearsal:
+    name: db-rehearsal
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pinned to the version the repository already runs locally. `latest` would let a CLI
+      # release change what this receipt means without a commit saying so.
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.116.0
+
+      # Artifact names are derived, never typed. `schema-after-0050` was hard-coded and went
+      # stale the day 0051 was written; a receipt whose name lies about its contents is worse
+      # than one with an awkward name.
+      - name: Read the head migration version out of the folder
+        id: chain
+        run: |
+          head_version="$(ls supabase/migrations/*.sql | sed 's#.*/##' | sed -E 's/^([0-9]+)_.*/\1/' | sort | tail -1)"
+          test -n "$head_version"
+          echo "head=$head_version" >> "$GITHUB_OUTPUT"
+          echo "head migration = $head_version, history boundary = $HISTORY_BOUNDARY"
+
+      # The repository carries migrations and tests but no config.toml, because the CLI's
+      # config is local-stack tooling rather than schema. `init` writes it and needs no Docker.
+      # The grep is the assertion: Postgres 17 is what production runs, so a rehearsal on any
+      # other major version proves nothing about it.
+      - name: Create the local stack config
+        run: |
+          test -f supabase/config.toml || supabase init
+          grep -qx 'major_version = 17' supabase/config.toml
+
+      # Approach: move everything past the boundary aside and let `supabase db start` apply what
+      # is left, then restore the files and re-apply the whole chain with `supabase db reset`.
+      # Both commands exist in the pinned CLI 2.116.0 and neither needs a project ref. The
+      # alternative -- copying 0001..0048 into a temporary folder -- would need the CLI to be
+      # pointed at that folder, and 2.116.0 has no flag for that.
+      #
+      # DB_URL comes from `supabase status`, which prints the local stack's loopback connection
+      # string (127.0.0.1, the container's own postgres/postgres). It is not a secret and it is
+      # never echoed: the value is eval'd out of a pipeline and psql is handed the variable.
+      - name: Apply the chain up to the history boundary and fingerprint it
+        run: |
+          mkdir -p /tmp/deferred-migrations
+          for file in supabase/migrations/*.sql; do
+            version="$(basename "$file" | sed -E 's/^([0-9]+)_.*/\1/')"
+            if [ "$version" \> "$HISTORY_BOUNDARY" ]; then mv "$file" /tmp/deferred-migrations/; fi
+          done
+          supabase db start
+          eval "$(supabase status --output env | grep '^DB_URL=')"
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -At -F "$(printf '\t')" \
+            -f nextjs/scripts/db/catalog-fingerprints.sql > /tmp/fingerprints-boundary.tsv
+          jq -R -s 'split("\n") | map(select(length > 0) | split("\t") | {kind: .[0], object: .[1], fingerprint: .[2]})' \
+            /tmp/fingerprints-boundary.tsv > "fingerprints-after-${HISTORY_BOUNDARY}.json"
+          echo "fingerprint rows: $(jq 'length' "fingerprints-after-${HISTORY_BOUNDARY}.json")"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fingerprints-after-${{ env.HISTORY_BOUNDARY }}
+          path: fingerprints-after-${{ env.HISTORY_BOUNDARY }}.json
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Restore the rest of the chain and apply every migration from empty
+        run: |
+          mv /tmp/deferred-migrations/*.sql supabase/migrations/
+          rmdir /tmp/deferred-migrations
+          supabase db reset
+
+      - name: Print the resulting migration history
+        run: supabase migration list --local
+
+      # Dumped and uploaded before the tests run, so a red pgTAP suite still leaves the
+      # orchestrator the schema it needs for the read-only diff against production (L-2).
+      - name: Dump the schema the migrations produced
+        run: supabase db dump --local --schema public -f "schema-after-${{ steps.chain.outputs.head }}.sql"
+
+      - name: Fingerprint the full chain
+        run: |
+          eval "$(supabase status --output env | grep '^DB_URL=')"
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -At -F "$(printf '\t')" \
+            -f nextjs/scripts/db/catalog-fingerprints.sql > /tmp/fingerprints-head.tsv
+          jq -R -s 'split("\n") | map(select(length > 0) | split("\t") | {kind: .[0], object: .[1], fingerprint: .[2]})' \
+            /tmp/fingerprints-head.tsv > "fingerprints-after-${{ steps.chain.outputs.head }}.json"
+          echo "fingerprint rows: $(jq 'length' "fingerprints-after-${{ steps.chain.outputs.head }}.json")"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: schema-after-${{ steps.chain.outputs.head }}
+          path: schema-after-${{ steps.chain.outputs.head }}.sql
+          retention-days: 30
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fingerprints-after-${{ steps.chain.outputs.head }}
+          path: fingerprints-after-${{ steps.chain.outputs.head }}.json
+          retention-days: 30
+          if-no-files-found: error
+
+      # pgTAP is what every fixture's plan()/ok() lives in. Creating it is idempotent and the
+      # official docs never confirmed the local image ships it enabled, so this asks rather
+      # than assumes -- and it is a CLI call, not a new dependency.
+      - name: Run the pgTAP suite
+        run: |
+          supabase db query --local "create extension if not exists pgtap with schema extensions;"
+          supabase test db
+
+      # The repair migrations are required to be re-runnable (USKC DB qualification contract,
+      # expand/contract discipline). "Idempotent by construction" is a claim; applying them a second
+      # time to the finished database and re-running the whole suite is the measurement. A migration
+      # that is not re-runnable errors here, and one that is re-runnable but changes state turns the
+      # suite red on the second pass. Only the repair files are replayed: 0001-0051 predate this
+      # rule and several of them are deliberately create-once.
+      - name: Apply the repair migrations a second time and re-run the suite
+        run: |
+          eval "$(supabase status --output env | grep '^DB_URL=')"
+          for file in supabase/migrations/005[234]_*.sql; do
+            echo "replaying $file"
+            psql "$DB_URL" -v ON_ERROR_STOP=1 -q -f "$file"
+          done
+          supabase test db

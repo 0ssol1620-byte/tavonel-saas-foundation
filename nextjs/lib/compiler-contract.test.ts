@@ -189,10 +189,19 @@ describe("compiler contract clauses", () => {
     expect(compiler).toContain("from: claimId");
     expect(compiler).toContain("to: evidenceId");
     expect(compiler).toContain('const evidenceId = stableId("evidence", input.documentId, input.versionKey)');
-    // Both document edges are derived from the whole document text, which is co-occurrence.
+    /*
+      Both document edges are still co-occurrence, and the clause still says so.
+
+      The topic edge is derived from the whole document text. The entity edge is derived a region
+      at a time since gap-matrix row D7-02 -- but it is still emitted once per document per
+      entity, from a capitalised-token scan with no read semantics behind it, so "document-level
+      co-occurrence" remains the accurate description and the clause is not upgraded.
+    */
     expect(compiler).toContain("const text = normalizeText(input.text);");
     expect(compiler).toContain("for (const topic of topicsFor(text))");
-    expect(compiler).toContain("for (const entity of entitiesFor(text))");
+    expect(compiler).toContain("for (const entity of entitiesFor(regionText))");
+    expect(compiler).toContain('type: "mentions_entity"');
+    expect(compiler).toContain("from: documentNodeId");
     // The header the clause quotes, taken from the emitter rather than retyped.
     expect(compiler).toContain('"id,subject_id,predicate,object_id,evidence_ids"');
     // A retrieval unit carries claims and entities and no relation of any kind.
@@ -219,19 +228,32 @@ describe("compiler contract clauses", () => {
   });
 
   /*
-    The package validator is an offline check, and the clause has to keep saying so.
+    The clause may say the validator runs before emission exactly while it does.
 
-    `validateCompiledWorldPackage` is imported by exactly one module -- its own test -- and is
-    otherwise reached through the `verify:package` CLI. Describing it as an emission gate would
-    promise a runtime refusal that no code performs, on the clause carrying the stronger word.
+    It could not, for one revision: `validateCompiledWorldPackage` was imported by its own test
+    and by nothing else, reached otherwise through the `verify:package` CLI, so describing it as
+    an emission gate would have promised a runtime check no code performed. Gap-matrix row D7-04
+    put it on the emit path -- `collection-compiler.ts` runs it over the package it just built and
+    derives the validation record from what it says -- so the sentence moved with the code, in
+    that order.
+
+    What the clause still may not say is that a failing package is withheld. It is not: it is
+    emitted as `review_required`, with the failing codes in `reviewReasons`, and the download and
+    promote gates in collection-download.ts are what refuse it. Promising non-emission would be
+    the same defect in the other direction.
   */
-  it("does not present the package validator as a gate on the emit path", () => {
+  it("says the package validator runs before emission only while it does", () => {
     const importers = ["./collection-compiler.ts", "./collection-download.ts", "./retrieval-compile.ts"]
       .filter((path) => read(path).includes("compiled-world/validate"));
-    expect(importers, "the validator now runs on the emit path; the clause may be upgraded").toEqual([]);
+    expect(importers, "the clause says the compiler runs the validator; this is the module that does")
+      .toEqual(["./collection-compiler.ts"]);
+    expect(read("./collection-compiler.ts"), "the validator is imported but its verdict is not used")
+      .toContain("validateCompiledWorldPackage(probePackage)");
 
     const body = clause("evidence-preserving").body;
     expect(body).toContain("offline check");
+    expect(body, "the clause no longer names the state a failing package actually reaches")
+      .toContain("review_required");
     expect(body, "the clause promises a refusal the emit path does not perform")
       .not.toContain("is not emitted");
   });
@@ -276,18 +298,23 @@ describe("contract promises", () => {
 
     A region is optional twice over. `validateCollectionOcrInput` accepts `regions: undefined` as
     a valid input, and the caller only ever passes regions for an OCR v2 read -- so a v1 document
-    compiles to Claim nodes and zero region-bound retrieval units. Even where regions exist, a
-    claim is bound to one by substring match, and `input.text` is the region texts joined with a
-    newline while claims are split on sentence punctuation, so a sentence crossing a region
-    boundary matches no region. What is true of *every* promoted fact is the version it was read
-    from: the Claim node's only evidence id is keyed by documentId + versionKey, and versionKey is
-    checked against the sha256 of the bytes. The promise says that, and may not say more.
+    compiles to zero region-bound retrieval units, and since gap-matrix row D7-02 made extraction
+    per region, to zero Claim nodes as well. What is true of *every* promoted fact is the version
+    it was read from: the Claim node's only evidence id is keyed by documentId + versionKey, and
+    versionKey is checked against the sha256 of the bytes. The promise says that, and may not say
+    more.
+
+    The substring-match caveat that used to stand here went with D7-02: a claim is emitted by the
+    region it was read from and carries that binding, so a sentence spanning a region boundary is
+    no longer a claim matched to nothing. Both compile paths now read "absent" through one shared
+    helper, `regionsOrNone`, which D7-03 added after finding that the production wire read it as
+    "invent a page-1 region covering the whole document".
   */
   it("promises a source version for every fact and a region only where one exists", () => {
     const compiler = read("./collection-compiler.ts");
     // Regions are optional at validation, and absent entirely from a v1 read.
     expect(compiler).toContain("if (input.regions !== undefined) {");
-    expect(compiler).toContain("for (const region of input.regions ?? []) {");
+    expect(compiler).toContain("for (const region of regionsOrNone(input)) {");
     expect(read("./collection-compile-run.ts"))
       .toContain('regions: json.schemaVersion === "tavonel.ocr_result.v2" ? json.regions : undefined');
     // A claim's evidence is a whole document version; the page and box live on the region.

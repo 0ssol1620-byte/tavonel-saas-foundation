@@ -1,4 +1,5 @@
 import { createHash, createHmac, randomUUID } from "node:crypto";
+import { readCompiledWorldValidationChecks, regionsOrNone } from "../../shared/compiledWorldValidation";
 import {
   GENERIC_MIXED_CORPUS_BLUEPRINT,
   type CollectionCandidateArtifact,
@@ -176,7 +177,18 @@ export function buildProductCoreV2Request(
         title: `Document ${document.documentId.slice(0, 8)}`,
         sourceFilename: `${document.documentId}.pdf`,
         pageCount: document.pageCount,
-        regions: document.regions?.map((region) => ({
+        /*
+          Regions are copied, never conjured.
+
+          This used to end in `?? [{ regionId: "ocr-full-document-…", pageNumber1: 1, text:
+          <the whole document> }]` -- a region the input did not contain, invented so a
+          legacy-OCR document would satisfy the Core's "at least one region" schema. Every
+          citation from such a document then pointed at page 1, and the customer who followed
+          one landed on the cover page and found the fact was not there. `regionsOrNone` is the
+          one reading of "absent" both compile paths take, and the compile is refused before
+          dispatch anyway (OCR_REGIONS_REQUIRED in collection-compile-run.ts).
+        */
+        regions: regionsOrNone(document).map((region) => ({
           regionId: region.regionId,
           pageIndex0: region.pageIndex0,
           pageNumber1: region.pageNumber1,
@@ -186,15 +198,7 @@ export function buildProductCoreV2Request(
           bbox1000: region.bbox1000,
           confidence: region.confidence,
           authority: region.authority,
-        })) ?? [{
-          regionId: `ocr-full-document-${document.documentId}`,
-          pageIndex0: 0,
-          pageNumber1: 1,
-          order: 0,
-          blockType: "paragraph" as const,
-          text: document.text,
-          authority: "unclassified" as const,
-        }],
+        })),
       })),
   };
 }
@@ -225,6 +229,26 @@ export function projectProductCoreV2Candidate(
     (result.status === "completed" && result.candidate.lifecycle !== "candidate") ||
     (result.status === "review_required" && result.candidate.lifecycle !== "review_required")
   ) return null;
+  /*
+    The Core is the authority on integrity, so its verdict is read rather than replaced.
+
+    This function used to write four `true` literals here and never touch
+    `result.candidate.validation` at all. If the Core had detected incomplete source coverage or
+    non-deterministic materialisation, the customer's downloadable package still asserted four
+    green checks -- the projection was structurally incapable of reporting a Core-detected
+    problem. A missing or non-boolean field is a refusal (`CORE_V2_PROJECTION_INVALID` at
+    collection-compile-run.ts), never a default: an unreported check and a passed one must not
+    look the same.
+  */
+  const coreChecks = readCompiledWorldValidationChecks(result.candidate.validation);
+  if (!coreChecks) return null;
+  /*
+    A completed compile whose own record says a check failed contradicts itself, and the site is
+    not the place to decide which half to believe. Refusing keeps `passed` meaning passed: the
+    alternative is an artifact the promote gate accepts because its status says `passed` while a
+    boolean beside it says the source was not fully covered.
+  */
+  if (result.status === "completed" && Object.values(coreChecks).some((check) => !check)) return null;
   const model = result.candidate.canonicalKnowledgeModel;
   const collectionId = typeof model.collectionId === "string" ? model.collectionId : "";
   const objects = Array.isArray(model.objects) ? model.objects as Array<Record<string, unknown>> : [];
@@ -299,10 +323,7 @@ export function projectProductCoreV2Candidate(
     },
     validation: {
       status: result.status === "completed" ? "passed" : "review_required",
-      deterministicMaterialization: true,
-      sourceCoverage: true,
-      evidenceCoverage: true,
-      immutableInputsOnly: true,
+      ...coreChecks,
       fullRebuildEquivalence: result.receipt.equivalence,
       reviewReasons: [...result.candidate.reviewReasons],
       counts,

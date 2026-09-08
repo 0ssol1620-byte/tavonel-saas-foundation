@@ -62,7 +62,17 @@ test("Activity reads the durable audit endpoint rather than a browser-only timel
 test("command palette is keyboard reachable and closes with Escape", async ({ page }) => {
   await installWorkspace(page);
   await page.goto("/workspace");
-  await expect(page.getByRole("heading", { name: /Compiled World|sources are ready|becoming a world|Build your first/ })).toBeVisible();
+  /*
+    A hydration gate, not the subject of this test: the palette is a client shortcut, so pressing
+    Control+K before the workspace has resolved its own state proves nothing.
+
+    The alternation missed the state this mock now produces. `17b3883` stopped counting a source
+    that has finished reading as a run and started counting *ready* sources rather than every
+    document, so a workspace holding one readable source and one held for review reports "1 source
+    is ready to compile." where it used to report "2 sources are ready to compile." — the same
+    state, told truthfully, in the singular. Both forms are accepted here.
+  */
+  await expect(page.getByRole("heading", { name: /Compiled World|sources? (is|are) ready|becoming a world|Build your first/ })).toBeVisible();
   await page.keyboard.press("Control+K");
   await expect(page.getByRole("dialog", { name: "Workspace command palette" })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "Search commands" })).toBeFocused();

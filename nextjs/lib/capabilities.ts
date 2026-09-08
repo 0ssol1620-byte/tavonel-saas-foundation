@@ -59,6 +59,7 @@ export function readCapabilities(status: StatusResponse | null, failed: boolean)
     gate("cdr", "Content disarm", "Sanitization runs before anything is read.", "Sanitization is not active."),
     gate("ocrGpu", "OCR on scans", "Qualified GPU OCR is available.", "GPU OCR is gated."),
     gate("candidatePromotion", "Promotion to the live world", "", "Promotion is always an explicit human decision. Closed on purpose, not pending."),
+    gate("customerData", "Customer-data compilation", "", "This deployment compiles synthetic sources only. Customer data stays gated until every named security precondition has evidence."),
     flag(status?.auth, "Google sign-in", ["google_oauth_configured"], "Sign-in is available to pilot users.", "No auth provider is configured here."),
     flag(
       status?.billing,

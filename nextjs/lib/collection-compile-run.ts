@@ -1,3 +1,4 @@
+import { OCR_REGIONS_REQUIRED, documentsWithoutRegions } from "../../shared/compiledWorldValidation";
 import { type CollectionCandidateArtifact, validateCollectionOcrInput } from "./collection-compiler";
 import { dispatchCoreCompile, readCoreRuntimeEnv } from "./core-runtime";
 import { dispatchProductCoreV2, projectProductCoreV2Candidate, readProductCoreV2Env } from "./core-runtime-v2";
@@ -72,11 +73,15 @@ export async function runCollectionCompile(
   }
 
   const fetched = await Promise.all(selected.map((item) => getWorkspaceOcrJson(signer, workspaceId, item!.ocrJsonKey!)));
-  const inputs = fetched.map((result, index) => {
+  // An OCR result that could not be read at all is a binding failure, not a missing-region one.
+  const bodies = fetched.map((result) => (result.ok ? result.json : null));
+  if (bodies.some((body) => body === null || typeof body !== "object")) {
+    return { ok: false, status: 422, code: "OCR_BINDING_INVALID", payload: {} };
+  }
+  const candidates = bodies.map((body, index) => {
     const document = selected[index]!;
-    if (!result.ok || !document.sanitizedKey || !document.ocrJsonKey) return null;
-    const json = result.json as Record<string, unknown>;
-    return validateCollectionOcrInput({
+    const json = body as Record<string, unknown>;
+    return {
       documentId: document.documentId,
       versionKey: document.versionKey,
       sanitizedKey: document.sanitizedKey,
@@ -86,8 +91,31 @@ export async function runCollectionCompile(
       inputSha256: json.inputSha256,
       sourceImmutableKey: json.sourceImmutableKey,
       regions: json.schemaVersion === "tavonel.ocr_result.v2" ? json.regions : undefined,
-    });
+    };
   });
+
+  /*
+    A document read before region capture is refused, and told apart from a malformed one.
+
+    Both used to end in OCR_BINDING_INVALID or, worse, in a compile: the v2 wire filled the
+    Core's mandatory `regions` with an invented page-1 region covering the whole document, so a
+    legacy-OCR source compiled into a World whose every citation pointed at the cover page. The
+    two failures need different words because they need different actions -- a malformed OCR
+    result is ours to fix, and this one is "re-read the source, the reader that produced this
+    did not record where anything was". The document ids travel with the code so the caller can
+    say which sources, rather than which corpus.
+  */
+  const withoutRegions = documentsWithoutRegions(candidates);
+  if (withoutRegions.length > 0) {
+    return {
+      ok: false,
+      status: 422,
+      code: OCR_REGIONS_REQUIRED,
+      payload: { documentIds: withoutRegions },
+    };
+  }
+
+  const inputs = candidates.map((candidate) => validateCollectionOcrInput(candidate));
   if (inputs.some((item) => item === null)) {
     return { ok: false, status: 422, code: "OCR_BINDING_INVALID", payload: {} };
   }

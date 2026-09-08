@@ -14,12 +14,15 @@ interface R2ObjectBody {
 interface R2Bucket {
   get(key: string): Promise<R2ObjectBody | null>;
   put(key: string, value: ArrayBuffer | ArrayBufferView | string, options?: R2PutOptions): Promise<unknown>;
+  list(options?: { prefix?: string }): Promise<{ objects: Array<{ key: string }> }>;
 }
 
 interface Message<Body = unknown> {
   readonly body: Body;
+  /** Cloudflare Queues counts delivery attempts from 1. */
+  readonly attempts: number;
   ack(): void;
-  retry(): void;
+  retry(options?: { delaySeconds?: number }): void;
 }
 
 interface MessageBatch<Body = unknown> {

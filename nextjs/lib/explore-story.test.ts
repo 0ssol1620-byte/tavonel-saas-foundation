@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { exploreChangeSourceFiles, exploreChangeStory } from "./explore-change";
+import { exploreChangeBaselineDocument, exploreChangeStory } from "./explore-change";
 import { exploreSampleAnswers, exploreSampleDocuments, exploreSampleWorld } from "./explore-sample";
 import {
   DEEP_LINK_ACTS,
@@ -50,7 +50,7 @@ const BARRED = ["unlock your data", "second brain", "100% accurate", "never hall
 const OVERCLAIMS = ["generally available", "production-ready", "fully automated ontology"];
 
 const model = toVisualWorldModel(exploreSampleWorld, exploreSampleDocuments);
-const change = buildExploreChangeView(exploreChangeStory, exploreChangeSourceFiles);
+const change = buildExploreChangeView(exploreChangeStory, exploreChangeBaselineDocument);
 
 describe("the act a link may ask for", () => {
   it("accepts the three deep-linkable acts", () => {
@@ -96,21 +96,23 @@ describe("the Change act's numbers are the diff's numbers", () => {
     expect(change.counts.untouched).toBe(exploreChangeStory.untouchedNodeIds.length);
   });
 
-  it("names both sides by the file that is in the repository", () => {
-    expect(change.before.filename).toBe(exploreChangeSourceFiles.before.filename);
-    expect(change.after.filename).toBe(exploreChangeSourceFiles.after.filename);
-    expect(change.before.manifestDigest).not.toBe(change.after.manifestDigest);
-    expect(change.before.excerpt).not.toBe(change.after.excerpt);
+  it("names the baseline and every arrival by the file that is in the repository", () => {
+    expect(change.baseline.filename).toBe(exploreChangeBaselineDocument.filename);
+    expect(change.baseline.manifestDigest).not.toBe(change.after.manifestDigest);
+    expect(change.arrivals.map((arrival) => arrival.documentId))
+      .toEqual(exploreChangeStory.arrivals.map((arrival) => arrival.documentId));
+    // One arriving filing is one new source version; the view refuses to build if they disagree.
+    expect(change.arrivals.length).toBe(change.sourceRevisions.added);
+    for (const arrival of change.arrivals) {
+      expect(arrival.filename, arrival.documentId).toBeTruthy();
+      expect(arrival.excerpt.length, arrival.documentId).toBeGreaterThan(0);
+    }
   });
 
-  it("shows a reached object and an untouched one in the same composition", () => {
-    // The act's whole claim is "dependent knowledge was recompiled, unrelated knowledge was
-    // not". If the opening composition happened to contain only one of the two, the sentence
-    // would be true of the World and unsupported by the picture.
+  it("shows objects named by the full-world diff without requiring a fabricated carry-over", () => {
     const affected = new Set(change.affectedNodeIds);
-    const untouched = new Set(change.untouchedNodeIds);
     expect(model.focus.some((id) => affected.has(id))).toBe(true);
-    expect(model.focus.some((id) => untouched.has(id))).toBe(true);
+    if (change.untouchedNodeIds.length === 0) expect(change.counts.untouched).toBe(0);
   });
 
   it("claims no equivalence and shows no PASS", () => {

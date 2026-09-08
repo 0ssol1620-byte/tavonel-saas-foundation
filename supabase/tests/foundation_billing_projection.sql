@@ -1,7 +1,7 @@
 -- Run with Supabase CLI db test after 0006_foundation_subscription_schedule.sql.
 -- Every fixture and projected event is rolled back.
 begin;
-select plan(31);
+select plan(32);
 
 select has_table('public', 'foundation_billing_accounts', 'billing accounts table exists');
 select has_table('public', 'foundation_billing_events', 'billing event receipt table exists');
@@ -12,8 +12,14 @@ select ok((select relrowsecurity from pg_class where oid = 'public.foundation_bi
 select ok((select relrowsecurity from pg_class where oid = 'public.foundation_credit_ledger'::regclass), 'credit ledger has RLS');
 select ok(not has_table_privilege('anon', 'public.foundation_billing_accounts', 'select'), 'anonymous clients cannot read billing');
 select ok(not has_table_privilege('authenticated', 'public.foundation_billing_accounts', 'select'), 'authenticated clients cannot read billing directly');
-select ok(not has_function_privilege('authenticated', 'public.apply_foundation_billing_event(text,text,timestamptz,text,text,text,uuid,text,text,text,text,text,integer,text)', 'execute'), 'authenticated clients cannot execute billing projection');
-select ok(has_function_privilege('service_role', 'public.apply_foundation_billing_event(text,text,timestamptz,text,text,text,uuid,text,text,text,text,text,integer,text)', 'execute'), 'service role can execute billing projection');
+-- 0005 shipped apply_foundation_billing_event; 0009, 0010 and 0035 superseded it with v2, v3
+-- and v4, and each revoked EXECUTE on the version it replaced -- 0009 line 214 takes the v1
+-- grant away from service_role by name. v4 is the live entry point
+-- (0035_subscription_allowance_ledger.sql line 156), so that is what the privileges are
+-- asserted on, and the retired v1 is asserted to be reachable by nobody at all.
+select ok(not has_function_privilege('authenticated', 'public.apply_foundation_billing_event_v4(text,text,timestamptz,text,text,text,uuid,text,text,text,text,text,integer,text)', 'execute'), 'authenticated clients cannot execute billing projection');
+select ok(has_function_privilege('service_role', 'public.apply_foundation_billing_event_v4(text,text,timestamptz,text,text,text,uuid,text,text,text,text,text,integer,text)', 'execute'), 'service role can execute billing projection');
+select ok(not has_function_privilege('service_role', 'public.apply_foundation_billing_event(text,text,timestamptz,text,text,text,uuid,text,text,text,text,text,integer,text)', 'execute'), 'the superseded v1 projection is reachable by nobody, service role included');
 select ok(not has_function_privilege('authenticated', 'public.apply_foundation_subscription_schedule(text,text,text,timestamptz)', 'execute'), 'authenticated clients cannot project cancellation schedules');
 select ok(has_function_privilege('service_role', 'public.apply_foundation_subscription_schedule(text,text,text,timestamptz)', 'execute'), 'service role can project cancellation schedules');
 

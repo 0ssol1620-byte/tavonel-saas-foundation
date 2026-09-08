@@ -348,6 +348,22 @@ h3 { font-size: 17px; letter-spacing: -0.012em; font-variation-settings: "wght" 
   letter-spacing: 0.005em;
 }
 .fine b { color: var(--text-lo); font-weight: 500; }
+/*
+   A link in fine print was not identifiable as one.
+
+   The global reset is `a { color: inherit; text-decoration: none }`, and `.fine` never restored
+   either, so every link inside fine print rendered as plain muted mono -- distinguishable from
+   the sentence around it by nothing at all, which is WCAG 1.4.1 as well as simply invisible.
+   The landing page now depends on one of these to send a reader from the evidence claim to the
+   capability manifest, so it stops being cosmetic. Same treatment `.policy-copy a` already uses.
+*/
+.fine a {
+  color: var(--text-lo);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+.fine a:hover { color: var(--text-hi); }
 
 .slate {
   margin: 0;
@@ -1119,12 +1135,20 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 .policy-copy a { color: var(--text-hi); text-decoration-thickness: 1px; text-underline-offset: 3px; }
 .processor-list, .status-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; margin: 8px 0 18px; background: var(--hairline); border: 1px solid var(--hairline); }
 .processor-list article, .status-list article { padding: 20px; background: var(--ground); }
-.processor-list h3, .status-list h2 { margin: 0 0 8px; font-size: 17px; letter-spacing: -0.012em; text-transform: capitalize; }
+/* `.status-list h3` was missing, so /status rendered its row names unstyled while /security,
+   which uses h2 in the same grid, did not. */
+.processor-list h3, .status-list h2, .status-list h3 { margin: 0 0 8px; font-size: 17px; letter-spacing: -0.012em; text-transform: capitalize; }
 .chain .link h2 { font-size: 17px; letter-spacing: -0.012em; font-variation-settings: "wght" 560; }
 .processor-list p, .status-list p { margin: 4px 0; }
 .status-list article > span { display: inline-block; margin-bottom: 18px; font: 600 10px/1 var(--f-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--verified); }
-.status-list article[data-state="test_only"] > span, .status-list article[data-state="restricted"] > span { color: var(--changed); }
-.status-list article[data-state="not_configured"] > span { color: var(--text-xlo); }
+/* A held-open decision reads as changed; an absent configuration reads as absent. `closed` and
+   `disabled` replaced the single `restricted`, which covered both (RESOLVED A-6). */
+.status-list article[data-state="test_only"] > span,
+.status-list article[data-state="restricted"] > span,
+.status-list article[data-state="closed"] > span,
+.status-list article[data-state="disabled"] > span { color: var(--changed); }
+.status-list article[data-state="not_configured"] > span,
+.status-list article[data-state="not_qualified"] > span { color: var(--text-xlo); }
 .offlist { margin: 0; padding: 0; list-style: none; display: grid; gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 4px; overflow: hidden; }
 .offlist li {
   background: var(--g1);
@@ -3281,4 +3305,156 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
   }
   .resolve-row { grid-template-columns: minmax(0, 1fr); }
   .resolve-join { display: none; }
+}
+
+/*
+  /sources — the capability matrix.
+
+  An instrument table, not a feature grid: hairlines, one weight of type, and colour only where
+  it carries state. The six support tiers map onto the four status tokens declared at the top of
+  this file rather than introducing a fifth hue; the rule and its reason are in
+  `components/source-capability-table.tsx`, beside the mapping it applies.
+
+  Below 760px the table stops being a table. Six columns of tokens on a 360px phone is a
+  horizontal scroll nobody finds, so each row becomes a stacked card and each cell prints its
+  column name from the `data-label` the component already writes for accessibility.
+*/
+.src-scroll { overflow-x: auto; margin: 0 -2px; }
+
+.src-matrix {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.src-matrix caption {
+  caption-side: bottom;
+  padding-top: 12px;
+  text-align: left;
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  color: var(--text-xlo);
+  word-break: break-word;
+}
+.src-matrix th, .src-matrix td {
+  padding: 12px 14px 12px 0;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--hairline);
+}
+.src-matrix thead th {
+  border-bottom-color: var(--hairline-hi);
+  font-family: var(--f-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-lo);
+  white-space: nowrap;
+}
+.src-matrix tbody th { font-weight: 400; min-width: 15ch; }
+.src-matrix tbody th b {
+  display: block;
+  font-family: var(--f-mono);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-hi);
+}
+.src-matrix tbody th i, .src-matrix td > i {
+  display: block;
+  margin-top: 3px;
+  font-style: normal;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--text-xlo);
+  word-break: break-word;
+}
+
+/* The tier chip. One border, one dot of colour; the tier's name is the label. */
+.src-tier {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 8px;
+  border: 1px solid var(--hairline-hi);
+  border-radius: 2px;
+  background: var(--g1);
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--text-mid);
+  white-space: nowrap;
+}
+.src-tier::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--reused);
+  flex: none;
+}
+.src-tier[data-token="verified"]::before { background: var(--verified); }
+.src-tier[data-token="unresolved"]::before { background: var(--unresolved); }
+.src-tier[data-token="changed"]::before { background: var(--changed); }
+.src-tier[data-token="reused"]::before { background: var(--reused); }
+
+.src-tokens { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+.src-tokens li { color: var(--text-mid); }
+.src-none { color: var(--text-xlo); font-family: var(--f-mono); font-size: 11px; letter-spacing: 0.08em; }
+
+.src-legend { margin: 0; display: grid; gap: 10px; max-width: 78ch; }
+.src-legend > div { display: grid; grid-template-columns: 20ch minmax(0, 1fr); gap: 14px; align-items: baseline; }
+.src-legend dt { margin: 0; }
+.src-legend dd { margin: 0; font-size: 13px; line-height: 1.65; color: var(--text-mid); }
+
+.src-state {
+  margin: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--hairline-hi);
+  /* --unresolved: nothing regressed, the question is simply still open. */
+  border-left: 2px solid var(--unresolved);
+  background: var(--g1);
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--text-mid);
+  max-width: 76ch;
+}
+.src-state b { color: var(--text-hi); font-weight: 500; }
+
+.src-refusal {
+  margin: 0;
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-lo);
+}
+
+.src-section { font-variation-settings: "wght" 500; text-wrap: initial; }
+.src-para { margin: 0; max-width: 72ch; font-size: 13.5px; line-height: 1.66; color: var(--text-mid); }
+.src-para b { color: var(--text-hi); font-weight: 500; }
+
+@media (max-width: 760px) {
+  .src-matrix thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .src-matrix tr {
+    display: block;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--hairline-hi);
+  }
+  .src-matrix th, .src-matrix td { display: block; padding: 0; border: 0; }
+  .src-matrix tbody th { min-width: 0; }
+  .src-matrix td { margin-top: 10px; }
+  .src-matrix td::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 4px;
+    font-family: var(--f-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-xlo);
+  }
+  .src-legend > div { grid-template-columns: minmax(0, 1fr); gap: 5px; }
 }

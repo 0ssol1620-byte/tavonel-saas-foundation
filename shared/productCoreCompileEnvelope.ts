@@ -1,3 +1,5 @@
+import { gateAdmitsCustomerData, type CustomerDataGateDecision } from "./customerDataGate";
+
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 
@@ -91,9 +93,15 @@ export function isImmutableScopedObjectKey(key: string, tenantId: string, worksp
 /**
  * Validates the Product-to-Core contract without reading bytes or calling a provider.
  * The Foundation's current policy accepts only synthetic privacy mode.
+ *
+ * `gate` is the only way `approved_customer_data` is ever accepted, and it has to be an allowed
+ * decision for this exact tenant and workspace (`shared/customerDataGate.ts`). Called without it --
+ * which is every call site in this repository -- the behaviour is unchanged: customer data is
+ * refused with `PRIVACY_POLICY_NOT_ALLOWED`.
  */
 export function validateCompileJobEnvelope(
   input: CompileJobEnvelope,
+  gate?: CustomerDataGateDecision,
 ): CompileEnvelopeDecision {
   if (input.schemaVersion !== COMPILE_JOB_SCHEMA) return { accepted: false, code: "SCHEMA_VERSION_INVALID" };
   if (![input.jobId, input.idempotencyKey, input.tenantId, input.workspaceId, input.source.sourceId, input.source.sourceVersionId, input.source.quarantineProofId].every(validIdentifier)) {
@@ -116,7 +124,16 @@ export function validateCompileJobEnvelope(
   if (!Number.isSafeInteger(input.route.maxLatencyMs) || input.route.maxLatencyMs < 1_000 || input.route.maxLatencyMs > 90_000) {
     return { accepted: false, code: "LATENCY_BOUND_INVALID" };
   }
-  if (input.route.privacyPolicy !== "foundation_synthetic_only") {
+  // An allowlist, not a denylist. Written as `!== "foundation_synthetic_only" && !gate` this
+  // admitted every other string a deserialized JSON body can carry -- an unknown policy, the empty
+  // string, or any value added to the union later -- as long as a gate object was present.
+  if (
+    input.route.privacyPolicy !== "foundation_synthetic_only" &&
+    !(
+      input.route.privacyPolicy === "approved_customer_data" &&
+      gateAdmitsCustomerData(gate, input.tenantId, input.workspaceId)
+    )
+  ) {
     return { accepted: false, code: "PRIVACY_POLICY_NOT_ALLOWED" };
   }
   if (!Number.isSafeInteger(input.requestedAtMs) || input.requestedAtMs <= 0) {

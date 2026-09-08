@@ -54,8 +54,8 @@ describe("a corpus is never described as one World", () => {
       compiled, and "ready" must not acquire a "your World is ready" reading anywhere.
     */
     const progress = summariseCorpus("corpus-" + "a".repeat(32), [
-      { jobId: "cjob-1", batchIndex: 0, state: "ready", collectionId: "c1", documentsTotal: 12, documentsReady: 12, errorCode: null },
-      { jobId: "cjob-2", batchIndex: 1, state: "ready", collectionId: "c2", documentsTotal: 12, documentsReady: 12, errorCode: null },
+      { jobId: "cjob-1", batchIndex: 0, state: "ready", collectionId: "c1", documentsTotal: 12, documentsReady: 12, errorCode: null, batchCount: 2 },
+      { jobId: "cjob-2", batchIndex: 1, state: "ready", collectionId: "c2", documentsTotal: 12, documentsReady: 12, errorCode: null, batchCount: 2 },
     ]);
     expect(progress.state).toBe("ready");
 
@@ -80,7 +80,9 @@ describe("the entity type is qualified where it is shown", () => {
   it("carries the measured precision in the copy that ships", () => {
     const copy = read("./explore-story.ts");
     expect(copy).toContain("entityDisclaimer");
-    expect(copy).toContain("3 of 15");
+    // 3 of 15 until 2026-09-06, when gap-matrix row D7-01 removed the extractor's eight-entity
+    // cap and a sixteenth candidate appeared. The number moved down; the test moved with it.
+    expect(copy).toContain("3 of 16");
     expect(copy).toContain("Unreviewed");
     expect(copy).toContain("heuristic");
   });

@@ -29,11 +29,11 @@ export const metadata: Metadata = {
 const VALUE = [
   [
     "Connected sources",
-    "Compile what you already have. Files, folders and archives, or the systems your knowledge lives in — shared drives, object storage and a file-server agent for what never leaves your network.",
+    "Compile what you already have. Upload files, folders and archives, or connect Google Drive, Dropbox and OneDrive/SharePoint in beta. Object storage and mounted shares are imported by an agent that runs inside your network, configured with you rather than switched on.",
   ],
   [
     "Source-level evidence",
-    "Every qualified claim and relation carries the document version, page and region it came from. Reviewers and auditors open the actual page, not a paraphrase of it.",
+    "Every compiled fact stays traceable to its exact source location: a qualified claim or relation carries the source version and the address of the place inside it. Reviewers and auditors open that place, not a paraphrase of it.",
   ],
   [
     "Governed activation",
@@ -76,7 +76,7 @@ export default function EnterprisePage() {
               <p className="lede">
                 Technical manuals, specifications, contracts, policies and reports become one
                 versioned world that your search, your agents and your applications all read from
-                — with every result traceable to the page it came from, and activation in the
+                — with every result traceable to its exact source location, and activation in the
                 hands of your own reviewers.
               </p>
 

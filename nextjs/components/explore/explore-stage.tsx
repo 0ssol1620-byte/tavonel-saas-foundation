@@ -66,7 +66,13 @@ export default function ExploreStage({ model, layout, change, answers, technical
 
   const [act, setAct] = useState<ExploreAct>("entry");
   const [settled, setSettled] = useState(false);
-  const [selectedId, setSelectedId] = useState(opening);
+  /*
+    The graph enters unselected. The opening id only seeds the evidence fallback so a direct
+    Evidence deep-link has a real region to show; it must not pre-activate a World node before
+    the reader clicks one. Otherwise the stage says DIRECTLY CONNECTED on first entry and the
+    intended click-to-focus interaction has already happened invisibly.
+  */
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [evidenceId, setEvidenceId] = useState(() => {
     const node = model.nodes.find((item) => item.id === opening);
     return node?.evidenceRefs[0] ?? model.evidence[0]?.id ?? "";
@@ -169,8 +175,9 @@ export default function ExploreStage({ model, layout, change, answers, technical
 
     Every object in this World is a candidate, so the World and Evidence acts are drawn without
     state colour -- there is no state to report. The Change act is the one place a real state
-    difference exists, so it is the one place the palette is used: amber on the objects the
-    revision reached, dimmed on the ones it did not.
+    difference exists, so it is the one place the palette is used: amber on objects named by the
+    diff, dimmed only when an object retains the same compiled identity across both Worlds. A
+    filing comparison may legitimately have no dimmed objects.
   */
   const worldStates = useMemo<Record<string, VisualState>>(() => ({}), []);
   const changeStates = useMemo<Record<string, VisualState>>(() => {
@@ -267,7 +274,7 @@ export default function ExploreStage({ model, layout, change, answers, technical
               layout={layout}
               states={worldStates}
               selectedId={selectedId}
-              onSelect={setSelectedId}
+              onSelect={selectNode}
               onOpen={openNode}
               reduced={reduced}
               settled={settled}
@@ -296,8 +303,8 @@ export default function ExploreStage({ model, layout, change, answers, technical
               states={changeStates}
               change={change}
               selectedId={selectedId}
-              onSelect={setSelectedId}
-              onOpen={setSelectedId}
+              onSelect={selectNode}
+              onOpen={selectNode}
               reduced={reduced}
               settled={settled}
             />

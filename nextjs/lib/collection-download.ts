@@ -1,11 +1,19 @@
 import { createHash } from "node:crypto";
 import { strToU8, zipSync } from "fflate";
 import { COLLECTION_CANDIDATE_SCHEMA } from "./collection-compiler";
+import { buildAiPackageGuidance } from "./ai-package-guidance";
 import type { ExportSigner } from "./export-signing";
 
 const MAX_PACKAGE_FILES = 200;
 const MAX_UNCOMPRESSED_BYTES = 16 * 1024 * 1024;
-const REQUIRED_PACKAGE_PATHS = [
+/**
+ * Exported so /developers can list what a package contains from the code that writes it.
+ *
+ * The page described the export in prose. A published list of files is a promise about bytes,
+ * and the only version worth publishing is one that fails a check when the writer changes:
+ * `brand-copy.test.ts` asserts every path the page prints is a path this module produces.
+ */
+export const REQUIRED_PACKAGE_PATHS = [
   "ontology/knowledge.jsonld",
   "ontology/knowledge.ttl",
   "graph/nodes.csv",
@@ -206,11 +214,24 @@ export function buildSignedCollectionZip(artifact: ReviewableCollectionArtifact,
   ].join("\n");
   entries["manifest/candidate-world.json"] = strToU8(candidateWorld);
   entries["manifest/DOWNLOAD_README.txt"] = strToU8(readme);
+  const aiGuidance = buildAiPackageGuidance({
+    collectionId: artifact.collectionId,
+    manifestDigest: artifact.manifestDigest,
+    lifecycle: artifact.lifecycle,
+    worldStateId: artifact.coreExecution.worldStateId ?? null,
+  });
+  const aiEntrypointJson = `${JSON.stringify(aiGuidance.entrypoint, null, 2)}\n`;
+  entries["README.md"] = strToU8(aiGuidance.readme);
+  entries["AGENTS.md"] = strToU8(aiGuidance.agents);
+  entries["manifest/ai-entrypoint.json"] = strToU8(aiEntrypointJson);
 
   const files = [
     ...artifact.package.files.map((file) => ({ path: file.path, mediaType: file.mediaType, sizeBytes: file.sizeBytes, sha256: file.sha256 })),
     { path: "manifest/candidate-world.json", mediaType: "application/json", sizeBytes: Buffer.byteLength(candidateWorld), sha256: sha256(candidateWorld) },
     { path: "manifest/DOWNLOAD_README.txt", mediaType: "text/plain; charset=utf-8", sizeBytes: Buffer.byteLength(readme), sha256: sha256(readme) },
+    { path: "README.md", mediaType: "text/markdown; charset=utf-8", sizeBytes: Buffer.byteLength(aiGuidance.readme, "utf8"), sha256: sha256(aiGuidance.readme) },
+    { path: "AGENTS.md", mediaType: "text/markdown; charset=utf-8", sizeBytes: Buffer.byteLength(aiGuidance.agents, "utf8"), sha256: sha256(aiGuidance.agents) },
+    { path: "manifest/ai-entrypoint.json", mediaType: "application/json", sizeBytes: Buffer.byteLength(aiEntrypointJson, "utf8"), sha256: sha256(aiEntrypointJson) },
   ].sort((left, right) => left.path.localeCompare(right.path));
   const exportManifest = {
     schemaVersion: "tavonel.signed_export_manifest.v1",

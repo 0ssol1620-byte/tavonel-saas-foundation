@@ -127,3 +127,7 @@ client/public/__manus__/version.json
 
 # Agent runtime state (supervisor checkpoints, session caches). Machine-local, not project code.
 .hybrid-agent/
+
+# Supabase CLI scratch. `supabase/migrations` and `supabase/tests` are the project; the local
+# stack config and its cache are written by the CLI (see .github/workflows/db-rehearsal.yml).
+supabase/.temp/

@@ -1,10 +1,17 @@
 name: Production smoke
 on:
   workflow_dispatch:
+    inputs:
+      origin:
+        description: Origin to probe. Point it at a bad host to rehearse the failure page.
+        required: false
+        default: https://tavonel.com
   schedule:
     - cron: "*/15 * * * *"
 permissions:
   contents: read
+env:
+  TAVONEL_ORIGIN: ${{ inputs.origin || 'https://tavonel.com' }}
 jobs:
   smoke:
     runs-on: ubuntu-latest
@@ -12,4 +19,23 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
-      - run: node nextjs/scripts/operations-smoke.mjs
+      - id: probe
+        run: node nextjs/scripts/operations-smoke.mjs
+      # A red run nobody watches is not monitoring. Page the same destination
+      # OPERATIONS_ALERT_WEBHOOK_URL names for in-app alerts, and fail loudly
+      # when the secret is missing rather than passing this step in silence.
+      - name: Page the on-call destination
+        if: failure()
+        env:
+          OPERATIONS_ALERT_WEBHOOK_URL: ${{ secrets.OPERATIONS_ALERT_WEBHOOK_URL }}
+          FAILED_CHECKS: ${{ steps.probe.outputs.failed || 'workflow-step-failure' }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$OPERATIONS_ALERT_WEBHOOK_URL" ]; then
+            echo "ALERT_RECEIVER_UNCONFIGURED: secret OPERATIONS_ALERT_WEBHOOK_URL is unset, so nobody was paged for: $FAILED_CHECKS" >&2
+            exit 1
+          fi
+          jq -n --arg checks "$FAILED_CHECKS" --arg origin "$TAVONEL_ORIGIN" --arg run "$RUN_URL" \
+            '{text: "[critical] web: production smoke failed for \($origin) — checks: \($checks) — \($run)"}' \
+            | curl --fail --silent --show-error --max-time 10 \
+                --header 'Content-Type: application/json' --data @- "$OPERATIONS_ALERT_WEBHOOK_URL"

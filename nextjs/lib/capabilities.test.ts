@@ -87,8 +87,8 @@ describe("capability grid", () => {
   });
 
   it("returns a stable row count so a dropped row cannot pass as a passing grid", () => {
-    expect(readCapabilities(HEALTHY, false)).toHaveLength(9);
-    expect(readCapabilities(null, true)).toHaveLength(9);
+    expect(readCapabilities(HEALTHY, false)).toHaveLength(10);
+    expect(readCapabilities(null, true)).toHaveLength(10);
   });
 
   /*

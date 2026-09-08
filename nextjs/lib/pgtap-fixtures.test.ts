@@ -41,12 +41,38 @@ const ASSERTION_HELPERS = [
 ].join("|");
 
 // Comment lines are stripped before counting so a commented-out example is not counted.
-function assertionCount(sql: string): number {
-  const body = sql
+function withoutComments(sql: string): string {
+  return sql
     .split("\n")
     .filter((line) => !line.trim().startsWith("--"))
     .join("\n");
-  return body.match(new RegExp(`\\bselect\\s+(?:${ASSERTION_HELPERS})\\s*\\(`, "g"))?.length ?? 0;
+}
+
+function assertionCount(sql: string): number {
+  return withoutComments(sql).match(new RegExp(`\\bselect\\s+(?:${ASSERTION_HELPERS})\\s*\\(`, "g"))?.length ?? 0;
+}
+
+// A throws_ok call whose second argument is a description asserts that the database raises a
+// sentence nobody wrote: pgTAP's two-argument form reads that argument as the expected error
+// MESSAGE, so the call fails against correct behaviour and reads as a product bug. That is exactly
+// what the retrieval fixtures did before the first rehearsal run. Every call must therefore pin
+// what it expects -- a SQLSTATE, or an error string some migration actually raises -- and carry
+// the description as a further argument.
+//
+// "Actually raises" is not a prefix convention: the chain raises foundation_*, retrieval_*,
+// world_*, billing_*, enterprise_* and more. So the allowed set is read out of the migrations
+// rather than guessed, which also means a typo'd expectation fails here rather than at 2am.
+const THROWS_OK_CALL = /\bthrows_ok\s*\(/g;
+const THROWS_OK_PINNED = /\bthrows_ok\s*\(\s*\$\$[\s\S]*?\$\$\s*,\s*'([^']+)'\s*,/g;
+const RAISED_BY_A_MIGRATION = new Set(
+  [...allMigrations.matchAll(/raise exception '([a-z][a-z0-9_]*)/g)].map((match) => match[1]),
+);
+
+// `raise exception 'x_mismatch: stored % vs query %'` is raised with its arguments interpolated,
+// so a fixture pins the whole formatted string; the identifier before the colon is what has to be
+// a real error name.
+function isPinnedExpectation(argument: string): boolean {
+  return /^[0-9A-Z]{5}$/.test(argument) || RAISED_BY_A_MIGRATION.has(argument.split(":")[0]);
 }
 
 describe("pgTAP fixtures", () => {
@@ -71,6 +97,21 @@ describe("pgTAP fixtures", () => {
     expect(firstStatement).toBe("begin;");
     expect(sql.trimEnd().endsWith("rollback;")).toBe(true);
     expect(sql).toContain("select * from finish();");
+  });
+
+  it.each(fixtures)("$name pins every throws_ok to a SQLSTATE or an exact error string", ({ sql }) => {
+    const body = withoutComments(sql);
+    const pinned = [...body.matchAll(THROWS_OK_PINNED)].map((match) => match[1]);
+    expect(
+      pinned.length,
+      "every throws_ok needs 3+ arguments and a $$-quoted first argument",
+    ).toBe(body.match(THROWS_OK_CALL)?.length ?? 0);
+    for (const argument of pinned) {
+      expect(
+        isPinnedExpectation(argument),
+        `throws_ok second argument '${argument}' is neither a SQLSTATE nor an error any migration raises`,
+      ).toBe(true);
+    }
   });
 
   it.each(fixtures)("$name only expects error strings some migration actually raises", ({ sql }) => {

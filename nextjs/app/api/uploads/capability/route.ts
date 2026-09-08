@@ -4,7 +4,13 @@ import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { reserveFoundationCompute } from "@/lib/compute-reservation";
 import { reserveFoundationIntake } from "@/lib/intake-admission";
 import { validateQualifiedDocumentInput } from "@/lib/qualified-input";
-import { FOUNDATION_INTAKE_MAX_BYTES, FOUNDATION_TRIAL_INTAKE_MAX_BYTES, presignFoundationQuarantinePut } from "@/lib/r2-presign";
+import {
+  FOUNDATION_INTAKE_MAX_BYTES,
+  FOUNDATION_TRIAL_INTAKE_MAX_BYTES,
+  PROCESSING_CEILING,
+  PROCESSING_CEILING_SENTENCE,
+  presignFoundationQuarantinePut,
+} from "@/lib/r2-presign";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
 import { deterministicSourceDocumentId, validSourceIdempotencyKey } from "@/lib/source-intake";
 import { estimateBillablePages } from "@/lib/usage-pricing";
@@ -40,8 +46,26 @@ export async function POST(request: Request) {
   if (!Number.isSafeInteger(requestedBytes) || requestedBytes <= 0) {
     return NextResponse.json({ code: "UNQUALIFIED_INPUT" }, { status: 400, headers: NO_STORE });
   }
+  /*
+   * Refuse it here, or drop it silently later. Those are the only two options today.
+   *
+   * The ceiling is the deployment's, not this route's: the CDR worker and the Cloud Run
+   * rasterizer stop at `PROCESSING_CEILING`, and admitting anything larger only moves the
+   * refusal somewhere the customer cannot see it. The refusal names the real limit -- bytes and
+   * pages -- so it can be acted on rather than merely observed, and `/sources` states the same
+   * two numbers from the same module before an upload is ever attempted.
+   *
+   * The code is new because the old one is no longer true: `FILE_TOO_LARGE` is spelled out as
+   * "exceeds the 250 MB direct-upload limit" in the board's failure copy, and 250 MB is not what
+   * this deployment processes.
+   */
   if (requestedBytes > FOUNDATION_INTAKE_MAX_BYTES) {
-    return NextResponse.json({ code: "FILE_TOO_LARGE", maxBytes: FOUNDATION_INTAKE_MAX_BYTES }, { status: 413, headers: NO_STORE });
+    return NextResponse.json({
+      code: "SOURCE_EXCEEDS_PROCESSING_CEILING",
+      maxBytes: FOUNDATION_INTAKE_MAX_BYTES,
+      maxPages: PROCESSING_CEILING.maxSourcePages,
+      limit: PROCESSING_CEILING_SENTENCE,
+    }, { status: 413, headers: NO_STORE });
   }
   if (auth.principal.accessSource === "trial" && requestedBytes > FOUNDATION_TRIAL_INTAKE_MAX_BYTES) {
     return NextResponse.json({ code: "TRIAL_FILE_TOO_LARGE", maxBytes: FOUNDATION_TRIAL_INTAKE_MAX_BYTES }, { status: 413, headers: NO_STORE });
@@ -93,8 +117,14 @@ export async function POST(request: Request) {
     const conflict = admission.code === "INTAKE_IDEMPOTENCY_CONFLICT";
     return NextResponse.json(
       {
-        code: admission.code,
-        ...(tooLarge ? { maxBytes: admission.code === "TRIAL_FILE_TOO_LARGE" ? FOUNDATION_TRIAL_INTAKE_MAX_BYTES : FOUNDATION_INTAKE_MAX_BYTES } : {}),
+        // The admission RPC guards at the same ceiling this route does (migration 0051), so this
+        // is a backstop rather than a second opinion; it answers with the same numbers either way.
+        code: admission.code === "INTAKE_FILE_TOO_LARGE" ? "SOURCE_EXCEEDS_PROCESSING_CEILING" : admission.code,
+        ...(tooLarge ? {
+          maxBytes: admission.code === "TRIAL_FILE_TOO_LARGE" ? FOUNDATION_TRIAL_INTAKE_MAX_BYTES : FOUNDATION_INTAKE_MAX_BYTES,
+          maxPages: PROCESSING_CEILING.maxSourcePages,
+          limit: PROCESSING_CEILING_SENTENCE,
+        } : {}),
       },
       {
         status: tooLarge ? 413 : rateLimited ? 429 : trialLimited ? 402 : conflict ? 409 : 503,

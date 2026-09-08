@@ -192,9 +192,14 @@ test("the mobile menu opens inside the viewport and closes the way a menu closes
   expect(geometry.right).toBeLessThanOrEqual(geometry.viewport);
 
   // Every section is reachable and every row is inside the viewport, not just the panel box.
+  //
+  // Eight since /sources joined PRIMARY_NAV (USKC P0 lane D, founder RESOLVED A-3: the support
+  // matrix is a primary product surface, not a resources link). The count stays a literal rather
+  // than PRIMARY_NAV.length: a spec that reads the same constant as the header agrees with it
+  // whatever it says, and this one exists to notice when the header list changes.
   const links = panel.getByRole("link");
-  await expect(links).toHaveCount(7);
-  for (const label of ["Product", "Solutions", "Integrations", "Developers", "Security", "Pricing", "Resources"]) {
+  await expect(links).toHaveCount(8);
+  for (const label of ["Product", "Solutions", "Integrations", "Developers", "Security", "Pricing", "Sources", "Resources"]) {
     await expect(panel.getByRole("link", { name: label, exact: true })).toBeVisible();
   }
 

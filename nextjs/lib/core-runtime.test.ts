@@ -9,7 +9,16 @@ function inputs(): CollectionOcrInput[] {
     const versionKey = letter.repeat(64);
     const documentId = `doc-${index + 1}`;
     const sanitizedKey = `immutable/pilot/pilot/${documentId}/${versionKey}/sanitized.pdf`;
-    return { documentId, versionKey, sanitizedKey, ocrJsonKey: sanitizedKey.replace("sanitized.pdf", "ocr.json"), pageCount: 1, text: `Document ${index + 1} security policy evidence is complete.`, inputSha256: `sha256:${versionKey}`, sourceImmutableKey: sanitizedKey };
+    const text = `Document ${index + 1} security policy evidence is complete.`;
+    // Region-bound, because the compiler now computes `evidenceCoverage` from the package: a
+    // document with no anchored retrieval unit compiles to `review_required`, which
+    // dispatchCoreCompile correctly refuses. These tests are about the receipt, not that.
+    const regions = [{
+      regionId: `native-${documentId}`, pageIndex0: 0, pageNumber1: 1, order: 0,
+      blockType: "paragraph" as const, text, bbox1000: [100, 120, 900, 240] as [number, number, number, number],
+      confidence: 1, authority: "informal" as const,
+    }];
+    return { documentId, versionKey, sanitizedKey, ocrJsonKey: sanitizedKey.replace("sanitized.pdf", "ocr.json"), pageCount: 1, text, inputSha256: `sha256:${versionKey}`, sourceImmutableKey: sanitizedKey, regions };
   });
 }
 

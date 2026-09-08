@@ -8,10 +8,10 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { DocumentListItem } from "./immutable-keys";
-import { buildPipeline, summarize, type LocalUpload } from "./pipeline";
+import { PROCESSING_CEILING_SENTENCE } from "../../shared/intakeCeiling";
+import { buildPipeline, summarize, type LocalUpload, type PipelineDocument } from "./pipeline";
 
-function doc(overrides: Partial<DocumentListItem> = {}): DocumentListItem {
+function doc(overrides: Partial<PipelineDocument> = {}): PipelineDocument {
   return {
     documentId: "doc-1",
     versionKey: "v1",
@@ -143,5 +143,66 @@ describe("pipeline board", () => {
       ],
     );
     expect(summarize(rows)).toEqual({ total: 3, read: 1, held: 1, sending: 1 });
+  });
+});
+
+/*
+ * The one state the board had no way to show.
+ *
+ * Every stage was derived from an object existing, which is the right rule and left no way to say
+ * "an object will never exist". A source the CDR refuses produces none, so absence of evidence
+ * rendered identically to work in progress: PREPARE stayed active forever and the row vanished on
+ * reload. These tests fix that a refusal is terminal, is never active, and says why.
+ */
+describe("a refused source", () => {
+  const refusal = {
+    reasonCode: "PARSER_OOM",
+    observedBytes: 6 * 1024 * 1024,
+    occurredAt: "2026-09-06T00:00:00.000Z",
+  };
+
+  it("is terminal, and never shows preparation still running", () => {
+    const rows = buildPipeline([], [doc({ processingState: "refused", refusal })]);
+    expect(states(rows)).toEqual(["done", "failed", "waiting", "waiting"]);
+    expect(rows[0].stages.some((stage) => stage.state === "active")).toBe(false);
+    expect(rows[0].needsPerson).toBe(false);
+  });
+
+  it("says what the customer can do about it, with the live ceiling in the sentence", () => {
+    const rows = buildPipeline([], [doc({ processingState: "refused", refusal })]);
+    const detail = rows[0].stages[1].detail;
+    expect(detail).toContain("6.0 MB");
+    expect(detail).toContain(PROCESSING_CEILING_SENTENCE);
+  });
+
+  it("keeps the refusal visible for a document this browser never uploaded", () => {
+    const rows = buildPipeline([], [doc({ documentId: "doc-9", processingState: "refused", refusal })]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].id).toBe("doc-9");
+    expect(rows[0].stages[1].state).toBe("failed");
+  });
+
+  it("joins the refusal to this browser's own upload row instead of listing it twice", () => {
+    const rows = buildPipeline(
+      [upload({ documentId: "doc-1", phase: "stored", loaded: 6 * 1024 * 1024 })],
+      [doc({ documentId: "doc-1", processingState: "refused", refusal })],
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].filename).toBe("handbook.pdf");
+    expect(rows[0].stages[1].state).toBe("failed");
+  });
+
+  it("names a class it does not recognise rather than pretending the source is fine", () => {
+    const rows = buildPipeline(
+      [],
+      [doc({ processingState: "refused", refusal: { ...refusal, reasonCode: "SOMETHING_NEW", observedBytes: null } })],
+    );
+    expect(rows[0].stages[1].state).toBe("failed");
+    expect(rows[0].stages[1].detail).toContain("SOMETHING_NEW");
+  });
+
+  it("leaves a document with no refusal exactly as it was", () => {
+    const rows = buildPipeline([], [doc({ sanitizedKey: "k/sanitized.pdf" })]);
+    expect(states(rows)).toEqual(["done", "done", "active", "waiting"]);
   });
 });

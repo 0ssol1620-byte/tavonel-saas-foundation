@@ -55,6 +55,17 @@ describe("the information architecture", () => {
     }
   });
 
+  it("publishes a dedicated ontology-output guide with format and grounding boundaries", () => {
+    const section = findDocsSection("ontology-output");
+    expect(section).not.toBeNull();
+    const text = JSON.stringify(section);
+    expect(text).toContain("ontology/knowledge.jsonld");
+    expect(text).toContain("ontology/knowledge.ttl");
+    expect(text).toContain("OWL/TBox");
+    expect(text).toContain("urn:tavonel:<id>");
+    expect(text).toContain("provenance");
+  });
+
   it("has no section that is not reachable and no duplicate slug", () => {
     const slugs = DOCS_SECTIONS.map((section) => section.slug);
     expect(new Set(slugs).size).toBe(slugs.length);

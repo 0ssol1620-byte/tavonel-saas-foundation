@@ -1,13 +1,29 @@
 import { createHash, createHmac } from "node:crypto";
+import { PROCESSING_CEILING } from "../../shared/intakeCeiling";
+/** Re-exported so a route reads one intake module instead of two. */
+export { PROCESSING_CEILING, PROCESSING_CEILING_SENTENCE } from "../../shared/intakeCeiling";
 import { FOUNDATION_R2_BUCKET, type R2SignerEnv } from "./r2-synthetic-canary";
 import { immutableWorkspacePrefix } from "./immutable-keys";
 
 export const QUARANTINE_PREFIX = "quarantine/";
-/** Browser-direct R2 uploads never traverse the application server. Paid/owner workspaces can
- * therefore accept real manuals and technical packages without an arbitrary 5 MiB bottleneck. */
-export const FOUNDATION_INTAKE_MAX_BYTES = 250 * 1024 * 1024;
-/** Free evaluation stays bounded independently of page/compute quotas. */
-export const FOUNDATION_TRIAL_INTAKE_MAX_BYTES = 50 * 1024 * 1024;
+/**
+ * What intake admits, which is exactly what the deployment can process.
+ *
+ * This was 250 MiB, on the correct reasoning that browser-direct R2 transfer removed the
+ * application server from the byte path. The mistake was that the 5 MiB constant it replaced was
+ * not an application-server bottleneck at all: it lives in the CDR worker and in the Cloud Run
+ * rasterizer, in two other trees, and nothing related them. So everything between 5 and 250 MiB
+ * was admitted, stored, billed and then permanently refused, and the customer was told the
+ * source was being prepared while it was being dropped.
+ *
+ * Admitting a source the deployment cannot process is not a bigger limit, it is a worse refusal.
+ * Both ceilings are now derived from `shared/intakeCeiling.ts`, so the number cannot drift from
+ * the processors again, and `r2-presign.test.ts` asserts intake is never above what they read.
+ * Raising it for real is decomposition (D1-01's second half), not a larger constant.
+ */
+export const FOUNDATION_INTAKE_MAX_BYTES = PROCESSING_CEILING.maxSourceBytes;
+/** Free evaluation stays bounded independently, and never above what can be processed. */
+export const FOUNDATION_TRIAL_INTAKE_MAX_BYTES = Math.min(50 * 1024 * 1024, PROCESSING_CEILING.maxSourceBytes);
 
 function hmac(key: Buffer | string, data: string) {
   return createHmac("sha256", key).update(data, "utf8").digest();
@@ -114,6 +130,10 @@ export function presignFoundationQuarantinePut(
 ) {
   const blocked = assertFoundationQuarantineKey(env.bucket, key);
   if (blocked) return { ok: false as const, code: blocked };
+  // The byte count is signed now, so an impossible one must not reach the signature at all.
+  if (!Number.isSafeInteger(contentLength) || contentLength < 1 || contentLength > FOUNDATION_INTAKE_MAX_BYTES) {
+    return { ok: false as const, code: "CONTENT_LENGTH_INVALID" };
+  }
   const host = `${env.accountId}.r2.cloudflarestorage.com`;
   const canonicalUri = `/${env.bucket}/${key.split("/").map(encodeURIComponent).join("/")}`;
   const iso = now.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
@@ -121,24 +141,45 @@ export function presignFoundationQuarantinePut(
   const region = "auto";
   const service = "s3";
   const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
+  /*
+   * The byte count enters the signature.
+   *
+   * It was accepted, charged for, returned to the client -- and never bound to anything. The
+   * capability said "one object, this key, this type", the quota accounting summed the declared
+   * value, and the bucket enforced neither: a capability issued for 1 MB accepted a body of any
+   * size R2 would take. A published quota that a one-line client change bypasses is not a quota.
+   *
+   * SigV4 verification recomputes the signature from the headers named here, so a body of a
+   * different length arrives with a different `Content-Length` and does not verify. The browser
+   * sets that header from the body and forbids scripts from overriding it, which is what makes
+   * this binding rather than a request.
+   *
+   * `x-amz-checksum-sha256` is deliberately *not* signed alongside it. R2's S3 compatibility
+   * matrix (developers.cloudflare.com/r2/api/s3/api/, "Checksum Types", read 2026-09-06) lists
+   * SHA-256 as COMPOSITE only, with FULL_OBJECT unimplemented -- and a single PUT is a
+   * full-object checksum. Signing it would put an integrity claim on the wire that nothing
+   * verifies, which is worse than not making it. The digest is bound at confirm instead, where
+   * this deployment checks it itself.
+   */
+  const signedHeaders = "content-length;content-type;host";
   const query: Record<string, string> = {
     "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
     "X-Amz-Credential": `${env.accessKeyId}/${credentialScope}`,
     "X-Amz-Date": iso,
     "X-Amz-Expires": String(expiresInSeconds),
-    "X-Amz-SignedHeaders": "content-type;host",
+    "X-Amz-SignedHeaders": signedHeaders,
   };
   const canonicalQuery = Object.keys(query)
     .sort()
     .map((name) => `${encodeURIComponent(name)}=${encodeURIComponent(query[name])}`)
     .join("&");
-  const canonicalHeaders = `content-type:${contentType}\nhost:${host}\n`;
+  const canonicalHeaders = `content-length:${contentLength}\ncontent-type:${contentType}\nhost:${host}\n`;
   const canonicalRequest = [
     "PUT",
     canonicalUri,
     canonicalQuery,
     canonicalHeaders,
-    "content-type;host",
+    signedHeaders,
     "UNSIGNED-PAYLOAD",
   ].join("\n");
   const stringToSign = ["AWS4-HMAC-SHA256", iso, credentialScope, sha256Hex(canonicalRequest)].join("\n");

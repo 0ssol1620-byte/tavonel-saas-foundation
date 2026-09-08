@@ -148,6 +148,12 @@
   padding-top: 12px;
   border-top: 1px solid var(--hairline);
 }
+.worldFocus { display: grid; gap: 7px; min-width: min(100%, 420px); }
+.worldFocus > strong { color: var(--text-hi); font: 500 12px/1.4 var(--f-sans); }
+.relationList { display: flex; flex-wrap: wrap; gap: 5px; }
+.relationList span { padding: 5px 7px; color: var(--text-lo); border: 1px solid var(--hairline); font: 8px/1.4 var(--f-mono); }
+.relationList b { color: var(--verified); font-weight: 500; text-transform: uppercase; }
+.openEvidence { width: max-content; padding: 7px 10px; color: var(--text-hi); border: 1px solid var(--verified-dim); font: 9px var(--f-mono); text-transform: uppercase; }
 
 .hint {
   margin: 0;
@@ -163,6 +169,62 @@
   letter-spacing: 0.12em;
 }
 
+/*
+  The accessible parallel reading of the composition (§20).
+
+  Deliberately plain: an indented list, no columns, no truncation. It exists to be read straight
+  through by a screen reader, by a keyboard, and by anyone on a phone who would rather see the
+  World as text than as a diagram, so nothing here is allowed to depend on width.
+*/
+.parallelList {
+  border-top: 1px solid var(--hairline);
+  padding-top: 10px;
+}
+
+.parallelList > summary {
+  color: var(--text-lo);
+  font: 9px var(--f-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.parallelList > summary:hover { color: var(--text-hi); }
+
+.parallelList ul {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.parallelList ul ul {
+  margin: 4px 0 12px 14px;
+  border-left: 1px solid var(--hairline);
+  padding-left: 12px;
+}
+
+.parallelList li {
+  color: var(--text-lo);
+  font: 10px/1.7 var(--f-mono);
+  letter-spacing: 0.03em;
+}
+
+.parallelList button {
+  display: block;
+  min-height: 30px;
+  padding: 2px 0;
+  color: var(--text-hi);
+  background: none;
+  border: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.parallelList button:hover { color: var(--verified); }
+.parallelList button small { color: var(--text-xlo); font-size: 8px; letter-spacing: 0.12em; }
+.parallelList button span { display: block; }
+
 /* ------------------------------------------------------------------ act 2 */
 
 .evidenceAct {
@@ -173,8 +235,35 @@
   align-items: start;
 }
 
+/*
+  Both panes are bounded by the viewport, and the long list inside each one scrolls (§24).
+
+  Measured before this rule: the Evidence act at 1440x900 laid out a 6,706px document, because
+  both of its long lists are as long as the compiled World makes them. An object in this corpus
+  carries up to 117 compiled relations and a filing page carries several kilobytes of region
+  text, and neither was bounded -- so opening an object put the Previous/Next controls that walk
+  its regions six screens below the fold, and the page became the scroll container for something
+  the panes should have been scrolling.
+
+  Each pane is now a flex column whose one growing child scrolls: the relation list in the object
+  pane, the source page inside the sheet. Everything that is a control -- "Open the source
+  region", Previous/Next, the provenance table, the footer links -- sits outside the scrolling
+  child and stays on screen. Nothing is removed from the DOM, so the reading order is the list it
+  always was.
+
+  The subtracted constant is the stage chrome above and below: header, rail, caption, Ask bar.
+  `dvh` first, so a phone's collapsing address bar cannot leave a pane taller than the visible
+  viewport; the `vh` line above it is the fallback for an engine without `dvh`.
+*/
+.objectPane,
+.sourcePane {
+  max-height: calc(100vh - 210px);
+  max-height: calc(100dvh - 210px);
+}
+
 .objectPane {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 14px;
   min-width: 0;
 }
@@ -256,15 +345,25 @@
 .objectFacts dt { color: var(--text-xlo); }
 .objectFacts dd { margin: 0; color: var(--text-lo); overflow-wrap: anywhere; }
 
-.relationList {
+/*
+  The Evidence act's relation list. Named apart from the World act's `.relationList` chip row,
+  which it silently overrode: two blocks in one CSS module under the same class name are one
+  rule, and the later `display: grid` was reaching the chips above.
+*/
+.objectRelations {
   display: grid;
+  align-content: start;
+  /* The one growing child of the object pane, and therefore the one that scrolls. */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
   margin: 0;
   padding: 0;
   list-style: none;
   border-top: 1px solid var(--hairline);
 }
 
-.relationList button {
+.objectRelations button {
   display: grid;
   gap: 4px;
   width: 100%;
@@ -276,9 +375,9 @@
   border-bottom: 1px solid var(--hairline);
 }
 
-.relationList button:hover { color: var(--text-hi); }
-.relationList small { color: var(--text-xlo); font: 8px var(--f-mono); letter-spacing: 0.11em; }
-.relationList span { font-size: 12px; line-height: 1.45; }
+.objectRelations button:hover { color: var(--text-hi); }
+.objectRelations small { color: var(--text-xlo); font: 8px var(--f-mono); letter-spacing: 0.11em; }
+.objectRelations span { font-size: 12px; line-height: 1.45; }
 
 .openSource {
   display: flex;
@@ -294,23 +393,46 @@
 }
 
 .sourcePane {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
   min-width: 0;
 }
 
-.regionSwitch { display: flex; flex-wrap: wrap; gap: 6px; }
+.regionSwitch { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 
 .regionSwitch button {
-  padding: 6px 9px;
-  color: var(--text-xlo);
+  /* A touch target, not a chip: §20 asks for ~44px and this is the control a phone uses most. */
+  min-height: 40px;
+  padding: 6px 12px;
+  color: var(--text-lo);
   background: none;
   border: 1px solid var(--hairline-hi);
   font: 8px var(--f-mono);
   letter-spacing: 0.1em;
 }
 
-.regionSwitch button[aria-pressed="true"] { color: var(--text-hi); border-color: var(--verified); }
+.regionSwitch button:hover:not(:disabled) { color: var(--text-hi); border-color: var(--verified); }
+
+/* Disabled reads as disabled without colour alone: the border goes dotted as well as dim. */
+.regionSwitch button:disabled {
+  color: var(--text-xlo);
+  border-style: dotted;
+  cursor: not-allowed;
+}
+
+.regionSwitch span {
+  color: var(--text-xlo);
+  font: 8px var(--f-mono);
+  letter-spacing: 0.12em;
+}
+
+.evidenceLead {
+  margin: 0;
+  color: var(--text-hi);
+  font-size: 13px;
+  line-height: 1.5;
+}
 
 .sourceLink { color: var(--verified); }
 
@@ -374,11 +496,23 @@
 
 .revision[data-tone="after"] > header b { color: var(--changed); }
 
+.revisionMeta {
+  margin: 0;
+  padding: 10px 14px 0;
+  color: var(--text-xlo);
+  font: 8px/1.6 var(--f-mono);
+  letter-spacing: 0.11em;
+}
+
+/* A filing's opening region is a page of a real SEC document, not a pull quote, so it scrolls in
+   its own box rather than setting the height of the card it sits in. */
 .revisionText {
+  max-height: 210px;
   margin: 0;
   padding: 16px 14px;
+  overflow-y: auto;
   color: var(--text-hi);
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.62;
 }
 
@@ -755,8 +889,19 @@
   .evidenceAct { grid-template-columns: 1fr; }
 
   .evidenceAct[data-step="object_focus"] .sourcePane { display: none; }
-  .evidenceAct[data-step="evidence"] .relationList,
+  .evidenceAct[data-step="evidence"] .objectRelations,
   .evidenceAct[data-step="evidence"] .openSource { display: none; }
+
+  /*
+    On a phone the pane is the whole step, so it gets the whole viewport minus the header, the
+    rail and the step's own back control -- and the sheet inside it still scrolls rather than
+    growing. A bottom sheet taller than the screen is not a sheet.
+  */
+  .objectPane,
+  .sourcePane {
+    max-height: calc(100vh - 150px);
+    max-height: calc(100dvh - 150px);
+  }
 
   /*
     The two revisions read one above the other on a phone. Side by side, each card kept its
@@ -766,6 +911,17 @@
   */
   .revisions { grid-template-columns: minmax(0, 1fr); }
   .revision { min-width: 0; }
+
+  /*
+    On a phone the card header wraps rather than spilling.
+
+    "DEF 14A · FILED 2026-01-08" plus a reference-render filename is wider than 412px and the
+    name is `white-space: nowrap` by design, so at this width the flex row pushed 55px past the
+    viewport and took the whole card with it. The name still never breaks mid-token; it simply
+    gets its own line, and the filename below it keeps its ellipsis.
+  */
+  .revision > header { flex-wrap: wrap; min-height: 0; padding: 10px 14px; }
+  .revision > header span { flex-basis: 100%; }
 
   .next { grid-template-columns: 1fr; }
   .next > div { grid-column: 1; }

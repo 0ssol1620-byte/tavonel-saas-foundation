@@ -141,6 +141,8 @@ export default function WorkspaceUltimateShell({
       { group: "BUILD", label: "Connections", hint: "", surface: "connections" as const },
       { group: "BUILD", label: "Developer tools", hint: "", surface: "developer" as const },
     ]),
+    { group: "HELP", label: "Getting started", hint: "", run: () => window.location.assign("/docs/quickstart") },
+    { group: "HELP", label: "Use results with AI", hint: "", run: () => window.location.assign("/docs/use-with-ai") },
   ].filter((item) => item.label.toLowerCase().includes(query.toLowerCase()));
 
   const moveRailFocus = (event: KeyboardEvent<HTMLElement>) => {
@@ -213,7 +215,9 @@ export default function WorkspaceUltimateShell({
         <div className={`workspace-content ${styles.content}`}>
           <section className={styles.stateHero} aria-labelledby="workspace-state-title">
             <div><p>{surface.toUpperCase()} · CURRENT STATE</p><h1 id="workspace-state-title">{stateTitle}</h1><span>{stateDescription}</span></div>
-            <button type="button" onClick={() => runAction(nextAction)}>{nextAction.label}</button>
+            {/* While the workspace state is still resolving there is no honest next action, so
+                the control says so and stays inert rather than offering a guess. */}
+            <button type="button" disabled={!nextAction.surface && !nextAction.run} onClick={() => runAction(nextAction)}>{nextAction.label}</button>
           </section>
           {children}
         </div>

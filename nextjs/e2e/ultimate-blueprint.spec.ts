@@ -31,7 +31,17 @@ test("the sample opens onto real provenance and claims nothing it has not compil
   await page.goto("/explore");
   const stage = page.locator('[data-visual-world="explore"]');
   await page.getByRole("button", { name: "ENTER WORLD" }).click();
-  await stage.locator('[data-visual-node][data-node-kind="Claim"]').first().click();
+  /*
+    A filing, opened the way a reader opens one: select the object, then ask for its evidence.
+
+    This used to click a `Claim` node and expect an `fp-200-*.pdf` filename and an "Open source
+    PDF" link -- three facts about a page that no longer exists. The opening composition is the
+    declared presentation subset of §11.4, the corpus is five public SEC filings, and the sheet's
+    footer link now says which bytes it opens. Selecting a node also does not open it; the World
+    act's own button does.
+  */
+  await stage.locator('[data-visual-node][data-node-kind="Document"]').first().click();
+  await page.getByRole("button", { name: "Open source evidence" }).click();
   /*
     A phone walks World → Object → Source as steps rather than opening two panels at once, so
     the source is one step further on. The branch is taken on the stage's own state rather than
@@ -44,18 +54,21 @@ test("the sample opens onto real provenance and claims nothing it has not compil
     await page.getByRole("button", { name: /Open the source region/ }).click();
   }
   await expect(stage).toHaveAttribute("data-world-act", "evidence");
-  // The fixture is a maintenance manual, not TAVONEL's own retention policy: compiling our own
-  // document taught the visitor what we say about ourselves rather than what the product does
-  // to their material, and the filename was the tell. The filename, the page and the region
-  // come from three committed PDFs compiled by the same code that compiles a customer's, and
-  // `lib/explore-sample.test.ts` pins them. What this file is for is the thing that test cannot
-  // see: that provenance reaches the screen at all.
-  // Addressed through the source sheet: the object pane names the same file in its relation
-  // list, which a phone hides at this step, so an unscoped "first match" is a hidden element.
+  /*
+    Which filing, which page and which region are pinned by `lib/explore-sample.test.ts` and
+    walked act by act in `e2e/explore.spec.ts`. What this test asserts is the part neither of
+    those can see and no single page owns: that provenance reaches the screen at all, for a
+    reader who arrived at `/explore` and pressed the buttons in front of them.
+
+    Read through the source sheet: the object pane names the same file in its relation list,
+    which a phone hides at this step, so an unscoped "first match" is a hidden element.
+  */
   const sheet = page.locator("[data-source-sheet]");
-  await expect(sheet.getByText(/^fp-200-[a-z0-9-]+\.pdf$/i)).toBeVisible();
+  await expect(sheet.getByText(/^apple-[\w-]+\.pdf$/i).first()).toBeVisible();
   await expect(page.getByText(/^REGION ON PAGE \d+ OF \d+$/)).toBeVisible();
-  await expect(page.getByRole("link", { name: /Open source PDF/ })).toBeVisible();
+  // The footer names the bytes it opens: the committed PDF of the annual filing, or the
+  // reference render of a 2026 filing. It may never offer one under the other's name.
+  await expect(page.getByRole("link", { name: /Open (committed PDF|reference render)/ })).toBeVisible();
   // A RESEARCH FRONTIER card whose every field read `not_yet` used to stand here, and then the
   // `PAGE + BBOX BOUND` tile that replaced it. Both were a page claiming provenance in words.
   // What must still hold is that no placeholder renders as a fact.

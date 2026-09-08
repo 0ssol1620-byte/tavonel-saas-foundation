@@ -22,8 +22,32 @@ export type TransferProgress = {
 };
 
 export type TransferResult =
-  | { ok: true; status: number }
+  | { ok: true; status: number; sourceSha256: string | null }
   | { ok: false; status: number; reason: "http" | "network" | "aborted" };
+
+/**
+ * The digest of what was sent, computed where the bytes already are.
+ *
+ * Confirmation used to fingerprint the source by downloading it back through the application
+ * server -- a full GET, capped at 5 MiB, of an object intake would admit at fifty. The browser
+ * already holds these bytes, and `crypto.subtle` is a platform feature, so the digest is taken
+ * here and the byte path disappears. No dependency, and nothing to re-download.
+ *
+ * It is a *declared* digest and is treated as one: it says what the client believes it sent, the
+ * CDR worker computes the same digest over what actually arrived, and confirming the two agree is
+ * what makes it evidence. Null when the page is served without a secure context (`crypto.subtle`
+ * is unavailable over plain HTTP), because an absent digest is honest and a fabricated one is not.
+ */
+export async function sourceDigest(file: Blob): Promise<string | null> {
+  if (typeof crypto === "undefined" || !crypto.subtle) return null;
+  try {
+    const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+    const hex = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+    return `sha256:${hex}`;
+  } catch {
+    return null;
+  }
+}
 
 export type TransferHandle = {
   /** Resolves once the transfer settles, in every outcome. It never rejects. */
@@ -45,6 +69,9 @@ export function putWithProgress(
   onProgress?: (progress: TransferProgress) => void,
 ): TransferHandle {
   const request = new XMLHttpRequest();
+  // Started before the PUT and awaited only on success: hashing 5 MiB costs a few milliseconds,
+  // and doing it in parallel keeps it off the transfer's critical path entirely.
+  const digest = sourceDigest(file);
   const done = new Promise<TransferResult>((resolve) => {
     let settled = false;
     const settle = (result: TransferResult) => {
@@ -63,10 +90,13 @@ export function putWithProgress(
     // A completed upload does not always emit a final progress event at 100%.
     request.upload.addEventListener("load", () => onProgress?.({ loaded: file.size, total: file.size }));
 
-    request.addEventListener("load", () =>
-      settle(request.status >= 200 && request.status < 300
-        ? { ok: true, status: request.status }
-        : { ok: false, status: request.status, reason: "http" }));
+    request.addEventListener("load", () => {
+      if (request.status < 200 || request.status >= 300) {
+        settle({ ok: false, status: request.status, reason: "http" });
+        return;
+      }
+      void digest.then((sourceSha256) => settle({ ok: true, status: request.status, sourceSha256 }));
+    });
     request.addEventListener("error", () => settle({ ok: false, status: 0, reason: "network" }));
     request.addEventListener("timeout", () => settle({ ok: false, status: 0, reason: "network" }));
     request.addEventListener("abort", () => settle({ ok: false, status: 0, reason: "aborted" }));

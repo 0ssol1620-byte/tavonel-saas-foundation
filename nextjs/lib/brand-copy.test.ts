@@ -94,6 +94,55 @@ const COPY_SURFACES = [
   */
   "components/change-inbox.tsx",
   "lib/change-inbox.ts",
+  /*
+    The support matrix. `../shared/capabilityManifest.ts` is on the list because most of the
+    words on /sources are in it -- the tiers, the preserved lists and every limitation are data,
+    and a barred phrase written into a manifest entry would render on the page while the page's
+    own source stayed clean.
+  */
+  "app/sources/page.tsx",
+  "components/source-capability-table.tsx",
+  "../shared/capabilityManifest.ts",
+  /*
+    The surfaces the positioning pass (RESOLVED A-1, A-4, A-6) rewrote, none of which had a row.
+
+    Every one of them carries a claim of the exact kind this file exists to guard -- what
+    evidence is bound to, which connectors are reachable, and what state a service is in -- and
+    each was edited in this pass without any check that the edit stayed inside the rules.
+
+    The two lib files are here because their strings are public copy that no page contains:
+    `activation-policy.ts` is served verbatim from /api/status and rendered on /security, and
+    `operations.ts` writes the detail line under every row on /status. The share card is here
+    for the same reason: it repeats the hero, and a barred phrase reaching it would be the one
+    place a reader sees before the page loads.
+  */
+  "app/evidence/page.tsx",
+  "app/knowledge-compiler/page.tsx",
+  "app/resources/page.tsx",
+  "app/integrations/page.tsx",
+  "app/security/page.tsx",
+  "app/status/page.tsx",
+  "app/opengraph-image.tsx",
+  "lib/activation-policy.ts",
+  "lib/operations.ts",
+  /*
+    Repair, 2026-09-06. Two surfaces a reader reaches from the primary nav that the positioning
+    pass neither edited nor disclosed: /solutions still published "Citations back to page
+    regions", "Page and bbox provenance" and "Page-level citation inspection", and /api
+    "page-and-bbox-bound citations" -- the abstraction A-1 retires, on pages the nav points at.
+    Neither had a row here, so nothing would have caught the drift on the way in either.
+  */
+  "app/solutions/[slug]/page.tsx",
+  "app/api/page.tsx",
+  /*
+    The conversion pass, 2026-09-08. Three surfaces a buyer reads in order, none of which had a
+    row. The pricing client is the one that matters: the plan cards, the six §12.1 answers and
+    the rollover sentence are all written there, and it was guarded only through
+    `app/pricing/page.tsx` -- fifteen lines of wiring with no copy in it at all.
+  */
+  "app/docs/page.tsx",
+  "components/pricing-page-client.tsx",
+  "components/trust-next.tsx",
 ];
 
 const BARRED = [
@@ -103,6 +152,44 @@ const BARRED = [
   "never hallucinates",
   "better than rag",
   "ai brain",
+  /*
+    The 2026-09-06 blueprint's §42 guardrails, added by the lane that built /sources.
+
+    A support matrix is exactly where "supports every file" gets written, and it is the one
+    sentence this product may never say: the architecture is meant to accept any source, the
+    deployment reads eleven MIME types, and collapsing that distinction is how a page becomes a
+    promise the upload route refuses. The other five are the same shape -- each asserts an
+    absolute no evidence here reaches.
+
+    "all files" was left out of the first version of this list on the theory that it is ordinary
+    English ("all files in the archive") and would fire on innocent prose. It does not: no copy
+    surface in this repository contains it. The contract lists it, the check is cheap, and a
+    surface that one day needs the innocent reading can say "every file in the archive".
+
+    "industry-leading" is barred outright rather than "without evidence". The qualified version
+    is not testable, and the unqualified version has never appeared in this repository; if a
+    receipt ever supports the claim the right move is to delete this entry in the commit that
+    cites the receipt, the way "better than RAG" is meant to leave.
+  */
+  "supports every file",
+  "all files",
+  "perfect parsing",
+  "best ocr",
+  "never stale",
+  "always current",
+  "industry-leading",
+  /*
+    RESOLVED A-2 (2026-09-06), added with the re-derived hero.
+
+    "100% accurate" and "never hallucinates" were already here; these three are the rest of
+    that decision's list. Each is the absolute form of something this deployment does at best
+    effort: the reader is a converted-to-PDF OCR path, so "every file supported" and "lossless
+    for every format" are contradicted by the manifest on /sources, and "fully autonomous
+    truth" is contradicted by the promotion gate that requires a person.
+  */
+  "every file supported",
+  "lossless for every format",
+  "fully autonomous truth",
 ];
 
 /**
@@ -172,12 +259,27 @@ describe("public copy", () => {
     }
   });
 
-  it("keeps the locked source-grounded hero and concise lede", () => {
+  /*
+    The lock, re-derived. RESOLVED A-2 (2026-09-06).
+
+    The previous lock pinned "Turn documents and connected systems / into a source-grounded
+    world your AI can use." and a lede ending "evidence back to the page." That lede is the
+    reason this test changes rather than the headline alone: "back to the page" is only true
+    while every accepted format is converted to PDF before reading, and it is the wording
+    RESOLVED A-1 retires across the site. A lock is not a claim that the string is right
+    forever; it is a claim that the string does not drift without a decision. This is that
+    decision, so the lock moves with it instead of being deleted.
+  */
+  it("keeps the locked current-and-traceable hero and its two definitions", () => {
     const page = landingSource();
-    expect(page).toContain("Turn documents and connected systems");
-    expect(page).toContain("into a source-grounded world your AI can use.");
-    expect(page).toContain("TAVONEL reads difficult sources");
-    expect(page).toContain("evidence back to the page.");
+    expect(page).toContain("Your AI needs more than searchable files.");
+    expect(page).toContain("It needs a current, traceable world.");
+    expect(page).toContain("TAVONEL compiles your own sources into that world");
+    // Both adjectives are defined on the page, not left as adjectives.
+    expect(page).toContain("recompiled when those sources change");
+    expect(page).toContain("stays traceable to its exact source location");
+    // The retired wording must not come back by hand.
+    expect(page).not.toContain("evidence back to the page");
   });
 
   it("puts the locked hero proof and three motion cuts on the landing page", () => {
@@ -339,8 +441,14 @@ describe("public copy", () => {
     expect(page).toContain('id="s1"');
     expect(page).toContain("Object");
     expect(page).toContain("Relation");
-    expect(page).toContain("Document page");
-    expect(page).toContain("Exact bbox");
+    /*
+      The path ends at a source location, not a page (RESOLVED A-1). "Document page" and
+      "Exact bbox" were the last two steps; they describe a PDF locator, and the landing page
+      may not present one locator as the shape of all evidence.
+    */
+    expect(page).toContain("Source version");
+    expect(page).toContain("Exact location");
+    expect(page).not.toContain("Exact bbox");
   });
 
   it("stages a customer's own upload in the workspace, not a fixture world", () => {
@@ -351,5 +459,211 @@ describe("public copy", () => {
     // the demo world, and no census figure. (The file may name them in prose to say so.)
     expect(stage).not.toMatch(/from ["']@\/lib\/demo-world["']/);
     expect(stage).not.toContain("SOURCE_CENSUS");
+  });
+
+  /*
+    RESOLVED A-4's four words, and no fifth. Repair, 2026-09-06.
+
+    The landing page shipped "AVAILABLE TODAY" on two rows and "ON REQUEST" on a third. None of
+    those is one of A-4's words, and the third named the same S3/SMB agent route that reads
+    "Enterprise-assisted" on /integrations and /workspace, so the one surface A-4 is actually
+    about was the one surface using its own vocabulary. This reads the status chips out of the
+    source, which is where the drift happened: a hand-written chip fails here the moment it is
+    written, whether or not anyone remembers the decision.
+  */
+  const A4_WORDS = ["QUALIFIED", "BETA", "ENTERPRISE-ASSISTED", "UNSUPPORTED"];
+
+  it("labels every connector on the landing page with one of RESOLVED A-4's four words", () => {
+    const source = read("components/home-page-client.tsx");
+    const chips = [...source.matchAll(/<span className="st">([^<{}]+)<\/span>/g)].map((match) => match[1]!.trim());
+    expect(chips.length, "the landing page still prints connector status chips").toBeGreaterThan(0);
+    for (const chip of chips) {
+      expect(A4_WORDS, `"${chip}" is not one of RESOLVED A-4's connector support words`).toContain(chip.toUpperCase());
+    }
+  });
+
+  /*
+    Repair, 2026-09-06: the guard above read the landing page only, and the surface that defines
+    the vocabulary was the one drifting from it. /integrations printed a four-level legend whose
+    first and last words -- "Available" and "Planned" -- are not A-4's, so the page teaching the
+    reader what the labels mean taught two labels the rest of the site does not use. The words
+    live in three places in that file (the legend, `level:` on each OAuth connector, and the
+    middle column of INFRA) and all three are read here.
+  */
+  it("uses only RESOLVED A-4's four words as the support vocabulary on /integrations", () => {
+    const source = read("app/integrations/page.tsx").replace(/\/\*[\s\S]*?\*\//g, " ");
+    const block = (name: string) => {
+      const match = source.match(new RegExp(`const ${name} = \\[([\\s\\S]*?)\\n\\] as const;`));
+      expect(match, `${name} is still declared in app/integrations/page.tsx`).not.toBeNull();
+      return match![1]!;
+    };
+    const legend = [...block("SUPPORT_LEVELS").matchAll(/\["([^"]+)",/g)].map((match) => match[1]!);
+    expect(legend.length, "the support-level legend still has four entries").toBe(4);
+    const infra = [...block("INFRA").matchAll(/\["[^"]+",\s*"([^"]+)",/g)].map((match) => match[1]!);
+    expect(infra.length, "the infrastructure rows still carry a support word").toBeGreaterThan(0);
+    const connectors = [...source.matchAll(/\blevel:\s*"([^"]+)"/g)].map((match) => match[1]!);
+    expect(connectors.length, "the OAuth connectors still carry a support word").toBeGreaterThan(0);
+    for (const word of [...legend, ...infra, ...connectors]) {
+      expect(A4_WORDS, `"${word}" is not one of RESOLVED A-4's connector support words`).toContain(word.toUpperCase());
+    }
+  });
+
+  /*
+    RESOLVED A-1: one locator shape may not be published as the shape of all evidence.
+    Repair, 2026-09-06.
+
+    The positioning pass applied A-1 to six pages and left /solutions -- a PRIMARY_NAV
+    destination -- and /api carrying "Citations back to page regions", "Page and bbox
+    provenance", "Page-level citation inspection" and "page-and-bbox-bound citations". A guard
+    over the pages A-1 governs is what makes the decision stick past the commit that made it.
+
+    Block comments are stripped first, deliberately: a file is allowed to quote the wording it
+    retired in order to explain why, and `app/evidence/page.tsx` does exactly that. Product
+    surfaces that print a real locator value are not on this list and are not meant to be --
+    `/sources` states what the manifest preserves (page, paragraph text, bbox1000), the workspace
+    and the evidence viewer read back the actual region on screen, and the OpenAPI description
+    names the literal response fields. Those are values, not claims about what evidence is.
+  */
+  const RETIRED_LOCATOR_WORDING = [
+    "page and bbox",
+    "page-and-bbox",
+    "page regions",
+    "page-level citation",
+    "evidence back to the page",
+    "page number and bounding box",
+    // Repair, 2026-09-06: /product/compiled-world published "a document version, page and
+    // region" as what every qualified claim points at. Retired for the same reason as the rest.
+    "version, page and region",
+  ];
+  const A1_SURFACES = [
+    "components/home-page-client.tsx",
+    "app/product/compiled-world/page.tsx",
+    "app/solutions/[slug]/page.tsx",
+    "app/api/page.tsx",
+    "app/evidence/page.tsx",
+    "app/enterprise/page.tsx",
+    "app/product/document-understanding/page.tsx",
+    "app/knowledge-compiler/page.tsx",
+    "app/resources/page.tsx",
+  ];
+
+  it.each(A1_SURFACES)("publishes no retired PDF-locator wording in %s", (surface) => {
+    const copy = read(surface).replace(/\/\*[\s\S]*?\*\//g, " ").toLowerCase();
+    for (const phrase of RETIRED_LOCATOR_WORDING) {
+      expect(copy, `RESOLVED A-1 retires "${phrase}"`).not.toContain(phrase);
+    }
+  });
+
+  /*
+    §17's five pages are one sequence, and the sequence is what breaks first.
+
+    Before this pass each of them ended in three sibling links to two or three of the others, in
+    a different order every time, and /reproducibility and /research had no way onward at all.
+    That state passed every test in this repository, because nothing checked that the pages knew
+    about each other. This does: each page must render `TrustNext` naming itself, so a page
+    dropped out of the funnel -- or given someone else's position -- fails here rather than
+    quietly ending the reader's journey.
+  */
+  const TRUST_PAGES: Array<[string, string]> = [
+    ["app/security/page.tsx", "/security"],
+    ["app/evidence/page.tsx", "/evidence"],
+    ["app/benchmarks/page.tsx", "/benchmarks"],
+    ["app/reproducibility/page.tsx", "/reproducibility"],
+    ["app/research/page.tsx", "/research"],
+  ];
+
+  it.each(TRUST_PAGES)("%s ends on its own step of the §17 trust sequence", (surface, href) => {
+    const source = read(surface);
+    expect(source, `${surface} must render the shared next step`).toContain("TrustNext");
+    expect(source, `${surface} must name itself, not another page's position`)
+      .toContain(`from="${href}"`);
+  });
+
+  it("gives every step of the trust sequence a precise next action", () => {
+    const source = read("components/trust-next.tsx");
+    // Every href declared in the order must also have an action, or a page renders an empty CTA.
+    const steps = [...source.matchAll(/href: "([^"]+)"/g)].map((match) => match[1]!);
+    const actions = [...source.matchAll(/"(\/[a-z]+)": "([^"]+)"/g)];
+    expect(steps.length).toBeGreaterThanOrEqual(5);
+    for (const step of steps.slice(0, -1)) {
+      const action = actions.find(([, href]) => href === step);
+      expect(action, `${step} has no next action`).toBeDefined();
+      // §22 bars the generic CTA where a precise next action exists, which is every step here.
+      expect(action![2]!.toLowerCase()).not.toContain("learn more");
+      expect(action![2]!.toLowerCase()).not.toContain("read more");
+    }
+  });
+
+  /*
+    A published file list is a promise about bytes.
+
+    /developers prints the contents of a signed export. It used to describe them in prose, which
+    drifts silently; now it prints `REQUIRED_PACKAGE_PATHS` plus the files the exporter adds on
+    the way out, and this checks each of those strings against the module that writes them. A
+    file renamed in the exporter fails here instead of on a customer's `unzip`.
+  */
+  it("names only files the exporter actually writes on /developers", () => {
+    const page = read("app/developers/page.tsx");
+    const exporter = read("lib/collection-download.ts");
+    const extras = page.match(/const PACKAGE_EXTRAS = \[([\s\S]*?)\n\] as const;/);
+    expect(extras, "the extra-file list is still declared on the page").not.toBeNull();
+    const paths = [...extras![1]!.matchAll(/"([^"]+)"/g)].map((match) => match[1]!);
+    expect(paths.length).toBeGreaterThan(0);
+    for (const path of paths) {
+      expect(exporter, `lib/collection-download.ts never writes ${path}`).toContain(`"${path}"`);
+    }
+    expect(page, "the required paths come from the exporter, not a second list")
+      .toContain("REQUIRED_PACKAGE_PATHS");
+    // §16.4: the export is a semantic projection, never a claimed OWL ontology.
+    expect(page.toLowerCase()).not.toContain("complete owl");
+    expect(page).toContain("semantic projection");
+  });
+
+  /*
+    §22: no generic CTA on a conversion surface where a precise next action exists.
+
+    Every one of these pages has a specific thing the reader should do next -- run the
+    quickstart, open a result at its source, start an evaluation -- and "Learn more" is what a
+    page says when nobody decided which.
+  */
+  const CONVERSION_SURFACES = [
+    "components/home-page-client.tsx",
+    "components/pricing-page-client.tsx",
+    "app/sources/page.tsx",
+    "app/security/page.tsx",
+    "app/evidence/page.tsx",
+    "app/benchmarks/page.tsx",
+    "app/research/page.tsx",
+    "app/developers/page.tsx",
+    "app/docs/page.tsx",
+  ];
+
+  it.each(CONVERSION_SURFACES)("uses no generic call to action in %s", (surface) => {
+    const copy = read(surface).replace(/\/\*[\s\S]*?\*\//g, " ").toLowerCase();
+    for (const generic of ["learn more", "read more", "find out more"]) {
+      expect(copy, `§22 asks for the precise next action, not "${generic}"`).not.toContain(generic);
+    }
+  });
+
+  /*
+    §10.2's proof strip must stay proof rather than becoming a statistics row.
+
+    A strip under a hero is where invented figures arrive: "10M pages compiled", "99.9% uptime",
+    a customer count. §35 bars every one of them and none is measured here, so each item is a
+    link to the page that substantiates it and the strip may carry no digit-bearing figure at
+    all. This reads the rendered items, not the file, so a number added in any of them fails.
+  */
+  it("keeps the landing proof strip linked and free of invented figures", () => {
+    const landing = read("components/home-page-client.tsx");
+    const strip = landing.match(/<ul className="hero-proof"[\s\S]*?<\/ul>/);
+    expect(strip, "the hero proof strip is still on the landing page").not.toBeNull();
+    const items = [...strip![0].matchAll(/<li>([\s\S]*?)<\/li>/g)].map((match) => match[1]!);
+    expect(items.length, "§10.2 asks for the strip, not one item").toBeGreaterThanOrEqual(4);
+    for (const item of items) {
+      expect(item, "every proof item points at the page that substantiates it").toContain("href=");
+      const text = item.replace(/<[^>]*>/g, "");
+      expect(text, `"${text.trim()}" carries a figure; §35 bars invented metrics`)
+        .not.toMatch(/[0-9]/);
+    }
   });
 });

@@ -37,10 +37,27 @@ test("compilation film is autoplay-first without a blocking play control", async
   const frame = page.locator(".compile-film-sequence");
   await frame.scrollIntoViewIfNeeded();
   await expect(frame).toBeVisible();
-  const video = frame.locator("video[data-active='1']");
-  await expect(video).toHaveCount(1);
-  const media = await video.evaluate((element: HTMLVideoElement) => ({ autoplay: element.autoplay, muted: element.muted, inline: element.playsInline, controls: element.controls }));
-  expect(media).toEqual({ autoplay: true, muted: true, inline: true, controls: false });
+  /*
+    The film has had two renderers since `cc29ecd` ("Film: replace soft landing proof with vector
+    renderer"), and `2e88caf` ("mobile: stop drawing a 1440-wide film into a 350px frame") settled
+    which one runs where: a frame wide enough for the cut's fixed-pixel composition draws it live
+    on a canvas, a narrow or coarse-pointer one plays the recorded mp4. This test predates both
+    and assumed the <video> was the only renderer.
+
+    What it is actually about is unchanged and is asserted for whichever renderer mounted: the
+    film starts on its own, and nothing sits in front of the frame demanding a click first.
+    `CompileStagePlayer` publishes the renderer it chose, so read that rather than re-deriving
+    its media query here.
+  */
+  await expect(frame).toHaveAttribute("data-film-renderer", /live-canvas|video-fallback/);
+  if (await frame.getAttribute("data-film-renderer") === "live-canvas") {
+    await expect(frame.locator(".compile-film-live canvas")).toHaveCount(1);
+  } else {
+    const video = frame.locator("video[data-active='1']");
+    await expect(video).toHaveCount(1);
+    const media = await video.evaluate((element: HTMLVideoElement) => ({ autoplay: element.autoplay, muted: element.muted, inline: element.playsInline, controls: element.controls }));
+    expect(media).toEqual({ autoplay: true, muted: true, inline: true, controls: false });
+  }
   await expect(frame.getByRole("button", { name: /^Play$/i })).toHaveCount(0);
   await expect(frame.getByRole("button", { name: /Pause compilation film|Resume compilation film/ })).toHaveCount(1);
 });
@@ -73,8 +90,22 @@ test("product page shows the product path before secondary product surfaces", as
   // runner happens to inherit.
   await page.route("**/api/status", route => route.fulfill({ json: { selfService: true, liveCheckout: true } }));
   await page.goto("/product");
-  await expect(page.locator(".product-flow > article")).toHaveCount(4);
-  await expect(page.getByText("SOURCE", { exact: false }).first()).toBeVisible();
-  await expect(page.getByText("WORLD", { exact: false }).first()).toBeVisible();
-  await expect(page.getByRole("link", { name: "Start free" })).toBeVisible();
+  /*
+    The product path's own stages, not "the word SOURCE somewhere on the document". Unscoped,
+    the first match is the header's `Sources` nav link, which the primary nav hides below 1024
+    in favour of `MobilePrimaryNav` — so this asserted the visibility of site chrome at the wide
+    projects and failed on a hidden link at the narrow ones, never once reading `.product-flow`.
+  */
+  const flow = page.locator(".product-flow");
+  await expect(flow.locator("> article")).toHaveCount(4);
+  await expect(flow.getByText("SOURCE", { exact: false }).first()).toBeVisible();
+  await expect(flow.getByText("WORLD", { exact: false }).first()).toBeVisible();
+  /*
+    The page's own CTA, not "a Start free somewhere on the document". `PublicSiteHeader` renders
+    the same runtime-derived `PublicPrimaryCta` on every public route (both arrived in `e5eb77c`),
+    so an unscoped lookup matches the banner's copy as well as the hero's and dies on strict mode
+    before it can check either. Scoping to `#main` is what this test's name already claims to be
+    checking, and it still fails if the product path loses its call to action.
+  */
+  await expect(page.locator("#main").getByRole("link", { name: "Start free" })).toBeVisible();
 });

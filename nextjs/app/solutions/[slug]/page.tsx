@@ -4,6 +4,16 @@ import { notFound } from "next/navigation";
 import { PublicPageShell } from "@/components/public-page-shell";
 import PublicPrimaryCta from "@/components/public-primary-cta";
 
+/*
+  RESOLVED A-1 (2026-09-06), applied here in the repair pass rather than in the pass that
+  changed six other pages. /solutions is a PRIMARY_NAV destination and was still publishing the
+  PDF locator as the general shape of evidence -- "Citations back to page regions", "Page and
+  bbox provenance", "Page-level citation inspection" -- which is the wording A-1 retires. The
+  outcomes are the claim-shaped lines, so they take the base wording; the flow steps and the
+  document-intelligence lede keep "pages and regions", because they describe what the
+  sanitize-to-PDF reading path literally does today and generalizing them would make them less
+  true. `brand-copy.test.ts` now guards this file and /api against the retired wording.
+*/
 const SOLUTIONS = {
   "ai-ready-knowledge": {
     eyebrow: "AI-READY KNOWLEDGE",
@@ -11,7 +21,7 @@ const SOLUTIONS = {
     lede: "Compile document collections into a versioned World before retrieval, assistants or agent workflows consume them.",
     problem: "Teams repeatedly clean, chunk and index the same sources for each model or application. Identity, relationships and provenance drift between projects.",
     flow: ["Connect sources", "Read and reconstruct", "Resolve identity and relations", "Review evidence", "Publish a portable World"],
-    outcomes: ["One governed source of knowledge", "Retrieval as a World projection", "Citations back to page regions", "Signed portable artifacts"],
+    outcomes: ["One governed source of knowledge", "Retrieval as a World projection", "Citations back to the exact source location", "Signed portable artifacts"],
     limitations: [
       "A compile costs a reading pass and a review. One project over one small corpus is cheaper to do by hand.",
       "Retrieval quality still depends on the questions asked of it; a World makes an answer traceable, not automatically better.",
@@ -24,7 +34,7 @@ const SOLUTIONS = {
     lede: "Move from difficult PDFs and scans to reviewable structure, without losing the page and region each result came from.",
     problem: "A clean text dump hides layout, tables, uncertainty and the exact source geometry needed to review an extraction.",
     flow: ["Quarantine and sanitize", "Read pages and regions", "Recover document structure", "Route uncertainty to review", "Bind results to evidence"],
-    outcomes: ["Page and bbox provenance", "Visible confidence and review reasons", "Immutable OCR output", "Structure ready for compilation"],
+    outcomes: ["Provenance to the exact source location", "Visible confidence and review reasons", "Immutable OCR output", "Structure ready for compilation"],
     limitations: [
       "Where a format does not state a page count, the quote is an estimate and is labelled one. Spreadsheets have no decided billable unit at all.",
       "Handwriting, stamps and heavily degraded scans are routed to review rather than guessed at, and review is a person's time.",
@@ -50,7 +60,7 @@ const SOLUTIONS = {
     lede: "Ask, API and MCP consume the same current World and return evidence from the same version.",
     problem: "An answer can sound confident while depending on stale, conflicting or untraceable source material.",
     flow: ["Ask the active World", "Retrieve qualified objects", "Generate with version context", "Attach evidence", "Abstain when support is insufficient"],
-    outcomes: ["Answer and evidence share one World version", "Page-level citation inspection", "Explicit abstention", "Model-independent knowledge"],
+    outcomes: ["Answer and evidence share one World version", "Citation inspection at the exact source location", "Explicit abstention", "Model-independent knowledge"],
     limitations: [
       "The World abstains where the sources do not support an answer.",
       "Ask, the API and MCP read the same active revision, so an assistant is as current as the last promotion.",

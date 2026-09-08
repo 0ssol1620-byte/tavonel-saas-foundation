@@ -61,7 +61,7 @@ export function actFromQuery(value: string | string[] | undefined): ExploreAct {
 export const EXPLORE_ACTS: Array<{ act: ExploreAct; query: string; label: string; caption: string }> = [
   { act: "world", query: "world", label: "WORLD", caption: "The compiled objects and the relations between them." },
   { act: "evidence", query: "evidence", label: "EVIDENCE", caption: "One object, opened to the page region that supports it." },
-  { act: "change_compare", query: "change", label: "CHANGE", caption: "One source revision, and the knowledge it reached." },
+  { act: "change_compare", query: "change", label: "CHANGE", caption: "The annual World, and the same World after four 2026 filings arrived." },
 ];
 
 export const EXPLORE_COPY = {
@@ -70,26 +70,28 @@ export const EXPLORE_COPY = {
   sub: "Explore how knowledge, relationships and answers remain connected to the exact source that supports them.",
   enter: "ENTER WORLD",
   worldHint: "SELECT AN OBJECT",
-  evidenceHint: "The page, the region and the version this object was compiled from.",
-  changeHint: "The maintenance manual was reissued. Nothing else in the corpus moved.",
   /*
-    The Change caption, written against the counts rather than around them.
+    §11.6's user-facing sentence, word for word.
 
-    The blueprint's draft reads "Dependent knowledge was rebuilt; unrelated knowledge remained
-    intact", which is true of this fixture and stops one word short of the part that matters:
-    this compiler addresses an object by its content, so a reworded claim leaves the World and a
-    new one arrives. Saying "rebuilt" without saying that invites a reader to look for a
-    "rebuilt" count and find a zero.
+    Everything else in the Evidence act is machinery -- the page, the box, two digests, the
+    accession. This is the one line that says what all of it means, and it says it in language
+    that needs no explanation, which is why it is a constant rather than something a component
+    rephrases.
   */
+  evidenceLead: "This object is supported by this exact source region.",
+  evidenceHint: "The page, the region and the version this object was compiled from.",
+  changeHint: "Apple's 2025 Form 10-K, then the same World after the four 2026 filings arrived.",
+  /* The public SEC sample is a full-world diff, not an incremental-recompile receipt. */
   changeCaption:
-    "One line of one source document was reissued. The knowledge that depended on it was recompiled; the rest of the World was carried over untouched.",
+    "Both snapshots are compiled independently and compared as two complete Worlds. Added, removed and in-place changes are measured from that diff; no selective carry-over is implied.",
   changeCountsNote:
-    "This compiler addresses a knowledge object by its content, so a reworded claim leaves the World as one object and returns as another. Read added, removed and carried over together.",
+    "A content-addressed object keeps its identity while its compiled fields hold and gets a new one when they do not, so an arriving filing both adds objects and rebuilds objects the annual filing already carried. All four counts are shown as measured.",
+  changeArrivalsHeading: "FILINGS THAT ARRIVED",
   equivalenceHeading: "FULL-REBUILD EQUIVALENCE",
-  equivalenceLead: "Both revisions were fully compiled; the comparison is between two complete compiles.",
+  equivalenceLead: "Both snapshots were fully compiled from the selected source pages; the comparison is between two complete compiles in this demo.",
   askPlaceholder: "Ask this World…",
   askNote:
-    "This sample answers three prepared questions. Each answer is the source text the retriever scored, not a rewrite of it.",
+    "This sample answers four prepared questions. Each answer is the source text the retriever scored, not a rewrite of it.",
   technical: "TECHNICAL DETAILS",
   /*
     The Entity qualifier, moved here from the object list by §49.
@@ -97,9 +99,15 @@ export const EXPLORE_COPY = {
     It reads as it always did, word for word, because two tests read it word for word: the
     measured figure has to match `entity-extraction-eval.json`, and the heuristic must never be
     described as a resolver. Moving a disclosure is allowed; softening one on the way is not.
+
+    The figure moved from "3 of 15" to "3 of 16" on 2026-09-06, and it moved down. Gap-matrix row
+    D7-01 removed the extractor's per-document cap of eight entities, so the manual's ninth
+    candidate -- MPa, a pressure unit -- reached the label set for the first time. The heuristic
+    did not change; the 15 was measured through the cap. Re-deriving the published number from
+    its receipt is the rule, and it applies in the direction that flatters nothing.
   */
   entityDisclaimer:
-    "Entity labels in this fixed sample come from a simple capitalised-token heuristic, not by a resolver. In the recorded evaluation, 3 of 15 baseline labels were true positives. Unreviewed entities are shown only as sample structure; Claims and page-bound evidence are the parts to judge here.",
+    "Entity labels in this fixed sample come from a simple capitalised-token heuristic, not by a resolver. In the recorded evaluation, 3 of 16 baseline labels were true positives. Unreviewed entities are shown only as sample structure; Claims and page-bound evidence are the parts to judge here.",
   closeLabel: "Leave the sample",
   endHeading: "Try the same path with your own knowledge.",
   endActions: [
@@ -111,24 +119,23 @@ export const EXPLORE_COPY = {
 
 /* --------------------------------------------------------------- change view */
 
-export type ExploreChangeSide = {
-  label: string;
-  manifestDigest: string;
-  filename: string;
-  href: string;
-  digest: string;
-  page: number;
-  /** The file's own page count, so "region on page N of M" states M rather than assuming it. */
-  pageCount: number;
-  excerpt: string;
-  bbox1000: [number, number, number, number];
-};
+/** One filing the Act shows, with the source region it opens on. */
+export type ExploreChangeArrivalView = ExploreChangeStory["arrivals"][number];
 
 export type ExploreChangeView = {
-  documentId: string;
-  before: ExploreChangeSide;
-  after: ExploreChangeSide;
-  /** Objects the revision reached: added, removed or rebuilt in place. Derived, never summed by hand. */
+  /** The World the arrivals landed on, named by its snapshot label and its one committed file. */
+  baseline: {
+    label: string;
+    manifestDigest: string;
+    filename: string;
+    href: string;
+    digest: string;
+    /** The file's own page count, so "region on page N of M" states M rather than assuming it. */
+    pageCount: number;
+  };
+  after: { label: string; manifestDigest: string };
+  arrivals: ExploreChangeArrivalView[];
+  /** Objects the arrivals reached: added, removed or rebuilt in place. Derived, never summed by hand. */
   reached: number;
   counts: ExploreChangeStory["counts"];
   relations: { added: number; removed: number; changed: number };
@@ -141,7 +148,7 @@ export type ExploreChangeView = {
 
 export function buildExploreChangeView(
   story: ExploreChangeStory,
-  files: { before: ExploreDocument; after: ExploreDocument },
+  baselineFile: ExploreDocument,
 ): ExploreChangeView {
   const reached = story.affectedNodeIds.length;
   if (reached !== story.counts.added + story.counts.removed + story.counts.rebuilt) {
@@ -149,30 +156,22 @@ export function buildExploreChangeView(
     // would be showing two incompatible readings of one comparison.
     throw new Error("explore_change_view_reached_disagrees_with_counts");
   }
+  if (story.arrivals.length !== story.diff.sourceRevisions.added.length) {
+    // One arriving filing is one new source version. If the two ever disagree, the Act's list of
+    // filings and its count of source versions are describing different events.
+    throw new Error("explore_change_view_arrivals_disagree_with_source_revisions");
+  }
   return {
-    documentId: story.sourceChange.documentId,
-    before: {
+    baseline: {
       label: story.before.label,
       manifestDigest: story.before.manifestDigest,
-      filename: files.before.filename,
-      href: files.before.href,
-      digest: files.before.digest,
-      page: story.sourceChange.page,
-      pageCount: files.before.pageCount,
-      excerpt: story.sourceChange.before.excerpt,
-      bbox1000: story.sourceChange.before.bbox1000,
+      filename: baselineFile.filename,
+      href: baselineFile.href,
+      digest: baselineFile.digest,
+      pageCount: baselineFile.pageCount,
     },
-    after: {
-      label: story.after.label,
-      manifestDigest: story.after.manifestDigest,
-      filename: files.after.filename,
-      href: files.after.href,
-      digest: files.after.digest,
-      page: story.sourceChange.page,
-      pageCount: files.after.pageCount,
-      excerpt: story.sourceChange.after.excerpt,
-      bbox1000: story.sourceChange.after.bbox1000,
-    },
+    after: { label: story.after.label, manifestDigest: story.after.manifestDigest },
+    arrivals: story.arrivals.map((arrival) => ({ ...arrival })),
     reached,
     counts: story.counts,
     relations: {

@@ -12,10 +12,20 @@
  * an admission about what tests do and do not establish.
  */
 
-/** The document boundary this deployment enforces, in the order it is enforced. */
+/**
+ * The document boundary this deployment enforces, in the order it is enforced.
+ *
+ * "02" used to say "Antivirus", which named a category and asserted nothing checkable. What the
+ * CDR sanitizer now enforces is a ClamAV scan it cannot be started without: the malware-scan
+ * opt-out was removed, so a service that comes up without a scanner refuses to serve, and a
+ * document whose scan does not complete is refused rather than passed through. The adapter
+ * measurement is `docs/evidence/receipts/malware_scan_latency_2026-09-06.json`, whose own status
+ * is `IMPLEMENTED_NOT_LIVE` -- so this describes the control the sanitizer enforces, and no line
+ * here claims a date on which a Cloud Run revision began serving it.
+ */
 export const BOUNDARY = [
   ["01", "Quarantine", "Browser-direct, tenant-scoped intake. Document bytes never pass through the application or the database."],
-  ["02", "Sanitize", "Antivirus and mandatory content disarm, with the sanitization proof kept as evidence."],
+  ["02", "Sanitize", "ClamAV scan on the CDR sanitizer, fail-closed: it does not start without a scanner, and a document whose scan cannot clear is refused. Mandatory content disarm, with the sanitization proof kept as evidence."],
   ["03", "Understand", "Only sanitized artifacts reach analysis. A parser gets no tools, no broad credentials, no outbound network."],
   ["04", "Review", "A person decides before anything is promoted. Automated analysis produces a candidate, never a world."],
 ] as const;

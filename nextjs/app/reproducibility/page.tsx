@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import PublicProofRegistry from "@/components/public-proof-registry";
+import { TrustNext } from "@/components/trust-next";
 
 /*
   Noindex until there is a run to reproduce.
@@ -13,7 +14,7 @@ import PublicProofRegistry from "@/components/public-proof-registry";
 export const metadata: Metadata = { title: "Reproducibility — TAVONEL", description: "Frozen public fixtures and digest-bound sample artifacts for TAVONEL evidence.", alternates: { canonical: "/reproducibility" }, openGraph: { url: "/reproducibility" }, robots: { index: false, follow: true } };
 
 export default function ReproducibilityPage() {
-  return <PublicProofRegistry eyebrow="PUBLIC PROOF PROTOCOL" title="Rebuild the evidence, not the claim." state="FIXTURE VERIFIED · EXTERNAL BENCHMARK OPEN" summary="This portal separates deterministic public fixtures from customer proof and independent benchmark evidence. A digest proves bytes; it does not prove semantic quality." sections={[
+  return <PublicProofRegistry footer={<TrustNext from="/reproducibility" />} eyebrow="PUBLIC PROOF PROTOCOL" title="Rebuild the evidence, not the claim." state="FIXTURE VERIFIED · EXTERNAL BENCHMARK OPEN" summary="This portal separates deterministic public fixtures from customer proof and independent benchmark evidence. A digest proves bytes; it does not prove semantic quality." sections={[
     { title: "Frozen inputs", body: "The current downloadable manifest names three public proof PDFs already shipped with the product and pins each byte sequence by SHA-256.", rows: [
       { key: "INPUT 01", description: "dart-jtc-page-1.pdf · sha256:bbc9bcd5c5c3efce74755e451e04f62ca1ca97402a10908d309ba5645d63751a", state: "PUBLIC FIXTURE" },
       { key: "INPUT 02", description: "dart-jtc-page-2.pdf · sha256:cbcd0747921a49fc88420521e6d655ddfa0ee7febdc8895f204e61625c933ee6", state: "PUBLIC FIXTURE" },

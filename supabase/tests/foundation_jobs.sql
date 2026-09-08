@@ -6,7 +6,7 @@
 -- reclaimable, a stale worker must not be able to advance a cursor it no longer owns, and a
 -- retry must back off rather than spin.
 begin;
-select plan(27);
+select plan(29);
 
 -- ---------------------------------------------------------------------------------------
 -- Shape and security
@@ -125,11 +125,21 @@ select is(
 -- ---------------------------------------------------------------------------------------
 -- Batch progress
 -- ---------------------------------------------------------------------------------------
+-- 0027 inverted this contract: "Each Vercel cron invocation executes exactly one bounded
+-- batch. A progress report must release its lease immediately so the next invocation can
+-- claim the next provider page." 0028 additionally resets attempt to 0, so a long healthy
+-- corpus does not spend its retry budget on pages that succeeded.
 select is(
   (select public.complete_foundation_job_batch(
     'pilot-jobstest1', 'job-' || repeat('a', 32), 'worker-1', 'progress', 200, 180, 'page-token-2') ->> 'state'),
-  'leased',
-  'a progress batch keeps the lease'
+  'queued',
+  'a progress batch releases the lease so the next invocation can claim the next page'
+);
+
+select is(
+  (select leased_by from public.foundation_jobs where job_id = 'job-' || repeat('a', 32)),
+  null::text,
+  'the released job holds no worker, so the same batch cannot be reported on twice'
 );
 
 select is(
@@ -146,7 +156,16 @@ select is(
 
 -- ---------------------------------------------------------------------------------------
 -- Retry and backoff
+--
+-- The progress report above released the lease, so the work continues the way the cron does:
+-- by claiming the job again. Nothing below can run on a lease this session no longer holds.
 -- ---------------------------------------------------------------------------------------
+select is(
+  (select public.claim_foundation_job('worker-1', 120) ->> 'job_id'),
+  'job-' || repeat('a', 32),
+  'the requeued job is immediately claimable, so a bounded batch resumes rather than stalls'
+);
+
 select is(
   (select public.complete_foundation_job_batch(
     'pilot-jobstest1', 'job-' || repeat('a', 32), 'worker-1', 'retry', 0, 0, null, 120, 'PROVIDER_RATE_LIMIT') ->> 'state'),
@@ -207,6 +226,7 @@ select throws_ok(
       '88888888-8888-8888-8888-888888888888',
       '{"access_token":"ya29.secret"}'::jsonb
     )$$,
+  '23514',
   'new row for relation "foundation_jobs" violates check constraint "foundation_jobs_payload_check"',
   'a credential-shaped payload is refused at the schema level'
 );

@@ -3,9 +3,12 @@ import { exploreSampleDocuments, exploreSampleWorld } from "./explore-sample";
 import {
   FOCUS_MAX,
   FOCUS_MIN,
+  PRESENTATION_OBJECTS,
+  PRESENTATION_OBJECT_KIND,
   STAGE_HEIGHT,
   STAGE_WIDTH,
   layoutVisualWorld,
+  resolvePresentationObjects,
   toVisualWorldModel,
 } from "./visual-world-model";
 
@@ -42,17 +45,24 @@ describe("the adapter reports the World and nothing else", () => {
     }
   });
 
-  it("labels an object with the compiler's own label, except a source bundle", () => {
+  it("labels an object with the compiler's own label, except a source bundle and a filing", () => {
+    /*
+      Two rewrites, and both restate the same fact in words a reader can use.
+
+      An Evidence node's storage key becomes the filename of the document its regions came from,
+      and a Document node's first-line-of-text title becomes the filing it is. Neither invents
+      anything: the filename has to be a file in the repository, and the filing label has to be
+      the form and filing date of a source record. Every other label is the compiler's, verbatim.
+    */
     const labelById = new Map(exploreSampleWorld.objects.map((object) => [object.id, object.label] as const));
     const filenames = new Set(exploreSampleDocuments.map((document) => document.filename));
+    const filingLabels = new Set(
+      exploreSampleDocuments.map((document) => `${document.form} · filed ${document.filingDate}`),
+    );
     for (const node of model.nodes) {
-      if (node.kind === "Evidence") {
-        // The one rewrite this module makes: a storage key becomes the filename of the document
-        // its regions came from. It must be a file that is actually in the repository.
-        expect(filenames.has(node.label), node.id).toBe(true);
-      } else {
-        expect(node.label).toBe(labelById.get(node.id));
-      }
+      if (node.kind === "Evidence") expect(filenames.has(node.label), node.id).toBe(true);
+      else if (node.kind === "Document") expect(filingLabels.has(node.label), node.id).toBe(true);
+      else expect(node.label).toBe(labelById.get(node.id));
     }
   });
 
@@ -110,31 +120,82 @@ describe("the opening composition is chosen, not written", () => {
     expect(model.focus.length).toBeLessThanOrEqual(FOCUS_MAX);
   });
 
-  it("draws claims and their sources, and no heuristic entity label", () => {
-    const kindOf = new Map(model.nodes.map((node) => [node.id, node.kind] as const));
-    const kinds = new Set(model.focus.map((id) => kindOf.get(id)));
-    expect(kinds.has("Claim")).toBe(true);
-    expect(kinds.has("Evidence")).toBe(true);
-    expect(kinds.has("Entity")).toBe(false);
-  });
+  it("resolves every declared presentation object against the compiled artifact", () => {
+    /*
+      The guarantee behind a declared mapping (§11.4).
 
-  it("does not draw a claim that only repeats its document's title", () => {
-    const labelOf = new Map(model.nodes.map((node) => [node.id, node.label] as const));
-    const documentLabels = new Set(
-      exploreSampleWorld.objects.filter((object) => object.type === "Document").map((object) => object.label),
-    );
-    for (const id of model.focus) {
-      if (!id.startsWith("claim-")) continue;
-      expect(documentLabels.has(labelOf.get(id) ?? ""), id).toBe(false);
+      A hand-written list of labels is only honest while every entry still names a real compiled
+      object. If the corpus, the page slice or the extractor moves under it, an entry stops
+      matching and the composition quietly loses a node -- so this is the test that has to fail
+      the build, not a rendering that has to look wrong.
+    */
+    const byId = new Map(exploreSampleWorld.objects.map((object) => [object.id, object] as const));
+    const resolved = resolvePresentationObjects(exploreSampleWorld);
+    expect(resolved.length, PRESENTATION_OBJECTS.join(", ")).toBe(PRESENTATION_OBJECTS.length);
+    resolved.forEach((id, index) => {
+      const object = byId.get(id);
+      expect(object, PRESENTATION_OBJECTS[index]).toBeTruthy();
+      // Kind and label both, verbatim: the node label a reader sees is the compiler's own.
+      expect(object!.type).toBe(PRESENTATION_OBJECT_KIND);
+      expect(object!.label).toBe(PRESENTATION_OBJECTS[index]);
+      expect(object!.evidenceRefs.length, PRESENTATION_OBJECTS[index]).toBeGreaterThan(0);
+    });
+    // Each label names one object, so the mapping cannot silently pick a different one.
+    for (const label of PRESENTATION_OBJECTS) {
+      const matches = exploreSampleWorld.objects.filter(
+        (object) => object.type === PRESENTATION_OBJECT_KIND && object.label === label,
+      );
+      expect(matches.length, label).toBe(1);
     }
   });
 
-  it("keeps every source in the composition when the budget forces a cut", () => {
+  it("draws the filings and the mapped objects, and nothing else", () => {
+    const kindOf = new Map(model.nodes.map((node) => [node.id, node.kind] as const));
+    const mapped = new Set(resolvePresentationObjects(exploreSampleWorld));
+    for (const id of model.focus) {
+      // Every drawn node is either a compiled filing or a declared entry -- never a heuristic
+      // entity that a fallback rule promoted into the opening frame.
+      expect(kindOf.get(id) === "Document" || mapped.has(id), id).toBe(true);
+    }
+    expect(model.focus.filter((id) => mapped.has(id))).toEqual([...mapped]);
+  });
+
+  it("gives every drawn node real evidence and a real relation count", () => {
+    // The two numbers the composition prints under a node, checked against the artifact: a
+    // filing shows its own regions, a mapped object shows how many compiled relations reach it.
+    const regionIds = new Set(exploreSampleWorld.evidence.map((item) => item.id));
+    for (const id of model.focus) {
+      const node = model.nodes.find((item) => item.id === id)!;
+      expect(node.evidenceRefs.length, node.label).toBeGreaterThan(0);
+      for (const ref of node.evidenceRefs) expect(regionIds.has(ref), ref).toBe(true);
+      expect(node.degree, node.label).toBe(
+        exploreSampleWorld.relations.filter(
+          (relation) => relation.subject === id || relation.object === id,
+        ).length,
+      );
+      expect(node.degree, node.label).toBeGreaterThan(0);
+    }
+  });
+
+  it("draws every compiled filing exactly once", () => {
+    /*
+      The corpus is five separate public filings, and the whole point of the composition is that
+      it shows them as five separate objects rather than as one blurred "source". A filing that
+      silently dropped out of the opening frame would be a picture of a smaller corpus.
+    */
+    const documents = exploreSampleWorld.objects.filter((object) => object.type === "Document");
+    expect(documents.length).toBe(exploreSampleDocuments.length);
+    for (const document of documents) expect(model.focus, document.id).toContain(document.id);
+  });
+
+  it("keeps both halves of the subset when the budget forces a cut", () => {
     const tight = toVisualWorldModel(exploreSampleWorld, exploreSampleDocuments, { focusLimit: 8 });
     const kindOf = new Map(tight.nodes.map((node) => [node.id, node.kind] as const));
-    const sources = tight.focus.filter((id) => kindOf.get(id) === "Evidence");
     expect(tight.focus.length).toBeLessThanOrEqual(8);
-    expect(sources.length).toBe(model.focus.filter((id) => kindOf.get(id) === "Evidence").length);
+    // A budget that cannot hold the whole subset still has to show both what the sources are and
+    // what the World says about them -- every filing, then as much of the mapping as fits.
+    expect(tight.focus.filter((id) => kindOf.get(id) === "Document").length).toBeGreaterThan(0);
+    expect(tight.focus.filter((id) => kindOf.get(id) === PRESENTATION_OBJECT_KIND).length).toBeGreaterThan(0);
   });
 
   it("returns the same composition every time it is asked", () => {
@@ -159,11 +220,22 @@ describe("the layout is geometry, not a simulation", () => {
     }
   });
 
-  it("gives each source a column and hangs its claims on it", () => {
+  it("gives each kind its own column, in the declared order", () => {
     const roles = new Map(layout.placements.map((placement) => [placement.id, placement] as const));
+    const kindOf = new Map(model.nodes.map((node) => [node.id, node.kind] as const));
     const hubs = layout.placements.filter((placement) => placement.role === "hub");
     expect(hubs.length).toBeGreaterThan(1);
     expect(new Set(hubs.map((hub) => hub.column)).size).toBe(hubs.length);
+    // One kind per column, and the columns run in focus order left to right -- the filings
+    // first, then the mapped objects.
+    const kindByColumn = new Map<number, string>();
+    for (const placement of layout.placements) {
+      const kind = kindOf.get(placement.id)!;
+      expect(kindByColumn.get(placement.column) ?? kind).toBe(kind);
+      kindByColumn.set(placement.column, kind);
+    }
+    expect([...kindByColumn.entries()].sort((left, right) => left[0] - right[0]).map(([, kind]) => kind))
+      .toEqual(["Document", PRESENTATION_OBJECT_KIND]);
     for (const edge of layout.edges) {
       // Every drawn line is a compiled relation between two drawn objects.
       expect(model.edges.some((item) => item.id === edge.id)).toBe(true);

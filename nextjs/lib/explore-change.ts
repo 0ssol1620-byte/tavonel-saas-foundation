@@ -1,43 +1,63 @@
 import type { CollectionOcrInput, CollectionOcrRegion } from "./collection-compiler";
 import {
+  exploreSampleBaselineInputs,
+  exploreSampleBaselineWorld,
   exploreSampleDocuments,
   exploreSampleInputs,
-  exploreSampleRevisionBDocuments,
-  exploreSampleRevisionBInputs,
-  exploreSampleRevisionBWorld,
   exploreSampleWorld,
 } from "./explore-sample";
 import { diffWorldVersions, type WorldVersionDiff } from "./world-version-diff";
 
 /*
-  What one source revision did to a Compiled World.
+  What arriving filings did to a Compiled World.
 
-  The Change Act asks the hardest question the product makes: a document was reissued -- what
-  did that cost? The honest answer can only come from two complete compiles, so that is what
-  this is. `lib/explore-sample.ts` compiles the same three-document corpus twice, once with the
-  maintenance manual at revision B and once at revision C, and everything below is read out of
-  those two artifacts by `diffWorldVersions`. No count here was typed. No count here could be
-  typed: change either fixture and the frozen digests in `explore-sample.ts` refuse the build
-  before this module runs.
+  The Change Act asks the hardest question the product makes, and it now asks the temporal form
+  of it: a year of new public filings landed on top of an annual report -- what did the World do
+  about it? The honest answer can only come from two complete compiles, so that is what this is.
+  `lib/explore-sample.ts` compiles Apple's 2025 Form 10-K alone (W0) and the same 10-K together
+  with the four 2026 filings that followed it (W4), and everything below is read out of those
+  two artifacts by `diffWorldVersions`. No count here was typed. No count here could be typed:
+  change either snapshot and the frozen digests in `explore-sample.ts` refuse the build before
+  this module runs.
 
-  What this does not do, stated because the temptation is obvious: it does not claim
-  full-rebuild equivalence. Both sides of this comparison are full compiles, so the comparison
-  proves that the two worlds differ in the ways reported -- not that a *selective* rebuild would
-  have reached the same world as a full one. That is a different experiment, it needs the Core's
-  `verify_equivalence`, and until a receipt from it is wired in here, `equivalence` says
-  `not_yet` and the Act renders without a badge.
+  Two things this deliberately does not do.
+
+  It does not claim full-rebuild equivalence. Both sides are full compiles, so the comparison
+  proves that the two Worlds differ in the ways reported -- not that a *selective* rebuild would
+  have reached the same World as a full one. That is a different experiment, it needs the Core's
+  `verify_equivalence`, and until a receipt from it is wired in here, `equivalence` says `not_yet`
+  and the Act renders without a badge.
+
+  And it does not describe an arrival as a revision. Nothing in the 2025 10-K was reissued: four
+  new documents joined the corpus. `sourceRevisions.added` is therefore four new source versions
+  with none removed, and the Act says a filing arrived rather than that a filing changed.
 */
 
+export type ExploreChangeArrival = {
+  documentId: string;
+  /** The filing as a reader names it: form and filing date, both from the acquisition record. */
+  label: string;
+  form: string;
+  filingDate: string;
+  reportDate: string;
+  accession: string;
+  /** The bytes the compiler read -- a reference render for every 2026 filing. */
+  filename: string;
+  href: string;
+  digest: string;
+  representationKind: "original" | "reference_render";
+  pageCount: number;
+  regionCount: number;
+  page: number;
+  excerpt: string;
+  bbox1000: [number, number, number, number];
+};
+
 export type ExploreChangeStory = {
-  before: { label: "Revision B"; manifestDigest: string; documentIds: string[] };
-  after: { label: "Revision C"; manifestDigest: string; documentIds: string[] };
-  sourceChange: {
-    documentId: string;
-    filename: string;
-    page: number;
-    before: { excerpt: string; bbox1000: [number, number, number, number] };
-    after: { excerpt: string; bbox1000: [number, number, number, number] };
-  };
+  before: { label: string; manifestDigest: string; documentIds: string[] };
+  after: { label: string; manifestDigest: string; documentIds: string[] };
+  /** The filings W4 has and W0 does not, oldest first. */
+  arrivals: ExploreChangeArrival[];
   diff: WorldVersionDiff;
   counts: { rebuilt: number; added: number; removed: number; untouched: number };
   affectedNodeIds: string[];
@@ -52,102 +72,97 @@ function documentIdsOf(inputs: readonly CollectionOcrInput[]) {
 }
 
 function regionsOf(input: CollectionOcrInput): CollectionOcrRegion[] {
-  const regions = input.regions;
-  if (!regions || regions.length === 0) {
-    throw new Error(`explore_change_document_has_no_regions: ${input.documentId}`);
-  }
-  return [...regions].sort((left, right) => left.order - right.order);
-}
-
-/** Every number a region states, in the order it states them. */
-function quantities(text: string) {
-  return (text.match(/\d[\d.,]*/g) ?? []).join("|");
+  return [...(input.regions ?? [])].sort((left, right) => left.order - right.order);
 }
 
 /**
- * The one document that was reissued.
+ * The filings W4 compiled that W0 did not.
  *
- * Both corpora hold the same document ids -- that is the point of the fixture -- so the revised
- * document is the one whose content digest moved. More than one, and this throws rather than
- * choosing: a story about "the source revision" is only true while there is exactly one.
+ * Membership only. A document present in both must be byte-identical in both, or this is not an
+ * arrival story at all and the Act would be narrating the wrong event; that case throws rather
+ * than being reported as an addition. So does a baseline document that W4 dropped.
  */
-function findRevisedDocument() {
-  const before = new Map(exploreSampleRevisionBInputs.map((input) => [input.documentId, input] as const));
-  const after = new Map(exploreSampleInputs.map((input) => [input.documentId, input] as const));
-  const revised = [...after.values()].filter((input) => {
+function findArrivals() {
+  const before = new Map(exploreSampleBaselineInputs.map((input) => [input.documentId, input] as const));
+  for (const input of exploreSampleInputs) {
     const previous = before.get(input.documentId);
-    return previous !== undefined && previous.inputSha256 !== input.inputSha256;
-  });
-  if (revised.length !== 1) {
-    throw new Error(`explore_change_expects_one_revised_document: found ${revised.length}`);
+    if (previous && previous.inputSha256 !== input.inputSha256) {
+      throw new Error(`explore_change_carried_document_moved: ${input.documentId}`);
+    }
   }
-  const afterInput = revised[0];
-  const beforeInput = before.get(afterInput.documentId)!;
-  if (before.size !== after.size || [...after.keys()].some((id) => !before.has(id))) {
-    throw new Error("explore_change_corpus_membership_changed");
-  }
-  return { beforeInput, afterInput };
+  const missing = [...before.keys()].filter((documentId) =>
+    !exploreSampleInputs.some((input) => input.documentId === documentId));
+  if (missing.length > 0) throw new Error(`explore_change_baseline_document_dropped: ${missing.join(",")}`);
+  const arrived = exploreSampleInputs.filter((input) => !before.has(input.documentId));
+  if (arrived.length === 0) throw new Error("explore_change_expects_at_least_one_arriving_filing");
+  return arrived;
 }
 
 /**
- * The region the revision rewrote.
+ * The one region of an arriving filing the Act puts on screen.
  *
- * Paired by reading order, because these are two revisions of one page rather than two
- * documents. Of the regions whose text moved, the one this Act is about is the one whose stated
- * quantities moved with it -- a reissue that renames itself is not the change a maintenance
- * planner is asking about, and the interval is. Exactly one region may qualify; if the fixture
- * ever grows a second, this throws instead of silently picking the first.
+ * A presentation choice, and a deliberately dumb one so that it stays a choice about layout
+ * rather than about meaning: the longest region on the filing's first compiled page. On this
+ * corpus that is the condensed statements of operations for each 10-Q and the Board's role for
+ * the proxy statement, which is what those page slices were selected for -- but nothing here
+ * reads a number, a phrase or a page out of the filing to decide, so a different corpus shows a
+ * different region rather than showing the wrong one.
  */
-function findChangedRegion(beforeInput: CollectionOcrInput, afterInput: CollectionOcrInput) {
-  const before = regionsOf(beforeInput);
-  const after = regionsOf(afterInput);
-  if (before.length !== after.length) {
-    throw new Error("explore_change_region_count_changed");
-  }
-  const candidates = after.flatMap((region, index) => {
-    const previous = before[index];
-    if (previous.order !== region.order) throw new Error("explore_change_region_order_misaligned");
-    if (previous.text === region.text) return [];
-    if (quantities(previous.text) === quantities(region.text)) return [];
-    return [{ before: previous, after: region }];
-  });
-  if (candidates.length !== 1) {
-    throw new Error(`explore_change_expects_one_restated_quantity: found ${candidates.length}`);
-  }
-  const pair = candidates[0];
-  if (pair.before.pageNumber1 !== pair.after.pageNumber1) {
-    throw new Error("explore_change_region_moved_pages");
-  }
-  return pair;
+function openingRegion(input: CollectionOcrInput): CollectionOcrRegion {
+  const regions = regionsOf(input);
+  if (regions.length === 0) throw new Error(`explore_change_document_has_no_regions: ${input.documentId}`);
+  const firstPage = Math.min(...regions.map((region) => region.pageNumber1));
+  return regions
+    .filter((region) => region.pageNumber1 === firstPage)
+    .reduce((longest, region) => (region.text.length > longest.text.length ? region : longest));
 }
 
-const revised = findRevisedDocument();
-const changedRegion = findChangedRegion(revised.beforeInput, revised.afterInput);
-const diff = diffWorldVersions(exploreSampleRevisionBWorld, exploreSampleWorld);
+function arrivalOf(input: CollectionOcrInput): ExploreChangeArrival {
+  const document = exploreSampleDocuments.find((entry) => entry.documentId === input.documentId);
+  if (!document?.form || !document.filingDate || !document.reportDate || !document.accession) {
+    throw new Error(`explore_change_arrival_has_no_source_record: ${input.documentId}`);
+  }
+  const region = openingRegion(input);
+  return {
+    documentId: input.documentId,
+    label: `${document.form} · filed ${document.filingDate}`,
+    form: document.form,
+    filingDate: document.filingDate,
+    reportDate: document.reportDate,
+    accession: document.accession,
+    filename: document.filename,
+    href: document.href,
+    digest: document.digest,
+    representationKind: document.representationKind ?? "original",
+    pageCount: document.pageCount,
+    regionCount: document.regionCount,
+    page: region.pageNumber1,
+    excerpt: region.text,
+    bbox1000: region.bbox1000,
+  };
+}
+
+const arrivals = findArrivals()
+  .map(arrivalOf)
+  .sort((left, right) => left.filingDate.localeCompare(right.filingDate));
+const diff = diffWorldVersions(exploreSampleBaselineWorld, exploreSampleWorld);
 
 /*
-  Which objects the revision reached, and which it did not.
+  Which objects the arrivals reached, and which they did not.
 
-  Read-model object ids are content-derived, so an object that survives a revision unchanged
-  keeps its id in both worlds and an object the revision rewrote does not. That makes the four
-  counts a partition rather than four separate measurements: every object of the revision-C
-  world is either rebuilt, added, or untouched, and every object of the revision-B world is
-  either rebuilt, removed, or untouched. `explore-change.test.ts` asserts both sums.
+  Read-model object ids are content-derived, so an object that survives unchanged keeps its id in
+  both Worlds and an object the arrivals rewrote does not. That makes the four counts a partition
+  rather than four separate measurements: every object of W4 is either rebuilt, added or
+  untouched, and every object of W0 is either rebuilt, removed or untouched.
+  `explore-change.test.ts` asserts both sums.
 
-  `rebuilt` is deliberately the narrow number -- objects present in both worlds whose compiled
-  fields differ -- and it sits beside `added` and `removed` rather than absorbing them. Rolling
-  the three into one "recompiled" figure would be a bigger, friendlier number that no longer
-  says which of three different things happened.
-
-  A consequence worth knowing before anyone writes a caption over these numbers: this compiler
-  addresses objects by their content, so a claim whose wording changed is not the same object
-  with a new field -- it is a removal and an addition. `rebuilt` is therefore small, and on this
-  fixture it is zero, while `added` and `removed` carry the work the revision caused. "0
-  rebuilt" is a true statement about in-place mutation and a false summary of the change; the
-  three numbers have to be read together, or the Act should read `added` and `removed` and leave
-  `rebuilt` to the technical drawer.
+  `rebuilt` is deliberately the narrow number -- objects present in both Worlds whose compiled
+  fields differ -- and it sits beside `added` and `removed` rather than absorbing them. On this
+  corpus it is the interesting one: a Topic the annual filing already carried is still the same
+  object after four filings arrive, now with more evidence and more relations under it. Rolling
+  the three counts into one friendlier "recompiled" figure would hide exactly that.
 */
-const beforeIds = new Set(exploreSampleRevisionBWorld.objects.map((object) => object.id));
+const beforeIds = new Set(exploreSampleBaselineWorld.objects.map((object) => object.id));
 const afterIds = new Set(exploreSampleWorld.objects.map((object) => object.id));
 const rebuiltIds = new Set(diff.objects.changed.map((object) => object.id));
 const untouchedNodeIds = [...afterIds].filter((id) => beforeIds.has(id) && !rebuiltIds.has(id)).sort();
@@ -161,22 +176,16 @@ const affectedNodeIds = [
 
 export const exploreChangeStory: ExploreChangeStory = {
   before: {
-    label: "Revision B",
-    manifestDigest: exploreSampleRevisionBWorld.world.manifestDigest,
-    documentIds: documentIdsOf(exploreSampleRevisionBInputs),
+    label: "2025 Form 10-K",
+    manifestDigest: exploreSampleBaselineWorld.world.manifestDigest,
+    documentIds: documentIdsOf(exploreSampleBaselineInputs),
   },
   after: {
-    label: "Revision C",
+    label: "2025 Form 10-K + four 2026 filings",
     manifestDigest: exploreSampleWorld.world.manifestDigest,
     documentIds: documentIdsOf(exploreSampleInputs),
   },
-  sourceChange: {
-    documentId: revised.afterInput.documentId,
-    filename: revised.afterInput.sanitizedKey.slice(revised.afterInput.sanitizedKey.lastIndexOf("/") + 1),
-    page: changedRegion.after.pageNumber1,
-    before: { excerpt: changedRegion.before.text, bbox1000: changedRegion.before.bbox1000 },
-    after: { excerpt: changedRegion.after.text, bbox1000: changedRegion.after.bbox1000 },
-  },
+  arrivals,
   diff,
   counts: {
     rebuilt: diff.objects.changed.length,
@@ -190,14 +199,14 @@ export const exploreChangeStory: ExploreChangeStory = {
     No equivalence claim on this deployment.
 
     `EquivalenceReport` lives in the Core (`akc_cir.recompilation`), not in this repository, and
-    nothing here has run it over this fixture. The Act says what the comparison is instead of
+    nothing here has run it over this corpus. The Act says what the comparison is instead of
     showing a badge for a check that did not happen.
   */
   equivalence: {
     state: "not_yet",
     /*
       Read on the page directly after `EXPLORE_COPY.equivalenceLead`, which already says both
-      revisions were fully compiled. Saying it again here ran the two into one paragraph that
+      snapshots were fully compiled. Saying it again here ran the two into one paragraph that
       repeated itself, so this states only what the lead does not.
     */
     reason:
@@ -206,13 +215,14 @@ export const exploreChangeStory: ExploreChangeStory = {
 };
 
 /**
- * The two files behind the comparison, for the pane that puts the source page on screen.
+ * The filing the arrivals landed on, for the pane that names the starting point.
  *
- * Separate from `ExploreChangeStory` on purpose: that type is the interface other lanes read,
- * and it names one document rather than one file per side. The revised document has two files
- * because it has two revisions, and the Act needs both hrefs.
+ * Separate from `ExploreChangeStory` because that type is the interface other modules read and
+ * it speaks in document ids; the Act also needs the file's own name, href and page count.
  */
-export const exploreChangeSourceFiles = {
-  before: exploreSampleRevisionBDocuments.find((document) => document.documentId === revised.beforeInput.documentId)!,
-  after: exploreSampleDocuments.find((document) => document.documentId === revised.afterInput.documentId)!,
-};
+export const exploreChangeBaselineDocument = (() => {
+  const documentId = exploreSampleBaselineInputs[0]?.documentId;
+  const document = exploreSampleDocuments.find((entry) => entry.documentId === documentId);
+  if (!document) throw new Error("explore_change_baseline_document_missing");
+  return document;
+})();

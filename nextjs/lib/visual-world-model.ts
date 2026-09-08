@@ -51,6 +51,19 @@ export type VisualEvidence = {
   sourceVersionId: string;
   digest: string;
   authority: string;
+  sourceLabel?: string;
+  accession?: string;
+  officialHref?: string;
+  secHref?: string;
+  selectedPages?: number[];
+  /* §11.3: which bytes the region was read out of, and the acquired original beside them. */
+  form?: string;
+  filingDate?: string;
+  representationKind?: "original" | "reference_render";
+  sourceFilename?: string;
+  sourceHref?: string;
+  originalSha256?: string;
+  renderProfile?: string;
 };
 
 export type VisualRevision = {
@@ -73,7 +86,14 @@ export type VisualWorldModel = {
   focus: string[];
 };
 
-/** One committed source file behind a World, as `lib/explore-sample.ts` describes it. */
+/**
+ * One committed filing behind a World, as `lib/explore-sample.ts` describes it.
+ *
+ * `filename`, `digest` and `href` always name the bytes the compiler actually read. When
+ * `representationKind` is `reference_render` those are not the acquired original: the original
+ * is `sourceFilename` / `originalSha256` / `sourceHref`, and the two are shown side by side
+ * rather than one standing in for the other (§11.3).
+ */
 export type ExploreDocument = {
   documentId: string;
   filename: string;
@@ -81,6 +101,21 @@ export type ExploreDocument = {
   digest: string;
   pageCount: number;
   regionCount: number;
+  sourceLabel?: string;
+  accession?: string;
+  officialHref?: string;
+  secHref?: string;
+  selectedPages?: number[];
+  form?: string;
+  filingDate?: string;
+  reportDate?: string;
+  authority?: string;
+  representationKind?: "original" | "reference_render";
+  sourceFilename?: string;
+  sourceHref?: string;
+  originalSha256?: string;
+  renderProfile?: string;
+  sliceRationale?: string;
 };
 
 export type ExploreDocuments = ReadonlyArray<ExploreDocument>;
@@ -112,83 +147,97 @@ function sourceOfEvidenceNode(
 }
 
 /*
-  Which objects Act 1 draws.
+  THE PRESENTATION SUBSET Act 1 draws (§11.4). This is a presentation subset and nothing more.
 
-  Blueprint §18 asks for 7-12 curated objects and forbids a hairball, and §1 of the lane
-  contract forbids a hand-typed id list. So the curation is a rule over the compiled graph:
+  The public corpus compiles to 476 objects. Drawing them is the hairball §11.4 forbids, so the
+  opening composition is two declared halves:
 
-    1. A claim is a leaf. It is the only object type in this World whose label is a sentence a
-       reader can judge, and it is what the product is for.
-    2. A claim whose label is identical to a Document's label is that document's title line. It
-       is already on the stage as its source, and drawing it twice says nothing new.
-    3. A leaf's hub is whatever it points at. In this compiler that is the Evidence bundle its
-       `supported_by` relation names, but the rule does not name a predicate -- an object's hub
-       is simply the object it is the subject of a relation to.
-    4. Hubs come first, ordered by how many leaves they carry; leaves follow their hub, so the
-       DOM order is also the stacked order a phone reads top to bottom.
-    5. If that set overflows `focusLimit`, leaves are dropped from the largest hub first, in
-       rotation, so no source disappears from the composition. If it underflows `FOCUS_MIN`,
-       the highest-degree objects left in the World fill the remainder.
+    left    every compiled Document -- one node per public filing, oldest first, so the column
+            reads as the corpus's timeline
+    right   the objects named in `PRESENTATION_OBJECTS` below
 
-  What this deliberately does not do is show Entity objects. This World's entities come from a
-  capitalised-token heuristic and include "The", "Before" and "Confirm"; §49 moves that
-  disclosure to the technical drawer, and putting the tokens themselves in the opening
-  composition would be the page arguing against itself. They remain in `nodes`, addressable by
-  every other act.
+  The right half used to be declared as a *kind* (the four compiled Topics), which had the
+  property that nothing was hand-picked and the cost that the World read as a document index:
+  "Security", "Research" and "Finance" are bound to all 97 regions of the corpus, so three of the
+  four nodes were interchangeable and none of them was about anything a reader of these filings
+  came for. §11.4's own candidate list is semantic -- Apple, Services, the reportable segments,
+  tariffs, legal/regulatory, privacy and data security -- so the mapping is now declared object
+  by object.
+
+  The rules that keep a declared mapping honest, all three enforced by
+  `visual-world-model.test.ts`:
+
+    1. Every entry names an object the compiler actually emitted, matched on kind and on the
+       compiler's own label, verbatim. Nothing here writes a label, invents a node, or reaches
+       for an object id that is a hash of content nobody can read.
+    2. A label that stops resolving fails the unit test and therefore the build. If the corpus
+       changes underneath this list, the list is wrong loudly rather than quietly short.
+    3. What is left out is out of the opening frame, not out of the World: the other 464 objects
+       are still in the model, in the technical drawer, in Ask, and reachable from the accessible
+       object list below the canvas.
+
+  These labels come from the compiler's capitalised-token entity heuristic, which the technical
+  drawer discloses in those words. Choosing seven of them for the opening frame is a presentation
+  choice about *which* real objects to draw first; it is not a claim that the heuristic is a
+  resolver, and the disclosure stays where a reader will meet it.
 */
-function chooseFocus(world: WorldReadModel, focusLimit: number): string[] {
-  const byId = new Map(world.objects.map((object) => [object.id, object] as const));
-  const documentLabels = new Set(
-    world.objects.filter((object) => object.type === "Document").map((object) => object.label),
-  );
+export const PRESENTATION_OBJECT_KIND: VisualKind = "Entity";
 
-  const hubOf = new Map<string, string>();
-  for (const relation of world.relations) {
-    const subject = byId.get(relation.subject);
-    if (!subject || subject.type !== "Claim") continue;
-    if (documentLabels.has(subject.label)) continue;
-    if (!byId.has(relation.object)) continue;
-    if (!hubOf.has(subject.id)) hubOf.set(subject.id, relation.object);
-  }
+/** Compiled object labels, verbatim, in reading order. See the block above before editing. */
+export const PRESENTATION_OBJECTS: readonly string[] = [
+  "Apple",         // the company the corpus is about; 2 filings
+  "Services",      // the revenue category all five filings report
+  "Risk Factors",  // legal / regulatory, carried by the 10-K and all three 10-Qs
+  "Americas",      // reportable segment
+  "Greater China", // reportable segment
+  "Tariffs",       // supply-chain and trade risk
+  "Privacy",       // the proxy's privacy and data security oversight
+];
 
-  const leavesByHub = new Map<string, string[]>();
-  for (const [leaf, hub] of [...hubOf.entries()].sort((left, right) => left[0].localeCompare(right[0]))) {
-    leavesByHub.set(hub, [...(leavesByHub.get(hub) ?? []), leaf]);
-  }
-
-  const hubs = [...leavesByHub.entries()].sort((left, right) =>
-    right[1].length - left[1].length || left[0].localeCompare(right[0]));
-
-  // Drop leaves from the largest hub first, one at a time, so the composition thins evenly
-  // instead of losing a whole source.
-  const budget = Math.max(FOCUS_MIN, focusLimit);
-  const kept = new Map<string, string[]>(hubs.map(([hub, leaves]) => [hub, [...leaves]]));
-  const size = () => kept.size + [...kept.values()].reduce((total, leaves) => total + leaves.length, 0);
-  while (size() > budget) {
-    const fullest = [...kept.entries()].sort((left, right) =>
-      right[1].length - left[1].length || left[0].localeCompare(right[0]))[0];
-    if (!fullest || fullest[1].length === 0) break;
-    fullest[1].pop();
-  }
-
+function chooseFocus(
+  world: WorldReadModel,
+  focusLimit: number,
+  filingDateOf: (object: WorldObject) => string | undefined,
+): string[] {
+  const degree = degreeMap(world);
+  const budget = Math.min(FOCUS_MAX, Math.max(FOCUS_MIN, focusLimit));
+  const byDegree = (left: WorldObject, right: WorldObject) =>
+    (degree.get(right.id) ?? 0) - (degree.get(left.id) ?? 0) || left.id.localeCompare(right.id);
+  /* Filings read oldest first, so the column is the corpus's timeline rather than a ranking. */
+  const byFilingDate = (left: WorldObject, right: WorldObject) =>
+    (filingDateOf(left) ?? "").localeCompare(filingDateOf(right) ?? "") || byDegree(left, right);
   const focus: string[] = [];
-  for (const [hub] of hubs) {
-    focus.push(hub);
-    focus.push(...(kept.get(hub) ?? []));
-  }
+  const add = (id: string | undefined) => {
+    if (id && !focus.includes(id) && focus.length < budget) focus.push(id);
+  };
 
-  if (focus.length < FOCUS_MIN) {
-    const degree = degreeMap(world);
-    const filler = world.objects
-      .filter((object) => !focus.includes(object.id))
-      .sort((left, right) =>
-        (degree.get(right.id) ?? 0) - (degree.get(left.id) ?? 0) || left.id.localeCompare(right.id));
-    for (const object of filler) {
-      if (focus.length >= FOCUS_MIN) break;
-      focus.push(object.id);
-    }
+  for (const object of world.objects.filter((object) => object.type === "Document").sort(byFilingDate)) {
+    add(object.id);
+  }
+  for (const id of resolvePresentationObjects(world)) add(id);
+
+  // A corpus too small to fill the composition from the subset alone is topped up by degree.
+  for (const object of [...world.objects].sort(byDegree)) {
+    if (focus.length >= FOCUS_MIN) break;
+    // An unmapped heuristic entity is never promoted into the frame by a fallback rule.
+    if (object.type === PRESENTATION_OBJECT_KIND) continue;
+    add(object.id);
   }
   return focus;
+}
+
+/**
+ * The mapped objects, in declared order, as ids in this compiled World.
+ *
+ * Exported so the unit test can assert that every declared label still resolves -- which is the
+ * whole guarantee: a mapping that silently stopped matching would shrink the composition without
+ * anyone noticing. An entry that matches nothing is dropped here and caught there.
+ */
+export function resolvePresentationObjects(world: WorldReadModel): string[] {
+  return PRESENTATION_OBJECTS
+    .map((label) =>
+      world.objects.find((object) => object.type === PRESENTATION_OBJECT_KIND && object.label === label)?.id)
+    .filter((id): id is string => Boolean(id));
 }
 
 /*
@@ -232,11 +281,28 @@ export function toVisualWorldModel(
   const degree = degreeMap(world);
   const pageCountOf = new Map(documents.map((document) => [document.documentId, document.pageCount] as const));
 
+  /*
+    A Document node is named by the filing it is, not by its first line of text.
+
+    The compiler titles a Document node from the opening text of the document, which for an SEC
+    proxy statement is the running "Table of Contents Summary Governance Directors ..." header --
+    true, and useless as a name. The same rewrite the Evidence nodes already get applies here:
+    the form and the filing date, both read out of the acquisition record beside the file, with
+    the compiler's own title still printed in the technical drawer. Nothing is invented, and a
+    document with no source record keeps the compiler's label.
+  */
+  const filingLabel = (document: ExploreDocument | undefined) =>
+    document?.form && document.filingDate ? `${document.form} · filed ${document.filingDate}` : null;
+  const filingOf = (object: WorldObject) =>
+    documents.find((document) => world.evidence.some((item) =>
+      object.evidenceRefs.includes(item.id) && item.sourceId === document.documentId));
+
   const nodes: VisualNode[] = world.objects.map((object) => {
     const source = object.type === "Evidence" ? sourceOfEvidenceNode(object, world, documents) : null;
+    const filing = object.type === "Document" ? filingOf(object) : undefined;
     return {
       id: object.id,
-      label: source ? source.filename : object.label,
+      label: source ? source.filename : filingLabel(filing) ?? object.label,
       kind: object.type,
       state,
       evidenceRefs: refsStatingFirst(object, world),
@@ -267,6 +333,18 @@ export function toVisualWorldModel(
       sourceVersionId: item.sourceVersionId,
       digest: item.digest,
       authority: item.authority,
+      sourceLabel: document?.sourceLabel,
+      accession: document?.accession,
+      officialHref: document?.officialHref,
+      secHref: document?.secHref,
+      selectedPages: document?.selectedPages,
+      form: document?.form,
+      filingDate: document?.filingDate,
+      representationKind: document?.representationKind,
+      sourceFilename: document?.sourceFilename,
+      sourceHref: document?.sourceHref,
+      originalSha256: document?.originalSha256,
+      renderProfile: document?.renderProfile,
     };
   });
 
@@ -295,7 +373,7 @@ export function toVisualWorldModel(
     edges,
     evidence,
     revisions,
-    focus: chooseFocus(world, focusLimit),
+    focus: chooseFocus(world, focusLimit, (object) => filingOf(object)?.filingDate),
   };
 }
 
@@ -309,9 +387,21 @@ export function toVisualWorldModel(
   function rather than a force simulation: a layout that settles differently per device cannot
   be compared against the landing film's last frame, and §29 asks for exactly that comparison.
 
-  Composition: one column per hub, leaves stacked alternately above and below it. It is the
-  shape the compiled graph actually has -- three sources, each carrying the claims it supports --
-  and it is the same reading order a phone gets when the same DOM lays out as a flow.
+  Composition: one column per kind in the focused graph, in the order the focus set first reaches
+  that kind -- which is the presentation subset's own order, so nothing here has to know what the
+  subset contains. On this corpus that reads directly: five filings down the left, the seven
+  mapped objects down the right, one edge per compiled relation between them. It stays readable
+  as the corpus grows, which the previous orbit composition did not -- nine objects in one
+  connected component collapsed into a single ring with every relation drawn as a chord across
+  the middle of it.
+
+  Columns are also the keyboard map. Left and right move between kinds, up and down move within
+  one, and the narrow layout stacks the same columns in the same order, so one arrangement
+  serves the canvas, the keyboard and the phone.
+
+  No physics, no orbit, no animation loop: this is a pure function of the focus set, so two
+  devices draw the same composition and §29's comparison against the landing film's last frame
+  is a comparison of two identical geometries.
 */
 export const STAGE_WIDTH = 1000;
 export const STAGE_HEIGHT = 625;
@@ -325,66 +415,30 @@ export type VisualLayout = {
   edges: VisualLayoutEdge[];
 };
 
-const COLUMN_INSET = 0.16;
-const TIER_STEP = 114;
-const COLUMN_LEAN = 22;
-
 export function layoutVisualWorld(model: VisualWorldModel, ids: readonly string[] = model.focus): VisualLayout {
   const inFocus = new Set(ids);
-  const parent = new Map<string, string>();
-  for (const edge of model.edges) {
-    if (!inFocus.has(edge.from) || !inFocus.has(edge.to)) continue;
-    if (!parent.has(edge.from)) parent.set(edge.from, edge.to);
-  }
+  const focusedEdges = model.edges.filter((edge) => inFocus.has(edge.from) && inFocus.has(edge.to));
+  const kindOf = new Map(model.nodes.map((node) => [node.id, node.kind] as const));
+  // Column order and the order inside a column are both the focus order: `chooseFocus` already
+  // put the filings in filing-date order ahead of the mapped objects in declared order, and
+  // re-sorting here by degree would turn the corpus's timeline into a ranking.
+  const columns = [...new Set(ids.map((id) => kindOf.get(id)))]
+    .map((kind) => ids.filter((id) => kindOf.get(id) === kind));
 
-  const columns = ids.filter((id) => !parent.has(id));
-  const leavesOf = new Map<string, string[]>(columns.map((id) => [id, []]));
-  const orphans: string[] = [];
-  for (const id of ids) {
-    const hub = parent.get(id);
-    if (!hub) continue;
-    if (leavesOf.has(hub)) leavesOf.get(hub)!.push(id);
-    else orphans.push(id);
-  }
-  // A node whose hub fell outside the focus set still has to be drawn somewhere; it becomes its
-  // own column rather than silently disappearing.
-  for (const id of orphans) {
-    columns.push(id);
-    leavesOf.set(id, []);
-  }
-
-  const count = Math.max(1, columns.length);
   const placements: VisualPlacement[] = [];
-  columns.forEach((hub, index) => {
-    const t = count === 1 ? 0.5 : COLUMN_INSET + ((1 - 2 * COLUMN_INSET) * index) / (count - 1);
-    const x = t * STAGE_WIDTH;
-    // A dead-straight row of hubs reads as a chart axis. The stagger is small, deterministic
-    // and derived from the index, not from a random seed.
-    const base = STAGE_HEIGHT / 2 + (index % 2 === 0 ? -16 : 16);
-
-    const leaves = leavesOf.get(hub) ?? [];
-    const tiers = leaves.map((_, order) => (order % 2 === 0 ? -1 : 1) * (Math.floor(order / 2) + 1));
-    /*
-      Each column is centred on its own contents, not on its hub.
-
-      A column with an odd number of leaves puts one more above the source than below it, and
-      three columns doing that leaves the whole composition sitting in the top half of the frame
-      with a band of empty stage beneath. Shifting each column by half its own extent keeps the
-      hub-and-leaves group centred while the alternating order -- and so the DOM order a phone
-      reads -- stays exactly as it was.
-    */
-    const extent = [0, ...tiers.map((tier) => tier * TIER_STEP)];
-    const shift = -(Math.min(...extent) + Math.max(...extent)) / 2;
-    const y = base + shift;
-
-    placements.push({ id: hub, x, y, role: "hub", column: index, tier: 0 });
-    leaves.forEach((leaf, order) => {
-      const tier = tiers[order];
+  columns.forEach((members, index) => {
+    const count = columns.length;
+    const x = count === 1 ? STAGE_WIDTH / 2 : 200 + (600 * index) / (count - 1);
+    // A stack centred on the stage, spread to fill it without letting two nodes touch.
+    const step = Math.min(120, (STAGE_HEIGHT - 150) / Math.max(1, members.length - 1));
+    const top = STAGE_HEIGHT / 2 - (step * (members.length - 1)) / 2;
+    members.forEach((id, tier) => {
       placements.push({
-        id: leaf,
-        x: x + Math.sign(tier) * COLUMN_LEAN,
-        y: y + tier * TIER_STEP,
-        role: "leaf",
+        id,
+        x,
+        y: top + step * tier,
+        // The strongest node of each column reads as its head; the rest of the column follows it.
+        role: tier === 0 ? "hub" : "leaf",
         column: index,
         tier,
       });
@@ -392,17 +446,17 @@ export function layoutVisualWorld(model: VisualWorldModel, ids: readonly string[
   });
 
   const at = new Map(placements.map((placement) => [placement.id, placement] as const));
-  const edges: VisualLayoutEdge[] = model.edges
-    .filter((edge) => at.has(edge.from) && at.has(edge.to))
+  const edges: VisualLayoutEdge[] = focusedEdges
     .map((edge) => {
       const from = at.get(edge.from)!;
       const to = at.get(edge.to)!;
+      const dx = to.x - from.x;
       const dy = to.y - from.y;
       return {
         id: edge.id,
         from: edge.from,
         to: edge.to,
-        d: `M ${round(from.x)} ${round(from.y)} C ${round(from.x)} ${round(from.y + dy * 0.42)}, ${round(to.x)} ${round(to.y - dy * 0.42)}, ${round(to.x)} ${round(to.y)}`,
+        d: `M ${round(from.x)} ${round(from.y)} C ${round(from.x + dx * 0.35)} ${round(from.y + dy * 0.08)}, ${round(to.x - dx * 0.35)} ${round(to.y - dy * 0.08)}, ${round(to.x)} ${round(to.y)}`,
       };
     });
 

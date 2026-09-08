@@ -19,6 +19,7 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import ProvenanceTether from "@/components/world-visual/provenance-tether";
 import SourceSheet from "@/components/world-visual/source-sheet";
 import styles from "./explore-stage.module.css";
+import { EXPLORE_COPY } from "@/lib/explore-story";
 import type { VisualEvidence, VisualState, VisualWorldModel } from "@/lib/visual-world-model";
 
 const KIND_WORD: Record<string, string> = {
@@ -65,6 +66,7 @@ export default function EvidenceAct({
 
   const regions: VisualEvidence[] = model.evidence.filter((item) => node.evidenceRefs.includes(item.id));
   const active = regions.find((item) => item.id === evidenceId) ?? regions[0];
+  const activeIndex = active ? regions.findIndex((item) => item.id === active.id) : -1;
 
   const neighbours = model.edges
     .filter((edge) => edge.from === node.id || edge.to === node.id)
@@ -109,7 +111,7 @@ export default function EvidenceAct({
         </div>
 
         {neighbours.length > 0 ? (
-          <ul className={styles.relationList}>
+          <ul className={styles.objectRelations}>
             {neighbours.map((entry) => (
               <li key={entry.id}>
                 <button type="button" onClick={() => onSelectObject(entry.other!.id)}>
@@ -134,6 +136,7 @@ export default function EvidenceAct({
 
       <div className={styles.sourcePane}>
         <p className={styles.paneLabel}>SOURCE</p>
+        {active ? <p className={styles.evidenceLead}>{EXPLORE_COPY.evidenceLead}</p> : null}
         {active ? (
           <SourceSheet regions={regions} activeId={active.id} onSelectRegion={onSelectRegion} />
         ) : (
@@ -142,18 +145,33 @@ export default function EvidenceAct({
             to open.
           </p>
         )}
-        {regions.length > 1 ? (
+        {/*
+          Explicit previous/next, not a row of numbered buttons (§19.1).
+
+          An object in this corpus can carry twenty-odd regions, and a phone showing twenty
+          numbered buttons has replaced navigation with a wall. Previous and Next are the two
+          controls a reader on a narrow screen actually wants, and they are the same two controls
+          on a wide one; the position between them says where they are.
+        */}
+        {regions.length > 1 && active ? (
           <div className={styles.regionSwitch} role="group" aria-label="Source regions for this object">
-            {regions.map((region, index) => (
-              <button
-                key={region.id}
-                type="button"
-                aria-pressed={region.id === active?.id}
-                onClick={() => onSelectRegion(region.id)}
-              >
-                REGION {index + 1}
-              </button>
-            ))}
+            <button
+              type="button"
+              disabled={activeIndex <= 0}
+              onClick={() => onSelectRegion(regions[activeIndex - 1].id)}
+            >
+              ← PREVIOUS
+            </button>
+            <span aria-live="polite">
+              REGION {activeIndex + 1} OF {regions.length}
+            </span>
+            <button
+              type="button"
+              disabled={activeIndex >= regions.length - 1}
+              onClick={() => onSelectRegion(regions[activeIndex + 1].id)}
+            >
+              NEXT →
+            </button>
           </div>
         ) : null}
       </div>

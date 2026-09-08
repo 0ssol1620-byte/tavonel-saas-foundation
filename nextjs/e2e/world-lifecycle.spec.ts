@@ -63,11 +63,17 @@ async function mockWorkspace(page: Page, reviewRequired = false) {
    * it rather than starting a second one. Unanswered, that request 401s against the fake session
    * and the console assertions below trip on a failure that has nothing to do with the World.
    */
+  await page.route("**/api/access/bootstrap", route =>
+    route.fulfill({ json: { code: "ACCESS_READY", access: { source: "owner", accessPlan: "studio_access", billingExempt: true, expiresAt: null, limits: null } } })
+  );
   await page.route("**/api/compile-jobs", route =>
     route.fulfill({ json: { code: "OK", jobs: [] } })
   );
   await page.route("**/api/documents", route =>
     route.fulfill({ json: { documents: [] } })
+  );
+  await page.route("**/api/v1/reviews**", route =>
+    route.fulfill({ json: { code: "OK", decisions: [] } })
   );
   await page.route("**/api/billing/status", route =>
     route.fulfill({
@@ -217,6 +223,8 @@ test("renders governed promotion, retained rollback and region-grounded Ask", as
   page,
 }, testInfo) => {
   const browserErrors: string[] = [];
+  const unauthorizedUrls: string[] = [];
+  page.on("response", response => { if (response.status() === 401) unauthorizedUrls.push(response.url()); });
   page.on("console", message => {
     if (message.type() === "error") browserErrors.push(message.text());
   });
@@ -271,6 +279,7 @@ test("renders governed promotion, retained rollback and region-grounded Ask", as
       document.documentElement.clientWidth
   );
   expect(overflow).toBeLessThanOrEqual(1);
+  expect(unauthorizedUrls).toEqual([]);
   expect(browserErrors).toEqual([]);
   await testInfo.attach("world-lifecycle", {
     body: await page.screenshot({ fullPage: true }),

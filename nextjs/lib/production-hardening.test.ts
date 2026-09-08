@@ -14,7 +14,10 @@ describe("2026-09-05 production hardening", () => {
     expect(server).toContain('readAccessMode() === "self_service"');
     expect(client).toContain("useState(initialLiveCheckout)");
     expect(client).toContain("useState(initialSelfService)");
-    expect(client.indexOf('className="plans rv"')).toBeLessThan(client.indexOf('className="usage-estimator rv"'));
+    expect(client.indexOf('className="plans"')).toBeLessThan(client.indexOf('className="usage-estimator"'));
+    expect(client).not.toContain('className="plans rv"');
+    expect(client).not.toContain('className="usage-estimator rv"');
+    expect(client).not.toContain('className="status-fold rv"');
   });
 
   it("keeps the live legal surfaces dynamic and removes the stale pilot statement from privacy", () => {
@@ -59,12 +62,42 @@ describe("2026-09-05 production hardening", () => {
     expect(css).toContain(".docs-endpoint { width: 100%; max-width: 100%; min-width: 0;");
   });
 
+  it("removes the desktop provenance tether from the narrow Explore composition", () => {
+    const css = read("components/world-visual/world-visual.module.css").replace(/\r\n/g, "\n");
+    const narrow = css.slice(css.indexOf("@media (max-width: 820px)"));
+    expect(narrow).toContain(".tether { display: none; }");
+    expect(narrow).toContain(".edges { display: none; }");
+  });
+
   it("keeps a reachable mobile primary navigation instead of removing the information architecture", () => {
     const css = read("app/tavonel.css");
     const nav = read("components/mobile-primary-nav.tsx");
     expect(css).toContain(".mobile-primary-nav { display: block; }");
     expect(nav).toContain("PRIMARY_NAV.map");
     expect(nav).toContain('aria-label="Mobile sections"');
+  });
+
+  /*
+    The compact intake keeps a drop affordance. Founder report, 2026-09-06.
+
+    The hierarchy pass shrank `.workspace-intake` to a one-row bar as soon as a source exists,
+    and the toolbar rule in `ux-polish.css` gave it the plain hairline and a transparent ground.
+    The section still accepts drops, so what it lost was only the ability to say so: the founder
+    saw the full drop zone while documents were still null and could not find where files went
+    once the first one loaded. The `[data-active="true"]` highlight went with it, outranked by
+    the more specific toolbar selector, so dragging over the bar gave no feedback either.
+
+    Both halves are asserted, because either one alone leaves the bar unreadable as a target.
+  */
+  it("keeps the compact workspace intake readable as a drop target", () => {
+    // Newlines are normalised: this repository checks CSS out with CRLF on Windows and LF in CI.
+    const css = read("app/workspace-final-polish.css").replace(/\r\n/g, "\n");
+    expect(css).toContain('.workspace-intake[data-existing-documents="1"] {\n  border: 1px dashed var(--text-xlo);\n}');
+    expect(css).toContain('.workspace-intake[data-existing-documents="1"][data-active="true"] {\n  border-style: solid;\n  border-color: var(--verified);');
+    expect(css).not.toContain(':has(.document-meta li) .workspace-intake');
+    expect(css).toContain('.workspace-intake[data-existing-documents="1"] .workspace-intake-copy {');
+    expect(css).not.toContain('[data-existing-documents="1"]-copy');
+    expect(css).not.toContain('[data-existing-documents="1"]-actions');
   });
 
   it("removes the full-viewport floor from short landing scenes but keeps the film immersive", () => {

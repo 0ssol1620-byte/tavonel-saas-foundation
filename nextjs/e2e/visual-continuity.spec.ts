@@ -159,15 +159,35 @@ async function runCut4Test(
     await goToSceneThree(page);
 
     const reducedMotion = testInfo.project.name === "reduced-motion";
-    if (reducedMotion) {
+    /*
+      The live canvas is not the film everywhere, and the capture contract is only about the
+      canvas.
+
+      `2e88caf` ("mobile: stop drawing a 1440-wide film into a 350px frame, and let a cut finish")
+      confined the live renderer to frames wide enough for the cut's fixed-pixel composition:
+      below 900px, or on a coarse pointer up to 1023px, the landing plays the recorded mp4
+      instead. So at the 768/390/360 projects `.compile-film-live canvas` never attaches, and the
+      `__filmSeek` / `__filmFreeze` hooks below have nothing to hook to — they belong to
+      `opening-film-4.tsx`, which is not mounted. (The note about a "~700px backing store at the
+      390 project" further down predates that change and describes a canvas that no longer runs
+      there; `scripts/visual-continuity.mjs` captures at desktop width.)
+
+      That is not a reason to assert nothing on those projects: the WORLD stage still has to be
+      presented, and presented as WORLD. `CompileStagePlayer` publishes which renderer it mounted,
+      so this reads product truth rather than restating its media query.
+    */
+    const liveRenderer = (await page.locator(".compile-film-sequence").getAttribute("data-film-renderer")) === "live-canvas";
+    if (reducedMotion || !liveRenderer) {
       // §1 standing rule: reduced motion removes transitions, never content — the still poster
-      // for the selected stage must still be there and still be the WORLD stage, not blank.
+      // for the selected stage must still be there and still be the WORLD stage, not blank. The
+      // narrow-frame projects reach the same stage through the recorded cut, whose accessible
+      // name carries the stage the same way the poster's alt does.
       // Dynamic-import + hydration under this suite's shared-machine load can take a few
       // seconds (measured up to ~3s locally under contention), well short of this budget.
-      const poster = page.locator(".compile-film-viewport img.compile-film-still");
-      await poster.waitFor({ state: "visible", timeout: 25_000 });
-      const alt = await poster.getAttribute("alt");
-      expect(alt ?? "").toMatch(/WORLD/i);
+      const frame = page.locator(".compile-film-viewport img.compile-film-still, .compile-film-viewport video.compile-film-video");
+      await frame.waitFor({ state: "visible", timeout: 25_000 });
+      const label = (await frame.getAttribute("alt")) ?? (await frame.getAttribute("aria-label"));
+      expect(label ?? "").toMatch(/WORLD/i);
       const canvasCount = await page.locator(CANVAS_SELECTOR).count();
       expect(canvasCount).toBe(0);
     } else {

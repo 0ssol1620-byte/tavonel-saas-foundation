@@ -216,7 +216,11 @@ select throws_ok(
 
 select is(
   (select count(*)::integer from public.foundation_compile_jobs where workspace_key = 'pilot-slottest01'),
-  5,
+  -- Four calls above returned created = true and each is asserted individually: cjob-1
+  -- (standalone 1..12), cjob-3 (corpus a slot 0), cjob-5 (corpus a slot 1) and cjob-6
+  -- (standalone 13..24). cjob-2 and cjob-4 were idempotent answers, cjob-7 and the duplicate
+  -- job_id were refused. So four rows, not five.
+  4,
   'no failed call left a row behind');
 
 -- ---------------------------------------------------------------------------------------

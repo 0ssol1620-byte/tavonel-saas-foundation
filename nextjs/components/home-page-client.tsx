@@ -14,6 +14,7 @@ import Logomark from "@/components/logomark";
 import MobilePrimaryNav from "@/components/mobile-primary-nav";
 import WorldField, { type WorldMode } from "@/components/world-field";
 import { trackFunnel, trackSceneDepth } from "@/lib/funnel-events";
+import { sourceFamilyChips } from "@/lib/qualified-input";
 import { FOOTER_GROUPS, PRIMARY_NAV } from "@/lib/site-navigation";
 import { useScrollProgress, useScrollScenes } from "@/lib/use-scroll-scenes";
 
@@ -178,13 +179,28 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
         <section className="scene hero" id="s1" data-scene="1" data-band="scatter">
           <div className="shell">
             <p className="slate"><b>TAVONEL</b><span /> KNOWLEDGE COMPILER</p>
+            {/*
+              The headline names the gap the buyer arrives with, not the machinery.
+
+              "Turn documents and connected systems into a source-grounded world your AI can
+              use" described what the product does to files. What a buyer already has is an
+              assistant that can search those files and still answers from stale or
+              unattributable material, so the headline states that gap and the lede states the
+              two properties that close it. Neither adjective is left to mean whatever the
+              reader wants: current is defined as recompiled when the sources change, traceable
+              as every fact pointing at the place it came from.
+
+              Deliberate re-derivation of a locked string under RESOLVED A-2 (2026-09-06).
+              `brand-copy.test.ts` locks the new wording in the same commit.
+            */}
             <h1>
-              <span className="line"><i>Turn documents and connected systems</i></span>
-              <span className="line dim"><i>into a source-grounded world your AI can use.</i></span>
+              <span className="line"><i>Your AI needs more than searchable files.</i></span>
+              <span className="line dim"><i>It needs a current, traceable world.</i></span>
             </h1>
             <p className="lede">
-              TAVONEL reads difficult sources, reconstructs structure, resolves identities and
-              relationships, and compiles a versioned knowledge layer with evidence back to the page.
+              TAVONEL compiles your own sources into that world: current, because it is
+              recompiled when those sources change, and traceable, because every compiled fact
+              stays traceable to its exact source location.
             </p>
             {/*
               Understanding comes before the account.
@@ -198,47 +214,199 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
               whole sequence and starting is the next move.
             */}
             <div className="actions">
-              <ExploreLink className="btn" />
-              <Link className="btn ghost" href={startHref}>{startLabel}</Link>
+              <ExploreLink className="btn" onActivate={() => trackFunnel("hero_explore_clicked")} />
+              <Link className="btn ghost" href={startHref} onClick={() => trackFunnel("hero_start_clicked")}>{startLabel}</Link>
+              {/*
+                The tertiary action §10.1 asks for, as a link rather than a third button.
+
+                /product is the page that answers "how does this work". A third button here
+                would compete with the two that matter and would mostly duplicate the rail and
+                the instrument bar, which already move a reader through this page.
+              */}
+              <Link className="hero-tertiary" href={"/product" as Route}>See how it works</Link>
             </div>
+            {/*
+              §10.2's proof strip. Five properties, each one a page on this site.
+
+              Deliberately not a metrics row: §35 bars invented company numbers and there are no
+              measured ones that belong here. What it carries instead is the shape of the
+              product -- what goes in, what holds it together, what comes out -- with every item
+              linked to the surface that substantiates it. Each destination exists, and each is
+              the page that would have to be edited if its claim stopped being true.
+            */}
+            <ul className="hero-proof" aria-label="What a compiled world carries">
+              <li><Link href={"/sources" as Route}>Documents, scans, spreadsheets, decks</Link></li>
+              <li><Link href="/evidence">Evidence-bound</Link></li>
+              <li><Link href={"/product/continuous-knowledge" as Route}>Version-aware</Link></li>
+              <li><Link href="/security">Reviewed before it goes live</Link></li>
+              <li><Link href={"/developers" as Route}>MCP · API · signed export</Link></li>
+            </ul>
           </div>
         </section>
 
         <Scene id={2} band="structure" eyebrow="INPUT" title="Bring the knowledge you already have.">
-          <p className="lede rv">Upload files, folders or ZIP archives, or connect the system where your knowledge already lives.</p>
+          <p className="lede rv">Upload files, folders or a ZIP archive, or connect a cloud document system.</p>
           {/*
-            Named formats, not a category.
+            Named formats, not a category, and named by the manifest rather than by this file.
 
             "Office documents" reads as every Office file ever made, and the intake whitelist is
-            narrower: DOCX, XLSX, PPTX and the OpenDocument equivalents, but not legacy
+            narrower: the OOXML and OpenDocument formats the manifest lists, but not legacy
             DOC/XLS/PPT. Naming the extensions is the difference between a promise and a
-            rejection at upload. ZIP is listed as a container, because that is what it is.
+            rejection at upload -- which is why the format chips are derived from the Capability
+            Manifest, the same list the server validates against and /sources publishes. A
+            format this page offers is a format the upload route accepts, by construction rather
+            than by remembering to edit two files.
           */}
-          <ul className="input-formats rv" aria-label="Supported knowledge sources">
-            {[
-              "PDF", "DOCX / XLSX / PPTX", "ODT / ODS / ODP", "JPG / PNG / TIFF scans",
-              "Folders", "ZIP archives", "Google Drive", "Dropbox",
-              "OneDrive / SharePoint", "S3 / R2 / MinIO", "SMB / NFS / SFTP",
-            ].map((source) => <li key={source}>{source}</li>)}
+          <ul className="input-formats rv" aria-label="Formats this deployment reads">
+            {sourceFamilyChips.map((source) => <li key={source}>{source}</li>)}
           </ul>
+          {/*
+            The flat connector list is gone. RESOLVED A-4 (2026-09-06).
+
+            It read "Folders · Google Drive · Dropbox · OneDrive / SharePoint · S3 / R2 / MinIO ·
+            SMB / NFS / SFTP" as one row of equal chips. Three of those are OAuth adapters that
+            exist and are labelled Beta on /integrations; two were not connectors at all. A
+            reader could not tell which half of the row they could actually use, and the
+            homepage was the one surface that dropped the distinction /integrations makes.
+
+            What is left is code-backed and reachable, each with the word that says how far it
+            has got. The OAuth three stay `beta` and not `qualified`: the adapters exist
+            (`connector-oauth-adapters.ts`, three providers, list and download), and RESOLVED
+            B-7 makes Google Drive's deletion semantics a blocker on connector qualification, so
+            no connector here is verified.
+
+            S3-compatible storage and mounted SMB/NFS/SFTP paths are not listed as connectors.
+            There is no import adapter for either in `lib/connector-*`; what exists is a local
+            agent the customer runs themselves, so the row sits outside the connector list and
+            below it, described as the assisted route it is rather than as something you switch
+            on. /integrations and /developers carry the full description.
+
+            ZIP says what actually happens to it. The archive is expanded in the browser and its
+            members are validated and compiled one at a time; the archive itself is never
+            compiled, and writing "ZIP" beside "PDF" implied it was.
+
+            Repair, 2026-09-06. The first version of this block kept four cards and gave two of
+            them status words of their own -- "AVAILABLE TODAY" for upload and for ZIP, "ON
+            REQUEST" for the agent route. Three faults in that. A-4 names four words --
+            qualified, beta, enterprise-assisted, unsupported -- and none of those three is one
+            of them; the same agent route reads "Enterprise-assisted" on /integrations and
+            /workspace, so the homepage was again the odd surface out; and "ZIP archive --
+            AVAILABLE TODAY" printed the opposite word to the one the Capability Manifest and
+            /sources print for `application/zip`, which is UNSUPPORTED and is refused by
+            `validateQualifiedDocumentInput` at upload.
+
+            The two axes were the cause: upload is not a connector, so it has no place in a list
+            whose every row must carry a connector support word, and forcing one on it produced a
+            word from outside the vocabulary. Direct upload and ZIP move into the sentence above
+            the list -- where the ZIP truth is stated in full, including the manifest's word for
+            it -- and the list holds only what A-4 governs: the connectors, each with one of
+            A-4's words. `brand-copy.test.ts` now fails if any other word appears in a status
+            chip on this page.
+          */}
+          <p className="fine rv">
+            Files and folders you upload go in directly: each one is checked against the manifest
+            above before it is stored. A ZIP is expanded in your browser and every file inside it
+            is checked the same way — the archive itself is never compiled, and the Capability
+            Manifest published on /sources lists ZIP as UNSUPPORTED.
+          </p>
+          <div className="chain rv" aria-label="Connectors, and how far each has got">
+            <article className="link">
+              <span className="st">BETA</span>
+              <h3>Google Drive · Dropbox · OneDrive / SharePoint</h3>
+              <p>Read-only discovery and import, built and contract-tested. Not qualified: deletion and permission semantics are still being settled, so verify a connection before depending on it.</p>
+            </article>
+          </div>
+          {/*
+            Out of the connector list, because it is not a connector. Repair, 2026-09-06.
+
+            The block above argues at length that S3-compatible storage and mounted shares are an
+            agent route rather than something you switch on, and then rendered them as the second
+            row of a list whose accessible name is "Connectors". A screen reader was told the
+            opposite of what the page says in prose, which is the one reading that cannot be
+            argued with. The word stays ENTERPRISE-ASSISTED -- it is A-4's, and it is the word
+            /integrations and /workspace print for the same route -- and the row moves to a list
+            of its own that says what it is.
+          */}
+          <div className="chain rv" aria-label="Assisted import route, not a connector">
+            <article className="link">
+              <span className="st">ENTERPRISE-ASSISTED</span>
+              <h3>Object storage and mounted shares</h3>
+              <p>S3-compatible buckets and SMB, NFS or SFTP paths are imported by an agent you run inside your own network — not a connector you switch on here. Set up with you, not self-serve.</p>
+            </article>
+          </div>
         </Scene>
 
         <Scene id={3} film band="change" eyebrow="COMPILE FILM" title="Watch knowledge take shape.">
           <CompileStagePlayer onStageChange={handleStageChange} />
         </Scene>
 
+        {/*
+          The path ends at a location, not at a page.
+
+          It used to read "Object → relation → evidence → document page → exact bounding box",
+          which is what a PDF locator looks like and was written as though it were what evidence
+          is. A cell in a spreadsheet, a shape on a slide and a MIME part in an email are exact
+          locations too, and none of them has a page. RESOLVED A-1 names the abstraction; the
+          per-source forms it covers are set out once, on /evidence, rather than repeated on
+          every surface, and /sources stays the answer to what is read here today.
+        */}
         <Scene id={4} band="answer" eyebrow="EVIDENCE" title="Follow grounded results back to the source.">
-          <p className="lede rv">Object → relation → evidence → document page → exact bounding box. Ask citations open the same source evidence.</p>
+          <p className="lede rv">Every compiled fact stays traceable to its exact source location. Ask citations open that same location.</p>
           <div className="evidence-path rv" aria-label="Evidence path">
-            {['Object', 'Relation', 'Evidence', 'Document page', 'Exact bbox'].map((step, index) => (
+            {['Object', 'Relation', 'Evidence', 'Source version', 'Exact location'].map((step, index) => (
               <Fragment key={step}><span>{step}</span>{index < 4 ? <i aria-hidden="true">→</i> : null}</Fragment>
             ))}
           </div>
-          <div className="actions rv"><ExploreLink className="btn" /></div>
+          {/*
+            The pointer to /sources is a button, not a link in fine print.
+
+            It was written as an inline link inside this sentence and `mobile-landing.spec.ts`
+            caught it: on a touch phone the tap target was 33px tall against a 44px floor. A
+            sentence can carry the nuance; the thing a thumb has to hit belongs in the actions
+            row, where every other control on this page already meets the floor.
+          */}
+          <p className="fine rv">
+            What a location is depends on the source — a page and a region in a PDF, a sheet and
+            a cell in a spreadsheet, a slide and a shape in a deck. Which of those this
+            deployment reads today is published, in full, as its capability manifest.
+          </p>
+          {/*
+            Two proofs, opened where the proof is, and Scene E of §10.3 with them.
+
+            The scene argues that a result returns to its source and that a world moves when its
+            sources do. Both are demonstrable in the public Apple SEC sample, and both were a
+            click into Explore's entry act away from being found. `?act=evidence` and
+            `?act=change` are the query vocabulary `lib/explore-story.ts` resolves, so each link
+            lands on the act that shows the thing this scene just claimed.
+          */}
+          <div className="actions rv">
+            <ExploreLink className="btn" act="evidence" />
+            <ExploreLink className="btn ghost" act="change" label="See what a new filing changed" />
+            <Link className="btn ghost" href={"/sources" as Route}>What this deployment reads</Link>
+          </div>
         </Scene>
 
         <Scene id={5} band="access" eyebrow="START" title="Compile your own knowledge.">
           <p className="lede rv">Files go in. Structured, traceable knowledge comes out.</p>
+          {/*
+            Scene F of §10.3, in one sentence rather than a sixth scene.
+
+            What the compiled world is *for* was the one step of the story this page never
+            stated: a reader reached the closing action without being told what they would then
+            hold. The three ways to use it are described in full on /developers, and this is the
+            line that says they exist.
+          */}
+          {/*
+            No inline link here, for the reason the evidence scene already records: an inline
+            link in a `.fine` paragraph is a 14px tap target against a 44px floor, and
+            `mobile-landing.spec.ts` measures it. The three ways to use a compiled world are set
+            out on /developers, which is in the primary nav, in the footer and in the hero proof
+            strip; this sentence's job is to say they exist.
+          */}
+          <p className="fine rv">
+            Then your AI reads it: live over MCP or the API, as a signed portable package, or
+            through Ask with a person in front of it.
+          </p>
           <div className="actions rv">
             {/*
               Two actions, not three. "Connect a source" asked a visitor who has not yet seen the
@@ -321,10 +489,35 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
   navigation is identical. It is one component so the three call sites cannot drift apart in
   label or destination.
 */
-function ExploreLink({ className }: { className: string }) {
+/*
+  `act` sends the reader to the part of Explore the surrounding scene has just argued for.
+
+  The three call sites still share one component and one door; what varies is where inside the
+  world it opens, using the query vocabulary `lib/explore-story.ts` already resolves (`world`,
+  `evidence`, `change`). The evidence scene sending a reader to Explore's entry act left the
+  trace it had just described two clicks away and unfound.
+
+  `label` is only ever passed where the link is a second, different proof rather than the door
+  again — the change link beside the evidence one. The door's own wording does not vary.
+*/
+function ExploreLink({
+  className,
+  act,
+  label,
+  onActivate,
+}: {
+  className: string;
+  act?: "world" | "evidence" | "change";
+  label?: string;
+  onActivate?: () => void;
+}) {
   return (
-    <CanvasTransitionLink className={className} href={"/explore" as Route}>
-      Explore a Compiled World
+    <CanvasTransitionLink
+      className={className}
+      href={(act ? `/explore?act=${act}` : "/explore") as Route}
+      onActivate={onActivate}
+    >
+      {label ?? "Explore a Compiled World"}
     </CanvasTransitionLink>
   );
 }

@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import os
 import secrets
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -10,15 +11,34 @@ import unittest
 from datetime import UTC, datetime
 from pathlib import Path
 
-import fitz
+import pypdfium2 as pdfium
+import pypdfium2.raw as pdfium_c
 from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 os.environ.setdefault("TAVONEL_CDR_HMAC", "fixture-cdr-hmac-secret-that-is-long-enough-123")
+
+from clamd_stub import FakeClamd  # noqa: E402
+
+# This suite is about LibreOffice conversion, not scanning, but the service refuses without a
+# scanner and has no bypass flag. So it gets a real socket speaking the real protocol.
+# `setdefault`, so a job that already exports CLAMD_HOST points it at that clamd instead.
+for _name, _value in FakeClamd("clean").start().env().items():
+    os.environ.setdefault(_name, _value)
 
 from app import app, cdr_request_signature  # noqa: E402
 
+# LibreOffice is installed by the Dockerfile, not by the developer machines in this lane, so
+# outside the image this suite skips with a reason instead of erroring in setUpClass. Inside
+# the qualification container OFFICE_QUALIFICATION=1 turns a missing `soffice` into a failure,
+# so the Office rows can never become a silent green if the package drops out of the image.
+SOFFICE = shutil.which("soffice")
+if not SOFFICE and os.getenv("OFFICE_QUALIFICATION") == "1":
+    raise RuntimeError("OFFICE_QUALIFICATION=1 but LibreOffice is not installed in this image")
 
+
+@unittest.skipUnless(SOFFICE, "requires LibreOffice (soffice); it ships in the CDR service image only")
 class OfficeConversionQualificationTest(unittest.TestCase):
     secret = "fixture-cdr-hmac-secret-that-is-long-enough-123"
 
@@ -107,11 +127,25 @@ class OfficeConversionQualificationTest(unittest.TestCase):
                     response.headers["x-tavonel-cdr-output-sha256"],
                     "sha256:" + hashlib.sha256(response.content).hexdigest(),
                 )
-                sanitized = fitz.open(stream=response.content, filetype="pdf")
+                sanitized = pdfium.PdfDocument(response.content)
                 try:
-                    self.assertGreaterEqual(sanitized.page_count, 1)
-                    self.assertEqual("".join(page.get_text() for page in sanitized).strip(), "")
-                    self.assertTrue(all(page.get_images(full=True) for page in sanitized))
+                    self.assertGreaterEqual(len(sanitized), 1)
+                    for page_index in range(len(sanitized)):
+                        page = sanitized[page_index]
+                        try:
+                            text_page = page.get_textpage()
+                            try:
+                                self.assertEqual(text_page.get_text_bounded().strip(), "")
+                            finally:
+                                text_page.close()
+                            self.assertTrue(
+                                any(
+                                    obj.type == pdfium_c.FPDF_PAGEOBJ_IMAGE
+                                    for obj in page.get_objects()
+                                )
+                            )
+                        finally:
+                            page.close()
                 finally:
                     sanitized.close()
 

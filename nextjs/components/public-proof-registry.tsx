@@ -23,7 +23,7 @@ export type RegistryRow = { key: string; description: string; state: string };
  * a page about an absence. A section with nothing to show is now simply not shown, and the
  * `empty` prop is kept only so callers do not have to change.
  */
-export default function PublicProofRegistry({ title, eyebrow, summary, state, sections }: {
+export default function PublicProofRegistry({ title, eyebrow, summary, state, sections, footer }: {
   title: string;
   eyebrow: string;
   summary: string;
@@ -51,12 +51,21 @@ export default function PublicProofRegistry({ title, eyebrow, summary, state, se
     faq?: Array<{ question: string; answer: string }>;
     links?: Array<{ href: Route; label: string }>;
   }>;
+  /*
+    One next step under the body, for a page that is a step in a sequence rather than a terminus.
+
+    `/reproducibility` sits in the middle of the §17 trust funnel and had no way onward at all.
+    Every other page in that funnel ends with `TrustNext`; this is how a registry-shaped page
+    gets the same ending without hand-writing the order a second time.
+  */
+  footer?: ReactNode;
 }) {
   return <div className={styles.page}>
     <PublicSiteHeader />
     <main id="main">
       <section className={styles.hero}><div><p className={styles.eyebrow}>{eyebrow}</p><h1>{title}</h1></div><aside>{state ? <span className={styles.status}>{state}</span> : null}<p>{summary}</p></aside></section>
       <div className={styles.body}>{sections.map((section) => <section className={styles.row} key={section.title}><h2>{section.title}</h2><div className={styles.rowBody}><p>{section.body}</p>{section.figure ? <figure className={styles.figure}>{section.figure}</figure> : null}{section.rows ? <ol className={styles.protocol}>{section.rows.map((row) => <li key={row.key}><b>{row.key}</b><span>{row.description}</span><em>{row.state}</em></li>)}</ol> : null}{section.faq ? <dl className={styles.faq}>{section.faq.map((entry) => <div key={entry.question}><dt>{entry.question}</dt><dd>{entry.answer}</dd></div>)}</dl> : null}{section.links ? <p className={styles.links}>{section.links.map((link) => <Link key={link.href} href={link.href}>{link.label}</Link>)}</p> : null}{section.download ? <a className={styles.download} href={section.download.href} download>{section.download.label}</a> : null}</div></section>)}</div>
+      {footer ? <div className={styles.body}>{footer}</div> : null}
     </main>
     <PublicSiteFooter />
   </div>;

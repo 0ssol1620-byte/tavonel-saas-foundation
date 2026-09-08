@@ -72,6 +72,12 @@ const CORPUS_COPY: Record<CorpusProgress["state"], string> = {
   ready: "all parts compiled",
   partial: "some parts did not compile",
   failed: "no part compiled",
+  /*
+    Not a failure of a part, but of the run: a position the corpus declares has no row at all,
+    so nothing is compiling it and nothing will report on it. Said here because this line is
+    where a customer meets the state of the whole run.
+  */
+  incomplete: "parts of this run are missing and are not compiling",
 };
 
 export function CompileJobPanel({

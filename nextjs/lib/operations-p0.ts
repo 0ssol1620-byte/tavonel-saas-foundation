@@ -326,7 +326,7 @@ export function buildOperationsAlert(input: AlertInput) {
         !Number.isFinite(input.thresholdValue) ||
         !input.unit))
   ) {
-    return { ok: false as const, code: "ALERT_PAYLOAD_INVALID" };
+    return { ok: false as const, code: "ALERT_PAYLOAD_INVALID" as const };
   }
   const dedupeKey = createHash("sha256")
     .update(`${input.kind}:${input.service}:${input.summary}`)
@@ -341,6 +341,113 @@ export function buildOperationsAlert(input: AlertInput) {
       containsCredentials: false as const,
     },
   };
+}
+
+/** Repeat of the same trigger inside this window is suppressed, not re-sent. */
+export const OPERATIONS_ALERT_DEDUPE_WINDOW_MS = 5 * 60_000;
+
+// ponytail: counters and the dedupe window live in one process. On Vercel that
+// means per-instance, so a fanned-out trigger can page twice; move both to the
+// alerts table or KV when more than one instance raises the same alert.
+const alertCounters = {
+  delivered: 0,
+  suppressed: 0,
+  unconfigured: 0,
+  failed: 0,
+  invalid: 0,
+};
+const alertLastSentAt = new Map<string, number>();
+
+export function operationsAlertCounters() {
+  return { ...alertCounters };
+}
+
+export function resetOperationsAlertDelivery() {
+  alertLastSentAt.clear();
+  for (const key of Object.keys(alertCounters) as (keyof typeof alertCounters)[])
+    alertCounters[key] = 0;
+}
+
+export type AlertDelivery =
+  | { ok: true; code: "ALERT_DELIVERED" | "ALERT_SUPPRESSED_DUPLICATE"; dedupeKey: string }
+  | { ok: false; code: "ALERT_PAYLOAD_INVALID" }
+  | {
+      ok: false;
+      code: "ALERT_RECEIVER_UNCONFIGURED" | "ALERT_DELIVERY_FAILED";
+      dedupeKey: string;
+    };
+
+/**
+ * Posts a `tavonel.operations_alert.v1` envelope to the single incoming webhook
+ * named by `OPERATIONS_ALERT_WEBHOOK_URL`. Every outcome except a real 2xx is a
+ * counted failure written to stderr — an unconfigured receiver never reads as a
+ * delivered alert. The URL itself is never logged.
+ */
+export async function deliverOperationsAlert(
+  input: AlertInput,
+  now: number = Date.now()
+): Promise<AlertDelivery> {
+  const built = buildOperationsAlert(input);
+  if (!built.ok) {
+    alertCounters.invalid += 1;
+    console.error(
+      JSON.stringify({ event: "operations_alert", code: built.code })
+    );
+    return built;
+  }
+  const { payload } = built;
+  const { dedupeKey } = payload;
+  const receipt = {
+    event: "operations_alert",
+    dedupeKey,
+    severity: payload.severity,
+    service: payload.service,
+    summary: payload.summary,
+    runbookUrl: payload.runbookUrl,
+  };
+
+  const webhookUrl = process.env.OPERATIONS_ALERT_WEBHOOK_URL;
+  if (!webhookUrl?.startsWith("https://")) {
+    alertCounters.unconfigured += 1;
+    console.error(
+      JSON.stringify({ ...receipt, code: "ALERT_RECEIVER_UNCONFIGURED" })
+    );
+    return { ok: false, code: "ALERT_RECEIVER_UNCONFIGURED", dedupeKey };
+  }
+
+  for (const [key, sentAt] of alertLastSentAt)
+    if (now - sentAt >= OPERATIONS_ALERT_DEDUPE_WINDOW_MS)
+      alertLastSentAt.delete(key);
+  if (alertLastSentAt.has(dedupeKey)) {
+    alertCounters.suppressed += 1;
+    return { ok: true, code: "ALERT_SUPPRESSED_DUPLICATE", dedupeKey };
+  }
+
+  let status = 0;
+  try {
+    const response = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(5_000),
+      body: JSON.stringify({
+        text: `[${payload.severity}] ${payload.service}: ${payload.summary} — ${payload.runbookUrl}`,
+        ...payload,
+      }),
+    });
+    status = response.status;
+  } catch {
+    status = 0;
+  }
+  if (status < 200 || status > 299) {
+    alertCounters.failed += 1;
+    console.error(
+      JSON.stringify({ ...receipt, code: "ALERT_DELIVERY_FAILED", status })
+    );
+    return { ok: false, code: "ALERT_DELIVERY_FAILED", dedupeKey };
+  }
+  alertLastSentAt.set(dedupeKey, now);
+  alertCounters.delivered += 1;
+  return { ok: true, code: "ALERT_DELIVERED", dedupeKey };
 }
 
 export function validateHumanChangeEvidence(input: {
