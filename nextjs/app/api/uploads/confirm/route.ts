@@ -3,7 +3,12 @@ import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { readBoundedJson } from "@/lib/enterprise-http";
 import { authorizeFoundationSessionProduct } from "@/lib/self-service-trial";
 import { DOCUMENT_ID_PATTERN } from "@/lib/immutable-keys";
-import { headFoundationQuarantineObject, readR2SignerEnv } from "@/lib/r2-synthetic-canary";
+import { verifySourceSignature } from "@/lib/magic-bytes";
+import {
+  headFoundationQuarantineObject,
+  headFoundationQuarantineSignature,
+  readR2SignerEnv,
+} from "@/lib/r2-synthetic-canary";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "@/lib/supabase-admin";
 import { assessTrialSourceReuse } from "@/lib/trial-source-risk";
 
@@ -121,6 +126,33 @@ export async function POST(request: Request) {
   const object = await headFoundationQuarantineObject(signer, auth.principal.workspaceKey, documentId);
   if (!object.ok) return NextResponse.json({ code: object.code }, { status: 503, headers });
   if (!object.exists) return NextResponse.json({ code: "QUARANTINE_OBJECT_NOT_FOUND" }, { status: 409, headers });
+
+  /*
+   * What arrived, checked against what was claimed (blueprint §36, S-66).
+   *
+   * `object.contentType` is not independent evidence: the presigned PUT was signed for the type
+   * the browser declared, so R2 is echoing the client's own claim back. Until now nothing in the
+   * pipeline had looked at the file at all, and a `.pdf` that was really an archive, a script or
+   * an HTML page was admitted, charged for and handed to the sanitizer as a PDF.
+   *
+   * 512 bytes, not the object. The full read that used to live here was removed because it put
+   * customer bytes on the application server behind a 5 MiB cap that refused half of what intake
+   * admits; a fixed 512-byte prefix has neither problem, and the signature is in the first 8.
+   *
+   * Fail closed on an unreadable prefix. "The check could not run" and "the check passed" must
+   * never produce the same confirmation.
+   */
+  const signature = await headFoundationQuarantineSignature(
+    signer,
+    auth.principal.workspaceKey,
+    documentId,
+  );
+  if (!signature.ok) return NextResponse.json({ code: signature.code }, { status: 503, headers });
+  if (!signature.exists) {
+    return NextResponse.json({ code: "QUARANTINE_OBJECT_NOT_FOUND" }, { status: 409, headers });
+  }
+  const verdict = verifySourceSignature(object.contentType, signature.bytes);
+  if (!verdict.ok) return NextResponse.json({ code: verdict.code }, { status: 415, headers });
 
   /*
    * Exact-content reuse is evaluated only for free evaluation. Paid customers and the operator may

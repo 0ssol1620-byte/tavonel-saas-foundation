@@ -1,4 +1,5 @@
 import type { OAuthConnectorProvider } from "./connector-oauth";
+import { assertSafeUrl, safeFetch, type EgressPolicy } from "./safe-url";
 
 export type OAuthSourceTarget = {
   rootPath?: string;
@@ -23,7 +24,30 @@ export type OAuthSourcePage = {
 };
 
 const GRAPH_ORIGIN = "https://graph.microsoft.com";
+const DRIVE_ORIGIN = "https://www.googleapis.com";
+const DROPBOX_API_ORIGIN = "https://api.dropboxapi.com";
+const DROPBOX_CONTENT_ORIGIN = "https://content.dropboxapi.com";
 export const OAUTH_SOURCE_PAGE_SIZE = 25;
+
+/*
+  Where each provider is allowed to be (blueprint §38, S-71/S-72).
+
+  The origins were already constants in this file; what was missing was anything that checked
+  the URL actually built from them, and a redirect off them was followed without a word. Every
+  request below now goes through `safeFetch` with the policy for its provider, so a 302 to
+  169.254.169.254 -- or to any other origin -- is a refusal rather than a request.
+*/
+const LIST_POLICY: Record<OAuthConnectorProvider, EgressPolicy> = {
+  google_drive: { origins: [DRIVE_ORIGIN], pathPrefix: "/drive/v3/", maxUrlLength: 4_096 },
+  dropbox: { origins: [DROPBOX_API_ORIGIN], pathPrefix: "/2/files/", maxUrlLength: 4_096 },
+  microsoft_graph: { origins: [GRAPH_ORIGIN], pathPrefix: "/v1.0/", maxUrlLength: 4_096 },
+};
+
+const DOWNLOAD_POLICY: Record<OAuthConnectorProvider, EgressPolicy> = {
+  google_drive: { origins: [DRIVE_ORIGIN], pathPrefix: "/drive/v3/", maxUrlLength: 4_096 },
+  dropbox: { origins: [DROPBOX_CONTENT_ORIGIN], pathPrefix: "/2/files/", maxUrlLength: 4_096 },
+  microsoft_graph: { origins: [GRAPH_ORIGIN], pathPrefix: "/v1.0/", maxUrlLength: 4_096 },
+};
 
 /**
  * A row worth trying to read.
@@ -47,14 +71,40 @@ function boundedSize(value: unknown) {
   return Number.isSafeInteger(size) && size >= 0 && size <= 524_288_000 ? size : null;
 }
 
+/*
+  A continuation, checked per provider rather than for Graph alone (S-72).
+
+  The three providers continue in two different shapes and the check has to match the shape,
+  not merely exist:
+
+    * Microsoft Graph hands back a whole URL and the adapter fetches it. That is a destination
+      supplied by a response, so it goes through the central egress policy -- origin, path
+      prefix, scheme, port, address -- exactly as the first page did.
+
+    * Google Drive and Dropbox hand back an opaque token which this adapter puts in a query
+      parameter and a JSON body respectively. A token cannot become a destination there, and
+      that is the property worth asserting rather than assuming, so the tests below drive a
+      hostile continuation through both and check where the request actually went.
+
+  What is refused for the opaque two is what a token has no reason to contain and a smuggled
+  URL does: a scheme, whitespace, or a control character. Refusing base64's own alphabet would
+  break a legitimate cursor to buy no security, so it is not refused.
+*/
+const HAS_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
+
 function safeGraphContinuation(value: unknown) {
   if (typeof value !== "string") return null;
-  try {
-    const url = new URL(value);
-    return url.origin === GRAPH_ORIGIN && url.pathname.startsWith("/v1.0/") && value.length <= 4_096 ? value : null;
-  } catch {
-    return null;
+  return assertSafeUrl(value, LIST_POLICY.microsoft_graph).ok ? value : null;
+}
+
+function safeOpaqueContinuation(value: unknown, maximum: number) {
+  const token = boundedString(value, maximum);
+  if (token === null || HAS_SCHEME.test(token)) return null;
+  for (let index = 0; index < token.length; index += 1) {
+    const code = token.charCodeAt(index);
+    if (code <= 0x20 || code === 0x7f) return null;
   }
+  return token;
 }
 
 function validTarget(target: OAuthSourceTarget) {
@@ -62,25 +112,42 @@ function validTarget(target: OAuthSourceTarget) {
   return values.every((value) => value.length <= 512 && /^[A-Za-z0-9._~!$&'()+,;=:@/ -]*$/.test(value));
 }
 
-async function jsonRequest(url: string, accessToken: string, init: RequestInit, fetcher: typeof fetch) {
-  const response = await fetcher(url, {
-    ...init,
-    headers: { authorization: `Bearer ${accessToken}`, accept: "application/json", ...init.headers },
-    cache: "no-store",
-    signal: AbortSignal.timeout(20_000),
-  });
-  const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
-  if (!response.ok) throw new Error("OAUTH_SOURCE_LIST_FAILED");
-  return payload;
+async function jsonRequest(
+  url: string,
+  accessToken: string,
+  init: RequestInit,
+  fetcher: typeof fetch,
+  policy: EgressPolicy,
+) {
+  const result = await safeFetch(
+    url,
+    { ...init, headers: { authorization: `Bearer ${accessToken}`, accept: "application/json", ...init.headers } },
+    { ...policy, timeoutMs: 20_000 },
+    fetcher,
+  );
+  // A refused destination is not a provider outage and must not read like one: the code names
+  // the egress decision, so a listing that stopped because the URL was refused is
+  // distinguishable in a log from one that stopped because the provider was down.
+  if (!result.ok) throw new Error(`OAUTH_SOURCE_EGRESS_REFUSED:${result.code}`);
+  if (result.status < 200 || result.status > 299) throw new Error("OAUTH_SOURCE_LIST_FAILED");
+  try {
+    return JSON.parse(result.text) as Record<string, unknown>;
+  } catch {
+    return {} as Record<string, unknown>;
+  }
 }
 
 async function listGoogleDrive(accessToken: string, cursor: string | null, fetcher: typeof fetch): Promise<OAuthSourcePage> {
-  const url = new URL("https://www.googleapis.com/drive/v3/files");
+  const url = new URL(`${DRIVE_ORIGIN}/drive/v3/files`);
   url.searchParams.set("pageSize", String(OAUTH_SOURCE_PAGE_SIZE));
   url.searchParams.set("q", "trashed = false");
   url.searchParams.set("fields", "nextPageToken,files(id,name,mimeType,size,modifiedTime,version,md5Checksum)");
-  if (cursor) url.searchParams.set("pageToken", cursor);
-  const payload = await jsonRequest(url.toString(), accessToken, {}, fetcher);
+  if (cursor !== null) {
+    const pageToken = safeOpaqueContinuation(cursor, 2_048);
+    if (pageToken === null) throw new Error("OAUTH_SOURCE_CURSOR_INVALID");
+    url.searchParams.set("pageToken", pageToken);
+  }
+  const payload = await jsonRequest(url.toString(), accessToken, {}, fetcher, LIST_POLICY.google_drive);
   const rows = Array.isArray(payload.files) ? payload.files as Array<Record<string, unknown>> : [];
   const items = rows.map((row): OAuthSourceItem | null => {
     if (!readableRow(row)) return null;
@@ -98,12 +165,21 @@ async function listGoogleDrive(accessToken: string, cursor: string | null, fetch
 }
 
 async function listDropbox(accessToken: string, cursor: string | null, target: OAuthSourceTarget, fetcher: typeof fetch): Promise<OAuthSourcePage> {
-  const continuation = cursor !== null;
-  const url = continuation ? "https://api.dropboxapi.com/2/files/list_folder/continue" : "https://api.dropboxapi.com/2/files/list_folder";
+  const continuation = cursor !== null ? safeOpaqueContinuation(cursor, 4_096) : null;
+  if (cursor !== null && continuation === null) throw new Error("OAUTH_SOURCE_CURSOR_INVALID");
+  const url = continuation
+    ? `${DROPBOX_API_ORIGIN}/2/files/list_folder/continue`
+    : `${DROPBOX_API_ORIGIN}/2/files/list_folder`;
   const body = continuation
-    ? { cursor }
+    ? { cursor: continuation }
     : { path: target.rootPath ?? "", recursive: true, include_deleted: true, limit: OAUTH_SOURCE_PAGE_SIZE };
-  const payload = await jsonRequest(url, accessToken, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }, fetcher);
+  const payload = await jsonRequest(
+    url,
+    accessToken,
+    { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) },
+    fetcher,
+    LIST_POLICY.dropbox,
+  );
   const rows = Array.isArray(payload.entries) ? payload.entries as Array<Record<string, unknown>> : [];
   const items = rows.map((row): OAuthSourceItem | null => {
     if (!readableRow(row)) return null;
@@ -132,7 +208,7 @@ async function listMicrosoftGraph(accessToken: string, cursor: string | null, ta
     firstPage.searchParams.set("$top", String(OAUTH_SOURCE_PAGE_SIZE));
     url = firstPage.toString();
   }
-  const payload = await jsonRequest(url, accessToken, {}, fetcher);
+  const payload = await jsonRequest(url, accessToken, {}, fetcher, LIST_POLICY.microsoft_graph);
   const rows = Array.isArray(payload.value) ? payload.value as Array<Record<string, unknown>> : [];
   const items = rows.map((row): OAuthSourceItem | null => {
     if (!readableRow(row)) return null;
@@ -188,20 +264,41 @@ export function oauthSourceDownloadRequest(input: {
   target?: OAuthSourceTarget;
 }) {
   if (!input.nativeId || input.nativeId.length > 512) throw new Error("OAUTH_SOURCE_INPUT_INVALID");
+  /*
+    The destination is built from constants and an encoded id, and it is still checked.
+
+    `encodeURIComponent` is what makes that true today; a future edit that interpolates one more
+    provider-supplied field is what makes checking it worth the line. The check is on the URL
+    this function returns rather than on its parts, so it cannot be satisfied by a part that is
+    safe on its own.
+
+    Redirects on the download path stay with `fetch`, deliberately: Graph answers /content with
+    a 302 to a per-request host that is not graph.microsoft.com, so pinning the hop would break
+    OneDrive downloads rather than secure them. The initial destination is pinned; the redirect
+    target is chosen by the provider we already authenticated to.
+  */
+  const checked = (url: string) => {
+    if (!assertSafeUrl(url, DOWNLOAD_POLICY[input.provider]).ok) throw new Error("OAUTH_SOURCE_EGRESS_REFUSED");
+    return url;
+  };
   if (input.provider === "google_drive") {
     const exportMime = input.mimeType ? GOOGLE_EXPORTS[input.mimeType] : undefined;
     const path = exportMime ? "export" : "";
-    const url = new URL(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(input.nativeId)}${path ? `/${path}` : ""}`);
+    const url = new URL(`${DRIVE_ORIGIN}/drive/v3/files/${encodeURIComponent(input.nativeId)}${path ? `/${path}` : ""}`);
     if (exportMime) url.searchParams.set("mimeType", exportMime);
     else url.searchParams.set("alt", "media");
     if (input.mimeType?.startsWith("application/vnd.google-apps.") && !exportMime) throw new Error("OAUTH_SOURCE_NATIVE_TYPE_UNSUPPORTED");
-    return { url: url.toString(), method: "GET" as const, headers: {} };
+    return { url: checked(url.toString()), method: "GET" as const, headers: {} };
   }
   if (input.provider === "dropbox") return {
-    url: "https://content.dropboxapi.com/2/files/download",
+    url: checked(`${DROPBOX_CONTENT_ORIGIN}/2/files/download`),
     method: "POST" as const,
     headers: { "Dropbox-API-Arg": JSON.stringify({ path: input.nativeId }) },
   };
   const drive = input.target?.driveId ? `drives/${encodeURIComponent(input.target.driveId)}` : "me/drive";
-  return { url: `${GRAPH_ORIGIN}/v1.0/${drive}/items/${encodeURIComponent(input.nativeId)}/content`, method: "GET" as const, headers: {} };
+  return {
+    url: checked(`${GRAPH_ORIGIN}/v1.0/${drive}/items/${encodeURIComponent(input.nativeId)}/content`),
+    method: "GET" as const,
+    headers: {},
+  };
 }

@@ -34,6 +34,74 @@ export function normalizeDocumentMimeType(value: string) {
   return value.split(";", 1)[0]?.trim().toLowerCase() ?? "";
 }
 
+/*
+  Filename normalization (blueprint 2026-09-08 section 36, S-67).
+
+  Traversal, control characters and the bare `.`/`..` were already refused. What was not:
+
+    LENGTH        -- an unbounded name is a value this deployment stores and later renders. 255
+                     is what every filesystem and every archive format agrees on.
+
+    FORMAT CHARS  -- Unicode Cf: the right-to-left override, the zero-width joiners, the bidi
+                     isolates. A name carrying U+202E renders to a reader as though its
+                     extension were something else, which is the double-extension attack
+                     without a double extension. Nothing legible puts one in a filename, and
+                     they are refused rather than stripped: silently rewriting a customer's
+                     filename would hide exactly the thing worth seeing.
+
+    SECOND EXT    -- `report.exe.pdf` passes an extension check and is still a file somebody
+                     will double-click after downloading it. The trailing extension must still
+                     match the declared MIME; this refuses an executable one hiding behind it.
+
+  NFC is applied rather than asserted. macOS hands the browser decomposed filenames, so
+  refusing a name that is not already composed would refuse ordinary Korean and Japanese
+  filenames from half the laptops this product is sold to. The composed form is what is
+  validated and what is returned, so the same file uploaded twice is the same name twice.
+*/
+const MAX_FILENAME_LENGTH = 255;
+/*
+  The format characters that make a displayed filename lie: the soft hyphen, the Arabic letter
+  mark, the Mongolian vowel separator, the zero-width and bidi range, the invisible-operator and
+  bidi-isolate range, the BOM, the interlinear annotation marks, and the lead surrogate of the
+  plane-14 tag block, where an entire invisible ASCII alphabet lives.
+
+  Code-unit ranges rather than a Unicode property escape, because the root package's tsconfig
+  declares no `target` and so type-checks at the ES5 default, where `\p{Cf}` is a compile error.
+  This file is imported by both packages, and a guard that only compiles in one of them is not a
+  guard. (That missing `target` is real config debt and is recorded in the lane report; silently
+  raising it here would change class-field emit semantics for the Vite client, which is not this
+  lane's call to make.)
+
+  The list is the display-affecting subset of Cf rather than all of it. An Arabic number sign is
+  a format character and spoofs nothing, and refusing it would refuse ordinary filenames.
+*/
+const FORMAT_CHARACTER_RANGES: ReadonlyArray<readonly [number, number]> = [
+  [0x00ad, 0x00ad], [0x061c, 0x061c], [0x180e, 0x180e], [0x200b, 0x200f], [0x202a, 0x202e],
+  [0x2060, 0x2064], [0x2066, 0x206f], [0xfeff, 0xfeff], [0xfff9, 0xfffb], [0xdb40, 0xdb40],
+];
+
+function hasFormatCharacter(value: string) {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (FORMAT_CHARACTER_RANGES.some(([low, high]) => code >= low && code <= high)) return true;
+  }
+  return false;
+}
+
+/** Extensions that make a downloaded file executable by double-clicking it. */
+const EXECUTABLE_EXTENSIONS = new Set([
+  "exe", "dll", "scr", "bat", "cmd", "com", "pif", "msi", "msp", "cpl", "jar", "app",
+  "ps1", "psm1", "sh", "bash", "zsh", "vbs", "vbe", "js", "mjs", "cjs", "jse", "wsf",
+  "wsh", "hta", "lnk", "reg", "scf", "iso", "img",
+]);
+
+function executableSecondExtension(filename: string) {
+  const parts = filename.toLowerCase().split(".");
+  // parts.at(-1) is the extension the MIME check binds; parts.at(-2) is the one nothing looks
+  // at, which is precisely why it is where an executable hides.
+  return parts.length >= 3 && EXECUTABLE_EXTENSIONS.has(parts.at(-2) ?? "");
+}
+
 /** Validates client-declared metadata only; CDR must still independently inspect the bytes. */
 export function validateQualifiedDocumentInput({
   originalFilename,
@@ -42,8 +110,14 @@ export function validateQualifiedDocumentInput({
   originalFilename: string;
   declaredMimeType: string;
 }): QualifiedInputDecision {
-  const filename = originalFilename.trim();
-  if (!filename || filename !== originalFilename || /[\u0000-\u001f\u007f\\/]/.test(filename) || filename === "." || filename === "..") {
+  const composed = originalFilename.normalize("NFC");
+  const filename = composed.trim();
+  if (!filename || filename !== composed || /[\u0000-\u001f\u007f\\/]/.test(filename) || filename === "." || filename === "..") {
+    return { valid: false, code: "INVALID_FILENAME" };
+  }
+  if (filename.length > MAX_FILENAME_LENGTH
+    || hasFormatCharacter(filename)
+    || executableSecondExtension(filename)) {
     return { valid: false, code: "INVALID_FILENAME" };
   }
   const normalizedMimeType = normalizeDocumentMimeType(declaredMimeType);
@@ -57,5 +131,6 @@ export function validateQualifiedDocumentInput({
   if (!qualifiedDocumentInputs[qualifiedMimeType].some((extension) => lowerFilename.endsWith(extension))) {
     return { valid: false, code: "FILENAME_MIME_MISMATCH" };
   }
+  // The composed name, not the one that arrived: what is stored must be what was validated.
   return { valid: true, normalizedMimeType: qualifiedMimeType, originalFilename: filename };
 }
