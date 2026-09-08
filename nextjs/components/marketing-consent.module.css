@@ -1,0 +1,16 @@
+@layer components {
+  .panel, .settings {
+    color: var(--text-hi);
+    background: var(--g1);
+    border: 1px solid var(--hairline-hi);
+    font: inherit;
+  }
+  .panel { position: fixed; inset: auto 1rem 1rem; z-index: 100; max-width: 40rem; padding: 1rem; }
+  .panel p { margin: 0 0 .75rem; font-size: .875rem; line-height: 1.5; }
+  .panel a { color: inherit; text-decoration: underline; }
+  .actions { display: flex; flex-wrap: wrap; gap: .75rem; }
+  .actions button { min-height: 44px; padding: .5rem 1rem; border: 1px solid var(--text-mid); color: var(--text-hi); background: var(--g2); font: inherit; cursor: pointer; }
+  .settings { position: relative; z-index: 100; display: block; margin: 1rem 1rem 5rem; padding: .5rem .75rem; min-height: 44px; font-size: .8125rem; cursor: pointer; }
+  .panel button:focus-visible, .panel a:focus-visible, .settings:focus-visible { outline: 2px solid var(--text-hi); outline-offset: 3px; }
+  @media (max-width: 390px) { .panel { inset-inline: .5rem; bottom: .5rem; padding: .75rem; } }
+}

@@ -3,6 +3,7 @@
 import { track } from "@vercel/analytics";
 
 export type FunnelEvent =
+  | "generate_lead"
   | "offer_selected"
   | "login_reached_with_intent"
   | "checkout_opened"

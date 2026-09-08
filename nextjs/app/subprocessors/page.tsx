@@ -17,7 +17,7 @@ const PROCESSORS = [
   ["RunPod", "Scale-to-zero GPU OCR", "Sanitized document candidates and processing telemetry"],
   ["Paddle", "Merchant-of-record billing when commercial mode is enabled", "Billing identity, checkout and subscription events"],
   ["Resend", "Transactional inquiry delivery", "Inquiry name, work email, company and message"],
-  ["Google", "OAuth identity provider", "Google account identity and authentication events"],
+  ["Google", "OAuth identity provider; optional, consent-based public website analytics", "Google account identity and authentication events; for visitors who allow analytics, pseudonymous browser identifiers, device information, public-page visits and selected interactions. Customer source contents and workspace events are excluded from analytics."],
 ] as const;
 export default function SubprocessorsPage() { return <PolicyLayout label="SUBPROCESSORS" title="The services allowed to touch each class of data." intro={<>Current as of {LEGAL_EFFECTIVE_DATE}. A provider appearing here does not mean every feature is live; the status page states the active deployment mode.</>}>
   <BreadcrumbJsonLd trail={[{ name: "Subprocessors", path: "/subprocessors" }]} />

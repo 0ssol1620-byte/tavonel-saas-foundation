@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { QUALIFICATION } from "@/lib/contact-qualification";
+import { trackFunnel } from "@/lib/funnel-events";
 
 type State = "idle" | "sending" | "sent" | "error";
 
@@ -29,6 +30,9 @@ export default function ContactForm() {
       });
       const result = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(result.error || "We could not send your inquiry.");
+      const topic = new FormData(form).get("topic");
+      // Count only a received commercial inquiry; no form values enter analytics.
+      if (topic === "sales" || topic === "partnership") trackFunnel("generate_lead");
       form.reset();
       setState("sent");
     } catch (reason) {
