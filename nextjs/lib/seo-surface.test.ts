@@ -54,15 +54,28 @@ function routeMatcherOf(pagePath: string): RegExp {
   of noindex routes is the same choice the sitemap makes about `DOCS_SECTIONS` -- a hand-kept list
   is the thing that goes stale silently.
 */
+/*
+  The retired-URL stub, matched on its shape rather than on the words in it.
+
+  `notFound()` appearing in a file proves nothing: `/docs/[section]` and `/solutions/[slug]` call it
+  for an unknown slug, and `/product/continuous-knowledge` -- a live 200 page -- both mentions
+  `notFound()` and quotes the retired-stub sentence in a comment explaining that it used to be one.
+  A substring test called that page a 404. The whole component body is the discriminator: a stub is
+  a default export that does nothing but 404.
+*/
+const RETIRED_STUB_BODY = /export default function \w+\(\)\s*\{\s*notFound\(\);\s*\}/;
+const RETIRED_STUB_REASON = "stable 404 for retired inbound URLs";
+
 const pages = findFiles(appDirectory, "page.tsx").map((path) => {
   const source = readFileSync(path, "utf8");
+  const alwaysNotFound = RETIRED_STUB_BODY.test(source);
   return {
-    source,
     route: `/${segmentsOf(path, "page.tsx").join("/")}`,
     matcher: routeMatcherOf(path),
     noindex: /robots:\s*\{[^}]*index:\s*false/.test(source),
-    // The retired-URL stub shape, both halves: it must actually 404, and it must say why.
-    retiredStub: source.includes("notFound()") && source.includes("stable 404 for retired inbound URLs"),
+    alwaysNotFound,
+    // Both halves: it must actually 404 for everyone, and it must say why.
+    retiredStub: alwaysNotFound && source.includes(RETIRED_STUB_REASON),
   };
 });
 
@@ -180,7 +193,7 @@ describe("public surface: every disallowed path is deliberate", () => {
   });
 
   it.each(genericDisallow)("%s is a live surface or an annotated retired URL", (token) => {
-    const stub = pages.find((page) => page.route === token && page.source.includes("notFound()"));
+    const stub = pages.find((page) => page.route === token && page.alwaysNotFound);
     expect(
       stub === undefined || stub.retiredStub,
       `${token} is disallowed and 404s without saying it is a retired URL -- annotate it or drop the disallow line`,
@@ -189,9 +202,12 @@ describe("public surface: every disallowed path is deliberate", () => {
 
   /*
     Same reason as the noindex reader above: an annotation check that stopped recognising the
-    annotation would pass every path by finding no stub at all.
+    annotation would pass every path by finding no stub at all. The second assertion is the one
+    that catches the opposite mistake -- a live page mentioning the stub sentence in a comment
+    being read as a 404, which a substring test did.
   */
-  it("recognises the retired-URL stubs it is guarding", () => {
+  it("recognises the retired-URL stubs it is guarding, and nothing else", () => {
     expect(pages.filter((page) => page.retiredStub).map((page) => page.route).sort()).toEqual(["/customers", "/film-2", "/film-3", "/film-4", "/research/experiments"]);
+    expect(pages.find((page) => page.route === "/product/continuous-knowledge")?.alwaysNotFound, "a live page that describes the stub pattern is being read as a stub").toBe(false);
   });
 });
