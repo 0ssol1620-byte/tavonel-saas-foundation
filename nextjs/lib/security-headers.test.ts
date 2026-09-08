@@ -36,7 +36,8 @@ describe("production security headers", () => {
     const policy =
       "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; " +
       "form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.paddle.com https://*.paddle.com; " +
-      "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; " +
+      "style-src 'self' 'unsafe-inline'; style-src-elem 'self'; style-src-attr 'unsafe-inline'; " +
+      "img-src 'self' data: blob:; font-src 'self' data:; " +
       "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.paddle.com https://*.r2.cloudflarestorage.com; " +
       "frame-src 'self' https://*.paddle.com https://*.r2.cloudflarestorage.com; " +
       "worker-src 'self' blob:; manifest-src 'self'";
@@ -49,6 +50,23 @@ describe("production security headers", () => {
       catchAll.headers.some((header) => header.key === "Content-Security-Policy-Report-Only"),
       "the report-only policy is minted per request in middleware, never as a static header",
     ).toBe(false);
+  });
+
+  /*
+    §41 P-08, stated as an invariant rather than as a position in the byte-identity string above.
+
+    The point of the split is that a `<style>` element and a `style="..."` attribute stop sharing
+    one permission. Two ways to lose that silently: dropping `style-src-elem` back to
+    `'unsafe-inline'` to make something render, or dropping `style-src-attr` and breaking the 39
+    attribute uses in `app` and `components`. Both are one word, and both pass a `toContain`
+    check on `style-src`.
+  */
+  it("keeps style elements and style attributes on separate permissions", async () => {
+    const { default: nextConfig } = await import("../next.config.mjs");
+    const enforced = (await nextConfig.headers!()).find((entry) => entry.source === "/(.*)")!.headers.find((header) => header.key === "Content-Security-Policy")!.value;
+    expect(enforced, "a <style> element is attacker-authored CSS; 'self' is the point").toContain("style-src-elem 'self'");
+    expect(enforced.match(/style-src-elem [^;]*/)?.[0], "style-src-elem admitted inline CSS again").not.toContain("'unsafe-inline'");
+    expect(enforced, "React renders style attributes; blocking them breaks the product, not an attack").toContain("style-src-attr 'unsafe-inline'");
   });
 
   it("pins every versioned API response to the v1 response contract", () => {
