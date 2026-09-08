@@ -107,6 +107,54 @@ const AT_A_GLANCE = [
   ],
 ] as const;
 
+/*
+  §54's purchase friction map, answered on the page where the purchase is decided.
+
+  The blueprint lists seventeen objections and asks that every one have a public answer. Fourteen
+  already did, scattered over six pages, and a buyer had to know which page to look on. Three did
+  not: whether this is finished, whether it locks you in, and whether you can delete your data.
+
+  Nothing below is a new answer. Each one is the existing sentence from the page that owns it,
+  shortened to the length someone reads on a pricing page, with the link to the page that says it
+  in full -- so the wording stays maintained in one place and this list can only go stale by
+  pointing somewhere that no longer says it. `lib/brand-copy.test.ts` counts the seventeen.
+
+  Two of the blueprint's questions are reworded rather than quoted. "Why not <vendor> + a vector
+  DB" names competitors, which §71 forbids on a public page, so it asks about the architecture
+  instead. The fourth is phrased as a superiority claim over RAG -- the exact comparative SPEC
+  13.3 bars, and one nothing in this repository has measured -- so it asks how the two relate.
+
+  Writing that second reason out cost two test failures on the first run: the sentence explaining
+  why the phrase is barred contained the phrase. Both guards read source text, comments included,
+  which is correct -- a barred claim in a comment is one copy-paste from being a barred claim on
+  the page.
+
+  The three that had no answer are answered from what exists and nothing more. "Is this finished"
+  is the uncomfortable one, and it is answered with the deployment's own facts -- no format
+  carries a qualification receipt, promotion needs a person, connectors are beta -- rather than
+  with a reassurance, because a buyer who finds that out after a pilot is a worse outcome than one
+  who finds it out here.
+*/
+const PURCHASE_FAQ: Array<[string, string, Route, string]> = [
+  ["Is this just OCR?", "Reading the page is one step of the compile. What you keep is a Compiled World: objects, relations and claims that each carry the source region behind them, under a version you can go back to.", "/knowledge-compiler" as Route, "What a Knowledge Compiler is"],
+  ["Why not a parser plus a vector database?", "That is a way to build the retrieval layer, and the package ships one. What a parser and an index do not give you is the reviewed structure underneath, the evidence binding, or a version history when the sources change.", "/knowledge-compiler" as Route, "Where each category acts"],
+  ["What exactly is a World?", "The output of one compile: objects, relations, evidence, retrieval material and a validation report, addressed by a digest. Two Worlds with the same digest are the same World.", "/knowledge-compiler" as Route, "Glossary"],
+  ["How does this relate to RAG?", "RAG retrieves chunks at question time. Here the chunks are one file in the package, produced from a reviewed World, so they carry the page and region they came from and change only when the World does.", "/knowledge-compiler" as Route, "Compared with RAG"],
+  ["Can I verify an answer?", "Every object carries the regions that support it, and an export carries a manifest with a digest for each file, signed on the way out. The public key is published, so a recipient can check a package without asking us.", "/evidence" as Route, "How evidence is bound"],
+  ["What happens when a source document changes?", "The new bytes are a new version, and compiling produces a new candidate rather than editing the World in place. The active revision moves only when a person promotes it, and the previous one stays readable.", "/knowledge-compiler" as Route, "Questions people ask"],
+  ["Can it read Office files, images and tables?", "It accepts them. Every accepted source is sanitized to PDF and read by OCR, and what survives is the page, the paragraph text and the bounding box — a spreadsheet's cells and formulas do not.", "/sources" as Route, "What this deployment reads"],
+  ["Can my agent use it?", "A read-only MCP server and an HTTP API are published, with eight tools over sources, World, search, Ask, objects, relations, evidence and package. There is no write tool.", "/developers" as Route, "API and MCP"],
+  ["What does it do when it is uncertain?", "It abstains and says which sources it looked at. A composed answer with no region behind it would be indistinguishable from a correct one, which is the failure the whole contract exists to prevent.", "/knowledge-compiler" as Route, "Questions people ask"],
+  ["Is my data safe?", "Your sources go to a tenant-scoped quarantine, are sanitized before anything reads them, and are not used to train shared models. No third-party model API receives your documents in this deployment.", "/security" as Route, "Where your documents go"],
+  ["Is this finished?", "No, and the deployment says where it is not: no accepted format carries a qualification receipt, the connectors are beta, promoting a World is a human decision by design, and three of the thirteen things a security review asks have no published answer yet.", "/trust" as Route, "What is published, and what is not"],
+  ["How much does it cost?", "A monthly subscription with included pages, then a per-page rate past them. Both numbers are above, and the maximum for any page is shown before a run starts.", "/refunds" as Route, "Cancellation and refunds"],
+  ["How much setup is required?", "Upload your own files and compile. Evaluation takes no card, and nothing is charged until you choose a plan.", "/docs" as Route, "Documentation"],
+  ["Will I be locked in?", "The package is open formats — canonical JSON, Turtle, JSON-LD, CSV and JSONL — and the two verifiers are readable scripts rather than a service, so a package can be checked and loaded without us.", "/docs/exports" as Route, "The package format"],
+  ["Can I export?", "Yes. Signed export is included from the free evaluation up, and the export is the whole World rather than a report about it.", "/docs/exports" as Route, "What is in the package"],
+  ["Can I delete my data?", "Source material, derived artifacts and compiled packages are deleted on a verified request to privacy@tavonel.com. The categories and purposes are set out in the privacy notice.", "/privacy" as Route, "Storage and lifecycle"],
+  ["Can an enterprise security review approve it?", "Ten of the thirteen things such a review asks are published in one index, and the three that are not are listed there by name rather than left to be discovered after a pilot.", "/trust" as Route, "Trust Center"],
+];
+
 export default function PricingPageClient({ initialLiveCheckout, initialSelfService }: { initialLiveCheckout: boolean; initialSelfService: boolean }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [signedIn, setSignedIn] = useState(false);
@@ -307,11 +355,21 @@ export default function PricingPageClient({ initialLiveCheckout, initialSelfServ
                 been read, and never exceeds the maximum you were shown.
               </p>
             </details>
+            <p className="slate"><span />QUESTIONS THAT STOP A PURCHASE</p>
+            <div className="pricing-faq">
+              {PURCHASE_FAQ.map(([question, answer, href, label]) => (
+                <details className="status-fold" key={question}>
+                  <summary>{question}</summary>
+                  <p>{answer}</p>
+                  <p className="fine"><Link href={href}>{label}</Link></p>
+                </details>
+              ))}
+            </div>
+
             {/*
               §12.4. The four questions that stop a purchase, each pointed at the page that
               answers it rather than at a sales conversation. "Refunds" is the cancellation and
-              refund terms page; the FAQ the blueprint also lists does not exist as a route, and
-              the fold above is what stands in for it today.
+              refund terms page.
             */}
             <p className="slate"><span />BEFORE YOU START</p>
             <div className="actions">
