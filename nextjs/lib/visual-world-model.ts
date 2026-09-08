@@ -132,6 +132,8 @@ export type ExploreDocument = {
   sourceHref?: string;
   originalSha256?: string;
   renderProfile?: string;
+  /** Where the acquired original came from, in the acquisition record's own words (§11.3). */
+  acquiredFrom?: string;
   sliceRationale?: string;
 };
 

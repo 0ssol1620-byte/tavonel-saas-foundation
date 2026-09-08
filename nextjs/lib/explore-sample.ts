@@ -218,6 +218,10 @@ function documentsOf(inputs: readonly CollectionOcrInput[]) {
       sourceHref: `/explore-sample/${source.sourceFilename}`,
       originalSha256: source.originalSha256,
       renderProfile: source.renderProfile ?? undefined,
+      // §11.3 asks for the acquisition source beside the digests. It was already in the record
+      // and stopped here; a drawer that prints a digest without saying where the bytes were
+      // acquired from is an audit trail with its first line missing.
+      acquiredFrom: source.acquiredFrom,
       sliceRationale: source.sliceRationale,
     };
   });
