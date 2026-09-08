@@ -50,6 +50,56 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+  product-qa:
+    name: Product QA (widths + reduced motion)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: nextjs
+    env:
+      # Live-commerce posture, for this job only.
+      #
+      # The width projects exist to catch layout defects in the header a customer actually sees,
+      # and until now they could not: the test server runs in pilot posture, where the access
+      # action reads "Request access" and links to /contact (111px at 360), while tavonel.com is
+      # live and reads "Start with your files" linking to /login (158px). That difference is why
+      # the 360px header overflow reached main with every check green.
+      #
+      # `readCommercialState` (lib/commercial-state.ts:44-64) needs all four gates to agree:
+      # COMMERCIAL_MODE=live, TAVONEL_BILLING_LAUNCH_APPROVED=true, PADDLE_SANDBOX unset (so the
+      # provider reads "production") and VERCEL_ENV unset (so the deployment gate opens). The last
+      # two are already absent on a runner and are deliberately not set here. browser-qa and
+      # lighthouse keep the default pilot posture.
+      COMMERCIAL_MODE: live
+      TAVONEL_BILLING_LAUNCH_APPROVED: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.34.4 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: nextjs/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: Install Chromium runtime
+        run: pnpm exec playwright install --with-deps chromium
+      # One build, four viewports: the webServer in playwright.config.ts builds and starts the
+      # production bundle once for the whole run, so the added cost is the run, not four builds.
+      - name: Run the product width and reduced-motion projects
+        run: pnpm exec playwright test --project=1440 --project=390 --project=360 --project=reduced-motion
+      - name: Preserve product failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: product-qa
+          path: |
+            nextjs/playwright-report
+            nextjs/test-results
+          if-no-files-found: ignore
+          retention-days: 14
+
   lighthouse:
     name: Lighthouse budgets
     runs-on: ubuntu-latest
@@ -83,10 +133,11 @@ jobs:
   launch-gate:
     name: Launch gate
     if: always()
-    needs: [browser-qa, lighthouse]
+    needs: [browser-qa, product-qa, lighthouse]
     runs-on: ubuntu-latest
     steps:
       - name: Require every launch check
         run: |
           test "${{ needs.browser-qa.result }}" = "success"
+          test "${{ needs.product-qa.result }}" = "success"
           test "${{ needs.lighthouse.result }}" = "success"

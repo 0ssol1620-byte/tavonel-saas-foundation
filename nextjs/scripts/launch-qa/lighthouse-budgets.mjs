@@ -5,7 +5,16 @@ import { join } from "node:path";
 
 const baseUrl = process.env.QA_BASE_URL ?? "http://127.0.0.1:3117";
 const serverMode = process.env.QA_SERVER_MODE ?? "production";
-const routes = ["/", "/privacy", "/security"];
+/*
+  The routes worth a budget.
+
+  `/explore` is here because it is the heaviest public route -- 721 KB of served HTML, an entire
+  compiled World composition -- and it was the one route on the site with no ceiling at all.
+  `/pricing` is here because it is where a purchase decision happens. Adding a route moves nothing
+  about the ratchet: a budget is re-derived from a measurement and recorded with the decision that
+  authorized it, never raised to make a run go green.
+*/
+const routes = ["/", "/privacy", "/security", "/explore", "/pricing"];
 const runsPerRoute = 3;
 const maxAttemptsPerRoute = 6;
 const budgets = {
