@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, createHmac, randomBytes } from "node:crypto";
 
 import { NextResponse } from "next/server";
 
@@ -30,6 +30,45 @@ type Contact = {
 const RATE_WINDOW_MS = 10 * 60 * 1000;
 const RATE_LIMIT = 5;
 const buckets = new Map<string, number[]>();
+/*
+  Per-process, so it never leaves this instance and needs no configuration. Its only job is to
+  keep the raw client IP and the submitted address out of the limiter keys; the bucket map is
+  already process-local, so a durable secret would buy nothing here.
+*/
+const KEY_SALT = randomBytes(32);
+
+/*
+  ponytail: per-process in-memory limiter, one dimension short of durable.
+
+  Blueprint §30 asks for a distributed limit across IP AND account/domain, and §31 names this
+  Map as the P0 gap. Reusing lib/developer-store.ts consumeDeveloperApiRateLimit is not
+  possible without a migration: consume_foundation_api_rate_limit
+  (supabase/migrations/0012_foundation_connections_and_api_keys.sql:246) returns false unless
+  p_scope is one of the ten developer scopes (:264) and a live foundation_api_keys row exists
+  for p_key_id + p_workspace_key (:270), and foundation_api_rate_windows itself constrains
+  key_id by foreign key (:55) and workspace_key by `^pilot-...` check (:56). A contact
+  submission has none of those. Upgrade path: a `consume_public_form_rate_limit(p_bucket text,
+  p_window_seconds int, p_limit int)` RPC over its own table, then this function becomes an
+  await on it that answers 503 when the store is unreachable.
+
+  Until then this holds only within one warm instance. It is enforced on both dimensions so a
+  single rotating address cannot buy extra allowance, and so the key shape already matches the
+  durable version.
+*/
+function isRateLimitedMultiDimensional(request: Request, email: string) {
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+    || request.headers.get("x-real-ip")
+    || "unknown";
+  const domain = email.slice(email.lastIndexOf("@") + 1);
+  // Both must pass. Checking them in sequence would let a rejected first dimension skip
+  // recording the second, so every dimension is consumed before the verdict is returned.
+  const verdicts = [saltedKey("ip", ip), saltedKey("domain", domain)].map(isRateLimited);
+  return verdicts.some(Boolean);
+}
+
+function saltedKey(dimension: string, value: string) {
+  return createHmac("sha256", KEY_SALT).update(`${dimension}\n${value}`).digest("hex");
+}
 
 export async function POST(request: Request) {
   if (!isAllowedOrigin(request)) return error("This request origin is not allowed.", 403);
@@ -57,7 +96,7 @@ export async function POST(request: Request) {
     return accepted();
   }
 
-  if (isRateLimited(fingerprint(request))) {
+  if (isRateLimitedMultiDimensional(request, contact.email)) {
     return error("Too many requests. Please try again in 10 minutes.", 429);
   }
 
@@ -148,13 +187,6 @@ function isAllowedOrigin(request: Request) {
         return false;
       }
     });
-}
-
-function fingerprint(request: Request) {
-  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  return createHash("sha256")
-    .update(forwarded || request.headers.get("x-real-ip") || "unknown")
-    .digest("hex");
 }
 
 function isRateLimited(key: string) {
