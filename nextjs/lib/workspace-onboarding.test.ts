@@ -21,6 +21,7 @@ const base: WorkspaceStateInput = {
   compileErrorCode: null,
   blockedSourceCount: 0,
   hasGroundedAnswer: false,
+  hasAiConnection: false,
 };
 
 const input = (overrides: Partial<WorkspaceStateInput> = {}): WorkspaceStateInput => ({ ...base, ...overrides });
@@ -82,6 +83,42 @@ describe("workspace state", () => {
     expect(state.stateDescription).toContain("does not estimate progress");
   });
 
+  it("does not invite a re-compile without saying the last one stopped", () => {
+    /*
+      The defect this pins: sources read, no World built, the compile failed -- and the hero said
+      "4 sources are ready to compile" with "Choose sources to compile" beside it, which is an
+      invitation to repeat the run that just stopped, worded as if nothing had. The attention
+      queue named the failure; the primary state answer (§13.2) did not.
+    */
+    const failed = deriveWorkspaceState(input({
+      documentCount: 4,
+      readyDocumentCount: 4,
+      compileErrorCode: "COMPILE_CORE_UNAVAILABLE",
+    }));
+    expect(failed.stateTitle).toBe("The last compile stopped.");
+    expect(failed.stateDescription).toContain("COMPILE_CORE_UNAVAILABLE");
+    expect(failed.nextAction).toEqual({ label: "Open activity", surface: "activity" });
+
+    // With nothing readable either, the failure is still the answer rather than "no source is
+    // ready yet", which describes a symptom of it.
+    expect(deriveWorkspaceState(input({ documentCount: 4, compileErrorCode: "COMPILE_TIMEOUT" })).stateTitle)
+      .toBe("The last compile stopped.");
+  });
+
+  it("keeps newer news above a run that already ended", () => {
+    // A live run, a candidate awaiting a decision and an active World each outrank a previous
+    // failure -- the failure stays in the attention queue, which is where a second fact belongs.
+    const withFailure = (state: Partial<WorkspaceStateInput>) =>
+      deriveWorkspaceState(input({ documentCount: 4, compileErrorCode: "COMPILE_CORE_UNAVAILABLE", ...state })).stateTitle;
+
+    expect(withFailure({ activityCount: 1 })).toBe("1 source is becoming a world.");
+    expect(withFailure({ hasCandidate: true, candidateNeedsDecision: true })).toBe("Candidate World ready for review.");
+    expect(withFailure({ activeRevision: 2 })).toBe("World v2 is active and source-grounded.");
+    // And it is never lost: the attention queue still carries it in all three.
+    expect(deriveAttentionItems(input({ activeRevision: 2, compileErrorCode: "COMPILE_CORE_UNAVAILABLE" }))
+      .map((item) => item.id)).toEqual(["compile-failed"]);
+  });
+
   it("does not tell a returning user with nothing readable to build their first World", () => {
     const state = deriveWorkspaceState(input({ documentCount: 2, operatorReviewCount: 2 }));
     expect(state.stateTitle).toBe("No source is ready to compile yet.");
@@ -94,13 +131,35 @@ describe("onboarding steps", () => {
     const done = (state: WorkspaceStateInput) =>
       Object.fromEntries(deriveOnboardingSteps(state).map((step) => [step.id, step.done]));
 
-    expect(done(input())).toEqual({ source: false, compile: false, review: false, activate: false, ask: false });
+    expect(done(input())).toEqual({
+      source: false, compile: false, review: false, activate: false, ask: false, connect: false,
+    });
     expect(done(input({
       documentCount: 2,
       hasCandidate: true,
       activeRevision: 1,
       hasGroundedAnswer: true,
-    }))).toEqual({ source: true, compile: true, review: true, activate: true, ask: true });
+      hasAiConnection: true,
+    }))).toEqual({
+      source: true, compile: true, review: true, activate: true, ask: true, connect: true,
+    });
+  });
+
+  it("offers §13.3's six steps in order, Connect to AI last", () => {
+    // Five steps shipped where the blueprint's checklist has six, and the missing one was the
+    // step that turns a trusted World into something an AI actually reads.
+    expect(deriveOnboardingSteps(input()).map((step) => step.id))
+      .toEqual(["source", "compile", "review", "activate", "ask", "connect"]);
+  });
+
+  it("closes Connect to AI on the act, not on reaching an Active World", () => {
+    const connect = (state: Partial<WorkspaceStateInput>) =>
+      deriveOnboardingSteps(input({ documentCount: 1, hasCandidate: true, activeRevision: 2, ...state }))
+        .find((step) => step.id === "connect")!.done;
+
+    // An activated, answerable World is not a connection: nothing has read it yet.
+    expect(connect({ hasGroundedAnswer: true })).toBe(false);
+    expect(connect({ hasAiConnection: true })).toBe(true);
   });
 
   it("holds Review open while anything is still outstanding", () => {

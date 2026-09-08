@@ -169,6 +169,19 @@ export default function TechnicalDetails({
                       render profile: {document.renderProfile}
                     </>
                   ) : null}
+                  {/*
+                    Where the bytes came from, printed for every filing rather than only for the
+                    rendered ones. §11.3 lists the acquisition source beside the digests, and the
+                    two documents that differ most here are exactly the two this line separates:
+                    an SEC EDGAR primary document and an Apple Investor Relations PDF are not the
+                    same provenance even when both are official.
+                  */}
+                  {document.acquiredFrom ? (
+                    <>
+                      <br />
+                      acquired from: {document.acquiredFrom}
+                    </>
+                  ) : null}
                   {document.accession ? (
                     <>
                       <br />

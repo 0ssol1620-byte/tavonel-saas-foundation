@@ -14,6 +14,7 @@ import {
   actFromQuery,
   buildExploreAnswerViews,
   buildExploreChangeView,
+  evidenceIdFromQuery,
 } from "./explore-story";
 import { toVisualWorldModel } from "./visual-world-model";
 
@@ -94,6 +95,28 @@ describe("the act a link may ask for", () => {
         Array.isArray(value) ? "change_compare" : "entry",
       );
     }
+  });
+});
+
+describe("the region a link may ask for", () => {
+  it("resolves a region the shipped World actually holds", () => {
+    const region = model.evidence[0].id;
+    expect(evidenceIdFromQuery(region, model.evidence)).toBe(region);
+    // `?evidence=` and `?act=` are two different requests. A region is always more specific, and
+    // the stage reads it that way; this asserts the resolver does not silently drop one for the
+    // other by resolving both against the same list.
+    expect(actFromQuery("change")).toBe("change_compare");
+  });
+
+  it("refuses a region that is not in the composition the page sent", () => {
+    // A stale link, a mistyped id, a prototype key and an id from some other World all resolve
+    // to null so the stage falls back to its own opening region rather than addressing nothing.
+    for (const value of [undefined, "", "constructor", "toString", "region-that-never-existed", "__proto__"]) {
+      expect(evidenceIdFromQuery(value, model.evidence), String(value)).toBeNull();
+    }
+    // The array form a repeated query parameter produces takes the first value, like `act`.
+    expect(evidenceIdFromQuery([model.evidence[0].id, "nonsense"], model.evidence)).toBe(model.evidence[0].id);
+    expect(evidenceIdFromQuery(["nonsense", model.evidence[0].id], model.evidence)).toBeNull();
   });
 });
 

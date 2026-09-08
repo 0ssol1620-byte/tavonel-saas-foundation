@@ -76,6 +76,11 @@
 .node[data-selected="true"] text { fill: var(--graph-ink); }
 .node[data-matched="true"] circle { stroke: var(--graph-ink); stroke-width: 3; }
 .node[data-dimmed="true"] { opacity: .28; }
+/* The keyboard's position in the picture. The browser's own outline on an SVG group is drawn
+   around the group's bounding box in user units, which at any zoom but one is either invisible
+   or the size of the canvas, so the ring is painted on the circle instead. */
+.node:focus-visible { outline: none; }
+.node:focus-visible circle { stroke: var(--graph-ink); stroke-width: 4; }
 
 .tableWrap { max-height: clamp(320px, 52vh, 640px); overflow: auto; border: 1px solid var(--graph-line); }
 .table { width: 100%; border-collapse: collapse; font: 11px var(--f-mono, monospace); }

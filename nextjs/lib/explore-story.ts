@@ -57,6 +57,27 @@ export function actFromQuery(value: string | string[] | undefined): ExploreAct {
     : "entry";
 }
 
+/**
+ * The source region a query string asks for: `/explore?evidence=<regionId>` (§28 P0).
+ *
+ * `?act=evidence` lands a reader on the act; it cannot land them on the region a particular claim
+ * was compiled from, which is the half of "evidence deep link" that makes a citation quotable
+ * outside this page. This resolves the second half.
+ *
+ * The id is checked against the regions the page actually shipped rather than trusted. A stale,
+ * mistyped or invented id returns `null` and the stage opens on its own default region instead of
+ * addressing one that does not exist -- the same rule `actFromQuery` follows, and the reason a
+ * bare lookup is not used here either.
+ */
+export function evidenceIdFromQuery(
+  value: string | string[] | undefined,
+  regions: ReadonlyArray<{ id: string }>,
+): string | null {
+  const requested = Array.isArray(value) ? value[0] : value;
+  if (requested === undefined || requested === "") return null;
+  return regions.some((region) => region.id === requested) ? requested : null;
+}
+
 /** The three acts the stage offers as a rail, in order. */
 export const EXPLORE_ACTS: Array<{ act: ExploreAct; query: string; label: string; caption: string }> = [
   { act: "world", query: "world", label: "WORLD", caption: "The compiled objects and the relations between them." },

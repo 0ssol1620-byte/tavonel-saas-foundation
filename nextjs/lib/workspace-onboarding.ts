@@ -33,6 +33,18 @@ export type WorkspaceStateInput = {
   blockedSourceCount: number;
   /** A grounded answer has come back from the Active World in this session. */
   hasGroundedAnswer: boolean;
+  /**
+   * The reader has taken the AI-connection step: opened the Use-with-AI guide, or downloaded the
+   * signed package that guide describes.
+   *
+   * Session-scoped, and deliberately so. It is still an observed act rather than a "seen it"
+   * flag -- dismissing the guide cannot set it -- but the workspace holds no durable record of an
+   * AI connection to read: there is no connect dialog, and API keys live on a surface this
+   * derivation does not fetch. So the row reappears after a reload, which is the honest failure
+   * direction: an already-taken step shown once more costs a glance, while a finished step
+   * asserted from a flag that outlived the truth is a checklist that lies.
+   */
+  hasAiConnection: boolean;
 };
 
 /** An action the page has to run itself; anything else is a surface navigation. */
@@ -121,6 +133,26 @@ export function deriveWorkspaceState(input: WorkspaceStateInput): WorkspaceState
     };
   }
 
+  /*
+    A compile that stopped is the state, not a footnote to it (§13.6, program §35).
+
+    The attention queue below the hero has always named the failure. The hero itself did not: with
+    the sources still read and no World built, the next branch answered "4 sources are ready to
+    compile" and offered "Choose sources to compile" -- inviting the customer to repeat, without
+    a word about it, the exact run that had just stopped. It sits below the live-run, candidate
+    and active-World branches because each of those is newer news than a run that already ended,
+    and above every "here is what you could do next" branch because none of them is true until
+    the customer knows the last attempt failed.
+  */
+  if (input.compileErrorCode) {
+    return {
+      mode,
+      stateTitle: "The last compile stopped.",
+      stateDescription: `It stopped with ${input.compileErrorCode}, and nothing was activated. The run's own record says which sources it had read when it stopped.`,
+      nextAction: { label: "Open activity", surface: "activity" },
+    };
+  }
+
   if (input.readyDocumentCount > 0) {
     return {
       mode,
@@ -146,7 +178,7 @@ export function deriveWorkspaceState(input: WorkspaceStateInput): WorkspaceState
 }
 
 export type OnboardingStep = {
-  id: "source" | "compile" | "review" | "activate" | "ask";
+  id: "source" | "compile" | "review" | "activate" | "ask" | "connect";
   title: string;
   detail: string;
   done: boolean;
@@ -189,6 +221,17 @@ export function deriveOnboardingSteps(input: WorkspaceStateInput): OnboardingSte
       title: "Ask a grounded question",
       detail: "Ask the Active World, then follow each citation back to its exact source region.",
       done: input.hasGroundedAnswer,
+    },
+    {
+      /*
+        §13.3's sixth step. The first five end with a reader who trusts the World; this is the one
+        that puts it to work, and leaving it off the checklist made "Use with AI" a disclosure
+        somebody had to find rather than a step the product asks for.
+      */
+      id: "connect",
+      title: "Connect to AI",
+      detail: "Read the World through MCP or the API, or take the signed package to a local agent.",
+      done: input.hasAiConnection,
     },
   ];
 }

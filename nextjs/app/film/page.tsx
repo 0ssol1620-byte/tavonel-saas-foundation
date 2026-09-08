@@ -7,13 +7,19 @@ export const metadata: Metadata = {
   alternates: { canonical: "/film" },
   openGraph: { url: "/film" },
   /*
-    Shareable, not indexable.
+    Not indexable, and not reachable in production.
 
-    This page is the brand film on its own -- a link to hand to someone, and a thing to open in
-    a sales call. Its content is the same eighteen seconds the landing page already carries, so
-    letting a crawler index both offers the search engine two pages making one argument and
-    invites it to rank the one with no product on it. It stays reachable by anyone holding the
-    link, and follow stays on so the links out of it still count.
+    This comment used to call the page "a link to hand to someone, and a thing to open in a sales
+    call" that "stays reachable by anyone holding the link". That was never true of the deployed
+    site: `layout.tsx` beside this file calls `notFound()` whenever `VERCEL_ENV === "production"`,
+    so on tavonel.com the link is a 404 -- confirmed by curl, which returns 404 with
+    `X-Matched-Path: /film`. This route is a preview and review surface. Anyone wanting the film
+    as a shareable link has to remove that guard first, and then decide what it competes with.
+
+    The rest still holds, and is the reason the guard is not simply deleted: the content is the
+    same eighteen seconds the landing page already carries, so letting a crawler index both
+    offers the search engine two pages making one argument and invites it to rank the one with
+    no product on it. `follow` stays on so the links out of it still count.
   */
   robots: { index: false, follow: true },
   title: "Eighteen seconds — compile — TAVONEL",

@@ -39,6 +39,7 @@ import {
   EXPLORE_ACTS,
   EXPLORE_COPY,
   actFromQuery,
+  evidenceIdFromQuery,
   type ExploreAct,
   type ExploreAnswerView,
   type ExploreChangeView,
@@ -90,25 +91,6 @@ export default function ExploreStage({ model, layout, change, answers, technical
     setSettled(true);
   }, []);
 
-  useEffect(() => {
-    const requested = actFromQuery(new URLSearchParams(window.location.search).get("act") ?? undefined);
-    trackFunnel("explore_entered", { act: requested });
-    if (requested !== "entry") {
-      enter(requested);
-      return;
-    }
-    /*
-      The world settles behind the hero rather than after it (§17).
-
-      Arriving from the landing's last frame, the reader should be looking at the same world
-      through the entry copy, not at a black panel that turns into one when they click. So the
-      composition settles on mount and ENTER WORLD only lifts the scrim -- which is also why
-      entering costs nothing: there is no animation left to wait for.
-    */
-    const frame = window.requestAnimationFrame(() => setSettled(true));
-    return () => window.cancelAnimationFrame(frame);
-  }, [enter]);
-
   const selectNode = useCallback(
     (id: string) => {
       setSelectedId(id);
@@ -142,6 +124,43 @@ export default function ExploreStage({ model, layout, change, answers, technical
     },
     [enter, model.nodes],
   );
+
+  /*
+    What the URL asked for, read once after mount.
+
+    It sits below `openRegion` because a region link resolves through the same opener a click
+    does -- the region's owning object gets selected, the evidence id is set, and the act change
+    is counted once. A hand-rolled second path here would be the place the two drift apart.
+
+    `?evidence=<regionId>` wins over `?act=` when both are present: naming a region is the more
+    specific request, and it is always an Evidence-act request. An id the shipped World does not
+    hold resolves to `null` and the page falls through to the act (or to entry), so a stale link
+    still lands somewhere real rather than on an empty source sheet.
+  */
+  useEffect(() => {
+    const query = new URLSearchParams(window.location.search);
+    const region = evidenceIdFromQuery(query.get("evidence") ?? undefined, model.evidence);
+    const requested = region ? "evidence" : actFromQuery(query.get("act") ?? undefined);
+    trackFunnel("explore_entered", { act: requested });
+    if (region) {
+      openRegion(region);
+      return;
+    }
+    if (requested !== "entry") {
+      enter(requested);
+      return;
+    }
+    /*
+      The world settles behind the hero rather than after it (§17).
+
+      Arriving from the landing's last frame, the reader should be looking at the same world
+      through the entry copy, not at a black panel that turns into one when they click. So the
+      composition settles on mount and ENTER WORLD only lifts the scrim -- which is also why
+      entering costs nothing: there is no animation left to wait for.
+    */
+    const frame = window.requestAnimationFrame(() => setSettled(true));
+    return () => window.cancelAnimationFrame(frame);
+  }, [enter, model.evidence, openRegion]);
 
   const closeAsk = useCallback(() => setAct(returnAct.current), []);
 

@@ -2810,6 +2810,16 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
 @media (max-width: 400px) {
   .nav { gap: 6px; padding: 10px 12px; }
   .nav-actions { gap: 8px; }
+  /*
+    The 194..352 measurement above was taken with IBM Plex Mono already painted. The face is
+    `display: swap`, so until it arrives the label is set in the size-adjusted fallback, which is
+    not metric-identical: in the product-qa job the same label ran ~7px wider and the row ended at
+    361 in a 360px viewport -- one pixel past the edge for the swap period, on a real phone too.
+    Two pixels of padding and a fifth of the tracking, on the header action only and only below
+    400px, pay for that fallback with room to spare. (`.nav .btn.small` above is (0,3,0); this
+    selector has to outrank it or it does nothing, which is what the first attempt did.)
+  */
+  .nav .nav-actions .btn.small { padding-left: 8px; padding-right: 8px; letter-spacing: 0.06em; }
 }
 
 @media (max-width: 520px) {

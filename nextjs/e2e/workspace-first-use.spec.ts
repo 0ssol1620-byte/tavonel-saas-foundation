@@ -136,7 +136,10 @@ test.describe("workspace first use — desktop", () => {
     await expect(intake).toHaveAttribute("data-mode", "returning");
     await expect(intake).toHaveAttribute("data-existing-documents", "1");
     await expect(page.getByRole("heading", { name: "1 source is ready to compile." })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Getting started 1 of 5 complete/ })).toHaveAttribute("aria-expanded", "false");
+    // Six, not five: BP §13.3's checklist ends with "Connect to AI" and the shipped list stopped
+    // at five. The count is incidental to what these three tests hold -- that the guide's open
+    // state follows inventory truth, never a "seen it" flag -- but it has to name the real list.
+    await expect(page.getByRole("button", { name: /Getting started 1 of 6 complete/ })).toHaveAttribute("aria-expanded", "false");
     await expect(page.getByRole("heading", { name: "What changed" })).toBeVisible();
 
     const intakeBox = await intake.boundingBox();
@@ -160,12 +163,15 @@ test.describe("workspace first use — desktop", () => {
 
     await expect(page.getByRole("heading", { name: "Drop files, folders or ZIP here" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Build your first Compiled World." })).toBeVisible();
-    const guide = page.getByRole("button", { name: /Getting started 0 of 5 complete/ });
+    const guide = page.getByRole("button", { name: /Getting started 0 of 6 complete/ });
     await expect(guide).toHaveAttribute("aria-expanded", "true");
     await expect(page.getByRole("heading", { name: "The short path to a useful Compiled World." })).toBeVisible();
-    // The whole first-success spine, in order, before anything has been done.
+    // The whole first-success spine, in order, before anything has been done. Six steps, because
+    // BP §13.3's checklist ends at "Connect to AI" -- the step that turns a World somebody trusts
+    // into one an AI reads -- and the shipped list stopped one short of it.
     await expect(page.locator(".workspace-getting-started-steps li strong")).toHaveText([
       "Add a source", "Compile a candidate", "Review", "Activate World", "Ask a grounded question",
+      "Connect to AI",
     ]);
     // Progressive, not forced: it collapses and stays collapsed, and it is reopenable.
     await guide.click();
@@ -272,12 +278,12 @@ test.describe("workspace first use — mobile", () => {
     await page.route("**/api/documents", route => route.fulfill({ json: { documents: [] } }));
 
     await page.goto("/workspace");
-    const guide = page.getByRole("button", { name: /Getting started 0 of 5 complete/ });
+    const guide = page.getByRole("button", { name: /Getting started 0 of 6 complete/ });
     await expect(guide).toHaveAttribute("aria-expanded", "true");
     await page.getByRole("button", { name: "Hide guide" }).click();
     await expect(guide).toHaveAttribute("aria-expanded", "false");
     // Dismissal hides the guide; it never marks an unreached step complete.
-    await expect(guide).toContainText("0 of 5 complete");
+    await expect(guide).toContainText("0 of 6 complete");
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
     await page.screenshot({ path: receipt("home-new-mobile-412.png"), fullPage: true });
   });
