@@ -18,9 +18,10 @@ import { useRef } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import ProvenanceTether from "@/components/world-visual/provenance-tether";
 import SourceSheet from "@/components/world-visual/source-sheet";
+import { STATE_WORD } from "./parallel-view";
 import styles from "./explore-stage.module.css";
 import { EXPLORE_COPY } from "@/lib/explore-story";
-import type { VisualEvidence, VisualState, VisualWorldModel } from "@/lib/visual-world-model";
+import type { VisualEvidence, VisualWorldModel } from "@/lib/visual-world-model";
 
 const KIND_WORD: Record<string, string> = {
   Claim: "CLAIM",
@@ -30,14 +31,6 @@ const KIND_WORD: Record<string, string> = {
   Evidence: "SOURCE",
 };
 
-const STATE_WORD: Record<VisualState, string> = {
-  current: "CURRENT",
-  candidate: "CANDIDATE",
-  changed: "CHANGED",
-  affected: "AFFECTED",
-  unresolved: "UNRESOLVED",
-  dim: "UNCHANGED",
-};
 
 export default function EvidenceAct({
   model,
@@ -99,8 +92,13 @@ export default function EvidenceAct({
             </div>
             <div>
               <dt>Evidence</dt>
+              {/*
+                The compiler's number, not the shipped one. `boundVisualWorld` sends the browser
+                a prefix of an object's regions (§24), and printing the length of that prefix
+                here would restate a payload size as a compiled fact.
+              */}
               <dd>
-                {node.evidenceRefs.length} source region{node.evidenceRefs.length === 1 ? "" : "s"}
+                {node.evidenceCount} source region{node.evidenceCount === 1 ? "" : "s"}
               </dd>
             </div>
             <div>
@@ -162,8 +160,14 @@ export default function EvidenceAct({
             >
               ← PREVIOUS
             </button>
+            {/*
+              "of 12" is the number of regions this browser was sent, and when the compiler bound
+              more than that the line says which number is which rather than letting the smaller
+              one pass for the larger.
+            */}
             <span aria-live="polite">
               REGION {activeIndex + 1} OF {regions.length}
+              {node.evidenceCount > regions.length ? ` SHOWN · ${node.evidenceCount} COMPILED` : ""}
             </span>
             <button
               type="button"

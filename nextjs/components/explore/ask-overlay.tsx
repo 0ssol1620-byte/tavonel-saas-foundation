@@ -16,6 +16,7 @@
 
 import { useEffect, useRef } from "react";
 import { Quote, X } from "lucide-react";
+import { useDialogFocus } from "@/components/world-visual/use-dialog-focus";
 import styles from "./explore-stage.module.css";
 import { EXPLORE_COPY, type ExploreAnswerView } from "@/lib/explore-story";
 
@@ -33,14 +34,23 @@ export default function AskOverlay({
   onClose: () => void;
 }) {
   const firstRef = useRef<HTMLButtonElement | null>(null);
+  const panelRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
     firstRef.current?.focus();
   }, []);
+  // Tab stays inside while it is open and returns to the Ask bar when it closes (§20).
+  useDialogFocus(panelRef);
 
   const answer = answers[index] ?? answers[0];
 
   return (
-    <section className={styles.askPanel} role="dialog" aria-label="Ask this World">
+    <section
+      ref={panelRef}
+      className={styles.askPanel}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Ask this World"
+    >
       <header>
         <span>{EXPLORE_COPY.askPlaceholder}</span>
         <button type="button" onClick={onClose} aria-label="Close Ask">

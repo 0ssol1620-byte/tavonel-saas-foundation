@@ -20,6 +20,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import WorldCanvas from "@/components/world-visual/world-canvas";
 import PageRegion from "@/components/world-visual/page-region";
+import ParallelView from "./parallel-view";
 import styles from "./explore-stage.module.css";
 import { EXPLORE_COPY, type ExploreChangeArrivalView, type ExploreChangeView } from "@/lib/explore-story";
 import type { VisualLayout, VisualState, VisualWorldModel } from "@/lib/visual-world-model";
@@ -122,6 +123,19 @@ export default function ChangeAct({
           reduced={reduced}
           settled={settled}
           label="Compiled World after the 2026 filings arrived, with the objects they reached"
+        />
+        {/*
+          §20. This is the one act where an object's state differs, and the canvas reports that
+          difference in colour. The list prints AFFECTED or UNCHANGED as a word, so the same
+          reading is available to someone who cannot see the palette.
+        */}
+        <ParallelView
+          model={model}
+          layout={layout}
+          states={states}
+          onSelect={onSelect}
+          onOpen={onOpen}
+          open={reduced}
         />
         <p className={styles.changeCaption}>{EXPLORE_COPY.changeCaption}</p>
 

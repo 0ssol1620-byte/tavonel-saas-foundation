@@ -218,11 +218,12 @@ export default function WorldCanvas({
               filing rather than about the object -- three objects read out of the same filing
               printed the same number and the composition read as an index of documents. What is
               about the object is how much of the World it reaches, which is also exactly the
-              lines a reader can count from it. Both numbers are the artifact's.
+              lines a reader can count from it. Both numbers are the artifact's -- `evidenceCount`
+              rather than the shipped `evidenceRefs`, which is bounded (§24).
             */}
             <span className={styles.nodeMeta}>
               {node.kind === "Document" || node.kind === "Evidence"
-                ? `${node.evidenceRefs.length} region${node.evidenceRefs.length === 1 ? "" : "s"}`
+                ? `${node.evidenceCount} region${node.evidenceCount === 1 ? "" : "s"}`
                 : `${node.degree} relation${node.degree === 1 ? "" : "s"}`}
             </span>
           </button>
