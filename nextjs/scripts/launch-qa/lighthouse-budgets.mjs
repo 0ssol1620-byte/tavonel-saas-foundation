@@ -6,7 +6,12 @@ import { join } from "node:path";
 const baseUrl = process.env.QA_BASE_URL ?? "http://127.0.0.1:3117";
 const serverMode = process.env.QA_SERVER_MODE ?? "production";
 /*
-  The routes worth a budget.
+  Historical diagnosis before the 2026-09-09 entry-height fix (retained below).
+  The entry now owns its height independently of the inert World backdrop, so switching
+  to a phone/reduced-motion list cannot move its headline. The unchanged 0.1 ceiling now
+  ENFORCES /explore as well; the former measure-only exception is removed below.
+
+  Original baseline notes:
 
   `/pricing` is new here and is where a purchase decision happens; it passes every budget with
   room (CLS 0.0025, performance 0.97, measured 2026-09-09 against a production build).
@@ -30,8 +35,8 @@ const serverMode = process.env.QA_SERVER_MODE ?? "production";
   measured on every run, its summary line is printed like any other, and it starts failing the
   build the day the shift is fixed and it is moved into `routes`.
 */
-const routes = ["/", "/privacy", "/security", "/pricing"];
-const measureOnlyRoutes = ["/explore"];
+const routes = ["/", "/privacy", "/security", "/pricing", "/explore"];
+const measureOnlyRoutes = [];
 const runsPerRoute = 3;
 const maxAttemptsPerRoute = 6;
 const budgets = {
