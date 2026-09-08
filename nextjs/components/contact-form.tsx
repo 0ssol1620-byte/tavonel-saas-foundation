@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { QUALIFICATION } from "@/lib/contact-qualification";
+import { trackFunnel } from "@/lib/funnel-events";
 
 type State = "idle" | "sending" | "sent" | "error";
 
@@ -15,6 +16,9 @@ export default function ContactForm() {
     setState("sending");
     setMessage("");
     const form = event.currentTarget;
+    const formData = new FormData(form);
+    // The endpoint returns the same response for honeypots; exclude those submissions locally.
+    const eligibleLead = !formData.get("website") && Date.now() - startedAt >= 1_500;
 
     try {
       const response = await fetch("/api/contact", {
@@ -25,10 +29,13 @@ export default function ContactForm() {
           name, and fromEntries keeps only the last of them -- so a visitor who ticked four
           boxes would have been reported as having ticked one.
         */
-        body: JSON.stringify({ ...collect(new FormData(form)), startedAt }),
+        body: JSON.stringify({ ...collect(formData), startedAt }),
       });
       const result = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(result.error || "We could not send your inquiry.");
+      const topic = formData.get("topic");
+      // Count only a received commercial inquiry; no form values enter analytics.
+      if (eligibleLead && (topic === "sales" || topic === "partnership")) trackFunnel("generate_lead");
       form.reset();
       setState("sent");
     } catch (reason) {
