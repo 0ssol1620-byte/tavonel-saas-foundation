@@ -71,9 +71,10 @@ async function signedS3Response(
   key: string,
   body: Buffer | undefined,
   now = new Date(),
+  extraHeaders?: Record<string, string>,
 ) {
   const canonicalUri = `/${env.bucket}/${key.split("/").map(encodeURIComponent).join("/")}`;
-  return signedS3Request(env, method, canonicalUri, "", body, now);
+  return signedS3Request(env, method, canonicalUri, "", body, now, extraHeaders);
 }
 
 async function signedS3Request(
@@ -83,6 +84,13 @@ async function signedS3Request(
   canonicalQuery: string,
   body: Buffer | undefined,
   now = new Date(),
+  /*
+    Headers sent but not signed.
+    SigV4 signs the headers it lists in `SignedHeaders`, and a header outside that list travels
+    normally. `Range` is the only user of this, and leaving it unsigned is what keeps the
+    canonical-request construction below identical to the one every other call already produces.
+  */
+  extraHeaders?: Record<string, string>,
 ) {
   const host = `${env.accountId}.r2.cloudflarestorage.com`;
   const payloadHash = sha256Hex(body ?? Buffer.alloc(0));
@@ -122,7 +130,7 @@ async function signedS3Request(
   try {
     return await fetch(`https://${host}${canonicalUri}${canonicalQuery ? `?${canonicalQuery}` : ""}`, {
       method,
-      headers,
+      headers: { ...headers, ...extraHeaders },
       body: body ? new Uint8Array(body) : undefined,
       signal: AbortSignal.timeout(8_000),
     });
@@ -174,6 +182,51 @@ export async function headFoundationQuarantineObject(
     sizeBytes: Number.isSafeInteger(contentLength) && contentLength >= 0 ? contentLength : null,
     contentType: response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() || null,
     etag: response.headers.get("etag")?.replaceAll('"', "") || null,
+  };
+}
+
+/** How many leading bytes a signature check needs. Every signature this deployment knows is
+ *  within the first 16, and 512 leaves room for one to grow without another deploy. */
+export const QUARANTINE_SIGNATURE_BYTES = 512;
+
+/**
+ * The first bytes of a quarantine object, and nothing else (blueprint §36, S-66).
+ *
+ * `readFoundationQuarantineObject` was removed from this file for a good reason -- it pulled a
+ * whole customer source back through the application server behind a 5 MiB cap, which refused
+ * every trial upload between 5 and 50 MiB. That reason does not apply to 512 bytes, and the
+ * signature check §36 asks for cannot be done without them: a file's declared type is the
+ * client's claim, and Content-Type on the stored object is the same claim echoed back by the
+ * presigned PUT it was signed for.
+ *
+ * A 206 is the only success. R2 honours Range, and a 200 here would mean the whole object is on
+ * its way, which is the thing this function exists not to do -- so it is refused rather than
+ * read, and the refusal is visible instead of becoming a silent full download.
+ */
+export async function headFoundationQuarantineSignature(
+  env: R2SignerEnv,
+  workspaceKey: string,
+  documentId: string,
+  now = new Date(),
+) {
+  const key = `quarantine/${workspaceKey}/${documentId}/source`;
+  const blocked = assertFoundationQuarantineKey(env.bucket, workspaceKey, documentId, key);
+  if (blocked) return { ok: false as const, code: blocked };
+  const response = await signedS3Response(env, "GET", key, undefined, now, {
+    range: `bytes=0-${QUARANTINE_SIGNATURE_BYTES - 1}`,
+  });
+  const status = response?.status ?? 599;
+  if (status === 404) return { ok: true as const, exists: false as const };
+  if (status !== 206 || !response) {
+    await response?.body?.cancel().catch(() => {});
+    return { ok: false as const, code: "SIGNATURE_READ_FAILED", status };
+  }
+  const buffer = await response.arrayBuffer().catch(() => null);
+  if (!buffer) return { ok: false as const, code: "SIGNATURE_READ_FAILED", status };
+  return {
+    ok: true as const,
+    exists: true as const,
+    bytes: new Uint8Array(buffer.slice(0, QUARANTINE_SIGNATURE_BYTES)),
   };
 }
 
