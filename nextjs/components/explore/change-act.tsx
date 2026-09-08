@@ -56,6 +56,70 @@ function ArrivalCard({ arrival }: { arrival: ExploreChangeArrivalView }) {
   );
 }
 
+/*
+  W0 → W1 → W2 → W3 → W4, one row per arriving filing (§24, §25.2).
+
+  An ordered list, because the order is the meaning: each World is the one before it plus one
+  filing, and a reader who cannot see the layout still gets the sequence from the markup.
+
+  Every figure is read off a diff between two complete compiles whose digests are frozen. The
+  RECOMPILED cell prints "n of n" on purpose -- this deployment recompiles the whole World at
+  every step, and the honest way to show that beside four small change counts is to show the one
+  number that is not small.
+*/
+function Timeline({ steps }: { steps: ExploreChangeView["timeline"] }) {
+  return (
+    <section className={styles.timeline} data-change-timeline="">
+      <p className={styles.paneLabel}>{EXPLORE_COPY.changeTimelineHeading}</p>
+      <ol className={styles.timelineSteps}>
+        {steps.map((step) => (
+          <li key={step.id} className={styles.timelineStep} data-step={step.id}>
+            <p className={styles.timelineHead}>
+              <b>{step.id.toUpperCase()}</b>
+              <span>{step.to.toUpperCase()}</span>
+            </p>
+            <p className={styles.timelineArrival}>
+              {step.arrival.label.toUpperCase()} · ACCESSION {step.arrival.accession} ·{" "}
+              {step.arrival.compiledPageCount} OF {step.arrival.pageCount} PAGES ·{" "}
+              {step.arrival.regionCount} REGIONS
+            </p>
+            <dl className={styles.timelineCounts}>
+              <div>
+                <dt>Added</dt>
+                <dd data-tone="changed">{step.objects.added}</dd>
+              </div>
+              <div>
+                <dt>Rebuilt in place</dt>
+                <dd data-tone="changed">{step.objects.rebuilt}</dd>
+              </div>
+              <div>
+                <dt>Removed</dt>
+                <dd>{step.objects.removed}</dd>
+              </div>
+              <div>
+                <dt>Unchanged</dt>
+                <dd>{step.objects.untouched}</dd>
+              </div>
+              <div>
+                <dt>Recompiled</dt>
+                <dd>
+                  {step.recompiledObjects} of {step.objectsAfter}
+                </dd>
+              </div>
+            </dl>
+            <p className={styles.changeBreakdown}>
+              {step.relations.added} relations added · {step.relations.removed} removed ·{" "}
+              {step.evidenceRegions.added} source regions added ·{" "}
+              {step.sourceRevisions.added} source version added
+            </p>
+          </li>
+        ))}
+      </ol>
+      <p className={styles.changeNote}>{EXPLORE_COPY.changeTimelineNote}</p>
+    </section>
+  );
+}
+
 export default function ChangeAct({
   model,
   layout,
@@ -177,6 +241,8 @@ export default function ChangeAct({
           In the composition above, {shownAffected} of the {inFocus.size} objects on screen are
           named by the diff and {shownUntouched} retain the same compiled identity across both Worlds.
         </p>
+
+        <Timeline steps={change.timeline} />
 
         <section className={styles.equivalence}>
           <p className={styles.paneLabel}>{EXPLORE_COPY.equivalenceHeading}</p>

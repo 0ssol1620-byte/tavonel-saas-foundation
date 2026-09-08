@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import ExploreStage from "@/components/explore/explore-stage";
-import { exploreChangeBaselineDocument, exploreChangeStory } from "@/lib/explore-change";
+import {
+  exploreChangeBaselineDocument,
+  exploreChangeStory,
+  exploreChangeTimeline,
+} from "@/lib/explore-change";
 import {
   EXPLORE_SAMPLE_SOURCE_DIRECTORY,
   exploreSampleAnswers,
@@ -31,17 +35,18 @@ export const metadata: Metadata = {
   A server component, so the compile happens once, at build time, on the server.
 
   `lib/explore-sample` reads the committed filings' extracted text layer, runs the production
-  compiler over two World snapshots -- the annual filing alone, and the annual filing plus the
-  four 2026 filings -- and refuses to load if either stops matching its frozen digest. Doing that here rather than in the browser keeps `node:crypto` and the
-  compiler off the client bundle: what ships is the adapted `VisualWorldModel` and the layout
-  derived from it, not the machinery that produced them.
+  compiler over five World snapshots -- the annual filing alone, then the World after each of the
+  four 2026 filings arrived -- and refuses to load if any of them stops matching its frozen
+  digest. Doing that here rather than in the browser keeps `node:crypto` and the compiler off the
+  client bundle: what ships is the adapted `VisualWorldModel` and the layout derived from it, not
+  the machinery that produced them.
 
   The layout is computed here for the same reason it is a pure function -- one composition for
   every device, and a server-rendered first paint that already has the world in it.
 
   What the stage receives is `boundVisualWorld(...)`, not `world` (§24). The compiled World is
-  4,982 objects and 1,169 regions and every object carries a reference to every region of its
-  filing, so serializing it whole into the RSC payload costs about 245MB. The full model stays
+  6,300 objects and 1,281 regions and every object carries a reference to every region of its
+  filing, so serializing it whole into the RSC payload costs hundreds of megabytes. The full model stays
   here, on the server, where the counts, the Ask answers and the technical drawer are read off
   it; the browser gets the drawn composition, one hop out from it, and the source regions that
   composition can open. `model.totals` carries the compiled figures across the boundary, so a
@@ -50,7 +55,11 @@ export const metadata: Metadata = {
 
 const world = toVisualWorldModel(exploreSampleWorld, exploreSampleDocuments);
 const layout = layoutVisualWorld(world);
-const change = buildExploreChangeView(exploreChangeStory, exploreChangeBaselineDocument);
+const change = buildExploreChangeView(
+  exploreChangeStory,
+  exploreChangeBaselineDocument,
+  exploreChangeTimeline,
+);
 const answers = buildExploreAnswerViews(exploreSampleAnswers, world.evidence);
 const model = boundVisualWorld(
   world,

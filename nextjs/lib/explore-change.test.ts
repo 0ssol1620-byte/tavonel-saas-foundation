@@ -1,16 +1,21 @@
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { exploreChangeBaselineDocument, exploreChangeStory } from "./explore-change";
+import {
+  exploreChangeBaselineDocument,
+  exploreChangeStory,
+  exploreChangeTimeline,
+} from "./explore-change";
 import {
   EXPLORE_SAMPLE_BASELINE_DIGEST,
   EXPLORE_SAMPLE_DIGEST,
   exploreSampleBaselineInputs,
   exploreSampleBaselineWorld,
   exploreSampleInputs,
+  exploreSampleSnapshots,
   exploreSampleWorld,
 } from "./explore-sample";
-import { countChanges } from "./world-version-diff";
+import { countChanges, diffWorldVersions } from "./world-version-diff";
 
 /*
   The Change Act's numbers, checked against the two compiles they came from.
@@ -172,6 +177,75 @@ describe("every id the Act will highlight exists in a compiled World", () => {
     expect(story.untouchedNodeIds.filter((id) => affected.has(id))).toEqual([]);
     expect(new Set(story.affectedNodeIds).size).toBe(story.affectedNodeIds.length);
     expect(new Set(story.untouchedNodeIds).size).toBe(story.untouchedNodeIds.length);
+  });
+});
+
+describe("the timeline walks the five snapshots one filing at a time", () => {
+  it("is four steps that chain W0 to W4 without skipping a World", () => {
+    expect(exploreChangeTimeline).toHaveLength(4);
+    expect(exploreChangeTimeline.map((step) => step.id)).toEqual(["w1", "w2", "w3", "w4"]);
+    expect(exploreChangeTimeline[0].fromDigest).toBe(EXPLORE_SAMPLE_BASELINE_DIGEST);
+    expect(exploreChangeTimeline[3].toDigest).toBe(EXPLORE_SAMPLE_DIGEST);
+    // A gap here would be a path drawn through a World the corpus never passed through.
+    for (let index = 1; index < exploreChangeTimeline.length; index += 1) {
+      expect(exploreChangeTimeline[index].fromDigest, exploreChangeTimeline[index].id)
+        .toBe(exploreChangeTimeline[index - 1].toDigest);
+    }
+    /*
+      The order is §24's declared sequence -- 10-K, Q1, DEF 14A, Q2, Q3 -- and that is a
+      reporting-period order, not a filing-date order. Apple filed the 2026 proxy on 2026-01-08,
+      three weeks *before* the Q1 10-Q it follows here. The Act's arrival cards are sorted by
+      filing date because they answer "what arrived"; the timeline is not, because it answers
+      "which World came next", and asserting monotonic filing dates here would be asserting
+      something about Apple's filing calendar that is not true.
+    */
+    expect(exploreChangeTimeline.map((step) => step.arrival.documentId)).toEqual([
+      "apple-2026-q1-10-q",
+      "apple-2026-proxy-def14a",
+      "apple-2026-q2-10-q",
+      "apple-2026-q3-10-q",
+    ]);
+    expect(exploreChangeTimeline.map((step) => step.arrival.filingDate))
+      .toEqual(["2026-01-30", "2026-01-08", "2026-05-01", "2026-07-31"]);
+    // Every step's arrival is a filing W4 actually compiled, and the two lists cover each other.
+    expect([...exploreChangeTimeline.map((step) => step.arrival.documentId)].sort())
+      .toEqual([...story.arrivals.map((arrival) => arrival.documentId)].sort());
+  });
+
+  it("derives every step count from its own diff, and adds exactly one source version", () => {
+    for (const [index, step] of exploreChangeTimeline.entries()) {
+      const before = exploreSampleSnapshots[index].world;
+      const after = exploreSampleSnapshots[index + 1].world;
+      const diff = diffWorldVersions(before, after);
+      expect(step.objects.added, step.id).toBe(diff.objects.added.length);
+      expect(step.objects.rebuilt, step.id).toBe(diff.objects.changed.length);
+      expect(step.objects.removed, step.id).toBe(diff.objects.removed.length);
+      expect(step.relations.added, step.id).toBe(diff.relations.added.length);
+      expect(step.evidenceRegions.added, step.id).toBe(diff.evidence.added.length);
+      // One arriving filing is one new source version, at every step and not only end to end.
+      expect(step.sourceRevisions.added, step.id).toBe(1);
+      expect(step.sourceRevisions.removed, step.id).toBe(0);
+      // The partition holds per step exactly as it does across the whole change.
+      expect(step.objects.rebuilt + step.objects.added + step.objects.untouched, step.id)
+        .toBe(after.objects.length);
+      expect(step.objects.rebuilt + step.objects.removed + step.objects.untouched, step.id)
+        .toBe(before.objects.length);
+    }
+  });
+
+  it("reports the whole World as recompiled at every step, because it was", () => {
+    /*
+      §25.3. This deployment's compiler has no incremental path: every snapshot is a complete
+      compile of its corpus. `recompiledObjects === objectsAfter` is that fact in a number, and
+      the day a selective rebuild does run here it will be a receipt that moves this assertion,
+      not a copy edit.
+    */
+    for (const [index, step] of exploreChangeTimeline.entries()) {
+      expect(step.recompiledObjects, step.id).toBe(step.objectsAfter);
+      expect(step.objectsAfter, step.id).toBe(exploreSampleSnapshots[index + 1].world.objects.length);
+      // A step that recompiled everything still reports a smaller number of objects it changed.
+      expect(step.objects.rebuilt, step.id).toBeLessThan(step.objectsAfter);
+    }
   });
 });
 
