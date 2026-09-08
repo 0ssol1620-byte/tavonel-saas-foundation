@@ -59,7 +59,35 @@ export function normalizeDocumentMimeType(value: string) {
   validated and what is returned, so the same file uploaded twice is the same name twice.
 */
 const MAX_FILENAME_LENGTH = 255;
-const FORMAT_CHARACTERS = /\p{Cf}/u;
+/*
+  The format characters that make a displayed filename lie: the soft hyphen, the Arabic letter
+  mark, the Mongolian vowel separator, the zero-width and bidi range, the invisible-operator and
+  bidi-isolate range, the BOM, the interlinear annotation marks, and the lead surrogate of the
+  plane-14 tag block, where an entire invisible ASCII alphabet lives.
+
+  Code-unit ranges rather than a Unicode property escape, because the root package's tsconfig
+  declares no `target` and so type-checks at the ES5 default, where `\p{Cf}` is a compile error.
+  This file is imported by both packages, and a guard that only compiles in one of them is not a
+  guard. (That missing `target` is real config debt and is recorded in the lane report; silently
+  raising it here would change class-field emit semantics for the Vite client, which is not this
+  lane's call to make.)
+
+  The list is the display-affecting subset of Cf rather than all of it. An Arabic number sign is
+  a format character and spoofs nothing, and refusing it would refuse ordinary filenames.
+*/
+const FORMAT_CHARACTER_RANGES: ReadonlyArray<readonly [number, number]> = [
+  [0x00ad, 0x00ad], [0x061c, 0x061c], [0x180e, 0x180e], [0x200b, 0x200f], [0x202a, 0x202e],
+  [0x2060, 0x2064], [0x2066, 0x206f], [0xfeff, 0xfeff], [0xfff9, 0xfffb], [0xdb40, 0xdb40],
+];
+
+function hasFormatCharacter(value: string) {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (FORMAT_CHARACTER_RANGES.some(([low, high]) => code >= low && code <= high)) return true;
+  }
+  return false;
+}
+
 /** Extensions that make a downloaded file executable by double-clicking it. */
 const EXECUTABLE_EXTENSIONS = new Set([
   "exe", "dll", "scr", "bat", "cmd", "com", "pif", "msi", "msp", "cpl", "jar", "app",
@@ -88,7 +116,7 @@ export function validateQualifiedDocumentInput({
     return { valid: false, code: "INVALID_FILENAME" };
   }
   if (filename.length > MAX_FILENAME_LENGTH
-    || FORMAT_CHARACTERS.test(filename)
+    || hasFormatCharacter(filename)
     || executableSecondExtension(filename)) {
     return { valid: false, code: "INVALID_FILENAME" };
   }

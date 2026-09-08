@@ -21,6 +21,8 @@ const PDF = "application/pdf";
 const RIGHT_TO_LEFT_OVERRIDE = String.fromCharCode(0x202e);
 const ZERO_WIDTH_JOINER = String.fromCharCode(0x200d);
 const NUL = String.fromCharCode(0);
+// U+E0041, a plane-14 tag character: the letter A, invisible, as a surrogate pair.
+const TAG_LETTER_A = String.fromCharCode(0xdb40, 0xdc41);
 
 function check(originalFilename: string, declaredMimeType = PDF) {
   return validateQualifiedDocumentInput({ originalFilename, declaredMimeType });
@@ -55,6 +57,20 @@ describe("names that are refused", () => {
 
   it("refuses a zero-width joiner hiding inside an otherwise ordinary name", () => {
     expect(check(`report${ZERO_WIDTH_JOINER}.pdf`)).toEqual({ valid: false, code: "INVALID_FILENAME" });
+  });
+
+  it("refuses a plane-14 tag character, where a whole invisible alphabet lives", () => {
+    // Outside the BMP, so it is only reachable through its surrogate pair. The guard reads code
+    // units, and this is the case that says so.
+    expect(check(`report${TAG_LETTER_A}.pdf`)).toEqual({ valid: false, code: "INVALID_FILENAME" });
+  });
+
+  it("still accepts the ordinary non-ASCII names this guard must not break", () => {
+    // The refused set is the display-affecting subset of Cf, not all of it. Korean, Japanese and
+    // accented Latin names travel through unchanged, composed.
+    for (const name of ["2026년-계약서.pdf", "請求書.pdf", "résumé.pdf", "Отчёт.pdf"]) {
+      expect(check(name)).toEqual({ valid: true, normalizedMimeType: PDF, originalFilename: name.normalize("NFC") });
+    }
   });
 
   it.each([
