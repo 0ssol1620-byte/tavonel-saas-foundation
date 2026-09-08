@@ -176,6 +176,40 @@ test("the header keeps the wordmark, MENU and the primary action apart", async (
   expect(boxes.actions!.right, "the primary action is laid out past the right edge").toBeLessThanOrEqual(boxes.viewport);
 });
 
+/*
+  The header the test server never renders.
+
+  Locally the site is in pilot posture, so the access action reads "Request access" and links to
+  /contact: 111px, and the row fits at 360 with 3px to spare. tavonel.com is live, the action reads
+  "Start with your files" and links to /login: 158px, and on 2026-09-08 the same row measured Sign
+  in at 360..404 in a 360px viewport -- past the edge, hidden by overflow-x, found only by running
+  this suite against production. Live posture cannot be switched on here without turning every
+  pricing and legal assertion into a live-copy assertion, so the live header is reproduced in
+  place: the same markup with the live label and the live destination, then the same measurement.
+*/
+test("the live-commerce header fits a phone: an action that already opens /login has no Sign in beside it", async ({ page }, testInfo) => {
+  test.skip(!PHONE.includes(testInfo.project.name), "the collision is a phone-width failure");
+  await page.goto("/");
+  const header = await page.evaluate(() => {
+    const action = document.querySelector<HTMLAnchorElement>("header.nav .nav-actions .btn");
+    const signIn = document.querySelector<HTMLAnchorElement>("header.nav .nav-actions .nav-signin");
+    if (!action || !signIn) return null;
+    action.textContent = "Start with your files";
+    action.setAttribute("href", "/login");
+    const actions = document.querySelector("header.nav .nav-actions")!.getBoundingClientRect();
+    return {
+      actionsRight: Math.round(actions.right),
+      actionRight: Math.round(action.getBoundingClientRect().right),
+      signInVisible: signIn.getClientRects().length > 0,
+      viewport: window.innerWidth,
+    };
+  });
+  expect(header, "the landing header has an access action and a Sign in link").not.toBeNull();
+  expect(header!.signInVisible, "Sign in is the same destination twice beside an action that opens /login").toBe(false);
+  expect(header!.actionsRight, `the access action ends at x=${header!.actionsRight} in a ${header!.viewport}px viewport`).toBeLessThanOrEqual(header!.viewport);
+  expect(header!.actionRight).toBeLessThanOrEqual(header!.viewport);
+});
+
 test("the mobile menu opens inside the viewport and closes the way a menu closes", async ({ page }, testInfo) => {
   test.skip(!NARROW.includes(testInfo.project.name), "the menu only exists below 1080px");
   await page.goto("/");

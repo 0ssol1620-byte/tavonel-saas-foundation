@@ -2789,6 +2789,14 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
   action's right edge measured at 370. The 24px of gap and padding this recovers is what pays for
   that target; the alternative was dropping Sign in from the phone header, which would leave a
   returning customer no way in.
+
+  That arithmetic was done against the pilot label. With live commerce the access action reads
+  "Start with your files" (158px in IBM Plex Mono at 9.5px), and on tavonel.com at 360 the row
+  measured wordmark 12..116, MENU 122..188, action 194..352, Sign in 360..404 -- 44px past the
+  edge, clipped by overflow-x so no eye caught it. When the access action already goes to /login,
+  Sign in beside it is the same destination twice, so below 520px it is hidden in exactly that
+  case; a returning customer still has the way in, through the action itself, and the pilot
+  header (action → /contact) keeps Sign in because there it is the only way in.
 */
 @media (max-width: 400px) {
   .nav { gap: 6px; padding: 10px 12px; }
@@ -2797,6 +2805,7 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
 
 @media (max-width: 520px) {
   .mode { display: none; }
+  .nav-actions .btn[href="/login"] + .nav-signin { display: none; }
   /*
     Two columns, not one.
     Six figures stacked in a single column is 423px of numbers -- half a phone screen, arriving
