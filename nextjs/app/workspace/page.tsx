@@ -1903,6 +1903,7 @@ export default function WorkspacePage() {
               }}
             />
           ) : null}
+          {surface === "sources" ? <>
           {/*
             The compile, drawn.
 
@@ -2011,6 +2012,7 @@ export default function WorkspacePage() {
               <p>Prepared sources produce a reviewable directory, ontology, graph, retrieval index and provenance package. A human review keeps activation explicit.</p>
             </section>
           </div>
+          </> : null}
           </>
           ) : null}
 
