@@ -84,18 +84,26 @@ export default function TrustCenterPage() {
                 after a pilot.
               </p>
 
+              {/*
+                The whole tile is the link, not the heading inside it.
+
+                `a { color: inherit; text-decoration: none }` is global here, so a link wrapped
+                around a heading in a tile renders as prose -- on an index whose entire job is to
+                be seven destinations, that is the defect. Making the tile the anchor also gives a
+                phone a target the size of the card rather than the size of two words.
+              */}
               <p className="slate"><span />THE PAGES</p>
               <div className="tiles">
                 {DESTINATIONS.map(([title, body, href]) => (
-                  <article className="tile" key={title}>
-                    <h3><Link href={href}>{title}</Link></h3>
+                  <Link className="tile trust-link" key={title} href={href}>
+                    <h3>{title}</h3>
                     <p>{body}</p>
-                  </article>
+                  </Link>
                 ))}
-                <article className="tile" key="security.txt">
-                  <h3><a href="/.well-known/security.txt">security.txt</a></h3>
+                <a className="tile trust-link" key="security.txt" href="/.well-known/security.txt">
+                  <h3>security.txt</h3>
                   <p>The machine-readable disclosure record: reporting address, policy and preferred languages, at the well-known path.</p>
-                </article>
+                </a>
               </div>
 
               <p className="slate"><span />WHAT A REVIEW ASKS, AND WHERE IT IS ANSWERED</p>

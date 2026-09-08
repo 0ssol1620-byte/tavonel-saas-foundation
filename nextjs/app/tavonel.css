@@ -1090,6 +1090,13 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 .status-fold .caps { margin-bottom: 12px; }
 /* Seventeen stacked folds read as one list only if the last is closed off the way the others are. */
 .pricing-faq { border-bottom: 1px solid var(--hairline); }
+/*
+  `a { color: inherit; text-decoration: none }` is global, so a link inside a tile is invisible as
+  a link. On the Trust Center index, where every tile IS a destination, that is the whole page.
+*/
+.trust-link h3 { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--hairline); }
+.trust-link:hover { background: var(--g2); }
+.trust-link:hover h3 { color: var(--text-hi); text-decoration-color: currentColor; }
 .compile-stage {
   width: 100%;
   aspect-ratio: 1440 / 620;
