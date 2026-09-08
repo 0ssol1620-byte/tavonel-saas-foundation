@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import io
 import json
 import math
 import os
@@ -10,6 +11,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import warnings
 import zipfile
 from datetime import UTC, datetime
 from pathlib import Path
@@ -17,9 +19,11 @@ from threading import Lock
 from time import monotonic
 from typing import Final
 
-import fitz
+import pypdfium2 as pdfium
+import pypdfium2.raw as pdfium_c
 from fastapi import BackgroundTasks, FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
+from PIL import Image, UnidentifiedImageError
 
 from malware import (
     MalwareDetectedError,
@@ -68,6 +72,7 @@ ALLOWED_INPUTS: Final = {
     "image/gif": {".gif"},
 }
 LIBREOFFICE_MIMES: Final = set(ALLOWED_INPUTS) - {"application/pdf", "image/jpeg", "image/png", "image/tiff", "image/gif"}
+IMAGE_MIMES: Final = {"image/jpeg", "image/png", "image/tiff", "image/gif"}
 OOXML_MIMES: Final = {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -157,7 +162,10 @@ def require_authentication(
 def validate_input(name: str | None, mime: str | None) -> tuple[str, str]:
     file_name = Path(name or "").name
     declared_mime = normalized_mime(mime)
-    if not file_name or file_name in {".", ".."}:
+    # A control byte (NUL included) would reach `Path.open` and surface as an unhandled 500
+    # instead of a refusal. The name is never executed or shell-expanded, but it is still
+    # caller-controlled input on a trust boundary, so it refuses in the same vocabulary.
+    if not file_name or file_name in {".", ".."} or any(character < " " for character in file_name):
         raise HTTPException(422, "CDR source filename is invalid")
     if declared_mime not in ALLOWED_INPUTS or Path(file_name).suffix.casefold() not in ALLOWED_INPUTS[declared_mime]:
         raise HTTPException(422, "CDR source format is not qualified for PDF rasterization")
@@ -274,7 +282,87 @@ def scan_or_refuse(source: Path, input_sha256: str) -> dict[str, object]:
     }
 
 
+def _new_pdf_document() -> pdfium.PdfDocument:
+    raw_document = pdfium_c.FPDF_CreateNewDocument()
+    if not raw_document:
+        raise HTTPException(422, "CDR sanitized PDF could not be created")
+    return pdfium.PdfDocument(raw_document)
+
+
+def _save_pdf(document: pdfium.PdfDocument, target: Path) -> None:
+    try:
+        with target.open("wb") as stream:
+            document.save(stream)
+    except (OSError, pdfium.PdfiumError) as exc:
+        raise HTTPException(422, "CDR sanitized PDF could not be created") from exc
+
+
+def convert_image_to_pdf(source: Path, work_dir: Path) -> Path:
+    """Decode bounded raster input and rebuild it as image-only PDF pages.
+
+    Pillow is used only as a bounded decoder. Every frame is copied to fresh RGB pixels,
+    metadata is not forwarded, and the intermediate PDF is rebuilt through PDFium before the
+    final raster pass. The same page and pixel ceilings used by PDF rendering apply here before
+    a frame is fully decoded.
+    """
+    target = work_dir / "decoded-image.pdf"
+    output_doc: pdfium.PdfDocument | None = None
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            with Image.open(source) as image:
+                frame_count = int(getattr(image, "n_frames", 1))
+                if frame_count < 1 or frame_count > MAX_PAGES:
+                    raise HTTPException(422, "CDR source page count is not qualified")
+
+                frame_sizes: list[tuple[int, int]] = []
+                total_pixels = 0
+                for frame_index in range(frame_count):
+                    image.seek(frame_index)
+                    width, height = image.size
+                    pixel_count = width * height
+                    if (
+                        width < 1
+                        or height < 1
+                        or pixel_count > MAX_RENDER_PIXELS_PER_PAGE
+                        or total_pixels + pixel_count > MAX_RENDER_PIXELS_TOTAL
+                    ):
+                        raise HTTPException(422, "CDR source rendering budget is not qualified")
+                    frame_sizes.append((width, height))
+                    total_pixels += pixel_count
+
+                output_doc = _new_pdf_document()
+                for frame_index, (width, height) in enumerate(frame_sizes):
+                    image.seek(frame_index)
+                    frame = image.convert("RGB")
+                    bitmap = pdfium.PdfBitmap.from_pil(frame)
+                    try:
+                        output_page = output_doc.new_page(float(width), float(height))
+                        page_image = pdfium.PdfImage.new(output_doc)
+                        page_image.set_bitmap(bitmap)
+                        page_image.set_matrix(pdfium.PdfMatrix().scale(width, height))
+                        output_page.insert_obj(page_image)
+                        output_page.gen_content()
+                        output_page.close()
+                    finally:
+                        bitmap.close()
+                        frame.close()
+                _save_pdf(output_doc, target)
+    except HTTPException:
+        raise
+    except (Image.DecompressionBombError, Image.DecompressionBombWarning, UnidentifiedImageError, OSError, ValueError) as exc:
+        raise HTTPException(422, "CDR image source is not qualified") from exc
+    finally:
+        if output_doc is not None:
+            output_doc.close()
+    if not target.is_file() or target.stat().st_size < 1:
+        raise HTTPException(422, "CDR image source could not be normalized safely")
+    return target
+
+
 def convert_to_pdf(source: Path, source_mime: str, work_dir: Path) -> Path:
+    if source_mime in IMAGE_MIMES:
+        return convert_image_to_pdf(source, work_dir)
     if source_mime not in LIBREOFFICE_MIMES:
         return source
     profile = work_dir / "lo-profile"
@@ -305,8 +393,8 @@ def convert_to_pdf(source: Path, source_mime: str, work_dir: Path) -> Path:
     return converted
 
 
-def qualified_render_scale(page_rects: list[fitz.Rect]) -> float:
-    areas = [rect.width * rect.height for rect in page_rects]
+def qualified_render_scale(page_sizes: list[tuple[float, float]]) -> float:
+    areas = [width * height for width, height in page_sizes]
     if not areas or any(not math.isfinite(area) or area <= 0 for area in areas):
         raise HTTPException(422, "CDR source rendering budget is not qualified")
     scale = min(
@@ -321,38 +409,70 @@ def qualified_render_scale(page_rects: list[fitz.Rect]) -> float:
 
 
 def rasterize_to_pdf(source: Path, target: Path) -> int:
+    source_doc: pdfium.PdfDocument | None = None
+    output_doc: pdfium.PdfDocument | None = None
     try:
-        source_doc = fitz.open(source)
-    except Exception as exc:
-        raise HTTPException(422, "CDR source renderer rejected this document") from exc
-    output_doc = fitz.open()
-    try:
-        if source_doc.needs_pass:
-            raise HTTPException(422, "CDR password-protected PDF is not qualified")
-        if source_doc.page_count < 1 or source_doc.page_count > MAX_PAGES:
+        try:
+            source_doc = pdfium.PdfDocument(source)
+        except pdfium.PdfiumError as exc:
+            error_code = pdfium_c.FPDF_GetLastError()
+            if error_code in {pdfium_c.FPDF_ERR_PASSWORD, pdfium_c.FPDF_ERR_SECURITY}:
+                raise HTTPException(422, "CDR password-protected PDF is not qualified") from exc
+            raise HTTPException(422, "CDR source renderer rejected this document") from exc
+
+        page_count = len(source_doc)
+        if page_count < 1 or page_count > MAX_PAGES:
             raise HTTPException(422, "CDR source page count is not qualified")
-        page_rects = [page.rect for page in source_doc]
-        render_scale = qualified_render_scale(page_rects)
+        page_sizes: list[tuple[float, float]] = []
+        for page_index in range(page_count):
+            page = source_doc[page_index]
+            try:
+                page_sizes.append(tuple(float(value) for value in page.get_size()))
+            finally:
+                page.close()
+        render_scale = qualified_render_scale(page_sizes)
+        output_doc = _new_pdf_document()
         rendered_pixels = 0
-        for page, page_rect in zip(source_doc, page_rects, strict=True):
-            width = int(page_rect.width * render_scale)
-            height = int(page_rect.height * render_scale)
-            pixel_count = width * height
-            if width < 1 or height < 1 or pixel_count > MAX_RENDER_PIXELS_PER_PAGE or rendered_pixels + pixel_count > MAX_RENDER_PIXELS_TOTAL:
-                raise HTTPException(422, "CDR source rendering budget is not qualified")
-            rendered_pixels += pixel_count
-            pix = page.get_pixmap(matrix=fitz.Matrix(render_scale, render_scale), colorspace=fitz.csRGB, alpha=False)
-            output_page = output_doc.new_page(width=page_rect.width, height=page_rect.height)
-            output_page.insert_image(output_page.rect, stream=pix.tobytes("png"))
+        for page_index, (page_width, page_height) in enumerate(page_sizes):
+            source_page = source_doc[page_index]
+            bitmap: pdfium.PdfBitmap | None = None
+            try:
+                bitmap = source_page.render(
+                    scale=render_scale,
+                    fill_color=(255, 255, 255, 255),
+                )
+                pixel_count = bitmap.width * bitmap.height
+                if (
+                    bitmap.width < 1
+                    or bitmap.height < 1
+                    or pixel_count > MAX_RENDER_PIXELS_PER_PAGE
+                    or rendered_pixels + pixel_count > MAX_RENDER_PIXELS_TOTAL
+                ):
+                    raise HTTPException(422, "CDR source rendering budget is not qualified")
+                rendered_pixels += pixel_count
+
+                output_page = output_doc.new_page(page_width, page_height)
+                page_image = pdfium.PdfImage.new(output_doc)
+                page_image.set_bitmap(bitmap)
+                page_image.set_matrix(pdfium.PdfMatrix().scale(page_width, page_height))
+                output_page.insert_obj(page_image)
+                output_page.gen_content()
+                output_page.close()
+            finally:
+                if bitmap is not None:
+                    bitmap.close()
+                source_page.close()
         # This is a newly created document containing only rendered page images; source PDF metadata is never copied.
-        output_doc.save(target, garbage=4, deflate=True, clean=True)
+        _save_pdf(output_doc, target)
     except HTTPException:
         raise
-    except Exception as exc:
+    except (OSError, pdfium.PdfiumError, ValueError) as exc:
         raise HTTPException(422, "CDR source could not be rasterized safely") from exc
     finally:
-        source_doc.close()
-        output_doc.close()
+        if source_doc is not None:
+            source_doc.close()
+        if output_doc is not None:
+            output_doc.close()
     size = target.stat().st_size if target.is_file() else 0
     if size < 1 or size > MAX_OUTPUT_BYTES:
         raise HTTPException(422, "CDR sanitized output is outside the controlled-beta size limit")

@@ -21,7 +21,8 @@ RUN useradd --system --uid 10001 --create-home --home-dir /home/cdr cdr
 WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
-COPY app.py malware.py ./
+# NOTICE travels with the distribution it describes, not only with the repository.
+COPY app.py malware.py NOTICE ./
 RUN chown -R cdr:cdr /app /home/cdr
 USER cdr
 

@@ -2,7 +2,7 @@
 
 ## Purpose and activation state
 
-This directory contains a **format-changing Content Disarm and Reconstruction (CDR) service** for the isolated TAVONEL SaaS Foundation. It is an alternative to a managed CDR vendor when customer documents must remain in the APAC deployment boundary. The service accepts a source only after the Cloudflare quarantine sidecar supplies an independent HMAC, short-lived timestamp, request ID, and source SHA-256. It converts qualified Office inputs to PDF with LibreOffice, rasterizes every page with PyMuPDF, and returns a newly created image-only PDF.
+This directory contains a **format-changing Content Disarm and Reconstruction (CDR) service** for the isolated TAVONEL SaaS Foundation. It is an alternative to a managed CDR vendor when customer documents must remain in the APAC deployment boundary. The service accepts a source only after the Cloudflare quarantine sidecar supplies an independent HMAC, short-lived timestamp, request ID, and source SHA-256. It converts qualified Office inputs to PDF with LibreOffice, decodes qualified raster images with Pillow under explicit page/pixel ceilings, rasterizes PDF pages with PDFium through pypdfium2, and returns a newly created image-only PDF.
 
 The service is designed for **Google Cloud Run first generation in `asia-northeast3` (Seoul)**. First generation Cloud Run uses gVisor as its container sandbox, while Cloud Run resource data is stored in the selected region. [1] [2] A source-built Cloud Run revision is deployed but has no runtime HMAC configured, so the CDR service itself returns structured fail-closed `503` responses. The active Cloudflare Worker has no CDR runtime configuration and remains HTTP 503 fail-closed; it cannot accept or process customer bytes.
 
@@ -21,6 +21,20 @@ The service is designed for **Google Cloud Run first generation in `asia-northea
 | Executables, scripts, HTML, password-protected PDFs, macro/embedded-object Office packages, or unsupported files | No | — | Rejected before renderer invocation or conversion |
 
 The service accepts at most **5 MiB original input**, **80 pages**, **30 million rendered pixels per page**, **80 million rendered pixels total**, and **18 MiB reconstructed output**. The Cloudflare sidecar enforces the same 5 MiB ceiling and format allowlist before it can mint a browser-to-R2 upload URL for this provider. Any failure leaves the original in quarantine and creates no immutable approval.
+
+### Renderer licensing
+
+The renderer path intentionally uses permissive dependencies only. `pypdfium2==5.13.0` is distributed under Apache-2.0 or BSD-3-Clause and bundles PDFium, which uses a BSD-style licence plus dependency notices. Those wheel-provided PDFium/dependency licence files must remain present in the container distribution. `Pillow==12.3.0` uses the MIT-CMU licence. PyMuPDF/MuPDF is not used by this proprietary service.
+
+Every licence name in `NOTICE` is read from the installed distribution's own metadata, never
+guessed, and `NOTICE` is copied into the image so it travels with the distribution it describes.
+`tests/test_renderer_licensing.py` is the ratchet that keeps this true: it fails if `fitz`/PyMuPDF
+reappears in `requirements.txt`, the sources, the Dockerfile or the deploy YAML; if it is importable
+in the environment under test — which is how the qualification job proves the *built image* is
+clean, not just the source tree; if a direct dependency loses its exact `==` pin; or if a pinned
+dependency has no `NOTICE` row. What `NOTICE` still does **not** cover — unpinned transitive
+dependencies, and a machine-readable SBOM of the deployed image digest — is stated at the bottom of
+that file rather than left implicit.
 
 ## Security contract
 
@@ -51,7 +65,7 @@ Cloud Run terminates HTTPS before the container, so direct end-to-end mTLS is no
 
 ## Local evidence
 
-The following tests have passed against the local `linux/amd64` Docker image built from this directory. All fixtures are harmless PDFs or synthetic byte strings; no customer data or production secret is used.
+The current PDFium/Pillow revision is locally verified on Windows for the runnable Python suites, including PDF, PNG, multi-frame GIF, HMAC/replay/digest, malware adapter, and service-definition contracts. The exact pinned `pypdfium2==5.13.0` + `Pillow==12.3.0` application suite also passes in an isolated dependency target. This machine has neither Docker nor LibreOffice, so the revised Linux/LibreOffice container result is **not yet claimed** here. The required exact-image qualification is encoded in `.github/workflows/malware-scan-qualification.yml` and must pass for the pushed exact SHA before this evidence is promoted. All fixtures are harmless PDFs or synthetic byte strings; no customer data or production secret is used.
 
 ```bash
 sudo docker build --network=host -t tavonel-pdf-raster-cdr:local .
@@ -62,7 +76,7 @@ sudo docker run --rm --network host \
   python -m unittest discover -v -s /tests
 ```
 
-The container suite verifies structured no-store health and disarm failure with no HMAC, invalid HMAC rejection, duplicate authenticated-request rejection, source digest mismatch rejection, ZIP rejection, macro-bearing OOXML rejection, legacy binary Office rejection, and successful creation of a text-free image-only PDF with exact output digest. The sidecar contract suite separately verifies provider HMAC generation, output MIME/digest binding, 5 MiB and archive pre-upload rejection, and legacy generic/Cloudmersive fail-closed behavior.
+The container suite verifies structured no-store health and disarm failure with no HMAC, invalid HMAC rejection, duplicate authenticated-request rejection, source digest mismatch rejection, ZIP rejection, macro-bearing OOXML rejection, legacy binary Office rejection, PNG and multi-frame GIF normalization, empirically generated DOCX/XLSX/PPTX conversion through the LibreOffice packages installed by the Dockerfile, and successful creation of text-free image-only PDFs with exact output digests. The sidecar contract suite separately verifies provider HMAC generation, output MIME/digest binding, 5 MiB and archive pre-upload rejection, and legacy generic/Cloudmersive fail-closed behavior.
 
 ## Deployment gate for Google Cloud Run
 
@@ -219,7 +233,8 @@ gcloud run services replace service.yaml \
 
 The definition is `IMPLEMENTED_NOT_LIVE`: it has never been applied, so nothing here is qualified on a
 real Cloud Run revision. The evidence that exists is the container qualification job
-`.github/workflows/malware-scan-qualification.yml`, which runs the same adapter against a real
+`.github/workflows/malware-scan-qualification.yml`, which builds the CDR Dockerfile itself, exercises
+PDFium/Pillow and LibreOffice conversion inside that image, and runs the malware adapter against a real
 `clamd` of the pinned tag on every push.
 
 ## References

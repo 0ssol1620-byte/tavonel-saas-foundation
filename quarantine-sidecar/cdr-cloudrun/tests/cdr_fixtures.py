@@ -14,21 +14,34 @@ import zipfile
 from datetime import UTC, datetime
 from pathlib import Path
 
-import fitz
-
 EICAR = rb"X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
 
 
 def clean_pdf(pad_to_bytes: int = 0) -> bytes:
     """A harmless one-page PDF, optionally padded with a trailing comment to a size."""
-
-    document = fitz.open()
-    try:
-        page = document.new_page()
-        page.insert_text((72, 72), "TAVONEL harmless synthetic CDR fixture")
-        pdf = document.tobytes(garbage=4, deflate=True)
-    finally:
-        document.close()
+    content = b"BT /F1 12 Tf 72 720 Td (TAVONEL harmless synthetic CDR fixture) Tj ET"
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        (
+            b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+            b"/Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>"
+        ),
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+        b"<< /Length %d >>\nstream\n%s\nendstream" % (len(content), content),
+    ]
+    pdf = b"%PDF-1.4\n"
+    offsets = []
+    for number, body in enumerate(objects, start=1):
+        offsets.append(len(pdf))
+        pdf += b"%d 0 obj\n%s\nendobj\n" % (number, body)
+    xref_at = len(pdf)
+    pdf += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objects) + 1)
+    pdf += b"".join(b"%010d 00000 n \n" % offset for offset in offsets)
+    pdf += b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (
+        len(objects) + 1,
+        xref_at,
+    )
     if pad_to_bytes > len(pdf) + 3:
         # Trailing bytes after %%EOF are ignored by readers and still reach the scanner.
         pdf += b"\n%" + bytes(range(256)) * ((pad_to_bytes - len(pdf) - 2) // 256 + 1)

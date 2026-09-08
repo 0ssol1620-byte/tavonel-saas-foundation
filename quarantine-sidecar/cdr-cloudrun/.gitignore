@@ -1,0 +1,3 @@
+# Local test environment for the sidecar suite; never part of the image or the repository.
+.venv/
+.pytest_cache/
