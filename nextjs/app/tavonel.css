@@ -1088,6 +1088,8 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 .status-fold[open] > summary::before { content: "−"; }
 .status-fold > summary:hover { color: var(--text-hi); }
 .status-fold .caps { margin-bottom: 12px; }
+/* Seventeen stacked folds read as one list only if the last is closed off the way the others are. */
+.pricing-faq { border-bottom: 1px solid var(--hairline); }
 .compile-stage {
   width: 100%;
   aspect-ratio: 1440 / 620;

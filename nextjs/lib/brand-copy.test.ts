@@ -666,4 +666,41 @@ describe("public copy", () => {
         .not.toMatch(/[0-9]/);
     }
   });
+
+  /*
+    §54's purchase friction map, checked as coverage rather than as wording.
+
+    The blueprint names seventeen objections and asks that each have a public answer. Fourteen had
+    one on some page; three -- readiness, lock-in and deletion -- had none, which is the state
+    this list was added to fix. Each row is matched by the words that make it that objection and
+    not a neighbouring one, so an answer may be rewritten freely and may not quietly disappear.
+
+    The second assertion is the reason this belongs on the pricing page rather than in a marketing
+    fold: an answer with no destination is a paragraph, and every one of these is a question a
+    reader would rather verify than be told.
+  */
+  const PURCHASE_OBJECTIONS = [
+    "just OCR", "vector database", "exactly is a World", "relate to RAG", "verify an answer",
+    "source document changes", "Office files", "agent use it", "uncertain", "data safe",
+    "Is this finished", "much does it cost", "setup is required", "locked in", "Can I export",
+    "delete my data", "security review approve",
+  ];
+
+  const purchaseFaq = () =>
+    read("components/pricing-page-client.tsx").match(/const PURCHASE_FAQ[\s\S]*?\n\];/)?.[0] ?? "";
+
+  it.each(PURCHASE_OBJECTIONS)("answers the §54 objection about %s on /pricing", (objection) => {
+    const faq = purchaseFaq();
+    expect(faq, "the §54 answers are still declared on the pricing page").not.toBe("");
+    expect(faq).toContain(objection);
+  });
+
+  it("points every §54 answer at the page that maintains it", () => {
+    const rows = [...purchaseFaq().matchAll(/^ {2}\[".*\],$/gm)].map((match) => match[0]);
+    expect(rows.length, "§54 lists seventeen objections").toBe(17);
+    for (const row of rows) {
+      expect(row, `${row.slice(0, 40)}… answers without offering the page that says it in full`)
+        .toMatch(/"\/[a-z/-]+" as Route/);
+    }
+  });
 });
