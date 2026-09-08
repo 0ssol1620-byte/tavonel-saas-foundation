@@ -112,18 +112,25 @@ describe("prohibited public phrases", () => {
     expect(SOURCES).toContain("app/trust/page.tsx");
   });
 
-  it.each(SOURCES)("makes no contract-prohibited claim in %s", (surface) => {
-    const source = sourceOf(surface);
-    for (const [name, pattern] of CONTRACT_PHRASES) {
-      expect(pattern.test(source), `"${name}" is a claim no evidence in this repository supports`).toBe(false);
-    }
+  /*
+    One case per list rather than one per file.
+
+    Two hundred and ten files times two lists is four hundred and nineteen test names that all
+    say the same thing, and a failing one names the file without naming the phrase. Collecting
+    offenders into a list and asserting it is empty is the shape `route-classification.test.ts`
+    and `production-route-surface.test.ts` already use here, and the failure message carries both
+    halves a reader needs: which file, and which phrase.
+  */
+  it.each(CONTRACT_PHRASES)("finds no %s anywhere in app/ or components/", (_name, pattern) => {
+    const offenders = SOURCES.filter((surface) => pattern.test(sourceOf(surface)));
+    expect(offenders, "this is a claim no evidence in this repository supports").toEqual([]);
   });
 
-  it.each(SOURCES.filter((surface) => surface !== HEDGED))("names no frozen mechanism in %s", (surface) => {
-    const source = sourceOf(surface);
-    for (const [name, pattern] of FROZEN_MECHANISMS) {
-      expect(pattern.test(source), `"${name}" needs an IP disclosure review before it is published`).toBe(false);
-    }
+  it.each(FROZEN_MECHANISMS)("finds no %s anywhere in app/ or components/", (_name, pattern) => {
+    const offenders = SOURCES
+      .filter((surface) => surface !== HEDGED)
+      .filter((surface) => pattern.test(sourceOf(surface)));
+    expect(offenders, "this needs an IP disclosure review before it is published").toEqual([]);
   });
 
   it("keeps the one exempted surface hedged and unreferenced", () => {
