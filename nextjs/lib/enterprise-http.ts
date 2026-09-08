@@ -1,3 +1,5 @@
+import { csvCell } from "@/lib/csv-cell";
+
 export const ENTERPRISE_NO_STORE = { "Cache-Control": "no-store" };
 
 export function enterpriseRequestId(request: Request) {
@@ -21,11 +23,6 @@ export function parseAuditWindow(url: string, now = new Date()) {
   const format: "jsonl" | "csv" = params.get("format") === "csv" ? "csv" : "jsonl";
   if (!Number.isFinite(from.getTime()) || !Number.isFinite(to.getTime()) || from > to || to.getTime() - from.getTime() > 366 * 86_400_000) return null;
   return { from: from.toISOString(), to: to.toISOString(), format };
-}
-
-function csvCell(value: unknown) {
-  const text = typeof value === "string" ? value : JSON.stringify(value ?? "");
-  return `"${text.replaceAll('"', '""')}"`;
 }
 
 export function serializeAuditExport(events: readonly Record<string, unknown>[], format: "jsonl" | "csv") {

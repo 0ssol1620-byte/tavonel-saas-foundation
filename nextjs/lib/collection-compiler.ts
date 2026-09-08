@@ -6,6 +6,7 @@ import {
 } from "../../shared/compiledWorldValidation";
 import { validateCompiledWorldPackage } from "../scripts/compiled-world/validate.mjs";
 import { judgeCompileSet } from "./compile-limits";
+import { csvCell } from "./csv-cell";
 
 export const COLLECTION_CANDIDATE_SCHEMA = "tavonel.collection_candidate.v1" as const;
 export const GENERIC_MIXED_CORPUS_BLUEPRINT = {
@@ -243,10 +244,6 @@ function claimsFor(text: string) {
       .map((item) => item.trim())
       .filter((item) => item.length >= 20 && item.length <= 500),
   )];
-}
-
-function csvCell(value: string) {
-  return `"${value.replaceAll('"', '""')}"`;
 }
 
 function mediaType(path: string) {
