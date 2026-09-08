@@ -33,6 +33,11 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - run: pnpm install --frozen-lockfile
+      # Blueprint §43, P-13: the secret scan runs before anything is built, and it scans the whole
+      # checkout rather than nextjs/ alone -- a key pasted into a workflow file or a migration is
+      # the same incident as one pasted into a route. It needs no dependencies of its own, so it
+      # is the cheapest step that can stop a merge, and `nextjs` is a required check on main.
+      - run: pnpm scan:secrets
       - run: pnpm check
       - run: pnpm test
       - run: pnpm build
