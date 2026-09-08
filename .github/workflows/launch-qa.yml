@@ -39,6 +39,9 @@ jobs:
         run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
       - name: Run launch QA
         run: pnpm exec playwright test --project=launch-${{ matrix.browser }}
+      - name: Verify analytics consent at all seven widths and reduced motion
+        if: matrix.browser == 'chromium'
+        run: pnpm exec playwright test e2e/marketing-consent.spec.ts
       - name: Preserve browser failure evidence
         if: always()
         uses: actions/upload-artifact@v4
