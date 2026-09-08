@@ -59,6 +59,7 @@ test("consented measurement sanitizes URLs and excludes private events and route
 });
 
 test("only successful commercial inquiries produce a lead event", async ({ page }) => {
+  await page.clock.install();
   let success = false;
   await page.route("**/api/contact", route => route.fulfill({ status: success ? 200 : 503, contentType: "application/json", body: success ? "{}" : '{"error":"Unavailable"}' }));
   await page.goto("/contact");
@@ -66,6 +67,7 @@ test("only successful commercial inquiries produce a lead event", async ({ page 
   await page.getByRole("textbox", { name: "Name", exact: true }).fill("Test Visitor");
   await page.getByRole("textbox", { name: "Work email" }).fill("test@example.com");
   await page.getByRole("textbox", { name: "What should we understand?" }).fill("Test inquiry with no production delivery.");
+  await page.clock.fastForward(2_000);
   await page.getByRole("button", { name: "Send inquiry" }).click();
   await expect(page.getByText("Unavailable", { exact: true })).toBeVisible();
   const records = () => page.evaluate(() => JSON.parse(sessionStorage.getItem("tavonel.funnel-log") ?? "[]"));
