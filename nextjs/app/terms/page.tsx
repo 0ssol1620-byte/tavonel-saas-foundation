@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import PolicyLayout from "@/components/policy-layout";
+import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
 import LegalOperatorDisclosure from "@/components/legal-operator-disclosure";
 import { readCommercialState } from "@/lib/commercial-state";
 import { LEGAL_EFFECTIVE_DATE } from "@/lib/operations";
@@ -53,6 +54,7 @@ export default function TermsPage() {
         </>
       }
     >
+      <BreadcrumbJsonLd trail={[{ name: "Terms", path: "/terms" }]} />
       <h2>Service operator</h2>
       <p>
         TAVONEL is the operating brand for the service described on this site. TAVONEL Foundation

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import PolicyLayout from "@/components/policy-layout";
+import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
 import { LEGAL_EFFECTIVE_DATE } from "@/lib/operations";
 export const metadata: Metadata = {
   // Each page declares its own address. Without this every route inherited the root
@@ -19,6 +20,7 @@ const PROCESSORS = [
   ["Google", "OAuth identity provider", "Google account identity and authentication events"],
 ] as const;
 export default function SubprocessorsPage() { return <PolicyLayout label="SUBPROCESSORS" title="The services allowed to touch each class of data." intro={<>Current as of {LEGAL_EFFECTIVE_DATE}. A provider appearing here does not mean every feature is live; the status page states the active deployment mode.</>}>
+  <BreadcrumbJsonLd trail={[{ name: "Subprocessors", path: "/subprocessors" }]} />
   <div className="processor-list">{PROCESSORS.map(([name,purpose,data]) => <article key={name}><h3>{name}</h3><p><b>Purpose:</b> {purpose}</p><p><b>Data:</b> {data}</p></article>)}</div>
   <h3>Change notice</h3><p>Material processor changes will be recorded here before they apply to live customer processing. Contact privacy@tavonel.com for a data-processing review.</p>
 </PolicyLayout>; }
