@@ -5,9 +5,20 @@ import { readExportSignerEnv } from "@/lib/export-signing";
 import { loadPreferredCollectionCandidate } from "@/lib/collection-storage";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
+import { WORKSPACE_EXPORT_CONCURRENCY, acquireWorkspaceSlot } from "@/lib/workspace-cost-guard";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+/*
+ * A signed export builds a zip of the whole package and signs it, and nothing bounded either
+ * half (blueprint §32, S-22): no `maxDuration`, so a large package ran until the platform's own
+ * default gave up, and no concurrency guard, so one workspace could start as many builds at once
+ * as it could open connections.
+ *
+ * The two belong together. A concurrency cap without a deadline is a queue that fills and never
+ * drains; a deadline without a cap only makes each of the unbounded builds fail separately.
+ */
+export const maxDuration = 60;
 
 const NO_STORE = { "Cache-Control": "no-store" };
 
@@ -22,47 +33,62 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const signer = readR2SignerEnv();
   if (!signer) return NextResponse.json({ code: "SIGNER_NOT_CONFIGURED" }, { status: 503, headers: NO_STORE });
 
-  const manifestDigest = new URL(request.url).searchParams.get("manifest") ?? undefined;
-  const loaded = await loadPreferredCollectionCandidate(
-    signer,
-    auth.principal.workspaceKey,
-    id,
-    manifestDigest,
-  );
-  if (!loaded.ok) {
+  // Taken after the cheap refusals and before the first expensive one: a malformed id or an
+  // unconfigured signer costs nothing and must not consume a workspace's export slot.
+  const lease = acquireWorkspaceSlot("export", auth.principal.workspaceKey, WORKSPACE_EXPORT_CONCURRENCY);
+  if (!lease.ok) {
     return NextResponse.json(
-      { code: loaded.code },
-      { status: loaded.code === "NOT_FOUND" ? 404 : 503, headers: NO_STORE },
+      { code: lease.code, concurrencyLimit: WORKSPACE_EXPORT_CONCURRENCY },
+      { status: 429, headers: { ...NO_STORE, "Retry-After": "10" } },
     );
   }
-  const artifact = validateReviewableCollectionArtifact(loaded.value.artifact, id);
-  if (!artifact) {
-    return NextResponse.json({ code: "COLLECTION_PACKAGE_INVALID" }, { status: 422, headers: NO_STORE });
-  }
+  try {
+    const manifestDigest = new URL(request.url).searchParams.get("manifest") ?? undefined;
+    const loaded = await loadPreferredCollectionCandidate(
+      signer,
+      auth.principal.workspaceKey,
+      id,
+      manifestDigest,
+    );
+    if (!loaded.ok) {
+      return NextResponse.json(
+        { code: loaded.code },
+        { status: loaded.code === "NOT_FOUND" ? 404 : 503, headers: NO_STORE },
+      );
+    }
+    const artifact = validateReviewableCollectionArtifact(loaded.value.artifact, id);
+    if (!artifact) {
+      return NextResponse.json({ code: "COLLECTION_PACKAGE_INVALID" }, { status: 422, headers: NO_STORE });
+    }
 
-  const exportSigner = readExportSignerEnv();
-  if (!exportSigner) {
-    const configured = Boolean(
-      process.env.TAVONEL_EXPORT_SIGNING_KEY_ID ||
-      process.env.TAVONEL_EXPORT_SIGNING_PRIVATE_KEY_PKCS8_DER_B64,
-    );
-    return NextResponse.json(
-      { code: configured ? "EXPORT_SIGNER_INVALID" : "EXPORT_SIGNER_NOT_CONFIGURED" },
-      { status: 503, headers: NO_STORE },
-    );
+    const exportSigner = readExportSignerEnv();
+    if (!exportSigner) {
+      const configured = Boolean(
+        process.env.TAVONEL_EXPORT_SIGNING_KEY_ID ||
+        process.env.TAVONEL_EXPORT_SIGNING_PRIVATE_KEY_PKCS8_DER_B64,
+      );
+      return NextResponse.json(
+        { code: configured ? "EXPORT_SIGNER_INVALID" : "EXPORT_SIGNER_NOT_CONFIGURED" },
+        { status: 503, headers: NO_STORE },
+      );
+    }
+    const signed = buildSignedCollectionZip(artifact, exportSigner);
+    return new Response(signed.archive, {
+      status: 200,
+      headers: {
+        ...NO_STORE,
+        "Content-Type": "application/zip",
+        "Content-Disposition": `attachment; filename="tavonel-${id}.zip"`,
+        "Content-Length": String(signed.archive.byteLength),
+        "X-Content-Type-Options": "nosniff",
+        "X-Tavonel-Candidate-Promotion": "false",
+        "X-Tavonel-Export-Manifest-Sha256": signed.signature.signedPayloadSha256,
+        "X-Tavonel-Export-Key-Id": signed.signature.keyId,
+      },
+    });
+  } finally {
+    // The archive is fully built and in memory by the time the Response is constructed, so the
+    // slot is genuinely free here rather than merely returned from.
+    lease.release();
   }
-  const signed = buildSignedCollectionZip(artifact, exportSigner);
-  return new Response(signed.archive, {
-    status: 200,
-    headers: {
-      ...NO_STORE,
-      "Content-Type": "application/zip",
-      "Content-Disposition": `attachment; filename="tavonel-${id}.zip"`,
-      "Content-Length": String(signed.archive.byteLength),
-      "X-Content-Type-Options": "nosniff",
-      "X-Tavonel-Candidate-Promotion": "false",
-      "X-Tavonel-Export-Manifest-Sha256": signed.signature.signedPayloadSha256,
-      "X-Tavonel-Export-Key-Id": signed.signature.keyId,
-    },
-  });
 }

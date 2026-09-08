@@ -1,10 +1,14 @@
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { COMPILE_MAX_DOCUMENTS, CORPUS_MAX_DOCUMENTS } from "./compile-limits";
 import {
   RESTING_COMPILE_STATES,
   SCHEDULER_EXCLUDED_STATES,
   TERMINAL_COMPILE_STATES,
+  WORKSPACE_RUNNABLE_COMPILE_LIMIT,
+  compileIdempotencyKey,
   countCompileJobDeferrals,
+  enqueueCompileJob,
   isRestingCompileState,
   readOpenCompileJobs,
   recordCompileJobDeferral,
@@ -282,5 +286,133 @@ describe("resting and terminal are two different lists that must stay in step", 
     expect(SCHEDULER_EXCLUDED_STATES).toHaveLength(
       TERMINAL_COMPILE_STATES.length + RESTING_COMPILE_STATES.length,
     );
+  });
+});
+
+/*
+  Blueprint 2026-09-08 §32, S-20: a paid workspace's share of the worker pool.
+
+  The trial cap has been in `lib/self-service-trial.ts` since self-service shipped, and it is
+  applied only when `accessSource === "trial"` (app/api/compile-jobs/route.ts). A paid workspace
+  therefore had no concurrency limit of any kind: a credential in a retry loop, or a corpus split
+  into more parts than the pool has workers, could occupy every worker in the deployment.
+
+  The three things worth getting wrong here, each with a test:
+
+    * counting the wrong set -- a job resting on a person occupies no worker, and counting it
+      would let five parked reviews lock a paying customer out of compiling,
+    * refusing a retry -- at-least-once delivery means the same enqueue arrives twice, and the
+      second one must find its own row rather than a 429,
+    * failing open -- a read that does not come back is not evidence that there is room.
+*/
+describe("the paid workspace's runnable-compile cap", () => {
+  const WORKSPACE = "pilot-captest1";
+  const USER = "3f2504e0-4f89-41d3-9a0c-0305e82c3301";
+
+  function capacityFake(open: Array<{ state: CompileState; idempotency_key?: string }>) {
+    const enqueued: unknown[] = [];
+    vi.stubGlobal("fetch", async (url: string | URL, init?: RequestInit) => {
+      const parsed = new URL(typeof url === "string" ? url : url.toString());
+      if (parsed.pathname.endsWith("/rpc/enqueue_foundation_compile_job")) {
+        enqueued.push(JSON.parse(String(init?.body)));
+        return new Response(
+          JSON.stringify([{ job_id: `cjob-${"7".repeat(32)}`, state: "draft", created: true }]),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      if (!parsed.pathname.endsWith("/foundation_compile_jobs")) return new Response("[]", { status: 404 });
+      expect(parsed.searchParams.get("workspace_key")).toBe(`eq.${WORKSPACE}`);
+      const filter = parsed.searchParams.get("state") ?? "";
+      const excluded = /^not\.in\.\(([^)]*)\)$/.exec(filter);
+      if (!excluded) throw new Error(`unsupported state filter: ${filter}`);
+      const denied = excluded[1]!.split(",").map((value) => value.trim());
+      const matched = open
+        .filter((entry) => !denied.includes(entry.state))
+        .slice(0, Number(parsed.searchParams.get("limit") ?? "20"));
+      return new Response(JSON.stringify(matched), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    });
+    return enqueued;
+  }
+
+  function enqueue(documentIds = ["11111111-1111-4111-8111-111111111111"]) {
+    return enqueueCompileJob({ workspaceKey: WORKSPACE, createdByUserId: USER, documentIds });
+  }
+
+  it("enqueues while the workspace is under its limit", async () => {
+    const enqueued = capacityFake(Array.from({ length: WORKSPACE_RUNNABLE_COMPILE_LIMIT - 1 },
+      () => ({ state: "reading" as CompileState })));
+    const result = await enqueue();
+    expect(result.ok).toBe(true);
+    expect(enqueued).toHaveLength(1);
+  });
+
+  it("refuses the enqueue at the limit rather than accepting work it cannot run", async () => {
+    const enqueued = capacityFake(Array.from({ length: WORKSPACE_RUNNABLE_COMPILE_LIMIT },
+      () => ({ state: "reading" as CompileState })));
+    const result = await enqueue();
+    expect(result).toEqual({ ok: false, code: "COMPILE_JOB_WORKSPACE_LIMIT_REACHED" });
+    // Refused before the write, not after it: no row was created and then rejected.
+    expect(enqueued).toHaveLength(0);
+  });
+
+  it("leaves room for the largest run the product offers", () => {
+    /*
+      The cap is derived from the corpus contract rather than chosen, and this is the property
+      that derivation exists for. A ceiling below the number of parts in a full-size corpus would
+      refuse the second half of a compile the customer was invited to submit -- the cap enforcing
+      a limit the product does not advertise. If either number moves, this fails.
+    */
+    expect(WORKSPACE_RUNNABLE_COMPILE_LIMIT)
+      .toBeGreaterThanOrEqual(Math.ceil(CORPUS_MAX_DOCUMENTS / COMPILE_MAX_DOCUMENTS));
+  });
+
+  it("does not count a job that is resting on a person or already settled", async () => {
+    const enqueued = capacityFake([
+      ...Array.from({ length: WORKSPACE_RUNNABLE_COMPILE_LIMIT }, () => ({ state: "review_required" as CompileState })),
+      ...Array.from({ length: WORKSPACE_RUNNABLE_COMPILE_LIMIT }, () => ({ state: "ready" as CompileState })),
+      ...Array.from({ length: WORKSPACE_RUNNABLE_COMPILE_LIMIT }, () => ({ state: "cancelled" as CompileState })),
+    ]);
+    expect((await enqueue()).ok).toBe(true);
+    expect(enqueued).toHaveLength(1);
+  });
+
+  it("lets a retry of an already-enqueued compile through at the limit", async () => {
+    const documentIds = ["22222222-2222-4222-8222-222222222222"];
+    const key = compileIdempotencyKey(WORKSPACE, documentIds);
+    const enqueued = capacityFake([
+      { state: "reading", idempotency_key: key },
+      ...Array.from({ length: WORKSPACE_RUNNABLE_COMPILE_LIMIT - 1 }, () => ({ state: "reading" as CompileState })),
+    ]);
+    expect((await enqueue(documentIds)).ok).toBe(true);
+    expect(enqueued).toHaveLength(1);
+  });
+
+  it("fails closed when the count cannot be read, rather than admitting one more compile", async () => {
+    const enqueued: unknown[] = [];
+    vi.stubGlobal("fetch", async (url: string | URL) => {
+      const parsed = new URL(typeof url === "string" ? url : url.toString());
+      if (parsed.pathname.endsWith("/foundation_compile_jobs")) return new Response("nope", { status: 500 });
+      enqueued.push(parsed.pathname);
+      return new Response("[]", { status: 200 });
+    });
+    expect(await enqueue()).toEqual({ ok: false, code: "COMPILE_JOB_STORE_READ_FAILED" });
+    expect(enqueued).toHaveLength(0);
+  });
+
+  it("fails closed when the count comes back as something other than rows", async () => {
+    vi.stubGlobal("fetch", async (url: string | URL) => {
+      const parsed = new URL(typeof url === "string" ? url : url.toString());
+      if (parsed.pathname.endsWith("/foundation_compile_jobs")) {
+        return new Response(JSON.stringify({ message: "not an array" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      return new Response("[]", { status: 200 });
+    });
+    expect(await enqueue()).toEqual({ ok: false, code: "COMPILE_JOB_STORE_READ_FAILED" });
   });
 });

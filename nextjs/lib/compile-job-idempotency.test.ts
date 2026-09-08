@@ -125,6 +125,19 @@ function install(rule: LookupRule, returnsIdempotencyKey = true) {
   const store = new FakeCompileJobs(rule, returnsIdempotencyKey);
   vi.stubGlobal("fetch", async (url: string | URL, init?: RequestInit) => {
     const href = typeof url === "string" ? url : url.toString();
+    /*
+      The concurrency cap reads the workspace's runnable jobs before every enqueue. Every row this
+      fake holds was created by an enqueue and none of these scenarios settle one, so the store is
+      the answer to that query -- and answering it from the same rows is what keeps the cap honest
+      here: if a scenario ever did exceed the ceiling, this would fail rather than pass through a
+      stub that always says "empty".
+    */
+    if (href.includes("/foundation_compile_jobs?")) {
+      const rows = store.rows
+        .filter((row) => row.workspaceKey === new URL(href).searchParams.get("workspace_key")?.slice(3))
+        .map((row) => ({ job_id: row.jobId, idempotency_key: row.idempotencyKey }));
+      return new Response(JSON.stringify(rows), { status: 200, headers: { "content-type": "application/json" } });
+    }
     if (!href.includes("/rpc/enqueue_foundation_compile_job")) {
       return new Response("null", { status: 404 });
     }
