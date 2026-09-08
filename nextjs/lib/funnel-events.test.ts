@@ -77,11 +77,20 @@ describe("every declared funnel event has a control that fires it", () => {
     The last member of the union ends with `;` and the first draft of this regex did not allow for
     it, so the extraction silently dropped one name and the class below quietly stopped covering
     it. An under-extraction is the failure mode that makes a per-name test look thorough while
-    testing less than it says, so the boundary is named: first member, last member, and the count.
+    testing less than it says, so the count is checked against the union counted a second way.
+
+    Counting rather than naming the boundary members, because a first draft of *this* assertion
+    pinned the first member by name and a merge that added an event above it turned a correct
+    extraction red. The invariant is "every declared name was extracted", not "the union begins
+    with a particular event".
   */
   it("extracts every member of the union, including the one that ends it", () => {
-    expect(declaredEvents.at(0)).toBe("login_reached_with_intent");
-    expect(declaredEvents.at(-1), "the trailing `;` member was dropped by the extraction").toBe("workspace_ai_connect_opened");
+    // Sliced to the union's own text and counted without the line anchoring the extraction uses,
+    // so a line-shape mistake in one is not repeated in the other. `+ 1` for the final member,
+    // whose closing quote is where the slice ends.
+    const start = moduleSource.indexOf("export type FunnelEvent =");
+    const unionBody = moduleSource.slice(start, moduleSource.indexOf('";', start));
+    expect(declaredEvents.length, "a member was dropped by the extraction -- the last one ends with `;`").toBe((unionBody.match(/"[a-z_]+"/g) ?? []).length + 1);
     expect(declaredEvents.length).toBe(new Set(declaredEvents).size);
     expect(declaredEvents.length).toBeGreaterThan(20);
     expect(declaredEvents).toContain("workspace_compile_failed");

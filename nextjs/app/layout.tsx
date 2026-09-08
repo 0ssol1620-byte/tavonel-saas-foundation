@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { IBM_Plex_Mono } from "next/font/google";
 import RouteBoot from "@/components/route-boot";
+import MarketingConsent from "@/components/marketing-consent";
 import "./globals.css";
 
 /**
@@ -107,8 +108,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           scenes and nobody knew how far down anyone got. It is Vercel's own analytics for
           one specific reason -- it loads from `/_vercel/insights` on this origin, so the strict
           CSP above admits it without a single directive being widened, and no third party is
-          contacted. It sets no cookie, which is why this page still has no consent banner to
-          apologise for.
+          contacted by that collector. It sets no cookie. The separate Google Analytics
+          integration below requires an explicit visitor choice before loading.
 
           Analytics is fail-closed. Vercel exposes observability build variables even when Web
           Analytics is not enabled for the project; rendering the component in that state points
@@ -117,6 +118,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           stay quiet and do not imply that measurement is active.
         */}
         {process.env.NEXT_PUBLIC_TAVONEL_ANALYTICS_ENABLED === "1" ? <Analytics /> : null}
+        <MarketingConsent />
       </body>
     </html>
   );

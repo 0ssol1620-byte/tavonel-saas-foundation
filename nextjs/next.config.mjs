@@ -10,7 +10,7 @@ const contentSecurityPolicy = [
   "object-src 'none'",
   "frame-ancestors 'none'",
   "form-action 'self'",
-  "script-src 'self' 'unsafe-inline' https://cdn.paddle.com https://*.paddle.com",
+  "script-src 'self' 'unsafe-inline' https://cdn.paddle.com https://*.paddle.com https://www.googletagmanager.com",
   /*
     §41 P-08. `'unsafe-inline'` on styles was covering two very different things, and only one of
     them is used.
@@ -29,13 +29,17 @@ const contentSecurityPolicy = [
     embedded font faces when `adoptedStyleSheets` is missing. Firefox 75-100 and Safari 15.4-16.3
     understand `style-src-elem` and lack `adoptedStyleSheets`, so on those the evidence viewer
     renders its PDF text in fallback fonts. That is the whole measured cost.
+
+    `be17e00` added gtag.js to script-src after this was written. It is loaded as a
+    `<script src>` by `components/marketing-consent.tsx` and injects no `<style>` element, so it
+    does not change the measurement above.
   */
   "style-src 'self' 'unsafe-inline'",
   "style-src-elem 'self'",
   "style-src-attr 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.paddle.com https://*.r2.cloudflarestorage.com",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.paddle.com https://*.r2.cloudflarestorage.com https://www.google-analytics.com https://region1.google-analytics.com",
   "frame-src 'self' https://*.paddle.com https://*.r2.cloudflarestorage.com",
   "worker-src 'self' blob:",
   "manifest-src 'self'",

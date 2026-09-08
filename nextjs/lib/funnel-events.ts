@@ -16,8 +16,18 @@ import { track } from "@vercel/analytics";
   controls they name -- a film stage rail, a World lens selector, a command palette -- exists in
   this deployment, and none of the three is a §40 hop. If one is built, the name comes back in
   the same commit as its call site, which is now the only way the suite will accept it.
+
+  `offer_selected` also survived the `be17e00` merge on the other side and was dropped again here
+  rather than by accident: that commit added `generate_lead` with a caller and left
+  `offer_selected` exactly as it was, with none.
 */
 export type FunnelEvent =
+  /*
+    The lead hop, from the consent-gated marketing measurement merged in `be17e00`. It fires from
+    `components/contact-form.tsx` on a sales or partnership enquiry that passed the honeypot and
+    timing checks, which is a real control, so it stays.
+  */
+  | "generate_lead"
   | "login_reached_with_intent"
   /*
     `login_reached_with_intent` counts arriving at the sign-in page. Without this, the funnel has

@@ -28,17 +28,17 @@ describe("production security headers", () => {
     `toContain` checks, because a directive silently dropped from the middle of the enforced
     policy is exactly the failure a substring test cannot see.
   */
-  it("enforces the same policy, byte for byte, as before the report-only phase", async () => {
+  it("pins the enforced policy including the specific consent-based analytics hosts", async () => {
     const { default: nextConfig } = await import("../next.config.mjs");
     const headers = await nextConfig.headers!();
     const catchAll = headers.find((entry) => entry.source === "/(.*)")!;
     const enforced = catchAll.headers.find((header) => header.key === "Content-Security-Policy")!;
     const policy =
       "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; " +
-      "form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.paddle.com https://*.paddle.com; " +
+      "form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.paddle.com https://*.paddle.com https://www.googletagmanager.com; " +
       "style-src 'self' 'unsafe-inline'; style-src-elem 'self'; style-src-attr 'unsafe-inline'; " +
       "img-src 'self' data: blob:; font-src 'self' data:; " +
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.paddle.com https://*.r2.cloudflarestorage.com; " +
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.paddle.com https://*.r2.cloudflarestorage.com https://www.google-analytics.com https://region1.google-analytics.com; " +
       "frame-src 'self' https://*.paddle.com https://*.r2.cloudflarestorage.com; " +
       "worker-src 'self' blob:; manifest-src 'self'";
     // The one directive the config itself makes conditional, and the Playwright web server
