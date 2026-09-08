@@ -214,9 +214,33 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
               whole sequence and starting is the next move.
             */}
             <div className="actions">
-              <ExploreLink className="btn" />
-              <Link className="btn ghost" href={startHref}>{startLabel}</Link>
+              <ExploreLink className="btn" onActivate={() => trackFunnel("hero_explore_clicked")} />
+              <Link className="btn ghost" href={startHref} onClick={() => trackFunnel("hero_start_clicked")}>{startLabel}</Link>
+              {/*
+                The tertiary action §10.1 asks for, as a link rather than a third button.
+
+                /product is the page that answers "how does this work". A third button here
+                would compete with the two that matter and would mostly duplicate the rail and
+                the instrument bar, which already move a reader through this page.
+              */}
+              <Link className="hero-tertiary" href={"/product" as Route}>See how it works</Link>
             </div>
+            {/*
+              §10.2's proof strip. Five properties, each one a page on this site.
+
+              Deliberately not a metrics row: §35 bars invented company numbers and there are no
+              measured ones that belong here. What it carries instead is the shape of the
+              product -- what goes in, what holds it together, what comes out -- with every item
+              linked to the surface that substantiates it. Each destination exists, and each is
+              the page that would have to be edited if its claim stopped being true.
+            */}
+            <ul className="hero-proof" aria-label="What a compiled world carries">
+              <li><Link href={"/sources" as Route}>Documents, scans, spreadsheets, decks</Link></li>
+              <li><Link href="/evidence">Evidence-bound</Link></li>
+              <li><Link href={"/product/continuous-knowledge" as Route}>Version-aware</Link></li>
+              <li><Link href="/security">Reviewed before it goes live</Link></li>
+              <li><Link href={"/developers" as Route}>MCP · API · signed export</Link></li>
+            </ul>
           </div>
         </section>
 
@@ -346,14 +370,43 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
             a cell in a spreadsheet, a slide and a shape in a deck. Which of those this
             deployment reads today is published, in full, as its capability manifest.
           </p>
+          {/*
+            Two proofs, opened where the proof is, and Scene E of §10.3 with them.
+
+            The scene argues that a result returns to its source and that a world moves when its
+            sources do. Both are demonstrable in the public Apple SEC sample, and both were a
+            click into Explore's entry act away from being found. `?act=evidence` and
+            `?act=change` are the query vocabulary `lib/explore-story.ts` resolves, so each link
+            lands on the act that shows the thing this scene just claimed.
+          */}
           <div className="actions rv">
-            <ExploreLink className="btn" />
+            <ExploreLink className="btn" act="evidence" />
+            <ExploreLink className="btn ghost" act="change" label="See what a new filing changed" />
             <Link className="btn ghost" href={"/sources" as Route}>What this deployment reads</Link>
           </div>
         </Scene>
 
         <Scene id={5} band="access" eyebrow="START" title="Compile your own knowledge.">
           <p className="lede rv">Files go in. Structured, traceable knowledge comes out.</p>
+          {/*
+            Scene F of §10.3, in one sentence rather than a sixth scene.
+
+            What the compiled world is *for* was the one step of the story this page never
+            stated: a reader reached the closing action without being told what they would then
+            hold. The three ways to use it are described in full on /developers, and this is the
+            line that says they exist.
+          */}
+          {/*
+            No inline link here, for the reason the evidence scene already records: an inline
+            link in a `.fine` paragraph is a 14px tap target against a 44px floor, and
+            `mobile-landing.spec.ts` measures it. The three ways to use a compiled world are set
+            out on /developers, which is in the primary nav, in the footer and in the hero proof
+            strip; this sentence's job is to say they exist.
+          */}
+          <p className="fine rv">
+            Then your AI reads it: live over MCP or the API, as a signed portable package, or
+            through Ask with a person in front of it.
+          </p>
           <div className="actions rv">
             {/*
               Two actions, not three. "Connect a source" asked a visitor who has not yet seen the
@@ -436,10 +489,35 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
   navigation is identical. It is one component so the three call sites cannot drift apart in
   label or destination.
 */
-function ExploreLink({ className }: { className: string }) {
+/*
+  `act` sends the reader to the part of Explore the surrounding scene has just argued for.
+
+  The three call sites still share one component and one door; what varies is where inside the
+  world it opens, using the query vocabulary `lib/explore-story.ts` already resolves (`world`,
+  `evidence`, `change`). The evidence scene sending a reader to Explore's entry act left the
+  trace it had just described two clicks away and unfound.
+
+  `label` is only ever passed where the link is a second, different proof rather than the door
+  again — the change link beside the evidence one. The door's own wording does not vary.
+*/
+function ExploreLink({
+  className,
+  act,
+  label,
+  onActivate,
+}: {
+  className: string;
+  act?: "world" | "evidence" | "change";
+  label?: string;
+  onActivate?: () => void;
+}) {
   return (
-    <CanvasTransitionLink className={className} href={"/explore" as Route}>
-      Explore a Compiled World
+    <CanvasTransitionLink
+      className={className}
+      href={(act ? `/explore?act=${act}` : "/explore") as Route}
+      onActivate={onActivate}
+    >
+      {label ?? "Explore a Compiled World"}
     </CanvasTransitionLink>
   );
 }

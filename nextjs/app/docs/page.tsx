@@ -57,8 +57,17 @@ export default function DocsPage() {
             <a href="/api/openapi">machine-readable contract</a> ·{" "}
             <a href="/llms.txt">llms.txt</a>
           </p>
+          {/*
+            §22: this page's next action is "run the first flow", not "open a page".
+
+            "Open your workspace" is where the reader ends up anyway and says nothing about what
+            to do once there. The quickstart is the flow this hub exists to start, and
+            /developers answers the other question a reader arrives with — which of the three
+            access paths they want, before they follow any of them.
+          */}
           <div className="actions">
-            <Link className="btn" href="/login">Open your workspace</Link>
+            <Link className="btn" href={"/docs/quickstart" as Route}>Run the quickstart</Link>
+            <Link className="btn ghost" href={"/developers" as Route}>Choose an access path</Link>
             <a className="btn ghost" href="/api">API reference</a>
           </div>
         </div>

@@ -55,9 +55,20 @@ test("serves /sources and names a support status on it", async ({ page }) => {
 /*
   The same list, or the page is advertising something the deployment does not read.
 
-  Row for row and in order: a page that prints a superset promises a format the upload route
-  refuses, and a page that prints a subset hides one it accepts. Both are the failure this
-  surface exists to make impossible, and only a deployment can be asked which it is doing.
+  Row for row: a page that prints a superset promises a format the upload route refuses, and a
+  page that prints a subset hides one it accepts. Both are the failure this surface exists to
+  make impossible, and only a deployment can be asked which it is doing.
+
+  No longer in the manifest's order, as of 2026-09-08. That order is the order formats were
+  added to the intake whitelist -- a fact about this repository's history -- and §14.3 asks for
+  the most common first, so `SourceCapabilityTable` sorts by source family before rendering.
+  Positional equality was asserting two things at once: that the sets match, and that nothing
+  had been reordered. The second was incidental, and is now wrong on purpose.
+
+  The pairing is therefore asserted directly, which is stricter than the two ordered lists it
+  replaces rather than looser: "this MIME under this tier" survives any reordering of the rows,
+  where two separately-ordered arrays agree even if every row swapped its tier with its
+  neighbour's, so long as both lists shifted together.
 */
 test("prints exactly the MIME rows the manifest serves", async ({ page }) => {
   const response = await page.request.get("/api/v1/capabilities");
@@ -65,21 +76,24 @@ test("prints exactly the MIME rows the manifest serves", async ({ page }) => {
   const manifest = (await response.json()) as Manifest;
 
   await page.goto("/sources");
-  // The row header prints the MIME type and then the source family, both in an `i`. The first
-  // one is the MIME; matching both would compare the page's families against the API's types.
-  const printed = (await page
-    .locator("table.src-matrix tbody th[scope='row'] > i:first-of-type")
-    .allInnerTexts()).map((mime) => mime.trim());
+  /*
+    Each row prints its MIME type and then its source family, both in an `i`; the first is the
+    MIME, and matching both would compare the page's families against the API's types. Reading
+    the tier from inside the same row is what binds them: `tbody` alone keeps the legend's own
+    .src-tier chips out, and the row scope keeps a tier from being paired with another row's
+    format.
+  */
+  const rows = page.locator("table.src-matrix tbody tr");
+  const rowCount = await rows.count();
+  const printed: string[] = [];
+  for (let index = 0; index < rowCount; index += 1) {
+    const row = rows.nth(index);
+    const mime = (await row.locator("th[scope='row'] > i").first().innerText()).trim();
+    const tier = (await row.locator(".src-tier").first().innerText()).trim();
+    printed.push(`${mime} ${tier}`);
+  }
 
-  expect(printed).toEqual(manifest.entries.map((entry) => entry.mime));
-
-  // The status column too, or the page can print the right format under the wrong tier -- which
-  // is the same lie in a quieter place: BEST_EFFORT rendered as VERIFIED_NATIVE promises a
-  // fidelity the deployment does not have. `tbody` keeps this off the legend's own .src-tier
-  // chips.
-  const tiers = (await page
-    .locator("table.src-matrix tbody .src-tier")
-    .allInnerTexts()).map((status) => status.trim());
-
-  expect(tiers).toEqual(manifest.entries.map((entry) => entry.status));
+  expect(printed.sort()).toEqual(
+    manifest.entries.map((entry) => `${entry.mime} ${entry.status}`).sort(),
+  );
 });

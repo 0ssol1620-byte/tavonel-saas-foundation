@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { Route } from "next";
 import { PublicSitePage } from "@/components/public-site-chrome";
+import { TrustNext } from "@/components/trust-next";
 
 export const metadata: Metadata = {
   // Each page declares its own address. Without this every route inherited the root
@@ -148,9 +149,18 @@ export default function EvidencePage() {
                 ))}
               </div>
 
+              {/*
+                The proof link is a deep link, not the front door.
+
+                "Follow a result to its page" landed the reader on Explore's entry act, where
+                the evidence trace this page has just described is two clicks away and has to be
+                found. `?act=evidence` is the query `lib/explore-story.ts` resolves to the
+                Evidence Act, so the claim and the thing that demonstrates it are one click
+                apart. The label also stops naming a page: RESOLVED A-1 retires one locator
+                shape as the shape of all evidence, and this page is where that is explained.
+              */}
               <div className="actions">
-                <Link className="btn" href={"/explore" as Route}>Follow a result to its page</Link>
-                <Link className="btn ghost" href="/security">How your documents are handled</Link>
+                <Link className="btn" href={"/explore?act=evidence" as Route}>Open a result at its exact source location</Link>
                 <Link className="btn ghost" href={"/research/notes" as Route}>Research notes and findings</Link>
               </div>
 
@@ -160,6 +170,7 @@ export default function EvidencePage() {
                 hypothesis we tested and did not ship.
               </p>
             </div>
+            <TrustNext from="/evidence" />
           </div>
         </div>
       </section>

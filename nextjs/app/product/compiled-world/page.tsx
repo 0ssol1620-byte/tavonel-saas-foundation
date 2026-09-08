@@ -70,6 +70,8 @@ export default function CompiledWorldPage() {
               </p>
               <div className="actions">
                 <Link className="btn" href={"/explore" as Route}>Explore a Compiled World</Link>
+                <Link className="btn ghost" href="/docs/use-with-ai">Use the result with AI</Link>
+                <Link className="btn ghost" href="/docs/ontology-output">Use the ontology output</Link>
                 <Link className="btn ghost" href="/evidence">How evidence is bound</Link>
                 <Link className="btn ghost" href="/developers">Read it from your code</Link>
               </div>

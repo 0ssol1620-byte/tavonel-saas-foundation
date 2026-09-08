@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { Route } from "next";
 import { PublicSitePage } from "@/components/public-site-chrome";
+import { TrustNext } from "@/components/trust-next";
 
 export const metadata: Metadata = {
   // Each page declares its own address. Without this every route inherited the root
@@ -100,12 +101,12 @@ export default function ResearchPage() {
               </div>
 
               <div className="actions">
-                <Link className="btn" href={"/research/notes" as Route}>Notes and findings</Link>
+                <Link className="btn ghost" href={"/research/notes" as Route}>Notes and findings</Link>
                 <Link className="btn ghost" href={"/benchmarks" as Route}>Benchmark protocol</Link>
                 <Link className="btn ghost" href="/evidence">How evidence is bound</Link>
-                <Link className="btn ghost" href={"/reproducibility" as Route}>Reproducibility</Link>
               </div>
             </div>
+            <TrustNext from="/research" />
           </div>
         </div>
       </section>

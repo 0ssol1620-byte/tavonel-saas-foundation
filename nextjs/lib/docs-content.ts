@@ -101,6 +101,102 @@ export const DOCS_SECTIONS: DocsSection[] = [
     ],
   },
   {
+    slug: "use-with-ai",
+    title: "Use your results with AI",
+    group: "Start",
+    summary: "Choose live MCP/API access or the signed portable package, and keep answers grounded in the same evidence.",
+    blocks: [
+      {
+        kind: "prose",
+        text: "There are two supported ways to use TAVONEL output. **Live access** through Ask, the API or the read-only MCP server reads the active World and is the preferred path for a production assistant that needs the current revision. The **signed knowledge package** is a portable snapshot for offline work, handoff, archive and systems that consume files rather than an API.",
+      },
+      {
+        kind: "table",
+        head: ["Use case", "Recommended surface", "Why"],
+        rows: [
+          ["AI/agent that should stay current", "MCP or API", "Reads the active World, access policy and evidence without copying a stale snapshot."],
+          ["TAVONEL workspace Q&A", "Ask", "Uses the same active World and returns source-grounded citations."],
+          ["Local coding/research agent with folder access", "Signed ZIP", "Extract once, grant the agent folder access, and let AGENTS.md describe the package contract."],
+          ["Web chat with file upload but no local filesystem", "Signed ZIP or selected package files", "The chat must receive the bytes; a local path by itself does not grant access."],
+          ["Graph/RDF/RAG import", "Signed ZIP", "Use the projection that matches the target system while retaining validation and provenance beside it."],
+        ],
+      },
+      {
+        kind: "steps",
+        items: [
+          "Before using a result as organizational truth, confirm that the World you intend to use is active. A review_required candidate is not automatically authoritative.",
+          "For a live agent, create a least-privilege API key and use the read-only MCP bridge or the REST API from the Developers surface.",
+          "For a portable workflow, download the signed knowledge package and extract it without changing its internal paths.",
+          "Give a filesystem-capable agent access to the extracted folder and tell it to read AGENTS.md first. The machine-readable manifest/ai-entrypoint.json points to retrieval, ontology, graph, provenance and validation files.",
+          "Require the consuming AI to preserve uncertainty and cite the package evidence/source locator it actually used. README.md and AGENTS.md are instructions, not evidence sources.",
+        ],
+      },
+      {
+        kind: "code",
+        label: "Minimal prompt for a local agent",
+        language: "text",
+        body: "Read AGENTS.md in this folder first. Use manifest/ai-entrypoint.json to locate the compiled knowledge and evidence. Answer from this package, preserve uncertainty, and cite the source evidence you relied on. If the task requires the latest organizational state, tell me to use the live TAVONEL MCP/API instead of assuming this snapshot is current.",
+      },
+      {
+        kind: "table",
+        head: ["Package path", "Use it for"],
+        rows: [
+          ["README.md", "Human-facing start guide and integration choices."],
+          ["AGENTS.md", "Instructions for a filesystem-capable AI/agent."],
+          ["manifest/ai-entrypoint.json", "Machine-readable map of the portable entrypoints and grounding rules."],
+          ["rag/chunks.jsonl", "Generic retrieval/RAG ingestion."],
+          ["rag/documents.jsonl", "Document-level retrieval records."],
+          ["ontology/knowledge.jsonld", "JSON-LD semantic/ontology consumers."],
+          ["ontology/knowledge.ttl", "RDF/Turtle graph consumers."],
+          ["graph/nodes.csv + graph/relationships.csv", "Simple graph imports."],
+          ["provenance/activities.jsonl", "Lineage and provenance inspection."],
+          ["validation/report.json", "Whether the result passed validation or still requires review."],
+          ["manifest/export-manifest.json + signatures/", "Integrity verification for every signed package entry."],
+        ],
+      },
+      {
+        kind: "note",
+        text: "A filesystem path is not a connector. If an AI application cannot read local files, upload the package or use MCP/API instead of pasting a path it cannot access.",
+      },
+    ],
+  },
+  {
+    slug: "ontology-output",
+    title: "Use the ontology output",
+    group: "Start",
+    summary: "Import the Compiled World ontology into RDF, linked-data and graph systems without losing validation, evidence or stable identity.",
+    blocks: [
+      { kind: "prose", text: "Every portable package includes **ontology/knowledge.jsonld** and **ontology/knowledge.ttl**. They are semantic projections of the Compiled World. The current export is RDF/JSON-LD with TAVONEL node kinds and compiled relation predicates; it should not be described as a hand-authored OWL/TBox schema. Keep provenance and validation beside the ontology, because the ontology is for semantic navigation and integration rather than a replacement for source evidence." },
+      {
+        kind: "table",
+        head: ["Target", "Use", "Important companion"],
+        rows: [
+          ["JSON-LD / linked-data application", "ontology/knowledge.jsonld", "provenance/activities.jsonl + validation/report.json"],
+          ["RDF store / SPARQL / RDF tooling", "ontology/knowledge.ttl", "canonical/model.json + provenance/ + validation/"],
+          ["Neo4j or another property-graph import", "graph/nodes.csv + graph/relationships.csv", "Keep the same stable ids and evidence ids"],
+          ["Production AI or agent", "Prefer live MCP/API", "The active World stays current and preserves access/evidence resolution"],
+        ],
+      },
+      {
+        kind: "steps",
+        items: [
+          "Read validation/report.json first. A review_required candidate is not approved organizational truth.",
+          "Choose JSON-LD for linked-data JSON consumers, Turtle for RDF/SPARQL consumers, or the CSV graph for property-graph import.",
+          "Preserve every urn:tavonel:<id> identifier. Those ids are the join key across ontology, canonical model, graph and evidence-bearing records.",
+          "Do semantic traversal in the ontology, but resolve factual claims back to provenance/evidence before presenting them as grounded answers.",
+          "Treat a signed ZIP as a snapshot. When the active World changes, import the newer signed projection or use MCP/API instead of editing the old snapshot in place.",
+        ],
+      },
+      {
+        kind: "code",
+        label: "Portable SPARQL inspection",
+        language: "text",
+        body: "SELECT ?resource ?type ?label\nWHERE {\n  ?resource a ?type .\n  OPTIONAL { ?resource <http://www.w3.org/2000/01/rdf-schema#label> ?label }\n}\nLIMIT 50",
+      },
+      { kind: "note", text: "The Turtle projection serializes node types, rdfs:label values and compiled relations. The JSON-LD projection also carries node evidence references through the PROV mapping in its context. For exact source locators, keep the provenance/evidence material from the same signed package." },
+    ],
+  },
+  {
     slug: "concepts",
     title: "Concepts",
     group: "Concepts",

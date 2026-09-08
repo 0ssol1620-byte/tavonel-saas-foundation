@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { Route } from "next";
 import { PublicSitePage } from "@/components/public-site-chrome";
+import { TrustNext } from "@/components/trust-next";
 import {
   BENCHMARK_FAMILIES,
   NORTH_STAR,
@@ -182,11 +183,11 @@ export default function BenchmarksPage() {
               ) : null}
 
               <div className="actions">
-                <Link className="btn" href={"/research" as Route}>How we report research</Link>
-                <Link className="btn ghost" href={"/reproducibility" as Route}>Reproducibility</Link>
+                <Link className="btn ghost" href={"/research" as Route}>How we report research</Link>
                 <Link className="btn ghost" href="/evidence">How evidence is bound</Link>
               </div>
             </div>
+            <TrustNext from="/benchmarks" />
           </div>
         </div>
       </section>

@@ -1,6 +1,10 @@
+"use client";
+
+import { useState } from "react";
 import { CLAIM_STATE, type ClaimStateKey } from "@/lib/claim-state";
+import { trackFunnel } from "@/lib/funnel-events";
 import type { CapabilityManifest, CapabilityManifestEntry } from "../../shared/capabilityManifest";
-import { capabilityStatuses, type CapabilityStatus } from "../../shared/uskcEnums";
+import { capabilityStatuses, type CapabilityStatus, type SourceFamily } from "../../shared/uskcEnums";
 
 /*
   The support matrix, printed from the manifest.
@@ -92,9 +96,76 @@ function Row({ entry }: { entry: CapabilityManifestEntry }) {
   );
 }
 
+/*
+  Most common first, and a way to get to one family without reading past the others (§14.3).
+
+  The manifest's own order is the order the formats were added to the intake whitelist, which is
+  a fact about this repository's history and not about what a visitor came to look up. A buyer
+  asking "can it read my files" is holding a PDF or a scan far more often than an ODS, so the
+  families are ordered by how often they are the reason someone opened this page, and the
+  ordering is stated here rather than by reordering the manifest -- that file is the server's
+  whitelist and its order has no business being a presentation decision.
+
+  A family absent from the manifest simply never renders a button; the list is derived, so
+  adding a format to the manifest adds its family here without a second edit.
+*/
+const FAMILY_ORDER: readonly SourceFamily[] = ["document", "image", "spreadsheet", "presentation", "archive"];
+
+const FAMILY_LABEL: Partial<Record<SourceFamily, string>> = {
+  document: "Documents and PDFs",
+  image: "Scans and images",
+  spreadsheet: "Spreadsheets",
+  presentation: "Presentations",
+  archive: "Archives",
+};
+
+function familyRank(family: SourceFamily) {
+  const at = FAMILY_ORDER.indexOf(family);
+  return at === -1 ? FAMILY_ORDER.length : at;
+}
+
 export default function SourceCapabilityTable({ manifest }: { manifest: CapabilityManifest }) {
+  const [family, setFamily] = useState<SourceFamily | "all">("all");
+  const ordered = [...manifest.entries].sort((a, b) => familyRank(a.sourceFamily) - familyRank(b.sourceFamily));
+  const families = FAMILY_ORDER.filter((name) => ordered.some((entry) => entry.sourceFamily === name));
+  const rows = family === "all" ? ordered : ordered.filter((entry) => entry.sourceFamily === family);
+
+  const choose = (next: SourceFamily | "all") => {
+    setFamily(next);
+    // The family name is one of the frozen enum values, not anything the visitor typed.
+    trackFunnel("source_category_viewed", { family: next });
+  };
+
   return (
     <>
+      {/*
+        The quick navigator is a filter, not a set of anchors.
+
+        Anchors down a twelve-row table move the viewport and leave the reader to work out
+        which rows belong to the heading they landed on. Filtering answers the question the
+        page is actually asked -- "is my kind of file in here" -- and leaves the row count
+        visible so a reader can see that filtering removed something rather than that the page
+        broke. It is sticky because on a phone the table is taller than the screen and the
+        control that narrows it must not scroll away above it.
+      */}
+      <div className="src-filter" role="group" aria-label="Filter by source type">
+        <button type="button" data-on={family === "all" ? 1 : 0} onClick={() => choose("all")} aria-pressed={family === "all"}>
+          All formats <i>{ordered.length}</i>
+        </button>
+        {families.map((name) => (
+          <button
+            key={name}
+            type="button"
+            data-on={family === name ? 1 : 0}
+            aria-pressed={family === name}
+            onClick={() => choose(name)}
+          >
+            {FAMILY_LABEL[name] ?? words(name)}{" "}
+            <i>{ordered.filter((entry) => entry.sourceFamily === name).length}</i>
+          </button>
+        ))}
+      </div>
+
       <div className="src-scroll">
         <table className="src-matrix">
           <caption>
@@ -112,21 +183,33 @@ export default function SourceCapabilityTable({ manifest }: { manifest: Capabili
             </tr>
           </thead>
           <tbody>
-            {manifest.entries.map((entry) => <Row key={entry.mime} entry={entry} />)}
+            {rows.map((entry) => <Row key={entry.mime} entry={entry} />)}
           </tbody>
         </table>
       </div>
 
-      <dl className="src-legend">
-        {capabilityStatuses.map((status) => (
-          <div key={status}>
-            <dt>
-              <span className="src-tier" data-token={TIERS[status].token}>{status}</span>
-            </dt>
-            <dd>{TIERS[status].meaning}</dd>
-          </div>
-        ))}
-      </dl>
+      {/*
+        The tier legend is a technical detail, so it starts closed (§14.3).
+
+        Six definitions of six frozen status words is the right thing to have on the page and
+        the wrong thing to put between a reader and the table: it was two screens of vocabulary
+        immediately below the rows the vocabulary describes. The chip in each row still prints
+        the tier name, so nothing is hidden -- what folds is the paragraph explaining it, for
+        the reader who wants it.
+      */}
+      <details className="status-fold">
+        <summary>What each support tier means</summary>
+        <dl className="src-legend">
+          {capabilityStatuses.map((status) => (
+            <div key={status}>
+              <dt>
+                <span className="src-tier" data-token={TIERS[status].token}>{status}</span>
+              </dt>
+              <dd>{TIERS[status].meaning}</dd>
+            </div>
+          ))}
+        </dl>
+      </details>
     </>
   );
 }

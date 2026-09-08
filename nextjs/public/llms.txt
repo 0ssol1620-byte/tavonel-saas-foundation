@@ -10,23 +10,28 @@ Indexing: public product, documentation, research and trust pages are indexable.
 
 ## Pages
 
-- [Home](https://tavonel.com/): Knowledge Compiler. Turn documents and connected systems into a source-grounded world an AI can use.
+- [Home](https://tavonel.com/): Knowledge Compiler. Your AI needs more than searchable files; it needs a current, traceable world. TAVONEL compiles your own sources into one.
 - [Product](https://tavonel.com/product): Product overview — document understanding, compilation, evidence and Compiled Worlds.
 - [Knowledge Compiler guide](https://tavonel.com/knowledge-compiler): What a Knowledge Compiler is, how it differs from RAG/search/graphs, and when to use one.
-- [Explore a Compiled World](https://tavonel.com/explore): Inspect a source-to-world example and follow evidence back to its page region.
+- [Explore a Compiled World](https://tavonel.com/explore): Inspect a deterministic source-to-world sample and follow a compiled fact back to its exact source location.
 - [Research](https://tavonel.com/research): Research areas, methods and current findings.
 - [Research notes](https://tavonel.com/research/notes): Measurements, limitations and experiment notes.
 - [Evidence](https://tavonel.com/evidence): How claims, source regions, versions and signed packages are bound together.
 - [Developers](https://tavonel.com/developers): API, MCP, retrieval packages and signed exports.
 - [Documentation](https://tavonel.com/docs): Product and developer documentation.
 - [Pricing](https://tavonel.com/pricing): Free Evaluation, Developer, Team and Enterprise access.
+- [Sources](https://tavonel.com/sources): The capability manifest this deployment reads — every accepted format, its support tier, what survives into the compiled world, and what does not.
 - [Security](https://tavonel.com/security): Data path, tenant isolation, retention and security controls.
+- [Benchmarks](https://tavonel.com/benchmarks): The metric families and receipt fields a knowledge-compilation result must satisfy before a number is published.
+- [Reproducibility](https://tavonel.com/reproducibility): Frozen public fixtures and digest-bound sample artifacts.
 - [Status](https://tavonel.com/status): Current service status.
 
 ## Product
 
 - [Document understanding](https://tavonel.com/product/document-understanding): Recover text, layout, tables and source geometry from documents and scans.
 - [Compiled World](https://tavonel.com/product/compiled-world): Structured knowledge with provenance, versions and reusable retrieval artifacts.
+- [Use results with AI](https://tavonel.com/docs/use-with-ai): Choose live MCP/API access or a signed portable knowledge package, with grounding and validation guidance.
+- [Use ontology output](https://tavonel.com/docs/ontology-output): Import JSON-LD, Turtle or graph projections while preserving stable identity, validation and evidence grounding.
 - [Integrations](https://tavonel.com/integrations): Connect supported systems where knowledge already lives.
 
 ## Trust and legal

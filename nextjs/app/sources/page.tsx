@@ -68,7 +68,23 @@ export default function SourcesPage() {
 
               <p className="src-refusal">Formats not listed are refused at upload.</p>
 
-              <h2 className="slate src-section"><span />HOW A ROW IS FILLED IN</h2>
+              {/*
+                The four paragraphs explaining the table are technical detail, and §14.3 asks for
+                technical detail collapsed on a long page. They sat as four screens of prose
+                between the table and the way out: read by the reader who wants to know how a row
+                is filled in, scrolled past by everyone else. Opening is one click and the summary
+                says what is inside.
+
+                §14.4's lifecycle definition belongs in here too, because it is the caveat the
+                table cannot state row by row. The table is about formats; "supported" for a
+                *connector* means the ten behaviours listed below, and no connector on this
+                deployment has been qualified for them (RESOLVED B-7). Without the paragraph a
+                reader can take a format's tier as a statement about a Drive folder staying in
+                step, which is a different claim entirely.
+              */}
+              <details className="status-fold">
+                <summary>How a row is filled in, and what &ldquo;supported&rdquo; will mean</summary>
+                <div className="stack">
               <p className="src-para">
                 <b>What is preserved</b> is what the compile request carries today, not what the
                 file format contains. Every source here is sanitized to PDF and read by the OCR
@@ -104,6 +120,18 @@ export default function SourcesPage() {
                 review would describe a queue that does not exist, so it is refused with
                 everything else that is absent, and it appears here instead.
               </p>
+              <p className="src-para">
+                <b>A format is not a connector.</b> Every row above is about reading one file
+                that has already arrived. For a connected system, &ldquo;supported&rdquo; has to
+                mean the whole lifecycle: create, update, rename, move, delete, permission
+                change, tombstone behaviour, source-version propagation, world update and ACL
+                enforcement. No connector on this deployment has been qualified for that set —
+                deletion and permission semantics are still being settled — which is why the
+                connectors are labelled beta rather than qualified everywhere they appear, and
+                why nothing here is called verified.
+              </p>
+                </div>
+              </details>
 
               <div className="actions">
                 <Link className="btn" href={"/docs/files-and-formats" as Route}>Files and formats</Link>

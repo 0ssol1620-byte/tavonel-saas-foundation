@@ -22,8 +22,13 @@ type Page = {
   on: (event: string, handler: (value: never) => void) => void;
 };
 
-/** The three places the landing offers the compiled world: hero, evidence scene, closing scene. */
-const EXPLORE_CTA_COUNT = 3;
+/*
+  Every link into the compiled world: the hero door, the evidence scene's two named proofs
+  (`?act=evidence` and `?act=change`) and the closing scene's door. Four since 2026-09-08, when
+  the evidence scene stopped sending a reader to the entry act to hunt for the trace it had
+  just described.
+*/
+const EXPLORE_CTA_COUNT = 4;
 
 /** Every grid on the page whose tracks are equal and therefore can be widened by one child. */
 const CONTAINERS = [".plans", ".packs", ".caps", ".checks", ".stops", ".legend", ".chain", ".tiles", ".twoworlds", ".sources"];
@@ -134,8 +139,17 @@ test("draws the final five-scene journey over the opening world field", async ({
 test("hero leads with the compiled world and keeps the access action beside it", async ({ page }) => {
   await page.goto("/");
 
+  /*
+    Three actions since 2026-09-08, and the third is deliberately not a button.
+
+    §10.1 asks for a tertiary "See how it works" beside the two that matter, and it is a text
+    link rather than a third `.btn` precisely so the hero keeps one primary and one secondary
+    action. The button count is asserted alongside the link count for that reason: a third
+    button would satisfy a count of three and would be the thing the blueprint warns against.
+  */
   const heroActions = page.locator("#s1 .actions > a");
-  await expect(heroActions).toHaveCount(2);
+  await expect(heroActions).toHaveCount(3);
+  await expect(page.locator("#s1 .actions > a.btn")).toHaveCount(2);
 
   const primary = heroActions.nth(0);
   await expect(primary).toHaveText("Explore a Compiled World");
@@ -149,6 +163,10 @@ test("hero leads with the compiled world and keeps the access action beside it",
   // "Start with your files". Both are legitimate, and neither may be an empty button.
   await expect(secondary).toHaveText(/\S/);
 
+  const tertiary = heroActions.nth(2);
+  await expect(tertiary).not.toHaveClass(/btn/);
+  await expect(tertiary).toHaveText("See how it works");
+
   // The closing scene is the mirror image: by scene 5 the argument has been made and starting is
   // the next move, so the access action leads and Explore is the alternative.
   const closingActions = page.locator("#s5 .actions > a");
@@ -160,18 +178,42 @@ test("hero leads with the compiled world and keeps the access action beside it",
 /*
  * Every door into the world is the same door.
  *
- * Three CTAs point at /explore and they used to be three independent literals, which is how a
- * label drifts on one of them. They now come from one component, and this is the assertion that
- * notices if a fourth is added by hand.
+ * The CTAs pointing at /explore used to be independent literals, which is how a label drifts on
+ * one of them. They come from one component, and this is the assertion that notices if another
+ * is added by hand.
+ *
+ * Since 2026-09-08 two of them carry `?act=`, which sends the reader to the act the surrounding
+ * scene has just argued for instead of to the entry act. That splits the links into two kinds
+ * and the rule is different for each, so both are stated rather than counted together:
+ *
+ *   the door        `/explore`, and it always reads "Explore a Compiled World"
+ *   a named proof   `/explore?act=…`, a second link with its own label
+ *
+ * A hand-written fourth door still fails here: an unqualified /explore link with any other
+ * label, or a proof link pointing at an act the story never resolves.
  */
 test("offers the compiled world under one label wherever it is offered", async ({ page }) => {
   await page.goto("/");
   await settle(page);
-  const explore = page.locator('main a[href="/explore"]');
-  await expect(explore).toHaveCount(EXPLORE_CTA_COUNT);
-  for (let index = 0; index < EXPLORE_CTA_COUNT; index += 1) {
-    await expect(explore.nth(index)).toHaveText("Explore a Compiled World");
+
+  const doors = page.locator('main a[href="/explore"]');
+  await expect(doors.first()).toHaveText("Explore a Compiled World");
+  const doorCount = await doors.count();
+  expect(doorCount, "the landing still offers the entry door").toBeGreaterThanOrEqual(1);
+  for (let index = 0; index < doorCount; index += 1) {
+    await expect(doors.nth(index)).toHaveText("Explore a Compiled World");
   }
+
+  const links = page.locator('main a[href^="/explore"]');
+  await expect(links).toHaveCount(EXPLORE_CTA_COUNT);
+
+  // Every deep link resolves to an act `lib/explore-story.ts` knows; anything else silently
+  // lands the reader on the entry act and the scene's argument goes unproven.
+  const acts = await links.evaluateAll((nodes) =>
+    nodes
+      .map((node) => new URL((node as HTMLAnchorElement).href).searchParams.get("act"))
+      .filter((act): act is string => act !== null));
+  for (const act of acts) expect(["world", "evidence", "change"]).toContain(act);
 });
 
 /*

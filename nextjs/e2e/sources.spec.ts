@@ -77,6 +77,18 @@ test("states the refusal rule once and claims nothing it cannot support", async 
   await page.goto("/sources");
   await expect(page.locator(".src-refusal")).toHaveText("Formats not listed are refused at upload.");
 
+  /*
+    Open every fold before reading the page.
+
+    The tier legend and the explanatory prose moved into `<details>` for §14.3, and `innerText`
+    returns nothing for collapsed content -- so without this the barred-phrase scan would have
+    quietly stopped covering the two blocks most likely to hold a claim, and passed while
+    covering less than it did before.
+  */
+  await page.evaluate(() => {
+    for (const fold of document.querySelectorAll("details")) fold.open = true;
+  });
+
   const body = (await page.locator("main").innerText()).toLowerCase().replace(/\s+/g, " ");
   for (const barred of [
     "supports every file",
@@ -147,4 +159,38 @@ test("is in the primary navigation and listed in the sitemap", async ({ page }) 
 
   const sitemap = await page.request.get("/sitemap.xml");
   expect(await sitemap.text()).toContain("https://tavonel.com/sources");
+});
+
+/*
+  §14.3's quick navigator, checked as a filter rather than as a control that exists.
+
+  The failure this guards against is a filter that renders and does nothing -- or worse, one
+  that promotes a status by showing a row under the wrong family. So it asserts the two things
+  that make it useful: choosing a family leaves only that family's rows, and the counts on the
+  buttons match what the API served. The unfiltered default is asserted first, because a page
+  that starts filtered would hide formats from a reader who came to check one.
+*/
+test("filters the matrix by source family without changing any row's tier", async ({ page }) => {
+  const served = await manifest(page);
+  await page.goto("/sources");
+
+  const rows = page.locator("table.src-matrix tbody tr");
+  await expect(rows, "the page opens showing every format").toHaveCount(served.entries.length);
+
+  const documents = page.getByRole("button", { name: /Documents and PDFs/ });
+  await expect(documents).toBeVisible();
+  const expected = served.entries.filter((entry) =>
+    ["pdf", "wordprocessingml", "opendocument.text"].some((mark) => entry.mime.includes(mark)));
+  expect(expected.length, "the manifest still has a document family").toBeGreaterThan(0);
+
+  await documents.click();
+  await expect(rows).toHaveCount(expected.length);
+  const chips = await page.locator("table.src-matrix .src-tier").allInnerTexts();
+  expect(
+    chips.map((chip) => chip.trim()),
+    "filtering may hide a row, never restate its tier",
+  ).toEqual(expected.map((entry) => entry.status));
+
+  await page.getByRole("button", { name: /All formats/ }).click();
+  await expect(rows).toHaveCount(served.entries.length);
 });

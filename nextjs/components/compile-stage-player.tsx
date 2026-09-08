@@ -94,6 +94,20 @@ export default function CompileStagePlayer({
   const [narrow, setNarrow] = useState(false);
   const [saveData, setSaveData] = useState(false);
   /*
+    WCAG 2.2.2. A cut runs ~18s and then advances on its own — auto-playing motion well past the
+    five-second bound — so a mechanism to stop it is not optional.
+
+    The control existed until `0d550fa` ("UX: complete 120-point visual, interaction and intake
+    polish"), which rewrote the viewport down to one keyed decoder and dropped the button with
+    it. `.compile-film-motion-control` in `app/ux-polish.css`, and its "the motion control
+    remains for WCAG" note, were left behind pointing at nothing. Restored here.
+
+    Pausing shows the stage's own still and disarms the auto-advance — the same path reduced
+    motion already takes, rather than a second mechanism per renderer. It has to be that path:
+    the wide-viewport renderer is a canvas rAF loop, not a <video> with a `pause()` to call.
+  */
+  const [paused, setPaused] = useState(false);
+  /*
     The stage the visitor chose, and which the player may not take back from them.
 
     Auto-advance and manual selection were fighting: tapping STRUCTURE started an 18-second
@@ -148,7 +162,7 @@ export default function CompileStagePlayer({
     return () => observer.disconnect();
   }, []);
 
-  const cycling = !reducedMotion && inView && held !== index;
+  const cycling = !reducedMotion && !paused && inView && held !== index;
 
   useEffect(() => {
     if (!cycling) return;
@@ -210,7 +224,7 @@ export default function CompileStagePlayer({
 
   const LiveFilm = LIVE_FILMS[index] ?? LIVE_FILMS[0];
   const live = canvasReady && !narrow;
-  const still = reducedMotion || saveData || !inView;
+  const still = reducedMotion || paused || saveData || !inView;
 
   return (
     <div className="compile-film-sequence rv" ref={frameRef} {...touchHandlers} data-film-renderer={live ? "live-canvas" : "video-fallback"}>
@@ -238,6 +252,17 @@ export default function CompileStagePlayer({
           <video key={active.id} ref={videoRef} className="compile-film-video" data-active={1} muted autoPlay playsInline preload="metadata" poster={active.poster} aria-label={`${active.label} — ${active.line}`} onEnded={onEnded}>
             {stages.map((stage, position) => admitted.has(position) ? <source key={stage.id} src={stage.src} type="video/mp4" /> : null)}
           </video>
+        )}
+        {reducedMotion ? null : (
+          <button
+            type="button"
+            className="compile-film-motion-control"
+            aria-label={paused ? "Resume compilation film" : "Pause compilation film"}
+            aria-pressed={paused}
+            onClick={() => setPaused((value) => !value)}
+          >
+            <span aria-hidden="true">{paused ? "▶" : "Ⅱ"}</span>
+          </button>
         )}
       </div>
 

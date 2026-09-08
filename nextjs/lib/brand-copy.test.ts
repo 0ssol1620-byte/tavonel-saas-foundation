@@ -134,6 +134,15 @@ const COPY_SURFACES = [
   */
   "app/solutions/[slug]/page.tsx",
   "app/api/page.tsx",
+  /*
+    The conversion pass, 2026-09-08. Three surfaces a buyer reads in order, none of which had a
+    row. The pricing client is the one that matters: the plan cards, the six §12.1 answers and
+    the rollover sentence are all written there, and it was guarded only through
+    `app/pricing/page.tsx` -- fifteen lines of wiring with no copy in it at all.
+  */
+  "app/docs/page.tsx",
+  "components/pricing-page-client.tsx",
+  "components/trust-next.tsx",
 ];
 
 const BARRED = [
@@ -542,6 +551,119 @@ describe("public copy", () => {
     const copy = read(surface).replace(/\/\*[\s\S]*?\*\//g, " ").toLowerCase();
     for (const phrase of RETIRED_LOCATOR_WORDING) {
       expect(copy, `RESOLVED A-1 retires "${phrase}"`).not.toContain(phrase);
+    }
+  });
+
+  /*
+    §17's five pages are one sequence, and the sequence is what breaks first.
+
+    Before this pass each of them ended in three sibling links to two or three of the others, in
+    a different order every time, and /reproducibility and /research had no way onward at all.
+    That state passed every test in this repository, because nothing checked that the pages knew
+    about each other. This does: each page must render `TrustNext` naming itself, so a page
+    dropped out of the funnel -- or given someone else's position -- fails here rather than
+    quietly ending the reader's journey.
+  */
+  const TRUST_PAGES: Array<[string, string]> = [
+    ["app/security/page.tsx", "/security"],
+    ["app/evidence/page.tsx", "/evidence"],
+    ["app/benchmarks/page.tsx", "/benchmarks"],
+    ["app/reproducibility/page.tsx", "/reproducibility"],
+    ["app/research/page.tsx", "/research"],
+  ];
+
+  it.each(TRUST_PAGES)("%s ends on its own step of the §17 trust sequence", (surface, href) => {
+    const source = read(surface);
+    expect(source, `${surface} must render the shared next step`).toContain("TrustNext");
+    expect(source, `${surface} must name itself, not another page's position`)
+      .toContain(`from="${href}"`);
+  });
+
+  it("gives every step of the trust sequence a precise next action", () => {
+    const source = read("components/trust-next.tsx");
+    // Every href declared in the order must also have an action, or a page renders an empty CTA.
+    const steps = [...source.matchAll(/href: "([^"]+)"/g)].map((match) => match[1]!);
+    const actions = [...source.matchAll(/"(\/[a-z]+)": "([^"]+)"/g)];
+    expect(steps.length).toBeGreaterThanOrEqual(5);
+    for (const step of steps.slice(0, -1)) {
+      const action = actions.find(([, href]) => href === step);
+      expect(action, `${step} has no next action`).toBeDefined();
+      // §22 bars the generic CTA where a precise next action exists, which is every step here.
+      expect(action![2]!.toLowerCase()).not.toContain("learn more");
+      expect(action![2]!.toLowerCase()).not.toContain("read more");
+    }
+  });
+
+  /*
+    A published file list is a promise about bytes.
+
+    /developers prints the contents of a signed export. It used to describe them in prose, which
+    drifts silently; now it prints `REQUIRED_PACKAGE_PATHS` plus the files the exporter adds on
+    the way out, and this checks each of those strings against the module that writes them. A
+    file renamed in the exporter fails here instead of on a customer's `unzip`.
+  */
+  it("names only files the exporter actually writes on /developers", () => {
+    const page = read("app/developers/page.tsx");
+    const exporter = read("lib/collection-download.ts");
+    const extras = page.match(/const PACKAGE_EXTRAS = \[([\s\S]*?)\n\] as const;/);
+    expect(extras, "the extra-file list is still declared on the page").not.toBeNull();
+    const paths = [...extras![1]!.matchAll(/"([^"]+)"/g)].map((match) => match[1]!);
+    expect(paths.length).toBeGreaterThan(0);
+    for (const path of paths) {
+      expect(exporter, `lib/collection-download.ts never writes ${path}`).toContain(`"${path}"`);
+    }
+    expect(page, "the required paths come from the exporter, not a second list")
+      .toContain("REQUIRED_PACKAGE_PATHS");
+    // §16.4: the export is a semantic projection, never a claimed OWL ontology.
+    expect(page.toLowerCase()).not.toContain("complete owl");
+    expect(page).toContain("semantic projection");
+  });
+
+  /*
+    §22: no generic CTA on a conversion surface where a precise next action exists.
+
+    Every one of these pages has a specific thing the reader should do next -- run the
+    quickstart, open a result at its source, start an evaluation -- and "Learn more" is what a
+    page says when nobody decided which.
+  */
+  const CONVERSION_SURFACES = [
+    "components/home-page-client.tsx",
+    "components/pricing-page-client.tsx",
+    "app/sources/page.tsx",
+    "app/security/page.tsx",
+    "app/evidence/page.tsx",
+    "app/benchmarks/page.tsx",
+    "app/research/page.tsx",
+    "app/developers/page.tsx",
+    "app/docs/page.tsx",
+  ];
+
+  it.each(CONVERSION_SURFACES)("uses no generic call to action in %s", (surface) => {
+    const copy = read(surface).replace(/\/\*[\s\S]*?\*\//g, " ").toLowerCase();
+    for (const generic of ["learn more", "read more", "find out more"]) {
+      expect(copy, `§22 asks for the precise next action, not "${generic}"`).not.toContain(generic);
+    }
+  });
+
+  /*
+    §10.2's proof strip must stay proof rather than becoming a statistics row.
+
+    A strip under a hero is where invented figures arrive: "10M pages compiled", "99.9% uptime",
+    a customer count. §35 bars every one of them and none is measured here, so each item is a
+    link to the page that substantiates it and the strip may carry no digit-bearing figure at
+    all. This reads the rendered items, not the file, so a number added in any of them fails.
+  */
+  it("keeps the landing proof strip linked and free of invented figures", () => {
+    const landing = read("components/home-page-client.tsx");
+    const strip = landing.match(/<ul className="hero-proof"[\s\S]*?<\/ul>/);
+    expect(strip, "the hero proof strip is still on the landing page").not.toBeNull();
+    const items = [...strip![0].matchAll(/<li>([\s\S]*?)<\/li>/g)].map((match) => match[1]!);
+    expect(items.length, "§10.2 asks for the strip, not one item").toBeGreaterThanOrEqual(4);
+    for (const item of items) {
+      expect(item, "every proof item points at the page that substantiates it").toContain("href=");
+      const text = item.replace(/<[^>]*>/g, "");
+      expect(text, `"${text.trim()}" carries a figure; §35 bars invented metrics`)
+        .not.toMatch(/[0-9]/);
     }
   });
 });
