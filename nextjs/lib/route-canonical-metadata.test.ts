@@ -119,11 +119,34 @@ describe("per-route canonical metadata", () => {
   });
 
   it("excludes authenticated and transient surfaces from indexing", () => {
-    // A sign-in screen, a private workspace, an OAuth redirect target and an internal render
-    // harness have no business in a search index, and must not compete with public pages.
-    for (const route of ["login", "workspace", "auth/callback", "dev"]) {
+    // A sign-in screen, a private workspace, an OAuth redirect target, an internal render
+    // harness and the standalone brand film have no business in a search index, and must not
+    // compete with public pages. `/film` is on the list because its content is the same
+    // eighteen seconds the landing page carries: indexed, it is the landing page's own
+    // duplicate with no product on it.
+    for (const route of ["login", "workspace", "auth/callback", "dev", "film"]) {
       const layout = readFileSync(join(appDirectory, route, "layout.tsx"), "utf8");
       expect(layout, `${route} must be noindex`).toMatch(/robots:\s*\{[^}]*index:\s*false/);
+    }
+  });
+
+  it("keeps the preview-only routes out of production, not merely out of the index", () => {
+    /*
+      `/film` and `/dev/*` return 404 on tavonel.com -- measured by this lane, `X-Matched-Path:
+      /film`, not inferred -- and they do it here, in a layout guard. Not by accident, and not
+      because `public/film/` shadows the route, which was this lane's first hypothesis and is
+      wrong. The only thing that settles which of the two it is, for the next person who finds
+      the 404, is the guard being present and named.
+
+      Deleting either guard publishes a surface nobody decided to publish: the film competes
+      with the landing page for the same argument, and the dev harnesses put fixture-shaped
+      internals on the marketing domain.
+    */
+    for (const route of ["film", "dev"]) {
+      const layout = readFileSync(join(appDirectory, route, "layout.tsx"), "utf8");
+      expect(layout, `${route} must 404 in production`).toMatch(
+        /process\.env\.VERCEL_ENV === "production"\)\s*notFound\(\)/,
+      );
     }
   });
 
