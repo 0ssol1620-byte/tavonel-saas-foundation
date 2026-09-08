@@ -70,6 +70,9 @@ export const FOOTER_GROUPS: readonly { title: string; links: readonly SiteLink[]
   {
     title: "Trust",
     links: [
+      // First, because it indexes the three below it and two more in Legal. A Trust Center
+      // reachable only by typing its URL is a Trust Center nobody in procurement finds.
+      { href: "/trust", label: "Trust Center" },
       { href: "/security", label: "Security" },
       { href: "/status", label: "Status" },
       { href: "/subprocessors", label: "Subprocessors" },
