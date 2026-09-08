@@ -90,6 +90,23 @@ test("renders launch-critical public routes without browser errors", async ({ pa
   const previewToolbarCspErrors = errors.filter(message =>
     message.includes("vercel.live") && message.includes("Content-Security-Policy"),
   );
+  /*
+    §41 Phase 1: the strict CSP is deployed in Report-Only, and a report-only violation is a
+    measurement, not a failure.
+
+    A browser logs these to the console with the same severity as a real refusal, so without this
+    filter the phase whose entire purpose is "block nothing, report everything" would turn every
+    page in this suite red while the pages themselves rendered perfectly. The filter is anchored
+    on the disposition the browser prints, so an *enforced* refusal -- the thing this assertion
+    exists for -- still fails. The count is annotated because it is the number Phase 3 reads.
+  */
+  const reportOnlyCspErrors = errors.filter(message => /report[ -]only/i.test(message));
+  if (reportOnlyCspErrors.length > 0) {
+    testInfo.annotations.push({
+      type: "csp-report-only",
+      description: `${reportOnlyCspErrors.length} strict-CSP violations reported and not blocked (§41 Phase 1). Phase 4 enforces only once this is zero.`,
+    });
+  }
   if (previewToolbarCspErrors.length > 0) {
     testInfo.annotations.push({
       type: "tool-blocker",
@@ -111,7 +128,8 @@ test("renders launch-critical public routes without browser errors", async ({ pa
   expect(errors.filter(message =>
     !localWebKitUpgradeErrors.includes(message)
     && !localDevCspErrors.includes(message)
-    && !previewToolbarCspErrors.includes(message),
+    && !previewToolbarCspErrors.includes(message)
+    && !reportOnlyCspErrors.includes(message),
   )).toEqual([]);
 });
 
