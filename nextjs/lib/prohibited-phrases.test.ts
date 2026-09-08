@@ -37,6 +37,17 @@ const SOURCES = ["app", "components"]
   .sort();
 
 /*
+  Read once at module load rather than inside each `it`.
+
+  `production-route-surface.test.ts` records why: on a machine where every file open goes through
+  an on-access scanner, a whole-tree scan inside a test body spends the 5s per-test budget on I/O
+  and fails with a timeout -- which, in a test about prohibited claims, reads exactly like a
+  prohibited claim was found. Module-level work is not subject to that budget.
+*/
+const TEXT = new Map(SOURCES.map((surface) => [surface, readFileSync(join(root, surface), "utf8")]));
+const sourceOf = (surface: string) => TEXT.get(surface) ?? "";
+
+/*
   The contract's seven, as patterns rather than substrings for the two that need it.
 
   "every file" is the one that cannot be a substring check. Four sentences in this repository use
@@ -102,23 +113,23 @@ describe("prohibited public phrases", () => {
   });
 
   it.each(SOURCES)("makes no contract-prohibited claim in %s", (surface) => {
-    const source = readFileSync(join(root, surface), "utf8");
+    const source = sourceOf(surface);
     for (const [name, pattern] of CONTRACT_PHRASES) {
       expect(pattern.test(source), `"${name}" is a claim no evidence in this repository supports`).toBe(false);
     }
   });
 
   it.each(SOURCES.filter((surface) => surface !== HEDGED))("names no frozen mechanism in %s", (surface) => {
-    const source = readFileSync(join(root, surface), "utf8");
+    const source = sourceOf(surface);
     for (const [name, pattern] of FROZEN_MECHANISMS) {
       expect(pattern.test(source), `"${name}" needs an IP disclosure review before it is published`).toBe(false);
     }
   });
 
   it("keeps the one exempted surface hedged and unreferenced", () => {
-    expect(readFileSync(join(root, HEDGED), "utf8")).toContain(HEDGE);
+    expect(sourceOf(HEDGED)).toContain(HEDGE);
     const importers = SOURCES.filter((surface) => surface !== HEDGED)
-      .filter((surface) => readFileSync(join(root, surface), "utf8").includes("rebuild-console"));
+      .filter((surface) => sourceOf(surface).includes("rebuild-console"));
     expect(importers, `${HEDGED} is exempted because nothing renders it`).toEqual([]);
   });
 });

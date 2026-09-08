@@ -142,7 +142,7 @@ describe("/trust indexes the six published surfaces", () => {
 describe("§37 the CDR row names the build that is actually running", () => {
   const reason = activationPolicy.cdr.reason;
 
-  it("names the deployed synthetic qualification build", () => {
+  it("names the deployed synthetic build", () => {
     expect(reason).toContain("tavonel-cdr-synthetic");
     expect(reason.toLowerCase()).toContain("not deployed");
   });
