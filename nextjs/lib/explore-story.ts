@@ -261,5 +261,8 @@ export type ExploreTechnicalRecord = {
   sourceDirectory: string;
   documents: ExploreDocument[];
   revisions: VisualRevision[];
+  /** What the compiler emitted for this World. */
   counts: { objects: number; relations: number; regions: number };
+  /** What the page actually sent to the browser -- a bounded projection of the above (§24). */
+  shipped: { objects: number; relations: number; regions: number };
 };
