@@ -21,12 +21,12 @@ import sitemap from "@/app/sitemap";
 const appDirectory = resolve(import.meta.dirname, "../app");
 const ORIGIN = "https://tavonel.com";
 
-function findPages(directory: string): string[] {
+function findFiles(directory: string, filename: string): string[] {
   const found: string[] = [];
   for (const entry of readdirSync(directory)) {
     const path = join(directory, entry);
-    if (statSync(path).isDirectory()) found.push(...findPages(path));
-    else if (entry === "page.tsx") found.push(path);
+    if (statSync(path).isDirectory()) found.push(...findFiles(path, filename));
+    else if (entry === filename) found.push(path);
   }
   return found;
 }
@@ -35,10 +35,12 @@ function findPages(directory: string): string[] {
   A route pattern, not a literal: `/docs/[section]` has to match `/docs/exports`, and a list of
   literal routes would have to be maintained beside the sitemap that already generates them.
 */
+function segmentsOf(filePath: string, filename: string): string[] {
+  return relative(appDirectory, filePath).split(sep).filter((segment) => segment && segment !== filename);
+}
+
 function routeMatcherOf(pagePath: string): RegExp {
-  const pattern = relative(appDirectory, pagePath)
-    .split(sep)
-    .filter((segment) => segment && segment !== "page.tsx")
+  const pattern = segmentsOf(pagePath, "page.tsx")
     // `[...slug]` swallows the rest of the path, `[section]` one segment, everything else is a
     // literal. Route directories are lowercase words and hyphens, so nothing here needs escaping.
     .map((segment) => (/^\[\.\.\..+\]$/.test(segment) ? ".+" : /^\[.+\]$/.test(segment) ? "[^/]+" : segment))
@@ -46,8 +48,27 @@ function routeMatcherOf(pagePath: string): RegExp {
   return new RegExp(`^/${pattern}$`);
 }
 
-const routeMatchers = findPages(appDirectory).map(routeMatcherOf);
+/*
+  Each page read once, with the two facts every assertion below needs: the pattern it answers to,
+  and whether it opts itself out of search. Reading the metadata rather than keeping a second list
+  of noindex routes is the same choice the sitemap makes about `DOCS_SECTIONS` -- a hand-kept list
+  is the thing that goes stale silently.
+*/
+const pages = findFiles(appDirectory, "page.tsx").map((path) => {
+  const source = readFileSync(path, "utf8");
+  return {
+    source,
+    route: `/${segmentsOf(path, "page.tsx").join("/")}`,
+    matcher: routeMatcherOf(path),
+    noindex: /robots:\s*\{[^}]*index:\s*false/.test(source),
+    // The retired-URL stub shape, both halves: it must actually 404, and it must say why.
+    retiredStub: source.includes("notFound()") && source.includes("stable 404 for retired inbound URLs"),
+  };
+});
+
+const routeMatchers = pages.map((page) => page.matcher);
 const isRealRoute = (path: string) => path === "/" ? routeMatchers.some((m) => m.test("/")) : routeMatchers.some((m) => m.test(path));
+const isNoindex = (path: string) => pages.some((page) => page.matcher.test(path) && page.noindex);
 
 /*
   robots.txt path semantics: a Disallow value is a prefix match on the path. None of ours use the
@@ -57,6 +78,18 @@ const isRealRoute = (path: string) => path === "/" ? routeMatchers.some((m) => m
 const genericRule = robots().rules;
 const genericDisallow = (Array.isArray(genericRule) ? genericRule : [genericRule]).filter((rule) => rule.userAgent === "*").flatMap((rule) => (Array.isArray(rule.disallow) ? rule.disallow : rule.disallow ? [rule.disallow] : []));
 const disallowedFor = (path: string) => genericDisallow.filter((token) => path === token || path.startsWith(token));
+
+/*
+  The other direction of the same prefix rule: what does a Disallow line actually withhold?
+
+  A token ending in `/` withholds a subtree, so it is answered by any page or API handler beneath
+  it; a token without one names a single route. Route handlers count -- `/api/` is disallowed for
+  the 76 endpoints under it, not for the `/api` marketing page, and a check that only looked at
+  `page.tsx` would call the most important line in the file dead.
+*/
+const handlerRoutes = findFiles(appDirectory, "route.ts").map((path) => `/${segmentsOf(path, "route.ts").join("/")}`);
+const allRoutes = [...pages.map((page) => page.route), ...handlerRoutes];
+const withheldBy = (token: string) => allRoutes.filter((route) => route === token || route.startsWith(token.endsWith("/") ? token : `${token}/`));
 
 const sitemapPaths = sitemap().map((entry) => new URL(entry.url).pathname);
 const llmsPaths = [...readFileSync(resolve(import.meta.dirname, "../public/llms.txt"), "utf8").matchAll(/https:\/\/tavonel\.com(\/[^)\s]*)?/g)].map((match) => (match[1] ?? "/").replace(/\/$/, "") || "/");
@@ -74,6 +107,36 @@ describe("public surface: robots, sitemap and llms.txt agree", () => {
 
   it.each([...new Set([...sitemapPaths, ...llmsPaths])])("%s is not disallowed for *", (path) => {
     expect(disallowedFor(path), `${ORIGIN}${path} is advertised and withheld by robots.txt`).toEqual([]);
+  });
+
+  /*
+    The third pairing, and the one that was missing while the other two passed.
+
+    `llms.txt` and `sitemap.xml` both advertise; the checks above only ask whether what they
+    advertise exists and is allowed. `/reproducibility` was in `llms.txt`, live, allowed, and in
+    neither list of the sitemap, and every assertion in this file was green -- because none of
+    them read the two advertising files against each other.
+
+    The exemption is narrow on purpose. A sitemap entry asks a search engine to index; a page
+    that declares `robots: { index: false }` asks it not to; listing such a page in the sitemap
+    would be the site contradicting itself, so the guard reads the page's own metadata and
+    accepts exactly that case. Anything else advertised to models and withheld from crawlers is
+    drift, and fails here.
+  */
+  it.each([...new Set(llmsPaths)])("%s is in the sitemap, or declares itself noindex", (path) => {
+    if (sitemapPaths.includes(path)) return;
+    expect(isNoindex(path), `${ORIGIN}${path} is in llms.txt but in neither the sitemap nor a noindex page`).toBe(true);
+  });
+
+  /*
+    The exemption above is only worth having if it can tell the two cases apart, and a metadata
+    regex that silently stopped matching would turn this whole class green by exempting
+    everything. Both directions are named.
+  */
+  it("reads noindex from the page rather than assuming it", () => {
+    expect(isNoindex("/reproducibility"), "the one deliberate llms-only URL no longer reads as noindex").toBe(true);
+    expect(isNoindex("/benchmarks"), "an indexable page reads as noindex, so the exemption admits anything").toBe(false);
+    expect(pages.filter((page) => page.noindex).length).toBeGreaterThan(0);
   });
 
   /*
@@ -97,5 +160,38 @@ describe("public surface: robots, sitemap and llms.txt agree", () => {
     for (const training of ["Google-Extended", "GPTBot", "CCBot", "ClaudeBot", "anthropic-ai", "Applebot-Extended"]) {
       expect(agents, `${training} is a training-crawler policy, not an SEO change`).not.toContain(training);
     }
+  });
+});
+
+/*
+  A Disallow line is a claim that there is something there to withhold.
+
+  Four of them -- `/research/experiments`, `/film-2`, `/film-3`, `/film-4` -- were reported as
+  pointing at nothing and proposed for deletion. All four resolve to `notFound()` stubs that exist
+  so a withdrawn URL keeps returning a stable 404, and the disallow line is what stops a crawler
+  re-walking it every pass. That is a decision worth keeping, and worth being able to tell apart
+  from a leftover, which is the whole job of these two assertions: a token that answers to nothing
+  is a leftover, and a token that answers only with an unexplained 404 is indistinguishable from
+  one.
+*/
+describe("public surface: every disallowed path is deliberate", () => {
+  it.each(genericDisallow)("%s withholds something that exists", (token) => {
+    expect(withheldBy(token).length, `robots.txt disallows ${token} and no page or route handler answers it`).toBeGreaterThan(0);
+  });
+
+  it.each(genericDisallow)("%s is a live surface or an annotated retired URL", (token) => {
+    const stub = pages.find((page) => page.route === token && page.source.includes("notFound()"));
+    expect(
+      stub === undefined || stub.retiredStub,
+      `${token} is disallowed and 404s without saying it is a retired URL -- annotate it or drop the disallow line`,
+    ).toBe(true);
+  });
+
+  /*
+    Same reason as the noindex reader above: an annotation check that stopped recognising the
+    annotation would pass every path by finding no stub at all.
+  */
+  it("recognises the retired-URL stubs it is guarding", () => {
+    expect(pages.filter((page) => page.retiredStub).map((page) => page.route).sort()).toEqual(["/customers", "/film-2", "/film-3", "/film-4", "/research/experiments"]);
   });
 });
