@@ -50,6 +50,35 @@ test("mobile Runs is a focused source/run surface without horizontal squeeze", a
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
 });
 
+test("mobile Home intake stays inside the viewport and keeps the fixed rail clear", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "390" && testInfo.project.name !== "360");
+  await installWorkspace(page);
+  await page.unroute("**/api/documents");
+  await page.route("**/api/documents", route => route.fulfill({ json: { documents: [] } }));
+  await page.goto("/workspace");
+
+  const intake = page.locator(".workspace-intake");
+  await expect(page.getByRole("heading", { name: "Drop files, folders or ZIP here" })).toBeVisible();
+  await expect(intake).toBeVisible();
+  await expect(page.locator(".workspace-source-choices")).toBeHidden();
+  await expect(page.getByText("Knowledge workspace")).toBeHidden();
+
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+
+  const viewportWidth = page.viewportSize()?.width ?? 0;
+  for (const label of ["Choose files", "Choose folder", "Connect a source"]) {
+    const box = await page.getByRole("button", { name: label }).boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(viewportWidth + 1);
+  }
+
+  await testInfo.attach(`workspace-home-${testInfo.project.name}`, {
+    body: await page.screenshot({ fullPage: true }),
+    contentType: "image/png",
+  });
+});
+
 test("Activity reads the durable audit endpoint rather than a browser-only timeline", async ({ page }) => {
   await installWorkspace(page);
   await page.goto("/workspace/activity");

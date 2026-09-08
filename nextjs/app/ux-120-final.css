@@ -192,3 +192,122 @@
   html.landing-scroll { scroll-snap-type: none; }
   .board-row-detail:not([hidden]) { animation: none; }
 }
+
+/* Workspace mobile mode begins at the same breakpoint as the fixed bottom rail. Keeping the
+   shell in mobile navigation while leaving intake in tablet/desktop geometry is what produced
+   the hybrid layout: oversized copy, stretched controls and content underneath the rail. */
+@media (max-width: 820px) {
+  .workspace .workspace-body > header > div:first-child { display: none; }
+
+  .workspace-content {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    padding: 18px 14px calc(96px + env(safe-area-inset-bottom));
+    gap: 14px;
+    overflow-x: clip;
+  }
+
+  .workspace-intake,
+  .workspace-grid,
+  .workspace-intake-copy,
+  .workspace-preflight,
+  .workspace-compile-job,
+  .workspace .card {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .workspace-intake {
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr);
+    overflow: hidden;
+  }
+
+  .workspace-intake-copy,
+  .workspace-preflight {
+    width: 100%;
+    padding: 24px 16px;
+  }
+
+  .workspace-intake-copy {
+    min-height: 0;
+    place-content: initial;
+    align-content: start;
+    text-align: center;
+  }
+
+  .workspace-intake-copy .eyebrow {
+    font-size: 9px;
+    line-height: 1.45;
+    letter-spacing: .14em;
+  }
+
+  .workspace-intake-copy h2 {
+    max-width: 14ch;
+    margin: 10px auto 8px;
+    font-size: clamp(28px, 6.4vw, 34px);
+    line-height: 1.06;
+    text-wrap: balance;
+    overflow-wrap: break-word;
+  }
+
+  .workspace-intake-copy > p:not(.eyebrow) {
+    max-width: 31ch;
+    margin: 0 auto;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+
+  .workspace-intake-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+    gap: 8px;
+    margin-top: 20px;
+  }
+
+  .workspace-intake-actions button {
+    width: 100%;
+    min-width: 0;
+    min-height: 48px;
+    padding: 12px 14px;
+    text-align: left;
+    font-size: 12px;
+  }
+
+  .workspace-intake-copy > small {
+    max-width: 100%;
+    margin-inline: auto;
+    font-size: 8.5px;
+    line-height: 1.55;
+    letter-spacing: .06em;
+    overflow-wrap: anywhere;
+  }
+
+  .workspace-intake-limits {
+    max-width: 38ch;
+    margin-top: 10px !important;
+  }
+
+  /* Detailed connector cards are redundant on a narrow first-run surface because the adjacent
+     Connect a source action reaches the same destination. Hiding the cards avoids two squeezed
+     columns and keeps the primary upload path above the fixed rail. */
+  .workspace-source-choices { display: none; }
+
+  .workspace-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+    margin-top: 18px;
+  }
+
+  .workspace-preflight dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 420px) {
+  .workspace-content { padding-inline: 12px; }
+  .workspace-intake-copy,
+  .workspace-preflight { padding-inline: 14px; }
+  .workspace-intake-copy h2 { font-size: 28px; }
+  .workspace-preflight dl { grid-template-columns: minmax(0, 1fr); }
+}
