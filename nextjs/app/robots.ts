@@ -14,6 +14,14 @@ import type { MetadataRoute } from "next";
 
   Robots is not access control. Every path below is enforced by authorization or by the route's
   own noindex; this list only spares a crawler the walk.
+
+  Five of the ten are retired URLs rather than private ones: `/customers`, `/research/experiments`
+  and `/film-2`, `/film-3`, `/film-4`. Each still has a `page.tsx` that calls `notFound()` and
+  says so in its own comment, kept as a stable 404 for links published before the page was
+  withdrawn. An audit read four of them as disallow lines pointing at nothing and proposed
+  deleting the lines; they point at deliberate 404s, and the line is what stops a crawler
+  re-walking a withdrawn URL on every pass. `lib/seo-surface.test.ts` now fails if a disallowed
+  path resolves to no file at all, and fails if one of these stubs loses its retired annotation.
 */
 const PRIVATE_PATHS = ["/api/", "/auth/", "/login", "/workspace", "/customers", "/research/experiments", "/film-2", "/film-3", "/film-4", "/dev/"];
 
