@@ -42,12 +42,15 @@ export type OptInAction =
   | { kind: "unsubscribe" };
 
 export type OptInOutcome =
-  /** Store a pending row with this digest, and send the confirmation mail. */
+  /** Store a pending row with a fresh token digest, and send the confirmation mail. */
   | { effect: "issue"; state: "pending" }
-  /** The address is confirmed; nothing is sent and nothing changes. */
+  /** The token checked out: move the row to confirmed. */
   | { effect: "activate"; state: "confirmed" }
+  /** Move the row to unsubscribed. Answered identically from every prior state. */
   | { effect: "deactivate"; state: "unsubscribed" }
+  /** Nothing to do and nothing to send. The row already says what the request asked for. */
   | { effect: "hold"; state: OptInState }
+  /** Change nothing, send nothing, and answer the caller exactly as any other outcome answers. */
   | { effect: "refuse"; reason: "no_pending_confirmation" | "token_mismatch" | "confirmation_expired" };
 
 export function issueToken(): string {
