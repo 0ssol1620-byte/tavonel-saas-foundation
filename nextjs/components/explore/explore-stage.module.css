@@ -577,6 +577,76 @@
   line-height: 1.6;
 }
 
+/* W0 → W4, one row per arriving filing. A list, so the order survives without the layout. */
+.timeline {
+  display: grid;
+  gap: 10px;
+  padding: 16px 0 0;
+  border-top: 1px solid var(--hairline);
+}
+
+.timelineSteps {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--hairline);
+  border: 1px solid var(--hairline);
+}
+
+.timelineStep {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  background: var(--g1);
+}
+
+.timelineHead {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0;
+  color: var(--text-hi);
+  font: 10px var(--f-mono);
+  letter-spacing: 0.14em;
+}
+
+.timelineHead b {
+  color: var(--changed);
+  font-weight: 500;
+}
+
+.timelineArrival {
+  margin: 0;
+  color: var(--text-lo);
+  font: 9px/1.7 var(--f-mono);
+  letter-spacing: 0.08em;
+}
+
+.timelineCounts {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.timelineCounts dt {
+  color: var(--text-xlo);
+  font: 8px var(--f-mono);
+  letter-spacing: 0.12em;
+}
+
+.timelineCounts dd {
+  margin: 4px 0 0;
+  color: var(--text-hi);
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.timelineCounts dd[data-tone="changed"] { color: var(--changed); }
+
 .equivalence {
   display: grid;
   gap: 8px;
@@ -925,6 +995,10 @@
 
   .next { grid-template-columns: 1fr; }
   .next > div { grid-column: 1; }
+
+  /* Five figures do not fit a phone column; they wrap rather than shrink to unreadable. */
+  .timelineCounts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .timelineHead { flex-wrap: wrap; }
 
   .askPanel { right: 14px; left: 14px; }
 }

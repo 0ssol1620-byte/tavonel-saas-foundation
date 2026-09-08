@@ -4,6 +4,7 @@ import {
   exploreSampleBaselineWorld,
   exploreSampleDocuments,
   exploreSampleInputs,
+  exploreSampleSnapshots,
   exploreSampleWorld,
 } from "./explore-sample";
 import { diffWorldVersions, type WorldVersionDiff } from "./world-version-diff";
@@ -221,6 +222,127 @@ export const exploreChangeStory: ExploreChangeStory = {
       "Full-rebuild equivalence is a separate check, run by the compiler core over a selective rebuild; no receipt from it is wired into this deployment.",
   },
 };
+
+/* ------------------------------------------------------------ the five steps */
+
+/**
+ * One arrival, as the step that produced a World rather than as a card.
+ *
+ * `rebuilt` is the dependency-impact figure and is deliberately separate from `added`: an object
+ * that the arriving filing *introduced* is not evidence that the filing reached anything, while
+ * an object the previous World already carried whose compiled fields moved is exactly that.
+ *
+ * `recompiledObjects` and `objectsAfter` are equal at every step and the type keeps both anyway,
+ * because that equality is the honest statement this deployment can make: the compiler in this
+ * repository has no incremental path, so each snapshot is a complete compile of its corpus. A
+ * type that carried only "objects changed" would let a reader infer a selective rebuild that did
+ * not happen. §11.7 and §25.3.
+ */
+export type ExploreChangeStep = {
+  id: string;
+  from: string;
+  to: string;
+  fromDigest: string;
+  toDigest: string;
+  arrival: {
+    documentId: string;
+    label: string;
+    form: string;
+    filingDate: string;
+    accession: string;
+    pageCount: number;
+    compiledPageCount: number;
+    regionCount: number;
+  };
+  objects: { added: number; removed: number; rebuilt: number; untouched: number };
+  relations: { added: number; removed: number; changed: number };
+  evidenceRegions: { added: number; removed: number; changed: number };
+  sourceRevisions: { added: number; removed: number; unchanged: number };
+  /** Every object of the resulting World. Equal to `recompiledObjects` on this deployment. */
+  objectsAfter: number;
+  recompiledObjects: number;
+};
+
+function stepBetween(
+  before: (typeof exploreSampleSnapshots)[number],
+  after: (typeof exploreSampleSnapshots)[number],
+): ExploreChangeStep {
+  const arrived = after.inputs.filter((input) =>
+    !before.inputs.some((previous) => previous.documentId === input.documentId));
+  if (arrived.length !== 1) {
+    throw new Error(`explore_change_step_expects_one_arrival: ${after.id}:${arrived.length}`);
+  }
+  const document = exploreSampleDocuments.find((entry) => entry.documentId === arrived[0].documentId);
+  if (!document?.form || !document.filingDate || !document.accession) {
+    throw new Error(`explore_change_step_arrival_has_no_source_record: ${arrived[0].documentId}`);
+  }
+  const diff = diffWorldVersions(before.world, after.world);
+  if (diff.sourceRevisions.added.length !== 1) {
+    // One arriving filing is one new source version, at every step and not only end to end.
+    throw new Error(`explore_change_step_source_revisions_disagree: ${after.id}`);
+  }
+  const beforeIds = new Set(before.world.objects.map((object) => object.id));
+  const rebuilt = new Set(diff.objects.changed.map((object) => object.id));
+  const untouched = after.world.objects
+    .filter((object) => beforeIds.has(object.id) && !rebuilt.has(object.id)).length;
+  return {
+    id: after.id,
+    from: before.label,
+    to: after.label,
+    fromDigest: before.world.world.manifestDigest,
+    toDigest: after.world.world.manifestDigest,
+    arrival: {
+      documentId: document.documentId,
+      label: `${document.form} · filed ${document.filingDate}`,
+      form: document.form,
+      filingDate: document.filingDate,
+      accession: document.accession,
+      pageCount: document.pageCount,
+      compiledPageCount: document.compiledPageCount,
+      regionCount: document.regionCount,
+    },
+    objects: {
+      added: diff.objects.added.length,
+      removed: diff.objects.removed.length,
+      rebuilt: diff.objects.changed.length,
+      untouched,
+    },
+    relations: {
+      added: diff.relations.added.length,
+      removed: diff.relations.removed.length,
+      changed: diff.relations.changed.length,
+    },
+    evidenceRegions: {
+      added: diff.evidence.added.length,
+      removed: diff.evidence.removed.length,
+      changed: diff.evidence.changed.length,
+    },
+    sourceRevisions: {
+      added: diff.sourceRevisions.added.length,
+      removed: diff.sourceRevisions.removed.length,
+      unchanged: diff.sourceRevisions.unchanged,
+    },
+    objectsAfter: after.world.objects.length,
+    /*
+      Not a placeholder for a number this deployment could report differently. Every snapshot in
+      `exploreSampleSnapshots` is a full compile of its whole corpus, so the objects recompiled at
+      each step are all of them. The Core's selective recompilation is a different execution with
+      its own receipt, and no receipt from it is wired into this page.
+    */
+    recompiledObjects: after.world.objects.length,
+  };
+}
+
+/**
+ * W0 → W1 → W2 → W3 → W4, one entry per arriving filing (§24, §25.2).
+ *
+ * Four steps for five snapshots: the first World is a starting point, not a change. Every figure
+ * is read out of a diff between two complete compiles whose digests are frozen, so a step cannot
+ * report a change to a World that did not compile.
+ */
+export const exploreChangeTimeline: ExploreChangeStep[] = exploreSampleSnapshots
+  .slice(1)
+  .map((snapshot, index) => stepBetween(exploreSampleSnapshots[index], snapshot));
 
 /**
  * The filing the arrivals landed on, for the pane that names the starting point.

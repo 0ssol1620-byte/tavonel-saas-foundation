@@ -10,39 +10,46 @@
  *     render is a representation. It is never "the original SEC PDF", and both digests are
  *     carried separately so a reader can tell which is which.
  *
- * `sec-corpus-manifest.json` is the acquisition record for the 2026 filings and is the only
+ * `sec-corpus-manifest.json` is the acquisition record for all five filings and is the only
  * place their §25.1 fields come from -- form, filing/report date, accession, CIK, primary
- * document, source URL, original sha256, render filename/sha256/profile, authority. This script
- * re-hashes the committed bytes and refuses to emit anything if a manifest digest and the file
- * on disk disagree.
+ * document, source URL, original sha256, render filename/sha256/profile, page count, authority.
+ * This script re-hashes the committed bytes and refuses to emit anything if a manifest digest or
+ * page count and the file on disk disagree. The 2025 10-K's record carries `renderFilename: null`
+ * because it has no render: its acquired bytes are the bytes the compiler reads.
  *
- * Every filing is compiled in full except the proxy statement, whose declared page slice is
- * recorded beside it in `lib/explore-sample.sources.json`. Page numbers, page counts and
- * bounding boxes are always the real ones.
+ * Every filing is compiled in full. No page slice is declared anywhere: `declaredPages` is null
+ * for all five documents and `compiledPages` -- the pages that actually produced a region -- is
+ * measured per filing. Page numbers, page counts and bounding boxes are always the real ones.
  *
- * Why the proxy is the one document that is cut. Measured on this corpus, 2026-09-08:
+ * The corpus, measured here on 2026-09-08 (program §24 directs all five filings, ~290 pages):
  *
- *   | corpus                                | pages | regions | candidates | lifecycle       |
- *   |---------------------------------------|------:|--------:|-----------:|-----------------|
- *   | all five filings, every page          |   287 |   1,281 |      6,457 | review_required |
- *   | 10-K + three 10-Qs, every page        |   184 |   1,044 |      3,578 | candidate       |
- *   | the above + proxy pages 1-48 and 51   |   233 |   1,169 |      4,982 | candidate       |
+ *   | snapshot | docs | pages | with text | regions | candidates | emitted | package B  |
+ *   |----------|-----:|------:|----------:|--------:|-----------:|--------:|-----------:|
+ *   | W0       |    1 |    80 |        80 |     502 |      2,310 |   2,310 |  4,649,873 |
+ *   | W1       |    2 |   110 |       110 |     671 |      2,679 |   2,679 |  5,786,326 |
+ *   | W2       |    3 |   213 |       213 |     908 |      5,406 |   5,406 | 11,157,220 |
+ *   | W3       |    4 |   250 |       249 |   1,095 |      5,859 |   5,859 | 12,613,858 |
+ *   | W4       |    5 |   290 |       287 |   1,281 |      6,300 |   6,300 | 14,046,999 |
  *
- * `EXTRACTION_CANDIDATE_BUDGET` in `lib/collection-compiler.ts` is 5,000 objects for the whole
- * compile. Past it the compiler stops emitting, reports `EXTRACTION_BUDGET_REACHED` and marks the
- * artifact `review_required` -- honestly, and by design. So the whole 290-page corpus does
- * compile, in about 0.4s, and 1,457 of its 6,457 candidate objects do not survive that budget.
- * Publishing that as "the full corpus, compiled" would be a claim the artifact itself contradicts,
- * so this build takes the largest slice that fits with nothing dropped and says which pages those
- * are. Raising the budget is a compiler decision with a production blast radius, not a demo one.
+ * Every snapshot is `lifecycle: candidate` with candidates considered equal to candidates
+ * emitted -- nothing dropped to fit. 287 of the 290 pages carry a text layer; the three that do
+ * not produce no region and are not published as compiled.
  *
- * Snapshots (blueprint §25.2) are a data list, `SNAPSHOTS` below. Two are compiled:
+ * Two constants decide whether this fits: `EXTRACTION_CANDIDATE_BUDGET`
+ * (`lib/collection-compiler.ts`, now 7,000) and `MAX_UNCOMPRESSED_BYTES`
+ * (`lib/collection-download.ts`, now 24 MiB). Both were re-derived from the measurement above
+ * rather than raised to make a build pass, and each derivation is written out above the
+ * constant. W4's package is 13.40 MiB against a 24 MiB ceiling.
+ *
+ * Snapshots (blueprint §25.2) are a data list, `SNAPSHOTS` below. All five are compiled:
  *   W0 = 2025 10-K alone
- *   W4 = 2025 10-K + 2026 Q1 10-Q + 2026 DEF 14A + 2026 Q2 10-Q + 2026 Q3 10-Q
- * W1-W3 (the World after each individual filing arrived) are one line of data each and are
- * deliberately not compiled: each one costs another frozen digest to re-freeze and review by
- * hand on every corpus change, and the Change Act's story -- what the 2026 filings did to the
- * annual World -- is answered by the two endpoints.
+ *   W1 = W0 + 2026 Q1 10-Q
+ *   W2 = W1 + 2026 DEF 14A
+ *   W3 = W2 + 2026 Q2 10-Q
+ *   W4 = W3 + 2026 Q3 10-Q
+ * Every snapshot costs a frozen digest to re-derive and review by hand on every corpus change
+ * (§25.4). That is the price of the Change Act showing the five steps §24 asks for rather than
+ * only its two endpoints.
  *
  * The 2024 Form 10-K stays committed in `public/explore-sample/` as the earlier annual filing,
  * but it is no longer compiled into any World: the temporal story is now the 2026 filings
@@ -65,38 +72,22 @@ const sourcesPath = join(root, "lib", "explore-sample.sources.json");
 const manifest = JSON.parse(readFileSync(join(pdfDirectory, "sec-corpus-manifest.json"), "utf8"));
 
 /**
- * The pages each 2026 filing contributes, and why.
+ * Every filing is compiled whole, so there is no slice table any more.
  *
- * `pages: null` means the whole document -- the ordinary case now. The one slice left is the
- * proxy statement's, and it is not an editorial preference: it is where the compiler's
- * corpus-wide candidate budget lands (see the header). It is written out rather than derived so
- * that the cut is a declared fact a reader can check, not a number that moves on its own.
+ * This string is still carried per document because `lib/explore-sample.sources.json` publishes
+ * it and the source sheet prints it: a reader gets told the scope of the compile rather than
+ * having to infer it from two page counts agreeing.
  */
-const PROXY_GOVERNANCE_PAGES = Array.from({ length: 48 }, (_item, index) => index + 1);
+const WHOLE_DOCUMENT = "Every page of the filing.";
 
-const SLICES = {
-  "apple-2026-q1-10-q": { pages: null, rationale: "Every page of the filing." },
-  "apple-2026-proxy-def14a": {
-    pages: [...PROXY_GOVERNANCE_PAGES, 51],
-    rationale:
-      "Pages 1-48, the proxy's governance half through director compensation, plus page 51, the Summary Compensation Table the earlier curated slice already compiled. Pages 49-103 are the compensation and meeting appendices and are left out because the compiler's 5,000-object candidate budget binds before them, not because they were judged uninteresting.",
-  },
-  "apple-2026-q2-10-q": { pages: null, rationale: "Every page of the filing." },
-  "apple-2026-q3-10-q": { pages: null, rationale: "Every page of the filing." },
-};
-
-/** Reference renders are letter-sized print output, so their page count is the render's own. */
-const RENDER_PAGE_COUNTS = {
-  "apple-2026-q1-10-q": 30,
-  "apple-2026-proxy-def14a": 103,
-  "apple-2026-q2-10-q": 37,
-  "apple-2026-q3-10-q": 40,
-};
-
-function fromManifest(id) {
+function manifestEntry(id) {
   const filing = manifest.filings.find((entry) => entry.id === id);
   if (!filing) throw new Error(`explore_sample_manifest_missing_filing:${id}`);
-  const slice = SLICES[id];
+  return filing;
+}
+
+function fromManifest(id) {
+  const filing = manifestEntry(id);
   return {
     documentId: filing.id,
     form: filing.form,
@@ -116,10 +107,11 @@ function fromManifest(id) {
     representationKind: "reference_render",
     renderProfile: filing.renderProfile,
     acquiredFrom: filing.acquiredFrom,
-    expectedPageCount: RENDER_PAGE_COUNTS[id],
+    /* The render's own page count, from the acquisition record, re-checked against the file. */
+    expectedPageCount: filing.pageCount,
     /* null = every page. The compiled page list is measured in `buildInput`, never assumed. */
-    declaredPages: slice.pages,
-    sliceRationale: slice.rationale,
+    declaredPages: null,
+    sliceRationale: WHOLE_DOCUMENT,
     sourceLabel: `Apple Inc. · ${filing.form} filed ${filing.filingDate} · SEC filing`,
     secUrl: filing.sourceUrl,
     officialUrl: null,
@@ -143,17 +135,18 @@ export const SOURCE_DOCUMENTS = [
     sourceUrl: "https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/aapl-20250927.htm",
     sourceFilename: "apple-2025-form-10-k.pdf",
     sourceMediaType: "application/pdf",
-    /* Computed from the committed bytes in `buildInput`: this filing's source and its
-       representation are the same file, so there is one digest and no render to declare. */
-    originalSha256: null,
+    /* This filing's source and its representation are the same file, so there is one digest and
+       no render to declare. `buildInput` re-hashes the committed bytes and throws if they and
+       the acquisition record disagree, which is why the record is read rather than left null. */
+    originalSha256: manifestEntry("apple-form-10-k").originalSha256,
     representationFilename: "apple-2025-form-10-k.pdf",
     representationMediaType: "application/pdf",
     representationKind: "original",
     renderProfile: null,
-    acquiredFrom: "Apple Investor Relations official PDF, cross-checkable in SEC EDGAR",
-    expectedPageCount: 80,
+    acquiredFrom: manifestEntry("apple-form-10-k").acquiredFrom,
+    expectedPageCount: manifestEntry("apple-form-10-k").pageCount,
     declaredPages: null,
-    sliceRationale: "Every page of the filing.",
+    sliceRationale: WHOLE_DOCUMENT,
     sourceLabel: "Apple Inc. · 2025 Form 10-K · public SEC filing",
     officialUrl: "https://d18rn0p25nwr6d.cloudfront.net/CIK-0000320193/c24e7a28-5254-4dfa-9447-62aaa3c24bb1.pdf",
     secUrl: "https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/aapl-20250927.htm",
@@ -175,9 +168,10 @@ export const UNCOMPILED_FILES = ["apple-2024-form-10-k.pdf"];
 /**
  * The World snapshots this build emits, §25.2.
  *
- * A list, so adding W1-W3 is a data change rather than a code change. Each added snapshot also
- * adds a frozen digest to re-derive and review by hand (§25.4), which is why only the two
- * endpoints are compiled today.
+ * A list, so the corpus's shape is a data change rather than a code change. Every snapshot
+ * carries a frozen digest that has to be re-derived and reviewed by hand on every corpus change
+ * (§25.4) -- five of them now, because §24 asks for the World after each filing arrived and a
+ * step that is not compiled cannot be shown.
  */
 const W0 = ["apple-form-10-k"];
 const W1 = [...W0, "apple-2026-q1-10-q"];
@@ -187,16 +181,9 @@ const W4 = [...W3, "apple-2026-q3-10-q"];
 
 export const SNAPSHOTS = [
   { id: "w0", label: "2025 Form 10-K", file: "explore-sample.w0.inputs.json", documentIds: W0 },
-  /*
-    W1-W3 are data, not UI (§25.2). `file: null` is what "declared but not compiled" looks like
-    here: the membership of each intermediate World is written down and checkable, and no
-    snapshot is emitted, because every emitted snapshot costs another frozen digest to re-derive
-    and review by hand on every corpus change (§25.4) and the Change Act's question -- what the
-    2026 filings did to the annual World -- is answered by the two endpoints.
-  */
-  { id: "w1", label: "+ 2026 Q1 10-Q", file: null, documentIds: W1 },
-  { id: "w2", label: "+ 2026 DEF 14A", file: null, documentIds: W2 },
-  { id: "w3", label: "+ 2026 Q2 10-Q", file: null, documentIds: W3 },
+  { id: "w1", label: "+ 2026 Q1 10-Q", file: "explore-sample.w1.inputs.json", documentIds: W1 },
+  { id: "w2", label: "+ 2026 DEF 14A", file: "explore-sample.w2.inputs.json", documentIds: W2 },
+  { id: "w3", label: "+ 2026 Q2 10-Q", file: "explore-sample.w3.inputs.json", documentIds: W3 },
   {
     id: "w4",
     label: "2025 Form 10-K + four 2026 filings",
@@ -357,8 +344,9 @@ async function buildInput(document) {
   if (document.originalSha256 !== null && document.originalSha256 !== originalSha256) {
     throw new Error(`explore_sample_original_digest_mismatch:${document.sourceFilename}`);
   }
-  const manifestRender = manifest.filings.find((entry) => entry.id === document.documentId)?.renderSha256;
-  if (manifestRender !== undefined && manifestRender !== `sha256:${digest}`) {
+  /* Null for a filing with no render -- the 2025 10-K, whose acquired bytes are what was read. */
+  const manifestRender = manifestEntry(document.documentId).renderSha256;
+  if (manifestRender !== null && manifestRender !== `sha256:${digest}`) {
     throw new Error(`explore_sample_render_digest_mismatch:${document.representationFilename}`);
   }
 
