@@ -90,8 +90,18 @@ export default function KnowledgeCompilerPage() {
     {
       title: "The package is the contract",
       body: "Portability is only real if someone outside can check it. The package format, its required files and the two verifiers — one for the archive's signature, one for what is inside it — are documented, and a compiled sample is open without an account.",
+      /*
+        E-21. The category guide is the page a reader arrives on from a search for the category,
+        and it was a dead end for the two questions it provokes -- "how is a fact actually bound
+        to a source" and "has any of this been measured" -- because it linked to the package
+        format and the sign-in and to neither of the pages that answer them. Both existed;
+        /benchmarks became crawlable in the Category Leadership campaign and nothing pointed at it
+        from here. `lib/trust-page-answers.test.ts` holds the two links in place.
+      */
       links: [
         { href: "/explore", label: "OPEN A COMPILED WORLD" },
+        { href: "/evidence", label: "HOW EVIDENCE IS BOUND" },
+        { href: "/benchmarks", label: "WHAT WOULD BE MEASURED" },
         // `/docs/[section]` is a dynamic route, so a literal section needs the cast typedRoutes asks for.
         { href: "/docs/exports" as Route, label: "PACKAGE FORMAT" },
         { href: "/docs/cli" as Route, label: "VERIFIERS" },
