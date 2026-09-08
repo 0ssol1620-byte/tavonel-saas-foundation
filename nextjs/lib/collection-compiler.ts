@@ -35,17 +35,33 @@ const PACKAGE_ROOTS = [
  * The most knowledge objects one compile may emit, and the reason it is this number.
  *
  * Not a quality judgement about how much a document contains -- it is the package ceiling read
- * backwards. `collection-download.ts` refuses a package over MAX_UNCOMPRESSED_BYTES (16 MiB), and
- * a claim label of the maximum 500 characters is materialised into four graph serialisations plus
- * a directory entry, so roughly 2.5 KiB of package per object. 5,000 objects is what fits with
- * room for the source text that sits beside them.
+ * backwards. `collection-download.ts` refuses a package over `MAX_UNCOMPRESSED_BYTES`, and a
+ * claim label of the maximum 500 characters is materialised into four graph serialisations plus
+ * a directory entry, so roughly 2.5 KiB of package per object in the worst case.
+ *
+ * Moved from 5,000 to 7,000 on 2026-09-08, together with the ceiling it is derived from
+ * (program §24). The old pair was 5,000 against 16 MiB, where the 5,000 came from the same
+ * 2.5 KiB estimate minus an unmeasured reserve "for the source text that sits beside them".
+ * Measured on the largest corpus this product has compiled -- Apple's five 2025/2026 SEC
+ * filings, 290 pages, 1,281 regions -- that reserve is 2,826,476 B and the object-scaled files
+ * cost 1,781 B per object: the worst-case estimate held and the reserve was the guess. The
+ * corpus yields 6,300 candidates, so 7,000 is a round number above it rather than one tuned to
+ * it, and `collection-download.ts` carries the arithmetic that took the ceiling to 24 MiB.
+ *
+ * One number in the previous measurement was read under the cap and is corrected here: this
+ * corpus was recorded as 6,457 candidates, which is what `candidatesConsidered` reports when
+ * emission stops at 5,000. Compiled without the cap it is 6,300, every one emitted, lifecycle
+ * `candidate`. A budget-capped run is not a measurement of the corpus.
+ *
+ * `collection-download.test.ts` asserts the derivation, so the day one of the two numbers moves
+ * alone the test says which side the package no longer fits.
  *
  * The point of the constant is not its value. It is that going past it is *reported*: the artifact
  * carries `counts.candidatesConsidered`, the reason `EXTRACTION_BUDGET_REACHED`, and lifecycle
  * `review_required`. The caps it replaces (3 topics, 8 entities, 4 claims per document) were sized
  * for a three-document, 470-character fixture and dropped the rest in silence.
  */
-export const EXTRACTION_CANDIDATE_BUDGET = 5_000;
+export const EXTRACTION_CANDIDATE_BUDGET = 7_000;
 
 /** Named so the reason a customer sees and the reason a test asserts are one string. */
 export const EXTRACTION_BUDGET_REACHED = "EXTRACTION_BUDGET_REACHED" as const;
