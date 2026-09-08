@@ -188,7 +188,76 @@ export default function CompileStage({ rows, reading = {}, names = {}, world = n
         return "WAITING";
       };
 
-      const pad = 10; const gap = 10; const colH = height - pad * 2;
+      const pad = 10;
+
+      /*
+        Four simultaneous panes are useful on a desktop, but on a phone each pane becomes too
+        narrow to carry a title, live state and real document content. Mobile therefore behaves
+        like an execution film: the whole SOURCES → READ → STRUCTURE → WORLD progression stays
+        visible in a compact rail while the current observed stage gets the full canvas width.
+        Advancement is driven only by durable job state and evidence already present in the run.
+      */
+      if (width < 640) {
+        const stageIndex = hasWorld || ["building_world", "review_required", "ready"].includes(jobState ?? "")
+          ? 3
+          : hasStructure || ["structuring", "resolving"].includes(jobState ?? "")
+            ? 2
+            : hasPage || jobState === "reading"
+              ? 1
+              : 0;
+        const current = panes[stageIndex];
+        const railH = 46;
+        const railY = pad;
+        const railW = width - pad * 2;
+        const stepW = railW / panes.length;
+
+        roundRect(context, pad, railY, railW, railH, 6);
+        context.fillStyle = "#0d0f11";
+        context.fill();
+        context.strokeStyle = "#2e353b";
+        context.lineWidth = 1;
+        context.stroke();
+
+        const labels = ["SOURCES", "READ", "STRUCTURE", "WORLD"];
+        panes.forEach((kind, i) => {
+          const cx = pad + stepW * i + stepW / 2;
+          const reached = i <= stageIndex;
+          const active = kind === current;
+          context.fillStyle = active ? "#7be0be" : reached ? "#c8ced2" : "#667078";
+          context.beginPath();
+          context.arc(cx, railY + 12, active ? 3.5 : 2.5, 0, Math.PI * 2);
+          context.fill();
+          context.fillStyle = active ? "#edeae4" : reached ? "#aeb6bb" : "#667078";
+          context.font = `${active ? "600" : "500"} 8px ui-monospace, Menlo, monospace`;
+          context.textAlign = "center";
+          context.fillText(labels[i], cx, railY + 31);
+          if (active) {
+            context.fillStyle = "#7be0be";
+            context.fillRect(pad + stepW * i + 8, railY + railH - 3, Math.max(10, stepW - 16), 2);
+          }
+        });
+        context.textAlign = "left";
+
+        const paneY = railY + railH + 10;
+        const paneW = railW;
+        const paneH = height - paneY - pad;
+        if (current === "sources") drawSources(pad, paneY, paneW, paneH, list, focus, nameMap);
+        if (current === "read") {
+          if (hasPage && progress) drawPage(pad, paneY, paneW, paneH, progress);
+          else pane(pad, paneY, paneW, paneH, "READ", activeFor("read"));
+        }
+        if (current === "structure") {
+          if (hasStructure && progress) drawExtract(pad, paneY, paneW, paneH, progress);
+          else pane(pad, paneY, paneW, paneH, "STRUCTURE", activeFor("structure"));
+        }
+        if (current === "world") {
+          if (hasWorld && model) drawWorld(pad, paneY, paneW, paneH, model);
+          else pane(pad, paneY, paneW, paneH, "WORLD", activeFor("world"));
+        }
+        return;
+      }
+
+      const gap = 10; const colH = height - pad * 2;
       const colW = (width - pad * 2 - gap * (panes.length - 1)) / panes.length;
       panes.forEach((kind, i) => {
         const x = pad + i * (colW + gap);

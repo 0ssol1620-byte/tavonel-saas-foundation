@@ -4,6 +4,7 @@ import { COMPILE_MAX_DOCUMENTS, CORPUS_MAX_DOCUMENTS, judgeCompileSet } from "./
 import { judgeCorpusSet } from "./corpus-batching";
 
 const workspace = readFileSync(new URL("../app/workspace/page.tsx", import.meta.url), "utf8");
+const compileStage = readFileSync(new URL("../components/compile-stage.tsx", import.meta.url), "utf8");
 
 /*
   Two limits, both of which were wrong on the primary intake path while every other layer
@@ -43,6 +44,26 @@ describe("workspace compile floor and ceiling", () => {
     expect(workspace).toContain("const verdict = judgeCorpusSet(stagedSelection.files.length);");
     // The reason is shown rather than the files being silently dropped.
     expect(workspace).toContain("workspace-preflight-blocked");
+  });
+
+  it("moves an authorised staged compile into the real live Sources view before upload begins", () => {
+    expect(workspace).toContain('navigateSurface("sources")');
+    expect(workspace).toContain('sources: "workspace-sources"');
+    expect(workspace).toContain('scrollIntoView({ block: "start", behavior: "smooth" })');
+    expect(workspace.indexOf('navigateSurface("sources")')).toBeLessThan(workspace.indexOf("await uploadDocuments(files)"));
+  });
+
+  it("keeps live compilation on Sources and gives phones one readable stage at a time", () => {
+    const sourcesGate = workspace.indexOf('{surface === "sources" ? <>');
+    const stage = workspace.indexOf("<CompileStage");
+    expect(sourcesGate).toBeGreaterThan(-1);
+    expect(sourcesGate).toBeLessThan(stage);
+
+    expect(compileStage).toContain("if (width < 640)");
+    expect(compileStage).toContain('const labels = ["SOURCES", "READ", "STRUCTURE", "WORLD"]');
+    expect(compileStage).toContain("const current = panes[stageIndex]");
+    expect(compileStage).toContain('if (current === "sources") drawSources');
+    expect(compileStage.indexOf("if (width < 640)")).toBeLessThan(compileStage.indexOf("const gap = 10; const colH"));
   });
 
   it("agrees with the shared judgement at both ends", () => {
