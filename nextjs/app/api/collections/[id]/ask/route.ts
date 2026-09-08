@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
+import { readBoundedJson } from "@/lib/enterprise-http";
 import { validatePromotableCollectionArtifact } from "@/lib/collection-download";
 import { answerGroundedQuestion } from "@/lib/grounded-ask";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
@@ -55,15 +56,12 @@ export async function POST(
       { status: 400, headers: NO_STORE }
     );
   }
-  let body: { question?: unknown };
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json(
-      { code: "INVALID_JSON" },
-      { status: 400, headers: NO_STORE }
-    );
-  }
+  const parsed = await readBoundedJson(request, 2_048);
+  if (!parsed.ok) return NextResponse.json(
+    { code: parsed.code === "REQUEST_TOO_LARGE" ? "QUESTION_TOO_LARGE" : "INVALID_JSON" },
+    { status: parsed.status, headers: NO_STORE }
+  );
+  const body = parsed.value as { question?: unknown };
   const question = typeof body.question === "string" ? body.question : "";
   if (
     question.normalize("NFKC").replace(/\s+/g, " ").trim().length < 3 ||

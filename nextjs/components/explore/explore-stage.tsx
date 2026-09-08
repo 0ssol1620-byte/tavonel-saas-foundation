@@ -27,6 +27,7 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
 import Logomark from "@/components/logomark";
+import { trackFunnel } from "@/lib/funnel-events";
 import WorldAct from "./world-act";
 import EvidenceAct from "./evidence-act";
 import ChangeAct from "./change-act";
@@ -82,12 +83,16 @@ export default function ExploreStage({ model, layout, change, answers, technical
   const returnAct = useRef<ExploreAct>("world");
 
   const enter = useCallback((next: ExploreAct) => {
+    // Every act change goes through here -- the rail, the entry CTA, the deep link and the
+    // openers -- so the change act is counted once rather than once per way in.
+    if (next === "change_compare") trackFunnel("explore_change_opened");
     setAct(next);
     setSettled(true);
   }, []);
 
   useEffect(() => {
     const requested = actFromQuery(new URLSearchParams(window.location.search).get("act") ?? undefined);
+    trackFunnel("explore_entered", { act: requested });
     if (requested !== "entry") {
       enter(requested);
       return;
@@ -108,6 +113,8 @@ export default function ExploreStage({ model, layout, change, answers, technical
     (id: string) => {
       setSelectedId(id);
       const node = model.nodes.find((item) => item.id === id);
+      // The kind, never the id. Which object a reader opened is the reader's business.
+      if (node) trackFunnel("explore_object_selected", { kind: node.kind });
       const first = node?.evidenceRefs[0];
       if (first) setEvidenceId(first);
     },
@@ -117,6 +124,7 @@ export default function ExploreStage({ model, layout, change, answers, technical
   const openNode = useCallback(
     (id: string) => {
       selectNode(id);
+      trackFunnel("explore_evidence_opened", { from: "object" });
       enter(narrow ? "object_focus" : "evidence");
     },
     [enter, narrow, selectNode],
@@ -129,6 +137,7 @@ export default function ExploreStage({ model, layout, change, answers, technical
         model.nodes.find((node) => node.evidenceRefs.includes(regionId));
       if (owner) setSelectedId(owner.id);
       setEvidenceId(regionId);
+      trackFunnel("explore_evidence_opened", { from: "region" });
       enter("evidence");
     },
     [enter, model.nodes],
@@ -137,6 +146,7 @@ export default function ExploreStage({ model, layout, change, answers, technical
   const closeAsk = useCallback(() => setAct(returnAct.current), []);
 
   const openAsk = useCallback(() => {
+    trackFunnel("explore_ask_used");
     setAct((current) => {
       if (current === "ask") return current;
       returnAct.current = current === "entry" ? "world" : current;
@@ -355,11 +365,14 @@ export default function ExploreStage({ model, layout, change, answers, technical
         <p>YOUR SOURCES</p>
         <h2>{EXPLORE_COPY.endHeading}</h2>
         <div>
+          {/* Only the sign-in exit is the signup step. The other two end actions stay on the
+              public site and counting them as conversions would inflate the last funnel row. */}
           {EXPLORE_COPY.endActions.map((action) => (
             <Link
               key={action.href}
               href={action.href as Route}
               data-primary={action.primary ? "1" : "0"}
+              onClick={action.href === "/login" ? () => trackFunnel("explore_to_signup") : undefined}
             >
               {action.label}
             </Link>

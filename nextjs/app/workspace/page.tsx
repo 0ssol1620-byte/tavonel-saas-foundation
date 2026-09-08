@@ -29,7 +29,7 @@ import { advanceProgressPoll, type ProgressPollState } from "@/lib/progress-poll
 import PipelineBoard from "@/components/pipeline-board";
 import CompileStage from "@/components/compile-stage";
 import { displayName, recallDocumentNames, rememberDocumentName, type DocumentNames } from "@/lib/document-names";
-import { trackFunnel } from "@/lib/funnel-events";
+import { trackFunnel, trackFunnelOnce } from "@/lib/funnel-events";
 import ConnectionsPanel from "@/components/connections-panel";
 import DeveloperPanel from "@/components/developer-panel";
 import WorkspaceUltimateShell, { type WorkspaceSurface } from "@/components/workspace-ultimate-shell";
@@ -565,6 +565,13 @@ export default function WorkspacePage() {
     setCollectionResult({ ...artifact, artifactKey: json.artifactKey ?? "" });
     await loadWorldState(collectionId, token);
     setNotice(`Compiled World ${collectionId} was restored and its evidence package verified.`);
+    /*
+      The lifecycle of a candidate that actually verified, for the caller that needs to know one
+      arrived. Every path above returns undefined, so a refused package cannot be counted as a
+      candidate -- and the caller reads it here rather than from a `setState` updater, which
+      React invokes twice under StrictMode and would double every row in the funnel.
+    */
+    return artifact.lifecycle;
   };
 
   useEffect(() => {
@@ -862,6 +869,8 @@ export default function WorkspacePage() {
         }
       }
       patchUpload(localId, { phase: "stored", loaded: file.size });
+      // Stored, not issued: a capability that was never transferred is not a source.
+      trackFunnelOnce("workspace_first_source_added", { mode: "upload" });
 
       /*
        * What finished is the transfer, and that is all this may claim.
@@ -931,7 +940,11 @@ export default function WorkspacePage() {
 
     if (controller.signal.aborted) return;
     if (!compiled) return;
-    await loadCollectionCandidate(compiled);
+    const lifecycle = await loadCollectionCandidate(compiled);
+    if (lifecycle) {
+      trackFunnel("workspace_candidate_ready", { lifecycle });
+      if (lifecycle === "review_required") trackFunnel("workspace_review_required");
+    }
     /*
       Say what was built, not that it was restored.
 
@@ -1011,6 +1024,8 @@ export default function WorkspacePage() {
     load, so a customer who never had the URL still finds the compile waiting.
   */
   const startDurableCompile = async (documentIds: string[]) => {
+    // A count, never the ids. Every compile route -- staged upload, selection, resume -- lands here.
+    trackFunnel("workspace_compile_started", { sources: String(documentIds.length) });
     const token = await sessionToken();
     if (!token) {
       setNotice("Sign in with Google first.");
@@ -1654,6 +1669,7 @@ export default function WorkspacePage() {
         return;
       }
       await loadWorldState(collectionResult.collectionId, token);
+      trackFunnel("workspace_world_activated");
       setReviewReason("");
       setNotice("Human review recorded. This revision is now the active World.");
     } finally {
@@ -1715,6 +1731,8 @@ export default function WorkspacePage() {
         return;
       }
       setAskResult(json);
+      // `json.status` is the enumerated outcome. `askQuestion` is a user string and never leaves.
+      trackFunnelOnce("workspace_first_ask", { status: json.status });
       setNotice(json.status === "grounded"
         ? `Answer returned from ${json.citations.length} exact source region(s) in active revision ${activeWorld.revision}.`
         : "The active world abstained because no region-bound evidence matched the question.");
@@ -2013,7 +2031,7 @@ export default function WorkspacePage() {
                 only behind a docs link. The file list is generated from the same constant the
                 exporter writes from, so it cannot advertise an artifact the ZIP does not hold.
               */}
-              <WorkspaceUseWithAi />
+              <WorkspaceUseWithAi onOpen={() => trackFunnel("workspace_ai_connect_opened")} />
             </section>
           ) : null}
 

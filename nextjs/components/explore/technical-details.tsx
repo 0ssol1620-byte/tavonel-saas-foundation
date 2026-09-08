@@ -12,9 +12,26 @@
   longest strings on it.
 */
 
+import { useRef } from "react";
 import { X } from "lucide-react";
+import { useDialogFocus } from "@/components/world-visual/use-dialog-focus";
 import styles from "./explore-stage.module.css";
 import { EXPLORE_COPY, type ExploreAnswerView, type ExploreChangeView, type ExploreTechnicalRecord } from "@/lib/explore-story";
+
+/** `[1..48, 51]` reads as "1–48, 51". A page list is only useful if it can be read. */
+function describePages(pages: number[]): string {
+  const runs: string[] = [];
+  let start = pages[0];
+  let previous = pages[0];
+  for (const page of pages.slice(1)) {
+    if (page === previous + 1) { previous = page; continue; }
+    runs.push(start === previous ? `${start}` : `${start}–${previous}`);
+    start = page;
+    previous = page;
+  }
+  runs.push(start === previous ? `${start}` : `${start}–${previous}`);
+  return runs.join(", ");
+}
 
 export type TechnicalSelection = {
   objectId: string;
@@ -39,8 +56,18 @@ export default function TechnicalDetails({
   answer: ExploreAnswerView | null;
   onClose: () => void;
 }) {
+  const panelRef = useRef<HTMLElement | null>(null);
+  // Focus enters the drawer, stays in it, and goes back to TECHNICAL DETAILS on Escape (§20).
+  useDialogFocus(panelRef);
+
   return (
-    <aside className={styles.drawer} role="dialog" aria-label={EXPLORE_COPY.technical}>
+    <aside
+      ref={panelRef}
+      className={styles.drawer}
+      role="dialog"
+      aria-modal="true"
+      aria-label={EXPLORE_COPY.technical}
+    >
       <header>
         <span>{EXPLORE_COPY.technical}</span>
         <button type="button" onClick={onClose} aria-label="Close technical details">
@@ -58,7 +85,23 @@ export default function TechnicalDetails({
             <div><dt>Objects</dt><dd>{record.counts.objects}</dd></div>
             <div><dt>Relations</dt><dd>{record.counts.relations}</dd></div>
             <div><dt>Evidence regions</dt><dd>{record.counts.regions}</dd></div>
+            <div>
+              <dt>Sent to this browser</dt>
+              <dd>
+                {record.shipped.objects} objects · {record.shipped.relations} relations ·{" "}
+                {record.shipped.regions} regions
+              </dd>
+            </div>
           </dl>
+          {/*
+            §24, said out loud. The compiled World is not the payload, and disclosing that is
+            cheaper than letting a reader assume either that the page ships all of it or that it
+            compiled only what it ships. Every other figure on this page is the compiler's.
+          */}
+          <p className={styles.drawerNote}>
+            The stage is sent the drawn composition, one relation hop out from it and the source
+            regions that composition can open &mdash; not the whole compiled World.
+          </p>
         </section>
 
         <section>
@@ -101,11 +144,16 @@ export default function TechnicalDetails({
                 <dd>
                   {document.digest}
                   <br />
-                  {document.documentId} · {document.pageCount} page
-                  {document.pageCount === 1 ? "" : "s"} · {document.regionCount} regions
-                  {document.selectedPages?.length
-                    ? ` · pages ${document.selectedPages.join(", ")} compiled`
-                    : ""}
+                  {document.documentId} · {document.compiledPageCount ?? document.pageCount} of{" "}
+                  {document.pageCount} page{document.pageCount === 1 ? "" : "s"} compiled ·{" "}
+                  {document.regionCount} regions
+                  {/*
+                    A declared slice is printed as a range, never as forty-nine numbers, and a
+                    document compiled in full says so rather than listing eighty of them (§57).
+                  */}
+                  {document.declaredPages?.length
+                    ? ` · declared pages ${describePages(document.declaredPages)}`
+                    : " · every page declared"}
                   {/*
                     The acquisition record, for the one reader who will check it (§11.3).
 

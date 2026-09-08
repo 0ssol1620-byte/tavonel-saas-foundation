@@ -3,6 +3,7 @@
 import { Cloud, Link2, Server, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { trackFunnelOnce } from "@/lib/funnel-events";
 
 type Connection = {
   connectionId: string;
@@ -230,6 +231,8 @@ export default function ConnectionsPanel() {
         setNotice(`Import could not be started (${json.code ?? response.status}).`);
         return;
       }
+      // A connector import is the other way a first source arrives, and it counts the same.
+      trackFunnelOnce("workspace_first_source_added", { mode: "connector" });
       // started === false means an identical import was already in flight and this request
       // joined it. Saying so beats showing a second "started" message for one job.
       await load(json.started

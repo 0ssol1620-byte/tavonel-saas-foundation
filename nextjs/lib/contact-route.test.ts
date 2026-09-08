@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { POST } from "../app/api/contact/route";
@@ -74,10 +77,58 @@ describe("contact route", () => {
   });
 });
 
-function request(body: unknown, origin = "http://localhost:3000") {
+/*
+  Blueprint 2026-09-08 §31 wants this limit durable and §30 wants it multi-dimensional. Only
+  the second half is here: the store it would live in does not exist yet (see the ponytail note
+  in the route for the migration it is blocked on), so what is asserted is what the
+  process-local limiter actually promises -- both dimensions are consumed on every submission,
+  so neither one address rotating its email nor one domain arriving from many addresses gets
+  more than the window allows.
+
+  Each case below uses its own address AND its own domain; a case that shared either with
+  another would be counting somebody else's submissions.
+*/
+describe("contact rate limit", () => {
+  it("stops a sixth submission from one address, however that address varies its email", async () => {
+    const attempts: number[] = [];
+    for (let index = 0; index < 6; index += 1) {
+      const response = await POST(request(
+        { ...valid, email: `buyer@ip-case-${index}.test` },
+        "http://localhost:3000",
+        "198.51.100.10",
+      ));
+      attempts.push(response.status);
+    }
+    // 503 is the unconfigured delivery channel: what matters is that the request got that far.
+    expect(attempts).toEqual([503, 503, 503, 503, 503, 429]);
+  });
+
+  it("stops a sixth submission to one email domain, however the source address varies", async () => {
+    const attempts: number[] = [];
+    for (let index = 0; index < 6; index += 1) {
+      const response = await POST(request(
+        { ...valid, email: `buyer${index}@domain-case.test` },
+        "http://localhost:3000",
+        `198.51.100.${100 + index}`,
+      ));
+      attempts.push(response.status);
+    }
+    expect(attempts).toEqual([503, 503, 503, 503, 503, 429]);
+  });
+
+  it("keeps the raw address and email out of the limiter key", async () => {
+    // Bucket keys are HMACs over a per-process salt, so the limiter retains nothing readable
+    // about the submitter -- which is what makes this ledger safe to make durable later.
+    const source = readFileSync(resolve(import.meta.dirname, "../app/api/contact/route.ts"), "utf8");
+    expect(source).toMatch(/createHmac\("sha256", KEY_SALT\)/);
+    expect(source).toMatch(/\[saltedKey\("ip", ip\), saltedKey\("domain", domain\)\]/);
+  });
+});
+
+function request(body: unknown, origin = "http://localhost:3000", forwardedFor = "203.0.113.8") {
   return new Request("http://localhost:3000/api/contact", {
     method: "POST",
-    headers: { "Content-Type": "application/json", Origin: origin, "X-Forwarded-For": "203.0.113.8" },
+    headers: { "Content-Type": "application/json", Origin: origin, "X-Forwarded-For": forwardedFor },
     body: JSON.stringify(body),
   });
 }

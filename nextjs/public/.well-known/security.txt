@@ -1,0 +1,14 @@
+# TAVONEL — vulnerability disclosure (RFC 9116)
+#
+# security@tavonel.com is the address already published on /contact, /privacy and /status,
+# so this file points a scanner at the mailbox a person is already reading rather than at a
+# new one nobody watches.
+#
+# Deliberately absent: Policy, Encryption, Acknowledgments, Hiring. There is no published
+# disclosure policy, no published PGP key, no bug bounty and no response-time commitment,
+# and a security.txt that implies one it cannot keep is worse than no file at all.
+
+Contact: mailto:security@tavonel.com
+Expires: 2027-09-01T00:00:00.000Z
+Canonical: https://tavonel.com/.well-known/security.txt
+Preferred-Languages: en, ko

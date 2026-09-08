@@ -73,22 +73,32 @@ test("is reachable from research and from the resources hub", async ({ page }) =
 });
 
 /*
-  The route is a page, is in the sitemap, and is still withheld from crawlers.
+  The route is a page, is in the sitemap, and is now offered to crawlers.
 
-  This lane removed `/benchmarks` from the robots disallow list, which is an indexing decision
-  rather than an implementation one. The orchestrator's 2026-09-05 adjudication reserved it for
-  the founder and set the default back to disallowed, so this assertion now holds the
-  adjudicated state instead of the lane's: the page is built and reachable, and robots.txt says
-  it is not yet offered. When the founder decides to index it, the token comes out of
-  `app/robots.ts` and this expectation flips in the same commit.
+  The 2026-09-05 adjudication put `/benchmarks` back in the robots disallow list until somebody
+  audited the claims on it, which left the site advertising a URL in `sitemap.xml` and `llms.txt`
+  that `robots.txt` withheld. The GTM lane ran that audit: no measured figure is published here,
+  the North Star metric is stamped DEFINITION - NO VALUE PUBLISHED, the results table has no rows,
+  and `validateBenchmarkReceipt` throws at build rather than rendering an unreceipted one. So the
+  token came out, and this expectation flipped with it -- as the note it replaces said it would.
+
+  `lib/seo-surface.test.ts` is the standing guard; this one checks the three files as served.
 */
-test("is a real page in the sitemap, with indexing still withheld pending the founder's call", async ({ page }) => {
+test("is a real page, in the sitemap, and offered to crawlers", async ({ page }) => {
   const sitemap = await page.request.get("/sitemap.xml");
   expect(sitemap.ok()).toBe(true);
   expect(await sitemap.text()).toContain("https://tavonel.com/benchmarks");
 
   const robots = await page.request.get("/robots.txt");
-  expect(await robots.text()).toContain("Disallow: /benchmarks");
+  const robotsText = await robots.text();
+  expect(robotsText).not.toContain("Disallow: /benchmarks");
+  expect(robotsText).not.toContain("Disallow: /product/continuous-knowledge");
+  // Named search crawlers are declared; training crawlers stay a founder decision (Blueprint 8.4).
+  expect(robotsText).toContain("User-Agent: OAI-SearchBot");
+  expect(robotsText).toContain("User-Agent: PerplexityBot");
+  expect(robotsText).not.toContain("Google-Extended");
+  // Private surfaces are still withheld from every one of them, named or not.
+  expect(robotsText.match(/Disallow: \/workspace/g)?.length).toBe(4);
 
   await page.goto("/benchmarks");
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", "https://tavonel.com/benchmarks");

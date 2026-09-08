@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { activationPolicy } from "@/lib/activation-policy";
+import { readBoundedJson } from "@/lib/enterprise-http";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { reserveFoundationCompute } from "@/lib/compute-reservation";
 import { reserveFoundationIntake } from "@/lib/intake-admission";
@@ -33,12 +34,9 @@ export async function POST(request: Request) {
   const auth = await authorizeFoundationRequest(request, "documents:intake", "observer");
   if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: NO_STORE });
 
-  let body: { originalFilename?: unknown; declaredMimeType?: unknown; requestedBytes?: unknown; estimatedPages?: unknown };
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ code: "METADATA_ONLY_ENDPOINT" }, { status: 415, headers: NO_STORE });
-  }
+  const parsed = await readBoundedJson(request, 8_192);
+  if (!parsed.ok) return NextResponse.json({ code: "METADATA_ONLY_ENDPOINT" }, { status: 415, headers: NO_STORE });
+  const body = parsed.value as { originalFilename?: unknown; declaredMimeType?: unknown; requestedBytes?: unknown; estimatedPages?: unknown };
 
   const originalFilename = typeof body.originalFilename === "string" ? body.originalFilename : "";
   const declaredMimeType = typeof body.declaredMimeType === "string" ? body.declaredMimeType : "";

@@ -117,18 +117,78 @@ test("Act 1 draws a curated composition of compiled objects", async ({ page }) =
 
 test("Act 1 offers the same composition as an accessible list", async ({ page }) => {
   // §20: the canvas is not the only reading. Every drawn object, its relations and its evidence
-  // link have to be reachable as text, on every width.
+  // link have to be reachable as text, on every width -- 1440 and 390 both run this.
   await enterWorld(page);
-  const list = page.locator("details", { hasText: "Objects, relations and evidence as a list" });
-  await list.getByRole("group").or(list.locator("summary")).first().click();
+  const list = page.locator("[data-parallel-view]");
+  await list.locator("summary").click();
   const objects = list.locator("[data-parallel-object]");
   const drawn = await page.locator(`${STAGE} ${NODE}`).count();
   expect(await objects.count()).toBe(drawn);
   await expect(list.getByRole("button", { name: /^Open evidence · \d+ source regions?$/ }).first()).toBeVisible();
 
+  // Every target is a real button; a clickable div would not be in the button role (§20).
+  expect(await objects.evaluateAll((nodes) => nodes.every((node) => node.tagName === "BUTTON"))).toBe(true);
+  // State is a word, never colour alone.
+  await expect(objects.first().locator("small")).toHaveText(/^[A-Z]+ · [A-Z]+$/);
+  // Every relation between two drawn objects is named in text.
+  const relations = await list.locator("li li").count();
+  expect(relations).toBeGreaterThan(0);
+
   await objects.first().click();
   await expect(page.locator(STAGE)).toHaveAttribute("data-world-act", "world");
   await expect(page.locator(`${STAGE} ${NODE}[data-selected="1"]`)).toHaveCount(1);
+});
+
+test("the list is reachable and operable from the keyboard alone", async ({ page }) => {
+  /*
+    §20's parallel representation is only a parallel representation if it can be driven without a
+    pointer: the summary takes focus and Enter opens it, and the objects inside are ordinary
+    buttons that Tab reaches and Enter activates.
+  */
+  await enterWorld(page);
+  const list = page.locator("[data-parallel-view]");
+  await list.locator("summary").focus();
+  await page.keyboard.press("Enter");
+  await expect(list).toHaveAttribute("open", "");
+
+  await page.keyboard.press("Tab");
+  const focused = await page.evaluate(() => document.activeElement?.getAttribute("data-parallel-object"));
+  expect(focused, "Tab from the summary lands on the first object in the list").not.toBeNull();
+  await page.keyboard.press("Enter");
+  await expect(page.locator(`${STAGE} ${NODE}[data-node-id="${focused}"]`)).toHaveAttribute("data-selected", "1");
+});
+
+test("Act 3 names each object's state in words, not only in colour", async ({ page }) => {
+  // §20: the Change act is the one place a state difference exists, and the canvas draws it as
+  // amber against dim. The list has to say AFFECTED or UNCHANGED.
+  await page.goto("/explore?act=change");
+  const list = page.locator("[data-parallel-view]");
+  await list.locator("summary").click();
+  const words = await list.locator("[data-parallel-object] small").allInnerTexts();
+  expect(words.length).toBeGreaterThan(0);
+  expect(words.some((word) => /AFFECTED|UNCHANGED/.test(word))).toBe(true);
+});
+
+test("a dialog keeps focus and gives it back", async ({ page }) => {
+  // §20: focus enters the drawer, Tab does not walk the world behind it, Escape returns focus to
+  // the control that opened it.
+  await enterWorld(page);
+  const opener = page.getByRole("button", { name: "TECHNICAL DETAILS" });
+  await opener.click();
+  const drawer = page.getByRole("dialog", { name: "TECHNICAL DETAILS" });
+  await expect(drawer).toBeVisible();
+
+  for (let step = 0; step < 6; step += 1) {
+    await page.keyboard.press("Tab");
+    expect(
+      await drawer.evaluate((panel) => panel.contains(document.activeElement)),
+      "Tab must not leave an open dialog",
+    ).toBe(true);
+  }
+
+  await page.keyboard.press("Escape");
+  await expect(drawer).toBeHidden();
+  await expect(opener).toBeFocused();
 });
 
 test("Act 2 opens an object onto the page region it was compiled from", async ({ page }) => {
@@ -198,13 +258,43 @@ test("an object with many regions is walked with previous and next", async ({ pa
   await page.locator(`${STAGE} ${NODE}[data-node-kind="Document"]`).first().click();
   await page.getByRole("button", { name: "Open source evidence" }).click();
   const group = page.getByRole("group", { name: "Source regions for this object" });
-  await expect(group.getByText(/^REGION 1 OF \d+$/)).toBeVisible();
+  /*
+    The counter says how many regions this browser was sent and, when the compiler bound more
+    than that, how many it bound. §24 bounds the payload; it does not get to shrink the number.
+  */
+  await expect(group.getByText(/^REGION 1 OF \d+( SHOWN · \d+ COMPILED)?$/)).toBeVisible();
   await expect(group.getByRole("button", { name: "← PREVIOUS" })).toBeDisabled();
   await group.getByRole("button", { name: "NEXT →" }).click();
-  await expect(group.getByText(/^REGION 2 OF \d+$/)).toBeVisible();
+  await expect(group.getByText(/^REGION 2 OF \d+( SHOWN · \d+ COMPILED)?$/)).toBeVisible();
   await expect(group.getByRole("button", { name: "← PREVIOUS" })).toBeEnabled();
   await group.getByRole("button", { name: "← PREVIOUS" }).click();
-  await expect(group.getByText(/^REGION 1 OF \d+$/)).toBeVisible();
+  await expect(group.getByText(/^REGION 1 OF \d+( SHOWN · \d+ COMPILED)?$/)).toBeVisible();
+});
+
+test("a filing says how much of itself is in the World", async ({ page }) => {
+  /*
+    §57. Four filings are compiled end to end and one carries a declared page slice, and the
+    source sheet has to be able to say which of the two it is showing. "Curated slice" printed
+    over a filing compiled whole understates the World; the reverse overstates it.
+  */
+  test.skip(isNarrow(page));
+  await enterWorld(page);
+  await page.locator(`${STAGE} ${NODE}[data-node-kind="Document"]`).first().click();
+  await page.getByRole("button", { name: "Open source evidence" }).click();
+  const sheet = page.locator("[data-source-sheet]");
+  await expect(
+    sheet.getByText(/^(FULL FILING COMPILED · \d+ PAGES|CURATED PAGE SLICE · \d+ OF \d+ PAGES COMPILED)$/),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "TECHNICAL DETAILS" }).click();
+  const drawer = page.getByRole("dialog", { name: "TECHNICAL DETAILS" });
+  // Compiled pages against document pages, per filing, and the declared slice as a range.
+  await expect(drawer.getByText(/\d+ of \d+ pages compiled/).first()).toBeVisible();
+  await expect(drawer.getByText(/declared pages 1–48, 51/)).toBeVisible();
+  await expect(drawer.getByText(/every page declared/).first()).toBeVisible();
+  // §24: what was compiled and what was sent are both printed, and they are not the same number.
+  await expect(drawer.getByText("Sent to this browser")).toBeVisible();
+  await expect(drawer.getByText(/\d+ objects · \d+ relations · \d+ regions/)).toBeVisible();
 });
 
 test("Act 3 reports the arriving filings with derived counts and claims no equivalence", async ({ page }) => {
@@ -259,8 +349,20 @@ test("Ask quotes the source and its citation lands in the Evidence act", async (
   // Four prepared questions, reaching three different filings of the corpus.
   await expect(panel.getByRole("button", { name: /\?$/ })).toHaveCount(4);
   await panel.getByRole("button", { name: "What were net sales by reportable segment?" }).click();
-  await expect(panel.getByText(/Americas/).first()).toBeVisible();
+  /*
+    What is asserted here is the contract, not the sentence.
+
+    This used to expect the word "Americas", which was the top-scored region while the corpus was
+    three pages of each filing. Over 1,169 regions the same lexical retriever scores a different
+    region first -- still from the corpus, still cited to a filing and a page, and no longer the
+    segment table itself. Pinning the old word would have meant either tuning the question until
+    the retriever flattered it or asserting a result the retriever does not guarantee. What Ask
+    does guarantee is that the answer is source text with a citation a reader can open, so that
+    is what this checks; `explore-sample.ts` fails the build if any question stops being grounded.
+  */
+  await expect(panel.locator("blockquote")).not.toBeEmpty();
   await expect(panel.getByText(/^\d+ SOURCE REGIONS?$/)).toBeVisible();
+  await expect(panel.getByRole("button", { name: /^apple-.*\.pdf/ }).first()).toBeVisible();
   // §49 keeps the relevance decimal off the stage.
   await expect(panel).not.toContainText(/relevance/i);
 
@@ -364,6 +466,28 @@ test("reduced motion removes the transitions and none of the content", async ({ 
   const pulses = await page.$$eval('[data-node-state="affected"]', (elements) =>
     elements.map((element) => getComputedStyle(element).animationName));
   expect([...new Set(pulses)]).toEqual(["none"]);
+
+  /*
+    §20's parallel representation is also the no-canvas path, so a reader who asked for stillness
+    arrives with it already open rather than having to find a disclosure first.
+  */
+  await expect(page.locator("[data-parallel-view]")).toHaveAttribute("open", "");
+  await expect(page.locator("[data-parallel-object]").first()).toBeVisible();
+});
+
+test("the deep links land on the acts they name", async ({ page }) => {
+  // §57 step 4. A link in an email is read by a person, and it has to arrive where it says.
+  for (const [query, act] of [
+    ["?act=world", "world"],
+    ["?act=evidence", "evidence"],
+    ["?act=change", "change_compare"],
+    ["?act=constructor", "entry"],
+    ["", "entry"],
+  ] as const) {
+    await page.goto(`/explore${query}`);
+    const expected = act === "evidence" && isNarrow(page) ? "evidence" : act;
+    await expect(page.locator(STAGE), query || "(no query)").toHaveAttribute("data-world-act", expected);
+  }
 });
 
 test("the closing action offers the reader their own sources", async ({ page }) => {

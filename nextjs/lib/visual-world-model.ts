@@ -25,7 +25,15 @@ export type VisualNode = {
   label: string;
   kind: VisualKind;
   state: VisualState;
+  /**
+   * The compiled regions this object is bound to, stating region first.
+   *
+   * In a bounded model (`boundVisualWorld`) this is the shipped prefix of that list, and
+   * `evidenceCount` still reports how many the compiler bound. The two are equal in the full
+   * model, and a renderer that shows a total must read `evidenceCount`.
+   */
   evidenceRefs: string[];
+  evidenceCount: number;
   /** Degree in the whole compiled World, not in the focus subgraph: how connected this object is. */
   degree: number;
 };
@@ -36,7 +44,6 @@ export type VisualEdge = {
   to: string;
   predicate: string;
   state: VisualState;
-  evidenceRefs: string[];
 };
 
 export type VisualEvidence = {
@@ -55,7 +62,8 @@ export type VisualEvidence = {
   accession?: string;
   officialHref?: string;
   secHref?: string;
-  selectedPages?: number[];
+  /** How many of the document's pages this World compiled. Equal to `pageCount` when all of them. */
+  compiledPageCount?: number;
   /* §11.3: which bytes the region was read out of, and the acquired original beside them. */
   form?: string;
   filingDate?: string;
@@ -84,6 +92,13 @@ export type VisualWorldModel = {
   revisions: VisualRevision[];
   /** The 7-12 node ids Act 1 draws. Derived, never a hand-typed list -- see `chooseFocus`. */
   focus: string[];
+  /**
+   * What the compiled World holds, which is not what this model carries once it is bounded.
+   *
+   * Every count a reader is shown -- "SHOWING 12 OF 4,982 COMPILED OBJECTS" -- reads this, so
+   * that shipping less to the browser can never quietly shrink a published number.
+   */
+  totals: { objects: number; relations: number; regions: number };
 };
 
 /**
@@ -105,7 +120,9 @@ export type ExploreDocument = {
   accession?: string;
   officialHref?: string;
   secHref?: string;
-  selectedPages?: number[];
+  /** How many of the document's pages this World compiled, and which ones when it is a slice. */
+  compiledPageCount?: number;
+  declaredPages?: number[];
   form?: string;
   filingDate?: string;
   reportDate?: string;
@@ -253,11 +270,15 @@ export function resolvePresentationObjects(world: WorldReadModel): string[] {
   compiler attached is still in the list, and the one that states the object leads it. If no
   region states it, or more than one does, the compiler's order stands and nothing is asserted.
 */
-function refsStatingFirst(object: WorldObject, world: WorldReadModel): string[] {
+function refsStatingFirst(
+  object: WorldObject,
+  excerptOf: ReadonlyMap<string, string>,
+): string[] {
   const refs = [...object.evidenceRefs];
   if (object.type !== "Claim" || refs.length < 2) return refs;
-  const stating = refs.filter((id) =>
-    world.evidence.some((item) => item.id === id && item.excerpt.includes(object.label)));
+  // Indexed rather than scanned. The linear scan this replaces was O(claims x refs x evidence),
+  // which on the 1,169-region corpus was seven seconds of build time for the same answer.
+  const stating = refs.filter((id) => (excerptOf.get(id) ?? "").includes(object.label));
   if (stating.length !== 1) return refs;
   return [stating[0], ...refs.filter((id) => id !== stating[0])];
 }
@@ -293,9 +314,12 @@ export function toVisualWorldModel(
   */
   const filingLabel = (document: ExploreDocument | undefined) =>
     document?.form && document.filingDate ? `${document.form} · filed ${document.filingDate}` : null;
+  /* Indexed once. Both lookups below used to scan `world.evidence` per object. */
+  const excerptOf = new Map(world.evidence.map((item) => [item.id, item.excerpt] as const));
+  const sourceIdOf = new Map(world.evidence.map((item) => [item.id, item.sourceId] as const));
   const filingOf = (object: WorldObject) =>
-    documents.find((document) => world.evidence.some((item) =>
-      object.evidenceRefs.includes(item.id) && item.sourceId === document.documentId));
+    documents.find((document) =>
+      object.evidenceRefs.some((ref) => sourceIdOf.get(ref) === document.documentId));
 
   const nodes: VisualNode[] = world.objects.map((object) => {
     const source = object.type === "Evidence" ? sourceOfEvidenceNode(object, world, documents) : null;
@@ -305,18 +329,26 @@ export function toVisualWorldModel(
       label: source ? source.filename : filingLabel(filing) ?? object.label,
       kind: object.type,
       state,
-      evidenceRefs: refsStatingFirst(object, world),
+      evidenceRefs: refsStatingFirst(object, excerptOf),
+      evidenceCount: object.evidenceRefs.length,
       degree: degree.get(object.id) ?? 0,
     };
   });
 
+  /*
+    `relation.evidenceRefs` is deliberately not carried across.
+
+    Nothing on the stage reads it, and this compiler binds a relation to every region of the
+    document it was derived from -- so on the 1,169-region corpus that one unread field was
+    139MB of the model, serialized straight into the page's RSC payload (§24). The relation's
+    evidence is still in the artifact and still in the technical drawer's counts.
+  */
   const edges: VisualEdge[] = world.relations.map((relation) => ({
     id: relation.id,
     from: relation.subject,
     to: relation.object,
     predicate: relation.predicate,
     state,
-    evidenceRefs: [...relation.evidenceRefs],
   }));
 
   const evidence: VisualEvidence[] = world.evidence.map((item) => {
@@ -337,7 +369,7 @@ export function toVisualWorldModel(
       accession: document?.accession,
       officialHref: document?.officialHref,
       secHref: document?.secHref,
-      selectedPages: document?.selectedPages,
+      compiledPageCount: document?.compiledPageCount,
       form: document?.form,
       filingDate: document?.filingDate,
       representationKind: document?.representationKind,
@@ -373,7 +405,88 @@ export function toVisualWorldModel(
     edges,
     evidence,
     revisions,
+    totals: { objects: nodes.length, relations: edges.length, regions: evidence.length },
     focus: chooseFocus(world, focusLimit, (object) => filingOf(object)?.filingDate),
+  };
+}
+
+/* ------------------------------------------------------------------- bounding */
+
+/*
+  What the page sends to the browser (§24).
+
+  `toVisualWorldModel` is the whole compiled World, and the whole compiled World does not belong
+  in an RSC payload. Measured on this corpus: the unbounded model of the five filings serializes
+  to about 245MB, because every object and every relation carries a reference to every region of
+  the document it was read from -- O(objects x regions), a shape that gets worse exactly as the
+  corpus proof gets better. Even the earlier 97-region slice shipped 2.1MB of it.
+
+  So the server keeps the full model -- the counts, Ask, the Change diff and the technical drawer
+  are all computed from it -- and hands the stage a projection of what the stage can actually
+  reach:
+
+    - every drawn object, and up to RELATION_BOUND of each drawn object's relations;
+    - the objects on the other end of those relations, so a relation list can name them;
+    - up to REGION_BOUND regions per shipped object, plus every region on the same page as one of
+      them, because the source sheet draws the page rather than the line;
+    - anything `keepRegionIds` names -- the Ask citations -- and the objects that own them.
+
+  Two rules keep this honest rather than merely smaller. `totals` is carried through untouched,
+  so every published count still describes the compiled World. And `evidenceCount` on each node
+  stays the compiler's number while `evidenceRefs` shrinks, so a renderer can say "12 of 502
+  shown" and never pass off the bound as the fact.
+*/
+export const RELATION_BOUND = 24;
+export const REGION_BOUND = 12;
+
+export function boundVisualWorld(
+  model: VisualWorldModel,
+  drawnIds: readonly string[],
+  keepRegionIds: readonly string[] = [],
+): VisualWorldModel {
+  const nodeById = new Map(model.nodes.map((node) => [node.id, node] as const));
+  const evidenceById = new Map(model.evidence.map((item) => [item.id, item] as const));
+  const drawn = new Set(drawnIds.filter((id) => nodeById.has(id)));
+
+  const keptNodeIds = new Set<string>(drawn);
+  const keptEdgeIds = new Set<string>();
+  const spent = new Map<string, number>();
+  for (const edge of model.edges) {
+    for (const [end, other] of [[edge.from, edge.to], [edge.to, edge.from]] as const) {
+      if (!drawn.has(end)) continue;
+      const used = spent.get(end) ?? 0;
+      if (used >= RELATION_BOUND) continue;
+      if (!nodeById.has(other)) continue;
+      spent.set(end, used + 1);
+      keptEdgeIds.add(edge.id);
+      keptNodeIds.add(other);
+    }
+  }
+  for (const regionId of keepRegionIds) {
+    const owner = model.nodes.find((node) => node.evidenceRefs.includes(regionId));
+    if (owner) keptNodeIds.add(owner.id);
+  }
+
+  const keptRegionIds = new Set<string>(keepRegionIds.filter((id) => evidenceById.has(id)));
+  for (const id of keptNodeIds) {
+    for (const ref of nodeById.get(id)!.evidenceRefs.slice(0, REGION_BOUND)) keptRegionIds.add(ref);
+  }
+  // The source sheet renders a page, so a region without its page-mates would render a gap.
+  const pages = new Set([...keptRegionIds].map((id) => {
+    const item = evidenceById.get(id);
+    return item ? `${item.sourceId}#${item.page}` : "";
+  }));
+  for (const item of model.evidence) {
+    if (pages.has(`${item.sourceId}#${item.page}`)) keptRegionIds.add(item.id);
+  }
+
+  return {
+    ...model,
+    nodes: model.nodes
+      .filter((node) => keptNodeIds.has(node.id))
+      .map((node) => ({ ...node, evidenceRefs: node.evidenceRefs.filter((ref) => keptRegionIds.has(ref)) })),
+    edges: model.edges.filter((edge) => keptEdgeIds.has(edge.id)),
+    evidence: model.evidence.filter((item) => keptRegionIds.has(item.id)),
   };
 }
 

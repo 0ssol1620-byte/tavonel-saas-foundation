@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { Route } from "next";
 import { PublicSitePage } from "@/components/public-site-chrome";
+import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
 
 export const metadata: Metadata = {
   // Each page declares its own address. Without this every route inherited the root
@@ -42,6 +43,7 @@ const PARTS = [
 export default function CompiledWorldPage() {
   return (
     <PublicSitePage>
+      <BreadcrumbJsonLd trail={[{ name: "Product", path: "/product" }, { name: "Compiled World", path: "/product/compiled-world" }]} />
       <section className="scene doc">
         <div className="shell">
           <div className="body">

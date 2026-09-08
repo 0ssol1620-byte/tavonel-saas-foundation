@@ -13,7 +13,11 @@ import {
   buildExploreChangeView,
   type ExploreTechnicalRecord,
 } from "@/lib/explore-story";
-import { layoutVisualWorld, toVisualWorldModel } from "@/lib/visual-world-model";
+import {
+  boundVisualWorld,
+  layoutVisualWorld,
+  toVisualWorldModel,
+} from "@/lib/visual-world-model";
 
 export const metadata: Metadata = {
   title: "Explore a Compiled World | TAVONEL",
@@ -34,17 +38,30 @@ export const metadata: Metadata = {
 
   The layout is computed here for the same reason it is a pure function -- one composition for
   every device, and a server-rendered first paint that already has the world in it.
+
+  What the stage receives is `boundVisualWorld(...)`, not `world` (§24). The compiled World is
+  4,982 objects and 1,169 regions and every object carries a reference to every region of its
+  filing, so serializing it whole into the RSC payload costs about 245MB. The full model stays
+  here, on the server, where the counts, the Ask answers and the technical drawer are read off
+  it; the browser gets the drawn composition, one hop out from it, and the source regions that
+  composition can open. `model.totals` carries the compiled figures across the boundary, so a
+  smaller payload never becomes a smaller published number.
 */
 
-const model = toVisualWorldModel(exploreSampleWorld, exploreSampleDocuments);
-const layout = layoutVisualWorld(model);
+const world = toVisualWorldModel(exploreSampleWorld, exploreSampleDocuments);
+const layout = layoutVisualWorld(world);
 const change = buildExploreChangeView(exploreChangeStory, exploreChangeBaselineDocument);
-const answers = buildExploreAnswerViews(exploreSampleAnswers, model.evidence);
+const answers = buildExploreAnswerViews(exploreSampleAnswers, world.evidence);
+const model = boundVisualWorld(
+  world,
+  layout.placements.map((placement) => placement.id),
+  answers.flatMap((answer) => answer.regions.map((region) => region.evidenceId)),
+);
 
 const technical: ExploreTechnicalRecord = {
-  worldId: model.worldId,
-  worldStatus: model.status,
-  manifestDigest: model.manifestDigest,
+  worldId: world.worldId,
+  worldStatus: world.status,
+  manifestDigest: world.manifestDigest,
   runtime: exploreSampleArtifact.coreExecution.runtime,
   receipt: {
     requestId: exploreSampleArtifact.coreExecution.receipt.requestId,
@@ -54,8 +71,10 @@ const technical: ExploreTechnicalRecord = {
   },
   sourceDirectory: EXPLORE_SAMPLE_SOURCE_DIRECTORY,
   documents: [...exploreSampleDocuments],
-  revisions: model.revisions,
-  counts: {
+  revisions: world.revisions,
+  /* The compiled World's counts, read off the full model rather than the bounded one. */
+  counts: { ...world.totals },
+  shipped: {
     objects: model.nodes.length,
     relations: model.edges.length,
     regions: model.evidence.length,

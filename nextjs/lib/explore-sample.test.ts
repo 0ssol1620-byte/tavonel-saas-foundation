@@ -29,7 +29,8 @@ type SourceDocument = {
   representationFilename: string;
   sourceFilename: string;
   representationKind: string;
-  selectedPages: number[];
+  /** The declared page set, `null` when every page of the document is compiled. */
+  declaredPages: number[] | null;
 };
 
 /*
@@ -138,20 +139,55 @@ describe("the public sample is bound to committed filing bytes", () => {
       expect(document.accession, document.documentId).toMatch(/^\d{10}-\d{2}-\d{6}$/);
       expect(document.form, document.documentId).toBeTruthy();
       expect(document.filingDate, document.documentId).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-      expect(document.selectedPages?.length, document.documentId).toBe(3);
       expect(document.authority, document.documentId).toBe("official");
       expect(document.secHref, document.documentId).toContain("sec.gov");
+      // §57: how much of the filing is in the World, never asserted, always measured.
+      expect(document.compiledPageCount, document.documentId).toBeGreaterThan(0);
+      expect(document.compiledPageCount!, document.documentId).toBeLessThanOrEqual(document.pageCount);
     }
     expect(exploreSampleDocuments[0].sourceLabel).toContain("2025 Form 10-K");
     expect(exploreSampleDocuments[0].accession).toBe("0000320193-25-000079");
-    expect(exploreSampleDocuments[0].selectedPages).toEqual([4, 25, 32]);
   });
 
-  it("declares the snapshots the two frozen digests belong to", () => {
-    const snapshots = SNAPSHOTS as Array<{ id: string; documentIds: string[] }>;
-    expect(snapshots.map((snapshot) => snapshot.id)).toEqual(["w0", "w4"]);
+  it("compiles four filings whole and declares the one page slice that is left", () => {
+    /*
+      §57 and §86 #1. The whole 290-page corpus compiles in under a second, and past 5,000
+      candidate objects `EXTRACTION_CANDIDATE_BUDGET` stops the compiler emitting and marks the
+      artifact `review_required`. So four filings are compiled end to end and the proxy carries
+      the one declared slice -- and the test that says so is the one that would notice the slice
+      quietly spreading back across the corpus.
+    */
+    const sliced = exploreSampleSources.filter((source) => source.declaredPages !== null);
+    expect(sliced.map((source) => source.documentId)).toEqual(["apple-2026-proxy-def14a"]);
+    for (const source of exploreSampleSources) {
+      expect(source.compiledPages.length, source.documentId).toBeGreaterThan(0);
+      if (source.declaredPages === null) continue;
+      // A declared page that produced no region is not published as compiled.
+      const declared = new Set(source.declaredPages);
+      expect(source.compiledPages.every((page) => declared.has(page)), source.documentId).toBe(true);
+    }
+    expect(exploreSampleArtifact.lifecycle).toBe("candidate");
+    expect(exploreSampleBaselineArtifact.lifecycle).toBe("candidate");
+    // Nothing was dropped: the compiler emitted every candidate it considered.
+    const counts = exploreSampleArtifact.validation.counts;
+    expect(counts.candidatesConsidered).toBe(
+      (counts.topics ?? 0) + (counts.entities ?? 0) + (counts.claims ?? 0),
+    );
+  });
+
+  it("declares W0-W4 and compiles the two the frozen digests belong to", () => {
+    /* §25.2: the intermediate Worlds are data with `file: null`, not a comment and not a page. */
+    const snapshots = SNAPSHOTS as Array<{ id: string; file: string | null; documentIds: string[] }>;
+    expect(snapshots.map((snapshot) => snapshot.id)).toEqual(["w0", "w1", "w2", "w3", "w4"]);
+    expect(snapshots.filter((snapshot) => snapshot.file !== null).map((snapshot) => snapshot.id))
+      .toEqual(["w0", "w4"]);
     expect(snapshots[0].documentIds).toEqual(["apple-form-10-k"]);
-    expect(snapshots[1].documentIds).toEqual(CATALOG.map((document) => document.documentId));
+    expect(snapshots[4].documentIds).toEqual(CATALOG.map((document) => document.documentId));
+    // Each intermediate World is the previous one plus exactly one arriving filing.
+    for (let index = 1; index < snapshots.length; index += 1) {
+      expect(snapshots[index].documentIds.slice(0, -1), snapshots[index].id)
+        .toEqual(snapshots[index - 1].documentIds);
+    }
   });
 });
 
@@ -159,7 +195,7 @@ describe("the geometry was read out of the documents, not written down", () => {
   it.each(ALL_INPUTS.map(filenameOf))("re-extracts %s to the same regions", async (filename) => {
     const input = ALL_INPUTS.find((item) => filenameOf(item) === filename)!;
     const source = CATALOG.find((document) => document.representationFilename === filename)!;
-    const extracted = await extractRegions(read(`${sampleDirectory}${filename}`), input.documentId, source.selectedPages);
+    const extracted = await extractRegions(read(`${sampleDirectory}${filename}`), input.documentId, source.declaredPages);
     const authority = input.regions![0].authority;
     expect(extracted.map((region: object) => ({ ...region, authority }))).toEqual(input.regions);
   }, 15_000);

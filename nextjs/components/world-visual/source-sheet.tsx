@@ -157,9 +157,19 @@ export default function SourceSheet({
 
       <footer>
         <span>
-          {active.selectedPages?.length
-            ? `CURATED PUBLIC SLICE · ${active.selectedPages.length} OF ${active.pageCount} PAGES COMPILED`
-            : "THIS PAGE, AS THE COMPILER READ IT"}
+          {/*
+            §57: whichever of the two this filing is, in its own words.
+
+            "Curated slice" was the truth about every filing when three pages of each were
+            compiled. It is now the truth about one of them, and printing it over a filing
+            compiled end to end would understate the World as badly as the reverse would
+            overstate it. Both branches read the same measured field.
+          */}
+          {active.compiledPageCount === undefined
+            ? "THIS PAGE, AS THE COMPILER READ IT"
+            : active.compiledPageCount >= active.pageCount
+              ? `FULL FILING COMPILED · ${active.pageCount} PAGES`
+              : `CURATED PAGE SLICE · ${active.compiledPageCount} OF ${active.pageCount} PAGES COMPILED`}
         </span>
         <Link className={styles.sourceLink} href={active.href as Route} target="_blank" rel="noreferrer">
           {rendered ? "Open reference render ↗" : "Open committed PDF ↗"}

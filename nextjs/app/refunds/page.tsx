@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import PolicyLayout from "@/components/policy-layout";
+import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
 import { readCommercialState } from "@/lib/commercial-state";
 import { LEGAL_EFFECTIVE_DATE } from "@/lib/operations";
 
@@ -42,6 +43,7 @@ export default function RefundsPage() {
         title="Cancellation and refund terms during the pilot."
         intro={<>Effective {LEGAL_EFFECTIVE_DATE}.</>}
       >
+        <BreadcrumbJsonLd trail={[{ name: "Refunds", path: "/refunds" }]} />
         <h3>Nothing can be charged</h3>
         <p>
           TAVONEL is offered as a private pilot. There is no checkout, no stored payment method
@@ -72,6 +74,7 @@ export default function RefundsPage() {
         </>
       }
     >
+        <BreadcrumbJsonLd trail={[{ name: "Refunds", path: "/refunds" }]} />
       <h3>Access cancellation</h3>
       <p>You may request cancellation of access at any time through support@tavonel.com.</p>
 

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { authorizeEnterpriseRequest } from "@/lib/enterprise-auth";
 import { parseEnterprisePolicyInput } from "@/lib/enterprise-contracts";
-import { ENTERPRISE_NO_STORE, enterpriseRequestId, readEnterpriseJson } from "@/lib/enterprise-http";
+import { ENTERPRISE_NO_STORE, enterpriseRequestId, readBoundedJson } from "@/lib/enterprise-http";
 import { putPolicy, readPolicy } from "@/lib/enterprise-store";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +18,7 @@ export async function GET(request: Request) {
 export async function PUT(request: Request) {
   const auth = await authorizeEnterpriseRequest(request, "policy:write");
   if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: ENTERPRISE_NO_STORE });
-  const body = await readEnterpriseJson(request);
+  const body = await readBoundedJson(request);
   if (!body.ok) return NextResponse.json({ code: body.code }, { status: body.status, headers: ENTERPRISE_NO_STORE });
   const input = parseEnterprisePolicyInput(body.value);
   if (!input) return NextResponse.json({ code: "ENTERPRISE_POLICY_INPUT_INVALID" }, { status: 400, headers: ENTERPRISE_NO_STORE });
