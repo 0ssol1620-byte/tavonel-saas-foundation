@@ -283,7 +283,7 @@ test("the workspace World offers the same composition as an accessible list", as
   // exist only once a compiled model is in hand -- before asking which reading is on screen.
   await expect(page.getByRole("searchbox", { name: "Search" })).toBeVisible();
   const table = page.getByRole("table", { name: /Compiled objects and the relations/ });
-  if (await table.count() === 0) await page.getByRole("button", { name: "Table" }).click();
+  if (await table.count() === 0) await page.getByRole("button", { name: "Table", exact: true }).click();
   await expect(table).toBeVisible();
 
   // Every drawn object is a row, and its own state -- type, evidence count -- is in words.
@@ -329,7 +329,7 @@ test("the World arrives as a list on a phone and for a reader who asked for stil
     await expect(table, "the list is what arrives, with no toggle to find").toBeVisible();
     await expect(graph).toHaveCount(0);
     // The reader can still ask for the picture; the default is a default, not a restriction.
-    await page.getByRole("button", { name: "Graph" }).click();
+    await page.getByRole("button", { name: "Graph", exact: true }).click();
     await expect(graph).toBeVisible();
   } else {
     await expect(graph, "a desktop reader still arrives at the picture").toBeVisible();
@@ -358,7 +358,7 @@ test("the compiled graph is one tab stop and walks under the arrow keys", async 
   // exist only once a compiled model is in hand -- before asking which reading is on screen.
   await expect(page.getByRole("searchbox", { name: "Search" })).toBeVisible();
   const graph = page.getByRole("group", { name: /Compiled world graph/ });
-  if (await graph.count() === 0) await page.getByRole("button", { name: "Graph" }).click();
+  if (await graph.count() === 0) await page.getByRole("button", { name: "Graph", exact: true }).click();
   await expect(graph).toBeVisible();
   if (narrow) return;
 

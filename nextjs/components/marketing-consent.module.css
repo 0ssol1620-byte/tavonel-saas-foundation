@@ -8,6 +8,20 @@
   .panel { position: fixed; inset: auto 1rem 1rem; z-index: 100; max-width: 40rem; padding: 1rem; }
   .panel p { margin: 0 0 .75rem; font-size: .875rem; line-height: 1.5; }
   .panel a { color: inherit; text-decoration: underline; }
+  /*
+    The one control in this banner that was not thumb-sized.
+
+    `.actions button` and `.settings` both carry the 44px floor already; the "Privacy notice" link
+    inside the sentence was 19px. `e2e/mobile-landing.spec.ts:330` measures every `a` and `button`
+    on a coarse pointer against that floor, and it fails at 360 and 390 in both commercial
+    postures -- but no CI job has ever run those projects, so nothing said so. That is the
+    evidence hole the `product-qa` job in this same change closes, and this is the first thing it
+    found.
+
+    Padding grows the hit area to 44px; the equal negative block margin holds the line box at its
+    text height, so the paragraph does not reflow and the sentence still reads as a sentence.
+  */
+  .panel p a { display: inline-block; padding-block: 12.5px; margin-block: -12.5px; }
   .actions { display: flex; flex-wrap: wrap; gap: .75rem; }
   .actions button { min-height: 44px; padding: .5rem 1rem; border: 1px solid var(--text-mid); color: var(--text-hi); background: var(--g2); font: inherit; cursor: pointer; }
   .settings { position: relative; z-index: 100; display: block; margin: 1rem 1rem 5rem; padding: .5rem .75rem; min-height: 44px; font-size: .8125rem; cursor: pointer; }
