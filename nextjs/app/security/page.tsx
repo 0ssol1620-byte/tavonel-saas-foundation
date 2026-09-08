@@ -68,6 +68,32 @@ const CONTROLS = [
     deployment, and a security page is the last place to imply either.
   */
   ["Access and audit", "Access is a workspace membership checked server-side on every request; there are no roles, no SSO and no seat model in this deployment, so the account that owns a workspace is the account that reaches it. Creating, rotating and revoking a developer key writes an append-only audit row naming the workspace, the action, the target and whether a person or a key acted."],
+  /*
+    §17.1 asks two more questions this page did not answer: which model providers see a document,
+    and what a model is allowed to do with it.
+
+    Written from `lib/generator-adapter.ts`, which is a contract with no implementation -- its own
+    STATUS note records that no concrete adapter and no calling route exist -- and from
+    /subprocessors, which lists every service permitted to process any class of data. Neither
+    names a model API, because there is not one. The sentence is about this deployment rather than
+    about the product, because wiring a provider is a decision that will change the answer.
+  */
+  ["Model providers", "No third-party model API receives your documents in this deployment: no such integration is wired, and document reading runs on GPU workers TAVONEL operates. Every service permitted to process any class of data is named on the subprocessors page, and a new one is recorded there before it processes anything."],
+] as const;
+
+/*
+  §17.1's last question, left open rather than answered comfortably.
+
+  A buyer asking about backup and recovery is asking whether their compiled world survives a
+  provider incident, and this deployment has no published answer: no tested restore, no stated
+  recovery objective, no documented backup retention. Every sentence available to fill the gap is
+  reassurance -- "stored durably", "the storage provider replicates" -- and each answers a
+  different, easier question than the one being asked. Saying the answer is not ready is worth
+  more than saying something true about a question nobody asked. Founder item F-10 owns the real
+  answer; until it lands, this stays where a reader looking for it will find it.
+*/
+const UNANSWERED = [
+  ["Backup and recovery", "Not yet answered. This deployment publishes no recovery objective, no backup retention period and no tested restore. Ask before you depend on one, and read the absence of a number here as the state of it."],
 ] as const;
 
 export default function SecurityPage() {
@@ -112,6 +138,16 @@ export default function SecurityPage() {
               <p className="slate"><span />CONTROLS</p>
               <div className="tiles">
                 {CONTROLS.map(([title, body]) => (
+                  <article className="tile" key={title}>
+                    <h3>{title}</h3>
+                    <p>{body}</p>
+                  </article>
+                ))}
+              </div>
+
+              <p className="slate"><span />NOT ANSWERED HERE</p>
+              <div className="tiles">
+                {UNANSWERED.map(([title, body]) => (
                   <article className="tile" key={title}>
                     <h3>{title}</h3>
                     <p>{body}</p>

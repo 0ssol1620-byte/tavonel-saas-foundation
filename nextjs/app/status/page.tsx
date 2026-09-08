@@ -25,7 +25,18 @@ const CHECKED_AT = new Intl.DateTimeFormat("en-GB", {
   hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
 });
 
-export default function StatusPage() { const status=readPublicOperations(); return <PolicyLayout label="SERVICE STATUS" title="TAVONEL service status" intro={<>Last checked {CHECKED_AT.format(new Date(status.generatedAt))} KST from the active production deployment.</>}>
+/*
+  §77: this page states its scope, because it cannot state uptime.
+
+  Every row comes from `readPublicOperations`, which reads this deployment's own configuration and
+  activation gates at render time. Not one of them sends a request through the component it
+  describes, so "operational" here means configured and open, not reachable. Before this sentence
+  a reader had "Last checked ... from the active production deployment" and no way to tell the
+  difference -- which is the exact shape §77 warns about, a page that can keep saying operational
+  through an outage. Naming the scope is cheaper and more honest than a synthetic probe nobody
+  runs, and it is what has to be replaced first if this ever becomes a real status dashboard.
+*/
+export default function StatusPage() { const status=readPublicOperations(); return <PolicyLayout label="SERVICE STATUS" title="TAVONEL service status" intro={<>Read {CHECKED_AT.format(new Date(status.generatedAt))} KST from the active production deployment. Each row is that deployment&rsquo;s own configuration and activation state at the moment this page rendered, not an uptime probe: &ldquo;operational&rdquo; means a component is configured and its gate is open, not that a request has just succeeded through it. Report an outage you are seeing rather than waiting for it to appear here.</>}>
   <div className="status-list">{Object.entries(status.components).map(([key,value]) => <article key={key} data-state={value.state}><span>{value.state.replaceAll("_", " ")}</span><h3>{key.replaceAll("_", " ")}</h3><p>{value.detail}</p></article>)}</div>
   <h3>Incident contact</h3><p>Report service impact to support@tavonel.com and security issues to security@tavonel.com. Do not include document contents in email.</p>
 </PolicyLayout>; }
