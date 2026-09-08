@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import CompilerContractDiagram from "@/components/compiler-contract-diagram";
 import { PublicSitePage } from "@/components/public-site-chrome";
+import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
 import {
   CONTRACT_CLAUSES,
   CONTRACT_STATE,
@@ -63,6 +64,7 @@ const STATE_KEY: readonly ContractClauseState[] = ["demonstrated", "direction"];
 export default function ContinuousKnowledgePage() {
   return (
     <PublicSitePage>
+      <BreadcrumbJsonLd trail={[{ name: "Product", path: "/product" }, { name: "Continuous knowledge", path: "/product/continuous-knowledge" }]} />
       <section className="scene doc">
         <div className="shell">
           <div className="body">

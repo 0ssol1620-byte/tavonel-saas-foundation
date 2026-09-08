@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { notFound } from "next/navigation";
 import { PublicPageShell } from "@/components/public-page-shell";
+import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
 import { DocsCopyButton } from "@/components/docs-copy-button";
 import { DocsSnippet } from "@/components/docs-snippet";
 import {
@@ -135,6 +136,7 @@ export default async function DocsSectionPage({ params }: { params: Promise<{ se
 
   return (
     <PublicPageShell>
+      <BreadcrumbJsonLd trail={[{ name: "Documentation", path: "/docs" }, { name: entry.title, path: `/docs/${section}` }]} />
       <section className="scene doc"><div className="shell"><div className="body">
         <div className="stack">
           <p className="slate">

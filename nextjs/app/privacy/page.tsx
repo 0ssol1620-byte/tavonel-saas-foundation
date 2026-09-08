@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import PolicyLayout from "@/components/policy-layout";
+import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
 import LegalOperatorDisclosure from "@/components/legal-operator-disclosure";
 import { LEGAL_EFFECTIVE_DATE } from "@/lib/operations";
 
@@ -11,6 +12,7 @@ export const metadata: Metadata = {
 
 export default function PrivacyPage() {
   return <PolicyLayout label="PRIVACY" title="Your documents are inputs, not training material." intro={<>This notice explains the production data path for the TAVONEL service. Effective {LEGAL_EFFECTIVE_DATE}. TAVONEL does not sell personal data or use customer document contents to train shared models.</>}>
+    <BreadcrumbJsonLd trail={[{ name: "Privacy notice", path: "/privacy" }]} />
     <h2>What we collect</h2><p>Account identifiers from Google OAuth; workspace and entitlement metadata; source files you deliberately upload; derived OCR, citation and knowledge artifacts; security and operational logs; billing identifiers supplied by Paddle; and the name, work email and message you submit through the contact form.</p>
     <h2>Why we process it</h2><p>We process data to authenticate users, compile and return knowledge packages, secure and operate the service, provide support, prevent abuse, maintain transaction records and comply with law. We do not request sensitive source documents through the public inquiry form.</p>
     <h2>Storage and lifecycle</h2><p>Document bytes are stored in tenant-scoped Cloudflare R2 quarantine and immutable result paths, not in the application database. Supabase stores account, entitlement and proof metadata. Data remains until workspace deletion, a verified deletion request, or a legal retention duty applies. Backup remnants expire on the provider backup schedule. Retention controls and verified deletion requests apply to source material and derived artifacts as described here.</p>

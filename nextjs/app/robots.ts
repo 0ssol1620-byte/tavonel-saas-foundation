@@ -1,22 +1,38 @@
 import type { MetadataRoute } from "next";
 
 /*
-  Two routes on this branch are pages now and are still disallowed here, on purpose.
+  The private surface. One list, four rules -- the generic crawler and the three named search
+  crawlers get identical treatment, because a path that is private is private to all of them.
 
-  `/benchmarks` and `/product/continuous-knowledge` both stopped being stubs in the Category
-  Leadership campaign, and both were added to the sitemap by the lanes that built them. Whether
-  a search engine is invited to either is an indexing decision, not an implementation detail,
-  and this file belongs to no lane. The benchmarks lane removed the `/benchmarks` token; the
-  orchestrator's 2026-09-05 adjudication put it back until the founder decides, so that the two
-  new pages are treated the same way and neither is published to a crawler by side effect.
+  `/benchmarks` and `/product/continuous-knowledge` used to be in this list. Both stopped being
+  stubs in the Category Leadership campaign, both are in the sitemap, and `llms.txt` presents
+  Benchmarks as a public destination -- so robots.txt was withholding two URLs the other two
+  files advertised. The claim audit that gated their removal found no measured figure on either
+  page: every quantity is a count of a structure printed beside it, and both pages state in their
+  own copy that nothing on them is qualified. `lib/seo-surface.test.ts` now fails if the three
+  files drift apart again.
 
-  Both tokens come out in one commit when the founder says to index them. Until then the
-  sitemap lists a URL that robots.txt withholds -- deliberate, and the reason it is written
-  down here.
+  Robots is not access control. Every path below is enforced by authorization or by the route's
+  own noindex; this list only spares a crawler the walk.
 */
+const PRIVATE_PATHS = ["/api/", "/auth/", "/login", "/workspace", "/customers", "/research/experiments", "/film-2", "/film-3", "/film-4", "/dev/"];
+
+/*
+  §88 -- search discovery is named explicitly, model training is not.
+
+  OAI-SearchBot, PerplexityBot and Googlebot are the retrieval crawlers whose operators document
+  a user-agent for search appearance, and each gets the same public/private split as `*`. The
+  training tokens -- Google-Extended, GPTBot, CCBot and the rest -- are deliberately absent. That
+  is an IP and legal decision, and a default written here would make it by accident.
+*/
+const SEARCH_CRAWLERS = ["OAI-SearchBot", "PerplexityBot", "Googlebot"];
+
 export default function robots(): MetadataRoute.Robots {
   return {
-    rules: [{ userAgent: "*", allow: "/", disallow: ["/api/", "/auth/", "/login", "/workspace", "/customers", "/benchmarks", "/research/experiments", "/product/continuous-knowledge", "/film-2", "/film-3", "/film-4", "/dev/"] }],
+    rules: [
+      ...SEARCH_CRAWLERS.map((userAgent) => ({ userAgent, allow: "/", disallow: [...PRIVATE_PATHS] })),
+      { userAgent: "*", allow: "/", disallow: [...PRIVATE_PATHS] },
+    ],
     sitemap: "https://tavonel.com/sitemap.xml",
     host: "https://tavonel.com",
   };
