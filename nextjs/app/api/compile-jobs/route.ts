@@ -21,6 +21,10 @@ const HEADERS = { "Cache-Control": "no-store" };
 function enqueueFailureStatus(code: CompileJobFailure) {
   if (code === "COMPILE_JOB_SCOPE_INVALID") return 400;
   if (code === "COMPILE_JOB_SLOT_CONFLICT") return 409;
+  // 429, not 402: the workspace is not out of money, it is using its whole share of the worker
+  // pool. The difference matters to a client library, which should back off rather than ask a
+  // person for a card.
+  if (code === "COMPILE_JOB_WORKSPACE_LIMIT_REACHED") return 429;
   return 503;
 }
 

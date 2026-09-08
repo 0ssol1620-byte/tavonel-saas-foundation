@@ -125,7 +125,17 @@ export type CompileJobFailure =
     writer this one cannot see, and overwriting it would be a compile deciding on its own that
     another compile's work does not count.
   */
-  | "COMPILE_JOB_SLOT_CONFLICT";
+  | "COMPILE_JOB_SLOT_CONFLICT"
+  /*
+    The workspace already has as many compiles in flight as it is allowed (blueprint §32, S-20).
+
+    A trial workspace was capped at `lib/self-service-trial.ts`; a paid one was capped at
+    nothing, and a paid credential in a retry loop could enqueue compiles until the worker pool
+    was entirely its own. Distinct from SLOT_CONFLICT, which is about one corpus position being
+    taken -- this is about how much of the deployment one tenant may be using at once, and it
+    clears on its own as the running jobs finish.
+  */
+  | "COMPILE_JOB_WORKSPACE_LIMIT_REACHED";
 
 export type CompileJobResult<T> = { ok: true; value: T } | { ok: false; code: CompileJobFailure };
 
@@ -262,6 +272,47 @@ function toJob(row: CompileJobRow): CompileJob | null {
   };
 }
 
+/*
+  How many compiles one workspace may have moving at once (blueprint §32, S-20).
+
+  The trial cap at `lib/self-service-trial.ts:271-282` counts world-BEARING jobs, because what a
+  trial is limited to is one Compiled World. This counts RUNNABLE jobs, because what a paid
+  workspace is limited to is how much of the worker pool it may occupy -- and those are different
+  sets. A job parked in `review_required` is unfinished and world-bearing, and no worker will
+  ever pick it up, so counting it here would let five parked reviews lock a paying customer out
+  of compiling anything, which is the exact bug the scheduler window already had once.
+
+  Twelve is four corpus batches of a large compile plus headroom, not a tuned number. It is a
+  ceiling on one tenant's share of a shared pool, not a product limit, and it is deliberately far
+  above what a person clicking Compile can reach.
+*/
+export const WORKSPACE_RUNNABLE_COMPILE_LIMIT = 12;
+
+async function workspaceCompileCapacity(
+  workspaceKey: string,
+  idempotencyKey: string,
+): Promise<CompileJobResult<{ allowed: boolean }>> {
+  const query = new URLSearchParams({
+    select: "job_id,idempotency_key",
+    workspace_key: `eq.${workspaceKey}`,
+    state: `not.in.(${SCHEDULER_EXCLUDED_STATES.join(",")})`,
+    limit: String(WORKSPACE_RUNNABLE_COMPILE_LIMIT + 1),
+  });
+  const response = await admin(`/rest/v1/foundation_compile_jobs?${query}`);
+  if (!response) return fail("COMPILE_JOB_STORE_NOT_CONFIGURED");
+  if (!response.ok) return fail("COMPILE_JOB_STORE_READ_FAILED");
+  const rows = await response.json().catch(() => null) as Array<{ idempotency_key?: unknown }> | null;
+  // Fail closed. A read that did not come back as rows says nothing about how many compiles are
+  // running, and admitting one more on the strength of an unreadable answer is the failure this
+  // cap exists to prevent.
+  if (!Array.isArray(rows)) return fail("COMPILE_JOB_STORE_READ_FAILED");
+  // A retry of a compile that is already enqueued is not a new compile. Letting the cap refuse
+  // it would turn at-least-once delivery into a customer-visible failure at exactly the moment
+  // the workspace is busiest.
+  const replay = rows.some((row) => row.idempotency_key === idempotencyKey);
+  return { ok: true, value: { allowed: replay || rows.length < WORKSPACE_RUNNABLE_COMPILE_LIMIT } };
+}
+
 export async function enqueueCompileJob(input: {
   workspaceKey: string;
   createdByUserId: string;
@@ -280,6 +331,10 @@ export async function enqueueCompileJob(input: {
     : undefined;
 
   const idempotencyKey = compileIdempotencyKey(input.workspaceKey, documentIds, slot);
+
+  const capacity = await workspaceCompileCapacity(input.workspaceKey, idempotencyKey);
+  if (!capacity.ok) return capacity;
+  if (!capacity.value.allowed) return fail("COMPILE_JOB_WORKSPACE_LIMIT_REACHED");
 
   const result = await rpc("enqueue_foundation_compile_job", {
     p_job_id: newCompileJobId(),
