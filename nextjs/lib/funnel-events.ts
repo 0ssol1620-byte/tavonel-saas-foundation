@@ -19,6 +19,14 @@ import { track } from "@vercel/analytics";
 */
 export type FunnelEvent =
   | "login_reached_with_intent"
+  /*
+    `login_reached_with_intent` counts arriving at the sign-in page. Without this, the funnel has
+    no closing half for that hop, and a Google OAuth round trip that silently fails is reported as
+    a reader who changed their mind. It fires on the one point in `app/auth/callback/page.tsx`
+    where the session and the access bootstrap have both succeeded -- not on the callback mounting,
+    which happens for every failure phase too.
+  */
+  | "signed_in"
   | "checkout_opened"
   | "checkout_completed"
   | "scene_reached"

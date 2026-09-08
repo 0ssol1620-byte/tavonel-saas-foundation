@@ -14,6 +14,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import Logomark from "@/components/logomark";
 import { takeCheckoutIntent } from "@/lib/checkout-intent";
+import { trackFunnel } from "@/lib/funnel-events";
 
 type Phase = "working" | "unconfigured" | "session-failed" | "access-failed";
 
@@ -63,6 +64,10 @@ export default function AuthCallbackPage() {
       // that has forgotten it. Owner access never reaches checkout, while an existing paid user
       // can still resume a checkout intent deliberately started before sign-in.
       const resume = takeCheckoutIntent();
+      // The closing half of the sign-in hop, and the last point at which this page knows which
+      // destination it is. `mode` is the destination, not the account: nothing here identifies
+      // who signed in, and the event does not fire on any of the three failure phases.
+      trackFunnel("signed_in", { mode: resume ? "resume-checkout" : "workspace" });
       window.location.replace(resume ? `/workspace?checkout=${resume}` : "/workspace");
     })();
     return () => { cancelled = true; };
