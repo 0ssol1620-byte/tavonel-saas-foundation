@@ -363,6 +363,15 @@ export default function WorkspacePage() {
     return () => controller.abort();
   }, [collectionResult?.collectionId]);
   const [downloading, setDownloading] = useState(false);
+  /*
+    Whether the reader has taken the "Connect to AI" step (§13.3's sixth).
+
+    Set by opening the Use-with-AI guide or by a completed package download -- the two acts the
+    workspace can actually observe. It is not persisted: see the note on `hasAiConnection` in
+    `lib/workspace-onboarding.ts` for why an unfinished row shown twice beats a finished row
+    asserted from a flag nothing can re-check.
+  */
+  const [aiConnectionTaken, setAiConnectionTaken] = useState(false);
   const [billingAccount, setBillingAccount] = useState<BillingAccount | null>(null);
   const [billingBusy, setBillingBusy] = useState(false);
   /**
@@ -1246,6 +1255,9 @@ export default function WorkspacePage() {
       anchor.click();
       anchor.remove();
       URL.revokeObjectURL(url);
+      // The package in the reader's hands is the AI-connection step taken, so §13.3's sixth row
+      // reads done. Set after the bytes arrived, never beside the click.
+      setAiConnectionTaken(true);
       setNotice(`Downloaded the verified knowledge package with ${collectionResult.validation.counts.packageFiles} files.`);
     } finally {
       setDownloading(false);
@@ -1816,6 +1828,7 @@ export default function WorkspacePage() {
     compileErrorCode: compileJob?.errorCode ?? null,
     blockedSourceCount: compileJob?.blocked.length ?? 0,
     hasGroundedAnswer: askResult?.status === "grounded",
+    hasAiConnection: aiConnectionTaken,
   };
   const workspaceState = deriveWorkspaceState(workspaceStateInput);
   const onboardingSteps = deriveOnboardingSteps(workspaceStateInput);
@@ -2031,7 +2044,12 @@ export default function WorkspacePage() {
                 only behind a docs link. The file list is generated from the same constant the
                 exporter writes from, so it cannot advertise an artifact the ZIP does not hold.
               */}
-              <WorkspaceUseWithAi onOpen={() => trackFunnel("workspace_ai_connect_opened")} />
+              <WorkspaceUseWithAi
+                onOpen={() => {
+                  trackFunnel("workspace_ai_connect_opened");
+                  setAiConnectionTaken(true);
+                }}
+              />
             </section>
           ) : null}
 
