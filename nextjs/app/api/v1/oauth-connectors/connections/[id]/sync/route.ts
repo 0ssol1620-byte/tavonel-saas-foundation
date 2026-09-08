@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { activationPolicy } from "@/lib/activation-policy";
 import { requireFoundationSession } from "@/lib/developer-auth";
+import { readBoundedJson } from "@/lib/enterprise-http";
 import { enqueueJob, listConnectionJobs } from "@/lib/job-store";
 
 export const dynamic = "force-dynamic";
@@ -50,7 +51,9 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
   const declaredLength = Number(request.headers.get("content-length") ?? "0");
   if (!Number.isFinite(declaredLength) || declaredLength > 4_096) return NextResponse.json({ code: "REQUEST_TOO_LARGE" }, { status: 413, headers: HEADERS });
-  const parsed = parseBody(await request.json().catch(() => null));
+  const read = await readBoundedJson(request, 4_096);
+  if (!read.ok && read.code === "REQUEST_TOO_LARGE") return NextResponse.json({ code: "REQUEST_TOO_LARGE" }, { status: 413, headers: HEADERS });
+  const parsed = parseBody(read.ok ? read.value : null);
   if (!parsed) return NextResponse.json({ code: "OAUTH_SYNC_INPUT_INVALID" }, { status: 400, headers: HEADERS });
 
   // The idempotency key is (job type, connection) with no timestamp or nonce. A second

@@ -9,6 +9,7 @@ import {
 } from "@/lib/compile-job-store";
 import { CORPUS_MAX_DOCUMENTS, judgeCorpusSet, needsCorpusCompile } from "@/lib/corpus-batching";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
+import { readBoundedJson } from "@/lib/enterprise-http";
 import { DOCUMENT_ID_PATTERN } from "@/lib/immutable-keys";
 import { checkTrialCompileCapacity } from "@/lib/self-service-trial";
 
@@ -31,12 +32,12 @@ export async function POST(request: Request) {
   const auth = await authorizeFoundationRequest(request, "collections:compile", "observer");
   if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: HEADERS });
 
-  let body: { documentIds?: unknown };
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ code: "INVALID_JSON" }, { status: 400, headers: HEADERS });
-  }
+  const parsed = await readBoundedJson(request, 4_096);
+  if (!parsed.ok) return NextResponse.json(
+    { code: parsed.code === "REQUEST_TOO_LARGE" ? "METADATA_ONLY_ENDPOINT" : "INVALID_JSON" },
+    { status: parsed.code === "REQUEST_TOO_LARGE" ? 415 : 400, headers: HEADERS },
+  );
+  const body = parsed.value as { documentIds?: unknown };
   if (!Array.isArray(body.documentIds)) {
     return NextResponse.json({ code: "DOCUMENT_IDS_REQUIRED" }, { status: 400, headers: HEADERS });
   }

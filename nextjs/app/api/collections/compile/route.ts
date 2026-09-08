@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { runCollectionCompile } from "@/lib/collection-compile-run";
 import { COMPILE_MAX_DOCUMENTS, judgeCompileSet } from "@/lib/compile-limits";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
+import { readBoundedJson } from "@/lib/enterprise-http";
 import { DOCUMENT_ID_PATTERN } from "@/lib/immutable-keys";
 
 export const dynamic = "force-dynamic";
@@ -27,12 +28,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ code: "TRIAL_DURABLE_COMPILE_REQUIRED" }, { status: 402, headers: { "Cache-Control": "no-store" } });
   }
 
-  let body: { documentIds?: unknown };
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ code: "INVALID_JSON" }, { status: 400, headers: { "Cache-Control": "no-store" } });
-  }
+  const parsed = await readBoundedJson(request, 4_096);
+  if (!parsed.ok) return NextResponse.json(
+    { code: parsed.code === "REQUEST_TOO_LARGE" ? "METADATA_ONLY_ENDPOINT" : "INVALID_JSON" },
+    { status: parsed.code === "REQUEST_TOO_LARGE" ? 415 : 400, headers: { "Cache-Control": "no-store" } },
+  );
+  const body = parsed.value as { documentIds?: unknown };
   if (!Array.isArray(body.documentIds)) {
     return NextResponse.json({ code: "DOCUMENT_IDS_REQUIRED" }, { status: 400, headers: { "Cache-Control": "no-store" } });
   }

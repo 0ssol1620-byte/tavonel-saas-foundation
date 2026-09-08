@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
+import { readBoundedJson } from "@/lib/enterprise-http";
 import { authorizeFoundationSessionProduct } from "@/lib/self-service-trial";
 import { DOCUMENT_ID_PATTERN } from "@/lib/immutable-keys";
 import { headFoundationQuarantineObject, readR2SignerEnv } from "@/lib/r2-synthetic-canary";
@@ -96,12 +97,12 @@ export async function POST(request: Request) {
   const auth = await authorizeFoundationRequest(request, "documents:intake", "observer");
   if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers });
 
-  let body: { documentId?: unknown; sourceSha256?: unknown };
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ code: "UPLOAD_CONFIRM_BODY_INVALID" }, { status: 400, headers });
-  }
+  const parsed = await readBoundedJson(request, 1_024);
+  if (!parsed.ok) return NextResponse.json(
+    { code: parsed.code === "REQUEST_TOO_LARGE" ? "UPLOAD_CONFIRM_REQUEST_TOO_LARGE" : "UPLOAD_CONFIRM_BODY_INVALID" },
+    { status: parsed.status, headers },
+  );
+  const body = parsed.value as { documentId?: unknown; sourceSha256?: unknown };
   const documentId = typeof body.documentId === "string" ? body.documentId : "";
   if (!DOCUMENT_ID_PATTERN.test(documentId)) {
     return NextResponse.json({ code: "UPLOAD_CONFIRM_BODY_INVALID" }, { status: 400, headers });
