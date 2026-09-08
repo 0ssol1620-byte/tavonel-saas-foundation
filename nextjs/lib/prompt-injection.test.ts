@@ -133,14 +133,33 @@ describe("a direct injection in the question itself", () => {
 });
 
 describe("tool authority under injection", () => {
-  it("still exposes no write tool when every fixture payload is the sample input", () => {
+  it("still exposes no write tool at all", () => {
+    // The contract itself, unmodified: every tool's request is a GET or one of the two POSTs
+    // that read. Asserted here as well as in mcp-server.test.ts because the fixtures below only
+    // mean something while this holds.
+    expect(assertReadOnly()).toBe(true);
+  });
+
+  it("lets no payload change where a tool's request goes", () => {
+    /*
+      Stronger than re-checking the read-only rule with a hostile sample, and it does not
+      restate the rule: the request built from a payload is compared to the request built from
+      an ordinary sample. If a payload could reach the method or the path -- which is what a
+      smuggled tool call would have to do -- the two would differ.
+    */
+    type ToolEntry = { name: string; request: (input: unknown) => { method: string; path: string } };
+    const tools = TOOLS as unknown as ToolEntry[];
+    const benign = { collectionId: COLLECTION_ID, query: "sample query", question: "sample question" };
     for (const fixture of PROMPT_INJECTION_FIXTURES) {
-      // assertReadOnly builds each tool's request from a sample. Driving it with the payloads
-      // asserts that no payload can make a tool's request table entry produce a write.
-      expect(assertReadOnly(TOOLS.map((tool) => ({
-        ...tool,
-        request: (input: Record<string, unknown>) => tool.request({ ...input, question: fixture.payload, query: fixture.payload }),
-      })))).toBe(true);
+      const hostile = { ...benign, query: fixture.payload, question: fixture.payload };
+      for (const tool of tools) {
+        const ordinary = tool.request(benign);
+        const injected = tool.request(hostile);
+        expect(
+          { method: injected.method, path: injected.path },
+          `${tool.name} / ${fixture.id}`,
+        ).toEqual({ method: ordinary.method, path: ordinary.path });
+      }
     }
   });
 
