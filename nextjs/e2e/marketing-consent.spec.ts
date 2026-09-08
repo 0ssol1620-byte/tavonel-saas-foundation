@@ -53,11 +53,11 @@ test("consented measurement sanitizes URLs and excludes private events and route
   await page.getByRole("button", { name: "No thanks" }).click();
   await expect(page.getByRole("button", { name: "Analytics preferences" })).toBeVisible();
   expect(tagRequests).toBe(1);
-  await page.goto("https://tavonel.com/login");
+  // Login checks its auth configuration after hydration; finish those mocked requests
+  // before closing the context instead of removing routes while handlers are running.
+  await page.goto("https://tavonel.com/login", { waitUntil: "networkidle" });
   await expect(page.getByRole("region", { name: "Optional analytics" })).toHaveCount(0);
   expect(tagRequests).toBe(1);
-  // Let mocked requests finish before Playwright disposes their API responses.
-  await page.unrouteAll({ behavior: "wait" });
 });
 
 test("only successful commercial inquiries produce a lead event", async ({ page }) => {
