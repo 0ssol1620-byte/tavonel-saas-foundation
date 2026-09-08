@@ -14,9 +14,17 @@
 
   Two deliberate narrowings:
 
-  - script-src only. `style-src 'unsafe-inline'` matches the enforced policy, because next/font
-    and Next's own style injection emit inline <style> on every page and a strict style-src would
-    bury the script findings under thousands of style reports. Styles are a separate phase.
+  - script-src only. `style-src 'unsafe-inline'` matches the enforced policy so this header keeps
+    reporting on one directive.
+
+    The reason first recorded here was wrong, and it is worth correcting in place rather than
+    deleting, because it is what deferred a free hardening for a whole phase. It said next/font
+    and Next's own style injection emit an inline <style> on every page, so a strict style-src
+    would bury the script findings under thousands of style reports. A production build says
+    otherwise: across 27 prerendered pages there are **zero** <style> elements and 13 style
+    attributes, and next/font emits a `<link rel="stylesheet">`. The enforced policy in
+    `next.config.mjs` now carries `style-src-elem 'self'` on the strength of that measurement, so
+    styles are stricter where it counts and this header stays script-shaped on purpose.
   - The nonce is not yet handed to first-party scripts. Reading `headers()` in the root layout to
     stamp a nonce onto the JSON-LD block would opt every page out of static rendering, and Phase 1
     is supposed to find out what is inline, not pay for the fix before the answer is in. The

@@ -1,3 +1,5 @@
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { extname, join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { FUNNEL_DETAIL_KEYS, allowedDetail } from "./funnel-events";
 
@@ -31,5 +33,82 @@ describe("funnel event property allowlist", () => {
     // A non-string is not a "count stringified by the caller"; it is a value that arrived by
     // accident, and an object serialized into an event property is how source text escapes.
     expect(allowedDetail({ scene: 3 } as never)).toBeUndefined();
+  });
+});
+
+/*
+  `funnel-events.ts` has said since it was written that a name with no call site is a funnel
+  column that is always zero, and reads as a broken step rather than an unbuilt one. Four names
+  were in that state -- `offer_selected`, `film_stage_selected`, `world_lens_selected`,
+  `workspace_command_used` -- for as long as the rule had only a comment enforcing it. Whoever
+  reads that dashboard cannot tell a step nobody reached from a step nothing fires.
+
+  Source text, not module inspection: the union is a type and vanishes at runtime, and the thing
+  worth checking is whether a caller exists in the shipped tree, which is a fact about files.
+*/
+function sourceFiles(directory: string): string[] {
+  const found: string[] = [];
+  for (const entry of readdirSync(directory)) {
+    const path = join(directory, entry);
+    if (statSync(path).isDirectory()) found.push(...sourceFiles(path));
+    // A test naming every event would satisfy every assertion below, this file included.
+    else if ([".ts", ".tsx"].includes(extname(entry)) && !/\.test\.tsx?$/.test(entry)) found.push(path);
+  }
+  return found;
+}
+
+const modulePath = resolve(import.meta.dirname, "./funnel-events.ts");
+const moduleSource = readFileSync(modulePath, "utf8");
+const declaredEvents = [...moduleSource.matchAll(/^\s*\|\s*"([a-z_]+)";?$/gm)].map((match) => match[1]);
+
+/*
+  The union's own lines are struck out of the corpus and the rest of the module is kept. The
+  declaration is not a call site; `trackSceneDepth`, three functions further down, is -- it is the
+  only wrapper that names an event itself, and dropping the whole file would make `scene_reached`
+  look dead when what it actually has is one indirection.
+*/
+const callSites = ["../app", "../components", "../lib"]
+  .flatMap((path) => sourceFiles(resolve(import.meta.dirname, path)))
+  .map((path) => (path === modulePath ? moduleSource.replace(/^\s*\|\s*"[a-z_]+";?$/gm, "") : readFileSync(path, "utf8")))
+  .join("\n");
+
+describe("every declared funnel event has a control that fires it", () => {
+  /*
+    The last member of the union ends with `;` and the first draft of this regex did not allow for
+    it, so the extraction silently dropped one name and the class below quietly stopped covering
+    it. An under-extraction is the failure mode that makes a per-name test look thorough while
+    testing less than it says, so the count is checked against the union counted a second way.
+
+    Counting rather than naming the boundary members, because a first draft of *this* assertion
+    pinned the first member by name and a merge that added an event above it turned a correct
+    extraction red. The invariant is "every declared name was extracted", not "the union begins
+    with a particular event".
+  */
+  it("extracts every member of the union, including the one that ends it", () => {
+    // Sliced to the union's own text and counted without the line anchoring the extraction uses,
+    // so a line-shape mistake in one is not repeated in the other. `+ 1` for the final member,
+    // whose closing quote is where the slice ends.
+    const start = moduleSource.indexOf("export type FunnelEvent =");
+    const unionBody = moduleSource.slice(start, moduleSource.indexOf('";', start));
+    expect(declaredEvents.length, "a member was dropped by the extraction -- the last one ends with `;`").toBe((unionBody.match(/"[a-z_]+"/g) ?? []).length + 1);
+    expect(declaredEvents.length).toBe(new Set(declaredEvents).size);
+    expect(declaredEvents.length).toBeGreaterThan(20);
+    expect(declaredEvents).toContain("workspace_compile_failed");
+    expect(declaredEvents).toContain("checkout_completed");
+    expect(declaredEvents).toContain("signed_in");
+  });
+
+  it.each(declaredEvents)("%s is fired from somewhere", (event) => {
+    expect(callSites.includes(`"${event}"`), `${event} is declared and never fired -- wire it to its control or delete the name`).toBe(true);
+  });
+
+  /*
+    Both halves of the corpus, named. Without the strike-out every event passes by matching its
+    own declaration; without the module body `scene_reached` fails for having a wrapper.
+  */
+  it("reads the module body but not the union that declares the names", () => {
+    expect(callSites.includes("trackFunnel(\"scene_reached\""), "the module body is not in the corpus, so a wrapper's event reads as dead").toBe(true);
+    expect(callSites.includes("| \"cta_clicked\""), "the union is in the corpus, so every name matches its own declaration").toBe(false);
+    expect(callSites.includes("\"film_stage_selected\""), "a name deleted for having no caller is back in the tree").toBe(false);
   });
 });
