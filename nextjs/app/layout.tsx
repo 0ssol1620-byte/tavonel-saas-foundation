@@ -31,6 +31,9 @@ export const metadata: Metadata = {
     www.tavonel.com already 308s to it.
   */
   metadataBase: new URL("https://tavonel.com"),
+  verification: {
+    other: { "naver-site-verification": "8543297cf37328d0919d31e4d3d618beecc532de" },
+  },
   title: "Knowledge Compiler for AI — TAVONEL",
   /*
     "code" came off both descriptions with the RESOLVED A-2 hero.
