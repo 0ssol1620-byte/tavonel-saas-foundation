@@ -16,10 +16,25 @@
  * re-hashes the committed bytes and refuses to emit anything if a manifest digest and the file
  * on disk disagree.
  *
- * For a fast public demo each filing contributes a small, declared page slice rather than the
- * whole document. The slice and the reason for it are recorded per filing in
- * `lib/explore-sample.sources.json`; page numbers, page counts and bounding boxes are always
- * the real ones.
+ * Every filing is compiled in full except the proxy statement, whose declared page slice is
+ * recorded beside it in `lib/explore-sample.sources.json`. Page numbers, page counts and
+ * bounding boxes are always the real ones.
+ *
+ * Why the proxy is the one document that is cut. Measured on this corpus, 2026-09-08:
+ *
+ *   | corpus                                | pages | regions | candidates | lifecycle       |
+ *   |---------------------------------------|------:|--------:|-----------:|-----------------|
+ *   | all five filings, every page          |   287 |   1,281 |      6,457 | review_required |
+ *   | 10-K + three 10-Qs, every page        |   184 |   1,044 |      3,578 | candidate       |
+ *   | the above + proxy pages 1-48 and 51   |   233 |   1,169 |      4,982 | candidate       |
+ *
+ * `EXTRACTION_CANDIDATE_BUDGET` in `lib/collection-compiler.ts` is 5,000 objects for the whole
+ * compile. Past it the compiler stops emitting, reports `EXTRACTION_BUDGET_REACHED` and marks the
+ * artifact `review_required` -- honestly, and by design. So the whole 290-page corpus does
+ * compile, in about 0.4s, and 1,457 of its 6,457 candidate objects do not survive that budget.
+ * Publishing that as "the full corpus, compiled" would be a claim the artifact itself contradicts,
+ * so this build takes the largest slice that fits with nothing dropped and says which pages those
+ * are. Raising the budget is a compiler decision with a production blast radius, not a demo one.
  *
  * Snapshots (blueprint §25.2) are a data list, `SNAPSHOTS` below. Two are compiled:
  *   W0 = 2025 10-K alone
@@ -50,29 +65,24 @@ const sourcesPath = join(root, "lib", "explore-sample.sources.json");
 const manifest = JSON.parse(readFileSync(join(pdfDirectory, "sec-corpus-manifest.json"), "utf8"));
 
 /**
- * The page slice each 2026 filing contributes, and why that slice.
+ * The pages each 2026 filing contributes, and why.
  *
- * Written here rather than derived, because "which pages are worth compiling for a public demo"
- * is an editorial choice and should read as one. Everything downstream of it -- page numbers,
- * geometry, text -- is read out of the bytes.
+ * `pages: null` means the whole document -- the ordinary case now. The one slice left is the
+ * proxy statement's, and it is not an editorial preference: it is where the compiler's
+ * corpus-wide candidate budget lands (see the header). It is written out rather than derived so
+ * that the cut is a declared fact a reader can check, not a number that moves on its own.
  */
+const PROXY_GOVERNANCE_PAGES = Array.from({ length: 48 }, (_item, index) => index + 1);
+
 const SLICES = {
-  "apple-2026-q1-10-q": {
-    pages: [4, 17, 18],
-    rationale: "Condensed consolidated statements of operations, Note 10 segment information, and the opening of Item 2 MD&A.",
-  },
+  "apple-2026-q1-10-q": { pages: null, rationale: "Every page of the filing." },
   "apple-2026-proxy-def14a": {
-    pages: [16, 20, 51],
-    rationale: "Role of the Board of Directors, the Board's privacy and data security oversight, and the Summary Compensation Table.",
+    pages: [...PROXY_GOVERNANCE_PAGES, 51],
+    rationale:
+      "Pages 1-48, the proxy's governance half through director compensation, plus page 51, the Summary Compensation Table the earlier curated slice already compiled. Pages 49-103 are the compensation and meeting appendices and are left out because the compiler's 5,000-object candidate budget binds before them, not because they were judged uninteresting.",
   },
-  "apple-2026-q2-10-q": {
-    pages: [4, 18, 19],
-    rationale: "Condensed consolidated statements of operations, Note 10 segment information, and the opening of Item 2 MD&A.",
-  },
-  "apple-2026-q3-10-q": {
-    pages: [4, 20, 21],
-    rationale: "Condensed consolidated statements of operations, Note 10 segment information, and the opening of Item 2 MD&A.",
-  },
+  "apple-2026-q2-10-q": { pages: null, rationale: "Every page of the filing." },
+  "apple-2026-q3-10-q": { pages: null, rationale: "Every page of the filing." },
 };
 
 /** Reference renders are letter-sized print output, so their page count is the render's own. */
@@ -107,7 +117,8 @@ function fromManifest(id) {
     renderProfile: filing.renderProfile,
     acquiredFrom: filing.acquiredFrom,
     expectedPageCount: RENDER_PAGE_COUNTS[id],
-    selectedPages: slice.pages,
+    /* null = every page. The compiled page list is measured in `buildInput`, never assumed. */
+    declaredPages: slice.pages,
     sliceRationale: slice.rationale,
     sourceLabel: `Apple Inc. · ${filing.form} filed ${filing.filingDate} · SEC filing`,
     secUrl: filing.sourceUrl,
@@ -141,8 +152,8 @@ export const SOURCE_DOCUMENTS = [
     renderProfile: null,
     acquiredFrom: "Apple Investor Relations official PDF, cross-checkable in SEC EDGAR",
     expectedPageCount: 80,
-    selectedPages: [4, 25, 32],
-    sliceRationale: "Business overview, segment net sales, and the consolidated statements of operations.",
+    declaredPages: null,
+    sliceRationale: "Every page of the filing.",
     sourceLabel: "Apple Inc. · 2025 Form 10-K · public SEC filing",
     officialUrl: "https://d18rn0p25nwr6d.cloudfront.net/CIK-0000320193/c24e7a28-5254-4dfa-9447-62aaa3c24bb1.pdf",
     secUrl: "https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/aapl-20250927.htm",
@@ -168,28 +179,29 @@ export const UNCOMPILED_FILES = ["apple-2024-form-10-k.pdf"];
  * adds a frozen digest to re-derive and review by hand (§25.4), which is why only the two
  * endpoints are compiled today.
  */
+const W0 = ["apple-form-10-k"];
+const W1 = [...W0, "apple-2026-q1-10-q"];
+const W2 = [...W1, "apple-2026-proxy-def14a"];
+const W3 = [...W2, "apple-2026-q2-10-q"];
+const W4 = [...W3, "apple-2026-q3-10-q"];
+
 export const SNAPSHOTS = [
-  {
-    id: "w0",
-    label: "2025 Form 10-K",
-    file: "explore-sample.w0.inputs.json",
-    documentIds: ["apple-form-10-k"],
-  },
-  /* Not compiled -- one line each if the digest ritual is ever worth five worlds instead of two:
-     { id: "w1", label: "+ 2026 Q1 10-Q",  documentIds: [...w0, "apple-2026-q1-10-q"] }
-     { id: "w2", label: "+ 2026 DEF 14A",  documentIds: [...w1, "apple-2026-proxy-def14a"] }
-     { id: "w3", label: "+ 2026 Q2 10-Q",  documentIds: [...w2, "apple-2026-q2-10-q"] } */
+  { id: "w0", label: "2025 Form 10-K", file: "explore-sample.w0.inputs.json", documentIds: W0 },
+  /*
+    W1-W3 are data, not UI (§25.2). `file: null` is what "declared but not compiled" looks like
+    here: the membership of each intermediate World is written down and checkable, and no
+    snapshot is emitted, because every emitted snapshot costs another frozen digest to re-derive
+    and review by hand on every corpus change (§25.4) and the Change Act's question -- what the
+    2026 filings did to the annual World -- is answered by the two endpoints.
+  */
+  { id: "w1", label: "+ 2026 Q1 10-Q", file: null, documentIds: W1 },
+  { id: "w2", label: "+ 2026 DEF 14A", file: null, documentIds: W2 },
+  { id: "w3", label: "+ 2026 Q2 10-Q", file: null, documentIds: W3 },
   {
     id: "w4",
     label: "2025 Form 10-K + four 2026 filings",
     file: "explore-sample.w4.inputs.json",
-    documentIds: [
-      "apple-form-10-k",
-      "apple-2026-q1-10-q",
-      "apple-2026-proxy-def14a",
-      "apple-2026-q2-10-q",
-      "apple-2026-q3-10-q",
-    ],
+    documentIds: W4,
   },
 ];
 
@@ -331,11 +343,12 @@ async function buildInput(document) {
   const representationPath = join(pdfDirectory, document.representationFilename);
   const stored = readFileSync(representationPath);
   const digest = createHash("sha256").update(stored).digest("hex");
-  const extracted = await extractRegionsWithPageCount(stored, document.documentId, document.selectedPages);
+  const extracted = await extractRegionsWithPageCount(stored, document.documentId, document.declaredPages);
   if (extracted.pageCount !== document.expectedPageCount) {
     throw new Error(`explore_sample_page_count_changed:${document.representationFilename}:${extracted.pageCount}`);
   }
   const regions = extracted.regions.map((region) => ({ ...region, authority: document.authority }));
+  const compiledPages = [...new Set(regions.map((region) => region.pageNumber1))].sort((a, b) => a - b);
   const key = `public/explore-sample/${document.representationFilename}`;
 
   const originalSha256 = document.representationKind === "original"
@@ -381,7 +394,17 @@ async function buildInput(document) {
     renderProfile: document.renderProfile,
     acquiredFrom: document.acquiredFrom,
     pageCount: extracted.pageCount,
-    selectedPages: document.selectedPages,
+    /*
+      Three page numbers, and they answer three different questions.
+
+      `declaredPages` is the editorial/engine decision -- null when the whole document is
+      compiled. `compiledPages` is what the extractor actually read a region out of, which is
+      smaller than the declared set whenever a page carries no text layer. `pageCount` is the
+      document's own length. Reporting only the first would let a blank page be published as
+      compiled; reporting only the last would hide the slice.
+    */
+    declaredPages: document.declaredPages,
+    compiledPages,
     sliceRationale: document.sliceRationale,
     regionCount: regions.length,
     sourceLabel: document.sourceLabel,
@@ -407,11 +430,19 @@ async function main() {
       if (!input) throw new Error(`explore_sample_snapshot_unknown_document:${snapshot.id}:${documentId}`);
       return input;
     });
+    const regions = inputs.reduce((total, input) => total + input.regions.length, 0);
+    if (!snapshot.file) {
+      console.log(`${snapshot.id}  ${inputs.length} documents  ${regions} regions  -> declared, not compiled`);
+      continue;
+    }
     writeFileSync(join(root, "lib", snapshot.file), `${JSON.stringify(inputs, null, 2)}\n`);
-    console.log(`${snapshot.id}  ${inputs.length} documents  ${inputs.reduce((total, input) => total + input.regions.length, 0)} selected regions  -> lib/${snapshot.file}`);
+    console.log(`${snapshot.id}  ${inputs.length} documents  ${regions} compiled regions  -> lib/${snapshot.file}`);
   }
   for (const source of sources) {
-    console.log(`  ${source.documentId}  ${source.representationKind}  pages ${source.selectedPages.join(",")} of ${source.pageCount}  ${source.regionCount} regions`);
+    const scope = source.declaredPages === null
+      ? "every page"
+      : `declared pages ${source.declaredPages.length}`;
+    console.log(`  ${source.documentId}  ${source.representationKind}  ${scope}  ${source.compiledPages.length} of ${source.pageCount} pages compiled  ${source.regionCount} regions`);
   }
 }
 

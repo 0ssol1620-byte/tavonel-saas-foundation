@@ -102,27 +102,35 @@ function findArrivals() {
  * The one region of an arriving filing the Act puts on screen.
  *
  * A presentation choice, and a deliberately dumb one so that it stays a choice about layout
- * rather than about meaning: the longest region on the filing's first compiled page. On this
- * corpus that is the condensed statements of operations for each 10-Q and the Board's role for
- * the proxy statement, which is what those page slices were selected for -- but nothing here
- * reads a number, a phrase or a page out of the filing to decide, so a different corpus shows a
- * different region rather than showing the wrong one.
+ * rather than about meaning: the longest region on the first compiled page that carries text the
+ * baseline World did not already have. Nothing here reads a number, a phrase or a page out of
+ * the filing to decide, so a different corpus shows a different region rather than the wrong one.
+ *
+ * The "not already in W0" clause earns its place. An SEC filing opens on a cover sheet, and now
+ * that W0 is the whole 2025 Form 10-K instead of three of its pages, the longest line on a
+ * 10-Q's cover -- the Commission's own address block -- is text the baseline already contained.
+ * An arrival card answers "what arrived", so quoting a line that did not arrive would be the
+ * wrong answer told convincingly. `explore-change.test.ts` asserts exactly this property.
  */
-function openingRegion(input: CollectionOcrInput): CollectionOcrRegion {
+function openingRegion(input: CollectionOcrInput, baselineText: string): CollectionOcrRegion {
   const regions = regionsOf(input);
   if (regions.length === 0) throw new Error(`explore_change_document_has_no_regions: ${input.documentId}`);
-  const firstPage = Math.min(...regions.map((region) => region.pageNumber1));
-  return regions
+  const arrived = regions.filter((region) => !baselineText.includes(region.text));
+  if (arrived.length === 0) throw new Error(`explore_change_arrival_adds_no_text: ${input.documentId}`);
+  const firstPage = Math.min(...arrived.map((region) => region.pageNumber1));
+  return arrived
     .filter((region) => region.pageNumber1 === firstPage)
     .reduce((longest, region) => (region.text.length > longest.text.length ? region : longest));
 }
+
+const baselineText = exploreSampleBaselineInputs.map((input) => input.text).join("\n");
 
 function arrivalOf(input: CollectionOcrInput): ExploreChangeArrival {
   const document = exploreSampleDocuments.find((entry) => entry.documentId === input.documentId);
   if (!document?.form || !document.filingDate || !document.reportDate || !document.accession) {
     throw new Error(`explore_change_arrival_has_no_source_record: ${input.documentId}`);
   }
-  const region = openingRegion(input);
+  const region = openingRegion(input, baselineText);
   return {
     documentId: input.documentId,
     label: `${document.form} · filed ${document.filingDate}`,

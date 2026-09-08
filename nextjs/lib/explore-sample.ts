@@ -48,31 +48,37 @@ import rawSources from "./explore-sample.sources.json";
 */
 
 /*
-  Re-derived 2026-09-08, deliberately, when the public corpus stopped being two annual filings
-  and became one annual filing plus the four 2026 filings that followed it.
+  Re-derived 2026-09-08, when the corpus stopped being a three-page slice of each
+  filing and became four filings compiled end to end plus one declared page slice (§57, §86 #1).
 
-  What moved, and why:
+  Both digests moved, and this is the review §25.4 asks for before freezing them:
 
-  - W0 did not move. The baseline snapshot is still exactly the 2025 Form 10-K compiled from the
-    same three pages, so `EXPLORE_SAMPLE_BASELINE_DIGEST` holds the value that used to be called
-    `EXPLORE_SAMPLE_DIGEST`, byte-identical inputs and all. That is the point: the corpus grew
-    around the annual filing without disturbing it.
-  - W4 is a snapshot that did not exist before, so its digest has no earlier value to compare.
-  - `EXPLORE_SAMPLE_REVISION_B_DIGEST` is retired rather than re-frozen. It named a compile of
-    Apple's 2024 Form 10-K, which is no longer part of any World. The file stays committed.
+  - W0 moved because its input moved. The baseline is the same 2025 Form 10-K, but all 80 pages of
+    it rather than pages 4, 25 and 32 -- 502 regions instead of 26. A World compiled from more of
+    the same document is a different World, and the digest saying so is the system working.
+  - W4 moved for the same reason across five documents: 1,169 regions instead of 97, from 233 of
+    the corpus's 290 pages.
+  - Neither moved because of a compiler change. `lib/collection-compiler.ts` is untouched.
+  - Both artifacts are still `lifecycle: candidate` with `candidatesConsidered` equal to what was
+    emitted, which is the measurable form of "nothing was dropped to fit". The whole 290-page
+    corpus is 6,457 candidates against a 5,000 budget and would compile `review_required`
+    instead; `scripts/build-explore-sample.mjs` records that measurement and why the proxy is the
+    document that carries the slice.
 
-  Previous values, kept so the move is traceable rather than merely different:
-    2026-09-06  current world (2025 10-K)   sha256:b2aaebd8dd73b8d161d7fc23e4cf649f6c009bce87ee107bab8311a28a268978
-    2026-09-06  revision B (2024 10-K)      sha256:2682d467ac1fd98d7570ace2053b7e9e9231d0b9f9c0715f81a011a8089c31bc
-    2026-09-06  revision C (mixed fixture)  sha256:dff62fcee5954bf5df236ac0e6927d1978e2441eeb7fbdf8608934cefbeabc52
-    2026-09-06  revision B (mixed fixture)  sha256:85a2932b18ea0e418d15adbfcff39c5f29804377ae82da2ab97641db795cfb4d
+  Previous values, kept so the moves are traceable rather than merely different:
+    2026-09-06  current world (2025 10-K)     sha256:b2aaebd8dd73b8d161d7fc23e4cf649f6c009bce87ee107bab8311a28a268978
+    2026-09-06  revision B (2024 10-K)        sha256:2682d467ac1fd98d7570ace2053b7e9e9231d0b9f9c0715f81a011a8089c31bc
+    2026-09-06  revision C (mixed fixture)    sha256:dff62fcee5954bf5df236ac0e6927d1978e2441eeb7fbdf8608934cefbeabc52
+    2026-09-06  revision B (mixed fixture)    sha256:85a2932b18ea0e418d15adbfcff39c5f29804377ae82da2ab97641db795cfb4d
+    2026-09-08  W0, three-page 10-K slice     sha256:b2aaebd8dd73b8d161d7fc23e4cf649f6c009bce87ee107bab8311a28a268978
+    2026-09-08  W4, three pages per filing    sha256:50b61e20484c1a06cbf7b2a9ce7aa4c8926bc5819a59f60d8fec1f8096aba7e8
 */
 
 /** W4: the compiled World the Explore page shows. Recorded so that it cannot change unobserved. */
-export const EXPLORE_SAMPLE_DIGEST = "sha256:50b61e20484c1a06cbf7b2a9ce7aa4c8926bc5819a59f60d8fec1f8096aba7e8";
+export const EXPLORE_SAMPLE_DIGEST = "sha256:277df1a439a8806ebb290b77f31ffdaf0a61b59e5efca3641d9cb7596aca9d20";
 
 /** W0: the same annual filing alone, before the four 2026 filings arrived. */
-export const EXPLORE_SAMPLE_BASELINE_DIGEST = "sha256:b2aaebd8dd73b8d161d7fc23e4cf649f6c009bce87ee107bab8311a28a268978";
+export const EXPLORE_SAMPLE_BASELINE_DIGEST = "sha256:1db0e4c5ef2f89655e57d478a3761ce36c871ea9f1dfcd1a801aa8e1719b3597";
 
 export const EXPLORE_SAMPLE_SOURCE_DIRECTORY = "public/explore-sample";
 
@@ -158,7 +164,10 @@ export type ExploreSampleSource = {
   renderProfile: string | null;
   acquiredFrom: string;
   pageCount: number;
-  selectedPages: number[];
+  /** The declared page set, or `null` when every page of the document is compiled. */
+  declaredPages: number[] | null;
+  /** The pages a region was actually read out of; never larger than the declared set. */
+  compiledPages: number[];
   sliceRationale: string;
   regionCount: number;
   sourceLabel: string;
@@ -193,7 +202,13 @@ function documentsOf(inputs: readonly CollectionOcrInput[]) {
       accession: source.accession,
       officialHref: source.officialUrl ?? undefined,
       secHref: source.secUrl,
-      selectedPages: source.selectedPages,
+      /*
+        Two numbers, never one (§57). `compiledPageCount` is how much of this filing the World
+        actually holds; `pageCount` is how long the filing is. A UI that shows only the second
+        would let a 49-page slice of a 103-page proxy read as the whole proxy.
+      */
+      compiledPageCount: source.compiledPages.length,
+      declaredPages: source.declaredPages ?? undefined,
       form: source.form,
       filingDate: source.filingDate,
       reportDate: source.reportDate,
