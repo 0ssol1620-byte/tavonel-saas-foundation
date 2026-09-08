@@ -121,8 +121,13 @@ const AT_A_GLANCE = [
 
   Two of the blueprint's questions are reworded rather than quoted. "Why not <vendor> + a vector
   DB" names competitors, which §71 forbids on a public page, so it asks about the architecture
-  instead. "How is this better than RAG" is a barred phrase and would also be a claim this
-  deployment has not measured; it asks how the two relate.
+  instead. The fourth is phrased as a superiority claim over RAG -- the exact comparative SPEC
+  13.3 bars, and one nothing in this repository has measured -- so it asks how the two relate.
+
+  Writing that second reason out cost two test failures on the first run: the sentence explaining
+  why the phrase is barred contained the phrase. Both guards read source text, comments included,
+  which is correct -- a barred claim in a comment is one copy-paste from being a barred claim on
+  the page.
 
   The three that had no answer are answered from what exists and nothing more. "Is this finished"
   is the uncomfortable one, and it is answered with the deployment's own facts -- no format
