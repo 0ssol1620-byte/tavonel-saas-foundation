@@ -95,7 +95,7 @@ export type VisualWorldModel = {
   /**
    * What the compiled World holds, which is not what this model carries once it is bounded.
    *
-   * Every count a reader is shown -- "SHOWING 12 OF 4,982 COMPILED OBJECTS" -- reads this, so
+   * Every graph count a reader is shown -- "SHOWING 12 OF 6310 GRAPH NODES" -- reads this, so
    * that shipping less to the browser can never quietly shrink a published number.
    */
   totals: { objects: number; relations: number; regions: number };

@@ -79,8 +79,8 @@ export default function WorldAct({
           ) : null}
         </div>
         {/* `totals`, not `nodes.length`: the payload is bounded, the published number is not. */}
-        <p className={styles.worldScope}>
-          SHOWING {layout.placements.length} OF {model.totals.objects} COMPILED OBJECTS
+        <p className={styles.worldScope} title="Includes documents, extracted knowledge and evidence nodes.">
+          SHOWING {layout.placements.length} OF {model.totals.objects} GRAPH NODES
         </p>
       </div>
 
