@@ -663,9 +663,20 @@
 
 /* ------------------------------------------------------------------ entry */
 
-.entry {
+/* The entry owns its height; the inert World is only its backdrop. On hydration,
+   a phone or reduced-motion reader gets the accessible list rather than the SVG.
+   Centering an absolute entry over that changing height moved its heading and CTA
+   below the viewport. Keep the background out of flow until ENTER WORLD is used. */
+.stage[data-world-act="entry"] { grid-template-rows: 1fr; }
+.stage[data-world-act="entry"] > .acts {
   position: absolute;
-  inset: 0;
+  inset: clamp(12px, 1.8vw, 18px) clamp(14px, 3vw, 40px) clamp(16px, 2.4vw, 24px);
+  overflow: hidden;
+}
+
+.entry {
+  position: relative;
+  min-height: clamp(440px, 72svh, 760px);
   z-index: 3;
   display: grid;
   align-content: center;
@@ -700,6 +711,7 @@
 
 .entryCta {
   justify-self: start;
+  min-height: 44px;
   margin-top: 10px;
   padding: 14px 22px;
   color: var(--ground);

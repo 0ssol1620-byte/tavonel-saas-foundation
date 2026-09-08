@@ -96,7 +96,7 @@ test("Act 1 draws a curated composition of compiled objects", async ({ page }) =
   expect([...new Set(drawn.states)]).toEqual(["candidate"]);
 
   await expect(page.getByText("SELECT AN OBJECT")).toBeVisible();
-  await expect(page.getByText(/^SHOWING \d+ OF \d+ COMPILED OBJECTS$/)).toBeVisible();
+  await expect(page.getByText(/^SHOWING \d+ OF \d+ GRAPH NODES$/)).toBeVisible();
 
   const firstFiling = page.locator(`${STAGE} ${NODE}[data-node-kind="Document"]`).first();
   await firstFiling.click();
