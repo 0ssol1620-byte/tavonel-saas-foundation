@@ -37,6 +37,7 @@
     "app/api/operations/p0/admission/route.ts": { "type": "P-public", "methods": ["POST"], "credential": "none", "note": "planLargeDocumentAdmission is a pure policy calculator: no read, no write, no tenant data. 4KB body cap. Unauthenticated compute; edge rate limit is backlog." },
     "app/api/operations/p0/credits/release/route.ts": { "type": "C-webhook", "methods": ["POST"], "credential": "hmac:x-tavonel-billing-signature" },
     "app/api/paddle/webhook/route.ts": { "type": "C-webhook", "methods": ["POST"], "credential": "hmac:paddle-signature", "note": "lib/paddle-webhook.ts: HMAC over `ts:rawBody`, 300s window; dedupe by p_event_id in lib/billing-store.ts." },
+    "app/api/proof-pdf/route.ts": { "type": "P-public", "methods": ["GET"], "credential": "none", "note": "GET only, and state-changing in neither shape nor effect: it re-fetches one fixed public W3C fixture and refuses it unless the bytes hash to a pinned sha256. It accepts no URL, no id and no customer input, so it reaches no tenant data. Listed because the inventory is a checked-in fact only if the routes that are deliberately public appear in it alongside the ones that are not." },
     "app/api/uploads/capability/route.ts": { "type": "A-bearer", "methods": ["POST"], "credential": "bearer:api-key-or-supabase-jwt" },
     "app/api/uploads/confirm/route.ts": { "type": "A-bearer", "methods": ["POST"], "credential": "bearer:api-key-or-supabase-jwt" },
     "app/api/uploads/release/route.ts": { "type": "A-bearer", "methods": ["POST"], "credential": "bearer:api-key-or-supabase-jwt" },
