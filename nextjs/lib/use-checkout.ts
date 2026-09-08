@@ -4,6 +4,7 @@
 
 import { useCallback, useState } from "react";
 import type { BillingOfferCode } from "./billing-catalog";
+import { trackFunnel } from "./funnel-events";
 
 type CheckoutResponse = {
   code?: string;
@@ -62,6 +63,21 @@ export function useCheckout(notify: (message: string) => void) {
           environment: checkout.environment,
           eventCallback: (event) => {
             if (event.name === "checkout.completed") {
+              /*
+                The last hop of §40's funnel, and the only one the browser can see.
+
+                `checkout_opened` without a matching close is the abandonment this measures. The
+                honest name is `checkout_completed`, not `paid`: Paddle has accepted the payment
+                here, and the sentence below says out loud that entitlement waits for the signed
+                webhook. Naming this event for the entitlement would put a number on the dashboard
+                that the product refuses to act on.
+
+                Server-side is where the entitlement truth is, and it is not reachable from this
+                module: `trackFunnel` is a browser call, and the property that would identify a
+                workspace in a webhook is exactly the kind of value this module exists to keep off
+                the wire.
+              */
+              trackFunnel("checkout_completed", { offer: offerCode, mode: paymentMode });
               notify(`Paddle accepted the ${paymentMode} payment. Access and credits remain pending until the signed webhook is persisted.`);
             }
           },

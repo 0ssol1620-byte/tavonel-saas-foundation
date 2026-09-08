@@ -939,7 +939,16 @@ export default function WorkspacePage() {
     });
 
     if (controller.signal.aborted) return;
-    if (!compiled) return;
+    /*
+      The compile ran to a stop and produced no World. `workspace_compile_started` already
+      counted the attempt, so without this the funnel reports the drop as a gap between two
+      columns and cannot tell it from a reader who closed the tab. The abort above is excluded
+      deliberately: a cancelled follow is this component unmounting, not a compile that failed.
+    */
+    if (!compiled) {
+      trackFunnel("workspace_compile_failed");
+      return;
+    }
     const lifecycle = await loadCollectionCandidate(compiled);
     if (lifecycle) {
       trackFunnel("workspace_candidate_ready", { lifecycle });
