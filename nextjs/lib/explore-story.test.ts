@@ -1,7 +1,11 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { exploreChangeBaselineDocument, exploreChangeStory } from "./explore-change";
+import {
+  exploreChangeBaselineDocument,
+  exploreChangeStory,
+  exploreChangeTimeline,
+} from "./explore-change";
 import { exploreSampleAnswers, exploreSampleDocuments, exploreSampleWorld } from "./explore-sample";
 import {
   DEEP_LINK_ACTS,
@@ -51,7 +55,11 @@ const BARRED = ["unlock your data", "second brain", "100% accurate", "never hall
 const OVERCLAIMS = ["generally available", "production-ready", "fully automated ontology"];
 
 const model = toVisualWorldModel(exploreSampleWorld, exploreSampleDocuments);
-const change = buildExploreChangeView(exploreChangeStory, exploreChangeBaselineDocument);
+const change = buildExploreChangeView(
+  exploreChangeStory,
+  exploreChangeBaselineDocument,
+  exploreChangeTimeline,
+);
 
 describe("the act a link may ask for", () => {
   it("accepts the three deep-linkable acts", () => {

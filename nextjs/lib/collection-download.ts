@@ -5,7 +5,54 @@ import { buildAiPackageGuidance } from "./ai-package-guidance";
 import type { ExportSigner } from "./export-signing";
 
 const MAX_PACKAGE_FILES = 200;
-const MAX_UNCOMPRESSED_BYTES = 16 * 1024 * 1024;
+
+/**
+ * The most uncompressed package bytes one download may materialise, and what it protects.
+ *
+ * Not a quality limit and not a plan tier. `app/api/collections/[id]/download/route.ts` loads a
+ * stored artifact out of object storage and then, in one synchronous pass inside one function
+ * invocation, SHA-256s every file's content, copies each into a `Uint8Array`, `zipSync`s the lot
+ * and buffers the finished archive so it can set `Content-Length`. Peak memory is a small
+ * multiple of this number per concurrent request, and what it is spent on is *stored data*. This
+ * is therefore the bound that stops one large or tampered artifact from turning a single
+ * authenticated request into an out-of-memory event, and the reason it is enforced during
+ * validation rather than after: `validateReviewableCollectionArtifact` returns `null` the moment
+ * the running total passes it, and the route answers 422 instead of streaming a partial package.
+ * That refusal is the fail-closed behaviour and it does not move.
+ *
+ * Re-derived 2026-09-08 from 16 MiB, measured rather than argued (program §24, matrix item 2).
+ * The measurement is Apple's five 2025/2026 SEC filings, the largest corpus this product has
+ * compiled: 290 pages, 1,281 regions, 6,300 candidate objects, every one of them emitted, whole
+ * package 14,046,999 B (13.40 MiB).
+ *
+ *   - a budget that compiles that corpus whole has to be at least 6,300.
+ *     `EXTRACTION_CANDIDATE_BUDGET` is 7,000, a round number above it rather than one tuned to
+ *     the corpus that motivated the change;
+ *   - the per-object worst case stays what it always was: a 500-character claim label
+ *     materialised into four graph serialisations plus a directory entry, ~2.5 KiB. Measured on
+ *     this corpus the object-scaled files (canonical model, both ontologies, both graph CSVs)
+ *     come to 11,220,523 B, i.e. 1,781 B per object -- so the 2.5 KiB worst case is a real upper
+ *     bound and not an optimistic one;
+ *   - the rest of the package does not scale with objects. Measured on the same corpus the
+ *     region text, source binding, provenance and validation files come to 2,826,476 B;
+ *   - so the requirement is 7,000 x 2,560 + 2,826,476 = 20,746,476 B = 19.79 MiB. 24 MiB is the
+ *     next round size above it and leaves 4.21 MiB of headroom.
+ *
+ * At 16 MiB the same arithmetic supports 5,449 objects, which is why the two constants had to
+ * move together: raising only the budget would have compiled a World whose package the download
+ * route then refuses.
+ *
+ * This raises peak per-request memory by half. That is the cost of the change and it is the
+ * reason the number was derived rather than doubled: the control is meant to bind, and a ceiling
+ * nothing ever reaches is not a control. The alternatives are recorded in the lane report --
+ * splitting the package per SourceVersion breaks the single signed export manifest, and bounding
+ * the compiler by measured package bytes instead of by object count is the right long-term fix
+ * and a compiler change with production blast radius.
+ *
+ * Exported so `collection-compiler.ts` can name the number its budget is derived from instead of
+ * restating it, and so a test can assert the derivation still holds.
+ */
+export const MAX_UNCOMPRESSED_BYTES = 24 * 1024 * 1024;
 /**
  * Exported so /developers can list what a package contains from the code that writes it.
  *

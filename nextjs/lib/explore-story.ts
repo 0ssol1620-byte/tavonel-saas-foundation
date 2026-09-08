@@ -1,4 +1,4 @@
-import type { ExploreChangeStory } from "./explore-change";
+import type { ExploreChangeStep, ExploreChangeStory } from "./explore-change";
 import type { ExploreSampleAnswer } from "./explore-sample";
 import type { ExploreDocument, VisualEvidence, VisualRevision } from "./visual-world-model";
 
@@ -108,6 +108,18 @@ export const EXPLORE_COPY = {
   changeCountsNote:
     "A content-addressed object keeps its identity while its compiled fields hold and gets a new one when they do not, so an arriving filing both adds objects and rebuilds objects the annual filing already carried. All four counts are shown as measured.",
   changeArrivalsHeading: "FILINGS THAT ARRIVED",
+  changeTimelineHeading: "HOW THIS WORLD WAS REACHED",
+  /*
+    The sentence that stops the timeline from implying a capability this deployment does not have.
+
+    A five-step temporal view is exactly the shape a reader expects incremental compilation to
+    have, so the step that says otherwise has to be on the same screen as the steps. The Core's
+    selective recompilation is a different execution with its own receipt (§25.3); this page has
+    none, and a timeline that quietly let the reader assume one would be the most convenient
+    untruth available in this act.
+  */
+  changeTimelineNote:
+    "Each step is a complete compile of the corpus as it stood, compared with the complete compile before it. This deployment's compiler has no incremental path: every object in the World is rebuilt at every step, so the recompiled figure is the whole World and not a selectively rebuilt subset. Rebuilt in place counts objects the previous World already carried whose compiled fields moved — the arriving filing's dependency impact, as measured, not as modelled. The steps run in reporting-period order, which is not filing order here: Apple filed the 2026 proxy statement three weeks before the first-quarter report it follows above.",
   equivalenceHeading: "FULL-REBUILD EQUIVALENCE",
   equivalenceLead: "Both snapshots were fully compiled from the selected source pages; the comparison is between two complete compiles in this demo.",
   askPlaceholder: "Ask this World…",
@@ -162,6 +174,8 @@ export type ExploreChangeView = {
   relations: { added: number; removed: number; changed: number };
   evidenceRegions: { added: number; removed: number; changed: number };
   sourceRevisions: { added: number; removed: number; unchanged: number };
+  /** W0 → W1 → W2 → W3 → W4, one entry per arriving filing (§24). Oldest first. */
+  timeline: ExploreChangeStep[];
   affectedNodeIds: string[];
   untouchedNodeIds: string[];
   equivalence: ExploreChangeStory["equivalence"];
@@ -170,6 +184,7 @@ export type ExploreChangeView = {
 export function buildExploreChangeView(
   story: ExploreChangeStory,
   baselineFile: ExploreDocument,
+  timeline: readonly ExploreChangeStep[],
 ): ExploreChangeView {
   const reached = story.affectedNodeIds.length;
   if (reached !== story.counts.added + story.counts.removed + story.counts.rebuilt) {
@@ -181,6 +196,15 @@ export function buildExploreChangeView(
     // One arriving filing is one new source version. If the two ever disagree, the Act's list of
     // filings and its count of source versions are describing different events.
     throw new Error("explore_change_view_arrivals_disagree_with_source_revisions");
+  }
+  if (timeline.length !== story.arrivals.length) {
+    // The timeline walks one step per arriving filing. A shorter one would draw a path that
+    // skips a World the corpus actually passed through.
+    throw new Error("explore_change_view_timeline_disagrees_with_arrivals");
+  }
+  if (timeline[timeline.length - 1]?.toDigest !== story.after.manifestDigest) {
+    // The last step has to land on the World the rest of the Act is describing.
+    throw new Error("explore_change_view_timeline_does_not_reach_after");
   }
   return {
     baseline: {
@@ -210,6 +234,7 @@ export function buildExploreChangeView(
       removed: story.diff.sourceRevisions.removed.length,
       unchanged: story.diff.sourceRevisions.unchanged,
     },
+    timeline: timeline.map((step) => ({ ...step })),
     affectedNodeIds: [...story.affectedNodeIds],
     untouchedNodeIds: [...story.untouchedNodeIds],
     equivalence: story.equivalence,

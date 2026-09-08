@@ -9,6 +9,9 @@ import {
 import { answerGroundedQuestion, type GroundedAnswer } from "./grounded-ask";
 import { buildWorldReadModel, type WorldReadModel } from "./world-read-model";
 import rawBaselineInputs from "./explore-sample.w0.inputs.json";
+import rawW1Inputs from "./explore-sample.w1.inputs.json";
+import rawW2Inputs from "./explore-sample.w2.inputs.json";
+import rawW3Inputs from "./explore-sample.w3.inputs.json";
 import rawInputs from "./explore-sample.w4.inputs.json";
 import rawSources from "./explore-sample.sources.json";
 
@@ -21,14 +24,18 @@ import rawSources from "./explore-sample.sources.json";
   Nothing on the Explore page is authored -- the objects, the claims, the relations, the page
   numbers and the bounding boxes are all what `compileCollectionCandidate` emitted.
 
-  Two World snapshots, and what separates them is time rather than an edit (§25.2):
+  Five World snapshots, and what separates each from the last is time rather than an edit
+  (§25.2, and §24's five steps):
 
     W0  Apple's 2025 Form 10-K alone -- the annual World, before the year happened.
-    W4  the same 10-K plus the four 2026 filings that arrived after it: the Q1 10-Q, the
-        DEF 14A proxy statement, the Q2 10-Q and the Q3 10-Q.
+    W1  W0 after the 2026 Q1 10-Q arrived.
+    W2  W1 after the 2026 DEF 14A proxy statement arrived.
+    W3  W2 after the 2026 Q2 10-Q arrived.
+    W4  W3 after the 2026 Q3 10-Q arrived -- the whole 290-page corpus.
 
-  W4 is the World the page shows. `lib/explore-change.ts` derives the comparison; it does not
-  compile, and it does not restate a single number that is not in one of these two artifacts.
+  W4 is the World the page shows. `lib/explore-change.ts` derives the comparisons -- W0 against
+  W4, and each consecutive step -- it does not compile, and it does not restate a single number
+  that is not in one of these five artifacts.
 
   Source and representation are not conflated. The 2025 10-K is an official PDF, so the bytes
   the compiler read are the source. The 2026 filings are SEC EDGAR HTML primary documents, and
@@ -43,27 +50,33 @@ import rawSources from "./explore-sample.sources.json";
   fails the build, not a page view.
 
   Regenerating: run the script, run `vitest lib/explore-sample`, and paste the digests it
-  reports into the two constants below. A digest moving is not a problem; it moving without
+  reports into the five constants below. A digest moving is not a problem; it moving without
   anyone noticing is.
 */
 
 /*
-  Re-derived 2026-09-08, when the corpus stopped being a three-page slice of each
-  filing and became four filings compiled end to end plus one declared page slice (§57, §86 #1).
+  Re-derived 2026-09-08 (second time that day), when the corpus stopped carrying a declared page
+  slice and became all five filings compiled end to end, and when the three intermediate Worlds
+  were compiled for the first time (program §24, blueprint §25.2).
 
-  Both digests moved, and this is the review §25.4 asks for before freezing them:
+  W4 moved and W0 did not, and this is the review §25.4 asks for before freezing:
 
-  - W0 moved because its input moved. The baseline is the same 2025 Form 10-K, but all 80 pages of
-    it rather than pages 4, 25 and 32 -- 502 regions instead of 26. A World compiled from more of
-    the same document is a different World, and the digest saying so is the system working.
-  - W4 moved for the same reason across five documents: 1,169 regions instead of 97, from 233 of
-    the corpus's 290 pages.
-  - Neither moved because of a compiler change. `lib/collection-compiler.ts` is untouched.
-  - Both artifacts are still `lifecycle: candidate` with `candidatesConsidered` equal to what was
-    emitted, which is the measurable form of "nothing was dropped to fit". The whole 290-page
-    corpus is 6,457 candidates against a 5,000 budget and would compile `review_required`
-    instead; `scripts/build-explore-sample.mjs` records that measurement and why the proxy is the
-    document that carries the slice.
+  - W0 did not move. Its input is unchanged -- the same 2025 Form 10-K, all 80 pages, 502 regions
+    -- so its digest is the same string it was this morning. That matters more than it looks:
+    `EXTRACTION_CANDIDATE_BUDGET` moved from 5,000 to 7,000 in the same change, and W0 compiles
+    2,310 objects, well under either number. An unchanged W0 is the evidence that raising the
+    budget did not change how anything below it is compiled.
+  - W4 moved because its input grew: the DEF 14A's declared slice of pages 1-48 and 51 is gone
+    and all 103 of its pages are compiled, so W4 is 1,281 regions from 287 pages instead of 1,169
+    regions from 233. It also stopped being truncated -- at the old budget this corpus emitted
+    5,000 of its objects and compiled `review_required`. Both causes are corpus and budget, not
+    a change to the extractors, which are untouched.
+  - W1, W2 and W3 are new. They were declared data with `file: null` until now; nothing about
+    them moved, they did not exist.
+  - All five artifacts are `lifecycle: candidate` with `candidatesConsidered` equal to what was
+    emitted, which is the measurable form of "nothing was dropped to fit". W4 is 6,300 objects;
+    the 6,457 recorded for this corpus previously was `candidatesConsidered` read under the old
+    cap, which is not a measurement of the corpus.
 
   Previous values, kept so the moves are traceable rather than merely different:
     2026-09-06  current world (2025 10-K)     sha256:b2aaebd8dd73b8d161d7fc23e4cf649f6c009bce87ee107bab8311a28a268978
@@ -72,13 +85,19 @@ import rawSources from "./explore-sample.sources.json";
     2026-09-06  revision B (mixed fixture)    sha256:85a2932b18ea0e418d15adbfcff39c5f29804377ae82da2ab97641db795cfb4d
     2026-09-08  W0, three-page 10-K slice     sha256:b2aaebd8dd73b8d161d7fc23e4cf649f6c009bce87ee107bab8311a28a268978
     2026-09-08  W4, three pages per filing    sha256:50b61e20484c1a06cbf7b2a9ce7aa4c8926bc5819a59f60d8fec1f8096aba7e8
+    2026-09-08  W4, 233 of 290 pages          sha256:277df1a439a8806ebb290b77f31ffdaf0a61b59e5efca3641d9cb7596aca9d20
 */
 
 /** W4: the compiled World the Explore page shows. Recorded so that it cannot change unobserved. */
-export const EXPLORE_SAMPLE_DIGEST = "sha256:277df1a439a8806ebb290b77f31ffdaf0a61b59e5efca3641d9cb7596aca9d20";
+export const EXPLORE_SAMPLE_DIGEST = "sha256:328d3ef3a6ee0153b14e9a782cdb4e9f499a6443b1f5dbf2898ace1cb4915b7f";
 
 /** W0: the same annual filing alone, before the four 2026 filings arrived. */
 export const EXPLORE_SAMPLE_BASELINE_DIGEST = "sha256:1db0e4c5ef2f89655e57d478a3761ce36c871ea9f1dfcd1a801aa8e1719b3597";
+
+/* The three intermediate Worlds, one per arriving filing. Frozen on the same terms as the ends. */
+export const EXPLORE_SAMPLE_W1_DIGEST = "sha256:aec94176876a0db8d2c2284ffb633b86672080ba0041e0d18a0c2a3ce55f4187";
+export const EXPLORE_SAMPLE_W2_DIGEST = "sha256:364b38dbfd36d4ce524bf7702117817d17a4dba84ef7249cbd5de98ceeb9c5af";
+export const EXPLORE_SAMPLE_W3_DIGEST = "sha256:05adb2a5f5f3401ac6293040162b73b21966625834efa5a74f602f1a89bdfbeb";
 
 export const EXPLORE_SAMPLE_SOURCE_DIRECTORY = "public/explore-sample";
 
@@ -229,6 +248,9 @@ function documentsOf(inputs: readonly CollectionOcrInput[]) {
 
 const sample = build(rawInputs, "W4 · 2025 10-K + four 2026 filings", EXPLORE_SAMPLE_DIGEST);
 const baseline = build(rawBaselineInputs, "W0 · 2025 Form 10-K", EXPLORE_SAMPLE_BASELINE_DIGEST);
+const w1 = build(rawW1Inputs, "W1 · + 2026 Q1 10-Q", EXPLORE_SAMPLE_W1_DIGEST);
+const w2 = build(rawW2Inputs, "W2 · + 2026 DEF 14A", EXPLORE_SAMPLE_W2_DIGEST);
+const w3 = build(rawW3Inputs, "W3 · + 2026 Q2 10-Q", EXPLORE_SAMPLE_W3_DIGEST);
 
 export const exploreSampleInputs: readonly CollectionOcrInput[] = sample.inputs;
 export const exploreSampleArtifact = sample.artifact;
@@ -239,6 +261,31 @@ export const exploreSampleBaselineInputs: readonly CollectionOcrInput[] = baseli
 export const exploreSampleBaselineArtifact = baseline.artifact;
 export const exploreSampleBaselineWorld: WorldReadModel = baseline.world;
 export const exploreSampleBaselineDocuments = documentsOf(baseline.inputs);
+
+export type ExploreSampleSnapshot = {
+  /** The snapshot id `scripts/build-explore-sample.mjs` emitted the inputs under. */
+  id: "w0" | "w1" | "w2" | "w3" | "w4";
+  /** How the corpus grew at this step, in the words the build script uses. */
+  label: string;
+  inputs: readonly CollectionOcrInput[];
+  world: WorldReadModel;
+};
+
+/*
+  The five compiled Worlds in arrival order (§24, §25.2).
+
+  Ordered, so a consecutive-step comparison is `snapshots[n-1]` against `snapshots[n]` rather
+  than a lookup that could silently pair the wrong two. Every entry is a *complete* compile of
+  its corpus -- this repository's compiler has no incremental path -- so nothing derived from
+  this list may be described as a selective rebuild.
+*/
+export const exploreSampleSnapshots: readonly ExploreSampleSnapshot[] = [
+  { id: "w0", label: "2025 Form 10-K", inputs: baseline.inputs, world: baseline.world },
+  { id: "w1", label: "+ 2026 Q1 10-Q", inputs: w1.inputs, world: w1.world },
+  { id: "w2", label: "+ 2026 DEF 14A", inputs: w2.inputs, world: w2.world },
+  { id: "w3", label: "+ 2026 Q2 10-Q", inputs: w3.inputs, world: w3.world },
+  { id: "w4", label: "2025 Form 10-K + four 2026 filings", inputs: sample.inputs, world: sample.world },
+];
 
 /*
   Four questions the page can put to the World, answered by the retriever the workspace uses.

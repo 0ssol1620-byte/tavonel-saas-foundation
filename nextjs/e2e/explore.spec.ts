@@ -273,9 +273,11 @@ test("an object with many regions is walked with previous and next", async ({ pa
 
 test("a filing says how much of itself is in the World", async ({ page }) => {
   /*
-    §57. Four filings are compiled end to end and one carries a declared page slice, and the
-    source sheet has to be able to say which of the two it is showing. "Curated slice" printed
-    over a filing compiled whole understates the World; the reverse overstates it.
+    §57 and program §24. All five filings are now compiled end to end -- the proxy's declared
+    slice of pages 1-48 and 51 is gone -- and the source sheet still has to say which of the two
+    scopes it is showing. "Curated slice" printed over a filing compiled whole understates the
+    World; the reverse overstates it, and the reverse is the one this corpus could now produce
+    by accident, so the assertion below is that no filing declares a slice at all.
   */
   test.skip(isNarrow(page));
   await enterWorld(page);
@@ -288,10 +290,10 @@ test("a filing says how much of itself is in the World", async ({ page }) => {
 
   await page.getByRole("button", { name: "TECHNICAL DETAILS" }).click();
   const drawer = page.getByRole("dialog", { name: "TECHNICAL DETAILS" });
-  // Compiled pages against document pages, per filing, and the declared slice as a range.
+  // Compiled pages against document pages, per filing, and no declared slice on any of the five.
   await expect(drawer.getByText(/\d+ of \d+ pages compiled/).first()).toBeVisible();
-  await expect(drawer.getByText(/declared pages 1–48, 51/)).toBeVisible();
-  await expect(drawer.getByText(/every page declared/).first()).toBeVisible();
+  await expect(drawer.getByText(/every page declared/)).toHaveCount(5);
+  await expect(drawer.getByText(/declared pages /)).toHaveCount(0);
   // §24: what was compiled and what was sent are both printed, and they are not the same number.
   await expect(drawer.getByText("Sent to this browser")).toBeVisible();
   await expect(drawer.getByText(/\d+ objects · \d+ relations · \d+ regions/)).toBeVisible();
@@ -330,6 +332,27 @@ test("Act 3 reports the arriving filings with derived counts and claims no equiv
   const unchangedCount = Number(await page.getByText("Unchanged object identities", { exact: true })
     .locator("xpath=following-sibling::dd").textContent());
   if (unchangedCount === 0) await expect(page.locator(`${NODE}[data-node-state="dim"]`)).toHaveCount(0);
+
+  /*
+    §24's five steps, on the page rather than in a data file. Four steps for five Worlds, in
+    filing order, each naming the World it produced and the filing that produced it.
+  */
+  const timeline = page.locator("[data-change-timeline]");
+  await expect(timeline).toBeVisible();
+  const steps = timeline.locator("li[data-step]");
+  await expect(steps).toHaveCount(4);
+  expect(await steps.evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-step"))))
+    .toEqual(["w1", "w2", "w3", "w4"]);
+  await expect(steps.first()).toContainText(/ACCESSION \d{10}-\d{2}-\d{6}/);
+  await expect(steps.first()).toContainText(/\d+ OF \d+ PAGES · \d+ REGIONS/);
+  await expect(steps.first().getByText("Rebuilt in place", { exact: true })).toBeVisible();
+  /*
+    The pair that stops a five-step temporal view from implying incremental compilation: a
+    RECOMPILED figure that is the whole World, and the sentence that says why. Both are asserted
+    on the rendered page rather than on the constant, because the page is what makes the claim.
+  */
+  await expect(steps.first().getByText("Recompiled", { exact: true })).toBeVisible();
+  await expect(timeline).toContainText("every object in the World is rebuilt at every step");
 
   await expect(page.getByText("FULL-REBUILD EQUIVALENCE", { exact: true })).toBeVisible();
   await expect(page.getByText("NOT ESTABLISHED IN THIS DEPLOYMENT", { exact: true })).toBeVisible();

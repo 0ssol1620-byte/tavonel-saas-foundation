@@ -3,6 +3,26 @@
   "generatedAt": "2026-09-08T02:04:13.025Z",
   "filings": [
     {
+      "id": "apple-form-10-k",
+      "form": "10-K",
+      "filingDate": "2025-10-31",
+      "reportDate": "2025-09-27",
+      "accession": "0000320193-25-000079",
+      "primaryDocument": "aapl-20250927.htm",
+      "cik": "0000320193",
+      "authority": "official",
+      "sourceUrl": "https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/aapl-20250927.htm",
+      "sourceFilename": "apple-2025-form-10-k.pdf",
+      "sourceMediaType": "application/pdf",
+      "originalSha256": "sha256:108590052c3ba5400c63660d787fe7ed4e43868292946d7a7facebe9ab7d1aab",
+      "renderFilename": null,
+      "renderMediaType": null,
+      "renderSha256": null,
+      "renderProfile": null,
+      "pageCount": 80,
+      "acquiredFrom": "Apple Investor Relations official PDF, cross-checkable in SEC EDGAR"
+    },
+    {
       "id": "apple-2026-q1-10-q",
       "form": "10-Q",
       "filingDate": "2026-01-30",
@@ -19,6 +39,7 @@
       "renderMediaType": "application/pdf",
       "renderSha256": "sha256:7fe2683c59e0b48f6c112bc17b3900d907f64236c138d1dd32f40d544b1ba89f",
       "renderProfile": "chromium-print-letter-v1; scripts/links/iframes/images removed; inline filing content retained",
+      "pageCount": 30,
       "acquiredFrom": "SEC EDGAR primary document"
     },
     {
@@ -38,6 +59,7 @@
       "renderMediaType": "application/pdf",
       "renderSha256": "sha256:aa84ce73eb0f181844ccd0bb8a4a53f670fae6a007c086ccdb55f705f8d7a0c2",
       "renderProfile": "chromium-print-letter-v1; scripts/links/iframes/images removed; inline filing content retained",
+      "pageCount": 103,
       "acquiredFrom": "SEC EDGAR primary document"
     },
     {
@@ -57,6 +79,7 @@
       "renderMediaType": "application/pdf",
       "renderSha256": "sha256:054bff6adefda8601bc6a253181448d708ea78e93f936d9b0cff6e97e4f2a9d7",
       "renderProfile": "chromium-print-letter-v1; scripts/links/iframes/images removed; inline filing content retained",
+      "pageCount": 37,
       "acquiredFrom": "SEC EDGAR primary document"
     },
     {
@@ -76,6 +99,7 @@
       "renderMediaType": "application/pdf",
       "renderSha256": "sha256:6a9e1c4bbaaed622299d4e6db70d2672fe04512c1ccde72ded20ee9d05a7a0c5",
       "renderProfile": "chromium-print-letter-v1; scripts/links/iframes/images removed; inline filing content retained",
+      "pageCount": 40,
       "acquiredFrom": "SEC EDGAR primary document"
     }
   ]

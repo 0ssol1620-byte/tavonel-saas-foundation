@@ -11,6 +11,9 @@ import {
 import {
   EXPLORE_SAMPLE_BASELINE_DIGEST,
   EXPLORE_SAMPLE_DIGEST,
+  EXPLORE_SAMPLE_W1_DIGEST,
+  EXPLORE_SAMPLE_W2_DIGEST,
+  EXPLORE_SAMPLE_W3_DIGEST,
   exploreSampleAnswers,
   exploreSampleArtifact,
   exploreSampleBaselineArtifact,
@@ -18,6 +21,7 @@ import {
   exploreSampleBaselineWorld,
   exploreSampleDocuments,
   exploreSampleInputs,
+  exploreSampleSnapshots,
   exploreSampleSources,
   exploreSampleWorld,
 } from "./explore-sample";
@@ -149,23 +153,23 @@ describe("the public sample is bound to committed filing bytes", () => {
     expect(exploreSampleDocuments[0].accession).toBe("0000320193-25-000079");
   });
 
-  it("compiles four filings whole and declares the one page slice that is left", () => {
+  it("compiles all five filings whole, with no page slice declared anywhere", () => {
     /*
-      §57 and §86 #1. The whole 290-page corpus compiles in under a second, and past 5,000
-      candidate objects `EXTRACTION_CANDIDATE_BUDGET` stops the compiler emitting and marks the
-      artifact `review_required`. So four filings are compiled end to end and the proxy carries
-      the one declared slice -- and the test that says so is the one that would notice the slice
-      quietly spreading back across the corpus.
+      Program §24 and §57. The whole 290-page corpus is compiled: no filing carries a declared
+      page slice, and the two constants that used to force one were re-derived from a measurement
+      of this corpus rather than raised to make a build pass. This is the test that would notice
+      a slice creeping back in, so it asserts the absence rather than a particular slice's shape.
     */
-    const sliced = exploreSampleSources.filter((source) => source.declaredPages !== null);
-    expect(sliced.map((source) => source.documentId)).toEqual(["apple-2026-proxy-def14a"]);
+    expect(exploreSampleSources.filter((source) => source.declaredPages !== null)).toEqual([]);
+    expect(exploreSampleSources).toHaveLength(5);
     for (const source of exploreSampleSources) {
       expect(source.compiledPages.length, source.documentId).toBeGreaterThan(0);
-      if (source.declaredPages === null) continue;
-      // A declared page that produced no region is not published as compiled.
-      const declared = new Set(source.declaredPages);
-      expect(source.compiledPages.every((page) => declared.has(page)), source.documentId).toBe(true);
+      // Every compiled page is a page of the document, and no page is counted twice.
+      expect(new Set(source.compiledPages).size, source.documentId).toBe(source.compiledPages.length);
+      expect(Math.max(...source.compiledPages), source.documentId).toBeLessThanOrEqual(source.pageCount);
     }
+    // 290 pages acquired; a page with no text layer produces no region and is not called compiled.
+    expect(exploreSampleSources.reduce((total, source) => total + source.pageCount, 0)).toBe(290);
     expect(exploreSampleArtifact.lifecycle).toBe("candidate");
     expect(exploreSampleBaselineArtifact.lifecycle).toBe("candidate");
     // Nothing was dropped: the compiler emitted every candidate it considered.
@@ -175,18 +179,56 @@ describe("the public sample is bound to committed filing bytes", () => {
     );
   });
 
-  it("declares W0-W4 and compiles the two the frozen digests belong to", () => {
-    /* §25.2: the intermediate Worlds are data with `file: null`, not a comment and not a page. */
-    const snapshots = SNAPSHOTS as Array<{ id: string; file: string | null; documentIds: string[] }>;
+  it("declares W0-W4 and compiles every one of them", () => {
+    /* §25.2 and §24: an intermediate World that is not compiled cannot be shown as a step. */
+    const snapshots = SNAPSHOTS as Array<{ id: string; file: string | null; label: string; documentIds: string[] }>;
     expect(snapshots.map((snapshot) => snapshot.id)).toEqual(["w0", "w1", "w2", "w3", "w4"]);
     expect(snapshots.filter((snapshot) => snapshot.file !== null).map((snapshot) => snapshot.id))
-      .toEqual(["w0", "w4"]);
+      .toEqual(["w0", "w1", "w2", "w3", "w4"]);
     expect(snapshots[0].documentIds).toEqual(["apple-form-10-k"]);
     expect(snapshots[4].documentIds).toEqual(CATALOG.map((document) => document.documentId));
     // Each intermediate World is the previous one plus exactly one arriving filing.
     for (let index = 1; index < snapshots.length; index += 1) {
       expect(snapshots[index].documentIds.slice(0, -1), snapshots[index].id)
         .toEqual(snapshots[index - 1].documentIds);
+    }
+    /*
+      The compiled snapshots are the declared ones, in the declared order, under the labels the
+      build script wrote. Two lists of five in two files is one drift away from a timeline whose
+      steps are labelled with the wrong filing, so they are compared rather than trusted.
+    */
+    expect(exploreSampleSnapshots.map((snapshot) => snapshot.id))
+      .toEqual(snapshots.map((snapshot) => snapshot.id));
+    expect(exploreSampleSnapshots.map((snapshot) => snapshot.label))
+      .toEqual(snapshots.map((snapshot) => snapshot.label));
+    for (const [index, snapshot] of exploreSampleSnapshots.entries()) {
+      expect([...snapshot.inputs.map((input) => input.documentId)].sort(), snapshot.id)
+        .toEqual([...snapshots[index].documentIds].sort());
+    }
+  });
+
+  it("freezes a distinct digest for every one of the five snapshots", () => {
+    /*
+      §25.4. Five snapshots are five frozen digests, and `build()` throws at import if any of
+      them stops matching. Distinctness is asserted separately: two snapshots sharing a digest
+      would mean an arriving filing changed nothing, which is a fact worth failing on rather than
+      rendering as a step.
+    */
+    const digests = exploreSampleSnapshots.map((snapshot) => snapshot.world.world.manifestDigest);
+    expect(digests).toEqual([
+      EXPLORE_SAMPLE_BASELINE_DIGEST,
+      EXPLORE_SAMPLE_W1_DIGEST,
+      EXPLORE_SAMPLE_W2_DIGEST,
+      EXPLORE_SAMPLE_W3_DIGEST,
+      EXPLORE_SAMPLE_DIGEST,
+    ]);
+    expect(new Set(digests).size).toBe(5);
+    // Every World is larger than the one it grew out of, because every step adds a filing.
+    for (let index = 1; index < exploreSampleSnapshots.length; index += 1) {
+      expect(
+        exploreSampleSnapshots[index].world.objects.length,
+        exploreSampleSnapshots[index].id,
+      ).toBeGreaterThan(exploreSampleSnapshots[index - 1].world.objects.length);
     }
   });
 });

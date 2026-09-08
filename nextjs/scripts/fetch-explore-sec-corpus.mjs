@@ -56,8 +56,49 @@ const filings = [
   },
 ];
 
+/**
+ * The 2025 Form 10-K, which this script does not fetch.
+ *
+ * It came from Apple's investor-relations site as an official PDF, so it has no EDGAR HTML
+ * original and no reference render -- the acquired bytes are the bytes the compiler reads, and
+ * the four `render*` fields are null rather than a copy of the source digest under a name that
+ * would imply a representation exists. It is written into the manifest anyway because
+ * `build-explore-sample.mjs` reads every filing's §25.1 record from there, and a corpus record
+ * missing one of its five filings is a record that has to be maintained in two places.
+ */
+const NOT_FETCHED_2025_10_K = {
+  id: "apple-form-10-k",
+  form: "10-K",
+  filingDate: "2025-10-31",
+  reportDate: "2025-09-27",
+  accession: "0000320193-25-000079",
+  primaryDocument: "aapl-20250927.htm",
+  cik: "0000320193",
+  authority: "official",
+  sourceUrl: "https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/aapl-20250927.htm",
+  sourceFilename: "apple-2025-form-10-k.pdf",
+  sourceMediaType: "application/pdf",
+  originalSha256: "sha256:108590052c3ba5400c63660d787fe7ed4e43868292946d7a7facebe9ab7d1aab",
+  renderFilename: null,
+  renderMediaType: null,
+  renderSha256: null,
+  renderProfile: null,
+  pageCount: 80,
+  acquiredFrom: "Apple Investor Relations official PDF, cross-checkable in SEC EDGAR",
+};
+
 function digest(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
+}
+
+/** Read back from the file just written, so the recorded length is the render's, not the DOM's. */
+async function pageCountOf(bytes) {
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const task = pdfjs.getDocument({ data: new Uint8Array(bytes), useSystemFonts: false });
+  const pdf = await task.promise;
+  const { numPages } = pdf;
+  await task.destroy();
+  return numPages;
 }
 function accessionPath(accession) {
   return accession.replaceAll("-", "");
@@ -120,6 +161,7 @@ try {
       renderMediaType: "application/pdf",
       renderSha256: `sha256:${digest(renderBytes)}`,
       renderProfile: "chromium-print-letter-v1; scripts/links/iframes/images removed; inline filing content retained",
+      pageCount: await pageCountOf(renderBytes),
       acquiredFrom: "SEC EDGAR primary document",
     });
   }
@@ -129,7 +171,15 @@ try {
 
 await writeFile(
   manifestPath,
-  `${JSON.stringify({ schemaVersion: "tavonel.public_sec_corpus.v1", generatedAt: new Date().toISOString(), filings: records }, null, 2)}\n`,
+  `${JSON.stringify(
+    {
+      schemaVersion: "tavonel.public_sec_corpus.v1",
+      generatedAt: new Date().toISOString(),
+      filings: [NOT_FETCHED_2025_10_K, ...records],
+    },
+    null,
+    2,
+  )}\n`,
 );
 for (const record of records) {
   console.log(`${record.form} ${record.filingDate} ${record.accession} ${record.originalSha256.slice(0, 24)}… -> ${record.renderFilename}`);

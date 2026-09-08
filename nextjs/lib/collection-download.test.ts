@@ -5,8 +5,13 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { strFromU8, unzipSync } from "fflate";
 import { describe, expect, it } from "vitest";
-import { compileCollectionCandidate, type CollectionOcrInput } from "./collection-compiler";
 import {
+  EXTRACTION_CANDIDATE_BUDGET,
+  compileCollectionCandidate,
+  type CollectionOcrInput,
+} from "./collection-compiler";
+import {
+  MAX_UNCOMPRESSED_BYTES,
   buildSignedCollectionZip,
   isSafeArchivePath,
   validateDownloadableCollectionArtifact,
@@ -191,6 +196,54 @@ describe("Foundation collection package download", () => {
       authoritativeUse: "blocked_pending_review",
     }));
   });
+
+  /*
+    The package ceiling, at the size it was re-derived to on 2026-09-08 (program §24).
+
+    Two obligations that pull against each other. The ceiling has to be large enough that a World
+    compiled inside `EXTRACTION_CANDIDATE_BUDGET` produces a package the download route will
+    actually serve -- raising only the budget would compile a World whose package is then refused
+    -- and it has to keep refusing past its own edge, because it is the bound on how much a
+    single request may materialise in memory out of stored data. Both are asserted here, so that
+    moving one constant without the other fails a test rather than a customer download.
+  */
+  it("serves a package at the derived ceiling and refuses the byte past it", () => {
+    const source = completedArtifact();
+    expect(validateDownloadableCollectionArtifact(source, source.collectionId)).not.toBeNull();
+
+    // The derivation `collection-compiler.ts` documents: the worst case of ~2.5 KiB of package
+    // per object across the whole budget, plus the 2,826,476 B the Apple corpus's region text,
+    // source binding, provenance and validation files were measured to cost beside them.
+    expect(MAX_UNCOMPRESSED_BYTES).toBe(24 * 1024 * 1024);
+    expect(EXTRACTION_CANDIDATE_BUDGET * 2_560 + 2_826_476).toBeLessThanOrEqual(MAX_UNCOMPRESSED_BYTES);
+    // And the budget still has to reach the corpus §24 directs: 290 pages, 6,300 objects.
+    expect(EXTRACTION_CANDIDATE_BUDGET).toBeGreaterThanOrEqual(6_300);
+
+    const used = source.package.files.reduce((total, file) => total + file.sizeBytes, 0);
+    const padded = (size: number) => {
+      const content = "x".repeat(size);
+      return {
+        ...source,
+        package: {
+          files: [...source.package.files, {
+            path: "canonical/padding.txt",
+            mediaType: "text/plain; charset=utf-8",
+            sizeBytes: Buffer.byteLength(content, "utf8"),
+            sha256: `sha256:${createHash("sha256").update(content, "utf8").digest("hex")}`,
+            content,
+          }],
+        },
+      };
+    };
+
+    const atCeiling = padded(MAX_UNCOMPRESSED_BYTES - used);
+    expect(validateDownloadableCollectionArtifact(atCeiling, source.collectionId)).not.toBeNull();
+
+    const overCeiling = padded(MAX_UNCOMPRESSED_BYTES - used + 1);
+    expect(validateDownloadableCollectionArtifact(overCeiling, source.collectionId)).toBeNull();
+    // Fail closed, not fail silent: an over-ceiling artifact is not promotable either.
+    expect(validatePromotableCollectionArtifact(overCeiling, source.collectionId)).toBeNull();
+  }, 60_000);
 
   it("rejects traversal paths, altered bytes, non-Core artifacts and the wrong tenant collection", () => {
     expect(isSafeArchivePath("../secret.txt")).toBe(false);
