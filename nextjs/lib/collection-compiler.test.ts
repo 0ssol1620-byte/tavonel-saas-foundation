@@ -68,6 +68,18 @@ function stored(artifact: ReturnType<typeof compileCollectionCandidate>) {
 }
 
 describe("Foundation collection candidate compiler", () => {
+  it("normalizes entity identity with the same case-folding used by stable ids", () => {
+    const artifact = compileCollectionCandidate([
+      input("case-fold", "f".repeat(64), "Part describes the filing. PART is the same section label in another extracted line."),
+    ]);
+    const canonical = JSON.parse(artifact.package.files.find((file) => file.path === "canonical/model.json")!.content) as {
+      nodes: Array<{ id: string; kind: string; label: string }>;
+    };
+    const matches = canonical.nodes.filter((node) => node.kind === "Entity" && node.label.toLowerCase() === "part");
+    expect(matches).toHaveLength(1);
+    expect(artifact.validation.reviewReasons).not.toContain("ID_DUPLICATE");
+  });
+
   it("builds a deterministic candidate package with directory, ontology, graph and evidence roots", () => {
     const inputs = [
       input("doc-finance", "a".repeat(64), "Quarterly financial revenue increased. The Board approved the policy."),

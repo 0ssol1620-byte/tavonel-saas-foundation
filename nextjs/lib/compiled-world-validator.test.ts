@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 // The validator is dependency-light .mjs so it can be published and read on its own.
 import { filesFromArtifact, validateCompiledWorldPackage } from "../scripts/compiled-world/validate.mjs";
-import { exploreSampleArtifact } from "./explore-sample";
+import { exploreSampleArtifact, exploreSampleInputs } from "./explore-sample";
 
 /*
   Does the validator find anything?
@@ -12,8 +12,8 @@ import { exploreSampleArtifact } from "./explore-sample";
   which must be clean, and once against that same package with one field broken, which must fail
   with the specific code and not merely "some error".
 
-  The clean fixture is the /explore sample, which is compiled from three committed PDFs by the
-  same function that compiles a customer's documents. Nothing here is hand-written, so a change
+  The clean fixture is the /explore sample, which is compiled from committed public source PDFs
+  by the same function that compiles a customer's documents. Nothing here is hand-written, so a change
   to the compiler that breaks the package contract fails here rather than in a customer's
   retrieval pipeline.
 */
@@ -71,7 +71,7 @@ describe("a package the compiler produced", () => {
     // `counts` is null only when canonical/model.json could not be read, which the case above
     // rules out -- so a null here is a finding, not a reason to reach for optional chaining.
     expect(result.counts).not.toBeNull();
-    expect(result.counts!.documents).toBe(3);
+    expect(result.counts!.documents).toBe(exploreSampleInputs.length);
     expect(result.counts!.evidence).toBeGreaterThan(0);
     expect(result.counts!.relations).toBeGreaterThan(0);
   });

@@ -531,16 +531,20 @@ export function compileCollectionCandidate(inputs: CollectionOcrInput[]): Collec
       const entitiesHere: Array<{ id: string; text: string }> = [];
       const claimsHere: string[] = [];
       for (const entity of entitiesFor(regionText)) {
-        let entityId = entityIds.get(entity);
+        // Stable entity ids are intentionally case-insensitive. The lookup and per-document
+        // dedupe must use the same normalized key: otherwise `Part` and `PART` create two nodes
+        // with the same stable id, which is exactly what real SEC filings exposed.
+        const entityKey = entity.toLowerCase();
+        let entityId = entityIds.get(entityKey);
         if (entityId === undefined) {
           if (!admitCandidate()) continue;
-          entityId = stableId("entity", entity.toLowerCase());
-          entityIds.set(entity, entityId);
+          entityId = stableId("entity", entityKey);
+          entityIds.set(entityKey, entityId);
           nodes.push({ id: entityId, kind: "Entity", label: entity, evidenceIds: [evidenceId] });
           directoryPlan.push({ path: `Entities/${entityId}.md`, kind: "entity", sourceIds: [input.documentId] });
         }
-        if (!seenEntities.has(entity)) {
-          seenEntities.add(entity);
+        if (!seenEntities.has(entityKey)) {
+          seenEntities.add(entityKey);
           edges.push({
             id: stableId("relation", documentNodeId, "mentions_entity", entityId),
             type: "mentions_entity",

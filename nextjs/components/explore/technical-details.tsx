@@ -103,6 +103,38 @@ export default function TechnicalDetails({
                   <br />
                   {document.documentId} · {document.pageCount} page
                   {document.pageCount === 1 ? "" : "s"} · {document.regionCount} regions
+                  {document.selectedPages?.length
+                    ? ` · pages ${document.selectedPages.join(", ")} compiled`
+                    : ""}
+                  {/*
+                    The acquisition record, for the one reader who will check it (§11.3).
+
+                    A reference render's own digest is above; the original it was rendered from,
+                    the render profile that produced it and the SEC accession belong here, so the
+                    source sheet can stay a page and the drawer can be the audit trail.
+                  */}
+                  {document.representationKind === "reference_render" ? (
+                    <>
+                      <br />
+                      reference render of {document.sourceFilename} · {document.originalSha256}
+                      <br />
+                      render profile: {document.renderProfile}
+                    </>
+                  ) : null}
+                  {document.accession ? (
+                    <>
+                      <br />
+                      {document.form} · filed {document.filingDate} · period ended{" "}
+                      {document.reportDate} · accession {document.accession} · authority{" "}
+                      {document.authority}
+                    </>
+                  ) : null}
+                  {document.sliceRationale ? (
+                    <>
+                      <br />
+                      slice: {document.sliceRationale}
+                    </>
+                  ) : null}
                 </dd>
               </div>
             ))}
@@ -118,7 +150,7 @@ export default function TechnicalDetails({
                 <dd>{revision.status} · {revision.manifestDigest}</dd>
               </div>
             ))}
-            <div><dt>{change.before.label}</dt><dd>{change.before.manifestDigest}</dd></div>
+            <div><dt>{change.baseline.label}</dt><dd>{change.baseline.manifestDigest}</dd></div>
             <div><dt>{change.after.label}</dt><dd>{change.after.manifestDigest}</dd></div>
           </dl>
           <p className={styles.drawerNote}>

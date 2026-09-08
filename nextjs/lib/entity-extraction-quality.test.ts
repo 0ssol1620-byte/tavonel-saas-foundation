@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { exploreSampleArtifact } from "./explore-sample";
+import rawInputs from "./entity-extraction-eval.inputs.json";
 import evaluation from "./entity-extraction-eval.json";
+import { compileCollectionCandidate, validateCollectionOcrInput, type CollectionOcrInput } from "./collection-compiler";
 
 /*
   What the entity extractor is actually worth, measured before anyone improves it.
@@ -39,9 +40,21 @@ const CANDIDATES = evaluation.observed.candidates as Candidate[];
 const GOLD = evaluation.corpus.gold.map((entry) => entry.value);
 const TAXONOMY = new Set(evaluation.falsePositiveTaxonomy.map((entry) => entry.code));
 
-/** The Entity labels the production compiler emitted for the /explore sample. */
+/*
+  Keep the reviewed measurement attached to the exact corpus that was labelled.
+
+  /explore moved to public SEC filings on 2026-09-08. Re-pointing this test at that new corpus
+  would silently replace a human-reviewed evaluation with unreviewed labels, so the old inputs
+  now live beside this evaluation as a frozen regression fixture. The extractor is still the
+  production compiler's extractor; only the public demo corpus changed.
+*/
+const EVAL_INPUTS = (rawInputs as unknown[]).map((raw) => validateCollectionOcrInput(raw));
+if (EVAL_INPUTS.some((input) => input === null)) throw new Error("entity_extraction_eval_inputs_invalid");
+const EVAL_ARTIFACT = compileCollectionCandidate(EVAL_INPUTS as CollectionOcrInput[]);
+
+/** The Entity labels the production compiler emitted for the reviewed evaluation corpus. */
 function compiledEntities(): string[] {
-  const files = (exploreSampleArtifact as unknown as {
+  const files = (EVAL_ARTIFACT as unknown as {
     package: { files: Array<{ path: string; content: string }> };
   }).package.files;
   const model = JSON.parse(files.find((file) => file.path === "canonical/model.json")!.content) as {

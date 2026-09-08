@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import ExploreStage from "@/components/explore/explore-stage";
-import { exploreChangeSourceFiles, exploreChangeStory } from "@/lib/explore-change";
+import { exploreChangeBaselineDocument, exploreChangeStory } from "@/lib/explore-change";
 import {
   EXPLORE_SAMPLE_SOURCE_DIRECTORY,
   exploreSampleAnswers,
@@ -18,7 +18,7 @@ import { layoutVisualWorld, toVisualWorldModel } from "@/lib/visual-world-model"
 export const metadata: Metadata = {
   title: "Explore a Compiled World | TAVONEL",
   description:
-    "Step inside a compiled World: open any object to the document version, the page and the exact region it came from, and see what one source revision rebuilt.",
+    "Step inside a compiled World: open any object to the filing, the page and the exact region it came from, and see what four newly filed documents rebuilt.",
   alternates: { canonical: "/explore" },
   openGraph: { url: "/explore" },
 };
@@ -26,9 +26,9 @@ export const metadata: Metadata = {
 /*
   A server component, so the compile happens once, at build time, on the server.
 
-  `lib/explore-sample` reads four committed PDFs' extracted text layer, runs the production
-  compiler over two revisions of the corpus and refuses to load if either result stops matching
-  its frozen digest. Doing that here rather than in the browser keeps `node:crypto` and the
+  `lib/explore-sample` reads the committed filings' extracted text layer, runs the production
+  compiler over two World snapshots -- the annual filing alone, and the annual filing plus the
+  four 2026 filings -- and refuses to load if either stops matching its frozen digest. Doing that here rather than in the browser keeps `node:crypto` and the
   compiler off the client bundle: what ships is the adapted `VisualWorldModel` and the layout
   derived from it, not the machinery that produced them.
 
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
 
 const model = toVisualWorldModel(exploreSampleWorld, exploreSampleDocuments);
 const layout = layoutVisualWorld(model);
-const change = buildExploreChangeView(exploreChangeStory, exploreChangeSourceFiles);
+const change = buildExploreChangeView(exploreChangeStory, exploreChangeBaselineDocument);
 const answers = buildExploreAnswerViews(exploreSampleAnswers, model.evidence);
 
 const technical: ExploreTechnicalRecord = {

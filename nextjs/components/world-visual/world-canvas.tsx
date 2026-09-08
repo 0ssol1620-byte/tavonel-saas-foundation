@@ -59,6 +59,17 @@ export default function WorldCanvas({
 }: Props) {
   const refs = useRef(new Map<string, HTMLButtonElement>());
   const nodeById = useMemo(() => new Map(model.nodes.map((node) => [node.id, node] as const)), [model.nodes]);
+  const edgeById = useMemo(() => new Map(model.edges.map((edge) => [edge.id, edge] as const)), [model.edges]);
+  const neighborhood = useMemo(() => {
+    const ids = new Set<string>();
+    if (!selectedId) return ids;
+    ids.add(selectedId);
+    for (const edge of layout.edges) {
+      if (edge.from === selectedId) ids.add(edge.to);
+      if (edge.to === selectedId) ids.add(edge.from);
+    }
+    return ids;
+  }, [layout.edges, selectedId]);
 
   /*
     Arrow keys move through the composition the way it looks, not the way the array is ordered.
@@ -124,19 +135,31 @@ export default function WorldCanvas({
             ? "dim"
             : states[edge.to] ?? states[edge.from] ?? "candidate";
           const lit = selectedId === edge.from || selectedId === edge.to;
+          const focusDimmed = Boolean(selectedId && !lit);
+          const relation = edgeById.get(edge.id);
+          const pathId = `world-edge-${edge.id.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
           return (
-            <path
-              key={edge.id}
-              className={styles.edge}
-              d={edge.d}
-              data-visual-edge=""
-              data-edge-id={edge.id}
-              data-edge-from={edge.from}
-              data-edge-to={edge.to}
-              data-edge-state={state}
-              data-lit={lit ? "1" : "0"}
-              vectorEffect="non-scaling-stroke"
-            />
+            <g key={edge.id} data-focus-dimmed={focusDimmed ? "1" : "0"}>
+              <path
+                id={pathId}
+                className={styles.edge}
+                d={edge.d}
+                data-visual-edge=""
+                data-edge-id={edge.id}
+                data-edge-from={edge.from}
+                data-edge-to={edge.to}
+                data-edge-state={state}
+                data-lit={lit ? "1" : "0"}
+                vectorEffect="non-scaling-stroke"
+              />
+              {lit && relation?.predicate ? (
+                <text className={styles.edgeLabel} data-relation-label="">
+                  <textPath href={`#${pathId}`} startOffset="50%" textAnchor="middle">
+                    {relation.predicate.replaceAll("_", " ")}
+                  </textPath>
+                </text>
+              ) : null}
+            </g>
           );
         })}
       </svg>
@@ -146,6 +169,8 @@ export default function WorldCanvas({
         if (!node) return null;
         const state = states[node.id] ?? node.state;
         const selected = selectedId === node.id;
+        const focusDimmed = Boolean(selectedId && !neighborhood.has(node.id));
+        const related = Boolean(selectedId && !selected && neighborhood.has(node.id));
         return (
           <button
             key={node.id}
@@ -161,6 +186,8 @@ export default function WorldCanvas({
             data-node-state={state}
             data-node-role={placement.role}
             data-selected={selected ? "1" : "0"}
+            data-related={related ? "1" : "0"}
+            data-focus-dimmed={focusDimmed ? "1" : "0"}
             aria-pressed={selected}
             tabIndex={rovingId === node.id ? 0 : -1}
             style={{
@@ -170,20 +197,33 @@ export default function WorldCanvas({
             }}
             onClick={() => {
               onSelect(node.id);
-              onOpen(node.id);
             }}
+            onDoubleClick={() => onOpen(node.id)}
             onFocus={() => onSelect(node.id)}
             onKeyDown={(event) => {
               if (event.key === "ArrowLeft") { event.preventDefault(); move(node.id, -1, 0); }
               else if (event.key === "ArrowRight") { event.preventDefault(); move(node.id, 1, 0); }
               else if (event.key === "ArrowUp") { event.preventDefault(); move(node.id, 0, -1); }
               else if (event.key === "ArrowDown") { event.preventDefault(); move(node.id, 0, 1); }
+              else if (event.key === "Enter") { event.preventDefault(); onOpen(node.id); }
             }}
           >
             <span className={styles.nodeKind}>{KIND_LABEL[node.kind] ?? node.kind.toUpperCase()}</span>
             <span className={styles.nodeLabel}>{node.label}</span>
+            {/*
+              A source reports its regions; anything derived reports its relations.
+
+              This compiler binds a derived object to every region of one document, so "97
+              regions" under a topic and "26 regions" under an entity are a fact about that
+              filing rather than about the object -- three objects read out of the same filing
+              printed the same number and the composition read as an index of documents. What is
+              about the object is how much of the World it reaches, which is also exactly the
+              lines a reader can count from it. Both numbers are the artifact's.
+            */}
             <span className={styles.nodeMeta}>
-              {node.evidenceRefs.length} region{node.evidenceRefs.length === 1 ? "" : "s"}
+              {node.kind === "Document" || node.kind === "Evidence"
+                ? `${node.evidenceRefs.length} region${node.evidenceRefs.length === 1 ? "" : "s"}`
+                : `${node.degree} relation${node.degree === 1 ? "" : "s"}`}
             </span>
           </button>
         );

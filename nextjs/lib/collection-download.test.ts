@@ -91,10 +91,23 @@ describe("Foundation collection package download", () => {
       "rag/chunks.jsonl",
       "manifest/candidate-world.json",
       "manifest/DOWNLOAD_README.txt",
+      "README.md",
+      "AGENTS.md",
+      "manifest/ai-entrypoint.json",
       "manifest/export-manifest.json",
       "signatures/export-manifest.ed25519.json",
     ]));
     expect(strFromU8(entries["manifest/DOWNLOAD_README.txt"])).toContain("candidatePromotion=false");
+    expect(strFromU8(entries["README.md"])).toContain("Read AGENTS.md in this folder first");
+    expect(strFromU8(entries["README.md"])).toContain("A filesystem path by itself does not grant an AI access");
+    expect(strFromU8(entries["AGENTS.md"])).toContain("validation/report.json");
+    const aiEntrypoint = JSON.parse(strFromU8(entries["manifest/ai-entrypoint.json"]));
+    expect(aiEntrypoint).toEqual(expect.objectContaining({
+      schemaVersion: "tavonel.ai_entrypoint.v1",
+      collectionId: source.collectionId,
+      lifecycle: "candidate",
+      authoritativeUse: "verify_active_world_status",
+    }));
     expect(JSON.parse(strFromU8(entries["manifest/candidate-world.json"])).collectionId).toBe(source.collectionId);
     const exportManifest = JSON.parse(strFromU8(entries["manifest/export-manifest.json"]));
     const signature = JSON.parse(strFromU8(entries["signatures/export-manifest.ed25519.json"]));
@@ -174,6 +187,9 @@ describe("Foundation collection package download", () => {
     const entries = unzipSync(signed.archive);
     expect(signed.exportManifest.lifecycle).toBe("review_required");
     expect(strFromU8(entries["manifest/DOWNLOAD_README.txt"])).toContain("Lifecycle: review_required");
+    expect(JSON.parse(strFromU8(entries["manifest/ai-entrypoint.json"]))).toEqual(expect.objectContaining({
+      authoritativeUse: "blocked_pending_review",
+    }));
   });
 
   it("rejects traversal paths, altered bytes, non-Core artifacts and the wrong tenant collection", () => {

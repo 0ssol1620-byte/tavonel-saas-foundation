@@ -9,9 +9,9 @@
     "awaitingReview": "The MPa label is this session's judgement and has not been confirmed by an independent reviewer. It is a pressure unit that appears in the manual's torque line, and the corpus gold exclusions already exclude quantities ('2,000 operating hours') on the same ground."
   },
   "corpus": {
-    "name": "explore-sample",
+    "name": "entity-extraction-eval",
     "documents": 3,
-    "why": "The only corpus in this repository whose text is real, whose page geometry was read back out of real PDFs, and whose compilation is exercised on every build. Three documents is a small sample and every figure below carries that.",
+    "why": "The exact three-document corpus reviewed for this baseline is frozen in entity-extraction-eval.inputs.json. It was originally the public Explore corpus; Explore moved to SEC filings on 2026-09-08, so keeping this measurement bound to the reviewed inputs avoids silently relabelling a different corpus. Three documents is a small sample and every figure below carries that.",
     "gold": [
       {
         "value": "FP-200",

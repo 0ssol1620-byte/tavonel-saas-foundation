@@ -2,20 +2,35 @@ import { createHash } from "node:crypto";
 import { readFileSync as read } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { SOURCE_DOCUMENTS, extractRegions, renderPdf } from "../scripts/build-explore-sample.mjs";
 import {
+  SNAPSHOTS,
+  SOURCE_DOCUMENTS,
+  UNCOMPILED_FILES,
+  extractRegions,
+} from "../scripts/build-explore-sample.mjs";
+import {
+  EXPLORE_SAMPLE_BASELINE_DIGEST,
   EXPLORE_SAMPLE_DIGEST,
-  EXPLORE_SAMPLE_REVISION_B_DIGEST,
   exploreSampleAnswers,
   exploreSampleArtifact,
+  exploreSampleBaselineArtifact,
+  exploreSampleBaselineInputs,
+  exploreSampleBaselineWorld,
   exploreSampleDocuments,
   exploreSampleInputs,
-  exploreSampleRevisionBArtifact,
-  exploreSampleRevisionBInputs,
-  exploreSampleRevisionBWorld,
+  exploreSampleSources,
   exploreSampleWorld,
 } from "./explore-sample";
 import { validateCollectionOcrInput } from "./collection-compiler";
+
+/** The shape of a catalog entry this file reads. The generator is untyped JavaScript on purpose. */
+type SourceDocument = {
+  documentId: string;
+  representationFilename: string;
+  sourceFilename: string;
+  representationKind: string;
+  selectedPages: number[];
+};
 
 /*
   The Explore page's provenance, checked against the files it claims to come from.
@@ -23,8 +38,8 @@ import { validateCollectionOcrInput } from "./collection-compiler";
   This is the test the previous sample could not have had. Its `SOURCE.digest` was
   `sha256:3e118d4e...bf1c` and its bbox was `[118, 214, 886, 374]`, for a PDF that was not in
   the repository -- there was nothing to compare them to, which is exactly what made them
-  possible to write. Now there is: three committed PDFs, and every number on the page traceable
-  back into them.
+  possible to write. Now there is: two official public Form 10-K PDFs, and every number on the
+  page traceable back into their committed bytes and selected page geometry.
 
   The chain each test covers one link of:
 
@@ -44,53 +59,107 @@ function filenameOf(input: { sanitizedKey: string }) {
 }
 
 /*
-  Every distinct input across both revisions of the corpus.
+  Every distinct input across both snapshots.
 
-  Deduplicated by file rather than by document: the manual appears at two revisions under one
-  `documentId`, and the change notice and the service log appear once each in two corpora. The
-  file is what has a sha256 and a geometry, so the file is what these tests iterate.
+  Deduplicated by file: W0's one document is also W4's, byte for byte, and the file is what has a
+  sha256 and geometry, so the file is what these tests iterate.
 */
-const ALL_INPUTS = [...exploreSampleInputs, ...exploreSampleRevisionBInputs].filter(
+const ALL_INPUTS = [...exploreSampleInputs, ...exploreSampleBaselineInputs].filter(
   (input, index, all) => all.findIndex((item) => item.sanitizedKey === input.sanitizedKey) === index,
 );
+const CATALOG = SOURCE_DOCUMENTS as SourceDocument[];
 
-describe("the committed PDFs are what the generator makes", () => {
-  it.each(SOURCE_DOCUMENTS.map((document: { filename: string }) => document.filename))(
-    "reproduces %s byte for byte",
-    (filename) => {
-      const document = SOURCE_DOCUMENTS.find((item: { filename: string }) => item.filename === filename)!;
-      const committed = read(`${sampleDirectory}${filename}`);
-      // Byte equality, not "looks similar". A PDF with a creation date in it could not pass
-      // this, which is why the generator writes none.
-      expect(renderPdf(document).equals(committed)).toBe(true);
-    },
-  );
+describe("the public sample is bound to committed filing bytes", () => {
+  it("compiles the 2025 annual filing and the four 2026 filings that followed it", () => {
+    expect(CATALOG.map((document) => document.documentId)).toEqual([
+      "apple-form-10-k",
+      "apple-2026-q1-10-q",
+      "apple-2026-proxy-def14a",
+      "apple-2026-q2-10-q",
+      "apple-2026-q3-10-q",
+    ]);
+    expect(ALL_INPUTS).toHaveLength(CATALOG.length);
+    // Five filings, five document identities: a 10-Q is not a version of the 10-K.
+    expect(new Set(ALL_INPUTS.map((input) => input.documentId)).size).toBe(CATALOG.length);
+    expect(new Set(ALL_INPUTS.map((input) => input.versionKey)).size).toBe(CATALOG.length);
+  });
 
-  it("binds each input to the sha256 of the file on disk", () => {
+  it("keeps the 2024 filing committed without compiling it into a World", () => {
+    /*
+      Deleting an acquired source would break the proof chain, so the file stays. It is in no
+      snapshot, and this is the assertion that notices if it quietly returns to one.
+    */
+    expect(UNCOMPILED_FILES).toContain("apple-2024-form-10-k.pdf");
+    const compiled = new Set(CATALOG.map((document) => document.representationFilename));
+    for (const filename of UNCOMPILED_FILES as string[]) {
+      expect(read(`${sampleDirectory}${filename}`).length).toBeGreaterThan(0);
+      expect(compiled.has(filename), filename).toBe(false);
+    }
+  });
+
+  it("binds each input to the sha256 of the file the compiler actually read", () => {
     for (const input of ALL_INPUTS) {
       expect(input.inputSha256).toBe(`sha256:${sha256(read(`${sampleDirectory}${filenameOf(input)}`))}`);
       expect(input.versionKey).toBe(input.inputSha256.replace("sha256:", ""));
     }
   });
 
-  it("gives the two revisions of the manual one document identity and two versions", () => {
+  it("keeps the acquired original and the reference render apart, with both digests", () => {
     /*
-      The fixture's whole shape. `documentId` is the document, `versionKey` is the revision --
-      the compiler's own model -- and the Change Act is only a change story while the two sides
-      agree on the first and differ on the second. Split the identity and every claim in the
-      manual reads as removed-and-added, which is the opposite of what the Act shows.
+      §11.3. A 2026 filing's acquired source is an SEC EDGAR HTML primary document; the committed
+      PDF beside it is a deterministic render of that document. The record has to carry both
+      digests, each hashed here from the file it names, or the page cannot honestly say which of
+      the two it is showing.
     */
-    const revisions = ALL_INPUTS.filter((input) => filenameOf(input).includes("maintenance-manual"));
-    expect(revisions).toHaveLength(2);
-    expect(new Set(revisions.map((input) => input.documentId)).size).toBe(1);
-    expect(new Set(revisions.map((input) => input.versionKey)).size).toBe(2);
+    let rendered = 0;
+    for (const source of exploreSampleSources) {
+      expect(source.representationSha256, source.documentId).toBe(
+        `sha256:${sha256(read(`${sampleDirectory}${source.representationFilename}`))}`,
+      );
+      expect(source.originalSha256, source.documentId).toBe(
+        `sha256:${sha256(read(`${sampleDirectory}${source.sourceFilename}`))}`,
+      );
+      if (source.representationKind === "original") {
+        expect(source.originalSha256).toBe(source.representationSha256);
+        expect(source.renderProfile).toBeNull();
+        continue;
+      }
+      rendered += 1;
+      expect(source.representationKind).toBe("reference_render");
+      expect(source.originalSha256).not.toBe(source.representationSha256);
+      expect(source.sourceMediaType).toBe("text/html");
+      expect(source.renderProfile).toBeTruthy();
+    }
+    expect(rendered).toBe(4);
+  });
+
+  it("publishes source provenance for every filing", () => {
+    for (const document of exploreSampleDocuments) {
+      expect(document.accession, document.documentId).toMatch(/^\d{10}-\d{2}-\d{6}$/);
+      expect(document.form, document.documentId).toBeTruthy();
+      expect(document.filingDate, document.documentId).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(document.selectedPages?.length, document.documentId).toBe(3);
+      expect(document.authority, document.documentId).toBe("official");
+      expect(document.secHref, document.documentId).toContain("sec.gov");
+    }
+    expect(exploreSampleDocuments[0].sourceLabel).toContain("2025 Form 10-K");
+    expect(exploreSampleDocuments[0].accession).toBe("0000320193-25-000079");
+    expect(exploreSampleDocuments[0].selectedPages).toEqual([4, 25, 32]);
+  });
+
+  it("declares the snapshots the two frozen digests belong to", () => {
+    const snapshots = SNAPSHOTS as Array<{ id: string; documentIds: string[] }>;
+    expect(snapshots.map((snapshot) => snapshot.id)).toEqual(["w0", "w4"]);
+    expect(snapshots[0].documentIds).toEqual(["apple-form-10-k"]);
+    expect(snapshots[1].documentIds).toEqual(CATALOG.map((document) => document.documentId));
   });
 });
 
 describe("the geometry was read out of the documents, not written down", () => {
   it.each(ALL_INPUTS.map(filenameOf))("re-extracts %s to the same regions", async (filename) => {
     const input = ALL_INPUTS.find((item) => filenameOf(item) === filename)!;
-    const extracted = await extractRegions(read(`${sampleDirectory}${filename}`), input.documentId);
+    const source = CATALOG.find((document) => document.representationFilename === filename)!;
+    const extracted = await extractRegions(read(`${sampleDirectory}${filename}`), input.documentId, source.selectedPages);
     const authority = input.regions![0].authority;
     expect(extracted.map((region: object) => ({ ...region, authority }))).toEqual(input.regions);
   }, 15_000);
@@ -107,16 +176,18 @@ describe("the World is compiled output", () => {
     expect(exploreSampleArtifact.manifestDigest).toBe(EXPLORE_SAMPLE_DIGEST);
   });
 
-  it("compiles the earlier revision to its own frozen digest", () => {
+  it("compiles the baseline snapshot to its own frozen digest", () => {
     /*
-      Two frozen digests, because the Change Act compares two worlds and a comparison is only
-      reproducible while both sides are. The revision-B world is not decoration: it is the other
-      half of every count `lib/explore-change.ts` derives.
+      Two frozen digests, because the Change Act compares two Worlds and a comparison is only
+      reproducible while both sides are. W0 is not decoration: it is the other half of every
+      count `lib/explore-change.ts` derives.
     */
-    expect(exploreSampleRevisionBArtifact.manifestDigest).toBe(EXPLORE_SAMPLE_REVISION_B_DIGEST);
-    expect(EXPLORE_SAMPLE_REVISION_B_DIGEST).not.toBe(EXPLORE_SAMPLE_DIGEST);
-    expect(exploreSampleRevisionBWorld.contract.origin).toBe("deterministic_sample");
-    expect(exploreSampleRevisionBWorld.objects.length).toBeGreaterThan(5);
+    expect(exploreSampleBaselineArtifact.manifestDigest).toBe(EXPLORE_SAMPLE_BASELINE_DIGEST);
+    expect(EXPLORE_SAMPLE_BASELINE_DIGEST).not.toBe(EXPLORE_SAMPLE_DIGEST);
+    expect(exploreSampleBaselineWorld.contract.origin).toBe("deterministic_sample");
+    expect(exploreSampleBaselineWorld.objects.length).toBeGreaterThan(5);
+    // W4 is W0's corpus plus four filings, so it cannot be the smaller World.
+    expect(exploreSampleWorld.objects.length).toBeGreaterThan(exploreSampleBaselineWorld.objects.length);
   });
 
   it("names the runtime that actually ran", () => {

@@ -32,6 +32,14 @@ supabase/tests/*.sql text eol=lf
 # checking a file the page no longer describes.
 nextjs/public/explore-sample/*.pdf binary
 
+# The SEC EDGAR primary documents under sec-source/ are the acquired source bytes of the four
+# 2026 filings: sec-corpus-manifest.json pins each one's sha256, and build-explore-sample.mjs
+# re-hashes the file on disk and refuses to build when the two disagree. Through core.autocrlf a
+# Windows checkout rewrote every line ending, so the acquired original hashed to a value the
+# acquisition record had never seen. `-text` is the strongest statement available: these bytes
+# are evidence, and git rewrites them in neither direction on any platform.
+nextjs/public/explore-sample/sec-source/*.html -text
+
 # The frozen USKC contract schemas are copied verbatim into both repositories and pinned by
 # sha256 against the contract artifact. Same rule as above: through core.autocrlf a Windows
 # checkout would hash differently from the Linux one, and the two repositories would be

@@ -1,0 +1,1614 @@
+[
+  {
+    "documentId": "apple-form-10-k",
+    "versionKey": "108590052c3ba5400c63660d787fe7ed4e43868292946d7a7facebe9ab7d1aab",
+    "sanitizedKey": "public/explore-sample/apple-2025-form-10-k.pdf",
+    "ocrJsonKey": "public/explore-sample/apple-form-10-k/108590052c3ba5400c63660d787fe7ed4e43868292946d7a7facebe9ab7d1aab/text-layer-public-slice.json",
+    "pageCount": 80,
+    "text": "This Annual Report on Form 10-K (“Form 10-K”) contains forward-looking statements, within the meaning of the Private Securities Litigation Reform Act of 1995, that involve risks and uncertainties. Many of the forward-looking statements are located in Part I, Item 1 of this Form 10-K under the heading “Business” and Part II, Item 7 of this Form 10-K under the heading “Management’s Discussion and Analysis of Financial Condition and Results of Operations.” Forward-looking statements provide current expectations of future events based on certain assumptions and include any statement that does not directly relate to any historical or current fact. For example, statements in this Form 10-K regarding the potential future impact of macroeconomic conditions and tariffs and other measures on the Company’s business and results of operations are forward-looking statements. Forward-looking statements can also be identified by words such as “future,” “anticipates,” “believes,” “estimates,” “expects,” “intends,” “plans,” “predicts,” “will,” “would,” “could,” “can,” “may,” and similar terms. Forward-looking statements are not guarantees of future performance and the Company’s actual results may differ significantly from the results discussed in the forward-looking statements. Factors that might cause such differences include, but are not limited to, those discussed in Part I, Item 1A of this Form 10-K under the heading “Risk Factors.” The Company assumes no obligation to revise or update any forward-looking statements for any reason, except as required by law.\nUnless otherwise stated, all information presented herein is based on the Company’s fiscal calendar, and references to particular years, quarters, months or periods refer to the Company’s fiscal years ended in September and the associated quarters, months and periods of those fiscal years. Each of the terms the “Company” and “Apple” as used herein refers collectively to Apple Inc. and its wholly owned subsidiaries, unless otherwise stated.\nPART I Item 1. Business Company Background The Company designs, manufactures and markets smartphones, personal computers, tablets, wearables and accessories, and sells a variety of related services. The Company’s fiscal year is the 52- or 53-week period that ends on the last Saturday of September.\nProducts iPhone ® iPhone is the Company’s line of smartphones based on its iOS operating system. The iPhone line includes iPhone 17 Pro, iPhone Air™, iPhone 17, iPhone 16 and iPhone 16e.\nMac ® ® ® ® Mac is the Company’s line of personal computers based on its macOS operating system. The Mac line includes laptops MacBook Air and MacBook Pro , as ® ® ® ® well as desktops iMac , Mac mini , Mac Studio and Mac Pro .\niPad ® ® ® ® ® iPad is the Company’s line of multipurpose tablets based on its iPadOS operating system. The iPad line includes iPad Pro , iPad Air , iPad and iPad mini .\nWearables, Home and Accessories ® Wearables includes smartwatches, wireless headphones and spatial computers. The Company’s line of smartwatches, based on its watchOS operating system, ® ® ® ® ® includes Apple Watch Series 11, Apple Watch SE 3 and Apple Watch Ultra 3. The Company’s line of wireless headphones includes AirPods , AirPods Pro , ® ® ® AirPods Max and Beats products. Apple Vision Pro™ is the Company’s spatial computer based on its visionOS operating system. ® ® ® ® Home includes Apple TV 4K , the Company’s media streaming and gaming device based on its tvOS operating system, and HomePod and HomePod mini , high-fidelity wireless smart speakers.\nAccessories includes Apple-branded and third-party accessories.\nApple Inc. | 2025 Form 10-K | 1\nTariffs and Other Measures Beginning in the second quarter of 2025, new U.S. Tariffs were announced, including additional tariffs on imports from China, India, Japan, South Korea, Taiwan, Vietnam and the EU, among others. In response, several countries have imposed, or threatened to impose, reciprocal tariffs on imports from the U.S. and other retaliatory measures. Various modifications to the U.S. Tariffs have been announced and further changes could be made in the future, which may include additional sector-based tariffs or other measures. For example, the U.S. Department of Commerce has initiated an investigation under Section 232 of the Trade Expansion Act of 1962, as amended, into, among other things, imports of semiconductors, semiconductor manufacturing equipment, and their derivative products, including downstream products that contain semiconductors. Tariffs and other measures that are applied to the Company’s products or their components can have a material adverse impact on the Company’s business, results of operations and financial condition, including impacting the Company’s supply chain, the availability of rare earths and other raw materials and components, pricing and gross margin. The ultimate impact remains uncertain and will depend on several factors, including whether additional or incremental U.S. Tariffs or other measures are announced or imposed, to what extent other countries implement tariffs or other retaliatory measures in response, and the overall magnitude and duration of these measures. Trade and other international disputes can have an adverse impact on the overall macroeconomic environment and result in shifts and reductions in consumer spending and negative consumer sentiment for the Company’s products and services, all of which can further adversely affect the Company’s business and results of operations.\nSegment Operating Performance The following table shows net sales by reportable segment for 2025, 2024 and 2023 (dollars in millions): 2025 Change 2024 Change 2023 Americas $ 178,353 7 % $ 167,045 3 % $ 162,560 Europe 111,032 10 % 101,328 7 % 94,294 Greater China 64,377 (4)% 66,952 (8)% 72,559 Japan 28,703 15 % 25,052 3 % 24,257 Rest of Asia Pacific 33,696 10 % 30,658 4 % 29,615 Total net sales $ 416,161 6 % $ 391,035 2 % $ 383,285\nAmericas Americas net sales increased during 2025 compared to 2024 primarily due to higher net sales of iPhone and Services. The weakness in foreign currencies relative to the U.S. dollar had an unfavorable year-over-year impact on Americas net sales during 2025.\nEurope Europe net sales increased during 2025 compared to 2024 primarily due to higher net sales of Services, iPhone and Mac.\nGreater China Greater China net sales decreased during 2025 compared to 2024 primarily due to lower net sales of iPhone, partially offset by higher net sales of Mac.\nJapan Japan net sales increased during 2025 compared to 2024 primarily due to higher net sales of iPhone, Services and iPad.\nRest of Asia Pacific Rest of Asia Pacific net sales increased during 2025 compared to 2024 primarily due to higher net sales of iPhone, Services and Mac.\nApple Inc. | 2025 Form 10-K | 22\nApple Inc. CONSOLIDATED STATEMENTS OF OPERATIONS (In millions, except number of shares, which are reflected in thousands, and per-share amounts)\nYears ended September 27, September 28, September 30, 2025 2024 2023 Net sales: Products $ 307,003 $ 294,866 $ 298,085 Services 109,158 96,169 85,200 Total net sales 416,161 391,035 383,285\nCost of sales: Products 194,116 185,233 189,282 Services 26,844 25,119 24,855 Total cost of sales 220,960 210,352 214,137 Gross margin 195,201 180,683 169,148\nOperating expenses: Research and development 34,550 31,370 29,915 Selling, general and administrative 27,601 26,097 24,932 Total operating expenses 62,151 57,467 54,847\nOperating income 133,050 123,216 114,301 Other income/(expense), net (321) 269 (565) Income before provision for income taxes 132,729 123,485 113,736 Provision for income taxes 20,719 29,749 16,741 Net income $ 112,010 $ 93,736 $ 96,995\nEarnings per share: Basic $ 7.49 $ 6.11 $ 6.16 Diluted $ 7.46 $ 6.08 $ 6.13\nShares used in computing earnings per share: Basic 14,948,500 15,343,783 15,744,231 Diluted 15,004,697 15,408,095 15,812,547\nSee accompanying Notes to Consolidated Financial Statements.\nApple Inc. | 2025 Form 10-K | 29",
+    "inputSha256": "sha256:108590052c3ba5400c63660d787fe7ed4e43868292946d7a7facebe9ab7d1aab",
+    "sourceImmutableKey": "public/explore-sample/apple-2025-form-10-k.pdf",
+    "regions": [
+      {
+        "regionId": "apple-form-10-k-p4-r0",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 0,
+        "blockType": "paragraph",
+        "text": "This Annual Report on Form 10-K (“Form 10-K”) contains forward-looking statements, within the meaning of the Private Securities Litigation Reform Act of 1995, that involve risks and uncertainties. Many of the forward-looking statements are located in Part I, Item 1 of this Form 10-K under the heading “Business” and Part II, Item 7 of this Form 10-K under the heading “Management’s Discussion and Analysis of Financial Condition and Results of Operations.” Forward-looking statements provide current expectations of future events based on certain assumptions and include any statement that does not directly relate to any historical or current fact. For example, statements in this Form 10-K regarding the potential future impact of macroeconomic conditions and tariffs and other measures on the Company’s business and results of operations are forward-looking statements. Forward-looking statements can also be identified by words such as “future,” “anticipates,” “believes,” “estimates,” “expects,” “intends,” “plans,” “predicts,” “will,” “would,” “could,” “can,” “may,” and similar terms. Forward-looking statements are not guarantees of future performance and the Company’s actual results may differ significantly from the results discussed in the forward-looking statements. Factors that might cause such differences include, but are not limited to, those discussed in Part I, Item 1A of this Form 10-K under the heading “Risk Factors.” The Company assumes no obligation to revise or update any forward-looking statements for any reason, except as required by law.",
+        "bbox1000": [
+          30,
+          97,
+          971,
+          217
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-form-10-k-p4-r1",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 1,
+        "blockType": "paragraph",
+        "text": "Unless otherwise stated, all information presented herein is based on the Company’s fiscal calendar, and references to particular years, quarters, months or periods refer to the Company’s fiscal years ended in September and the associated quarters, months and periods of those fiscal years. Each of the terms the “Company” and “Apple” as used herein refers collectively to Apple Inc. and its wholly owned subsidiaries, unless otherwise stated.",
+        "bbox1000": [
+          30,
+          234,
+          971,
+          268
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-form-10-k-p4-r2",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 2,
+        "blockType": "paragraph",
+        "text": "PART I Item 1. Business Company Background The Company designs, manufactures and markets smartphones, personal computers, tablets, wearables and accessories, and sells a variety of related services. The Company’s fiscal year is the 52- or 53-week period that ends on the last Saturday of September.",
+        "bbox1000": [
+          30,
+          291,
+          971,
+          380
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-form-10-k-p4-r3",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 3,
+        "blockType": "paragraph",
+        "text": "Products iPhone ® iPhone is the Company’s line of smartphones based on its iOS operating system. The iPhone line includes iPhone 17 Pro, iPhone Air™, iPhone 17, iPhone 16 and iPhone 16e.",
+        "bbox1000": [
+          30,
+          403,
+          971,
+          467
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-form-10-k-p4-r4",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 4,
+        "blockType": "paragraph",
+        "text": "Mac ® ® ® ® Mac is the Company’s line of personal computers based on its macOS operating system. The Mac line includes laptops MacBook Air and MacBook Pro , as ® ® ® ® well as desktops iMac , Mac mini , Mac Studio and Mac Pro .",
+        "bbox1000": [
+          30,
+          487,
+          971,
+          528
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-form-10-k-p4-r5",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 5,
+        "blockType": "paragraph",
+        "text": "iPad ® ® ® ® ® iPad is the Company’s line of multipurpose tablets based on its iPadOS operating system. The iPad line includes iPad Pro , iPad Air , iPad and iPad mini .",
+        "bbox1000": [
+          30,
+          549,
+          952,
+          579
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-form-10-k-p4-r6",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 6,
+        "blockType": "paragraph",
+        "text": "Wearables, Home and Accessories ® Wearables includes smartwatches, wireless headphones and spatial computers. The Company’s line of smartwatches, based on its watchOS operating system, ® ® ® ® ® includes Apple Watch Series 11, Apple Watch SE 3 and Apple Watch Ultra 3. The Company’s line of wireless headphones includes AirPods , AirPods Pro , ® ® ® AirPods Max and Beats products. Apple Vision Pro™ is the Company’s spatial computer based on its visionOS operating system. ® ® ® ® Home includes Apple TV 4K , the Company’s media streaming and gaming device based on its tvOS operating system, and HomePod and HomePod mini , high-fidelity wireless smart speakers.",
+        "bbox1000": [
+          30,
+          598,
+          971,
+          690
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-form-10-k-p4-r7",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 7,
+        "blockType": "paragraph",
+        "text": "Accessories includes Apple-branded and third-party accessories.",
+        "bbox1000": [
+          30,
+          707,
+          409,
+          717
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-form-10-k-p4-r8",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 8,
+        "blockType": "paragraph",
+        "text": "Apple Inc. | 2025 Form 10-K | 1",
+        "bbox1000": [
+          419,
+          756,
+          582,
+          765
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-form-10-k-p25-r9",
+        "pageIndex0": 24,
+        "pageNumber1": 25,
+        "order": 9,
+        "blockType": "paragraph",
+        "text": "Tariffs and Other Measures Beginning in the second quarter of 2025, new U.S. Tariffs were announced, including additional tariffs on imports from China, India, Japan, South Korea, Taiwan, Vietnam and the EU, among others. In response, several countries have imposed, or threatened to impose, reciprocal tariffs on imports from the U.S. and other retaliatory measures. Various modifications to the U.S. Tariffs have been announced and further changes could be made in the future, which may include additional sector-based tariffs or other measures. For example, the U.S. Department of Commerce has initiated an investigation under Section 232 of the Trade Expansion Act of 1962, as amended, into, among other things, imports of semiconductors, semiconductor manufacturing equipment, and their derivative products, including downstream products that contain semiconductors. Tariffs and other measures that are applied to the Company’s products or their components can have a material adverse impact on the Company’s business, results of operations and financial condition, including impacting the Company’s supply chain, the availability of rare earths and other raw materials and components, pricing and gross margin. The ultimate impact remains uncertain and will depend on several factors, including whether additional or incremental U.S. Tariffs or other measures are announced or imposed, to what extent other countries implement tariffs or other retaliatory measures in response, and the overall magnitude and duration of these measures. Trade and other international disputes can have an adverse impact on the overall macroeconomic environment and result in shifts and reductions in consumer spending and negative consumer sentiment for the Company’s products and services, all of which can further adversely affect the Company’s business and results of operations.",
+        "bbox1000": [
+          30,
+          97,
+          971,
+          261
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-form-10-k-p25-r10",
+        "pageIndex0": 24,
+        "pageNumber1": 25,
+        "order": 10,
+        "blockType": "paragraph",
+        "text": "Segment Operating Performance The following table shows net sales by reportable segment for 2025, 2024 and 2023 (dollars in millions): 2025 Change 2024 Change 2023 Americas $ 178,353 7 % $ 167,045 3 % $ 162,560 Europe 111,032 10 % 101,328 7 % 94,294 Greater China 64,377 (4)% 66,952 (8)% 72,559 Japan 28,703 15 % 25,052 3 % 24,257 Rest of Asia Pacific 33,696 10 % 30,658 4 % 29,615 Total net sales $ 416,161 6 % $ 391,035 2 % $ 383,285",
+        "bbox1000": [
+          30,
+          284,
+          964,
+          420
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-form-10-k-p25-r11",
+        "pageIndex0": 24,
+        "pageNumber1": 25,
+        "order": 11,
+        "blockType": "paragraph",
+        "text": "Americas Americas net sales increased during 2025 compared to 2024 primarily due to higher net sales of iPhone and Services. The weakness in foreign currencies relative to the U.S. dollar had an unfavorable year-over-year impact on Americas net sales during 2025.",
+        "bbox1000": [
+          30,
+          453,
+          971,
+          494
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-form-10-k-p25-r12",
+        "pageIndex0": 24,
+        "pageNumber1": 25,
+        "order": 12,
+        "blockType": "paragraph",
+        "text": "Europe Europe net sales increased during 2025 compared to 2024 primarily due to higher net sales of Services, iPhone and Mac.",
+        "bbox1000": [
+          30,
+          517,
+          741,
+          546
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-form-10-k-p25-r13",
+        "pageIndex0": 24,
+        "pageNumber1": 25,
+        "order": 13,
+        "blockType": "paragraph",
+        "text": "Greater China Greater China net sales decreased during 2025 compared to 2024 primarily due to lower net sales of iPhone, partially offset by higher net sales of Mac.",
+        "bbox1000": [
+          30,
+          569,
+          915,
+          598
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-form-10-k-p25-r14",
+        "pageIndex0": 24,
+        "pageNumber1": 25,
+        "order": 14,
+        "blockType": "paragraph",
+        "text": "Japan Japan net sales increased during 2025 compared to 2024 primarily due to higher net sales of iPhone, Services and iPad.",
+        "bbox1000": [
+          30,
+          620,
+          736,
+          650
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-form-10-k-p25-r15",
+        "pageIndex0": 24,
+        "pageNumber1": 25,
+        "order": 15,
+        "blockType": "paragraph",
+        "text": "Rest of Asia Pacific Rest of Asia Pacific net sales increased during 2025 compared to 2024 primarily due to higher net sales of iPhone, Services and Mac.",
+        "bbox1000": [
+          30,
+          672,
+          812,
+          701
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-form-10-k-p25-r16",
+        "pageIndex0": 24,
+        "pageNumber1": 25,
+        "order": 16,
+        "blockType": "paragraph",
+        "text": "Apple Inc. | 2025 Form 10-K | 22",
+        "bbox1000": [
+          415,
+          742,
+          585,
+          751
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-form-10-k-p32-r17",
+        "pageIndex0": 31,
+        "pageNumber1": 32,
+        "order": 17,
+        "blockType": "paragraph",
+        "text": "Apple Inc. CONSOLIDATED STATEMENTS OF OPERATIONS (In millions, except number of shares, which are reflected in thousands, and per-share amounts)",
+        "bbox1000": [
+          219,
+          76,
+          781,
+          121
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-form-10-k-p32-r18",
+        "pageIndex0": 31,
+        "pageNumber1": 32,
+        "order": 18,
+        "blockType": "paragraph",
+        "text": "Years ended September 27, September 28, September 30, 2025 2024 2023 Net sales: Products $ 307,003 $ 294,866 $ 298,085 Services 109,158 96,169 85,200 Total net sales 416,161 391,035 383,285",
+        "bbox1000": [
+          31,
+          140,
+          965,
+          234
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-form-10-k-p32-r19",
+        "pageIndex0": 31,
+        "pageNumber1": 32,
+        "order": 19,
+        "blockType": "paragraph",
+        "text": "Cost of sales: Products 194,116 185,233 189,282 Services 26,844 25,119 24,855 Total cost of sales 220,960 210,352 214,137 Gross margin 195,201 180,683 169,148",
+        "bbox1000": [
+          31,
+          253,
+          965,
+          325
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-form-10-k-p32-r20",
+        "pageIndex0": 31,
+        "pageNumber1": 32,
+        "order": 20,
+        "blockType": "paragraph",
+        "text": "Operating expenses: Research and development 34,550 31,370 29,915 Selling, general and administrative 27,601 26,097 24,932 Total operating expenses 62,151 57,467 54,847",
+        "bbox1000": [
+          31,
+          345,
+          965,
+          401
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-form-10-k-p32-r21",
+        "pageIndex0": 31,
+        "pageNumber1": 32,
+        "order": 21,
+        "blockType": "paragraph",
+        "text": "Operating income 133,050 123,216 114,301 Other income/(expense), net (321) 269 (565) Income before provision for income taxes 132,729 123,485 113,736 Provision for income taxes 20,719 29,749 16,741 Net income $ 112,010 $ 93,736 $ 96,995",
+        "bbox1000": [
+          31,
+          422,
+          968,
+          492
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-form-10-k-p32-r22",
+        "pageIndex0": 31,
+        "pageNumber1": 32,
+        "order": 22,
+        "blockType": "paragraph",
+        "text": "Earnings per share: Basic $ 7.49 $ 6.11 $ 6.16 Diluted $ 7.46 $ 6.08 $ 6.13",
+        "bbox1000": [
+          31,
+          515,
+          965,
+          554
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-form-10-k-p32-r23",
+        "pageIndex0": 31,
+        "pageNumber1": 32,
+        "order": 23,
+        "blockType": "paragraph",
+        "text": "Shares used in computing earnings per share: Basic 14,948,500 15,343,783 15,744,231 Diluted 15,004,697 15,408,095 15,812,547",
+        "bbox1000": [
+          31,
+          574,
+          965,
+          614
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-form-10-k-p32-r24",
+        "pageIndex0": 31,
+        "pageNumber1": 32,
+        "order": 24,
+        "blockType": "paragraph",
+        "text": "See accompanying Notes to Consolidated Financial Statements.",
+        "bbox1000": [
+          311,
+          637,
+          689,
+          647
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-form-10-k-p32-r25",
+        "pageIndex0": 31,
+        "pageNumber1": 32,
+        "order": 25,
+        "blockType": "paragraph",
+        "text": "Apple Inc. | 2025 Form 10-K | 29",
+        "bbox1000": [
+          415,
+          687,
+          585,
+          696
+        ],
+        "confidence": 1,
+        "authority": "official"
+      }
+    ]
+  },
+  {
+    "documentId": "apple-2026-q1-10-q",
+    "versionKey": "7fe2683c59e0b48f6c112bc17b3900d907f64236c138d1dd32f40d544b1ba89f",
+    "sanitizedKey": "public/explore-sample/apple-2026-q1-10-q-reference.pdf",
+    "ocrJsonKey": "public/explore-sample/apple-2026-q1-10-q/7fe2683c59e0b48f6c112bc17b3900d907f64236c138d1dd32f40d544b1ba89f/text-layer-public-slice.json",
+    "pageCount": 30,
+    "text": "PART I — FINANCIAL INFORMATION Item 1. Financial Statements\nApple Inc. CONDENSED CONSOLIDATED STATEMENTS OF OPERATIONS (Unaudited) (In millions, except number of shares, which are reflected in thousands, and per-share amounts)\nThree Months Ended December 27, December 28, 2025 2024 Net sales: Products $ 113,743 $ 97,960 Services 30,013 26,340 Total net sales 143,756 124,300\nCost of sales: Products 67,478 59,447 Services 7,047 6,578 Total cost of sales 74,525 66,025 Gross margin 69,231 58,275\nOperating expenses: Research and development 10,887 8,268 Selling, general and administrative 7,492 7,175 Total operating expenses 18,379 15,443\nOperating income 50,852 42,832 Other income/(expense), net 150 (248) Income before provision for income taxes 51,002 42,584 Provision for income taxes 8,905 6,254 Net income $ 42,097 $ 36,330\nEarnings per share: Basic $ 2.85 $ 2.41 Diluted $ 2.84 $ 2.40\nShares used in computing earnings per share: Basic 14,748,158 15,081,724 Diluted 14,810,356 15,150,865\nSee accompanying Notes to Condensed Consolidated Financial Statements.\nApple Inc. | Q1 2026 Form 10-Q | 1\nNote 10 – Segment Information The following table shows information by reportable segment for the three months ended December 27, 2025 and December 28, 2024 (in millions): Three Months Ended December 27, 2025 Greater Rest of Americas Europe China Japan Asia Pacific Corporate Total Net sales $ 58,529 $ 38,146 $ 25,526 $ 9,413 $ 12,142 $ — $ 143,756 Cost of sales (31,849) (19,061) (13,030) (4,511) (6,074) — (74,525) Research and development — — — — — (10,887) (10,887) Selling and marketing (2,727) (1,295) (704) (289) (382) — (5,397) General and administrative — — — — — (2,095) (2,095) Operating income/(loss) $ 23,953 $ 17,790 $ 11,792 $ 4,613 $ 5,686 $ (12,982) $ 50,852\nThree Months Ended December 28, 2024 Greater Rest of Americas Europe China Japan Asia Pacific Corporate Total Net sales $ 52,648 $ 33,861 $ 18,513 $ 8,987 $ 10,291 $ — $ 124,300 Cost of sales (28,495) (18,043) (9,759) (4,393) (5,335) — (66,025) Research and development — — — — — (8,268) (8,268) Selling and marketing (2,644) (1,211) (594) (280) (372) — (5,101) General and administrative — — — — — (2,074) (2,074) Operating income/(loss) $ 21,509 $ 14,607 $ 8,160 $ 4,314 $ 4,584 $ (10,342) $ 42,832\nApple Inc. | Q1 2026 Form 10-Q | 12\nItem 2. Management’s Discussion and Analysis of Financial Condition and Results of Operations This Item and other sections of this Quarterly Report on Form 10-Q (“Form 10-Q”) contain forward-looking statements, within the meaning of the Private Securities Litigation Reform Act of 1995, that involve risks and uncertainties. Forward-looking statements provide current expectations of future events based on certain assumptions and include any statement that does not directly relate to any historical or current fact. For example, statements in this Form 10-Q regarding the potential future impact of macroeconomic conditions and tariffs and other measures on the Company’s business and results of operations are forward-looking statements . Forward-looking statements can also be identified by words such as “future,” “anticipates,” “believes,” “estimates,” “expects,” “intends,” “plans,” “predicts,” “will,” “would,” “could,” “can,” “may,” and similar terms. Forward-looking statements are not guarantees of future performance and the Company’s actual results may differ significantly from the results discussed in the forward-looking statements. Factors that might cause such differences include, but are not limited to, those discussed in Part I, Item 1A of the 2025 Form 10-K and Part II, Item 1A of this Form 10-Q, in each case under the heading “Risk Factors.” The Company assumes no obligation to revise or update any forward-looking statements for any reason, except as required by law.\nUnless otherwise stated, all information presented herein is based on the Company’s fiscal calendar, and references to particular years, quarters, months or periods refer to the Company’s fiscal years ended in September and the associated quarters, months and periods of those fiscal years. The following discussion should be read in conjunction with the 2025 Form 10-K filed with the U.S. Securities and Exchange Commission (“SEC”) and the condensed consolidated financial statements and accompanying notes included in Part I, Item 1 of this Form 10-Q.\nAvailable Information The Company periodically provides certain information for investors on its corporate website, www.apple.com, and its investor relations website, investor.apple.com. This includes press releases and other information about financial performance, information on corporate governance, and details related to the Company’s annual meeting of shareholders. The information contained on the websites referenced in this Form 10-Q is not incorporated by reference into this filing. Further, the Company’s references to website URLs are intended to be inactive textual references only.\nBusiness Seasonality and Product Introductions The Company has historically experienced higher net sales in its first quarter compared to other quarters in its fiscal year due in part to seasonal holiday demand. Additionally, new product and service introductions can significantly impact net sales, cost of sales and operating expenses. The timing of product introductions can also impact the Company’s net sales to its indirect distribution channels as these channels are filled with new inventory following a product launch, and channel inventory of an older product often declines as the launch of a newer product approaches. Net sales can also be affected when consumers and distributors anticipate a product introduction.\nDuring the first quarter of 2026, the Company announced the following updated products: ® • 14-inch MacBook Pro ® • iPad Pro ® • Apple Vision Pro\nMacroeconomic Conditions Macroeconomic conditions, including inflation, interest rates, component pricing and currency fluctuations, have directly and indirectly impacted, and could in the future materially impact, the Company’s results of operations and financial condition.\nApple Inc. | Q1 2026 Form 10-Q | 13",
+    "inputSha256": "sha256:7fe2683c59e0b48f6c112bc17b3900d907f64236c138d1dd32f40d544b1ba89f",
+    "sourceImmutableKey": "public/explore-sample/apple-2026-q1-10-q-reference.pdf",
+    "regions": [
+      {
+        "regionId": "apple-2026-q1-10-q-p4-r0",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 0,
+        "blockType": "paragraph",
+        "text": "PART I — FINANCIAL INFORMATION Item 1. Financial Statements",
+        "bbox1000": [
+          62,
+          116,
+          318,
+          156
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q1-10-q-p4-r1",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 1,
+        "blockType": "paragraph",
+        "text": "Apple Inc. CONDENSED CONSOLIDATED STATEMENTS OF OPERATIONS (Unaudited) (In millions, except number of shares, which are reflected in thousands, and per-share amounts)",
+        "bbox1000": [
+          188,
+          174,
+          813,
+          224
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q1-10-q-p4-r2",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 2,
+        "blockType": "paragraph",
+        "text": "Three Months Ended December 27, December 28, 2025 2024 Net sales: Products $ 113,743 $ 97,960 Services 30,013 26,340 Total net sales 143,756 124,300",
+        "bbox1000": [
+          64,
+          249,
+          932,
+          352
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q1-10-q-p4-r3",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 3,
+        "blockType": "paragraph",
+        "text": "Cost of sales: Products 67,478 59,447 Services 7,047 6,578 Total cost of sales 74,525 66,025 Gross margin 69,231 58,275",
+        "bbox1000": [
+          64,
+          375,
+          932,
+          454
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q1-10-q-p4-r4",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 4,
+        "blockType": "paragraph",
+        "text": "Operating expenses: Research and development 10,887 8,268 Selling, general and administrative 7,492 7,175 Total operating expenses 18,379 15,443",
+        "bbox1000": [
+          64,
+          476,
+          932,
+          538
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q1-10-q-p4-r5",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 5,
+        "blockType": "paragraph",
+        "text": "Operating income 50,852 42,832 Other income/(expense), net 150 (248) Income before provision for income taxes 51,002 42,584 Provision for income taxes 8,905 6,254 Net income $ 42,097 $ 36,330",
+        "bbox1000": [
+          64,
+          561,
+          936,
+          639
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q1-10-q-p4-r6",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 6,
+        "blockType": "paragraph",
+        "text": "Earnings per share: Basic $ 2.85 $ 2.41 Diluted $ 2.84 $ 2.40",
+        "bbox1000": [
+          64,
+          664,
+          932,
+          707
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q1-10-q-p4-r7",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 7,
+        "blockType": "paragraph",
+        "text": "Shares used in computing earnings per share: Basic 14,748,158 15,081,724 Diluted 14,810,356 15,150,865",
+        "bbox1000": [
+          64,
+          730,
+          932,
+          775
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q1-10-q-p4-r8",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 8,
+        "blockType": "paragraph",
+        "text": "See accompanying Notes to Condensed Consolidated Financial Statements.",
+        "bbox1000": [
+          251,
+          800,
+          750,
+          812
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q1-10-q-p4-r9",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 9,
+        "blockType": "paragraph",
+        "text": "Apple Inc. | Q1 2026 Form 10-Q | 1",
+        "bbox1000": [
+          399,
+          855,
+          602,
+          866
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q1-10-q-p17-r10",
+        "pageIndex0": 16,
+        "pageNumber1": 17,
+        "order": 10,
+        "blockType": "paragraph",
+        "text": "Note 10 – Segment Information The following table shows information by reportable segment for the three months ended December 27, 2025 and December 28, 2024 (in millions): Three Months Ended December 27, 2025 Greater Rest of Americas Europe China Japan Asia Pacific Corporate Total Net sales $ 58,529 $ 38,146 $ 25,526 $ 9,413 $ 12,142 $ — $ 143,756 Cost of sales (31,849) (19,061) (13,030) (4,511) (6,074) — (74,525) Research and development — — — — — (10,887) (10,887) Selling and marketing (2,727) (1,295) (704) (289) (382) — (5,397) General and administrative — — — — — (2,095) (2,095) Operating income/(loss) $ 23,953 $ 17,790 $ 11,792 $ 4,613 $ 5,686 $ (12,982) $ 50,852",
+        "bbox1000": [
+          62,
+          116,
+          939,
+          304
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q1-10-q-p17-r11",
+        "pageIndex0": 16,
+        "pageNumber1": 17,
+        "order": 11,
+        "blockType": "paragraph",
+        "text": "Three Months Ended December 28, 2024 Greater Rest of Americas Europe China Japan Asia Pacific Corporate Total Net sales $ 52,648 $ 33,861 $ 18,513 $ 8,987 $ 10,291 $ — $ 124,300 Cost of sales (28,495) (18,043) (9,759) (4,393) (5,335) — (66,025) Research and development — — — — — (8,268) (8,268) Selling and marketing (2,644) (1,211) (594) (280) (372) — (5,101) General and administrative — — — — — (2,074) (2,074) Operating income/(loss) $ 21,509 $ 14,607 $ 8,160 $ 4,314 $ 4,584 $ (10,342) $ 42,832",
+        "bbox1000": [
+          64,
+          324,
+          936,
+          453
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q1-10-q-p17-r12",
+        "pageIndex0": 16,
+        "pageNumber1": 17,
+        "order": 12,
+        "blockType": "paragraph",
+        "text": "Apple Inc. | Q1 2026 Form 10-Q | 12",
+        "bbox1000": [
+          395,
+          538,
+          606,
+          548
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q1-10-q-p18-r13",
+        "pageIndex0": 17,
+        "pageNumber1": 18,
+        "order": 13,
+        "blockType": "paragraph",
+        "text": "Item 2. Management’s Discussion and Analysis of Financial Condition and Results of Operations This Item and other sections of this Quarterly Report on Form 10-Q (“Form 10-Q”) contain forward-looking statements, within the meaning of the Private Securities Litigation Reform Act of 1995, that involve risks and uncertainties. Forward-looking statements provide current expectations of future events based on certain assumptions and include any statement that does not directly relate to any historical or current fact. For example, statements in this Form 10-Q regarding the potential future impact of macroeconomic conditions and tariffs and other measures on the Company’s business and results of operations are forward-looking statements . Forward-looking statements can also be identified by words such as “future,” “anticipates,” “believes,” “estimates,” “expects,” “intends,” “plans,” “predicts,” “will,” “would,” “could,” “can,” “may,” and similar terms. Forward-looking statements are not guarantees of future performance and the Company’s actual results may differ significantly from the results discussed in the forward-looking statements. Factors that might cause such differences include, but are not limited to, those discussed in Part I, Item 1A of the 2025 Form 10-K and Part II, Item 1A of this Form 10-Q, in each case under the heading “Risk Factors.” The Company assumes no obligation to revise or update any forward-looking statements for any reason, except as required by law.",
+        "bbox1000": [
+          62,
+          105,
+          939,
+          277
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q1-10-q-p18-r14",
+        "pageIndex0": 17,
+        "pageNumber1": 18,
+        "order": 14,
+        "blockType": "paragraph",
+        "text": "Unless otherwise stated, all information presented herein is based on the Company’s fiscal calendar, and references to particular years, quarters, months or periods refer to the Company’s fiscal years ended in September and the associated quarters, months and periods of those fiscal years. The following discussion should be read in conjunction with the 2025 Form 10-K filed with the U.S. Securities and Exchange Commission (“SEC”) and the condensed consolidated financial statements and accompanying notes included in Part I, Item 1 of this Form 10-Q.",
+        "bbox1000": [
+          62,
+          295,
+          939,
+          390
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q1-10-q-p18-r15",
+        "pageIndex0": 17,
+        "pageNumber1": 18,
+        "order": 15,
+        "blockType": "paragraph",
+        "text": "Available Information The Company periodically provides certain information for investors on its corporate website, www.apple.com, and its investor relations website, investor.apple.com. This includes press releases and other information about financial performance, information on corporate governance, and details related to the Company’s annual meeting of shareholders. The information contained on the websites referenced in this Form 10-Q is not incorporated by reference into this filing. Further, the Company’s references to website URLs are intended to be inactive textual references only.",
+        "bbox1000": [
+          62,
+          415,
+          939,
+          502
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q1-10-q-p18-r16",
+        "pageIndex0": 17,
+        "pageNumber1": 18,
+        "order": 16,
+        "blockType": "paragraph",
+        "text": "Business Seasonality and Product Introductions The Company has historically experienced higher net sales in its first quarter compared to other quarters in its fiscal year due in part to seasonal holiday demand. Additionally, new product and service introductions can significantly impact net sales, cost of sales and operating expenses. The timing of product introductions can also impact the Company’s net sales to its indirect distribution channels as these channels are filled with new inventory following a product launch, and channel inventory of an older product often declines as the launch of a newer product approaches. Net sales can also be affected when consumers and distributors anticipate a product introduction.",
+        "bbox1000": [
+          62,
+          527,
+          939,
+          628
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q1-10-q-p18-r17",
+        "pageIndex0": 17,
+        "pageNumber1": 18,
+        "order": 17,
+        "blockType": "paragraph",
+        "text": "During the first quarter of 2026, the Company announced the following updated products: ® • 14-inch MacBook Pro ® • iPad Pro ® • Apple Vision Pro",
+        "bbox1000": [
+          62,
+          646,
+          642,
+          705
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q1-10-q-p18-r18",
+        "pageIndex0": 17,
+        "pageNumber1": 18,
+        "order": 18,
+        "blockType": "paragraph",
+        "text": "Macroeconomic Conditions Macroeconomic conditions, including inflation, interest rates, component pricing and currency fluctuations, have directly and indirectly impacted, and could in the future materially impact, the Company’s results of operations and financial condition.",
+        "bbox1000": [
+          62,
+          730,
+          939,
+          777
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q1-10-q-p18-r19",
+        "pageIndex0": 17,
+        "pageNumber1": 18,
+        "order": 19,
+        "blockType": "paragraph",
+        "text": "Apple Inc. | Q1 2026 Form 10-Q | 13",
+        "bbox1000": [
+          395,
+          821,
+          606,
+          831
+        ],
+        "confidence": 1,
+        "authority": "official"
+      }
+    ]
+  },
+  {
+    "documentId": "apple-2026-proxy-def14a",
+    "versionKey": "aa84ce73eb0f181844ccd0bb8a4a53f670fae6a007c086ccdb55f705f8d7a0c2",
+    "sanitizedKey": "public/explore-sample/apple-2026-proxy-def14a-reference.pdf",
+    "ocrJsonKey": "public/explore-sample/apple-2026-proxy-def14a/aa84ce73eb0f181844ccd0bb8a4a53f670fae6a007c086ccdb55f705f8d7a0c2/text-layer-public-slice.json",
+    "pageCount": 103,
+    "text": "Table of Contents Summary Governance Directors Compensation Proposals Other Information Role of the Board of Directors Apple’s Board oversees the CEO and other senior management in the competent and ethical operation of Apple and seeks to ensure that the long-term interests of shareholders are being served. Directors are expected to take a proactive, focused approach to ensure Apple is committed to business success through the maintenance of high standards of responsibility and ethics. Board Independence Apple’s Corporate Governance Guidelines require a majority of Board members to be independent. The Board has determined that all Board members, other than Mr. Cook, are independent under applicable rules of The Nasdaq Stock Market LLC (“Nasdaq”). Apple’s Board has a standing Audit and Finance Committee (the “Audit Committee”), People and Compensation Committee (the “People and Compensation Committee”), and Nominating and Corporate Governance Committee (the “Nominating Committee”). The Board has determined that all committee members are independent under applicable Nasdaq and Securities and Exchange Commission (“SEC”) rules for committee memberships, and that each member of the Audit Committee also meets the additional independence criteria set forth in Rule 10A-3(b)(1) under the Securities Exchange Act of 1934, as amended (the “Exchange Act”). Board and Committee Structure Apple regularly reviews the Board’s leadership structure and the responsibilities and composition of its standing committees. The structure and composition of Apple’s Board and its committees are intended to leverage the wide range of perspectives of the Board members and promote effective oversight. The Board believes its current leadership structure, in which the roles of Chair and CEO are separated, best serves Apple’s overall corporate structure and the Board’s ability to carry out its roles and responsibilities on behalf of Apple’s shareholders, including its oversight of management and corporate governance matters. The Board also believes that the current structure allows our CEO to focus on managing Apple, while leveraging our independent Chair’s experience to drive accountability at the Board level. The current membership and function of each standing committee is described on the following page. Each committee operates under a written charter adopted by the Board, which is available at investor.apple.com/leadership-and-governance. Each committee reviews and assesses its charter annually. 2026 Proxy Statement 15\nTable of Contents Summary Governance Directors Compensation Proposals Other Information\nPrivacy and Data Security The Audit Committee regularly reviews and discusses with management Apple’s privacy and data security risks. The Audit Committee receives regular updates from management, including Apple’s Head of Corporate Information Security. Additionally, the Audit Committee reviews updates on privacy and data security matters from Apple’s General Counsel, Chief Compliance Officer, and the heads of Business Assurance and Internal Audit. Apple also has a management Privacy Steering Committee chaired by Apple’s General Counsel, with members including Apple’s Senior Vice President of Software Engineering, Apple’s Senior Vice President, Services, and a cross-functional group of senior representatives from Privacy Engineering, Product Marketing, Corporate Communications, and Privacy Legal. The Privacy Steering Committee sets privacy standards for teams across Apple and acts as an escalation point for addressing privacy compliance issues for decision or further escalation. Online Safety The Board reviews regular updates from management relating to online safety. These updates cover a range of topics, including updates on regulatory and enforcement issues and on features designed to help keep users safe online. Apple also has a management Online Safety Steering Committee chaired by Apple’s General Counsel, with members including senior leaders from Software Engineering, Child Safety Engineering, Trust & Safety, and Product Marketing. The committee meets regularly and oversees online safety issues across Apple, including those affecting children. Artificial Intelligence Apple’s full Board directly oversees corporate and product strategy and receives regular updates on emerging technologies, including artificial intelligence. These updates cover a broad range of matters, such as strategy, investments, partnerships, regulation, and risks. The Audit Committee assists the Board in its oversight of privacy-related artificial intelligence matters, as well as legal and regulatory risks related to artificial intelligence. The Company has published Responsible AI principles, which aim to guide how the Company develops artificial intelligence tools, as well as the models that underpin them. The principles are available at: machinelearning.apple.com/research/introducing-apple-foundation-models. Human Rights The Board has adopted a human rights policy for Apple — Our Commitment to Human Rights. The policy governs how we treat everyone, including our customers and teams, business partners and communities, and people at every level of our supply chain. In line with Apple’s Human Rights Policy, which is based on the United Nations Guiding Principles, Apple identifies salient human rights risks through risk assessments and through channels we maintain with stakeholders. Apple works to mitigate any risks identified, and seeks to remedy adverse impacts, track and measure progress, and report findings. Additionally, the policy requires Apple to maintain active communication channels with rights holders and other stakeholders. The Board and its committees are responsible for overseeing and periodically reviewing our Human Rights Policy. Apple’s General Counsel is responsible for its ongoing implementation, and reports to the Board and its committees on any significant issues identified during the diligence process and Apple’s progress. Environment and Climate The Board and its committees review and discuss updates on environmental matters with senior management responsible for the development, review, and execution of plans designed to minimize Apple’s impact on the environment. These reports include updates on Apple’s progress towards environmental and climate goals and the environmental impact of our products and operations. Apple reports publicly on its efforts and progress across its environmental initiatives through an annual Environmental Progress Report. Supply Chain The Board and its committees review and discuss with management reports regarding Apple’s supply chain and operations. These include updates from Apple’s Chief Operating Officer on Apple’s supply chain management. Apple reports publicly on its efforts and progress in the critical work of protecting people and the planet across its supply chain through an annual People and Environment in Our Supply Chain progress report.\n2026 Proxy Statement 19\nTable of Contents Summary Governance Directors Compensation Proposals Other Information Executive Compensation Tables Summary Compensation Table—2025, 2024, and 2023 The following table, footnotes, and related narrative show information regarding the total compensation of each named executive officer for 2025, 2024, and 2023. Non-Equity Incentive All Other (1) (2) Salary Stock Awards Plan Compensation Compensation Total Name and Principal Position Year ($) ($) ($) ($) ($) Tim Cook 2025 3,000,000 57,535,293 12,000,000 1,759,518 (3)(4) 74,294,811 Chief Executive Officer 2024 3,000,000 58,088,946 12,000,000 1,520,856 74,609,802 2023 3,000,000 46,970,283 10,713,450 2,526,112 63,209,845 Kevan Parekh (4)(5) 2025 891,519 18,433,135 3,120,317 22,338 22,467,309 Senior Vice President, Chief Financial Officer Kate Adams 2025 1,000,000 22,009,766 4,000,000 22,482 (4)(6) 27,032,248 Senior Vice President, General Counsel and Secretary 2024 1,000,000 22,157,075 4,000,000 22,182 27,179,257 2023 1,000,000 22,323,641 3,571,150 46,914 26,941,705 Sabih Khan (4)(7) 2025 1,000,000 22,009,766 4,000,000 21,905 27,031,671 Senior Vice President, Chief Operating Officer Luca Maestri 2025 819,231 13,003,031 1,638,462 22,204 (4)(8) 15,482,928 Former Senior Vice President, Chief Financial Officer 2024 1,000,000 22,157,075 4,000,000 22,182 27,179,257 2023 1,000,000 22,323,641 3,571,150 41,092 26,935,883 Deirdre O’Brien 2025 1,000,000 22,009,766 4,000,000 37,867 (4)(9) 27,047,633 Senior Vice President, Retail + People 2024 1,000,000 22,157,075 4,000,000 22,182 27,179,257 2023 1,000,000 22,323,641 3,571,150 42,219 26,937,010 (1) The target grant value of Mr. Cook’s long-term equity award was $50 million for 2025 and 2024, and $40 million for 2023. The target grant value of the long-term equity awards for Ms. Adams, Mr. Khan, and Ms. O’Brien was $20 million for each of 2025, 2024, and 2023. The target grant value of Mr. Parekh’s long-term equity awards was $16.75 million and the target grant value of Mr. Maestri’s long-term equity awards was $12.5 million for 2025. This column shows the grant date fair value for accounting purposes of the long- term equity awards granted to our named executive officers. The grant date fair value for time-based RSUs is measured in accordance with FASB ASC 718 and based on the closing price of Apple’s common stock on the date of grant. The grant date fair value for performance-based RSUs is calculated using a Monte-Carlo model for each award on the date of grant, as determined under FASB ASC 718, based on the probable outcome of the performance condition as of the grant date. The grant date fair value for each award may differ based on the applicable data, assumptions, and estimates used in the model. See footnote 1 to the table entitled “Grants of Plan-Based Awards—2025.” (2) As described under “Executive Compensation—Compensation Discussion and Analysis,” the named executive officers’ Cash Incentive Plan awards are based on the performance of Apple relative to predetermined financial goals for the year. The threshold, target, and maximum payout amounts for each named executive officer’s Cash Incentive Plan payout opportunity for 2025 are shown in the table entitled “Grants of Plan-Based Awards—2025.” In 2025, Apple’s performance exceeded the maximum performance goals for both net sales and operating income, resulting in a maximum payout for each named executive officer.\n52 2026 Proxy Statement",
+    "inputSha256": "sha256:aa84ce73eb0f181844ccd0bb8a4a53f670fae6a007c086ccdb55f705f8d7a0c2",
+    "sourceImmutableKey": "public/explore-sample/apple-2026-proxy-def14a-reference.pdf",
+    "regions": [
+      {
+        "regionId": "apple-2026-proxy-def14a-p16-r0",
+        "pageIndex0": 15,
+        "pageNumber1": 16,
+        "order": 0,
+        "blockType": "paragraph",
+        "text": "Table of Contents Summary Governance Directors Compensation Proposals Other Information Role of the Board of Directors Apple’s Board oversees the CEO and other senior management in the competent and ethical operation of Apple and seeks to ensure that the long-term interests of shareholders are being served. Directors are expected to take a proactive, focused approach to ensure Apple is committed to business success through the maintenance of high standards of responsibility and ethics. Board Independence Apple’s Corporate Governance Guidelines require a majority of Board members to be independent. The Board has determined that all Board members, other than Mr. Cook, are independent under applicable rules of The Nasdaq Stock Market LLC (“Nasdaq”). Apple’s Board has a standing Audit and Finance Committee (the “Audit Committee”), People and Compensation Committee (the “People and Compensation Committee”), and Nominating and Corporate Governance Committee (the “Nominating Committee”). The Board has determined that all committee members are independent under applicable Nasdaq and Securities and Exchange Commission (“SEC”) rules for committee memberships, and that each member of the Audit Committee also meets the additional independence criteria set forth in Rule 10A-3(b)(1) under the Securities Exchange Act of 1934, as amended (the “Exchange Act”). Board and Committee Structure Apple regularly reviews the Board’s leadership structure and the responsibilities and composition of its standing committees. The structure and composition of Apple’s Board and its committees are intended to leverage the wide range of perspectives of the Board members and promote effective oversight. The Board believes its current leadership structure, in which the roles of Chair and CEO are separated, best serves Apple’s overall corporate structure and the Board’s ability to carry out its roles and responsibilities on behalf of Apple’s shareholders, including its oversight of management and corporate governance matters. The Board also believes that the current structure allows our CEO to focus on managing Apple, while leveraging our independent Chair’s experience to drive accountability at the Board level. The current membership and function of each standing committee is described on the following page. Each committee operates under a written charter adopted by the Board, which is available at investor.apple.com/leadership-and-governance. Each committee reviews and assesses its charter annually. 2026 Proxy Statement 15",
+        "bbox1000": [
+          62,
+          40,
+          949,
+          547
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-proxy-def14a-p20-r1",
+        "pageIndex0": 19,
+        "pageNumber1": 20,
+        "order": 1,
+        "blockType": "paragraph",
+        "text": "Table of Contents Summary Governance Directors Compensation Proposals Other Information",
+        "bbox1000": [
+          62,
+          40,
+          949,
+          72
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-proxy-def14a-p20-r2",
+        "pageIndex0": 19,
+        "pageNumber1": 20,
+        "order": 2,
+        "blockType": "paragraph",
+        "text": "Privacy and Data Security The Audit Committee regularly reviews and discusses with management Apple’s privacy and data security risks. The Audit Committee receives regular updates from management, including Apple’s Head of Corporate Information Security. Additionally, the Audit Committee reviews updates on privacy and data security matters from Apple’s General Counsel, Chief Compliance Officer, and the heads of Business Assurance and Internal Audit. Apple also has a management Privacy Steering Committee chaired by Apple’s General Counsel, with members including Apple’s Senior Vice President of Software Engineering, Apple’s Senior Vice President, Services, and a cross-functional group of senior representatives from Privacy Engineering, Product Marketing, Corporate Communications, and Privacy Legal. The Privacy Steering Committee sets privacy standards for teams across Apple and acts as an escalation point for addressing privacy compliance issues for decision or further escalation. Online Safety The Board reviews regular updates from management relating to online safety. These updates cover a range of topics, including updates on regulatory and enforcement issues and on features designed to help keep users safe online. Apple also has a management Online Safety Steering Committee chaired by Apple’s General Counsel, with members including senior leaders from Software Engineering, Child Safety Engineering, Trust & Safety, and Product Marketing. The committee meets regularly and oversees online safety issues across Apple, including those affecting children. Artificial Intelligence Apple’s full Board directly oversees corporate and product strategy and receives regular updates on emerging technologies, including artificial intelligence. These updates cover a broad range of matters, such as strategy, investments, partnerships, regulation, and risks. The Audit Committee assists the Board in its oversight of privacy-related artificial intelligence matters, as well as legal and regulatory risks related to artificial intelligence. The Company has published Responsible AI principles, which aim to guide how the Company develops artificial intelligence tools, as well as the models that underpin them. The principles are available at: machinelearning.apple.com/research/introducing-apple-foundation-models. Human Rights The Board has adopted a human rights policy for Apple — Our Commitment to Human Rights. The policy governs how we treat everyone, including our customers and teams, business partners and communities, and people at every level of our supply chain. In line with Apple’s Human Rights Policy, which is based on the United Nations Guiding Principles, Apple identifies salient human rights risks through risk assessments and through channels we maintain with stakeholders. Apple works to mitigate any risks identified, and seeks to remedy adverse impacts, track and measure progress, and report findings. Additionally, the policy requires Apple to maintain active communication channels with rights holders and other stakeholders. The Board and its committees are responsible for overseeing and periodically reviewing our Human Rights Policy. Apple’s General Counsel is responsible for its ongoing implementation, and reports to the Board and its committees on any significant issues identified during the diligence process and Apple’s progress. Environment and Climate The Board and its committees review and discuss updates on environmental matters with senior management responsible for the development, review, and execution of plans designed to minimize Apple’s impact on the environment. These reports include updates on Apple’s progress towards environmental and climate goals and the environmental impact of our products and operations. Apple reports publicly on its efforts and progress across its environmental initiatives through an annual Environmental Progress Report. Supply Chain The Board and its committees review and discuss with management reports regarding Apple’s supply chain and operations. These include updates from Apple’s Chief Operating Officer on Apple’s supply chain management. Apple reports publicly on its efforts and progress in the critical work of protecting people and the planet across its supply chain through an annual People and Environment in Our Supply Chain progress report.",
+        "bbox1000": [
+          62,
+          93,
+          941,
+          782
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-proxy-def14a-p20-r3",
+        "pageIndex0": 19,
+        "pageNumber1": 20,
+        "order": 3,
+        "blockType": "paragraph",
+        "text": "2026 Proxy Statement 19",
+        "bbox1000": [
+          803,
+          803,
+          949,
+          812
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-proxy-def14a-p51-r4",
+        "pageIndex0": 50,
+        "pageNumber1": 51,
+        "order": 4,
+        "blockType": "paragraph",
+        "text": "Table of Contents Summary Governance Directors Compensation Proposals Other Information Executive Compensation Tables Summary Compensation Table—2025, 2024, and 2023 The following table, footnotes, and related narrative show information regarding the total compensation of each named executive officer for 2025, 2024, and 2023. Non-Equity Incentive All Other (1) (2) Salary Stock Awards Plan Compensation Compensation Total Name and Principal Position Year ($) ($) ($) ($) ($) Tim Cook 2025 3,000,000 57,535,293 12,000,000 1,759,518 (3)(4) 74,294,811 Chief Executive Officer 2024 3,000,000 58,088,946 12,000,000 1,520,856 74,609,802 2023 3,000,000 46,970,283 10,713,450 2,526,112 63,209,845 Kevan Parekh (4)(5) 2025 891,519 18,433,135 3,120,317 22,338 22,467,309 Senior Vice President, Chief Financial Officer Kate Adams 2025 1,000,000 22,009,766 4,000,000 22,482 (4)(6) 27,032,248 Senior Vice President, General Counsel and Secretary 2024 1,000,000 22,157,075 4,000,000 22,182 27,179,257 2023 1,000,000 22,323,641 3,571,150 46,914 26,941,705 Sabih Khan (4)(7) 2025 1,000,000 22,009,766 4,000,000 21,905 27,031,671 Senior Vice President, Chief Operating Officer Luca Maestri 2025 819,231 13,003,031 1,638,462 22,204 (4)(8) 15,482,928 Former Senior Vice President, Chief Financial Officer 2024 1,000,000 22,157,075 4,000,000 22,182 27,179,257 2023 1,000,000 22,323,641 3,571,150 41,092 26,935,883 Deirdre O’Brien 2025 1,000,000 22,009,766 4,000,000 37,867 (4)(9) 27,047,633 Senior Vice President, Retail + People 2024 1,000,000 22,157,075 4,000,000 22,182 27,179,257 2023 1,000,000 22,323,641 3,571,150 42,219 26,937,010 (1) The target grant value of Mr. Cook’s long-term equity award was $50 million for 2025 and 2024, and $40 million for 2023. The target grant value of the long-term equity awards for Ms. Adams, Mr. Khan, and Ms. O’Brien was $20 million for each of 2025, 2024, and 2023. The target grant value of Mr. Parekh’s long-term equity awards was $16.75 million and the target grant value of Mr. Maestri’s long-term equity awards was $12.5 million for 2025. This column shows the grant date fair value for accounting purposes of the long- term equity awards granted to our named executive officers. The grant date fair value for time-based RSUs is measured in accordance with FASB ASC 718 and based on the closing price of Apple’s common stock on the date of grant. The grant date fair value for performance-based RSUs is calculated using a Monte-Carlo model for each award on the date of grant, as determined under FASB ASC 718, based on the probable outcome of the performance condition as of the grant date. The grant date fair value for each award may differ based on the applicable data, assumptions, and estimates used in the model. See footnote 1 to the table entitled “Grants of Plan-Based Awards—2025.” (2) As described under “Executive Compensation—Compensation Discussion and Analysis,” the named executive officers’ Cash Incentive Plan awards are based on the performance of Apple relative to predetermined financial goals for the year. The threshold, target, and maximum payout amounts for each named executive officer’s Cash Incentive Plan payout opportunity for 2025 are shown in the table entitled “Grants of Plan-Based Awards—2025.” In 2025, Apple’s performance exceeded the maximum performance goals for both net sales and operating income, resulting in a maximum payout for each named executive officer.",
+        "bbox1000": [
+          62,
+          40,
+          949,
+          571
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-proxy-def14a-p51-r5",
+        "pageIndex0": 50,
+        "pageNumber1": 51,
+        "order": 5,
+        "blockType": "paragraph",
+        "text": "52 2026 Proxy Statement",
+        "bbox1000": [
+          62,
+          589,
+          207,
+          598
+        ],
+        "confidence": 1,
+        "authority": "official"
+      }
+    ]
+  },
+  {
+    "documentId": "apple-2026-q2-10-q",
+    "versionKey": "054bff6adefda8601bc6a253181448d708ea78e93f936d9b0cff6e97e4f2a9d7",
+    "sanitizedKey": "public/explore-sample/apple-2026-q2-10-q-reference.pdf",
+    "ocrJsonKey": "public/explore-sample/apple-2026-q2-10-q/054bff6adefda8601bc6a253181448d708ea78e93f936d9b0cff6e97e4f2a9d7/text-layer-public-slice.json",
+    "pageCount": 37,
+    "text": "PART I — FINANCIAL INFORMATION Item 1. Financial Statements\nApple Inc. CONDENSED CONSOLIDATED STATEMENTS OF OPERATIONS (Unaudited) (In millions, except number of shares, which are reflected in thousands, and per-share amounts)\nThree Months Ended Six Months Ended March 28, March 29, March 28, March 29, 2026 2025 2026 2025 Net sales: Products $ 80,208 $ 68,714 $ 193,951 $ 166,674 Services 30,976 26,645 60,989 52,985 Total net sales 111,184 95,359 254,940 219,659\nCost of sales: Products 49,179 44,030 116,657 103,477 Services 7,224 6,462 14,271 13,040 Total cost of sales 56,403 50,492 130,928 116,517 Gross margin 54,781 44,867 124,012 103,142\nOperating expenses: Research and development 11,419 8,550 22,306 16,818 Selling, general and administrative 7,477 6,728 14,969 13,903 Total operating expenses 18,896 15,278 37,275 30,721\nOperating income 35,885 29,589 86,737 72,421 Other income/(expense), net (52) (279) 98 (527) Income before provision for income taxes 35,833 29,310 86,835 71,894 Provision for income taxes 6,255 4,530 15,160 10,784 Net income $ 29,578 $ 24,780 $ 71,675 $ 61,110\nEarnings per share: Basic $ 2.02 $ 1.65 $ 4.87 $ 4.06 Diluted $ 2.01 $ 1.65 $ 4.85 $ 4.05\nShares used in computing earnings per share: Basic 14,673,278 14,994,082 14,710,718 15,037,903 Diluted 14,725,873 15,056,133 14,768,115 15,103,499\nSee accompanying Notes to Condensed Consolidated Financial Statements.\nApple Inc. | Q2 2026 Form 10-Q | 1\nNote 10 – Segment Information The following tables show information by reportable segment for the three- and six-month periods ended March 28, 2026 and March 29, 2025 (in millions): Three Months Ended March 28, 2026 Greater Rest of Americas Europe China Japan Asia Pacific Corporate Total Net sales $ 45,093 $ 28,055 $ 20,497 $ 8,401 $ 9,138 $ — $ 111,184 Cost of sales (23,114) (13,756) (10,633) (4,267) (4,633) — (56,403) Research and development — — — — — (11,419) (11,419) Selling and marketing (2,606) (1,247) (675) (295) (378) — (5,201) General and administrative — — — — — (2,276) (2,276) Operating income/(loss) $ 19,373 $ 13,052 $ 9,189 $ 3,839 $ 4,127 $ (13,695) $ 35,885\nThree Months Ended March 29, 2025 Greater Rest of Americas Europe China Japan Asia Pacific Corporate Total Net sales $ 40,315 $ 24,454 $ 16,002 $ 7,298 $ 7,290 $ — $ 95,359 Cost of sales (21,094) (13,025) (8,794) (3,610) (3,969) — (50,492) Research and development — — — — — (8,550) (8,550) Selling and marketing (2,447) (1,113) (582) (254) (335) — (4,731) General and administrative — — — — — (1,997) (1,997) Operating income/(loss) $ 16,774 $ 10,316 $ 6,626 $ 3,434 $ 2,986 $ (10,547) $ 29,589\nSix Months Ended March 28, 2026 Greater Rest of Americas Europe China Japan Asia Pacific Corporate Total Net sales $ 103,622 $ 66,201 $ 46,023 $ 17,814 $ 21,280 $ — $ 254,940 Cost of sales (54,963) (32,817) (23,663) (8,778) (10,707) — (130,928) Research and development — — — — — (22,306) (22,306) Selling and marketing (5,333) (2,542) (1,379) (584) (760) — (10,598) General and administrative — — — — — (4,371) (4,371) Operating income/(loss) $ 43,326 $ 30,842 $ 20,981 $ 8,452 $ 9,813 $ (26,677) $ 86,737\nSix Months Ended March 29, 2025 Greater Rest of Americas Europe China Japan Asia Pacific Corporate Total Net sales $ 92,963 $ 58,315 $ 34,515 $ 16,285 $ 17,581 $ — $ 219,659 Cost of sales (49,589) (31,068) (18,553) (8,003) (9,304) — (116,517) Research and development — — — — — (16,818) (16,818) Selling and marketing (5,091) (2,324) (1,176) (534) (707) — (9,832) General and administrative — — — — — (4,071) (4,071) Operating income/(loss) $ 38,283 $ 24,923 $ 14,786 $ 7,748 $ 7,570 $ (20,889) $ 72,421\nApple Inc. | Q2 2026 Form 10-Q | 12\nItem 2. Management’s Discussion and Analysis of Financial Condition and Results of Operations This Item and other sections of this Quarterly Report on Form 10-Q (“Form 10-Q”) contain forward-looking statements, within the meaning of the Private Securities Litigation Reform Act of 1995, that involve risks and uncertainties. Forward-looking statements provide current expectations of future events based on certain assumptions and include any statement that does not directly relate to any historical or current fact. For example, statements in this Form 10-Q regarding the potential future impact of macroeconomic conditions and tariffs and other measures on the Company’s business and results of operations are forward-looking statements . Forward-looking statements can also be identified by words such as “future,” “anticipates,” “believes,” “estimates,” “expects,” “intends,” “plans,” “predicts,” “will,” “would,” “could,” “can,” “may,” and similar terms. Forward-looking statements are not guarantees of future performance and the Company’s actual results may differ significantly from the results discussed in the forward-looking statements. Factors that might cause such differences include, but are not limited to, those discussed in Part I, Item 1A of the 2025 Form 10-K and Part II, Item 1A of this Form 10-Q, in each case under the heading “Risk Factors.” The Company assumes no obligation to revise or update any forward-looking statements for any reason, except as required by law.\nUnless otherwise stated, all information presented herein is based on the Company’s fiscal calendar, and references to particular years, quarters, months or periods refer to the Company’s fiscal years ended in September and the associated quarters, months and periods of those fiscal years. The following discussion should be read in conjunction with the 2025 Form 10-K filed with the U.S. Securities and Exchange Commission (“SEC”) and the condensed consolidated financial statements and accompanying notes included in Part I, Item 1 of this Form 10-Q.\nAvailable Information The Company periodically provides certain information for investors on its corporate website, www.apple.com, and its investor relations website, investor.apple.com. This includes press releases and other information about financial performance, information on corporate governance, and details related to the Company’s annual meeting of shareholders. The information contained on the websites referenced in this Form 10-Q is not incorporated by reference into this filing. Further, the Company’s references to website URLs are intended to be inactive textual references only.\nBusiness Seasonality and Product Introductions The Company has historically experienced higher net sales in its first quarter compared to other quarters in its fiscal year due in part to seasonal holiday demand. Additionally, new product and service introductions can significantly impact net sales, cost of sales and operating expenses. The timing of product introductions can also impact the Company’s net sales to its indirect distribution channels as these channels are filled with new inventory following a product launch, and channel inventory of an older product often declines as the launch of a newer product approaches. Net sales can also be affected when consumers and distributors anticipate a product introduction.\nDuring the second quarter of 2026, the Company announced the following new or updated products: ® • iPad Air • iPhone 17e ® • MacBook Pro ® • MacBook Air • MacBook Neo™ ® • AirPods Max 2\nMacroeconomic Conditions Macroeconomic conditions, including inflation, interest rates, component pricing and currency fluctuations, have directly and indirectly impacted, and could in the future materially impact, the Company’s results of operations and financial condition.\nThe Company is experiencing a period of supply constraints and increasing costs for components driven by factors such as industry supply-demand imbalances for components, including advanced semiconductors, storage (NAND) and memory (DRAM). The Company expects these trends to intensify, which, together with actions that may be taken by the Company in response to such trends, may materially adversely affect demand for the Company’s products and negatively impact the Company’s revenue, costs, gross margin, results of operations and financial condition.\nApple Inc. | Q2 2026 Form 10-Q | 13",
+    "inputSha256": "sha256:054bff6adefda8601bc6a253181448d708ea78e93f936d9b0cff6e97e4f2a9d7",
+    "sourceImmutableKey": "public/explore-sample/apple-2026-q2-10-q-reference.pdf",
+    "regions": [
+      {
+        "regionId": "apple-2026-q2-10-q-p4-r0",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 0,
+        "blockType": "paragraph",
+        "text": "PART I — FINANCIAL INFORMATION Item 1. Financial Statements",
+        "bbox1000": [
+          62,
+          116,
+          318,
+          156
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q2-10-q-p4-r1",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 1,
+        "blockType": "paragraph",
+        "text": "Apple Inc. CONDENSED CONSOLIDATED STATEMENTS OF OPERATIONS (Unaudited) (In millions, except number of shares, which are reflected in thousands, and per-share amounts)",
+        "bbox1000": [
+          188,
+          174,
+          813,
+          224
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q2-10-q-p4-r2",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 2,
+        "blockType": "paragraph",
+        "text": "Three Months Ended Six Months Ended March 28, March 29, March 28, March 29, 2026 2025 2026 2025 Net sales: Products $ 80,208 $ 68,714 $ 193,951 $ 166,674 Services 30,976 26,645 60,989 52,985 Total net sales 111,184 95,359 254,940 219,659",
+        "bbox1000": [
+          64,
+          249,
+          932,
+          352
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q2-10-q-p4-r3",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 3,
+        "blockType": "paragraph",
+        "text": "Cost of sales: Products 49,179 44,030 116,657 103,477 Services 7,224 6,462 14,271 13,040 Total cost of sales 56,403 50,492 130,928 116,517 Gross margin 54,781 44,867 124,012 103,142",
+        "bbox1000": [
+          64,
+          375,
+          932,
+          454
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q2-10-q-p4-r4",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 4,
+        "blockType": "paragraph",
+        "text": "Operating expenses: Research and development 11,419 8,550 22,306 16,818 Selling, general and administrative 7,477 6,728 14,969 13,903 Total operating expenses 18,896 15,278 37,275 30,721",
+        "bbox1000": [
+          64,
+          476,
+          932,
+          538
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q2-10-q-p4-r5",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 5,
+        "blockType": "paragraph",
+        "text": "Operating income 35,885 29,589 86,737 72,421 Other income/(expense), net (52) (279) 98 (527) Income before provision for income taxes 35,833 29,310 86,835 71,894 Provision for income taxes 6,255 4,530 15,160 10,784 Net income $ 29,578 $ 24,780 $ 71,675 $ 61,110",
+        "bbox1000": [
+          64,
+          561,
+          936,
+          639
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q2-10-q-p4-r6",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 6,
+        "blockType": "paragraph",
+        "text": "Earnings per share: Basic $ 2.02 $ 1.65 $ 4.87 $ 4.06 Diluted $ 2.01 $ 1.65 $ 4.85 $ 4.05",
+        "bbox1000": [
+          64,
+          664,
+          932,
+          707
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q2-10-q-p4-r7",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 7,
+        "blockType": "paragraph",
+        "text": "Shares used in computing earnings per share: Basic 14,673,278 14,994,082 14,710,718 15,037,903 Diluted 14,725,873 15,056,133 14,768,115 15,103,499",
+        "bbox1000": [
+          64,
+          730,
+          932,
+          775
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q2-10-q-p4-r8",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 8,
+        "blockType": "paragraph",
+        "text": "See accompanying Notes to Condensed Consolidated Financial Statements.",
+        "bbox1000": [
+          251,
+          800,
+          750,
+          812
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q2-10-q-p4-r9",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 9,
+        "blockType": "paragraph",
+        "text": "Apple Inc. | Q2 2026 Form 10-Q | 1",
+        "bbox1000": [
+          399,
+          855,
+          602,
+          866
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q2-10-q-p18-r10",
+        "pageIndex0": 17,
+        "pageNumber1": 18,
+        "order": 10,
+        "blockType": "paragraph",
+        "text": "Note 10 – Segment Information The following tables show information by reportable segment for the three- and six-month periods ended March 28, 2026 and March 29, 2025 (in millions): Three Months Ended March 28, 2026 Greater Rest of Americas Europe China Japan Asia Pacific Corporate Total Net sales $ 45,093 $ 28,055 $ 20,497 $ 8,401 $ 9,138 $ — $ 111,184 Cost of sales (23,114) (13,756) (10,633) (4,267) (4,633) — (56,403) Research and development — — — — — (11,419) (11,419) Selling and marketing (2,606) (1,247) (675) (295) (378) — (5,201) General and administrative — — — — — (2,276) (2,276) Operating income/(loss) $ 19,373 $ 13,052 $ 9,189 $ 3,839 $ 4,127 $ (13,695) $ 35,885",
+        "bbox1000": [
+          62,
+          116,
+          939,
+          304
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q2-10-q-p18-r11",
+        "pageIndex0": 17,
+        "pageNumber1": 18,
+        "order": 11,
+        "blockType": "paragraph",
+        "text": "Three Months Ended March 29, 2025 Greater Rest of Americas Europe China Japan Asia Pacific Corporate Total Net sales $ 40,315 $ 24,454 $ 16,002 $ 7,298 $ 7,290 $ — $ 95,359 Cost of sales (21,094) (13,025) (8,794) (3,610) (3,969) — (50,492) Research and development — — — — — (8,550) (8,550) Selling and marketing (2,447) (1,113) (582) (254) (335) — (4,731) General and administrative — — — — — (1,997) (1,997) Operating income/(loss) $ 16,774 $ 10,316 $ 6,626 $ 3,434 $ 2,986 $ (10,547) $ 29,589",
+        "bbox1000": [
+          64,
+          324,
+          936,
+          453
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q2-10-q-p18-r12",
+        "pageIndex0": 17,
+        "pageNumber1": 18,
+        "order": 12,
+        "blockType": "paragraph",
+        "text": "Six Months Ended March 28, 2026 Greater Rest of Americas Europe China Japan Asia Pacific Corporate Total Net sales $ 103,622 $ 66,201 $ 46,023 $ 17,814 $ 21,280 $ — $ 254,940 Cost of sales (54,963) (32,817) (23,663) (8,778) (10,707) — (130,928) Research and development — — — — — (22,306) (22,306) Selling and marketing (5,333) (2,542) (1,379) (584) (760) — (10,598) General and administrative — — — — — (4,371) (4,371) Operating income/(loss) $ 43,326 $ 30,842 $ 20,981 $ 8,452 $ 9,813 $ (26,677) $ 86,737",
+        "bbox1000": [
+          64,
+          478,
+          936,
+          605
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q2-10-q-p18-r13",
+        "pageIndex0": 17,
+        "pageNumber1": 18,
+        "order": 13,
+        "blockType": "paragraph",
+        "text": "Six Months Ended March 29, 2025 Greater Rest of Americas Europe China Japan Asia Pacific Corporate Total Net sales $ 92,963 $ 58,315 $ 34,515 $ 16,285 $ 17,581 $ — $ 219,659 Cost of sales (49,589) (31,068) (18,553) (8,003) (9,304) — (116,517) Research and development — — — — — (16,818) (16,818) Selling and marketing (5,091) (2,324) (1,176) (534) (707) — (9,832) General and administrative — — — — — (4,071) (4,071) Operating income/(loss) $ 38,283 $ 24,923 $ 14,786 $ 7,748 $ 7,570 $ (20,889) $ 72,421",
+        "bbox1000": [
+          64,
+          626,
+          936,
+          754
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q2-10-q-p18-r14",
+        "pageIndex0": 17,
+        "pageNumber1": 18,
+        "order": 14,
+        "blockType": "paragraph",
+        "text": "Apple Inc. | Q2 2026 Form 10-Q | 12",
+        "bbox1000": [
+          395,
+          810,
+          606,
+          820
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q2-10-q-p19-r15",
+        "pageIndex0": 18,
+        "pageNumber1": 19,
+        "order": 15,
+        "blockType": "paragraph",
+        "text": "Item 2. Management’s Discussion and Analysis of Financial Condition and Results of Operations This Item and other sections of this Quarterly Report on Form 10-Q (“Form 10-Q”) contain forward-looking statements, within the meaning of the Private Securities Litigation Reform Act of 1995, that involve risks and uncertainties. Forward-looking statements provide current expectations of future events based on certain assumptions and include any statement that does not directly relate to any historical or current fact. For example, statements in this Form 10-Q regarding the potential future impact of macroeconomic conditions and tariffs and other measures on the Company’s business and results of operations are forward-looking statements . Forward-looking statements can also be identified by words such as “future,” “anticipates,” “believes,” “estimates,” “expects,” “intends,” “plans,” “predicts,” “will,” “would,” “could,” “can,” “may,” and similar terms. Forward-looking statements are not guarantees of future performance and the Company’s actual results may differ significantly from the results discussed in the forward-looking statements. Factors that might cause such differences include, but are not limited to, those discussed in Part I, Item 1A of the 2025 Form 10-K and Part II, Item 1A of this Form 10-Q, in each case under the heading “Risk Factors.” The Company assumes no obligation to revise or update any forward-looking statements for any reason, except as required by law.",
+        "bbox1000": [
+          62,
+          105,
+          939,
+          277
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q2-10-q-p19-r16",
+        "pageIndex0": 18,
+        "pageNumber1": 19,
+        "order": 16,
+        "blockType": "paragraph",
+        "text": "Unless otherwise stated, all information presented herein is based on the Company’s fiscal calendar, and references to particular years, quarters, months or periods refer to the Company’s fiscal years ended in September and the associated quarters, months and periods of those fiscal years. The following discussion should be read in conjunction with the 2025 Form 10-K filed with the U.S. Securities and Exchange Commission (“SEC”) and the condensed consolidated financial statements and accompanying notes included in Part I, Item 1 of this Form 10-Q.",
+        "bbox1000": [
+          62,
+          295,
+          939,
+          390
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q2-10-q-p19-r17",
+        "pageIndex0": 18,
+        "pageNumber1": 19,
+        "order": 17,
+        "blockType": "paragraph",
+        "text": "Available Information The Company periodically provides certain information for investors on its corporate website, www.apple.com, and its investor relations website, investor.apple.com. This includes press releases and other information about financial performance, information on corporate governance, and details related to the Company’s annual meeting of shareholders. The information contained on the websites referenced in this Form 10-Q is not incorporated by reference into this filing. Further, the Company’s references to website URLs are intended to be inactive textual references only.",
+        "bbox1000": [
+          62,
+          415,
+          939,
+          502
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q2-10-q-p19-r18",
+        "pageIndex0": 18,
+        "pageNumber1": 19,
+        "order": 18,
+        "blockType": "paragraph",
+        "text": "Business Seasonality and Product Introductions The Company has historically experienced higher net sales in its first quarter compared to other quarters in its fiscal year due in part to seasonal holiday demand. Additionally, new product and service introductions can significantly impact net sales, cost of sales and operating expenses. The timing of product introductions can also impact the Company’s net sales to its indirect distribution channels as these channels are filled with new inventory following a product launch, and channel inventory of an older product often declines as the launch of a newer product approaches. Net sales can also be affected when consumers and distributors anticipate a product introduction.",
+        "bbox1000": [
+          62,
+          527,
+          939,
+          628
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q2-10-q-p19-r19",
+        "pageIndex0": 18,
+        "pageNumber1": 19,
+        "order": 19,
+        "blockType": "paragraph",
+        "text": "During the second quarter of 2026, the Company announced the following new or updated products: ® • iPad Air • iPhone 17e ® • MacBook Pro ® • MacBook Air • MacBook Neo™ ® • AirPods Max 2",
+        "bbox1000": [
+          62,
+          646,
+          714,
+          746
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q2-10-q-p19-r20",
+        "pageIndex0": 18,
+        "pageNumber1": 19,
+        "order": 20,
+        "blockType": "paragraph",
+        "text": "Macroeconomic Conditions Macroeconomic conditions, including inflation, interest rates, component pricing and currency fluctuations, have directly and indirectly impacted, and could in the future materially impact, the Company’s results of operations and financial condition.",
+        "bbox1000": [
+          62,
+          771,
+          939,
+          817
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q2-10-q-p19-r21",
+        "pageIndex0": 18,
+        "pageNumber1": 19,
+        "order": 21,
+        "blockType": "paragraph",
+        "text": "The Company is experiencing a period of supply constraints and increasing costs for components driven by factors such as industry supply-demand imbalances for components, including advanced semiconductors, storage (NAND) and memory (DRAM). The Company expects these trends to intensify, which, together with actions that may be taken by the Company in response to such trends, may materially adversely affect demand for the Company’s products and negatively impact the Company’s revenue, costs, gross margin, results of operations and financial condition.",
+        "bbox1000": [
+          62,
+          835,
+          939,
+          901
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q2-10-q-p19-r22",
+        "pageIndex0": 18,
+        "pageNumber1": 19,
+        "order": 22,
+        "blockType": "paragraph",
+        "text": "Apple Inc. | Q2 2026 Form 10-Q | 13",
+        "bbox1000": [
+          395,
+          945,
+          606,
+          955
+        ],
+        "confidence": 1,
+        "authority": "official"
+      }
+    ]
+  },
+  {
+    "documentId": "apple-2026-q3-10-q",
+    "versionKey": "6a9e1c4bbaaed622299d4e6db70d2672fe04512c1ccde72ded20ee9d05a7a0c5",
+    "sanitizedKey": "public/explore-sample/apple-2026-q3-10-q-reference.pdf",
+    "ocrJsonKey": "public/explore-sample/apple-2026-q3-10-q/6a9e1c4bbaaed622299d4e6db70d2672fe04512c1ccde72ded20ee9d05a7a0c5/text-layer-public-slice.json",
+    "pageCount": 40,
+    "text": "PART I — FINANCIAL INFORMATION Item 1. Financial Statements\nApple Inc. CONDENSED CONSOLIDATED STATEMENTS OF OPERATIONS (Unaudited) (In millions, except number of shares, which are reflected in thousands, and per-share amounts)\nThree Months Ended Nine Months Ended June 27, June 28, June 27, June 28, 2026 2025 2026 2025 Net sales: Products $ 78,678 $ 66,613 $ 272,629 $ 233,287 Services 30,739 27,423 91,728 80,408 Total net sales 109,417 94,036 364,357 313,695\nCost of sales: Products 47,153 43,620 163,810 147,097 Services 7,494 6,698 21,765 19,738 Total cost of sales 54,647 50,318 185,575 166,835 Gross margin 54,770 43,718 178,782 146,860\nOperating expenses: Research and development 11,729 8,866 34,035 25,684 Selling, general and administrative 7,346 6,650 22,315 20,553 Total operating expenses 19,075 15,516 56,350 46,237\nOperating income 35,695 28,202 122,432 100,623 Other income/(expense), net 572 (171) 670 (698) Income before provision for income taxes 36,267 28,031 123,102 99,925 Provision for income taxes 6,478 4,597 21,638 15,381 Net income $ 29,789 $ 23,434 $ 101,464 $ 84,544\nEarnings per share: Basic $ 2.03 $ 1.57 $ 6.91 $ 5.64 Diluted $ 2.02 $ 1.57 $ 6.88 $ 5.62\nShares used in computing earnings per share: Basic 14,656,110 14,902,886 14,692,515 14,992,898 Diluted 14,714,676 14,948,179 14,750,302 15,051,726\nSee accompanying Notes to Condensed Consolidated Financial Statements.\nApple Inc. | Q3 2026 Form 10-Q | 1\nNote 10 – Segment Information The following tables show information by reportable segment for the three- and nine-month periods ended June 27, 2026 and June 28, 2025 (in millions): Three Months Ended June 27, 2026 Greater Rest of Americas Europe China Japan Asia Pacific Corporate Total Net sales $ 45,781 $ 29,395 $ 18,816 $ 6,554 $ 8,871 $ — $ 109,417 Cost of sales (21,507) (14,732) (10,771) (3,310) (4,327) — (54,647) Research and development — — — — — (11,729) (11,729) Selling and marketing (2,573) (1,220) (639) (240) (362) — (5,034) General and administrative — — — — — (2,312) (2,312) Operating income/(loss) $ 21,701 $ 13,443 $ 7,406 $ 3,004 $ 4,182 $ (14,041) $ 35,695\nThree Months Ended June 28, 2025 Greater Rest of Americas Europe China Japan Asia Pacific Corporate Total Net sales $ 41,198 $ 24,014 $ 15,369 $ 5,782 $ 7,673 $ — $ 94,036 Cost of sales (22,174) (12,379) (8,970) (2,695) (4,100) — (50,318) Research and development — — — — — (8,866) (8,866) Selling and marketing (2,513) (1,134) (577) (215) (330) — (4,769) General and administrative — — — — — (1,881) (1,881) Operating income/(loss) $ 16,511 $ 10,501 $ 5,822 $ 2,872 $ 3,243 $ (10,747) $ 28,202\nNine Months Ended June 27, 2026 Greater Rest of Americas Europe China Japan Asia Pacific Corporate Total Net sales $ 149,403 $ 95,596 $ 64,839 $ 24,368 $ 30,151 $ — $ 364,357 Cost of sales (76,470) (47,549) (34,434) (12,088) (15,034) — (185,575) Research and development — — — — — (34,035) (34,035) Selling and marketing (7,906) (3,762) (2,018) (824) (1,122) — (15,632) General and administrative — — — — — (6,683) (6,683) Operating income/(loss) $ 65,027 $ 44,285 $ 28,387 $ 11,456 $ 13,995 $ (40,718) $ 122,432\nNine Months Ended June 28, 2025 Greater Rest of Americas Europe China Japan Asia Pacific Corporate Total Net sales $ 134,161 $ 82,329 $ 49,884 $ 22,067 $ 25,254 $ — $ 313,695 Cost of sales (71,763) (43,447) (27,523) (10,698) (13,404) — (166,835) Research and development — — — — — (25,684) (25,684) Selling and marketing (7,604) (3,458) (1,753) (749) (1,037) — (14,601) General and administrative — — — — — (5,952) (5,952) Operating income/(loss) $ 54,794 $ 35,424 $ 20,608 $ 10,620 $ 10,813 $ (31,636) $ 100,623\nApple Inc. | Q3 2026 Form 10-Q | 12\nItem 2. Management’s Discussion and Analysis of Financial Condition and Results of Operations This Item and other sections of this Quarterly Report on Form 10-Q (“Form 10-Q”) contain forward-looking statements, within the meaning of the Private Securities Litigation Reform Act of 1995, that involve risks and uncertainties. Forward-looking statements provide current expectations of future events based on certain assumptions and include any statement that does not directly relate to any historical or current fact. For example, statements in this Form 10-Q regarding the potential future impact of macroeconomic conditions and tariffs and other measures on the Company’s business and results of operations are forward-looking statements . Forward-looking statements can also be identified by words such as “future,” “anticipates,” “believes,” “estimates,” “expects,” “intends,” “plans,” “predicts,” “will,” “would,” “could,” “can,” “may,” and similar terms. Forward-looking statements are not guarantees of future performance and the Company’s actual results may differ significantly from the results discussed in the forward-looking statements. Factors that might cause such differences include, but are not limited to, those discussed in Part I, Item 1A of the 2025 Form 10-K and Part II, Item 1A of this Form 10-Q, in each case under the heading “Risk Factors.” The Company assumes no obligation to revise or update any forward-looking statements for any reason, except as required by law.\nUnless otherwise stated, all information presented herein is based on the Company’s fiscal calendar, and references to particular years, quarters, months or periods refer to the Company’s fiscal years ended in September and the associated quarters, months and periods of those fiscal years. The following discussion should be read in conjunction with the 2025 Form 10-K filed with the U.S. Securities and Exchange Commission (“SEC”) and the condensed consolidated financial statements and accompanying notes included in Part I, Item 1 of this Form 10-Q.\nAvailable Information The Company periodically provides certain information for investors on its corporate website, www.apple.com, and its investor relations website, investor.apple.com. This includes press releases and other information about financial performance, information on corporate governance, and details related to the Company’s annual meeting of shareholders. The information contained on the websites referenced in this Form 10-Q is not incorporated by reference into this filing. Further, the Company’s references to website URLs are intended to be inactive textual references only.\nBusiness Seasonality and Product Introductions The Company has historically experienced higher net sales in its first quarter compared to other quarters in its fiscal year due in part to seasonal holiday demand. Additionally, new product and service introductions can significantly impact net sales, cost of sales and operating expenses. The timing of product introductions can also impact the Company’s net sales to its indirect distribution channels as these channels are filled with new inventory following a product launch, and channel inventory of an older product often declines as the launch of a newer product approaches. Net sales can also be affected when consumers and distributors anticipate a product introduction. ® ® ® ® During the third quarter of 2026, the Company announced iOS 27, macOS 27 Golden Gate, iPadOS 27, watchOS 27, visionOS ® 27 and tvOS 27, and introduced Siri AI.\nMacroeconomic Conditions Macroeconomic conditions, including inflation, interest rates, component pricing and currency fluctuations, have directly and indirectly impacted, and could in the future materially impact, the Company’s results of operations and financial condition.\nThe Company is experiencing a period of supply constraints and increasing costs for components driven by factors such as industry supply-demand imbalances for components, including advanced semiconductors, storage (NAND) and memory (DRAM). The Company expects these trends to intensify, which may materially negatively impact the Company’s revenue, costs, gross margin, results of operations and financial condition. Actions, such as price increases, that have been and may in the future be taken by the Company may not effectively mitigate these negative impacts, and may also reduce demand for the Company’s products and materially adversely affect the Company’s revenue, costs, gross margin, results of operations and financial condition.\nApple Inc. | Q3 2026 Form 10-Q | 13",
+    "inputSha256": "sha256:6a9e1c4bbaaed622299d4e6db70d2672fe04512c1ccde72ded20ee9d05a7a0c5",
+    "sourceImmutableKey": "public/explore-sample/apple-2026-q3-10-q-reference.pdf",
+    "regions": [
+      {
+        "regionId": "apple-2026-q3-10-q-p4-r0",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 0,
+        "blockType": "paragraph",
+        "text": "PART I — FINANCIAL INFORMATION Item 1. Financial Statements",
+        "bbox1000": [
+          62,
+          116,
+          318,
+          156
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q3-10-q-p4-r1",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 1,
+        "blockType": "paragraph",
+        "text": "Apple Inc. CONDENSED CONSOLIDATED STATEMENTS OF OPERATIONS (Unaudited) (In millions, except number of shares, which are reflected in thousands, and per-share amounts)",
+        "bbox1000": [
+          188,
+          174,
+          813,
+          224
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q3-10-q-p4-r2",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 2,
+        "blockType": "paragraph",
+        "text": "Three Months Ended Nine Months Ended June 27, June 28, June 27, June 28, 2026 2025 2026 2025 Net sales: Products $ 78,678 $ 66,613 $ 272,629 $ 233,287 Services 30,739 27,423 91,728 80,408 Total net sales 109,417 94,036 364,357 313,695",
+        "bbox1000": [
+          64,
+          251,
+          932,
+          361
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q3-10-q-p4-r3",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 3,
+        "blockType": "paragraph",
+        "text": "Cost of sales: Products 47,153 43,620 163,810 147,097 Services 7,494 6,698 21,765 19,738 Total cost of sales 54,647 50,318 185,575 166,835 Gross margin 54,770 43,718 178,782 146,860",
+        "bbox1000": [
+          64,
+          385,
+          932,
+          469
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q3-10-q-p4-r4",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 4,
+        "blockType": "paragraph",
+        "text": "Operating expenses: Research and development 11,729 8,866 34,035 25,684 Selling, general and administrative 7,346 6,650 22,315 20,553 Total operating expenses 19,075 15,516 56,350 46,237",
+        "bbox1000": [
+          64,
+          493,
+          932,
+          559
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q3-10-q-p4-r5",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 5,
+        "blockType": "paragraph",
+        "text": "Operating income 35,695 28,202 122,432 100,623 Other income/(expense), net 572 (171) 670 (698) Income before provision for income taxes 36,267 28,031 123,102 99,925 Provision for income taxes 6,478 4,597 21,638 15,381 Net income $ 29,789 $ 23,434 $ 101,464 $ 84,544",
+        "bbox1000": [
+          64,
+          583,
+          936,
+          668
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q3-10-q-p4-r6",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 6,
+        "blockType": "paragraph",
+        "text": "Earnings per share: Basic $ 2.03 $ 1.57 $ 6.91 $ 5.64 Diluted $ 2.02 $ 1.57 $ 6.88 $ 5.62",
+        "bbox1000": [
+          64,
+          693,
+          932,
+          741
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q3-10-q-p4-r7",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 7,
+        "blockType": "paragraph",
+        "text": "Shares used in computing earnings per share: Basic 14,656,110 14,902,886 14,692,515 14,992,898 Diluted 14,714,676 14,948,179 14,750,302 15,051,726",
+        "bbox1000": [
+          64,
+          764,
+          932,
+          811
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q3-10-q-p4-r8",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 8,
+        "blockType": "paragraph",
+        "text": "See accompanying Notes to Condensed Consolidated Financial Statements.",
+        "bbox1000": [
+          251,
+          836,
+          750,
+          848
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q3-10-q-p4-r9",
+        "pageIndex0": 3,
+        "pageNumber1": 4,
+        "order": 9,
+        "blockType": "paragraph",
+        "text": "Apple Inc. | Q3 2026 Form 10-Q | 1",
+        "bbox1000": [
+          399,
+          892,
+          602,
+          902
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q3-10-q-p20-r10",
+        "pageIndex0": 19,
+        "pageNumber1": 20,
+        "order": 10,
+        "blockType": "paragraph",
+        "text": "Note 10 – Segment Information The following tables show information by reportable segment for the three- and nine-month periods ended June 27, 2026 and June 28, 2025 (in millions): Three Months Ended June 27, 2026 Greater Rest of Americas Europe China Japan Asia Pacific Corporate Total Net sales $ 45,781 $ 29,395 $ 18,816 $ 6,554 $ 8,871 $ — $ 109,417 Cost of sales (21,507) (14,732) (10,771) (3,310) (4,327) — (54,647) Research and development — — — — — (11,729) (11,729) Selling and marketing (2,573) (1,220) (639) (240) (362) — (5,034) General and administrative — — — — — (2,312) (2,312) Operating income/(loss) $ 21,701 $ 13,443 $ 7,406 $ 3,004 $ 4,182 $ (14,041) $ 35,695",
+        "bbox1000": [
+          62,
+          116,
+          939,
+          314
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q3-10-q-p20-r11",
+        "pageIndex0": 19,
+        "pageNumber1": 20,
+        "order": 11,
+        "blockType": "paragraph",
+        "text": "Three Months Ended June 28, 2025 Greater Rest of Americas Europe China Japan Asia Pacific Corporate Total Net sales $ 41,198 $ 24,014 $ 15,369 $ 5,782 $ 7,673 $ — $ 94,036 Cost of sales (22,174) (12,379) (8,970) (2,695) (4,100) — (50,318) Research and development — — — — — (8,866) (8,866) Selling and marketing (2,513) (1,134) (577) (215) (330) — (4,769) General and administrative — — — — — (1,881) (1,881) Operating income/(loss) $ 16,511 $ 10,501 $ 5,822 $ 2,872 $ 3,243 $ (10,747) $ 28,202",
+        "bbox1000": [
+          64,
+          337,
+          936,
+          475
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q3-10-q-p20-r12",
+        "pageIndex0": 19,
+        "pageNumber1": 20,
+        "order": 12,
+        "blockType": "paragraph",
+        "text": "Nine Months Ended June 27, 2026 Greater Rest of Americas Europe China Japan Asia Pacific Corporate Total Net sales $ 149,403 $ 95,596 $ 64,839 $ 24,368 $ 30,151 $ — $ 364,357 Cost of sales (76,470) (47,549) (34,434) (12,088) (15,034) — (185,575) Research and development — — — — — (34,035) (34,035) Selling and marketing (7,906) (3,762) (2,018) (824) (1,122) — (15,632) General and administrative — — — — — (6,683) (6,683) Operating income/(loss) $ 65,027 $ 44,285 $ 28,387 $ 11,456 $ 13,995 $ (40,718) $ 122,432",
+        "bbox1000": [
+          64,
+          501,
+          936,
+          639
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q3-10-q-p20-r13",
+        "pageIndex0": 19,
+        "pageNumber1": 20,
+        "order": 13,
+        "blockType": "paragraph",
+        "text": "Nine Months Ended June 28, 2025 Greater Rest of Americas Europe China Japan Asia Pacific Corporate Total Net sales $ 134,161 $ 82,329 $ 49,884 $ 22,067 $ 25,254 $ — $ 313,695 Cost of sales (71,763) (43,447) (27,523) (10,698) (13,404) — (166,835) Research and development — — — — — (25,684) (25,684) Selling and marketing (7,604) (3,458) (1,753) (749) (1,037) — (14,601) General and administrative — — — — — (5,952) (5,952) Operating income/(loss) $ 54,794 $ 35,424 $ 20,608 $ 10,620 $ 10,813 $ (31,636) $ 100,623",
+        "bbox1000": [
+          64,
+          661,
+          936,
+          799
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q3-10-q-p20-r14",
+        "pageIndex0": 19,
+        "pageNumber1": 20,
+        "order": 14,
+        "blockType": "paragraph",
+        "text": "Apple Inc. | Q3 2026 Form 10-Q | 12",
+        "bbox1000": [
+          395,
+          855,
+          606,
+          866
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q3-10-q-p21-r15",
+        "pageIndex0": 20,
+        "pageNumber1": 21,
+        "order": 15,
+        "blockType": "paragraph",
+        "text": "Item 2. Management’s Discussion and Analysis of Financial Condition and Results of Operations This Item and other sections of this Quarterly Report on Form 10-Q (“Form 10-Q”) contain forward-looking statements, within the meaning of the Private Securities Litigation Reform Act of 1995, that involve risks and uncertainties. Forward-looking statements provide current expectations of future events based on certain assumptions and include any statement that does not directly relate to any historical or current fact. For example, statements in this Form 10-Q regarding the potential future impact of macroeconomic conditions and tariffs and other measures on the Company’s business and results of operations are forward-looking statements . Forward-looking statements can also be identified by words such as “future,” “anticipates,” “believes,” “estimates,” “expects,” “intends,” “plans,” “predicts,” “will,” “would,” “could,” “can,” “may,” and similar terms. Forward-looking statements are not guarantees of future performance and the Company’s actual results may differ significantly from the results discussed in the forward-looking statements. Factors that might cause such differences include, but are not limited to, those discussed in Part I, Item 1A of the 2025 Form 10-K and Part II, Item 1A of this Form 10-Q, in each case under the heading “Risk Factors.” The Company assumes no obligation to revise or update any forward-looking statements for any reason, except as required by law.",
+        "bbox1000": [
+          62,
+          105,
+          939,
+          277
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q3-10-q-p21-r16",
+        "pageIndex0": 20,
+        "pageNumber1": 21,
+        "order": 16,
+        "blockType": "paragraph",
+        "text": "Unless otherwise stated, all information presented herein is based on the Company’s fiscal calendar, and references to particular years, quarters, months or periods refer to the Company’s fiscal years ended in September and the associated quarters, months and periods of those fiscal years. The following discussion should be read in conjunction with the 2025 Form 10-K filed with the U.S. Securities and Exchange Commission (“SEC”) and the condensed consolidated financial statements and accompanying notes included in Part I, Item 1 of this Form 10-Q.",
+        "bbox1000": [
+          62,
+          295,
+          939,
+          390
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q3-10-q-p21-r17",
+        "pageIndex0": 20,
+        "pageNumber1": 21,
+        "order": 17,
+        "blockType": "paragraph",
+        "text": "Available Information The Company periodically provides certain information for investors on its corporate website, www.apple.com, and its investor relations website, investor.apple.com. This includes press releases and other information about financial performance, information on corporate governance, and details related to the Company’s annual meeting of shareholders. The information contained on the websites referenced in this Form 10-Q is not incorporated by reference into this filing. Further, the Company’s references to website URLs are intended to be inactive textual references only.",
+        "bbox1000": [
+          62,
+          415,
+          939,
+          502
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q3-10-q-p21-r18",
+        "pageIndex0": 20,
+        "pageNumber1": 21,
+        "order": 18,
+        "blockType": "paragraph",
+        "text": "Business Seasonality and Product Introductions The Company has historically experienced higher net sales in its first quarter compared to other quarters in its fiscal year due in part to seasonal holiday demand. Additionally, new product and service introductions can significantly impact net sales, cost of sales and operating expenses. The timing of product introductions can also impact the Company’s net sales to its indirect distribution channels as these channels are filled with new inventory following a product launch, and channel inventory of an older product often declines as the launch of a newer product approaches. Net sales can also be affected when consumers and distributors anticipate a product introduction. ® ® ® ® During the third quarter of 2026, the Company announced iOS 27, macOS 27 Golden Gate, iPadOS 27, watchOS 27, visionOS ® 27 and tvOS 27, and introduced Siri AI.",
+        "bbox1000": [
+          62,
+          527,
+          939,
+          670
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q3-10-q-p21-r19",
+        "pageIndex0": 20,
+        "pageNumber1": 21,
+        "order": 19,
+        "blockType": "paragraph",
+        "text": "Macroeconomic Conditions Macroeconomic conditions, including inflation, interest rates, component pricing and currency fluctuations, have directly and indirectly impacted, and could in the future materially impact, the Company’s results of operations and financial condition.",
+        "bbox1000": [
+          62,
+          695,
+          939,
+          741
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q3-10-q-p21-r20",
+        "pageIndex0": 20,
+        "pageNumber1": 21,
+        "order": 20,
+        "blockType": "paragraph",
+        "text": "The Company is experiencing a period of supply constraints and increasing costs for components driven by factors such as industry supply-demand imbalances for components, including advanced semiconductors, storage (NAND) and memory (DRAM). The Company expects these trends to intensify, which may materially negatively impact the Company’s revenue, costs, gross margin, results of operations and financial condition. Actions, such as price increases, that have been and may in the future be taken by the Company may not effectively mitigate these negative impacts, and may also reduce demand for the Company’s products and materially adversely affect the Company’s revenue, costs, gross margin, results of operations and financial condition.",
+        "bbox1000": [
+          62,
+          759,
+          939,
+          839
+        ],
+        "confidence": 1,
+        "authority": "official"
+      },
+      {
+        "regionId": "apple-2026-q3-10-q-p21-r21",
+        "pageIndex0": 20,
+        "pageNumber1": 21,
+        "order": 21,
+        "blockType": "paragraph",
+        "text": "Apple Inc. | Q3 2026 Form 10-Q | 13",
+        "bbox1000": [
+          395,
+          883,
+          606,
+          893
+        ],
+        "confidence": 1,
+        "authority": "official"
+      }
+    ]
+  }
+]
