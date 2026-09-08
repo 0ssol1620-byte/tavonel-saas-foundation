@@ -143,6 +143,8 @@ const COPY_SURFACES = [
   "app/docs/page.tsx",
   "components/pricing-page-client.tsx",
   "components/trust-next.tsx",
+  // `/trust` stopped being a redirect and became a page, which makes it a copy surface.
+  "app/trust/page.tsx",
 ];
 
 const BARRED = [

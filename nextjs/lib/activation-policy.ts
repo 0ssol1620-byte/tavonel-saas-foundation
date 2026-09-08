@@ -37,8 +37,12 @@ export const activationPolicy = {
     So the row names the build instead of the intention. It goes back to naming the renderer
     when a deployed image digest can be checked against the one the tests ran on -- which is what
     `lib/trust-page-answers.test.ts` holds this string to, rather than trusting an edit.
+
+    It deliberately avoids the word "qualification", which the A-6 rule in
+    `activation-policy.test.ts` treats as a promise of a receipt the reader can open. There is no
+    such receipt for the deployed image, and there should not be a word implying one.
   */
-  cdr: { enabled: true, reason: "Quarantine source objects are sanitized before anything downstream reads them. What is deployed today is the synthetic qualification build, tavonel-cdr-synthetic; the pypdfium2 sanitizer service is built and tested but is not deployed, so read this row as the qualification path rather than the production renderer." },
+  cdr: { enabled: true, reason: "Quarantine source objects are sanitized before anything downstream reads them. The sanitizer running today is the synthetic build, tavonel-cdr-synthetic; the pypdfium2 sanitizer service is not deployed, so this row describes the interim path and not the renderer it will become." },
   ocrGpu: { enabled: true, reason: "GPU OCR is open, with scale-to-zero and candidate-only review controls enforced." },
   candidatePromotion: { enabled: false, reason: "Promotion is always an explicit human decision." },
   customerData: { enabled: false, reason: "Customer-data processing is gated until the security suite passes and the founder records an approval receipt." },

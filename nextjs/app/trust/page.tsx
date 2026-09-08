@@ -50,7 +50,7 @@ const PUBLISHED: Array<[string, string, string]> = [
   ["Access control", "Security", "Workspace membership checked server-side on every request. There are no roles, no SSO and no seat model in this deployment."],
   ["Tenant isolation", "Security", "Workspace identity is derived server-side from the session, never from an identifier the browser supplies; storage prefixes, rows and signed capabilities are scoped to it."],
   ["Subprocessors", "Subprocessors", "Named service, purpose and data class, with a change notice commitment."],
-  ["Content disarm and malware", "Security and Service status", "Quarantine, mandatory scanning and sanitization before anything downstream reads a document. Which sanitizer build is deployed is stated on the status page rather than assumed here."],
+  ["Content disarm and malware", "Security", "Quarantine, mandatory scanning and sanitization before anything downstream reads a document. Which sanitizer build is actually running is named there rather than assumed."],
   ["Vulnerability disclosure", "security.txt", "Reporting address and policy, served at the well-known path a scanner looks for."],
   ["Security contact", "Contact and security.txt", "The same address in both places."],
 ];
