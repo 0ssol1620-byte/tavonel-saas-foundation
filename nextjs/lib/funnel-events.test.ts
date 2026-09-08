@@ -59,7 +59,7 @@ function sourceFiles(directory: string): string[] {
 
 const modulePath = resolve(import.meta.dirname, "./funnel-events.ts");
 const moduleSource = readFileSync(modulePath, "utf8");
-const declaredEvents = [...moduleSource.matchAll(/^\s*\|\s*"([a-z_]+)"$/gm)].map((match) => match[1]);
+const declaredEvents = [...moduleSource.matchAll(/^\s*\|\s*"([a-z_]+)";?$/gm)].map((match) => match[1]);
 
 /*
   The union's own lines are struck out of the corpus and the rest of the module is kept. The
@@ -69,14 +69,24 @@ const declaredEvents = [...moduleSource.matchAll(/^\s*\|\s*"([a-z_]+)"$/gm)].map
 */
 const callSites = ["../app", "../components", "../lib"]
   .flatMap((path) => sourceFiles(resolve(import.meta.dirname, path)))
-  .map((path) => (path === modulePath ? moduleSource.replace(/^\s*\|\s*"[a-z_]+"$/gm, "") : readFileSync(path, "utf8")))
+  .map((path) => (path === modulePath ? moduleSource.replace(/^\s*\|\s*"[a-z_]+";?$/gm, "") : readFileSync(path, "utf8")))
   .join("\n");
 
 describe("every declared funnel event has a control that fires it", () => {
-  it("found the union to check", () => {
+  /*
+    The last member of the union ends with `;` and the first draft of this regex did not allow for
+    it, so the extraction silently dropped one name and the class below quietly stopped covering
+    it. An under-extraction is the failure mode that makes a per-name test look thorough while
+    testing less than it says, so the boundary is named: first member, last member, and the count.
+  */
+  it("extracts every member of the union, including the one that ends it", () => {
+    expect(declaredEvents.at(0)).toBe("login_reached_with_intent");
+    expect(declaredEvents.at(-1), "the trailing `;` member was dropped by the extraction").toBe("workspace_ai_connect_opened");
+    expect(declaredEvents.length).toBe(new Set(declaredEvents).size);
     expect(declaredEvents.length).toBeGreaterThan(20);
     expect(declaredEvents).toContain("workspace_compile_failed");
     expect(declaredEvents).toContain("checkout_completed");
+    expect(declaredEvents).toContain("signed_in");
   });
 
   it.each(declaredEvents)("%s is fired from somewhere", (event) => {
