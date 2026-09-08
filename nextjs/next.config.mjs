@@ -11,7 +11,32 @@ const contentSecurityPolicy = [
   "frame-ancestors 'none'",
   "form-action 'self'",
   "script-src 'self' 'unsafe-inline' https://cdn.paddle.com https://*.paddle.com https://www.googletagmanager.com",
+  /*
+    §41 P-08. `'unsafe-inline'` on styles was covering two very different things, and only one of
+    them is used.
+
+    A `<style>` element executes attacker-authored CSS -- selector-driven exfiltration, an
+    injected overlay over a real control. A `style="..."` attribute on an element React already
+    decided to render is a far narrower thing. Splitting the directive keeps the second and drops
+    the first, and it costs nothing here: the 27 prerendered pages of a production build contain
+    **zero** `<style>` elements and 13 style attributes, and `app` + `components` contain zero
+    `<style>` in source against 39 attribute uses. next/font emits a `<link rel="stylesheet">`,
+    not the inline block an earlier note in `lib/csp-report-only.ts` assumed.
+
+    `style-src` stays, and stays permissive, as the fallback for a browser too old to know the
+    two narrower directives -- which is also the only browser that reaches the one runtime
+    `<style>` injection in the bundle: pdf.js falls back to appending a `<style>` element for
+    embedded font faces when `adoptedStyleSheets` is missing. Firefox 75-100 and Safari 15.4-16.3
+    understand `style-src-elem` and lack `adoptedStyleSheets`, so on those the evidence viewer
+    renders its PDF text in fallback fonts. That is the whole measured cost.
+
+    `be17e00` added gtag.js to script-src after this was written. It is loaded as a
+    `<script src>` by `components/marketing-consent.tsx` and injects no `<style>` element, so it
+    does not change the measurement above.
+  */
   "style-src 'self' 'unsafe-inline'",
+  "style-src-elem 'self'",
+  "style-src-attr 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
   "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.paddle.com https://*.r2.cloudflarestorage.com https://www.google-analytics.com https://region1.google-analytics.com",
