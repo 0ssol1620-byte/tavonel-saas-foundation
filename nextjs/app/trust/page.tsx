@@ -44,7 +44,7 @@ const DESTINATIONS: Array<[string, string, Route]> = [
 */
 const PUBLISHED: Array<[string, string, string]> = [
   ["Architecture and data flow", "Security", "The enforced boundary in order, and which component holds a document body at each step."],
-  ["Data handling", "Privacy notice", "Categories collected, purposes, storage locations and international processing."],
+  ["Data handling", "Privacy notice", "Categories collected, purposes, storage locations, international processing, and the optional website analytics you can decline or withdraw."],
   ["Retention and deletion", "Privacy notice", "Source material and derived artifacts are deleted on a verified request. No retention period in days is published: data remains until workspace deletion, a verified request, or a legal duty."],
   ["Encryption", "Security", "TLS in transit throughout; stored objects encrypted at rest by the storage provider. There is no customer-managed key."],
   ["Access control", "Security", "Workspace membership checked server-side on every request. There are no roles, no SSO and no seat model in this deployment."],
