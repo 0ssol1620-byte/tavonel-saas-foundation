@@ -24,7 +24,8 @@
     "verify:export": "node scripts/verify-signed-export.mjs",
     "verify:package": "node scripts/compiled-world/validate.mjs",
     "verify:developer-clean": "node scripts/verify-developer-clean-install.mjs",
-    "qa:links": "node scripts/launch-qa/internal-links.mjs"
+    "qa:links": "node scripts/launch-qa/internal-links.mjs",
+    "scan:secrets": "node scripts/secret-scan.mjs .."
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.4",
