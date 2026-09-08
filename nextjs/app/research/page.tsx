@@ -45,13 +45,26 @@ const AREAS = [
     "Temporal integrity",
     "Keeping worlds versioned as their sources change, so a past answer stays traceable to what the sources said at the time.",
   ],
+  /*
+    These last two used to name two frozen technologies outright and then describe how each one
+    works. Both sit on the disclosure registry's publication freeze, both were a mechanism
+    description rather than a research area, and neither was tracked as a claim -- so this page
+    was the deepest public description of two unfiled inventions, sitting where nobody was
+    auditing it. `lib/prohibited-phrases.test.ts` keeps the old wording from coming back.
+
+    They stay on the page, because they are genuinely two of the open problems and removing them
+    would misrepresent what the work is. What changed is the depth: each now states the problem
+    and the value of solving it, and says nothing about how. There is a second reason to write
+    them this way. The one measurement that exists for either is not flattering, and the previous
+    phrasing implied a capability the measurement does not support.
+  */
   [
-    "Selective recompilation",
-    "Working out which parts of a world a source change actually invalidates, so a corpus update does not mean recompiling everything.",
+    "Cost of staying current",
+    "Sources keep arriving, and a world nobody can afford to update stops being worth having. What it should cost to keep a compiled world faithful to changing sources is an open question here, not a settled one.",
   ],
   [
-    "Multi-model verification",
-    "Treating models as replaceable workers and checking their output against the source, so the world contract survives swapping any one of them.",
+    "Model independence",
+    "The worth of a compiled world should not rest on which model happened to produce it. Keeping what the product guarantees stable while the models underneath it change is a problem we work on rather than a property we assume.",
   ],
 ] as const;
 
