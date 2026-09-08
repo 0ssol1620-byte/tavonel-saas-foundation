@@ -3,6 +3,7 @@ import { createHash, createHmac, randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { parseQualification, qualificationLines } from "@/lib/contact-qualification";
+import { isAllowedFormOrigin } from "@/lib/public-form-origin";
 
 export const runtime = "nodejs";
 
@@ -71,7 +72,7 @@ function saltedKey(dimension: string, value: string) {
 }
 
 export async function POST(request: Request) {
-  if (!isAllowedOrigin(request)) return error("This request origin is not allowed.", 403);
+  if (!isAllowedFormOrigin(request)) return error("This request origin is not allowed.", 403);
   if (!request.headers.get("content-type")?.startsWith("application/json")) {
     return error("Only JSON requests are accepted.", 415);
   }
@@ -162,31 +163,6 @@ function parseContact(raw: unknown): Contact | null {
 
 function text(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
-}
-
-function isAllowedOrigin(request: Request) {
-  const origin = request.headers.get("origin");
-  if (!origin) return process.env.NODE_ENV !== "production";
-
-  if (process.env.NODE_ENV !== "production") {
-    try {
-      if (["localhost", "127.0.0.1"].includes(new URL(origin).hostname)) return true;
-    } catch {
-      return false;
-    }
-  }
-
-  return (process.env.AKC_CONTACT_ALLOWED_ORIGINS ?? "")
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean)
-    .some((value) => {
-      try {
-        return new URL(value).origin === origin;
-      } catch {
-        return false;
-      }
-    });
 }
 
 function isRateLimited(key: string) {
