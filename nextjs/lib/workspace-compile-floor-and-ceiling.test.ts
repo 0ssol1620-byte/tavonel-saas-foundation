@@ -45,6 +45,13 @@ describe("workspace compile floor and ceiling", () => {
     expect(workspace).toContain("workspace-preflight-blocked");
   });
 
+  it("moves an authorised staged compile into the real live Sources view before upload begins", () => {
+    expect(workspace).toContain('navigateSurface("sources")');
+    expect(workspace).toContain('sources: "workspace-sources"');
+    expect(workspace).toContain('scrollIntoView({ block: "start", behavior: "smooth" })');
+    expect(workspace.indexOf('navigateSurface("sources")')).toBeLessThan(workspace.indexOf("await uploadDocuments(files)"));
+  });
+
   it("agrees with the shared judgement at both ends", () => {
     expect(judgeCompileSet(1).ok).toBe(true);
     expect(judgeCompileSet(COMPILE_MAX_DOCUMENTS).ok).toBe(true);

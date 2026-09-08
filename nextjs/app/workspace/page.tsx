@@ -1278,6 +1278,26 @@ export default function WorkspacePage() {
     stays on screen with the reason, because silently discarding files someone chose is its own
     kind of lie.
   */
+  const navigateSurface = useCallback((next: WorkspaceSurface) => {
+    setSurface(next);
+    setTab(SURFACE_TO_TAB[next]);
+    const url = new URL(window.location.href);
+    url.pathname = next === "home" ? "/workspace" : `/workspace/${next}`;
+    url.searchParams.delete("tab");
+    window.history.pushState(null, "", url.toString());
+    const anchor = ({
+      sources: "workspace-sources",
+      runs: "workspace-runs",
+      review: "workspace-review",
+      changes: "workspace-changes",
+      world: "workspace-world",
+      ask: "workspace-ask",
+      activity: "workspace-runs",
+    } as Partial<Record<WorkspaceSurface, string>>)[next];
+    if (anchor) window.requestAnimationFrame(() => document.getElementById(anchor)?.scrollIntoView({ block: "start", behavior: "smooth" }));
+    else window.scrollTo({ top: 0 });
+  }, []);
+
   const stagedVerdict = judgeCorpusSet(stagedSelection?.files.length ?? 0);
 
   const startStagedCompile = async () => {
@@ -1288,6 +1308,21 @@ export default function WorkspacePage() {
     if (!verdict.ok) { setNotice(verdict.message); return; }
     const files = stagedSelection.files.map((entry) => entry.file);
     setStagedSelection(null);
+
+    /*
+      Make the product experience match the promise the visitor just saw on the landing page.
+
+      The public compile film is only a preview; this surface is the real thing. Move into Sources
+      before bytes start travelling so the customer watches their own files enter the live compile
+      view instead of remaining on Home with a changing status sentence. `CompileStage` is fed by
+      pipeline rows, streamed OCR observations and the persisted World model, so this transition
+      does not substitute a fixture or a timed animation for actual execution.
+
+      Keep this local to the staged-file path. Resuming an existing durable job must not steal the
+      operator's current surface, and proof-mode helpers intentionally retain their existing flow.
+    */
+    navigateSurface("sources");
+
     await uploadDocuments(files);
   };
 
@@ -1376,26 +1411,6 @@ export default function WorkspacePage() {
       `OCR JSON verified for ${target.documentId}: ${candidates.pageCount} page(s), ${candidates.text.length} text characters, digest ${digestMatches ? "matched" : "mismatched"}, immutable key ${keyMatches ? "matched" : "mismatched"}, candidatePromotion=${json.candidatePromotion === false ? "false" : "invalid"}.`,
     );
   };
-
-  const navigateSurface = useCallback((next: WorkspaceSurface) => {
-    setSurface(next);
-    setTab(SURFACE_TO_TAB[next]);
-    const url = new URL(window.location.href);
-    url.pathname = next === "home" ? "/workspace" : `/workspace/${next}`;
-    url.searchParams.delete("tab");
-    window.history.pushState(null, "", url.toString());
-    const anchor = ({
-      sources: "workspace-sources",
-      runs: "workspace-runs",
-      review: "workspace-review",
-      changes: "workspace-changes",
-      world: "workspace-world",
-      ask: "workspace-ask",
-      activity: "workspace-runs",
-    } as Partial<Record<WorkspaceSurface, string>>)[next];
-    if (anchor) window.requestAnimationFrame(() => document.getElementById(anchor)?.scrollIntoView({ block: "start" }));
-    else window.scrollTo({ top: 0 });
-  }, []);
 
   const navigateSettings = (panel: "usage" | "trust") => {
     setSurface("settings");
