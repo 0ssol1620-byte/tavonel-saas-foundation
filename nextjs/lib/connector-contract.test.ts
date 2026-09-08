@@ -196,16 +196,18 @@ describe.each(PROVIDERS)("connector contract: %s", (provider) => {
 
   it("refuses a cursor that did not come from the provider", async () => {
     // Only Microsoft's cursor is a URL, and it is the only one that can be pointed elsewhere.
-    // The others are opaque tokens the provider echoes, so the equivalent guard is that they
-    // are never interpolated into a host.
+    // The others are opaque tokens the provider echoes, so a value carrying a scheme did not
+    // come from the provider at all. It used to be enough that such a token never reached the
+    // host; since the egress policy landed it is refused outright, and no request is made.
     const { fetcher, calls } = fakeProvider(provider, 1);
     if (provider === "microsoft_graph") {
       await expect(listOAuthSourcePage({ provider, accessToken: "a", cursor: "https://attacker.test/v1.0/me/drive/root/delta" }))
         .rejects.toThrow("OAUTH_SOURCE_CURSOR_INVALID");
       return;
     }
-    await listOAuthSourcePage({ provider, accessToken: "a", cursor: "https://attacker.test/steal", fetcher });
-    expect(calls[0].url.startsWith("https://attacker.test")).toBe(false);
+    await expect(listOAuthSourcePage({ provider, accessToken: "a", cursor: "https://attacker.test/steal", fetcher }))
+      .rejects.toThrow("OAUTH_SOURCE_CURSOR_INVALID");
+    expect(calls).toHaveLength(0);
   });
 
   it("downloads only from the provider's own origin", async () => {

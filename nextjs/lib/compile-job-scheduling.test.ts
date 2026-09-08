@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { COMPILE_MAX_DOCUMENTS, CORPUS_MAX_DOCUMENTS } from "./compile-limits";
 import {
   RESTING_COMPILE_STATES,
   SCHEDULER_EXCLUDED_STATES,
@@ -355,6 +356,17 @@ describe("the paid workspace's runnable-compile cap", () => {
     expect(result).toEqual({ ok: false, code: "COMPILE_JOB_WORKSPACE_LIMIT_REACHED" });
     // Refused before the write, not after it: no row was created and then rejected.
     expect(enqueued).toHaveLength(0);
+  });
+
+  it("leaves room for the largest run the product offers", () => {
+    /*
+      The cap is derived from the corpus contract rather than chosen, and this is the property
+      that derivation exists for. A ceiling below the number of parts in a full-size corpus would
+      refuse the second half of a compile the customer was invited to submit -- the cap enforcing
+      a limit the product does not advertise. If either number moves, this fails.
+    */
+    expect(WORKSPACE_RUNNABLE_COMPILE_LIMIT)
+      .toBeGreaterThanOrEqual(Math.ceil(CORPUS_MAX_DOCUMENTS / COMPILE_MAX_DOCUMENTS));
   });
 
   it("does not count a job that is resting on a person or already settled", async () => {

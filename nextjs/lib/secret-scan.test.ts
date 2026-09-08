@@ -135,5 +135,8 @@ describe("the scanner over this repository", () => {
     // The scanner is inside the tree it scans and so is this test. If either one had to be
     // excluded to stay green, the exclusion would be the first place a real key could hide.
     expect(scanForSecrets(resolve(import.meta.dirname, ".."))).toEqual([]);
-  });
+    // The walk takes ~250 ms on its own and the default 5 s budget is generous for it; it is
+    // raised because this is synchronous disk work sharing a machine with the rest of the suite,
+    // and a timeout here would read as a finding.
+  }, 30_000);
 });

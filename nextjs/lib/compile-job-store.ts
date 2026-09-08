@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
 import { CORPUS_ID_PATTERN, planCorpusBatches, type CorpusBatch } from "./corpus-batching";
 import { corpusIdFor } from "./corpus-id";
+import { COMPILE_MAX_DOCUMENTS, CORPUS_MAX_DOCUMENTS } from "./compile-limits";
 
 /*
   The application's view of durable compile orchestration (migration 0038).
@@ -282,11 +283,15 @@ function toJob(row: CompileJobRow): CompileJob | null {
   ever pick it up, so counting it here would let five parked reviews lock a paying customer out
   of compiling anything, which is the exact bug the scheduler window already had once.
 
-  Twelve is four corpus batches of a large compile plus headroom, not a tuned number. It is a
-  ceiling on one tenant's share of a shared pool, not a product limit, and it is deliberately far
-  above what a person clicking Compile can reach.
+  The number is derived rather than picked, and the derivation is the point: the largest run the
+  product itself offers is a 128-document corpus, which is eleven parts. A fixed ceiling anywhere
+  near eleven refuses the second half of a compile the customer was invited to submit -- the cap
+  would then be enforcing a limit the product does not advertise, which is a worse failure than
+  the one it exists to prevent. Two full runs in flight is the headroom above that. It is still a
+  ceiling on one tenant's share of a shared pool, not a product limit.
 */
-export const WORKSPACE_RUNNABLE_COMPILE_LIMIT = 12;
+export const WORKSPACE_RUNNABLE_COMPILE_LIMIT =
+  Math.ceil(CORPUS_MAX_DOCUMENTS / COMPILE_MAX_DOCUMENTS) * 2;
 
 async function workspaceCompileCapacity(
   workspaceKey: string,
