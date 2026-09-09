@@ -289,6 +289,14 @@ describe("failure classification", () => {
     expect(completeJobBatch.mock.calls[0][3]).toMatchObject({ outcome: "retry", errorCode: "OAUTH_TOKEN_REFRESH_FAILED" });
   });
 
+  it.each(["OAUTH_SOURCE_PAGE_INVALID", "OAUTH_SOURCE_CURSOR_INVALID"])("retains the checkpoint and imports nothing after %s", async code => {
+    listOAuthSourcePage.mockRejectedValueOnce(new Error(code));
+    const result = await runSourceImportBatch({ ...JOB, cursorToken: "prior" }, "worker-1");
+    expect(result).toEqual({ ok: false, code });
+    expect(importSourceObject).not.toHaveBeenCalled();
+    expect(completeJobBatch.mock.calls[0][3]).toEqual({ outcome: "retry", errorCode: code });
+  });
+
   it("retries a provider listing failure without moving the cursor", async () => {
     listOAuthSourcePage.mockRejectedValue(new Error("429"));
     await runSourceImportBatch({ ...JOB, cursorToken: "page-3" }, "worker-1");

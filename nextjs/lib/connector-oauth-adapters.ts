@@ -55,11 +55,23 @@ const DOWNLOAD_POLICY: Record<OAuthConnectorProvider, EgressPolicy> = {
  * `Array.isArray(payload.files)` says the payload has an array; it says nothing about what is
  * in it. A single `null` entry -- which any of these APIs may emit, and which a proxy or a
  * partial response certainly can -- reached `row.id` and threw a TypeError out of the adapter.
- * The sync worker classifies failures by code and has no branch for that, so one malformed
- * entry took down a whole listing instead of being skipped like every other unreadable row.
+ * Invalid rows now refuse the page with a stable error code. Dropping them would let the
+ * sync cursor advance over source observations that were never actually processed.
  */
 function readableRow(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+// Do not silently remove malformed observations from a successful sync denominator.
+function sourceRows(payload: Record<string, unknown>, key: string): Record<string, unknown>[] {
+  const rows = payload[key];
+  if (!Array.isArray(rows) || !rows.every(readableRow)) throw new Error("OAUTH_SOURCE_PAGE_INVALID");
+  return rows;
+}
+
+function completeObservations(items: Array<OAuthSourceItem | null>): OAuthSourceItem[] {
+  if (items.some(item => item === null)) throw new Error("OAUTH_SOURCE_PAGE_INVALID");
+  return items as OAuthSourceItem[];
 }
 
 function boundedString(value: unknown, maximum: number) {
@@ -131,9 +143,11 @@ async function jsonRequest(
   if (!result.ok) throw new Error(`OAUTH_SOURCE_EGRESS_REFUSED:${result.code}`);
   if (result.status < 200 || result.status > 299) throw new Error("OAUTH_SOURCE_LIST_FAILED");
   try {
-    return JSON.parse(result.text) as Record<string, unknown>;
+    const payload: unknown = JSON.parse(result.text);
+    if (!readableRow(payload)) throw new Error("OAUTH_SOURCE_PAGE_INVALID");
+    return payload;
   } catch {
-    return {} as Record<string, unknown>;
+    throw new Error("OAUTH_SOURCE_PAGE_INVALID");
   }
 }
 
@@ -148,8 +162,8 @@ async function listGoogleDrive(accessToken: string, cursor: string | null, fetch
     url.searchParams.set("pageToken", pageToken);
   }
   const payload = await jsonRequest(url.toString(), accessToken, {}, fetcher, LIST_POLICY.google_drive);
-  const rows = Array.isArray(payload.files) ? payload.files as Array<Record<string, unknown>> : [];
-  const items = rows.map((row): OAuthSourceItem | null => {
+  const rows = sourceRows(payload, "files");
+  const items = completeObservations(rows.map((row): OAuthSourceItem | null => {
     if (!readableRow(row)) return null;
     const nativeId = boundedString(row.id, 512);
     const name = boundedString(row.name, 512);
@@ -159,8 +173,9 @@ async function listGoogleDrive(accessToken: string, cursor: string | null, fetch
     const revision = boundedString(row.md5Checksum, 512) ?? boundedString(row.version, 512) ?? boundedString(row.modifiedTime, 512);
     if (!revision) return null;
     return { nativeId, name, revision, mimeType, sizeBytes: folder ? null : boundedSize(row.size), modifiedAt: boundedString(row.modifiedTime, 64), kind: folder ? "folder" : "file" };
-  }).filter((item): item is OAuthSourceItem => item !== null);
-  const next = boundedString(payload.nextPageToken, 2_048);
+  }));
+  const next = payload.nextPageToken === undefined ? null : safeOpaqueContinuation(payload.nextPageToken, 2_048);
+  if (payload.nextPageToken !== undefined && next === null) throw new Error("OAUTH_SOURCE_CURSOR_INVALID");
   return { items, cursor: next, complete: next === null };
 }
 
@@ -180,8 +195,8 @@ async function listDropbox(accessToken: string, cursor: string | null, target: O
     fetcher,
     LIST_POLICY.dropbox,
   );
-  const rows = Array.isArray(payload.entries) ? payload.entries as Array<Record<string, unknown>> : [];
-  const items = rows.map((row): OAuthSourceItem | null => {
+  const rows = sourceRows(payload, "entries");
+  const items = completeObservations(rows.map((row): OAuthSourceItem | null => {
     if (!readableRow(row)) return null;
     const tag = row[".tag"];
     const nativeId = boundedString(row.id, 512) ?? boundedString(row.path_lower, 1_024);
@@ -190,10 +205,11 @@ async function listDropbox(accessToken: string, cursor: string | null, target: O
     const deleted = tag === "deleted";
     const revision = deleted ? `deleted:${boundedString(row.path_lower, 1_024) ?? nativeId}` : boundedString(row.rev, 512) ?? `folder:${nativeId}`;
     return { nativeId, name, revision, mimeType: null, sizeBytes: tag === "file" ? boundedSize(row.size) : null, modifiedAt: boundedString(row.server_modified, 64), kind: tag as OAuthSourceItem["kind"] };
-  }).filter((item): item is OAuthSourceItem => item !== null);
-  const next = boundedString(payload.cursor, 4_096);
-  const hasMore = payload.has_more === true;
-  if (hasMore && !next) throw new Error("OAUTH_SOURCE_CURSOR_INVALID");
+  }));
+  const next = safeOpaqueContinuation(payload.cursor, 4_096);
+  if (typeof payload.has_more !== "boolean") throw new Error("OAUTH_SOURCE_PAGE_INVALID");
+  const hasMore = payload.has_more;
+  if (!next) throw new Error("OAUTH_SOURCE_CURSOR_INVALID");
   return { items, cursor: next, complete: !hasMore };
 }
 
@@ -209,8 +225,8 @@ async function listMicrosoftGraph(accessToken: string, cursor: string | null, ta
     url = firstPage.toString();
   }
   const payload = await jsonRequest(url, accessToken, {}, fetcher, LIST_POLICY.microsoft_graph);
-  const rows = Array.isArray(payload.value) ? payload.value as Array<Record<string, unknown>> : [];
-  const items = rows.map((row): OAuthSourceItem | null => {
+  const rows = sourceRows(payload, "value");
+  const items = completeObservations(rows.map((row): OAuthSourceItem | null => {
     if (!readableRow(row)) return null;
     const nativeId = boundedString(row.id, 512);
     const name = boundedString(row.name, 512) ?? nativeId;
@@ -229,9 +245,9 @@ async function listMicrosoftGraph(accessToken: string, cursor: string | null, ta
       modifiedAt: boundedString(row.lastModifiedDateTime, 64),
       kind: deleted ? "deleted" : folder ? "folder" : "file",
     };
-  }).filter((item): item is OAuthSourceItem => item !== null);
+  }));
   const next = safeGraphContinuation(payload["@odata.nextLink"] ?? payload["@odata.deltaLink"]);
-  if ((payload["@odata.nextLink"] || payload["@odata.deltaLink"]) && !next) throw new Error("OAUTH_SOURCE_CURSOR_INVALID");
+  if ((payload["@odata.nextLink"] !== undefined || payload["@odata.deltaLink"] !== undefined) && !next) throw new Error("OAUTH_SOURCE_CURSOR_INVALID");
   return { items, cursor: next, complete: !payload["@odata.nextLink"] };
 }
 
