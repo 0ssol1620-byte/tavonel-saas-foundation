@@ -2116,8 +2116,10 @@ export default function WorkspacePage() {
                 <p>
                   {workspaceState.mode === "new"
                     ? "Upload sources or connect the system where your knowledge already lives."
-                    : activeWorld || candidateNeedsDecision
+                    : activeWorld
                       ? "Add more knowledge without losing access to the World you already have."
+                      : candidateNeedsDecision
+                        ? "Add more sources while this candidate waits for review."
                       : "Add more knowledge to the sources waiting for their first compile."}
                 </p>
                 <div className="workspace-intake-actions">
