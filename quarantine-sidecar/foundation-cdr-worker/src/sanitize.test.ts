@@ -637,6 +637,25 @@ describe("Worker HTTP and queue surface", () => {
     assert.equal(response.headers.get("content-type")?.includes("application/json"), true);
   });
 
+  it("keeps settlement failure terminal while returning bounded persisted-result diagnostics", async () => {
+    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
+    const response = await handleRequest(new Request("https://worker.example/v1/sanitize", {
+      method: "POST", headers: { authorization: `Bearer ${MANUAL_TRIGGER_TOKEN}`, "content-type": "application/json" },
+      body: JSON.stringify({ objectKey: SOURCE_KEY }),
+    }), envFor(r2), async (input, init) => String(input) === SETTLEMENT_URL
+      ? Response.json({ code: "COMPUTE_SETTLEMENT_INVALID", detail: "must not escape" }, { status: 503 })
+      : cleanCdrFetch(input, init));
+    assert.equal(response.status, 503);
+    const payload = await response.json() as Record<string, string>;
+    assert.equal(payload.error, "compute settlement returned HTTP 503 (COMPUTE_SETTLEMENT_INVALID)");
+    assert.equal(payload.sourceKey, SOURCE_KEY);
+    assert.equal(payload.immutableKey, immutableObjectKey("ws_pilot", "doc_1", outputSha256()));
+    assert.equal(payload.status, "clean");
+    assert.equal(payload.cdrReceiptStatus, "written");
+    assert.equal(payload.ocrStatus, "skipped");
+    assert.equal(JSON.stringify(payload).includes("must not escape"), false);
+  });
+
   it("blocks unauthenticated federated health before consuming identity budget", async () => {
     for (const path of ["/health", "/health?probe=1", "/ignored/../health"]) {
       for (const authorization of [undefined, "Bearer invalid", `Basic ${MANUAL_TRIGGER_TOKEN}`]) {
