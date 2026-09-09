@@ -5,6 +5,7 @@
     "A-bearer": "Privilege comes only from an Authorization: Bearer header. A cross-site request cannot attach one ambiently, so classic browser CSRF does not reach it. Requires: no wildcard credentialed CORS origin.",
     "B-cookie": "Privilege comes from an ambient cookie or session. Requires SameSite policy plus Origin/Referer validation or an anti-CSRF token. NO ROUTE IN THIS REPOSITORY IS TYPE B; adding one without an origin guard fails the test.",
     "C-webhook": "Privilege comes from a signature over the raw request body. Requires raw-body verification, a replay window, and event dedupe.",
+    "E-signed-service": "Bodyless service request signed over method, fixed path/audience, timestamp and request ID. Requires body refusal, durable replay prevention and issuance budget; no cookie authority.",
     "D-oauth-callback": "Provider redirect. Requires state, PKCE, and a fixed redirect policy.",
     "P-public": "Accepts no credential and grants no tenant privilege. Nothing exists for a forged request to ride, so origin checks here are anti-abuse, not CSRF defence."
   },
@@ -32,6 +33,7 @@
     "app/api/enterprise/identity/route.ts": { "type": "A-bearer", "methods": ["GET", "PUT"], "credential": "bearer:supabase-jwt" },
     "app/api/enterprise/policies/route.ts": { "type": "A-bearer", "methods": ["GET", "PUT"], "credential": "bearer:supabase-jwt" },
     "app/api/internal/billing/settle/route.ts": { "type": "C-webhook", "methods": ["POST"], "credential": "hmac:x-tavonel-billing-signature", "note": "lib/compute-settlement-auth.ts: digest over the raw body, 300s timestamp window, request id." },
+    "app/api/internal/cdr/identity/route.ts": { "type": "E-signed-service", "methods": ["POST"], "credential": "hmac:x-tavonel-identity-signature", "note": "Body forbidden; domain-separated method/path/audience/timestamp/UUID signature, 60s window, durable replay and issuance limit. No cookie authority; disabled by default and outside production." },
     "app/api/internal/jobs/run/route.ts": { "type": "A-bearer", "methods": ["GET", "POST"], "credential": "bearer:shared-secret", "note": "FOUNDATION_WORKER_SECRET / CRON_SECRET, constant-time compare, closed when unset. Cross-tenant by design; never reachable with a customer credential." },
     "app/api/internal/oauth-secrets/v1/secrets/[operation]/route.ts": { "type": "A-bearer", "methods": ["POST"], "credential": "bearer:shared-secret" },
     "app/api/operations/p0/admission/route.ts": { "type": "P-public", "methods": ["POST"], "credential": "none", "note": "planLargeDocumentAdmission is a pure policy calculator: no read, no write, no tenant data. 4KB body cap. Unauthenticated compute; edge rate limit is backlog." },

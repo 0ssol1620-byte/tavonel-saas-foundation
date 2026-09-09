@@ -1,0 +1,49 @@
+import { createHmac } from "node:crypto";
+import { expect, it, vi } from "vitest";
+import { handleCdrIdentity } from "./cdr-identity-handler";
+import { CDR_IDENTITY_PATH } from "./cdr-identity-request";
+import { CDR_IDENTITY_AUDIENCE } from "./cdr-workload-identity";
+const secret = "fixture-only-identity-secret-32-chars";
+function fixture() {
+  const timestamp = new Date().toISOString();
+  const id = "11111111-1111-4111-8111-111111111111";
+  const headers = { "x-tavonel-identity-request-id": id, "x-tavonel-identity-timestamp": timestamp,
+    "x-tavonel-identity-signature": createHmac("sha256", secret).update(
+      `tavonel.cdr.identity.v1\nPOST\n${CDR_IDENTITY_PATH}\n${CDR_IDENTITY_AUDIENCE}\n${timestamp}\n${id}`).digest("base64url") };
+  const deps = { env: { FOUNDATION_CDR_IDENTITY_ENABLED: "1", VERCEL_ENV: "production", FOUNDATION_CDR_IDENTITY_HMAC: secret },
+    claim: vi.fn(async () => true), subject: vi.fn(async () => "runtime.subject"), mint: vi.fn(async () => "id.token.fixture") };
+  return { headers, deps, request: new Request(`https://tavonel.com${CDR_IDENTITY_PATH}`, { method: "POST", headers }) };
+}
+it("claims before accessing runtime identity and minting, never caches the result", async () => {
+  const { request, deps } = fixture();
+  const response = await handleCdrIdentity(request, deps);
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({ token: "id.token.fixture", audience: CDR_IDENTITY_AUDIENCE });
+  expect(response.headers.get("cache-control")).toContain("no-store");
+  expect(deps.claim.mock.invocationCallOrder[0]).toBeLessThan(deps.subject.mock.invocationCallOrder[0]);
+  expect(deps.subject.mock.invocationCallOrder[0]).toBeLessThan(deps.mint.mock.invocationCallOrder[0]);
+});
+it("rejects unsigned requests before touching DB or runtime identity", async () => {
+  const { deps } = fixture();
+  const response = await handleCdrIdentity(new Request("https://tavonel.com", { method: "POST" }), deps);
+  expect(response.status).toBe(401); expect(deps.claim).not.toHaveBeenCalled(); expect(deps.subject).not.toHaveBeenCalled();
+});
+it("rejects any request body before claiming", async () => {
+  const { headers, deps } = fixture();
+  const response = await handleCdrIdentity(new Request("https://tavonel.com", { method: "POST", headers, body: "file" }), deps);
+  expect(response.status).toBe(400); expect(deps.claim).not.toHaveBeenCalled();
+});
+it.each(["preview", "development"])("refuses %s runtime", async environment => {
+  const { request, deps } = fixture(); deps.env.VERCEL_ENV = environment;
+  expect((await handleCdrIdentity(request, deps)).status).toBe(503); expect(deps.claim).not.toHaveBeenCalled();
+});
+it("stops on replay or issuance limit", async () => {
+  const { request, deps } = fixture(); deps.claim.mockResolvedValue(false);
+  expect((await handleCdrIdentity(request, deps)).status).toBe(429); expect(deps.subject).not.toHaveBeenCalled();
+});
+it.each(["claim", "subject", "mint"] as const)("redacts failure in %s", async step => {
+  const { request, deps } = fixture(); deps[step].mockRejectedValue(new Error("secret-should-not-leak"));
+  const response = await handleCdrIdentity(request, deps);
+  expect(response.status).toBe(503); expect(await response.text()).not.toContain("secret-should-not-leak");
+  if (step !== "mint") expect(deps.mint).not.toHaveBeenCalled();
+});

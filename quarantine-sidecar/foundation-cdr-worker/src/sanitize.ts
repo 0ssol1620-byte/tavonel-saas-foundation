@@ -1,5 +1,6 @@
 import type { FailureClass } from "../../../shared/uskcEnums";
 import { PermanentReject, RetryableError } from "./errors";
+import { cdrAuthorization } from "./identity";
 import { assertFoundationOnlyTarget } from "./guards";
 import { cdrRequestSignature, hmacSecretIsConfigured, sha256DigestHeader, sha256Hex } from "./hmac";
 import {
@@ -50,6 +51,7 @@ export type SanitizeEnv = {
   FOUNDATION_QUARANTINE: R2BucketLike;
   TAVONEL_CDR_URL: string;
   TAVONEL_CDR_HMAC?: string;
+  FOUNDATION_CDR_IDENTITY_HMAC?: string;
   TAVONEL_CDR_PROVIDER: string;
   FOUNDATION_R2_BUCKET: string;
   FOUNDATION_OCR_URL?: string;
@@ -58,11 +60,47 @@ export type SanitizeEnv = {
 
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{16,160}$/;
 const SAFE_CDR_DETAIL_PATTERN = /^CDR [A-Za-z0-9 ._()-]{1,156}$/;
+const CDR_RECEIPT_SCHEMA = "tavonel.cdr_receipt.v2";
+const DIGEST_PATTERN = /^sha256:[a-f0-9]{64}$/;
+const MAX_RECEIPT_BYTES = 16 * 1024;
+// Matches the qualified Cloud Run output ceiling, not the smaller source ceiling.
+const MAX_SANITIZED_BYTES = 18 * 1024 * 1024;
+
+async function boundedResponseBytes(response: Response, limit: number): Promise<ArrayBuffer> {
+  const declared = response.headers.get("content-length");
+  if (declared !== null && (!/^\d+$/.test(declared) || Number(declared) > limit)) {
+    await response.body?.cancel();
+    throw new RetryableError("CDR response exceeds its allowed bound");
+  }
+  if (!response.body) throw new RetryableError("CDR response body is missing");
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  try {
+    while (true) {
+      const next = await reader.read();
+      if (next.done) break;
+      length += next.value.byteLength;
+      if (length > limit) throw new RetryableError("CDR response exceeds its allowed bound");
+      chunks.push(next.value);
+    }
+    if (declared !== null && Number(declared) !== length) throw new RetryableError("CDR response length did not match");
+    const bytes = new Uint8Array(length);
+    let offset = 0;
+    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+    return bytes.buffer;
+  } catch {
+    await reader.cancel().catch(() => undefined);
+    throw new RetryableError("CDR response could not be read within its allowed bound");
+  } finally {
+    reader.releaseLock();
+  }
+}
 
 async function safeCdrRejectDetail(response: Response): Promise<string | null> {
   let body: unknown;
   try {
-    body = await response.json();
+    body = JSON.parse(new TextDecoder().decode(await boundedResponseBytes(response, 4096)));
   } catch {
     return null;
   }
@@ -83,32 +121,66 @@ async function putCreateOnceJson(
   value: Record<string, unknown>,
 ): Promise<"written" | "exists" | "failed"> {
   try {
-    await bucket.put(key, new TextEncoder().encode(`${JSON.stringify(value)}\n`), {
+    const written = await bucket.put(key, new TextEncoder().encode(`${JSON.stringify(value)}\n`), {
       httpMetadata: { contentType: "application/json" },
       customMetadata: { stage: "processing-receipt" },
       onlyIf: { etagDoesNotMatch: "*" },
     });
-    return "written";
+    return written === null ? "exists" : "written";
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     return /precondition|already exists|conflict/iu.test(message) ? "exists" : "failed";
   }
 }
 
-/**
- * The immutable object this exact source already produced, if it produced one.
- *
- * A redelivered queue message must not pay for the disarm twice, and the version key is derived
- * from the CDR *output* digest, so the only way to recognise the earlier run is to read the
- * receipts under the document prefix and match the input digest they recorded. A receipt that
- * does not parse, or whose PDF is gone, is not a match and the disarm runs again.
- */
+type CdrBinding = {
+  parts: { workspaceId: string; documentId: string };
+  sourceKey: string;
+  inputSha256: string;
+  provider: string;
+  targetSha256: string;
+};
+
+/** Validate what is actually persisted, including a concurrent create-once winner. */
+async function verifiedImmutable(
+  bucket: R2BucketLike,
+  immutableKey: string,
+  binding: CdrBinding,
+): Promise<{ immutableKey: string; outputSha256: string } | null> {
+  const receipt = await bucket.get(cdrReceiptSiblingKey(immutableKey));
+  if (!receipt || receipt.size < 1 || receipt.size > MAX_RECEIPT_BYTES) return null;
+  const receiptBytes = await receipt.arrayBuffer();
+  if (receiptBytes.byteLength !== receipt.size) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(new TextDecoder().decode(receiptBytes));
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  const record = parsed as Record<string, unknown>;
+  if (record.schemaVersion !== CDR_RECEIPT_SCHEMA || record.status !== "clean"
+    || record.sourceKey !== binding.sourceKey || record.inputSha256 !== binding.inputSha256
+    || record.provider !== binding.provider || record.targetSha256 !== binding.targetSha256
+    || record.immutableKey !== immutableKey || typeof record.outputSha256 !== "string"
+    || !DIGEST_PATTERN.test(record.outputSha256)
+    || immutableKey !== immutableObjectKey(binding.parts.workspaceId, binding.parts.documentId, record.outputSha256)) {
+    return null;
+  }
+  const pdf = await bucket.get(immutableKey);
+  if (!pdf || pdf.size < 1 || pdf.size > MAX_SANITIZED_BYTES) return null;
+  const bytes = await pdf.arrayBuffer();
+  if (bytes.byteLength !== pdf.size || await sha256DigestHeader(bytes) !== record.outputSha256) return null;
+  return { immutableKey, outputSha256: record.outputSha256 };
+}
+
+/** Valid same-source, same-target redelivery avoids paying for CDR twice. */
 async function reusableImmutable(
   bucket: R2BucketLike,
-  parts: { workspaceId: string; documentId: string },
-  inputSha256: string,
+  binding: CdrBinding,
 ): Promise<{ immutableKey: string; outputSha256: string } | null> {
   if (!bucket.list) return null;
+  const { parts } = binding;
   const prefix = `immutable/${parts.workspaceId}/${parts.workspaceId}/${parts.documentId}/`;
   let listed: { objects: Array<{ key: string }> };
   try {
@@ -118,18 +190,8 @@ async function reusableImmutable(
   }
   for (const object of listed.objects) {
     if (!object.key.endsWith("/sanitized.pdf")) continue;
-    const receipt = await bucket.get(cdrReceiptSiblingKey(object.key));
-    if (!receipt || !(await bucket.get(object.key))) continue;
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(new TextDecoder().decode(await receipt.arrayBuffer()));
-    } catch {
-      continue;
-    }
-    const record = parsed as { inputSha256?: unknown; outputSha256?: unknown };
-    if (record.inputSha256 === inputSha256 && typeof record.outputSha256 === "string") {
-      return { immutableKey: object.key, outputSha256: record.outputSha256 };
-    }
+    const verified = await verifiedImmutable(bucket, object.key, binding);
+    if (verified) return verified;
   }
   return null;
 }
@@ -199,6 +261,9 @@ export const CDR_DETAIL_FAILURE_CLASS: Record<string, FailureClass> = {
   "CDR source could not be converted safely": "CORRUPT_SOURCE",
   "CDR source renderer rejected this document": "CORRUPT_SOURCE",
   "CDR source could not be rasterized safely": "CORRUPT_SOURCE",
+  "CDR sanitized PDF could not be created": "CORRUPT_SOURCE",
+  "CDR image source is not qualified": "CORRUPT_SOURCE",
+  "CDR image source could not be normalized safely": "CORRUPT_SOURCE",
   "CDR source digest does not match the uploaded body": "RECEIPT_MISMATCH",
   "CDR request has already been consumed": "RECEIPT_MISMATCH",
 };
@@ -320,7 +385,13 @@ export async function sanitizeObject(
   }
 
   const inputSha256 = await sha256DigestHeader(bytes);
-  const reused = await reusableImmutable(env.FOUNDATION_QUARANTINE, parts, inputSha256);
+  // This binds configured routing, not scanner/image qualification. A runtime-policy change
+  // at the same URL must also change the provider identity before rollout.
+  const targetSha256 = await sha256DigestHeader(new TextEncoder().encode(JSON.stringify([
+    env.FOUNDATION_R2_BUCKET, env.TAVONEL_CDR_PROVIDER, env.TAVONEL_CDR_URL,
+  ])));
+  const binding: CdrBinding = { parts, sourceKey: objectKey, inputSha256, provider: env.TAVONEL_CDR_PROVIDER, targetSha256 };
+  const reused = await reusableImmutable(env.FOUNDATION_QUARANTINE, binding);
   let immutableKey: string;
   let outputSha256Header: string;
   let cdrReceiptStatus: "written" | "exists" | "failed";
@@ -345,15 +416,19 @@ export async function sanitizeObject(
 
     let response: Response;
     try {
+      const authorization = await cdrAuthorization(env.TAVONEL_CDR_URL, env.FOUNDATION_CDR_IDENTITY_HMAC, fetcher);
       response = await fetcher(env.TAVONEL_CDR_URL, {
         method: "POST",
         headers: {
+          ...(authorization ? { authorization } : {}),
           "x-tavonel-input-sha256": inputSha256,
           "x-tavonel-cdr-timestamp": timestamp,
           "x-tavonel-cdr-request-id": requestId,
           "x-tavonel-cdr-signature": signature,
         },
         body: form,
+        redirect: "error",
+        signal: AbortSignal.timeout(60_000),
       });
     } catch {
       throw new RetryableError("synthetic CDR request failed");
@@ -393,7 +468,10 @@ export async function sanitizeObject(
       throw refuse("RECEIPT_MISMATCH", "synthetic CDR output digest is missing", observed);
     }
 
-    const sanitized = await response.arrayBuffer();
+    const sanitized = await boundedResponseBytes(response, MAX_SANITIZED_BYTES);
+    if (sanitized.byteLength < 1 || sanitized.byteLength > MAX_SANITIZED_BYTES) {
+      throw new RetryableError("CDR output is outside the qualified storage bound");
+    }
     const computedOutput = `sha256:${await sha256Hex(sanitized)}`;
     if (outputDigest !== computedOutput) {
       throw refuse("RECEIPT_MISMATCH", "synthetic CDR output digest did not match the PDF body", observed);
@@ -415,17 +493,24 @@ export async function sanitizeObject(
     }
 
     cdrReceiptStatus = await putCreateOnceJson(env.FOUNDATION_QUARANTINE, cdrReceiptSiblingKey(immutableKey), {
-      schemaVersion: "tavonel.cdr_receipt.v1",
+      schemaVersion: CDR_RECEIPT_SCHEMA,
       status: "clean",
       sourceKey: objectKey,
       immutableKey,
       inputSha256,
       outputSha256: outputSha256Header,
       provider: env.TAVONEL_CDR_PROVIDER,
+      targetSha256,
       requestId,
       occurredAt: timestamp,
       candidatePromotion: false,
     });
+    // A null/throwing conditional PUT means another object won. Never authorize its
+    // bytes or receipt from the fresh response; inspect both persisted winners first.
+    const persisted = await verifiedImmutable(env.FOUNDATION_QUARANTINE, immutableKey, binding);
+    if (cdrReceiptStatus === "failed" || !persisted || persisted.outputSha256 !== outputSha256Header) {
+      throw new RetryableError("persisted CDR evidence conflicts or is incomplete; operator review required");
+    }
   }
 
   const cdrReceiptKey = cdrReceiptSiblingKey(immutableKey);

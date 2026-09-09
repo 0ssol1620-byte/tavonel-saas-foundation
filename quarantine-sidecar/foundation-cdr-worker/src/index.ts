@@ -12,6 +12,7 @@ export interface Env {
   TAVONEL_CDR_PROVIDER: string;
   FOUNDATION_R2_BUCKET: string;
   TAVONEL_CDR_HMAC: string;
+  FOUNDATION_CDR_IDENTITY_HMAC?: string;
   FOUNDATION_OCR_URL?: string;
   TAVONEL_OCR_HMAC?: string;
   RUNPOD_API_KEY?: string;
