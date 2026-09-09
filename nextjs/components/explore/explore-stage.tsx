@@ -28,6 +28,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
 import Logomark from "@/components/logomark";
 import { trackFunnel } from "@/lib/funnel-events";
+import { chooseExploreEntryProof, excerptPreview } from "@/lib/explore-entry-proof";
 import WorldAct from "./world-act";
 import EvidenceAct from "./evidence-act";
 import ChangeAct from "./change-act";
@@ -60,6 +61,8 @@ type Props = {
 export default function ExploreStage({ model, layout, change, answers, technical }: Props) {
   const reduced = useReducedMotion();
   const narrow = useNarrowStage();
+  const entryProof = useMemo(() => chooseExploreEntryProof(model.evidence, answers), [model.evidence, answers]);
+  const proofPreview = entryProof ? excerptPreview(entryProof.excerpt) : null;
 
   const opening = useMemo(() => {
     const claim = model.focus.find((id) => model.nodes.find((node) => node.id === id)?.kind === "Claim");
@@ -342,12 +345,37 @@ export default function ExploreStage({ model, layout, change, answers, technical
 
         {act === "entry" ? (
           <div className={styles.entry}>
-            <p className={styles.entryEyebrow}>EXPLORE · NO LOGIN REQUIRED</p>
-            <h1>{EXPLORE_COPY.hero}</h1>
-            <p className={styles.entrySub}>{EXPLORE_COPY.sub}</p>
-            <button type="button" className={styles.entryCta} onClick={() => enter("world")}>
-              {EXPLORE_COPY.enter}
-            </button>
+            <div className={styles.entryLayout}>
+              <div className={styles.entryCopy}>
+                <p className={styles.entryEyebrow}>EXPLORE · NO LOGIN REQUIRED</p>
+                <h1>{EXPLORE_COPY.hero}</h1>
+                <p className={styles.entrySub}>{EXPLORE_COPY.sub}</p>
+                <button type="button" className={styles.entryCta} onClick={() => enter("world")}>
+                  {EXPLORE_COPY.enter}<span aria-hidden="true">↗</span>
+                </button>
+                <div className={styles.entryPaths} aria-label="Other ways to explore">
+                  <button type="button" onClick={() => enter("change_compare")}>Compare filings <span aria-hidden="true">→</span></button>
+                  <button type="button" onClick={openAsk}>Try sample questions <span aria-hidden="true">→</span></button>
+                </div>
+              </div>
+              {entryProof && proofPreview ? (
+                <aside className={styles.entryProof} aria-label="Excerpt from the sample source" data-entry-proof="source-bound">
+                  <div className={styles.proofHeading}>
+                    <span>FROM THE SOURCE</span><span aria-hidden="true">↗</span>
+                  </div>
+                  <p className={styles.proofFiling}>
+                    {entryProof.form ?? "Public filing"}
+                    {entryProof.filingDate ? <span>Filed {entryProof.filingDate}</span> : null}
+                  </p>
+                  <blockquote>{proofPreview.text}{proofPreview.truncated ? <span aria-label="excerpt continues"> …</span> : null}</blockquote>
+                  <div className={styles.proofFoot}>
+                    <span>Page {entryProof.page} · {entryProof.representationKind === "reference_render" ? "Reference render" : "Source document"}</span>
+                    <button type="button" onClick={() => openRegion(entryProof.id)}>Inspect this source <span aria-hidden="true">↗</span></button>
+                  </div>
+                </aside>
+              ) : null}
+            </div>
+            <p className={styles.entryScope}>{technical.documents.length} public filings · Follow the evidence back to its source</p>
           </div>
         ) : null}
 
