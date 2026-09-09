@@ -45,3 +45,6 @@ nextjs/public/explore-sample/sec-source/*.html -text
 # checkout would hash differently from the Linux one, and the two repositories would be
 # validating against files that are no longer the same bytes.
 shared/*.schema.json text eol=lf
+
+# Imported executable script: keep its hashbang compatible with module transforms.
+nextjs/scripts/secret-scan.mjs text eol=lf

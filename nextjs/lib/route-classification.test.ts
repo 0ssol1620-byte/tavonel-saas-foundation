@@ -77,7 +77,7 @@ describe("state-changing route classification", () => {
     expect(drifted).toEqual([]);
   });
 
-  it("uses only the five classification types", () => {
+  it("uses only the declared classification types", () => {
     const legend = new Set(Object.keys(classification.legend));
     expect(Object.entries(entries).filter(([, entry]) => !legend.has(entry.type))).toEqual([]);
   });
@@ -94,6 +94,18 @@ describe("state-changing route classification", () => {
       .filter(([, entry]) => !entry.note?.includes("origin guard"))
       .map(([key]) => key);
     expect(unguarded).toEqual([]);
+  });
+});
+
+describe("bodyless signed-service routes", () => {
+  it("tracks the dedicated identity broker separately from raw-body webhooks", () => {
+    expect(Object.entries(entries).filter(([, entry]) => entry.type === "E-signed-service").map(([key]) => key))
+      .toEqual(["app/api/internal/cdr/identity/route.ts"]);
+    const handler = readFileSync(resolve(import.meta.dirname, "cdr-identity-handler.ts"), "utf8");
+    expect(handler).toContain("verifyCdrIdentityRequest");
+    expect(handler).toContain("request.body !== null");
+    expect(handler).toContain("deps.claim(id)");
+    // Behavioral failure/order tests live in cdr-identity-handler.test.ts and the DB suite.
   });
 });
 
