@@ -60,7 +60,7 @@ async function runOneBatch(request: Request) {
 
   // A fresh identity per invocation. Two concurrent invocations must be distinguishable, or
   // one could report on a job the other holds.
-  const workerId = `worker-sync-v2-${randomBytes(8).toString("hex")}`;
+  const workerId = `worker-sync-v3-${randomBytes(8).toString("hex")}`;
 
   /*
     Advance customer compiles first, because they are what someone is waiting on.

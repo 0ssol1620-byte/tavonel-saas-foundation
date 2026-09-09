@@ -13,6 +13,9 @@ declare
   j text := 'job-' || repeat('c',32);
   actor uuid := '91919191-9191-4191-8191-919191919191';
   conn uuid := '92929292-9292-4292-8292-929292929292';
+  gconn uuid := '93939393-9393-4393-8393-939393939393';
+  gcursor text := 'tv-drive-v2:' || translate(replace(rtrim(encode(convert_to(
+    '{"phase":"changes","drive":null,"start":"google-watermark","page":null}', 'UTF8'), 'base64'),'='),chr(10),''),'+/','-_');
 begin
   update public.foundation_oauth_connections set client_secret_reference='vault://' || repeat('x',500) where oauth_connection_id=conn;
   begin
@@ -65,6 +68,23 @@ begin
   r := public.enqueue_connector_sync('job-'||repeat('e',32),'pilot-cptest',actor,conn,'{"rootPath":"/two"}');
   assert r->>'created'='true', 'different target allowed once idle';
   assert (select cursor_token is null from public.foundation_jobs where workspace_key='pilot-cptest' and job_id='job-'||repeat('e',32)), 'different target never inherits watermark';
+  update public.foundation_jobs set state='canceled',completed_at=now() where workspace_key='pilot-cptest' and job_id='job-'||repeat('e',32);
+  insert into public.foundation_oauth_connections (oauth_connection_id,workspace_key,provider,display_name,provider_account_id,
+    granted_scopes,client_secret_reference,refresh_token_reference,created_by,updated_by)
+  values (gconn,'pilot-cptest','google_drive','Google test','google-test',array['drive.readonly'],
+    'vault://fixture-client','vault://fixture-refresh',actor,actor);
+  r := public.enqueue_connector_sync('job-'||repeat('f',32),'pilot-cptest',actor,gconn,'{}');
+  assert r->>'created'='true', 'Google lifecycle admission';
+  assert (select payload->>'sourceReaderVersion'='google-lifecycle-v2' and cursor_token is null
+    from public.foundation_jobs where workspace_key='pilot-cptest' and job_id='job-'||repeat('f',32)), 'Google starts with new reader and no legacy cursor';
+  r := public.claim_foundation_job('worker-sync-v2-aaaaaaaaaaaaaaaa',120,array['source_import']::public.foundation_job_type[]);
+  assert r->>'claimed'='false', 'v2 worker cannot execute Google lifecycle';
+  r := public.claim_foundation_job('worker-sync-v3-aaaaaaaaaaaaaaaa',120,array['source_import']::public.foundation_job_type[]);
+  assert r->>'job_id'='job-'||repeat('f',32), 'v3 worker claims Google lifecycle';
+  perform public.complete_foundation_job_batch('pilot-cptest','job-'||repeat('f',32),'worker-sync-v3-aaaaaaaaaaaaaaaa','succeeded',1,1,gcursor);
+  r := public.enqueue_connector_sync('job-'||repeat('0',32),'pilot-cptest',actor,gconn,'{}');
+  assert r->>'created'='true', 'Google subsequent poll admitted';
+  assert (select cursor_token=gcursor from public.foundation_jobs where workspace_key='pilot-cptest' and job_id='job-'||repeat('0',32)), 'Google change checkpoint inherited';
 end;
 $$;
 reset role;

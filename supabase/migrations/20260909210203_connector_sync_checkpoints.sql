@@ -16,7 +16,7 @@ create table public.foundation_connector_checkpoints (
   workspace_key text not null,
   oauth_connection_id uuid not null,
   target_key text not null check (target_key ~ '^[a-f0-9]{64}$'),
-  reader_version text not null check (reader_version in ('dropbox-list-v2','graph-delta-v2')),
+  reader_version text not null check (reader_version in ('dropbox-list-v2','graph-delta-v2','google-lifecycle-v2')),
   target jsonb not null check (jsonb_typeof(target) = 'object' and octet_length(target::text) <= 4096),
   cursor_token text not null check (char_length(cursor_token) between 1 and 4096),
   completed_job_id text not null,
@@ -41,7 +41,8 @@ begin
   -- This marker is a deployment protocol, not a substitute for service authentication.
   if new.job_type = 'source_import' and v_reader is not null and old.state = 'leased'
      and new.state in ('queued','succeeded') then
-    if coalesce(old.leased_by,'') !~ '^worker-sync-v2-[a-f0-9]{16}$' then
+    if coalesce(old.leased_by,'') !~ '^worker-sync-v[23]-[a-f0-9]{16}$'
+       or (v_reader = 'google-lifecycle-v2' and coalesce(old.leased_by,'') !~ '^worker-sync-v3-[a-f0-9]{16}$') then
       raise exception 'connector_checkpoint_worker_incompatible';
     end if;
     if old.lease_expires_at is null or old.lease_expires_at <= clock_timestamp() then
@@ -55,12 +56,14 @@ begin
      and status = 'active' for update;
   if not found then raise exception 'connector_checkpoint_connection_inactive'; end if;
   if not ((v_provider = 'dropbox' and v_reader = 'dropbox-list-v2') or
-          (v_provider = 'microsoft_graph' and v_reader = 'graph-delta-v2')) then
+          (v_provider = 'microsoft_graph' and v_reader = 'graph-delta-v2') or
+          (v_provider = 'google_drive' and v_reader = 'google-lifecycle-v2')) then
     raise exception 'connector_checkpoint_reader_invalid';
   end if;
   if new.cursor_token is null or new.cursor_token = '' or new.cursor_token like 'tavonel-sync-v1:%'
      or (v_provider = 'dropbox' and (new.cursor_token ~ '[[:space:][:cntrl:]]' or new.cursor_token ~ '^[A-Za-z][A-Za-z0-9+.-]*:'))
-     or (v_provider = 'microsoft_graph' and new.cursor_token not like 'https://graph.microsoft.com/v1.0/%') then
+     or (v_provider = 'microsoft_graph' and new.cursor_token not like 'https://graph.microsoft.com/v1.0/%')
+     or (v_provider = 'google_drive' and new.cursor_token !~ '^tv-drive-v2:[A-Za-z0-9_-]+$') then
     raise exception 'connector_checkpoint_cursor_invalid';
   end if;
   v_key := encode(sha256(convert_to(v_target::text, 'UTF8')), 'hex');
@@ -107,7 +110,7 @@ begin
    where workspace_key = p_workspace_key and oauth_connection_id = p_connection_id
      and status = 'active' for update;
   if not found then return jsonb_build_object('code','JOB_CONNECTION_UNAVAILABLE'); end if;
-  v_reader := case v_provider when 'google_drive' then 'google-files-v1'
+  v_reader := case v_provider when 'google_drive' then 'google-lifecycle-v2'
     when 'dropbox' then 'dropbox-list-v2' when 'microsoft_graph' then 'graph-delta-v2' end;
   if v_reader is null then raise exception 'connector_sync_provider_invalid'; end if;
   select * into v_existing from public.foundation_jobs
@@ -153,8 +156,9 @@ begin
   where ((state = 'queued' and available_at <= now()) or (state = 'leased' and lease_expires_at < now()))
     and (p_job_types is null or job_type = any(p_job_types))
     and (job_type <> 'source_import' or payload->>'sourceReaderVersion' is null
-      or (p_worker_id ~ '^worker-sync-v2-[a-f0-9]{16}$'
-        and payload->>'sourceReaderVersion' in ('google-files-v1','dropbox-list-v2','graph-delta-v2')))
+      or (p_worker_id ~ '^worker-sync-v[23]-[a-f0-9]{16}$'
+        and payload->>'sourceReaderVersion' in ('google-files-v1','dropbox-list-v2','graph-delta-v2'))
+      or (p_worker_id ~ '^worker-sync-v3-[a-f0-9]{16}$' and payload->>'sourceReaderVersion' = 'google-lifecycle-v2'))
   order by available_at asc, created_at asc for update skip locked limit 1;
   if not found then return jsonb_build_object('claimed', false); end if;
   update public.foundation_jobs set state='leased', leased_by=p_worker_id,

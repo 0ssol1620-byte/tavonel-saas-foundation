@@ -2,8 +2,8 @@ import type { OAuthSourceItem, OAuthSourcePage } from "./connector-oauth-adapter
 import { createHash } from "node:crypto";
 import { safeFetch } from "./safe-url";
 
-// Candidate lifecycle reader. Promotion requires durable source bindings and downstream
-// tombstone/ACL handling; the legacy import worker must not silently skip these events.
+// Selected only by versioned source jobs. Legacy listing cursors cannot enter this reader.
+// Real provider qualification and full ACL lifecycle remain separate release gates.
 const ORIGIN = "https://www.googleapis.com";
 const PREFIX = "tv-drive-v2:";
 const MAX_CURSOR = 3800; // Leave room for the worker's bounded in-page checkpoint wrapper.
@@ -93,7 +93,7 @@ export async function listGoogleDriveLifecyclePage(input: {
       fields: `nextPageToken,incompleteSearch,files(${fields})`, ...(state.page ? { pageToken: state.page } : {}) });
     if (!Array.isArray(payload.files) || payload.files.length > 25 ||
         (payload.incompleteSearch !== undefined && payload.incompleteSearch !== false)) throw new Error("DRIVE_SNAPSHOT_INCOMPLETE");
-    if (payload.nextPageToken !== undefined && !token(payload.nextPageToken)) throw new Error("DRIVE_CURSOR_INVALID");
+    if (payload.nextPageToken != null && !token(payload.nextPageToken)) throw new Error("DRIVE_CURSOR_INVALID");
     const next = payload.nextPageToken as string | undefined;
     if (next && next === state.page) throw new Error("DRIVE_CURSOR_STALLED");
     if (payload.files.some(row => record(row) && row.trashed === true)) throw new Error("DRIVE_SNAPSHOT_CONFLICT");
@@ -106,7 +106,7 @@ export async function listGoogleDriveLifecyclePage(input: {
     supportsAllDrives: "true", includeItemsFromAllDrives: "true",
     fields: `nextPageToken,newStartPageToken,changes(fileId,removed,changeType,time,file(${fields}))` });
   if (!Array.isArray(payload.changes) || payload.changes.length > 25) throw new Error("DRIVE_CHANGES_INVALID");
-  const next = payload.nextPageToken, checkpoint = payload.newStartPageToken;
+  const next = payload.nextPageToken ?? undefined, checkpoint = payload.newStartPageToken;
   if (next !== undefined ? !token(next) || checkpoint !== undefined || next === pageToken : !token(checkpoint)) throw new Error("DRIVE_CURSOR_INVALID");
   const items = payload.changes.map((change): GoogleDriveLifecycleItem => {
     if (!record(change) || typeof change.fileId !== "string" || !change.fileId || change.fileId.length > 512 ||

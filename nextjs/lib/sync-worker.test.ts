@@ -72,6 +72,42 @@ afterEach(() => {
 });
 
 describe("cursor safety", () => {
+  it("executes the versioned Google watermark, snapshot and changes chain through the worker", async () => {
+    const file = { id: "google-file", name: "report.pdf", version: "7", mimeType: "application/pdf", size: "100" };
+    const responses = [{ startPageToken: "before-snapshot" }, { files: [file] },
+      { changes: [{ fileId: file.id, file: { ...file, version: "8", name: "renamed.pdf" } }], newStartPageToken: "after-changes" },
+      { changes: [], newStartPageToken: "next-poll" }];
+    const fetcher = vi.fn(async () => Response.json(responses.shift()));
+    let cursorToken: string | null = null;
+    for (let step = 0; step < 3; step++) {
+      const result = await runSourceImportBatch({ ...JOB, cursorToken,
+        payload: { ...JOB.payload, sourceReaderVersion: "google-lifecycle-v2" } }, "worker-1", { fetcher });
+      expect(result.ok).toBe(true);
+      const batch = completeJobBatch.mock.calls.at(-1)![3];
+      expect(batch.outcome).toBe(step === 2 ? "succeeded" : "progress");
+      if (step === 0) expect(importSourceObject).not.toHaveBeenCalled();
+      cursorToken = batch.cursorToken;
+    }
+    expect(listOAuthSourcePage).not.toHaveBeenCalled();
+    expect(importSourceObject.mock.calls.map(call => call[1].revision)).toEqual(["7", "8"]);
+    const result = await runSourceImportBatch({ ...JOB, jobId: "job-" + "b".repeat(32), cursorToken,
+      payload: { ...JOB.payload, sourceReaderVersion: "google-lifecycle-v2" } }, "worker-2", { fetcher });
+    expect(result.ok).toBe(true);
+    expect(fetcher).toHaveBeenCalledTimes(4);
+    expect(importSourceObject).toHaveBeenCalledTimes(2);
+  });
+
+  it("routes a Google removal to the suspension guard instead of acknowledging it as imported", async () => {
+    const cursorToken = "tv-drive-v2:" + Buffer.from(JSON.stringify({ phase: "changes", drive: null, start: "checkpoint", page: null })).toString("base64url");
+    const result = await runSourceImportBatch({ ...JOB, cursorToken,
+      payload: { ...JOB.payload, sourceReaderVersion: "google-lifecycle-v2" } }, "worker-1",
+      { fetcher: async () => Response.json({ changes: [{ fileId: "gone", removed: true }], newStartPageToken: "new" }) });
+    expect(result).toEqual({ ok: false, code: "SOURCE_LIFECYCLE_REVIEW_REQUIRED" });
+    expect(suspendConnectorSource).toHaveBeenCalledWith(expect.objectContaining({ nativeId: "gone", provider: "google_drive" }));
+    expect(importSourceObject).not.toHaveBeenCalled();
+    expect(completeJobBatch.mock.calls.at(-1)![3]).not.toHaveProperty("cursorToken");
+  });
+
   it("resumes the stored page even if today's provider listing would omit an unprocessed file", async () => {
     loadConnectorSyncPage.mockResolvedValueOnce({ items: ["a", "b", "c", "d", "e", "f"].map(sourceItem), cursor: "next", complete: true });
     listOAuthSourcePage.mockResolvedValueOnce({ items: ["b", "c", "d", "e", "f"].map(sourceItem), cursor: "next", complete: true });

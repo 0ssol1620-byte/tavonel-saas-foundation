@@ -7,6 +7,7 @@ import { readR2SignerEnv } from "./r2-synthetic-canary";
 import { importSourceObject } from "./source-import";
 import { suspendConnectorSource } from "./connector-source-access";
 import { loadConnectorSyncPage } from "./connector-sync-page";
+import { listGoogleDriveLifecyclePage } from "./google-drive-lifecycle";
 
 // The worker that actually moves a connector sync forward.
 //
@@ -159,12 +160,16 @@ export async function runSourceImportBatch(
 
   let page: { items: OAuthSourceItem[]; cursor: string | null; complete: boolean };
   try {
-    page = await loadConnectorSyncPage(job, workerId, resume.providerCursor, resume.pageOffset, () => listOAuthSourcePage({
-      provider: binding.provider,
-      accessToken,
-      cursor: resume.providerCursor,
-      target,
-    }));
+    page = await loadConnectorSyncPage(job, workerId, resume.providerCursor, resume.pageOffset, () => {
+      if (job.payload.sourceReaderVersion === "google-lifecycle-v2") {
+        if (binding.provider !== "google_drive" || target.rootPath || target.siteId) {
+          throw new Error("OAUTH_SOURCE_TARGET_UNSUPPORTED");
+        }
+        return listGoogleDriveLifecyclePage({ accessToken, cursor: resume.providerCursor,
+          driveId: target.driveId, fetcher });
+      }
+      return listOAuthSourcePage({ provider: binding.provider, accessToken, cursor: resume.providerCursor, target });
+    });
   } catch (error) {
     const code = error instanceof Error && ["CONNECTOR_PAGE_STORE_UNAVAILABLE", "CONNECTOR_PAGE_INVALID", "CONNECTOR_PAGE_LEGACY_REVIEW_REQUIRED", "OAUTH_SOURCE_PAGE_INVALID", "OAUTH_SOURCE_CURSOR_INVALID", "OAUTH_SOURCE_CURSOR_STALLED", "OAUTH_SOURCE_TARGET_UNSUPPORTED"].includes(error.message)
       ? error.message : "SOURCE_LIST_FAILED";

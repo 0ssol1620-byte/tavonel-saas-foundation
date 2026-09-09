@@ -13,6 +13,16 @@ async function initial(fetcher: typeof fetch, driveId?: string) {
   return read({ accessToken: "test-only", cursor: null, fetcher, driveId });
 }
 describe("Google Drive lifecycle reader candidate", () => {
+  it("accepts null terminal page tokens while still requiring the final change watermark", async () => {
+    const fetcher = provider([{ startPageToken: "start" }, { files: [], nextPageToken: null },
+      { changes: [], nextPageToken: null, newStartPageToken: "end" }]);
+    let page = await initial(fetcher);
+    page = await read({ accessToken: "test-only", cursor: page.cursor, fetcher });
+    expect(page.complete).toBe(false);
+    page = await read({ accessToken: "test-only", cursor: page.cursor, fetcher });
+    expect(page.complete).toBe(true);
+    expect(page.cursor).toMatch(/^tv-drive-v2:/);
+  });
   it("checkpoints a watermark before snapshot, replays concurrent changes, and keeps the final polling token", async () => {
     const fetcher = provider([
       { startPageToken: "watermark-1" },
