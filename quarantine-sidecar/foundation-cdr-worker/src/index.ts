@@ -98,6 +98,13 @@ export function jsonResponse(status: number, body: Record<string, unknown>): Res
 export async function handleRequest(request: Request, env: Env, fetcher: typeof fetch = fetch): Promise<Response> {
   const url = new URL(request.url);
   if (request.method === "GET" && url.pathname === "/health") {
+    // Federated health mints a credential from the shared issuance budget.
+    // Authenticate the caller before allowing any such downstream work.
+    if (env.FOUNDATION_CDR_IDENTITY_HMAC) {
+      const authorization = authorizeManualTrigger(request, env.FOUNDATION_MANUAL_TRIGGER_TOKEN);
+      if (authorization === "disabled") return jsonResponse(404, { error: "not found" });
+      if (authorization === "denied") return jsonResponse(401, { error: "unauthorized" });
+    }
     const result = await evaluateHealth(env, fetcher);
     return jsonResponse(result.httpStatus, result.body);
   }
