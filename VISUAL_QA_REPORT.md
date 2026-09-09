@@ -82,3 +82,11 @@ Local production build: `.chatgpt2codex/detail-build-0910.log`, lint/typecheck a
 Beta labels remain truthful; connector implementation and real-account qualification are tracked in `D:\TAVONEL_DETAIL_COMPLETION_REGISTER_2026-09-10.md` under the existing active goal.
 
 PR49 full Product QA found a real regression at 390/360: the new Capability Manifest inline link was only 16px tall. The existing 44px mobile test failed both initial and retry runs (400 passed / 2 failed / 86 existing skips). Apply the same `input-next` 44px action treatment to this link; no test exception or threshold change. Rebuild, targeted existing mobile checks and fresh exact-head CI are required before merge. Earlier input-panel checks did not cover this separate inline link.
+
+## 2026-09-10 — Honest processing and review states
+
+Candidate follow-up to PR49. Login now reads customerData.enabled from /api/status before offering immediately usable evaluation processing. Missing or disabled capability shows a clear gate and a 44px public Explore action. Review-required compile jobs explain the paused review state and link to their validated collection ID; existing cancellation behavior is retained. Integrations now states that adapter deletion events are not yet applied downstream by the import worker.
+
+Validation: lint/typecheck passed; component rendering and brand-copy suites 200 passed. Added component tests use Vitest automatic JSX transform, matching Next's runtime (the first SSR attempt exposed the previous classic-transform configuration). The final login capability browser suite passed 24 cases at seven widths plus reduced motion, retries disabled, through a fresh production build. Capability responses in these cases are explicitly mocked: this proves presentation for enabled/disabled/missing states, not production customer activation. Initial port 3119 belonged to another process; tests used verified-free 3137 without disturbing it. Receipt: D:\tvdetail-0910\.chatgpt2codex\login-gate-final-0910.log.
+
+Actual authenticated review-package navigation, final visual review, exact-SHA CI and production verification remain required. Connector deletion/ACL lifecycle implementation remains open; honest copy does not qualify the connector.
