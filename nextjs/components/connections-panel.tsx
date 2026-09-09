@@ -4,6 +4,7 @@ import { Cloud, Link2, Server, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { trackFunnelOnce } from "@/lib/funnel-events";
+import ConnectionSyncStatus from "@/components/connection-sync-status";
 
 type Connection = {
   connectionId: string;
@@ -58,6 +59,7 @@ export default function ConnectionsPanel() {
   const [prefix, setPrefix] = useState("");
   const [region, setRegion] = useState("");
   const [busy, setBusy] = useState(false);
+  const [progressRevision, setProgressRevision] = useState(0);
   const [notice, setNotice] = useState("Reading tenant-scoped connections.");
 
   const load = async (successNotice?: string) => {
@@ -81,6 +83,7 @@ export default function ConnectionsPanel() {
     }
     setOAuthProviders(oauthJson.providers);
     setOAuthConnections(oauthJson.connections);
+    setProgressRevision(value => value + 1);
     const total = json.connections.length + oauthJson.connections.length;
     setNotice(successNotice ?? (total > 0 ? `${total} durable connection(s) loaded.` : "No source system is connected yet."));
   };
@@ -228,7 +231,10 @@ export default function ConnectionsPanel() {
       });
       const json = await response.json().catch(() => ({})) as { code?: string; jobId?: string; started?: boolean };
       if (!response.ok || typeof json.jobId !== "string") {
-        setNotice(`Import could not be started (${json.code ?? response.status}).`);
+        setNotice(json.code === "JOB_SYNC_CONFLICT"
+          ? "Another target or an older import is already running for this connection. Review its progress before starting a new import."
+          : json.code === "INTAKE_DISABLED" ? "Document imports are currently paused. Existing workspace results remain available."
+          : `Import could not be started (${json.code ?? response.status}).`);
         return;
       }
       // A connector import is the other way a first source arrives, and it counts the same.
@@ -309,6 +315,7 @@ export default function ConnectionsPanel() {
                 <small>{connection.cursorSha256 ?? "No cursor committed"}</small>
                 {connection.lastErrorCode ? <small className="connection-error">{connection.lastErrorCode}</small> : null}
                 <button type="button" disabled={busy} onClick={() => void startImport(connection)}>Import this source</button>
+                <ConnectionSyncStatus connectionId={connection.oauthConnectionId} revision={progressRevision} getToken={sessionToken} />
               </div>
               <button type="button" className="icon-action" disabled={busy} onClick={() => void revokeOAuth(connection)} aria-label={`Revoke ${connection.displayName}`}><Trash2 size={15} /></button>
             </article>
