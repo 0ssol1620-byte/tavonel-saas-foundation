@@ -303,17 +303,17 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
             A-4's words. `brand-copy.test.ts` now fails if any other word appears in a status
             chip on this page.
           */}
-          <p className="fine rv">
-            Files and folders you upload go in directly: each one is checked against the manifest
-            above before it is stored. A ZIP is expanded in your browser and every file inside it
-            is checked the same way — the archive itself is never compiled, and the Capability
-            Manifest published on /sources lists ZIP as UNSUPPORTED.
+          <p className="input-guidance rv">
+            Upload files or folders, or unpack a ZIP in your browser. Each file is checked
+            before storage. The ZIP archive itself is never compiled and is listed as
+            UNSUPPORTED in the <Link href="/sources">Capability Manifest</Link>.
           </p>
           <div className="chain rv" aria-label="Connectors, and how far each has got">
             <article className="link">
               <span className="st">BETA</span>
               <h3>Google Drive · Dropbox · OneDrive / SharePoint</h3>
               <p>Read-only discovery and import, built and contract-tested. Not qualified: deletion and permission semantics are still being settled, so verify a connection before depending on it.</p>
+              <Link className="input-next" href="/integrations">Review connector capabilities →</Link>
             </article>
           </div>
           {/*
@@ -332,6 +332,7 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
               <span className="st">ENTERPRISE-ASSISTED</span>
               <h3>Object storage and mounted shares</h3>
               <p>S3-compatible buckets and SMB, NFS or SFTP paths are imported by an agent you run inside your own network — not a connector you switch on here. Set up with you, not self-serve.</p>
+              <Link className="input-next" href="/integrations">Explore assisted import options →</Link>
             </article>
           </div>
         </Scene>
