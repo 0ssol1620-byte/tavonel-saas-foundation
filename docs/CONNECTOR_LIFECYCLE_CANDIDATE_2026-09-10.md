@@ -42,3 +42,5 @@ Primary contracts:
 - https://developers.google.com/workspace/drive/api/guides/manage-changes
 - https://developers.google.com/workspace/drive/api/reference/rest/v3/changes
 - https://developers.google.com/workspace/drive/api/reference/rest/v3/files
+
+PDF resource guard candidate: the binary source route acquires the existing workspace export lease before loading PDF bytes. The stream retains that slot through consumption or cancellation; early provider refusal, thrown failure and post-load authorization denial release it through finally. Response ownership transfers only after Response construction. Focused tests cover those boundaries and the existing export cap. This bounds PDF loading/streaming; the preliminary workspace object listing is still before acquisition. The 75-second crash-recovery lease relies on the deployed route enforcing its 30-second execution limit. Actual large-file Vercel streaming and authenticated browser qualification remain open. Independent read-only candidate review found no concrete surviving defect; this is not production verification.
