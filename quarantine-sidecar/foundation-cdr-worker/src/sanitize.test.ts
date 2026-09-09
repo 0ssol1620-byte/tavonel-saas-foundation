@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { failureClasses } from "../../../shared/uskcEnums";
 import { PermanentReject, RetryableError } from "./errors";
+import { PRIVATE_CDR_ORIGIN, IDENTITY_BROKER } from "./identity";
 import { cdrRequestSignature, sha256DigestHeader } from "./hmac";
 import { handleQueue, handleRequest, type Env } from "./index";
 import { cdrReceiptSiblingKey, immutableObjectKey, ocrReviewSiblingKey, ocrSiblingKey } from "./keys";
@@ -94,6 +95,33 @@ function outputSha256(): string {
 }
 
 describe("CDR response transport bounds", () => {
+  it("obtains identity then sends it only to the private CDR target", async () => {
+    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
+    const calls: string[] = [];
+    await sanitizeObject(envFor(r2, { TAVONEL_CDR_URL: `${PRIVATE_CDR_ORIGIN}/v1/disarm`,
+      FOUNDATION_CDR_IDENTITY_HMAC: "fixture-identity-broker-secret-32-chars" }), SOURCE_KEY, async (url, init) => {
+      calls.push(String(url));
+      if (String(url) === IDENTITY_BROKER) {
+        assert.equal(init?.body, undefined);
+        return Response.json({ audience: PRIVATE_CDR_ORIGIN, token: "fixture.identity.signature" });
+      }
+      assert.equal(String(url), `${PRIVATE_CDR_ORIGIN}/v1/disarm`);
+      assert.equal(new Headers(init?.headers).get("authorization"), "Bearer fixture.identity.signature");
+      assert.ok(new Headers(init?.headers).get("x-tavonel-cdr-signature"));
+      return cleanCdrFetch(url, init);
+    });
+    assert.deepEqual(calls, [IDENTITY_BROKER, `${PRIVATE_CDR_ORIGIN}/v1/disarm`]);
+    assert.ok(r2.puts.length > 0);
+  });
+  it("does not send source bytes or persist output when identity is refused", async () => {
+    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
+    const calls: string[] = [];
+    await assert.rejects(sanitizeObject(envFor(r2, { TAVONEL_CDR_URL: `${PRIVATE_CDR_ORIGIN}/v1/disarm`,
+      FOUNDATION_CDR_IDENTITY_HMAC: "fixture-identity-broker-secret-32-chars" }), SOURCE_KEY, async url => {
+      calls.push(String(url)); return new Response(null, { status: 429 });
+    }), RetryableError);
+    assert.deepEqual(calls, [IDENTITY_BROKER]); assert.equal(r2.puts.length, 0);
+  });
   for (const declared of [null, "1", String(19 * 1024 * 1024)]) {
     it(`cancels oversized output before persistence (declared ${declared})`, async () => {
       const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });

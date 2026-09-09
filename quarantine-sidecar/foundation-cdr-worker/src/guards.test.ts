@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { PermanentReject } from "./errors";
+import { PRIVATE_CDR_ORIGIN, IDENTITY_BROKER } from "./identity";
 import {
   assertFoundationOnlyTarget,
   evaluateHealth,
@@ -12,6 +13,26 @@ const SYNTHETIC_URL = "https://tavonel-cdr-synthetic-317850201666.asia-northeast
 const SYNTHETIC_HEALTH = "https://tavonel-cdr-synthetic-317850201666.asia-northeast3.run.app/health";
 const PROD_URL = "https://tavonel-pdf-cdr-xxxxx.asia-northeast3.run.app/v1/disarm";
 const FIXTURE_SECRET = "foundation-cdr-hmac-fixture-secret-ok";
+
+for (const configured of [true, false]) {
+  it(`private health requires authenticated broker (configured ${configured})`, async () => {
+    const calls: string[] = [];
+    const result = await evaluateHealth({ TAVONEL_CDR_HMAC: FIXTURE_SECRET,
+      TAVONEL_CDR_URL: `${PRIVATE_CDR_ORIGIN}/v1/disarm`, TAVONEL_CDR_HEALTH_URL: `${PRIVATE_CDR_ORIGIN}/health`,
+      TAVONEL_CDR_PROVIDER: "tavonel_pdfium_clamav_v1", FOUNDATION_R2_BUCKET: "tavonel-saas-foundation-quarantine",
+      FOUNDATION_CDR_IDENTITY_HMAC: configured ? FIXTURE_SECRET : undefined,
+    }, async (url, init) => {
+      calls.push(String(url));
+      if (String(url) === IDENTITY_BROKER) return Response.json({ audience: PRIVATE_CDR_ORIGIN, token: "fixture.identity.signature" });
+      assert.equal(String(url), `${PRIVATE_CDR_ORIGIN}/health`);
+      assert.equal(new Headers(init?.headers).get("authorization"), "Bearer fixture.identity.signature");
+      assert.equal(init?.redirect, "error");
+      return Response.json({ status: "ok" });
+    });
+    assert.equal(result.httpStatus, configured ? 200 : 503);
+    assert.deepEqual(calls, configured ? [IDENTITY_BROKER, `${PRIVATE_CDR_ORIGIN}/health`] : []);
+  });
+}
 
 describe("Foundation-only CDR target guards", () => {
   it("refuses a production tavonel-pdf-cdr URL", () => {

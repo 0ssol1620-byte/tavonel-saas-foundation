@@ -1,5 +1,6 @@
 import type { FailureClass } from "../../../shared/uskcEnums";
 import { PermanentReject, RetryableError } from "./errors";
+import { cdrAuthorization } from "./identity";
 import { assertFoundationOnlyTarget } from "./guards";
 import { cdrRequestSignature, hmacSecretIsConfigured, sha256DigestHeader, sha256Hex } from "./hmac";
 import {
@@ -50,6 +51,7 @@ export type SanitizeEnv = {
   FOUNDATION_QUARANTINE: R2BucketLike;
   TAVONEL_CDR_URL: string;
   TAVONEL_CDR_HMAC?: string;
+  FOUNDATION_CDR_IDENTITY_HMAC?: string;
   TAVONEL_CDR_PROVIDER: string;
   FOUNDATION_R2_BUCKET: string;
   FOUNDATION_OCR_URL?: string;
@@ -414,9 +416,11 @@ export async function sanitizeObject(
 
     let response: Response;
     try {
+      const authorization = await cdrAuthorization(env.TAVONEL_CDR_URL, env.FOUNDATION_CDR_IDENTITY_HMAC, fetcher);
       response = await fetcher(env.TAVONEL_CDR_URL, {
         method: "POST",
         headers: {
+          ...(authorization ? { authorization } : {}),
           "x-tavonel-input-sha256": inputSha256,
           "x-tavonel-cdr-timestamp": timestamp,
           "x-tavonel-cdr-request-id": requestId,

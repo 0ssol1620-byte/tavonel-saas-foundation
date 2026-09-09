@@ -1,5 +1,6 @@
 import { PermanentReject } from "./errors";
 import { hmacSecretIsConfigured } from "./hmac";
+import { cdrAuthorization, PRIVATE_CDR_ORIGIN } from "./identity";
 
 export const SYNTHETIC_CDR_HOST_MARKER = "tavonel-cdr-synthetic";
 export const PROD_CDR_HOST_MARKER = "tavonel-pdf-cdr";
@@ -13,6 +14,7 @@ export type HealthEnv = {
   TAVONEL_CDR_HEALTH_URL: string;
   TAVONEL_CDR_PROVIDER: string;
   FOUNDATION_R2_BUCKET: string;
+  FOUNDATION_CDR_IDENTITY_HMAC?: string;
 };
 
 export function cdrUrlHost(url: string): string {
@@ -62,7 +64,10 @@ export async function evaluateHealth(
   if (isProdQuarantineBucket(env.FOUNDATION_R2_BUCKET)) {
     return { httpStatus: 503, body: { status: "unavailable", reason: "production quarantine bucket is refused" } };
   }
-  if (!looksLikeSyntheticCdr(env.TAVONEL_CDR_URL, env.TAVONEL_CDR_PROVIDER)) {
+  const privateMode = env.TAVONEL_CDR_URL === `${PRIVATE_CDR_ORIGIN}/v1/disarm`
+    && env.TAVONEL_CDR_HEALTH_URL === `${PRIVATE_CDR_ORIGIN}/health`
+    && env.TAVONEL_CDR_PROVIDER === "tavonel_pdfium_clamav_v1";
+  if (!privateMode && !looksLikeSyntheticCdr(env.TAVONEL_CDR_URL, env.TAVONEL_CDR_PROVIDER)) {
     return {
       httpStatus: 503,
       body: { status: "unavailable", reason: "CDR target is not the Foundation synthetic service" },
@@ -75,7 +80,10 @@ export async function evaluateHealth(
     };
   }
   try {
-    const response = await fetcher(env.TAVONEL_CDR_HEALTH_URL, { method: "GET" });
+    const authorization = await cdrAuthorization(env.TAVONEL_CDR_HEALTH_URL, env.FOUNDATION_CDR_IDENTITY_HMAC, fetcher);
+    const response = await fetcher(env.TAVONEL_CDR_HEALTH_URL, { method: "GET", redirect: "error",
+      signal: AbortSignal.timeout(10_000), headers: authorization ? { authorization } : {} });
+    await response.body?.cancel().catch(() => undefined);
     if (!response.ok) {
       return { httpStatus: 503, body: { status: "unavailable", reason: "synthetic CDR health check failed" } };
     }
