@@ -20,6 +20,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       - run: pnpm test
+      - name: CDR Worker tests and types
+        working-directory: quarantine-sidecar/foundation-cdr-worker
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm test
+          node node_modules/typescript/bin/tsc --noEmit
       - run: pnpm build
   nextjs:
     runs-on: ubuntu-latest

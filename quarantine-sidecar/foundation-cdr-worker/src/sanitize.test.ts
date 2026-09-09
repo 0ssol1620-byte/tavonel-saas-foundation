@@ -93,6 +93,127 @@ function outputSha256(): string {
   return `sha256:${createHash("sha256").update(SANITIZED_BYTES).digest("hex")}`;
 }
 
+describe("persisted CDR trust boundary", () => {
+  async function seeded() {
+    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
+    const result = await sanitizeObject(envFor(r2), SOURCE_KEY, cleanCdrFetch);
+    const key = cdrReceiptSiblingKey(result.immutableKey);
+    const receipt = JSON.parse(new TextDecoder().decode(r2.objects.get(key)!.bytes));
+    return { r2, result, key, receipt };
+  }
+
+  for (const [name, mutate] of Object.entries({
+    legacy: (r: Record<string, unknown>) => ({ ...r, schemaVersion: "tavonel.cdr_receipt.v1", targetSha256: undefined }),
+    provider: (r: Record<string, unknown>) => ({ ...r, provider: "old-synthetic-provider" }),
+    target: (r: Record<string, unknown>) => ({ ...r, targetSha256: "sha256:" + "0".repeat(64) }),
+    status: (r: Record<string, unknown>) => ({ ...r, status: "rejected" }),
+    source: (r: Record<string, unknown>) => ({ ...r, sourceKey: "quarantine/another/doc/source" }),
+    input: (r: Record<string, unknown>) => ({ ...r, inputSha256: "sha256:" + "0".repeat(64) }),
+    key: (r: Record<string, unknown>) => ({ ...r, immutableKey: "immutable/wrong/sanitized.pdf" }),
+    digest: (r: Record<string, unknown>) => ({ ...r, outputSha256: "not-a-digest" }),
+    null: () => null,
+    array: () => [],
+  })) {
+    it(`blocks a same-output ${name} receipt collision before OCR`, async () => {
+      const { r2, result, key, receipt } = await seeded();
+      const old = new TextEncoder().encode(JSON.stringify(mutate(receipt)));
+      r2.objects.set(key, { bytes: old, contentType: "application/json" });
+      let cdr = 0;
+      let ocr = 0;
+      await assert.rejects(sanitizeObject(envFor(r2, { FOUNDATION_OCR_URL: FOUNDATION_OCR }), SOURCE_KEY,
+        async (input, init) => {
+          if (String(input) === FOUNDATION_OCR) ocr += 1;
+          else cdr += 1;
+          return cleanCdrFetch(input, init);
+        }), RetryableError);
+      assert.equal(cdr, 1);
+      assert.equal(ocr, 0);
+      assert.deepEqual(r2.objects.get(key)!.bytes, old);
+      assert.deepEqual(r2.objects.get(result.immutableKey)!.bytes, SANITIZED_BYTES);
+    });
+  }
+
+  it("rejects an immutable PDF whose persisted bytes do not match its receipt", async () => {
+    const { r2, result } = await seeded();
+    r2.objects.set(result.immutableKey, { bytes: SOURCE_BYTES, contentType: "application/pdf" });
+    let ocr = 0;
+    await assert.rejects(sanitizeObject(envFor(r2, { FOUNDATION_OCR_URL: FOUNDATION_OCR }), SOURCE_KEY,
+      async (input, init) => {
+        if (String(input) === FOUNDATION_OCR) ocr += 1;
+        return cleanCdrFetch(input, init);
+      }), RetryableError);
+    assert.equal(ocr, 0);
+    assert.deepEqual(r2.objects.get(result.immutableKey)!.bytes, SOURCE_BYTES);
+  });
+
+  it("keeps same-target valid redelivery free of repeated CDR calls", async () => {
+    const { r2, result } = await seeded();
+    const replay = await sanitizeObject(envFor(r2), SOURCE_KEY, async () => {
+      throw new Error("valid persisted proof should not call CDR");
+    });
+    assert.equal(replay.immutableKey, result.immutableKey);
+    assert.equal(replay.cdrReceipt.status, "exists");
+  });
+
+  for (const collision of ["null", "throw"] as const) {
+    it(`validates a matching concurrent winner when conditional puts ${collision}`, async () => {
+      const { r2, result } = await seeded();
+      r2.list = async () => ({ objects: [] }); // Another delivery may finish after listing.
+      const put = r2.put.bind(r2);
+      r2.put = async (key, value, options) => {
+        if (collision === "throw" && r2.objects.has(key)) throw new Error("precondition failed");
+        return put(key, value, options);
+      };
+      const replay = await sanitizeObject(envFor(r2), SOURCE_KEY, cleanCdrFetch);
+      assert.equal(replay.immutableKey, result.immutableKey);
+      assert.equal(replay.cdrReceipt.status, "exists");
+    });
+  }
+
+  it("fails closed when a fresh receipt cannot be persisted", async () => {
+    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
+    const put = r2.put.bind(r2);
+    r2.put = async (key, value, options) => {
+      if (key.endsWith("cdr-receipt.json")) throw new Error("storage unavailable");
+      return put(key, value, options);
+    };
+    let ocr = 0;
+    await assert.rejects(sanitizeObject(envFor(r2, { FOUNDATION_OCR_URL: FOUNDATION_OCR }), SOURCE_KEY,
+      async (input, init) => {
+        if (String(input) === FOUNDATION_OCR) ocr += 1;
+        return cleanCdrFetch(input, init);
+      }), RetryableError);
+    assert.equal(ocr, 0);
+  });
+
+  it("uses fresh output under a new target while preserving the old synthetic evidence", async () => {
+    const { r2, result, key } = await seeded();
+    const oldReceipt = r2.objects.get(key)!.bytes.slice();
+    const freshBytes = new TextEncoder().encode("%PDF-1.4 distinct-new-provider-output");
+    const freshSha = await sha256DigestHeader(freshBytes);
+    let cdr = 0;
+    const next = await sanitizeObject(envFor(r2, { TAVONEL_CDR_URL: "https://private-validation.example/v1/disarm" }), SOURCE_KEY,
+      async (_input, init) => {
+        cdr += 1;
+        return new Response(freshBytes, { headers: {
+          "content-type": "application/pdf", "x-tavonel-cdr-status": "clean",
+          "x-tavonel-input-sha256": new Headers(init?.headers).get("x-tavonel-input-sha256")!,
+          "x-tavonel-cdr-output-sha256": freshSha,
+        } });
+      });
+    assert.equal(cdr, 1);
+    assert.notEqual(next.immutableKey, result.immutableKey);
+    assert.equal(next.outputSha256, freshSha);
+    assert.deepEqual(r2.objects.get(key)!.bytes, oldReceipt);
+  });
+
+  it("does not accept the same bytes after an endpoint change with unchanged provider name", async () => {
+    const { r2 } = await seeded();
+    await assert.rejects(sanitizeObject(envFor(r2, { TAVONEL_CDR_URL: "https://private-validation.example/v1/disarm" }),
+      SOURCE_KEY, cleanCdrFetch), RetryableError);
+  });
+});
+
 async function cleanCdrFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const url = String(input);
   if (url.includes("tavonel-pdf-cdr")) {
@@ -233,7 +354,7 @@ describe("sanitizeObject", () => {
     assert.equal(result.cdrReceipt.key, cdrReceiptSiblingKey(expectedImmutable));
     assert.equal(r2.objects.has(cdrReceiptSiblingKey(expectedImmutable)), true);
     const receipt = JSON.parse(new TextDecoder().decode(r2.objects.get(cdrReceiptSiblingKey(expectedImmutable))?.bytes));
-    assert.equal(receipt.schemaVersion, "tavonel.cdr_receipt.v1");
+    assert.equal(receipt.schemaVersion, "tavonel.cdr_receipt.v2");
     assert.equal(receipt.candidatePromotion, false);
     assert.equal(receipt.outputSha256, outputSha256());
     assert.equal(sawLiveHost, false);
