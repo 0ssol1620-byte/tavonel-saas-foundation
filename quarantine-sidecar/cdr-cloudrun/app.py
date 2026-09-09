@@ -21,9 +21,10 @@ from typing import Final
 
 import pypdfium2 as pdfium
 import pypdfium2.raw as pdfium_c
-from fastapi import BackgroundTasks, FastAPI, File, Header, HTTPException, Request, UploadFile
+from fastapi import BackgroundTasks, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from PIL import Image, UnidentifiedImageError
+from request_boundary import CdrRequestBoundary
 
 from malware import (
     MalwareDetectedError,
@@ -98,7 +99,9 @@ class RequestReplayGuard:
         self._lock = Lock()
         self._expires_at: dict[str, float] = {}
 
-    def claim(self, request_id: str) -> None:
+    def claim(self, request_id: str, valid_for_seconds: float = SIGNATURE_TTL_SECONDS) -> None:
+        if not math.isfinite(valid_for_seconds) or not 0 < valid_for_seconds <= 2 * SIGNATURE_TTL_SECONDS:
+            raise HTTPException(401, "CDR request is expired")
         now = monotonic()
         with self._lock:
             for nonce, expires_at in tuple(self._expires_at.items()):
@@ -106,7 +109,7 @@ class RequestReplayGuard:
                     del self._expires_at[nonce]
             if request_id in self._expires_at:
                 raise HTTPException(409, "CDR request has already been consumed")
-            self._expires_at[request_id] = now + SIGNATURE_TTL_SECONDS
+            self._expires_at[request_id] = now + valid_for_seconds
 
 
 replay_guard = RequestReplayGuard()
@@ -140,13 +143,17 @@ def require_authentication(
 ) -> str:
     if not input_sha256 or not re.fullmatch(r"sha256:[a-f0-9]{64}", input_sha256):
         raise HTTPException(401, "CDR source digest is invalid")
-    if not timestamp or not request_id or not signature or not REQUEST_ID.fullmatch(request_id):
+    if (not timestamp or not request_id or not signature or not REQUEST_ID.fullmatch(request_id)
+            or not re.fullmatch(r"[A-Za-z0-9_-]{43}", signature)):
         raise HTTPException(401, "CDR authentication headers are invalid")
     try:
         parsed = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
     except ValueError as exc:
         raise HTTPException(401, "CDR timestamp is invalid") from exc
-    if parsed.tzinfo is None or abs((datetime.now(UTC) - parsed).total_seconds()) > SIGNATURE_TTL_SECONDS:
+    if parsed.tzinfo is None:
+        raise HTTPException(401, "CDR request is expired")
+    age_seconds = (datetime.now(UTC) - parsed).total_seconds()
+    if not -SIGNATURE_TTL_SECONDS <= age_seconds < SIGNATURE_TTL_SECONDS:
         raise HTTPException(401, "CDR request is expired")
     try:
         secret = read_hmac_secret()
@@ -155,7 +162,9 @@ def require_authentication(
     expected = cdr_request_signature(secret, timestamp, request_id, input_sha256)
     if not hmac.compare_digest(expected, signature):
         raise HTTPException(401, "CDR request signature is invalid")
-    replay_guard.claim(request_id)
+    # A timestamp inside the permitted future clock skew can remain valid for
+    # almost twice the nominal TTL. Retain its nonce until that actual deadline.
+    replay_guard.claim(request_id, SIGNATURE_TTL_SECONDS - age_seconds)
     return input_sha256
 
 
@@ -360,6 +369,18 @@ def convert_image_to_pdf(source: Path, work_dir: Path) -> Path:
     return target
 
 
+def office_process_environment(work_dir: Path) -> dict[str, str]:
+    """Pass only process basics, never API/provider credentials, to LibreOffice.
+
+    This reduces environment inheritance; it is not a substitute for the
+    container/network isolation required by the deployment qualification.
+    """
+    allowed = ("PATH", "SystemRoot", "WINDIR", "LANG", "LC_ALL", "TZ")
+    environment = {name: os.environ[name] for name in allowed if name in os.environ}
+    environment.update({"HOME": str(work_dir), "TMP": str(work_dir), "TEMP": str(work_dir)})
+    return environment
+
+
 def convert_to_pdf(source: Path, source_mime: str, work_dir: Path) -> Path:
     if source_mime in IMAGE_MIMES:
         return convert_image_to_pdf(source, work_dir)
@@ -376,7 +397,7 @@ def convert_to_pdf(source: Path, source_mime: str, work_dir: Path) -> Path:
         "--norestore",
         "--nodefault",
         "--nolockcheck",
-        f"-env:UserInstallation=file://{profile}",
+        f"-env:UserInstallation={profile.resolve().as_uri()}",
         "--convert-to",
         "pdf:writer_pdf_Export",
         "--outdir",
@@ -384,7 +405,11 @@ def convert_to_pdf(source: Path, source_mime: str, work_dir: Path) -> Path:
         str(source),
     ]
     try:
-        completed = subprocess.run(command, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=45)
+        completed = subprocess.run(
+            command, check=False, stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=45,
+            env=office_process_environment(work_dir),
+        )
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise HTTPException(422, "CDR source could not be converted safely") from exc
     converted = output_dir / f"{source.stem}.pdf"
@@ -484,6 +509,13 @@ def remove_tree(path: Path) -> None:
 
 
 app = FastAPI(title=APP_NAME, docs_url=None, redoc_url=None, openapi_url=None)
+app.add_middleware(
+    CdrRequestBoundary,
+    authenticate=require_authentication,
+    # File content remains capped separately. This only allows bounded multipart framing.
+    max_body_bytes=MAX_INPUT_BYTES + 64 * 1024,
+    receive_timeout_seconds=15.0,
+)
 
 
 @app.exception_handler(HTTPException)
@@ -528,18 +560,12 @@ def healthz() -> JSONResponse:
 @app.post("/v1/disarm")
 def disarm(
     background_tasks: BackgroundTasks,
+    request: Request,
     source: UploadFile = File(...),
-    x_tavonel_input_sha256: str | None = Header(default=None),
-    x_tavonel_cdr_timestamp: str | None = Header(default=None),
-    x_tavonel_cdr_request_id: str | None = Header(default=None),
-    x_tavonel_cdr_signature: str | None = Header(default=None),
 ) -> FileResponse:
-    expected_digest = require_authentication(
-        x_tavonel_input_sha256,
-        x_tavonel_cdr_timestamp,
-        x_tavonel_cdr_request_id,
-        x_tavonel_cdr_signature,
-    )
+    expected_digest = getattr(request.state, "cdr_authenticated_input_sha256", None)
+    if not isinstance(expected_digest, str):
+        raise HTTPException(401, "CDR request boundary authentication is required")
     file_name, mime_type = validate_input(source.filename, source.content_type)
     work_dir = Path(tempfile.mkdtemp(prefix="tavonel-cdr-"))
     try:
