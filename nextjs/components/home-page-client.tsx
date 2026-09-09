@@ -306,7 +306,7 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
           <p className="input-guidance rv">
             Upload files or folders, or unpack a ZIP in your browser. Each file is checked
             before storage. The ZIP archive itself is never compiled and is listed as
-            UNSUPPORTED in the <Link href="/sources">Capability Manifest</Link>.
+            UNSUPPORTED in the <Link className="input-next" href="/sources">Capability Manifest</Link>.
           </p>
           <div className="chain rv" aria-label="Connectors, and how far each has got">
             <article className="link">
