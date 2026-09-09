@@ -8,7 +8,7 @@ export const PRIVATE_CDR_ORIGIN = "https://tavonel-cdr-validation-0909-jw7bqc3nl
 export const IDENTITY_BROKER = "https://tavonel-saas-foundation.vercel.app/api/internal/cdr/identity";
 
 export class CdrIdentityError extends RetryableError {
-  constructor(readonly stage: "request" | "response" | "body" | "json" | "token") {
+  constructor(readonly stage: "request" | "sign" | "fetch" | "response" | "body" | "json" | "token") {
     super("CDR identity is unavailable");
     this.name = "CdrIdentityError";
   }
@@ -23,8 +23,10 @@ export async function cdrAuthorization(target: string, secret: string | undefine
   try {
     const timestamp = now.toISOString();
     const data = `tavonel.cdr.identity.v1\nPOST\n/api/internal/cdr/identity\n${PRIVATE_CDR_ORIGIN}\n${timestamp}\n${requestId}`;
+    stage = "sign";
     const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
     const signature = bytesToUnpaddedBase64Url(new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(data))));
+    stage = "fetch";
     const response = await fetcher(IDENTITY_BROKER, { method: "POST", redirect: "error", signal: AbortSignal.timeout(15_000),
       headers: { "x-tavonel-identity-timestamp": timestamp, "x-tavonel-identity-request-id": requestId,
         "x-tavonel-identity-signature": signature } });
