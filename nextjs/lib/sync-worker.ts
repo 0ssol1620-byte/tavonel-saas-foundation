@@ -5,6 +5,7 @@ import { getOAuthConnectionSecretReference } from "./connector-oauth-store";
 import { completeJobBatch, type ClaimedJob } from "./job-store";
 import { readR2SignerEnv } from "./r2-synthetic-canary";
 import { importSourceObject } from "./source-import";
+import { suspendConnectorSource } from "./connector-source-access";
 
 // The worker that actually moves a connector sync forward.
 //
@@ -185,6 +186,16 @@ export async function runSourceImportBatch(
   // durably connected, consuming it as an unsupported file would lose the event.
   // Inspect the remaining page before admitting bytes or advancing any checkpoint.
   if (page.items.slice(resume.pageOffset).some(item => item.kind === "deleted")) {
+    for (const item of page.items.slice(resume.pageOffset).filter(item => item.kind === "deleted")) {
+      const suspended = await suspendConnectorSource({ workspaceKey: job.workspaceKey,
+        connectionId: job.oauthConnectionId, provider: binding.provider, nativeId: item.nativeId });
+      if (!suspended.ok) {
+        const reported = await completeJobBatch(job.workspaceKey, job.jobId, workerId, {
+          outcome: "failed", errorCode: suspended.code,
+        });
+        return { ok: false, code: reported.ok ? suspended.code : reported.code };
+      }
+    }
     const reported = await completeJobBatch(job.workspaceKey, job.jobId, workerId, {
       outcome: "failed",
       errorCode: "SOURCE_LIFECYCLE_REVIEW_REQUIRED",

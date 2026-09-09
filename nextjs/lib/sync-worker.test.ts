@@ -14,6 +14,8 @@ const completeJobBatch = vi.fn<(...args: any[]) => Promise<any>>(async () => ({ 
 const getOAuthConnectionSecretReference = vi.fn<(...args: any[]) => any>();
 const listOAuthSourcePage = vi.fn<(...args: any[]) => any>();
 const importSourceObject = vi.fn<(...args: any[]) => any>();
+const suspendConnectorSource = vi.fn<(...args: any[]) => any>();
+vi.mock("./connector-source-access", () => ({ suspendConnectorSource }));
 const refreshOAuthAccessToken = vi.fn<(...args: any[]) => Promise<any>>(async () => ({ accessToken: "at-1" }));
 const readOAuthProviderRuntime = vi.fn<(...args: any[]) => any>(() => ({ clientSecretReference: "vault://client" }));
 const readOAuthSecretBrokerConfig = vi.fn<(...args: any[]) => any>(() => ({ kind: "vault" }));
@@ -50,6 +52,7 @@ function sourceItem(id: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  suspendConnectorSource.mockResolvedValue({ ok: true });
   completeJobBatch.mockResolvedValue({ ok: true as const, value: { state: "leased" as const } });
   getOAuthConnectionSecretReference.mockResolvedValue({ ok: true, provider: "google_drive", refreshTokenReference: "vault://refresh" });
   refreshOAuthAccessToken.mockResolvedValue({ accessToken: "at-1" });

@@ -14,6 +14,7 @@ import {
 } from "./retrieval-store";
 import { rankByStructuralOverlap } from "./structure-search";
 import { applyWorldGate, type WorldGateRejection } from "./world-gate";
+import { checkConnectorSourceAccess } from "./connector-source-access";
 
 // The Retrieval Compiler runtime: the single orchestrator that turns a question into a
 // ContextPacket by composing the stages Waves 1-2 built as isolated, individually tested
@@ -46,7 +47,9 @@ import { applyWorldGate, type WorldGateRejection } from "./world-gate";
 export type RetrievalPipelineFailure =
   | RetrievalStoreFailure
   | "RETRIEVAL_QUESTION_INVALID"
-  | "RETRIEVAL_EMBEDDER_UNAVAILABLE";
+  | "RETRIEVAL_EMBEDDER_UNAVAILABLE"
+  | "CONNECTOR_SOURCE_ACCESS_UNAVAILABLE"
+  | "CONNECTOR_SOURCE_ACCESS_DENIED";
 
 export type RetrievalPipelineResult =
   | {
@@ -243,6 +246,9 @@ export async function runRetrievalPipeline(input: RetrievalPipelineInput): Promi
     fusedTop.map((item) => item.id),
   );
   if (!hydrated.ok) return { ok: false, code: hydrated.code };
+  const documentIds = [...new Set(hydrated.value.map(unit => unit.documentId))];
+  const sourceAccess = await checkConnectorSourceAccess(input.workspaceKey, documentIds);
+  if (!sourceAccess.ok) return sourceAccess;
   const unitById = new Map(hydrated.value.map((unit) => [unit.unitId, unit]));
 
   // --- Rerank --------------------------------------------------------------------------
@@ -267,6 +273,10 @@ export async function runRetrievalPipeline(input: RetrievalPipelineInput): Promi
     degradations.push("reranker not applied: no reranker configured");
     orderedIds = fusedTop.filter((item) => unitById.has(item.id)).map((item) => item.id);
   }
+
+  // A provider call can take time. Recheck before releasing context after reranking.
+  const sourceAccessNow = await checkConnectorSourceAccess(input.workspaceKey, documentIds);
+  if (!sourceAccessNow.ok) return sourceAccessNow;
 
   // --- World Gate ----------------------------------------------------------------------
   // The active world for this request is already resolved by the caller (world-store), so
