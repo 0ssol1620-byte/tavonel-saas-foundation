@@ -51,6 +51,20 @@ test("connector progress follows real response states and retains uncertainty on
   unavailable = false; state = "succeeded";
   await panel.getByRole("button", { name: "Refresh import progress" }).click();
   await expect(panel).toContainText("Check the workspace for processing and review results");
+  // A lost response cannot prove whether a mutation happened on the server.
+  await page.route(`**/api/v1/oauth-connectors/connections/${connectionId}/sync`, route =>
+    route.request().method() === "POST" ? route.abort("failed") : route.fallback());
+  await page.getByRole("button", { name: "Import this source", exact: true }).click();
+  await expect(page.locator(".connection-notice")).toContainText("job may already be running");
+  await expect(page.getByRole("button", { name: "Import this source", exact: true })).toBeEnabled();
+  await page.route("**/api/connections", route => route.abort("failed"));
+  await page.getByRole("button", { name: "Refresh state", exact: true }).click();
+  await expect(page.locator(".connection-notice")).toContainText("last known state");
+  await expect(page.getByText("Fixture research source", { exact: true })).toBeVisible();
+  await page.route("**/api/v1/oauth-connectors/authorize", route => route.abort("failed"));
+  await page.getByRole("button", { name: "Connect Google Drive", exact: true }).click();
+  await expect(page.locator(".connection-notice")).toContainText("authorization page could not be opened");
+  await expect(page.getByRole("button", { name: "Connect Google Drive", exact: true })).toBeEnabled();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   expect(pageErrors).toEqual([]);
 });

@@ -34,6 +34,10 @@ type OAuthConnection = {
 
 type OAuthProviderState = { provider: OAuthProvider; configured: boolean };
 
+function connectionRequest(input: string, init: RequestInit) {
+  return fetch(input, { ...init, signal: AbortSignal.timeout(15_000) });
+}
+
 async function sessionToken() {
   const client = getSupabaseBrowserClient();
   const { data } = client ? await client.auth.getSession() : { data: { session: null } };
@@ -61,31 +65,41 @@ export default function ConnectionsPanel() {
   const [busy, setBusy] = useState(false);
   const [progressRevision, setProgressRevision] = useState(0);
   const [notice, setNotice] = useState("Reading tenant-scoped connections.");
+  const [readFailed, setReadFailed] = useState(false);
 
   const load = async (successNotice?: string) => {
-    const token = await sessionToken();
-    if (!token) {
-      setNotice("Session expired. Sign in again before reading connections.");
-      return;
+    setReadFailed(false);
+    try {
+      const token = await sessionToken();
+      if (!token) {
+        setReadFailed(true);
+        setNotice("Session expired. Sign in again before reading connections.");
+        return;
+      }
+      const response = await connectionRequest("/api/connections", { headers: { authorization: `Bearer ${token}` } });
+      const json = await response.json() as { code?: string; connections?: Connection[] };
+      if (!response.ok || !Array.isArray(json.connections)) {
+        setReadFailed(true);
+        setNotice(`Connections could not be read (${json.code ?? response.status}). No connection state is being inferred.`);
+        return;
+      }
+      setConnections(json.connections);
+      const oauthResponse = await connectionRequest("/api/v1/oauth-connectors", { headers: { authorization: `Bearer ${token}` } });
+      const oauthJson = await oauthResponse.json() as { code?: string; providers?: OAuthProviderState[]; connections?: OAuthConnection[] };
+      if (!oauthResponse.ok || !Array.isArray(oauthJson.providers) || !Array.isArray(oauthJson.connections)) {
+        setReadFailed(true);
+        setNotice(`Storage connections loaded, but OAuth sources could not be read (${oauthJson.code ?? oauthResponse.status}).`);
+        return;
+      }
+      setOAuthProviders(oauthJson.providers);
+      setOAuthConnections(oauthJson.connections);
+      setProgressRevision(value => value + 1);
+      const total = json.connections.length + oauthJson.connections.length;
+      setNotice(successNotice ?? (total > 0 ? `${total} durable connection(s) loaded.` : "No source system is connected yet."));
+    } catch {
+      setReadFailed(true);
+      setNotice("Connection state could not be refreshed. Any displayed connections are the last known state. Use Refresh state to try again.");
     }
-    const response = await fetch("/api/connections", { headers: { authorization: `Bearer ${token}` } });
-    const json = await response.json() as { code?: string; connections?: Connection[] };
-    if (!response.ok || !Array.isArray(json.connections)) {
-      setNotice(`Connections could not be read (${json.code ?? response.status}). No connection state is being inferred.`);
-      return;
-    }
-    setConnections(json.connections);
-    const oauthResponse = await fetch("/api/v1/oauth-connectors", { headers: { authorization: `Bearer ${token}` } });
-    const oauthJson = await oauthResponse.json() as { code?: string; providers?: OAuthProviderState[]; connections?: OAuthConnection[] };
-    if (!oauthResponse.ok || !Array.isArray(oauthJson.providers) || !Array.isArray(oauthJson.connections)) {
-      setNotice(`Storage connections loaded, but OAuth sources could not be read (${oauthJson.code ?? oauthResponse.status}).`);
-      return;
-    }
-    setOAuthProviders(oauthJson.providers);
-    setOAuthConnections(oauthJson.connections);
-    setProgressRevision(value => value + 1);
-    const total = json.connections.length + oauthJson.connections.length;
-    setNotice(successNotice ?? (total > 0 ? `${total} durable connection(s) loaded.` : "No source system is connected yet."));
   };
 
   useEffect(() => { void load(); }, []);
@@ -111,7 +125,7 @@ export default function ConnectionsPanel() {
         } : { rootLabel: displayName },
         secretReference: null,
       };
-      const response = await fetch("/api/connections", {
+      const response = await connectionRequest("/api/connections", {
         method: "POST",
         headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
         body: JSON.stringify(body),
@@ -127,6 +141,8 @@ export default function ConnectionsPanel() {
       setPrefix("");
       setRegion("");
       setNotice(`${json.connection.displayName} is pending its first signed cursor batch.`);
+    } catch {
+      setNotice("The create request could not be confirmed. Refresh state before trying again; the connection may already have been created.");
     } finally {
       setBusy(false);
     }
@@ -141,7 +157,7 @@ export default function ConnectionsPanel() {
         setNotice("Session expired. Sign in again before revoking a connection.");
         return;
       }
-      const response = await fetch(`/api/connections/${connection.connectionId}`, {
+      const response = await connectionRequest(`/api/connections/${connection.connectionId}`, {
         method: "DELETE",
         headers: { authorization: `Bearer ${token}` },
       });
@@ -152,6 +168,8 @@ export default function ConnectionsPanel() {
       }
       setConnections((current) => (current ?? []).filter((item) => item.connectionId !== connection.connectionId));
       setNotice(`${connection.displayName} was revoked. Existing immutable outputs were not deleted.`);
+    } catch {
+      setNotice("The revoke request could not be confirmed. Refresh state to check whether the connection was revoked.");
     } finally {
       setBusy(false);
     }
@@ -170,7 +188,7 @@ export default function ConnectionsPanel() {
         setNotice("Session expired. Sign in again before connecting a source.");
         return;
       }
-      const response = await fetch("/api/v1/oauth-connectors/authorize", {
+      const response = await connectionRequest("/api/v1/oauth-connectors/authorize", {
         method: "POST",
         headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
         body: JSON.stringify({ provider, displayName: name }),
@@ -181,6 +199,8 @@ export default function ConnectionsPanel() {
         return;
       }
       window.location.assign(json.authorizationUrl);
+    } catch {
+      setNotice("The authorization page could not be opened. Try connecting the source again.");
     } finally {
       setBusy(false);
     }
@@ -195,7 +215,7 @@ export default function ConnectionsPanel() {
         setNotice("Session expired. Sign in again before revoking a connection.");
         return;
       }
-      const response = await fetch(`/api/v1/oauth-connectors/connections/${connection.oauthConnectionId}`, {
+      const response = await connectionRequest(`/api/v1/oauth-connectors/connections/${connection.oauthConnectionId}`, {
         method: "DELETE",
         headers: { authorization: `Bearer ${token}` },
       });
@@ -206,6 +226,8 @@ export default function ConnectionsPanel() {
       }
       setOAuthConnections((current) => (current ?? []).filter((item) => item.oauthConnectionId !== connection.oauthConnectionId));
       setNotice(`${connection.displayName} was revoked. Existing immutable outputs were not deleted.`);
+    } catch {
+      setNotice("The revoke request could not be confirmed. Refresh state to check whether the connection was revoked.");
     } finally {
       setBusy(false);
     }
@@ -224,7 +246,7 @@ export default function ConnectionsPanel() {
         setNotice("Session expired. Sign in again before importing a source.");
         return;
       }
-      const response = await fetch(`/api/v1/oauth-connectors/connections/${connection.oauthConnectionId}/sync`, {
+      const response = await connectionRequest(`/api/v1/oauth-connectors/connections/${connection.oauthConnectionId}/sync`, {
         method: "POST",
         headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
         body: JSON.stringify({}),
@@ -244,6 +266,9 @@ export default function ConnectionsPanel() {
       await load(json.started
         ? `${connection.displayName}: import queued. It continues in the background, so you can leave this page.`
         : `${connection.displayName}: an import is already running. Showing its progress.`);
+    } catch {
+      setProgressRevision(value => value + 1);
+      setNotice("The import request could not be confirmed. Check import progress before trying again; the job may already be running.");
     } finally {
       setBusy(false);
     }
@@ -268,7 +293,7 @@ export default function ConnectionsPanel() {
             {item.configured ? `Connect ${oauthProviderLabel(item.provider)}` : `${oauthProviderLabel(item.provider)} not configured`}
           </button>
         ))}
-        {oauthProviders.length === 0 ? <p className="field-help">Reading OAuth provider availability.</p> : null}
+        {oauthProviders.length === 0 ? <p className="field-help">{readFailed ? "Provider availability could not be confirmed. Refresh state to retry." : "Reading OAuth provider availability."}</p> : null}
       </div>
       <div className="connection-layout">
         <form className="connection-form" onSubmit={create}>
