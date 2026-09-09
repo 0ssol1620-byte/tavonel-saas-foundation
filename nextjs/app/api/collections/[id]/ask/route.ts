@@ -16,6 +16,8 @@ import {
 import { getFoundationActiveWorld, type ActiveWorld } from "@/lib/world-store";
 import { WORKSPACE_ASK_CONCURRENCY } from "@/lib/workspace-cost-guard";
 import { acquireWorkspaceOperation } from "@/lib/workspace-operation-guard";
+import { loadActiveWorldSourceIds } from "@/lib/active-world-source-access";
+import { checkConnectorSourceAccess } from "@/lib/connector-source-access";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -191,8 +193,17 @@ export async function POST(
       { status: lease.status, headers: { ...NO_STORE, "Retry-After": "5" } },
     );
   }
+  let answered: Answered;
+  let documentIds: string[];
   try {
-    const answered = lease.replay ? lease.value : await answerQuestion(workspaceKey, id, question, active);
+    const sources = await loadActiveWorldSourceIds(workspaceKey, id, active.world);
+    if (!sources.ok) return NextResponse.json({ code: sources.code }, { status: 503, headers: NO_STORE });
+    documentIds = sources.documentIds;
+    const sourceAccess = await checkConnectorSourceAccess(workspaceKey, documentIds);
+    if (!sourceAccess.ok) return NextResponse.json({ code: sourceAccess.code }, {
+      status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503, headers: NO_STORE,
+    });
+    answered = lease.replay ? lease.value : await answerQuestion(workspaceKey, id, question, active);
     if (answered.status === 200) {
       const authorizedNow = await revalidateFoundationAuthorization(request, auth.principal, "ask:read", "observer");
       if (!authorizedNow.ok) return NextResponse.json({ code: authorizedNow.code }, {
@@ -209,11 +220,23 @@ export async function POST(
     // Only a completed answer is remembered. Replaying a 503 would turn a transient outage into
     // a ten-minute one for every client that retried politely with the same key.
     if (answered.status === 200 && !lease.replay) {
+      const sourceAccess = await checkConnectorSourceAccess(workspaceKey, documentIds);
+      if (!sourceAccess.ok) return NextResponse.json({ code: sourceAccess.code }, {
+        status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503, headers: NO_STORE,
+      });
       await lease.complete(answered);
     }
-    return NextResponse.json(answered.body, { status: answered.status, headers: lease.replay
-      ? { ...NO_STORE, "X-Tavonel-Idempotent-Replay": "true" } : NO_STORE });
   } finally {
     if (!lease.replay) await lease.release();
   }
+  // Cache completion and lease cleanup can await the database. Recheck after both,
+  // including for old cached answers, before constructing a response containing knowledge.
+  if (answered.status === 200) {
+    const sourceAccess = await checkConnectorSourceAccess(workspaceKey, documentIds);
+    if (!sourceAccess.ok) return NextResponse.json({ code: sourceAccess.code }, {
+      status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503, headers: NO_STORE,
+    });
+  }
+  return NextResponse.json(answered.body, { status: answered.status, headers: lease.replay
+    ? { ...NO_STORE, "X-Tavonel-Idempotent-Replay": "true" } : NO_STORE });
 }
