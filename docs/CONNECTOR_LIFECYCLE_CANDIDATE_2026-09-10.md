@@ -24,6 +24,10 @@ Both connector migrations must precede the app deployment. Missing authorization
 
 Signed collection download now checks package source manifest IDs against the RAG document inventory, refusing missing, duplicate or mismatched inventories. The direct route and its v1 wrapper check source access before signing and again after lease cleanup and account revalidation, before constructing the ZIP response. Unit route tests deny both early and late source revocation without ZIP bytes. This does not retract a package already downloaded. Fallback Ask and cached answer replays still need equivalent source checks.
 
+Subsequent implementation: Ask now validates active source inventory before new/fallback/cached answers and checks suspension before cache completion and after lease cleanup. Authenticated World loading, raw collection JSON and new PDF read-capability issuance also check source denial. Public deterministic buildWorldReadModel samples remain pure and do not call private authorization. Already-issued PDF capabilities still live for up to 120 seconds; strict immediate revocation requires a separately authorized streaming path. Existing downloadable packages cannot be recalled. Full per-user ACL and legacy import qualification remain open.
+
+DB repair replay: full-chain run34397664300 passed both initial application and repair replay after 0053 was updated to restore SELECT/INSERT for the two known connector tables when they exist. This CI receipt covers commit0ff99ab, not later application changes.
+
 1. Persist workspace + connection + provider + native ID bindings and revision observations; support Dropbox path aliases without conflating distinct files.
 2. Apply tombstones and permission shrink to all relevant imported versions and retrieval/export authorization before advancing the provider checkpoint.
 3. Bind source updates to affected Worlds and expose stale/review states; never leave a removed source usable because the sync stopped.

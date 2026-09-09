@@ -4,6 +4,8 @@ import { validateReviewableCollectionArtifact } from "@/lib/collection-download"
 import { loadPreferredCollectionCandidate } from "@/lib/collection-storage";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
+import { collectionSourceDocumentIds } from "@/lib/collection-source-access";
+import { checkConnectorSourceAccess } from "@/lib/connector-source-access";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -34,5 +36,12 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   if (!artifact) {
     return NextResponse.json({ code: "COLLECTION_PACKAGE_INVALID" }, { status: 422, headers: { "Cache-Control": "no-store" } });
   }
+  const documentIds = collectionSourceDocumentIds(artifact);
+  if (!documentIds) return NextResponse.json({ code: "COLLECTION_SOURCE_BINDING_INVALID" }, { status: 422, headers: { "Cache-Control": "no-store" } });
+  const sourceAccess = await checkConnectorSourceAccess(auth.principal.workspaceKey, documentIds);
+  if (!sourceAccess.ok) return NextResponse.json({ code: sourceAccess.code }, {
+    status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503,
+    headers: { "Cache-Control": "no-store" },
+  });
   return NextResponse.json({ code: "OK", artifactKey: loaded.value.key, candidatePromotion: false, artifact }, { headers: { "Cache-Control": "no-store" } });
 }

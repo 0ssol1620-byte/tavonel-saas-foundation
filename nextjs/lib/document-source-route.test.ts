@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getUser, pilotAccess, productAccess, listObjects, signPdf } = vi.hoisted(() => ({
+const { getUser, pilotAccess, productAccess, listObjects, signPdf, sourceAccess } = vi.hoisted(() => ({
   getUser: vi.fn(),
   pilotAccess: vi.fn(),
   productAccess: vi.fn(),
   listObjects: vi.fn(),
   signPdf: vi.fn(),
+  sourceAccess: vi.fn(),
 }));
+vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: sourceAccess }));
 
 vi.mock("@/lib/foundation-pilot", () => ({ getRequestUser: getUser, foundationPilotAccess: pilotAccess }));
 vi.mock("@/lib/billing-product-access", () => ({ authorizeFoundationProduct: productAccess }));
@@ -34,6 +36,7 @@ function request(requestedVersion = version) {
 }
 
 beforeEach(() => {
+  sourceAccess.mockReset().mockResolvedValue({ ok: true });
   getUser.mockReset().mockResolvedValue({ id: userId });
   pilotAccess.mockReset().mockReturnValue({ membership: { workspaceId } });
   productAccess.mockReset().mockResolvedValue({ ok: true });
@@ -48,6 +51,13 @@ beforeEach(() => {
 });
 
 describe("document source PDF route", () => {
+  it("does not issue a read capability for a suspended source", async () => {
+    sourceAccess.mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
+    const response = await GET(request(), { params: Promise.resolve({ id: documentId }) });
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
+    expect(signPdf).not.toHaveBeenCalled();
+  });
   it("returns a short-lived URL only for the exact version inside the authenticated workspace", async () => {
     const response = await GET(request(), { params: Promise.resolve({ id: documentId }) });
     expect(response.status).toBe(200);

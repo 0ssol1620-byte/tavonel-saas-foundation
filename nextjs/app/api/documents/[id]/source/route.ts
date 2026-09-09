@@ -5,6 +5,7 @@ import { DOCUMENT_ID_PATTERN, groupImmutableDocuments } from "@/lib/immutable-ke
 import { presignWorkspaceSanitizedPdfGet } from "@/lib/r2-presign";
 import { listImmutableWorkspaceObjects } from "@/lib/r2-objects";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
+import { checkConnectorSourceAccess } from "@/lib/connector-source-access";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -29,6 +30,11 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     .filter((item) => item.documentId === id && item.sanitizedKey);
   const match = (version ? candidates.find((item) => item.versionKey === version) : candidates[0]) ?? null;
   if (!match?.sanitizedKey) return NextResponse.json({ code: "NOT_FOUND" }, { status: 404 });
+  const sourceAccess = await checkConnectorSourceAccess(access.membership.workspaceId, [id]);
+  if (!sourceAccess.ok) return NextResponse.json({ code: sourceAccess.code }, {
+    status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503,
+    headers: { "Cache-Control": "no-store" },
+  });
   const signed = presignWorkspaceSanitizedPdfGet(signer, {
     workspaceId: access.membership.workspaceId,
     key: match.sanitizedKey,
