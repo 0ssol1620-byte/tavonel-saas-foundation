@@ -22,6 +22,8 @@ Candidate addition: `connector_source_suspensions` stores an immutable denial fo
 
 Both connector migrations must precede the app deployment. Missing authorization RPC fails retrieval closed. Actual production migrations remain unapplied. Local PostgreSQL tests cover active allowance, suspended denial, connection-revoked denial, tenant scope, browser denial and immutable suspension; mocked pipeline tests prove no reranker call for denied sources and no context return after mid-rerank denial. Full migration-chain CI is still required.
 
+Signed collection download now checks package source manifest IDs against the RAG document inventory, refusing missing, duplicate or mismatched inventories. The direct route and its v1 wrapper check source access before signing and again after lease cleanup and account revalidation, before constructing the ZIP response. Unit route tests deny both early and late source revocation without ZIP bytes. This does not retract a package already downloaded. Fallback Ask and cached answer replays still need equivalent source checks.
+
 1. Persist workspace + connection + provider + native ID bindings and revision observations; support Dropbox path aliases without conflating distinct files.
 2. Apply tombstones and permission shrink to all relevant imported versions and retrieval/export authorization before advancing the provider checkpoint.
 3. Bind source updates to affected Worlds and expose stale/review states; never leave a removed source usable because the sync stopped.
