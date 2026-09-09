@@ -60,3 +60,13 @@ The first production smoke exposed a Vercel Analytics script `404` because obser
 Automated evidence confirms rendering, interaction, accessibility, responsive behavior, product contracts, and measured performance. It does not establish aesthetic approval, customer consent, benchmark qualification, certification, or a real paid transaction. Customer stories and benchmarks remain private until qualified evidence exists.
 
 **FOUNDER VISUAL REVIEW REQUIRED**
+
+## 2026-09-10 — consent hydration prerequisite in premium craft QA
+
+The merge-SHA run for bf06a937 failed one 390px pointer-target case twice. Its captured screenshot shows the analytics consent panel still covering the scene controls. The helper used a one-shot visibility probe before client hydration, so it could skip the dismissal and measure behind the subsequently mounted panel.
+
+The helper now waits for the real named consent region, clicks No thanks, and waits for that region to disappear. Geometry and elementFromPoint assertions, target-size floors, project coverage and retries are unchanged. Application code and consent behavior are unchanged.
+
+The corrected premium-craft suite ran against actual https://tavonel.com at 1920, 1440, 1280, 1024, 768, 390, 360 and reduced motion: 27 passed, 5 existing desktop-only scene-mark skips, 0 failed. This is bounded automated public-route evidence, not founder visual acceptance or authenticated customer E2E.
+
+Failure evidence: GitHub Actions run34376893316, job102551856465, artifact10114616623 (product-qa). Local retained screenshot and trace are under D:/tvfix-0909/.chatgpt2codex/merge-product-qa-20260910/. The corrected live-run log is D:/tvfix-0909/.chatgpt2codex/consent-qa-all-widths-20260910.log.

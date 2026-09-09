@@ -1,8 +1,12 @@
 import { expect, test } from "@playwright/test";
 
 async function dismissConsent(page: import("@playwright/test").Page) {
-  const decline = page.getByRole("button", { name: "No thanks", exact: true });
-  if (await decline.isVisible()) await decline.click();
+  // Each test starts with fresh storage. The banner mounts after hydration;
+  // an immediate visibility probe can miss it and measure controls underneath it.
+  const panel = page.getByRole("region", { name: "Optional analytics", exact: true });
+  await expect(panel).toBeVisible();
+  await panel.getByRole("button", { name: "No thanks", exact: true }).click();
+  await expect(panel).toBeHidden();
 }
 
 test("evidence actions fit the document without clipping long source links", async ({ page }) => {
