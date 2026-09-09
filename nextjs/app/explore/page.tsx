@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import ExploreStage from "@/components/explore/explore-stage";
+import { chooseExploreEntryProof } from "@/lib/explore-entry-proof";
 import {
   exploreChangeBaselineDocument,
   exploreChangeStory,
@@ -61,10 +62,12 @@ const change = buildExploreChangeView(
   exploreChangeTimeline,
 );
 const answers = buildExploreAnswerViews(exploreSampleAnswers, world.evidence);
+const entryProof = chooseExploreEntryProof(world.evidence, answers);
 const model = boundVisualWorld(
   world,
   layout.placements.map((placement) => placement.id),
-  answers.flatMap((answer) => answer.regions.map((region) => region.evidenceId)),
+  [...answers.flatMap((answer) => answer.regions.map((region) => region.evidenceId)),
+    ...(entryProof ? [entryProof.id] : [])],
 );
 
 const technical: ExploreTechnicalRecord = {

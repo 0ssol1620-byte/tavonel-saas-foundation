@@ -723,6 +723,38 @@
 
 .entryCta:focus-visible { outline: 2px solid var(--text-hi); outline-offset: 3px; }
 
+/* Narrative and source surfaces share one composition, not a fabricated PDF.
+   All excerpt text, filing labels and page locations come from the bounded World. */
+.entryLayout { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr); align-items: center; gap: clamp(32px, 5vw, 88px); }
+.entryCopy { display: grid; gap: 22px; min-width: 0; }
+.entryCopy h1 { font-size: clamp(44px, 5.6vw, 82px); line-height: 1.01; letter-spacing: -0.055em; text-wrap: balance; }
+.entryCopy .entrySub { max-width: 46ch; font-size: clamp(16px, 1.25vw, 18px); line-height: 1.65; }
+.entryCopy .entryCta { display: inline-flex; align-items: center; justify-content: space-between; gap: 32px; min-height: 48px; font-family: inherit; font-size: 14px; font-weight: 600; letter-spacing: 0.035em; }
+.entryEyebrow { font-size: 10px; }
+.entryPaths { display: flex; flex-wrap: wrap; gap: 4px 22px; }
+.entryPaths button { display: inline-flex; align-items: center; gap: 14px; min-height: 44px; padding: 6px 0; color: var(--text-lo); border: 0; background: transparent; font-family: inherit; font-size: 14px; line-height: 1.4; text-align: left; }
+.entryPaths button:hover { color: var(--text-hi); }
+.entryPaths button:focus-visible, .entryProof button:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; }
+.entryProof { min-width: 0; margin: 0; padding: clamp(24px, 2.6vw, 38px); color: #171c20; background: #f1eee8; border: 1px solid #fff6; box-shadow: 0 14px 48px #0002; }
+.proofHeading { display: flex; align-items: center; justify-content: space-between; padding-bottom: 22px; border-bottom: 1px solid #171c2028; font: 10px/1.4 var(--f-mono); letter-spacing: 0.15em; }
+.proofHeading > span:last-child { font-size: 24px; line-height: 1; }
+.proofFiling { display: flex; flex-wrap: wrap; gap: 5px 16px; align-items: baseline; margin: 24px 0 18px; font-size: 18px; font-weight: 600; }
+.proofFiling > span { color: #53595e; font-size: 12px; font-weight: 400; }
+.entryProof blockquote { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp(18px, 1.55vw, 23px); line-height: 1.65; overflow-wrap: anywhere; }
+.proofFoot { display: grid; gap: 12px; margin-top: 26px; padding-top: 20px; border-top: 1px solid #171c2028; }
+.proofFoot > span { color: #53595e; font-size: 12px; line-height: 1.6; }
+.proofFoot button { display: flex; justify-content: space-between; align-items: center; gap: 14px; min-height: 44px; width: 100%; padding: 10px 0; color: inherit; background: transparent; border: 0; font-family: inherit; font-size: 14px; font-weight: 600; text-align: left; }
+.entryScope { margin: 26px 0 0; color: var(--text-lo); font-size: 12px; line-height: 1.6; }
+
+@media (max-width: 900px) {
+  .entry { align-content: start; padding: 36px 24px; }
+  .entryLayout { grid-template-columns: minmax(0, 1fr); gap: 36px; }
+  .entryCopy { gap: 18px; }
+  .entryCopy h1 { max-width: 15ch; font-size: clamp(44px, 8vw, 64px); }
+  .entryProof { max-width: 620px; }
+  .entryScope { margin-top: 18px; }
+}
+
 /* ------------------------------------------------------------------ ask */
 
 .askBar {
