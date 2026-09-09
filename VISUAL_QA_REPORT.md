@@ -70,3 +70,15 @@ The helper now waits for the real named consent region, clicks No thanks, and wa
 The corrected premium-craft suite ran against actual https://tavonel.com at 1920, 1440, 1280, 1024, 768, 390, 360 and reduced motion: 27 passed, 5 existing desktop-only scene-mark skips, 0 failed. This is bounded automated public-route evidence, not founder visual acceptance or authenticated customer E2E.
 
 Failure evidence: GitHub Actions run34376893316, job102551856465, artifact10114616623 (product-qa). Local retained screenshot and trace are under D:/tvfix-0909/.chatgpt2codex/merge-product-qa-20260910/. The corrected live-run log is D:/tvfix-0909/.chatgpt2codex/consent-qa-all-widths-20260910.log.
+
+## 2026-09-10 — Detail completion candidate
+
+User screenshot revealed half-empty gray panels in Home Scene 02. Root cause: a two-column `.chain` retained its divider background when it had one child. Candidate fills the final odd child across both columns, preserving multi-item grids. Home instructions use readable prose and link to the real capability manifest; connector and assisted-import panels now offer an actual next action.
+
+Local production build: `.chatgpt2codex/detail-build-0910.log`, lint/typecheck and 199 test files / 2434 unit tests passed. First premium run: 34 passed, 5 existing skips, 1 flaky because 44px was represented as 43.999969 after reveal transform. New regression rounds to hundredth-pixel precision, preserving the 44px requirement. Repeat of all eight input configurations with retries disabled: 8 passed (`detail-input-rerun-0910.log`).
+
+`.chatgpt2codex/detail-audit-0910/` is an IN-PROGRESS local production-build capture of 85 historical route targets at seven widths plus reduced motion. Input screenshots inspected at 1440; no founder visual acceptance claimed. Auth redirects do not qualify Workspace. The capture manifest contains exact baseline and application diff. A subsequent capability-link underline CSS change still requires rebuilt verification. Full route inspection, accessibility, Lighthouse, exact-SHA CI and production verification remain open.
+
+Beta labels remain truthful; connector implementation and real-account qualification are tracked in `D:\TAVONEL_DETAIL_COMPLETION_REGISTER_2026-09-10.md` under the existing active goal.
+
+PR49 full Product QA found a real regression at 390/360: the new Capability Manifest inline link was only 16px tall. The existing 44px mobile test failed both initial and retry runs (400 passed / 2 failed / 86 existing skips). Apply the same `input-next` 44px action treatment to this link; no test exception or threshold change. Rebuild, targeted existing mobile checks and fresh exact-head CI are required before merge. Earlier input-panel checks did not cover this separate inline link.
