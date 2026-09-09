@@ -181,6 +181,16 @@ export async function runSourceImportBatch(
   }
 
   const batch = page.items.slice(resume.pageOffset, resume.pageOffset + SYNC_BATCH_SIZE);
+  // A removal may also mean lost access. Until source identity and revocation are
+  // durably connected, consuming it as an unsupported file would lose the event.
+  // Inspect the remaining page before admitting bytes or advancing any checkpoint.
+  if (page.items.slice(resume.pageOffset).some(item => item.kind === "deleted")) {
+    const reported = await completeJobBatch(job.workspaceKey, job.jobId, workerId, {
+      outcome: "failed",
+      errorCode: "SOURCE_LIFECYCLE_REVIEW_REQUIRED",
+    });
+    return { ok: false, code: reported.ok ? "SOURCE_LIFECYCLE_REVIEW_REQUIRED" : reported.code };
+  }
   const skipped: Array<{ nativeId: string; code: string }> = [];
   let imported = 0;
   let processed = 0;

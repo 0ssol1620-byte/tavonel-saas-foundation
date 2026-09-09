@@ -66,6 +66,29 @@ afterEach(() => {
 });
 
 describe("cursor safety", () => {
+  it.each(["dropbox", "microsoft_graph"])("retains %s removal events before importing any page bytes", async provider => {
+    getOAuthConnectionSecretReference.mockResolvedValue({ ok: true, provider, refreshTokenReference: "vault://refresh" });
+    const removed = { ...sourceItem("removed"), kind: "deleted" };
+    listOAuthSourcePage.mockResolvedValue({
+      items: [...Array.from({ length: SYNC_IMPORT_LIMIT }, (_, i) => sourceItem(`file-${i}`)), removed],
+      cursor: "next", complete: true,
+    });
+    const result = await runSourceImportBatch({ ...JOB, cursorToken: "current" }, "worker-1");
+    expect(result).toEqual({ ok: false, code: "SOURCE_LIFECYCLE_REVIEW_REQUIRED" });
+    expect(importSourceObject).not.toHaveBeenCalled();
+    expect(completeJobBatch).toHaveBeenCalledExactlyOnceWith(JOB.workspaceKey, JOB.jobId, "worker-1", {
+      outcome: "failed", errorCode: "SOURCE_LIFECYCLE_REVIEW_REQUIRED",
+    });
+  });
+
+  it("surfaces failure to persist the lifecycle stop without committing progress", async () => {
+    listOAuthSourcePage.mockResolvedValue({ items: [{ ...sourceItem("gone"), kind: "deleted" }], cursor: "next", complete: false });
+    completeJobBatch.mockResolvedValue({ ok: false, code: "JOB_LEASE_LOST" });
+    expect(await runSourceImportBatch(JOB, "worker-1")).toEqual({ ok: false, code: "JOB_LEASE_LOST" });
+    expect(importSourceObject).not.toHaveBeenCalled();
+    expect(completeJobBatch.mock.calls[0][3]).not.toHaveProperty("cursorToken");
+  });
+
   it("advances the cursor only after the batch's imports are admitted", async () => {
     const order: string[] = [];
     importSourceObject.mockImplementation(async (_ctx: unknown, item: { nativeId: string }) => {
