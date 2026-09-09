@@ -1,12 +1,12 @@
 import { reserveFoundationCompute } from "./compute-reservation";
 import { estimateBillablePages } from "./usage-pricing";
 import { oauthSourceDownloadRequest, type OAuthSourceItem, type OAuthSourceTarget } from "./connector-oauth-adapters";
-import { sha256Hex, type OAuthConnectorProvider } from "./connector-oauth";
+import { type OAuthConnectorProvider } from "./connector-oauth";
 import { confirmFoundationIntake, reserveFoundationIntake } from "./intake-admission";
 import { validateQualifiedDocumentInput } from "./qualified-input";
 import { FOUNDATION_INTAKE_MAX_BYTES, presignFoundationQuarantinePut } from "./r2-presign";
 import { type R2SignerEnv } from "./r2-synthetic-canary";
-import { deterministicSourceDocumentId } from "./source-intake";
+import { connectorSourceIdentity, type ConnectorSourceIdentity } from "./connector-source-identity";
 import { readBoundedSourceBody } from "./bounded-source-body";
 
 // One source object, taken from a provider to quarantine.
@@ -41,7 +41,7 @@ export function importDescriptor(item: OAuthSourceItem) {
 }
 
 export type ImportOutcome =
-  | { ok: true; nativeId: string; documentId: string; filename: string }
+  | ({ ok: true; nativeId: string; filename: string } & ConnectorSourceIdentity)
   | { ok: false; nativeId: string; code: string };
 
 export type ImportContext = {
@@ -65,6 +65,9 @@ export async function importSourceObject(context: ImportContext, item: OAuthSour
   if (item.sizeBytes !== null && item.sizeBytes > FOUNDATION_INTAKE_MAX_BYTES) {
     return { ok: false, nativeId: item.nativeId, code: "SOURCE_TOO_LARGE" };
   }
+  let identity: ConnectorSourceIdentity;
+  try { identity = await connectorSourceIdentity({ ...context, nativeId: item.nativeId, revision: item.revision }); }
+  catch { return { ok: false, nativeId: item.nativeId, code: "SOURCE_IDENTITY_INVALID" }; }
 
   let download: ReturnType<typeof oauthSourceDownloadRequest>;
   try {
@@ -103,8 +106,7 @@ export async function importSourceObject(context: ImportContext, item: OAuthSour
 
   // Deterministic identity. Same (connection, object, revision) -> same document, so an
   // at-least-once retry re-imports rather than duplicates.
-  const sourceIdempotencyKey = await sha256Hex(`${context.connectionId}\u001f${item.nativeId}\u001f${item.revision}`);
-  const documentId = await deterministicSourceDocumentId(context.workspaceKey, sourceIdempotencyKey);
+  const { documentId } = identity;
   const objectKey = `quarantine/${context.workspaceKey}/${documentId}/source`;
 
   const admission = await reserveFoundationIntake({
@@ -119,7 +121,7 @@ export async function importSourceObject(context: ImportContext, item: OAuthSour
   // A deterministic source revision that already reached intake is complete for this sync
   // turn. Never reserve compute again or overwrite its create-once quarantine source.
   if (admission.result.idempotentReplay === true) {
-    return { ok: true, nativeId: item.nativeId, documentId, filename: descriptor.filename };
+    return { ok: true, nativeId: item.nativeId, ...identity, filename: descriptor.filename };
   }
 
   const compute = await reserveFoundationCompute({
@@ -158,5 +160,5 @@ export async function importSourceObject(context: ImportContext, item: OAuthSour
   });
   if (!confirmed.ok) return { ok: false, nativeId: item.nativeId, code: confirmed.code };
 
-  return { ok: true, nativeId: item.nativeId, documentId, filename: descriptor.filename };
+  return { ok: true, nativeId: item.nativeId, ...identity, filename: descriptor.filename };
 }

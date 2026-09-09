@@ -8,6 +8,10 @@ The Google Drive reader takes a change watermark before enumeration and returns 
 
 Legacy cursors are not converted or reset automatically. Shared-drive lifecycle events are refused for review. Existing imported data is not retroactively assigned a guessed native identity.
 
+The import path now emits a stable logical source ID scoped by workspace, connection, provider and native ID, plus a revision-specific source version ID. Names and paths do not participate. Existing valid quarantine document IDs remain byte-for-byte compatible. Missing or control-character-bearing native IDs/revisions fail before downloading; they cannot create ambiguous delimiter-based replay identities. These IDs are returned to the worker but are not yet persisted or used for authorization.
+
+The existing source-domain store cannot simply be called with these identities: its quarantine key check assumes sourceId equals documentId, and its exact insert replay compares observation timestamps. Connector integration must introduce an explicit immutable document binding and stable observation replay semantics rather than weakening workspace key validation or overwriting timestamps. This remains a required implementation step.
+
 ## Remaining integration gates
 
 1. Persist workspace + connection + provider + native ID bindings and revision observations; support Dropbox path aliases without conflating distinct files.
