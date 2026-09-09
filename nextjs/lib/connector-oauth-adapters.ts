@@ -260,6 +260,7 @@ const GOOGLE_EXPORTS: Record<string, string> = {
 export function oauthSourceDownloadRequest(input: {
   provider: OAuthConnectorProvider;
   nativeId: string;
+  revision?: string;
   mimeType?: string | null;
   target?: OAuthSourceTarget;
 }) {
@@ -290,11 +291,14 @@ export function oauthSourceDownloadRequest(input: {
     if (input.mimeType?.startsWith("application/vnd.google-apps.") && !exportMime) throw new Error("OAUTH_SOURCE_NATIVE_TYPE_UNSUPPORTED");
     return { url: checked(url.toString()), method: "GET" as const, headers: {} };
   }
-  if (input.provider === "dropbox") return {
-    url: checked(`${DROPBOX_CONTENT_ORIGIN}/2/files/download`),
-    method: "POST" as const,
-    headers: { "Dropbox-API-Arg": JSON.stringify({ path: input.nativeId }) },
-  };
+  if (input.provider === "dropbox") {
+    if (!input.revision || !/^[A-Za-z0-9_-]{1,512}$/.test(input.revision)) throw new Error("SOURCE_REVISION_UNQUALIFIED");
+    return {
+      url: checked(`${DROPBOX_CONTENT_ORIGIN}/2/files/download`),
+      method: "POST" as const,
+      headers: { "Dropbox-API-Arg": JSON.stringify({ path: `rev:${input.revision}` }) },
+    };
+  }
   const drive = input.target?.driveId ? `drives/${encodeURIComponent(input.target.driveId)}` : "me/drive";
   return {
     url: checked(`${GRAPH_ORIGIN}/v1.0/${drive}/items/${encodeURIComponent(input.nativeId)}/content`),

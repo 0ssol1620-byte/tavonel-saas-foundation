@@ -211,7 +211,7 @@ describe.each(PROVIDERS)("connector contract: %s", (provider) => {
   });
 
   it("downloads only from the provider's own origin", async () => {
-    const request = oauthSourceDownloadRequest({ provider, nativeId: "item-1", mimeType: "application/pdf", target: {} });
+    const request = oauthSourceDownloadRequest({ provider, nativeId: "item-1", revision: "a1c10ce0dd78", mimeType: "application/pdf", target: {} });
     const origin = new URL(request.url).origin;
     expect([
       "https://www.googleapis.com",

@@ -10,15 +10,14 @@ import { connectorSourceIdentity, type ConnectorSourceIdentity } from "./connect
 import { readBoundedSourceBody } from "./bounded-source-body";
 import { recordConnectorDocumentBinding } from "./connector-binding-store";
 import { createHash } from "node:crypto";
+import { verifyDropboxSource } from "./dropbox-source-integrity";
 
 // One source object, taken from a provider to quarantine.
 //
-// This is lifted verbatim in behaviour from the connector sync route, which did it inline
-// inside a single HTTP request. The logic was correct and is unchanged: qualify the file,
-// derive a deterministic document id from (connection, native id, revision), reserve intake
-// admission and compute, presign, upload. What changes is only who calls it -- a job worker
-// that can run it for the 4,000th file as easily as the 1st, instead of a request handler
-// bounded to maxImports <= 3 by a 60-second function timeout.
+// Qualify and bound the file, validate available provider version/content proof, persist
+// the immutable source binding, then reserve intake/compute and upload to quarantine.
+// A bounded job worker calls this path repeatedly. Provider version qualification remains
+// separate from deterministic identity: a revision-derived ID alone does not prove bytes.
 //
 // The determinism matters more here than it did before. A worker retries; a lease expires and
 // another worker re-reads the same page. Because the document id is a pure function of
@@ -76,11 +75,12 @@ export async function importSourceObject(context: ImportContext, item: OAuthSour
     download = oauthSourceDownloadRequest({
       provider: context.provider,
       nativeId: item.nativeId,
+      revision: item.revision,
       mimeType: item.mimeType,
       target: context.target,
     });
-  } catch {
-    return { ok: false, nativeId: item.nativeId, code: "SOURCE_NATIVE_TYPE_UNSUPPORTED" };
+  } catch (error) {
+    return { ok: false, nativeId: item.nativeId, code: error instanceof Error && error.message === "SOURCE_REVISION_UNQUALIFIED" ? error.message : "SOURCE_NATIVE_TYPE_UNSUPPORTED" };
   }
 
   const downloadHeaders = new Headers();
@@ -105,6 +105,10 @@ export async function importSourceObject(context: ImportContext, item: OAuthSour
   const body = await readBoundedSourceBody(source, FOUNDATION_INTAKE_MAX_BYTES);
   if (!body.ok) return { ok: false, nativeId: item.nativeId, code: body.code };
   const bytes = body.bytes;
+  if (context.provider === "dropbox") {
+    const rejected = verifyDropboxSource(source, bytes, item);
+    if (rejected) return { ok: false, nativeId: item.nativeId, code: rejected };
+  }
 
   // Deterministic identity. Same (connection, object, revision) -> same document, so an
   // at-least-once retry re-imports rather than duplicates.
