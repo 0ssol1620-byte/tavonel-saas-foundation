@@ -12,6 +12,11 @@ import styles from "./world-studio-ultimate.module.css";
 
 export type WorldStudioLens = "overview" | "graph" | "directory" | "ontology" | "evidence" | "versions" | "files";
 
+type SourcePreview = { sourceId: string; versionId: string } & (
+  | { state: "ready"; bytes: Uint8Array }
+  | { state: "loading" | "unavailable" }
+);
+
 type Props = {
   model: WorldReadModel | null;
   initialLens?: WorldStudioLens;
@@ -54,31 +59,36 @@ export default function WorldStudioUltimate({ model, initialLens = "overview", s
   const [lens, setLens] = useState<WorldStudioLens>(initialLens);
   const [localEvidenceId, setLocalEvidenceId] = useState<string | null>(null);
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
-  const [sourcePreview, setSourcePreview] = useState<{ url: string; state: "ready" | "loading" | "unavailable" } | null>(null);
+  const [sourcePreview, setSourcePreview] = useState<SourcePreview | null>(null);
   const activeEvidenceId = selectedEvidenceId === undefined ? localEvidenceId : selectedEvidenceId;
   const selection = selectWorldEvidence(model, activeEvidenceId);
   const selectedObject = model?.objects.find((object) => object.id === selectedObjectId) ?? null;
   const selectedSourceId = selection?.sourceId ?? null;
   const selectedSourceVersionId = selection?.sourceVersionId ?? null;
-  const selectedSourcePage = selection?.page ?? null;
+  const currentPreview = sourcePreview?.sourceId === selectedSourceId && sourcePreview?.versionId === selectedSourceVersionId ? sourcePreview : null;
 
   useEffect(() => { setLens(initialLens); }, [initialLens]);
 
   useEffect(() => {
-    if (!selectedSourceId || !selectedSourceVersionId || !selectedSourcePage) { setSourcePreview(null); return; }
+    if (!selectedSourceId || !selectedSourceVersionId) { setSourcePreview(null); return; }
     let cancelled = false;
-    setSourcePreview({ url: "", state: "loading" });
+    const controller = new AbortController();
+    const identity = { sourceId: selectedSourceId, versionId: selectedSourceVersionId };
+    setSourcePreview({ ...identity, state: "loading" });
     void (async () => {
       const client = getSupabaseBrowserClient();
       const { data } = client ? await client.auth.getSession() : { data: { session: null } };
       const token = data.session?.access_token;
-      if (!token) { if (!cancelled) setSourcePreview({ url: "", state: "unavailable" }); return; }
-      const response = await fetch(`/api/documents/${selectedSourceId}/source?version=${encodeURIComponent(selectedSourceVersionId)}`, { headers: { authorization: `Bearer ${token}` }, cache: "no-store" });
-      const body = await response.json().catch(() => ({})) as { readUrl?: string };
-      if (!cancelled) setSourcePreview(response.ok && body.readUrl ? { url: body.readUrl, state: "ready" } : { url: "", state: "unavailable" });
-    })();
-    return () => { cancelled = true; };
-  }, [selectedSourceId, selectedSourceVersionId, selectedSourcePage]);
+      if (cancelled) return;
+      if (!token) { setSourcePreview({ ...identity, state: "unavailable" }); return; }
+      const response = await fetch(`/api/documents/${encodeURIComponent(selectedSourceId)}/source?version=${encodeURIComponent(selectedSourceVersionId)}&format=pdf`, { headers: { authorization: `Bearer ${token}` }, cache: "no-store", signal: controller.signal });
+      if (!response.ok || !response.headers.get("content-type")?.startsWith("application/pdf")) throw new Error("SOURCE_PREVIEW_UNAVAILABLE");
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      if (cancelled) return;
+      setSourcePreview({ ...identity, bytes, state: "ready" });
+    })().catch(() => { if (!cancelled) setSourcePreview({ ...identity, state: "unavailable" }); });
+    return () => { cancelled = true; controller.abort(); };
+  }, [selectedSourceId, selectedSourceVersionId]);
 
   const selectEvidence = (evidence: WorldEvidence) => {
     if (selectedEvidenceId === undefined) setLocalEvidenceId(evidence.id);
@@ -140,7 +150,7 @@ export default function WorldStudioUltimate({ model, initialLens = "overview", s
 
         <aside className={styles.inspector} aria-label="World selection inspector">
           {selection ? (
-            <><div className={styles.inspectorTitle}><span>SELECTED EVIDENCE</span><button type="button" onClick={clearEvidence}>Clear</button></div><strong>{selection.sourceId}</strong><dl><div><dt>PAGE</dt><dd>{selection.page}</dd></div><div><dt>BBOX</dt><dd>[{selection.bbox.join(", ")}]</dd></div></dl><div className={styles.pagePreview} aria-label={`Actual source page ${selection.page} with evidence bounding box`}>{sourcePreview?.state === "ready" ? <PdfEvidenceViewer url={sourcePreview.url} page={selection.page} bbox={selection.bbox} label={`Source ${selection.sourceId}, page ${selection.page}, exact evidence region`} /> : <span>{sourcePreview?.state === "loading" ? "Opening source page…" : `Preview unavailable · page ${selection.page}`}</span>}</div></>
+            <><div className={styles.inspectorTitle}><span>SELECTED EVIDENCE</span><button type="button" onClick={clearEvidence}>Clear</button></div><strong>{selection.sourceId}</strong><dl><div><dt>PAGE</dt><dd>{selection.page}</dd></div><div><dt>BBOX</dt><dd>[{selection.bbox.join(", ")}]</dd></div></dl><div className={styles.pagePreview} aria-label={`Actual source page ${selection.page} with evidence bounding box`}>{currentPreview?.state === "ready" ? <PdfEvidenceViewer key={JSON.stringify([selection.sourceId, selection.sourceVersionId, selection.page])} data={currentPreview.bytes} page={selection.page} bbox={selection.bbox} label={`Source ${selection.sourceId}, page ${selection.page}, exact evidence region`} /> : <span>{!currentPreview || currentPreview.state === "loading" ? "Opening source page…" : `Preview unavailable · page ${selection.page}`}</span>}</div></>
           ) : selectedObject ? (
             <><div className={styles.inspectorTitle}><span>SELECTED OBJECT</span></div><strong data-sensitive="content">{selectedObject.label}</strong><dl><div><dt>TYPE</dt><dd>{selectedObject.type}</dd></div><div><dt>STATE</dt><dd>{selectedObject.readState === "read" ? "READY" : "NEEDS REVIEW"}</dd></div><div><dt>RELATIONS</dt><dd>{selectedObject.relations.length}</dd></div><div><dt>EVIDENCE</dt><dd>{selectedObject.evidenceRefs.length}</dd></div></dl></>
           ) : lens === "overview" ? (

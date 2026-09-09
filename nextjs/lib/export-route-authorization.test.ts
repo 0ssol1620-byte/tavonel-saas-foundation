@@ -5,8 +5,9 @@ import { compileCollectionCandidate } from "./collection-compiler";
 import { createExportSigner } from "./export-signing";
 
 const mocks = vi.hoisted(() => ({
-  authorize: vi.fn(), revalidate: vi.fn(), load: vi.fn(), release: vi.fn(), signer: vi.fn(),
+  authorize: vi.fn(), revalidate: vi.fn(), load: vi.fn(), release: vi.fn(), signer: vi.fn(), sourceAccess: vi.fn(),
 }));
+vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: mocks.sourceAccess }));
 vi.mock("@/lib/developer-auth", () => ({
   authorizeFoundationRequest: mocks.authorize,
   revalidateFoundationAuthorization: mocks.revalidate,
@@ -39,6 +40,7 @@ const principal = { kind: "api-key", workspaceKey: "test-export-auth", userId: "
 
 beforeEach(() => {
   vi.resetAllMocks();
+  mocks.sourceAccess.mockResolvedValue({ ok: true });
   mocks.authorize.mockResolvedValue({ ok: true, principal });
   mocks.revalidate.mockResolvedValue({ ok: true, principal });
   mocks.load.mockResolvedValue({ ok: true, value: { artifact } });
@@ -60,6 +62,15 @@ describe.each([["direct", direct], ["v1", versioned]] as const)("%s export autho
     expect(response.headers.get("content-type")).toBe("application/zip");
     const files = unzipSync(new Uint8Array(await response.arrayBuffer()));
     expect(files["signatures/export-manifest.ed25519.json"]).toBeDefined();
+  });
+  it.each([1, 2])("refuses source access denied at check %s without returning ZIP bytes", async check => {
+    if (check === 2) mocks.sourceAccess.mockResolvedValueOnce({ ok: true });
+    mocks.sourceAccess.mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
+    const response = await run();
+    expect(response.status).toBe(403);
+    expect(response.headers.get("content-type")).not.toBe("application/zip");
+    expect(await response.json()).toEqual({ code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
+    expect(mocks.release).toHaveBeenCalled();
   });
   it.each(["load", "release"] as const)("refuses access revoked during %s without returning archive bytes", async (boundary) => {
     let reached!: () => void;

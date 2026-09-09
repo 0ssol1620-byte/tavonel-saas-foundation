@@ -5,6 +5,9 @@ import { getOAuthConnectionSecretReference } from "./connector-oauth-store";
 import { completeJobBatch, type ClaimedJob } from "./job-store";
 import { readR2SignerEnv } from "./r2-synthetic-canary";
 import { importSourceObject } from "./source-import";
+import { suspendConnectorSource } from "./connector-source-access";
+import { loadConnectorSyncPage } from "./connector-sync-page";
+import { listGoogleDriveLifecyclePage } from "./google-drive-lifecycle";
 
 // The worker that actually moves a connector sync forward.
 //
@@ -145,8 +148,7 @@ export async function runSourceImportBatch(
 
   const target = targetFromPayload(job.payload);
 
-  // Resume exactly where the last committed batch left off. Legacy jobs store only the
-  // provider cursor; newer jobs can also checkpoint an offset inside a large provider page.
+  // Offsets refer to the durably observed provider page, never a new mutable listing.
   const resume = decodeSyncCursor(job.cursorToken);
   if (!resume) {
     await completeJobBatch(job.workspaceKey, job.jobId, workerId, {
@@ -158,18 +160,24 @@ export async function runSourceImportBatch(
 
   let page: { items: OAuthSourceItem[]; cursor: string | null; complete: boolean };
   try {
-    page = await listOAuthSourcePage({
-      provider: binding.provider,
-      accessToken,
-      cursor: resume.providerCursor,
-      target,
+    page = await loadConnectorSyncPage(job, workerId, resume.providerCursor, resume.pageOffset, () => {
+      if (job.payload.sourceReaderVersion === "google-lifecycle-v2") {
+        if (binding.provider !== "google_drive" || target.rootPath || target.siteId) {
+          throw new Error("OAUTH_SOURCE_TARGET_UNSUPPORTED");
+        }
+        return listGoogleDriveLifecyclePage({ accessToken, cursor: resume.providerCursor,
+          driveId: target.driveId, fetcher });
+      }
+      return listOAuthSourcePage({ provider: binding.provider, accessToken, cursor: resume.providerCursor, target });
     });
-  } catch {
-    await completeJobBatch(job.workspaceKey, job.jobId, workerId, {
-      outcome: "retry",
-      errorCode: "SOURCE_LIST_FAILED",
+  } catch (error) {
+    const code = error instanceof Error && ["CONNECTOR_PAGE_STORE_UNAVAILABLE", "CONNECTOR_PAGE_INVALID", "CONNECTOR_PAGE_LEGACY_REVIEW_REQUIRED", "OAUTH_SOURCE_PAGE_INVALID", "OAUTH_SOURCE_CURSOR_INVALID", "OAUTH_SOURCE_CURSOR_STALLED", "OAUTH_SOURCE_TARGET_UNSUPPORTED"].includes(error.message)
+      ? error.message : "SOURCE_LIST_FAILED";
+    const reported = await completeJobBatch(job.workspaceKey, job.jobId, workerId, {
+      outcome: ["CONNECTOR_PAGE_INVALID", "CONNECTOR_PAGE_LEGACY_REVIEW_REQUIRED", "OAUTH_SOURCE_TARGET_UNSUPPORTED"].includes(code) ? "failed" : "retry",
+      errorCode: code,
     });
-    return { ok: false, code: "SOURCE_LIST_FAILED" };
+    return { ok: false, code: reported.ok ? code : reported.code };
   }
 
   if (resume.pageOffset >= page.items.length && resume.pageOffset > 0) {
@@ -181,6 +189,26 @@ export async function runSourceImportBatch(
   }
 
   const batch = page.items.slice(resume.pageOffset, resume.pageOffset + SYNC_BATCH_SIZE);
+  // A removal may also mean lost access. Until source identity and revocation are
+  // durably connected, consuming it as an unsupported file would lose the event.
+  // Inspect the remaining page before admitting bytes or advancing any checkpoint.
+  if (page.items.slice(resume.pageOffset).some(item => item.kind === "deleted")) {
+    for (const item of page.items.slice(resume.pageOffset).filter(item => item.kind === "deleted")) {
+      const suspended = await suspendConnectorSource({ workspaceKey: job.workspaceKey,
+        connectionId: job.oauthConnectionId, provider: binding.provider, nativeId: item.nativeId });
+      if (!suspended.ok) {
+        const reported = await completeJobBatch(job.workspaceKey, job.jobId, workerId, {
+          outcome: "failed", errorCode: suspended.code,
+        });
+        return { ok: false, code: reported.ok ? suspended.code : reported.code };
+      }
+    }
+    const reported = await completeJobBatch(job.workspaceKey, job.jobId, workerId, {
+      outcome: "failed",
+      errorCode: "SOURCE_LIFECYCLE_REVIEW_REQUIRED",
+    });
+    return { ok: false, code: reported.ok ? "SOURCE_LIFECYCLE_REVIEW_REQUIRED" : reported.code };
+  }
   const skipped: Array<{ nativeId: string; code: string }> = [];
   let imported = 0;
   let processed = 0;

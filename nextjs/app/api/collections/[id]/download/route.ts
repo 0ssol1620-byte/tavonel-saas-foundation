@@ -7,6 +7,8 @@ import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
 import { WORKSPACE_EXPORT_CONCURRENCY } from "@/lib/workspace-cost-guard";
 import { acquireWorkspaceOperation } from "@/lib/workspace-operation-guard";
+import { collectionSourceDocumentIds } from "@/lib/collection-source-access";
+import { checkConnectorSourceAccess } from "@/lib/connector-source-access";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -44,6 +46,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     );
   }
   let signed: ReturnType<typeof buildSignedCollectionZip>;
+  let documentIds: string[];
   try {
     const manifestDigest = new URL(request.url).searchParams.get("manifest") ?? undefined;
     const loaded = await loadPreferredCollectionCandidate(
@@ -62,6 +65,13 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     if (!artifact) {
       return NextResponse.json({ code: "COLLECTION_PACKAGE_INVALID" }, { status: 422, headers: NO_STORE });
     }
+    const sourceIds = collectionSourceDocumentIds(artifact);
+    if (!sourceIds) return NextResponse.json({ code: "COLLECTION_SOURCE_BINDING_INVALID" }, { status: 422, headers: NO_STORE });
+    documentIds = sourceIds;
+    const sourceAccess = await checkConnectorSourceAccess(auth.principal.workspaceKey, documentIds);
+    if (!sourceAccess.ok) return NextResponse.json({ code: sourceAccess.code }, {
+      status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503, headers: NO_STORE,
+    });
 
     const exportSigner = readExportSignerEnv();
     if (!exportSigner) {
@@ -85,6 +95,10 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   );
   if (!authorizedNow.ok) return NextResponse.json({ code: authorizedNow.code }, {
     status: authorizedNow.status, headers: NO_STORE,
+  });
+  const sourceAccessNow = await checkConnectorSourceAccess(auth.principal.workspaceKey, documentIds);
+  if (!sourceAccessNow.ok) return NextResponse.json({ code: sourceAccessNow.code }, {
+    status: sourceAccessNow.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503, headers: NO_STORE,
   });
   return new Response(signed.archive, {
       status: 200,

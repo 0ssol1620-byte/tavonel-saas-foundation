@@ -4,13 +4,13 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import styles from "./pdf-evidence-viewer.module.css";
 
 type Props = {
-  url: string;
+  data: Uint8Array;
   page: number;
   bbox: [number, number, number, number];
   label: string;
 };
 
-export default function PdfEvidenceViewer({ url, page, bbox, label }: Props) {
+export default function PdfEvidenceViewer({ data, page, bbox, label }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [width, setWidth] = useState(0);
@@ -36,12 +36,15 @@ export default function PdfEvidenceViewer({ url, page, bbox, label }: Props) {
 
     void (async () => {
       const pdfjs = await import("pdfjs-dist");
+      if (cancelled) return;
       pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
-      const task = pdfjs.getDocument({ url, withCredentials: false });
+      // The worker may transfer the input buffer; retain the original for resize.
+      const task = pdfjs.getDocument({ data: data.slice() });
       loadingTask = task;
       const document = await task.promise;
       if (cancelled || page > document.numPages) throw new Error("PDF_PAGE_UNAVAILABLE");
       const pdfPage = await document.getPage(page);
+      if (cancelled) return;
       const natural = pdfPage.getViewport({ scale: 1 });
       const viewport = pdfPage.getViewport({ scale: width / natural.width });
       const ratio = Math.min(window.devicePixelRatio || 1, 2);
@@ -64,7 +67,7 @@ export default function PdfEvidenceViewer({ url, page, bbox, label }: Props) {
       renderTask?.cancel();
       void loadingTask?.destroy();
     };
-  }, [page, url, width]);
+  }, [page, data, width]);
 
   return (
     <div ref={containerRef} className={styles.viewer} aria-label={label} data-state={state} data-sensitive="content">

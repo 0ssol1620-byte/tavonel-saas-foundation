@@ -55,11 +55,23 @@ const DOWNLOAD_POLICY: Record<OAuthConnectorProvider, EgressPolicy> = {
  * `Array.isArray(payload.files)` says the payload has an array; it says nothing about what is
  * in it. A single `null` entry -- which any of these APIs may emit, and which a proxy or a
  * partial response certainly can -- reached `row.id` and threw a TypeError out of the adapter.
- * The sync worker classifies failures by code and has no branch for that, so one malformed
- * entry took down a whole listing instead of being skipped like every other unreadable row.
+ * Invalid rows now refuse the page with a stable error code. Dropping them would let the
+ * sync cursor advance over source observations that were never actually processed.
  */
 function readableRow(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+// Do not silently remove malformed observations from a successful sync denominator.
+function sourceRows(payload: Record<string, unknown>, key: string): Record<string, unknown>[] {
+  const rows = payload[key];
+  if (!Array.isArray(rows) || !rows.every(readableRow)) throw new Error("OAUTH_SOURCE_PAGE_INVALID");
+  return rows;
+}
+
+function completeObservations(items: Array<OAuthSourceItem | null>): OAuthSourceItem[] {
+  if (items.some(item => item === null)) throw new Error("OAUTH_SOURCE_PAGE_INVALID");
+  return items as OAuthSourceItem[];
 }
 
 function boundedString(value: unknown, maximum: number) {
@@ -131,25 +143,37 @@ async function jsonRequest(
   if (!result.ok) throw new Error(`OAUTH_SOURCE_EGRESS_REFUSED:${result.code}`);
   if (result.status < 200 || result.status > 299) throw new Error("OAUTH_SOURCE_LIST_FAILED");
   try {
-    return JSON.parse(result.text) as Record<string, unknown>;
+    const payload: unknown = JSON.parse(result.text);
+    if (!readableRow(payload)) throw new Error("OAUTH_SOURCE_PAGE_INVALID");
+    return payload;
   } catch {
-    return {} as Record<string, unknown>;
+    throw new Error("OAUTH_SOURCE_PAGE_INVALID");
   }
 }
 
-async function listGoogleDrive(accessToken: string, cursor: string | null, fetcher: typeof fetch): Promise<OAuthSourcePage> {
+async function listGoogleDrive(accessToken: string, cursor: string | null, target: OAuthSourceTarget, fetcher: typeof fetch): Promise<OAuthSourcePage> {
+  // rootPath is a Dropbox path; Graph site IDs are not Drive targets. Never turn an
+  // unsupported selection into a broader all-files scan. Folder-tree support is separate.
+  if (target.rootPath || target.siteId || (target.driveId !== undefined && !/^[A-Za-z0-9_-]{1,512}$/.test(target.driveId))) {
+    throw new Error("OAUTH_SOURCE_TARGET_UNSUPPORTED");
+  }
   const url = new URL(`${DRIVE_ORIGIN}/drive/v3/files`);
   url.searchParams.set("pageSize", String(OAUTH_SOURCE_PAGE_SIZE));
   url.searchParams.set("q", "trashed = false");
-  url.searchParams.set("fields", "nextPageToken,files(id,name,mimeType,size,modifiedTime,version,md5Checksum)");
+  url.searchParams.set("fields", "nextPageToken,incompleteSearch,files(id,name,mimeType,size,modifiedTime,version,md5Checksum)");
+  url.searchParams.set("supportsAllDrives", "true");
+  url.searchParams.set("includeItemsFromAllDrives", "true");
+  url.searchParams.set("corpora", target.driveId ? "drive" : "user");
+  if (target.driveId) url.searchParams.set("driveId", target.driveId);
   if (cursor !== null) {
     const pageToken = safeOpaqueContinuation(cursor, 2_048);
     if (pageToken === null) throw new Error("OAUTH_SOURCE_CURSOR_INVALID");
     url.searchParams.set("pageToken", pageToken);
   }
   const payload = await jsonRequest(url.toString(), accessToken, {}, fetcher, LIST_POLICY.google_drive);
-  const rows = Array.isArray(payload.files) ? payload.files as Array<Record<string, unknown>> : [];
-  const items = rows.map((row): OAuthSourceItem | null => {
+  if (payload.incompleteSearch !== undefined && payload.incompleteSearch !== false) throw new Error("OAUTH_SOURCE_PAGE_INVALID");
+  const rows = sourceRows(payload, "files");
+  const items = completeObservations(rows.map((row): OAuthSourceItem | null => {
     if (!readableRow(row)) return null;
     const nativeId = boundedString(row.id, 512);
     const name = boundedString(row.name, 512);
@@ -159,8 +183,10 @@ async function listGoogleDrive(accessToken: string, cursor: string | null, fetch
     const revision = boundedString(row.md5Checksum, 512) ?? boundedString(row.version, 512) ?? boundedString(row.modifiedTime, 512);
     if (!revision) return null;
     return { nativeId, name, revision, mimeType, sizeBytes: folder ? null : boundedSize(row.size), modifiedAt: boundedString(row.modifiedTime, 64), kind: folder ? "folder" : "file" };
-  }).filter((item): item is OAuthSourceItem => item !== null);
-  const next = boundedString(payload.nextPageToken, 2_048);
+  }));
+  const next = payload.nextPageToken == null ? null : safeOpaqueContinuation(payload.nextPageToken, 2_048);
+  if (payload.nextPageToken != null && next === null) throw new Error("OAUTH_SOURCE_CURSOR_INVALID");
+  if (next !== null && next === cursor) throw new Error("OAUTH_SOURCE_CURSOR_STALLED");
   return { items, cursor: next, complete: next === null };
 }
 
@@ -180,8 +206,8 @@ async function listDropbox(accessToken: string, cursor: string | null, target: O
     fetcher,
     LIST_POLICY.dropbox,
   );
-  const rows = Array.isArray(payload.entries) ? payload.entries as Array<Record<string, unknown>> : [];
-  const items = rows.map((row): OAuthSourceItem | null => {
+  const rows = sourceRows(payload, "entries");
+  const items = completeObservations(rows.map((row): OAuthSourceItem | null => {
     if (!readableRow(row)) return null;
     const tag = row[".tag"];
     const nativeId = boundedString(row.id, 512) ?? boundedString(row.path_lower, 1_024);
@@ -190,10 +216,11 @@ async function listDropbox(accessToken: string, cursor: string | null, target: O
     const deleted = tag === "deleted";
     const revision = deleted ? `deleted:${boundedString(row.path_lower, 1_024) ?? nativeId}` : boundedString(row.rev, 512) ?? `folder:${nativeId}`;
     return { nativeId, name, revision, mimeType: null, sizeBytes: tag === "file" ? boundedSize(row.size) : null, modifiedAt: boundedString(row.server_modified, 64), kind: tag as OAuthSourceItem["kind"] };
-  }).filter((item): item is OAuthSourceItem => item !== null);
-  const next = boundedString(payload.cursor, 4_096);
-  const hasMore = payload.has_more === true;
-  if (hasMore && !next) throw new Error("OAUTH_SOURCE_CURSOR_INVALID");
+  }));
+  const next = safeOpaqueContinuation(payload.cursor, 4_096);
+  if (typeof payload.has_more !== "boolean") throw new Error("OAUTH_SOURCE_PAGE_INVALID");
+  const hasMore = payload.has_more;
+  if (!next) throw new Error("OAUTH_SOURCE_CURSOR_INVALID");
   return { items, cursor: next, complete: !hasMore };
 }
 
@@ -209,8 +236,8 @@ async function listMicrosoftGraph(accessToken: string, cursor: string | null, ta
     url = firstPage.toString();
   }
   const payload = await jsonRequest(url, accessToken, {}, fetcher, LIST_POLICY.microsoft_graph);
-  const rows = Array.isArray(payload.value) ? payload.value as Array<Record<string, unknown>> : [];
-  const items = rows.map((row): OAuthSourceItem | null => {
+  const rows = sourceRows(payload, "value");
+  const items = completeObservations(rows.map((row): OAuthSourceItem | null => {
     if (!readableRow(row)) return null;
     const nativeId = boundedString(row.id, 512);
     const name = boundedString(row.name, 512) ?? nativeId;
@@ -229,9 +256,9 @@ async function listMicrosoftGraph(accessToken: string, cursor: string | null, ta
       modifiedAt: boundedString(row.lastModifiedDateTime, 64),
       kind: deleted ? "deleted" : folder ? "folder" : "file",
     };
-  }).filter((item): item is OAuthSourceItem => item !== null);
+  }));
   const next = safeGraphContinuation(payload["@odata.nextLink"] ?? payload["@odata.deltaLink"]);
-  if ((payload["@odata.nextLink"] || payload["@odata.deltaLink"]) && !next) throw new Error("OAUTH_SOURCE_CURSOR_INVALID");
+  if (!next || (payload["@odata.nextLink"] !== undefined && payload["@odata.deltaLink"] !== undefined)) throw new Error("OAUTH_SOURCE_CURSOR_INVALID");
   return { items, cursor: next, complete: !payload["@odata.nextLink"] };
 }
 
@@ -245,7 +272,7 @@ export async function listOAuthSourcePage(input: {
   const target = input.target ?? {};
   if (!input.accessToken || !validTarget(target)) throw new Error("OAUTH_SOURCE_INPUT_INVALID");
   const fetcher = input.fetcher ?? fetch;
-  if (input.provider === "google_drive") return listGoogleDrive(input.accessToken, input.cursor, fetcher);
+  if (input.provider === "google_drive") return listGoogleDrive(input.accessToken, input.cursor, target, fetcher);
   if (input.provider === "dropbox") return listDropbox(input.accessToken, input.cursor, target, fetcher);
   return listMicrosoftGraph(input.accessToken, input.cursor, target, fetcher);
 }
@@ -257,9 +284,16 @@ const GOOGLE_EXPORTS: Record<string, string> = {
   "application/vnd.google-apps.drawing": "image/png",
 };
 
+export function microsoftGraphItemUrl(nativeId: string, target: OAuthSourceTarget = {}) {
+  const drive = target.driveId ? `drives/${encodeURIComponent(target.driveId)}`
+    : target.siteId ? `sites/${encodeURIComponent(target.siteId)}/drive` : "me/drive";
+  return `${GRAPH_ORIGIN}/v1.0/${drive}/items/${encodeURIComponent(nativeId)}`;
+}
+
 export function oauthSourceDownloadRequest(input: {
   provider: OAuthConnectorProvider;
   nativeId: string;
+  revision?: string;
   mimeType?: string | null;
   target?: OAuthSourceTarget;
 }) {
@@ -286,18 +320,20 @@ export function oauthSourceDownloadRequest(input: {
     const path = exportMime ? "export" : "";
     const url = new URL(`${DRIVE_ORIGIN}/drive/v3/files/${encodeURIComponent(input.nativeId)}${path ? `/${path}` : ""}`);
     if (exportMime) url.searchParams.set("mimeType", exportMime);
-    else url.searchParams.set("alt", "media");
+    else { url.searchParams.set("alt", "media"); url.searchParams.set("supportsAllDrives", "true"); }
     if (input.mimeType?.startsWith("application/vnd.google-apps.") && !exportMime) throw new Error("OAUTH_SOURCE_NATIVE_TYPE_UNSUPPORTED");
     return { url: checked(url.toString()), method: "GET" as const, headers: {} };
   }
-  if (input.provider === "dropbox") return {
-    url: checked(`${DROPBOX_CONTENT_ORIGIN}/2/files/download`),
-    method: "POST" as const,
-    headers: { "Dropbox-API-Arg": JSON.stringify({ path: input.nativeId }) },
-  };
-  const drive = input.target?.driveId ? `drives/${encodeURIComponent(input.target.driveId)}` : "me/drive";
+  if (input.provider === "dropbox") {
+    if (!input.revision || !/^[A-Za-z0-9_-]{1,512}$/.test(input.revision)) throw new Error("SOURCE_REVISION_UNQUALIFIED");
+    return {
+      url: checked(`${DROPBOX_CONTENT_ORIGIN}/2/files/download`),
+      method: "POST" as const,
+      headers: { "Dropbox-API-Arg": JSON.stringify({ path: `rev:${input.revision}` }) },
+    };
+  }
   return {
-    url: checked(`${GRAPH_ORIGIN}/v1.0/${drive}/items/${encodeURIComponent(input.nativeId)}/content`),
+    url: checked(`${microsoftGraphItemUrl(input.nativeId, input.target)}/content`),
     method: "GET" as const,
     headers: {},
   };

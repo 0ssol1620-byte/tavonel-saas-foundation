@@ -16,6 +16,8 @@ export type JobStoreFailure =
   | "JOB_STORE_READ_FAILED"
   | "JOB_STORE_WRITE_FAILED"
   | "JOB_SCOPE_INVALID"
+  | "JOB_SYNC_CONFLICT"
+  | "JOB_CONNECTION_UNAVAILABLE"
   | "JOB_NOT_FOUND";
 
 export type JobResult<T> = { ok: true; value: T } | { ok: false; code: JobStoreFailure };
@@ -64,6 +66,19 @@ export type EnqueueInput = {
 };
 
 export type EnqueuedJob = { jobId: string; created: boolean };
+
+export async function enqueueConnectorSync(input: {
+  workspaceKey: string; userId: string; connectionId: string; target: Record<string, string>;
+}): Promise<JobResult<EnqueuedJob>> {
+  if (!WORKSPACE_KEY.test(input.workspaceKey) || !UUID.test(input.userId) || !UUID.test(input.connectionId)) return fail("JOB_SCOPE_INVALID");
+  const result = await rpc("enqueue_connector_sync", { p_job_id: newJobId(), p_workspace_key: input.workspaceKey,
+    p_created_by: input.userId, p_connection_id: input.connectionId, p_target: input.target });
+  if (!result.ok) return result;
+  const row = result.value as { code?: unknown; job_id?: unknown; created?: unknown } | null;
+  if (row?.code === "JOB_SYNC_CONFLICT" || row?.code === "JOB_CONNECTION_UNAVAILABLE") return fail(row.code);
+  if (typeof row?.job_id !== "string" || !JOB_ID.test(row.job_id) || typeof row.created !== "boolean") return fail("JOB_STORE_WRITE_FAILED");
+  return { ok: true, value: { jobId: row.job_id, created: row.created } };
+}
 
 export async function enqueueJob(input: EnqueueInput): Promise<JobResult<EnqueuedJob>> {
   if (!WORKSPACE_KEY.test(input.workspaceKey)) return fail("JOB_SCOPE_INVALID");

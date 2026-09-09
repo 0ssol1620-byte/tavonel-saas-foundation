@@ -14,6 +14,10 @@ const completeJobBatch = vi.fn<(...args: any[]) => Promise<any>>(async () => ({ 
 const getOAuthConnectionSecretReference = vi.fn<(...args: any[]) => any>();
 const listOAuthSourcePage = vi.fn<(...args: any[]) => any>();
 const importSourceObject = vi.fn<(...args: any[]) => any>();
+const suspendConnectorSource = vi.fn<(...args: any[]) => any>();
+const loadConnectorSyncPage = vi.fn<(...args: any[]) => any>();
+vi.mock("./connector-sync-page", () => ({ loadConnectorSyncPage }));
+vi.mock("./connector-source-access", () => ({ suspendConnectorSource }));
 const refreshOAuthAccessToken = vi.fn<(...args: any[]) => Promise<any>>(async () => ({ accessToken: "at-1" }));
 const readOAuthProviderRuntime = vi.fn<(...args: any[]) => any>(() => ({ clientSecretReference: "vault://client" }));
 const readOAuthSecretBrokerConfig = vi.fn<(...args: any[]) => any>(() => ({ kind: "vault" }));
@@ -50,6 +54,8 @@ function sourceItem(id: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  loadConnectorSyncPage.mockImplementation(async (_job, _worker, _cursor, _offset, list) => list());
+  suspendConnectorSource.mockResolvedValue({ ok: true });
   completeJobBatch.mockResolvedValue({ ok: true as const, value: { state: "leased" as const } });
   getOAuthConnectionSecretReference.mockResolvedValue({ ok: true, provider: "google_drive", refreshTokenReference: "vault://refresh" });
   refreshOAuthAccessToken.mockResolvedValue({ accessToken: "at-1" });
@@ -66,6 +72,79 @@ afterEach(() => {
 });
 
 describe("cursor safety", () => {
+  it("executes the versioned Google watermark, snapshot and changes chain through the worker", async () => {
+    const file = { id: "google-file", name: "report.pdf", version: "7", mimeType: "application/pdf", size: "100" };
+    const responses = [{ startPageToken: "before-snapshot" }, { files: [file] },
+      { changes: [{ fileId: file.id, file: { ...file, version: "8", name: "renamed.pdf" } }], newStartPageToken: "after-changes" },
+      { changes: [], newStartPageToken: "next-poll" }];
+    const fetcher = vi.fn(async () => Response.json(responses.shift()));
+    let cursorToken: string | null = null;
+    for (let step = 0; step < 3; step++) {
+      const result = await runSourceImportBatch({ ...JOB, cursorToken,
+        payload: { ...JOB.payload, sourceReaderVersion: "google-lifecycle-v2" } }, "worker-1", { fetcher });
+      expect(result.ok).toBe(true);
+      const batch = completeJobBatch.mock.calls.at(-1)![3];
+      expect(batch.outcome).toBe(step === 2 ? "succeeded" : "progress");
+      if (step === 0) expect(importSourceObject).not.toHaveBeenCalled();
+      cursorToken = batch.cursorToken;
+    }
+    expect(listOAuthSourcePage).not.toHaveBeenCalled();
+    expect(importSourceObject.mock.calls.map(call => call[1].revision)).toEqual(["7", "8"]);
+    const result = await runSourceImportBatch({ ...JOB, jobId: "job-" + "b".repeat(32), cursorToken,
+      payload: { ...JOB.payload, sourceReaderVersion: "google-lifecycle-v2" } }, "worker-2", { fetcher });
+    expect(result.ok).toBe(true);
+    expect(fetcher).toHaveBeenCalledTimes(4);
+    expect(importSourceObject).toHaveBeenCalledTimes(2);
+  });
+
+  it("routes a Google removal to the suspension guard instead of acknowledging it as imported", async () => {
+    const cursorToken = "tv-drive-v2:" + Buffer.from(JSON.stringify({ phase: "changes", drive: null, start: "checkpoint", page: null })).toString("base64url");
+    const result = await runSourceImportBatch({ ...JOB, cursorToken,
+      payload: { ...JOB.payload, sourceReaderVersion: "google-lifecycle-v2" } }, "worker-1",
+      { fetcher: async () => Response.json({ changes: [{ fileId: "gone", removed: true }], newStartPageToken: "new" }) });
+    expect(result).toEqual({ ok: false, code: "SOURCE_LIFECYCLE_REVIEW_REQUIRED" });
+    expect(suspendConnectorSource).toHaveBeenCalledWith(expect.objectContaining({ nativeId: "gone", provider: "google_drive" }));
+    expect(importSourceObject).not.toHaveBeenCalled();
+    expect(completeJobBatch.mock.calls.at(-1)![3]).not.toHaveProperty("cursorToken");
+  });
+
+  it("resumes the stored page even if today's provider listing would omit an unprocessed file", async () => {
+    loadConnectorSyncPage.mockResolvedValueOnce({ items: ["a", "b", "c", "d", "e", "f"].map(sourceItem), cursor: "next", complete: true });
+    listOAuthSourcePage.mockResolvedValueOnce({ items: ["b", "c", "d", "e", "f"].map(sourceItem), cursor: "next", complete: true });
+    await runSourceImportBatch({ ...JOB, cursorToken: "tavonel-sync-v1:5:current" }, "worker-1");
+    expect(listOAuthSourcePage).not.toHaveBeenCalled();
+    expect(importSourceObject.mock.calls.map(call => call[1].nativeId)).toEqual(["f"]);
+    expect(completeJobBatch.mock.calls[0][3]).toMatchObject({ outcome: "succeeded", itemsSeen: 1, itemsDone: 1 });
+  });
+  it("fails legacy offsets without advancing or importing when no page was saved", async () => {
+    loadConnectorSyncPage.mockRejectedValueOnce(new Error("CONNECTOR_PAGE_LEGACY_REVIEW_REQUIRED"));
+    await runSourceImportBatch({ ...JOB, cursorToken: "tavonel-sync-v1:5:current" }, "worker-1");
+    expect(importSourceObject).not.toHaveBeenCalled();
+    expect(completeJobBatch.mock.calls[0][3]).toEqual({ outcome: "failed", errorCode: "CONNECTOR_PAGE_LEGACY_REVIEW_REQUIRED" });
+  });
+  it.each(["dropbox", "microsoft_graph"])("retains %s removal events before importing any page bytes", async provider => {
+    getOAuthConnectionSecretReference.mockResolvedValue({ ok: true, provider, refreshTokenReference: "vault://refresh" });
+    const removed = { ...sourceItem("removed"), kind: "deleted" };
+    listOAuthSourcePage.mockResolvedValue({
+      items: [...Array.from({ length: SYNC_IMPORT_LIMIT }, (_, i) => sourceItem(`file-${i}`)), removed],
+      cursor: "next", complete: true,
+    });
+    const result = await runSourceImportBatch({ ...JOB, cursorToken: "current" }, "worker-1");
+    expect(result).toEqual({ ok: false, code: "SOURCE_LIFECYCLE_REVIEW_REQUIRED" });
+    expect(importSourceObject).not.toHaveBeenCalled();
+    expect(completeJobBatch).toHaveBeenCalledExactlyOnceWith(JOB.workspaceKey, JOB.jobId, "worker-1", {
+      outcome: "failed", errorCode: "SOURCE_LIFECYCLE_REVIEW_REQUIRED",
+    });
+  });
+
+  it("surfaces failure to persist the lifecycle stop without committing progress", async () => {
+    listOAuthSourcePage.mockResolvedValue({ items: [{ ...sourceItem("gone"), kind: "deleted" }], cursor: "next", complete: false });
+    completeJobBatch.mockResolvedValue({ ok: false, code: "JOB_LEASE_LOST" });
+    expect(await runSourceImportBatch(JOB, "worker-1")).toEqual({ ok: false, code: "JOB_LEASE_LOST" });
+    expect(importSourceObject).not.toHaveBeenCalled();
+    expect(completeJobBatch.mock.calls[0][3]).not.toHaveProperty("cursorToken");
+  });
+
   it("advances the cursor only after the batch's imports are admitted", async () => {
     const order: string[] = [];
     importSourceObject.mockImplementation(async (_ctx: unknown, item: { nativeId: string }) => {
@@ -244,6 +323,21 @@ describe("failure classification", () => {
     refreshOAuthAccessToken.mockRejectedValue(new Error("revoked"));
     await runSourceImportBatch(JOB, "worker-1");
     expect(completeJobBatch.mock.calls[0][3]).toMatchObject({ outcome: "retry", errorCode: "OAUTH_TOKEN_REFRESH_FAILED" });
+  });
+
+  it.each(["OAUTH_SOURCE_PAGE_INVALID", "OAUTH_SOURCE_CURSOR_INVALID"])("retains the checkpoint and imports nothing after %s", async code => {
+    listOAuthSourcePage.mockRejectedValueOnce(new Error(code));
+    const result = await runSourceImportBatch({ ...JOB, cursorToken: "prior" }, "worker-1");
+    expect(result).toEqual({ ok: false, code });
+    expect(importSourceObject).not.toHaveBeenCalled();
+    expect(completeJobBatch.mock.calls[0][3]).toEqual({ outcome: "retry", errorCode: code });
+  });
+
+  it("fails an unsupported target without advancing or importing a broader selection", async () => {
+    listOAuthSourcePage.mockRejectedValueOnce(new Error("OAUTH_SOURCE_TARGET_UNSUPPORTED"));
+    expect(await runSourceImportBatch(JOB, "worker-1")).toEqual({ ok: false, code: "OAUTH_SOURCE_TARGET_UNSUPPORTED" });
+    expect(importSourceObject).not.toHaveBeenCalled();
+    expect(completeJobBatch.mock.calls[0][3]).toEqual({ outcome: "failed", errorCode: "OAUTH_SOURCE_TARGET_UNSUPPORTED" });
   });
 
   it("retries a provider listing failure without moving the cursor", async () => {

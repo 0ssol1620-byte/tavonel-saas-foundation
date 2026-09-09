@@ -3,7 +3,6 @@ import {
   listOAuthSourcePage,
   OAUTH_SOURCE_PAGE_SIZE,
   oauthSourceDownloadRequest,
-  type OAuthSourceItem,
   type OAuthSourcePage,
 } from "./connector-oauth-adapters";
 import type { OAuthConnectorProvider } from "./connector-oauth";
@@ -170,11 +169,10 @@ describe.each(PROVIDERS)("connector contract: %s", (provider) => {
       .rejects.toThrow("OAUTH_SOURCE_LIST_FAILED");
   });
 
-  it("survives a payload that is nothing like the documented shape", async () => {
+  it("refuses malformed observations without presenting a partial listing as complete", async () => {
     /*
-      Every provider response is untrusted input. The adapters may drop what they cannot read;
-      what they may not do is emit an item with a missing field, or throw something the worker
-      has no branch for.
+      Invalid rows must not vanish from the success denominator. The worker recognizes this
+      failure code and retains its checkpoint instead of acknowledging a partial page.
     */
     const hostile = (async () => Response.json({
       files: [null, 42, { id: "", name: "x" }, { id: "a".repeat(9_999), name: "y", md5Checksum: "z" }, { __proto__: { polluted: true }, id: "ok", name: "ok", md5Checksum: "r" }],
@@ -184,13 +182,8 @@ describe.each(PROVIDERS)("connector contract: %s", (provider) => {
       has_more: false,
       nextPageToken: null,
     })) as unknown as typeof fetch;
-    const page = await listOAuthSourcePage({ provider, accessToken: "access-token-value", cursor: null, fetcher: hostile });
-    expect(page.complete).toBe(true);
-    for (const item of page.items satisfies OAuthSourceItem[]) {
-      expect(item.nativeId.length).toBeGreaterThan(0);
-      expect(item.nativeId.length).toBeLessThanOrEqual(1_024);
-      expect(item.revision.length).toBeGreaterThan(0);
-    }
+    await expect(listOAuthSourcePage({ provider, accessToken: "access-token-value", cursor: null, fetcher: hostile }))
+      .rejects.toThrow("OAUTH_SOURCE_PAGE_INVALID");
     expect(({} as Record<string, unknown>).polluted).toBeUndefined();
   });
 
@@ -211,7 +204,7 @@ describe.each(PROVIDERS)("connector contract: %s", (provider) => {
   });
 
   it("downloads only from the provider's own origin", async () => {
-    const request = oauthSourceDownloadRequest({ provider, nativeId: "item-1", mimeType: "application/pdf", target: {} });
+    const request = oauthSourceDownloadRequest({ provider, nativeId: "item-1", revision: "a1c10ce0dd78", mimeType: "application/pdf", target: {} });
     const origin = new URL(request.url).origin;
     expect([
       "https://www.googleapis.com",
