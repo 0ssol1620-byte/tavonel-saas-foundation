@@ -28,7 +28,7 @@ export async function cdrAuthorization(target: string, secret: string | undefine
     const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
     const signature = bytesToUnpaddedBase64Url(new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(data))));
     stage = "fetch";
-    const response = await fetcher(IDENTITY_BROKER, { method: "POST", redirect: "error", signal: AbortSignal.timeout(15_000),
+    const response = await fetcher(IDENTITY_BROKER, { method: "POST", redirect: "manual", signal: AbortSignal.timeout(15_000),
       headers: { "x-tavonel-identity-timestamp": timestamp, "x-tavonel-identity-request-id": requestId,
         "x-tavonel-identity-signature": signature } });
     stage = "response";

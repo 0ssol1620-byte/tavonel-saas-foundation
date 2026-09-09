@@ -427,7 +427,7 @@ export async function sanitizeObject(
           "x-tavonel-cdr-signature": signature,
         },
         body: form,
-        redirect: "error",
+        redirect: "manual",
         signal: AbortSignal.timeout(60_000),
       });
     } catch {

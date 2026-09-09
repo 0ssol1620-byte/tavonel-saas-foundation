@@ -81,7 +81,7 @@ export async function evaluateHealth(
   }
   try {
     const authorization = await cdrAuthorization(env.TAVONEL_CDR_HEALTH_URL, env.FOUNDATION_CDR_IDENTITY_HMAC, fetcher);
-    const response = await fetcher(env.TAVONEL_CDR_HEALTH_URL, { method: "GET", redirect: "error",
+    const response = await fetcher(env.TAVONEL_CDR_HEALTH_URL, { method: "GET", redirect: "manual",
       signal: AbortSignal.timeout(10_000), headers: authorization ? { authorization } : {} });
     await response.body?.cancel().catch(() => undefined);
     if (!response.ok) {

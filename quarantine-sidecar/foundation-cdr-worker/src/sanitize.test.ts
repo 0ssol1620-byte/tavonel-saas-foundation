@@ -129,7 +129,7 @@ describe("CDR response transport bounds", () => {
       let calls = 0;
       const fetcher: typeof fetch = async (_input, init) => {
         calls += 1;
-        assert.equal(init?.redirect, "error");
+        assert.equal(init?.redirect, "manual");
         assert.ok(init?.signal);
         const headers = new Headers({ "content-type": "application/pdf", "x-tavonel-cdr-status": "clean",
           "x-tavonel-input-sha256": await sha256DigestHeader(SOURCE_BYTES), "x-tavonel-cdr-output-sha256": outputSha256() });

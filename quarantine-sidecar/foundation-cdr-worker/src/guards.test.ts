@@ -26,7 +26,7 @@ for (const configured of [true, false]) {
       if (String(url) === IDENTITY_BROKER) return Response.json({ audience: PRIVATE_CDR_ORIGIN, token: "fixture.identity.signature" });
       assert.equal(String(url), `${PRIVATE_CDR_ORIGIN}/health`);
       assert.equal(new Headers(init?.headers).get("authorization"), "Bearer fixture.identity.signature");
-      assert.equal(init?.redirect, "error");
+      assert.equal(init?.redirect, "manual");
       return Response.json({ status: "ok" });
     });
     assert.equal(result.httpStatus, configured ? 200 : 503);
