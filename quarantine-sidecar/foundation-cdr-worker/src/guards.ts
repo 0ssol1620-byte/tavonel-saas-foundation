@@ -87,8 +87,11 @@ export async function evaluateHealth(
     if (!response.ok) {
       return { httpStatus: 503, body: { status: "unavailable", reason: "synthetic CDR health check failed" } };
     }
-  } catch {
-    return { httpStatus: 503, body: { status: "unavailable", reason: "synthetic CDR health check failed" } };
+  } catch (error) {
+    const reason = privateMode && error instanceof Error && error.message === "CDR identity is unavailable"
+      ? "private CDR identity is unavailable"
+      : privateMode ? "private CDR health check failed" : "synthetic CDR health check failed";
+    return { httpStatus: 503, body: { status: "unavailable", reason } };
   }
   return {
     httpStatus: 200,
