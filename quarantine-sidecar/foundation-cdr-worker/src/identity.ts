@@ -61,8 +61,10 @@ export async function cdrAuthorization(target: string, secret: string | undefine
       || value.token.length < 16 || value.token.length > 8192 || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(value.token)) throw new Error("invalid");
     return `Bearer ${value.token}`;
   } catch (error) {
-    const candidate = error instanceof Error ? `${error.name}: ${error.message}` : "unavailable";
-    const safeDetail = /^[A-Za-z0-9 .:_()-]{1,160}$/.test(candidate) ? candidate : "unavailable";
+    const record = error && typeof error === "object" ? error as { name?: unknown; message?: unknown } : null;
+    const candidate = record && typeof record.name === "string" && typeof record.message === "string"
+      ? `${record.name}: ${record.message}` : "unavailable";
+    const safeDetail = candidate.replace(/[^A-Za-z0-9 .:_()/?=-]/g, "?").slice(0, 160) || "unavailable";
     throw new CdrIdentityError(stage, safeDetail);
   }
 }
