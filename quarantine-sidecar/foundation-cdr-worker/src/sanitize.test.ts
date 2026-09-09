@@ -637,6 +637,58 @@ describe("Worker HTTP and queue surface", () => {
     assert.equal(response.headers.get("content-type")?.includes("application/json"), true);
   });
 
+  it("blocks unauthenticated federated health before consuming identity budget", async () => {
+    for (const path of ["/health", "/health?probe=1", "/ignored/../health"]) {
+      for (const authorization of [undefined, "Bearer invalid", `Basic ${MANUAL_TRIGGER_TOKEN}`]) {
+        const calls: string[] = [];
+        const env = envFor(new FakeR2({}), {
+          FOUNDATION_CDR_IDENTITY_HMAC: FIXTURE_SECRET,
+          TAVONEL_CDR_URL: `${PRIVATE_CDR_ORIGIN}/v1/disarm`,
+          TAVONEL_CDR_HEALTH_URL: `${PRIVATE_CDR_ORIGIN}/health`,
+          TAVONEL_CDR_PROVIDER: "tavonel_pdfium_clamav_v1",
+        });
+        const response = await handleRequest(new Request(`https://worker.example${path}`, {
+          headers: authorization ? { authorization } : {},
+        }), env, async (url) => { calls.push(String(url)); return Response.json({}); });
+        assert.equal(response.status, 401);
+        assert.deepEqual(calls, []);
+      }
+    }
+  });
+
+  it("requires a configured operator token for federated health and preserves authorized probes", async () => {
+    for (const configured of [false, true]) {
+      const calls: string[] = [];
+      const env = envFor(new FakeR2({}), {
+        FOUNDATION_CDR_IDENTITY_HMAC: FIXTURE_SECRET,
+        FOUNDATION_MANUAL_TRIGGER_TOKEN: configured ? MANUAL_TRIGGER_TOKEN : undefined,
+        TAVONEL_CDR_URL: `${PRIVATE_CDR_ORIGIN}/v1/disarm`,
+        TAVONEL_CDR_HEALTH_URL: `${PRIVATE_CDR_ORIGIN}/health`,
+        TAVONEL_CDR_PROVIDER: "tavonel_pdfium_clamav_v1",
+      });
+      const response = await handleRequest(new Request("https://worker.example/health", {
+        headers: { authorization: `Bearer ${MANUAL_TRIGGER_TOKEN}` },
+      }), env, async (url, init) => {
+        calls.push(String(url));
+        if (String(url) === IDENTITY_BROKER) return Response.json({ audience: PRIVATE_CDR_ORIGIN, token: "fixture.identity.signature" });
+        assert.equal(new Headers(init?.headers).get("authorization"), "Bearer fixture.identity.signature");
+        return Response.json({ status: "ok" });
+      });
+      assert.equal(response.status, configured ? 200 : 404);
+      assert.deepEqual(calls, configured ? [IDENTITY_BROKER, `${PRIVATE_CDR_ORIGIN}/health`] : []);
+    }
+  });
+
+  it("preserves public synthetic health without federation", async () => {
+    const calls: string[] = [];
+    const response = await handleRequest(new Request("https://worker.example/health"),
+      envFor(new FakeR2({}), { FOUNDATION_MANUAL_TRIGGER_TOKEN: undefined }), async (url) => {
+        calls.push(String(url)); return Response.json({ status: "ok" });
+      });
+    assert.equal(response.status, 200);
+    assert.deepEqual(calls, [SYNTHETIC_HEALTH]);
+  });
+
   it("keeps the manual sanitize endpoint disabled or authenticated", async () => {
     const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
     const request = (authorization?: string) => new Request("https://worker.example/v1/sanitize", {

@@ -103,7 +103,7 @@ describe("bodyless signed-service routes", () => {
       .toEqual(["app/api/internal/cdr/identity/route.ts"]);
     const handler = readFileSync(resolve(import.meta.dirname, "cdr-identity-handler.ts"), "utf8");
     expect(handler).toContain("verifyCdrIdentityRequest");
-    expect(handler).toContain("request.body !== null");
+    expect(handler).toContain("hasEmptyBody(request)");
     expect(handler).toContain("deps.claim(id)");
     // Behavioral failure/order tests live in cdr-identity-handler.test.ts and the DB suite.
   });

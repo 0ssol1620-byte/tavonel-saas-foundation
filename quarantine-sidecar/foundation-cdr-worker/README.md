@@ -37,3 +37,6 @@ The regression suite covers stale-provider/endpoint collisions, persisted byte c
 failed receipt writes, null and throwing conditional conflicts, and valid retry behavior.
 Cloudflare documents null conditional PUT results and read-after-write consistency in the
 [R2 Workers API reference](https://developers.cloudflare.com/r2/api/workers/workers-api-reference/).
+
+## Federated health authentication
+When FOUNDATION_CDR_IDENTITY_HMAC is configured, GET /health requires the existing FOUNDATION_MANUAL_TRIGGER_TOKEN (at least 32 characters) in an Authorization: Bearer header. A missing/short operator token disables the route (404); a missing or invalid request token returns 401 before any downstream request. Configure the monitoring client accordingly before enabling federation. Public synthetic health remains unchanged when no identity secret is configured. The operator token is not the identity HMAC. Never put either in query strings or logs.
