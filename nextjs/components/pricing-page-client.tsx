@@ -62,7 +62,7 @@ const ENTERPRISE = {
 const PLANS = [EVALUATION, ...PAID_PLANS, ENTERPRISE];
 
 /*
-  The §12.1 answers, above the plan grid, derived rather than retyped.
+  The usage details, after the plan choices, derived rather than retyped.
 
   The page already carried every one of these facts, spread between a lede, four cards, an
   estimator and a fold, so answering "what do I pay and what happens when I use more" took a
@@ -234,7 +234,7 @@ export default function PricingPageClient({ initialLiveCheckout, initialSelfServ
   };
 
   return (
-    <div className="page">
+    <div className="page pricing-page">
       <header className="nav" data-stuck={1}>
         <Link href="/" className="wordmark" aria-label="TAVONEL home">
           <Logomark />
@@ -276,14 +276,6 @@ export default function PricingPageClient({ initialLiveCheckout, initialSelfServ
               {BILLING_OFFERS.studio_access.label}. Additional compiled pages are billed at{" "}
               {formatUsd(STANDARD_PAGE_USD)} per standard page.
             </p>
-            <div className="tiles pricing-glance">
-              {AT_A_GLANCE.map(([title, body]) => (
-                <article className="tile" key={title}>
-                  <h3>{title}</h3>
-                  <p>{body}</p>
-                </article>
-              ))}
-            </div>
             <div className="plans" ref={plansRef}>
               {PLANS.map((plan) => (
                 <article className="plan" key={plan.name} data-featured={plan.name === "Developer" ? 1 : 0}>
@@ -317,6 +309,17 @@ export default function PricingPageClient({ initialLiveCheckout, initialSelfServ
                 </article>
               ))}
             </div>
+            <section className="pricing-details" aria-labelledby="pricing-details-title">
+              <h2 id="pricing-details-title">How your plan works</h2>
+            <div className="tiles pricing-glance">
+              {AT_A_GLANCE.map(([title, body]) => (
+                <article className="tile" key={title}>
+                  <h3>{title}</h3>
+                  <p>{body}</p>
+                </article>
+              ))}
+            </div>
+            </section>
             <section className="usage-estimator" aria-labelledby="usage-estimator-title">
               <div>
                 <p className="slate"><b>RUN ESTIMATE</b><span />BEFORE COMPILE</p>
@@ -355,7 +358,7 @@ export default function PricingPageClient({ initialLiveCheckout, initialSelfServ
                 been read, and never exceeds the maximum you were shown.
               </p>
             </details>
-            <p className="slate"><span />QUESTIONS THAT STOP A PURCHASE</p>
+            <p className="slate"><span />COMMON QUESTIONS</p>
             <div className="pricing-faq">
               {PURCHASE_FAQ.map(([question, answer, href, label]) => (
                 <details className="status-fold" key={question}>
