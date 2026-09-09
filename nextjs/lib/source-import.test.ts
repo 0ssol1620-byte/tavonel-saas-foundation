@@ -32,6 +32,23 @@ beforeEach(() => {
 });
 
 describe("source import replay safety", () => {
+  it("does not admit or upload a source whose stream fails", async () => {
+    const fetcher = vi.fn(async () => new Response(new ReadableStream({
+      start(controller) { controller.error(new Error("connection closed")); },
+    }))) as unknown as typeof fetch;
+    const result = await importSourceObject({
+      workspaceKey: "pilot-acme01", userId: "11111111-1111-4111-8111-111111111111",
+      connectionId: "22222222-2222-4222-8222-222222222222", provider: "google_drive",
+      accessToken: "access", target: {},
+      signer: { accountId: "a", bucket: "b", accessKeyId: "k", secretAccessKey: "s" }, fetcher,
+    }, { nativeId: "file", name: "file.pdf", revision: "v1", mimeType: "application/pdf",
+      sizeBytes: null, modifiedAt: null, kind: "file" });
+    expect(result).toEqual({ ok: false, nativeId: "file", code: "SOURCE_DOWNLOAD_FAILED" });
+    expect(reserveFoundationIntake).not.toHaveBeenCalled();
+    expect(reserveFoundationCompute).not.toHaveBeenCalled();
+    expect(presignFoundationQuarantinePut).not.toHaveBeenCalled();
+  });
+
   it("does not reserve compute or overwrite R2 for an admitted revision", async () => {
     const fetcher = vi.fn(async () => new Response(new Uint8Array([1, 2, 3]), {
       status: 200,

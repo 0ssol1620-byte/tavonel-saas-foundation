@@ -7,6 +7,7 @@ import { validateQualifiedDocumentInput } from "./qualified-input";
 import { FOUNDATION_INTAKE_MAX_BYTES, presignFoundationQuarantinePut } from "./r2-presign";
 import { type R2SignerEnv } from "./r2-synthetic-canary";
 import { deterministicSourceDocumentId } from "./source-intake";
+import { readBoundedSourceBody } from "./bounded-source-body";
 
 // One source object, taken from a provider to quarantine.
 //
@@ -96,10 +97,9 @@ export async function importSourceObject(context: ImportContext, item: OAuthSour
   }
   if (!source.ok) return { ok: false, nativeId: item.nativeId, code: "SOURCE_DOWNLOAD_FAILED" };
 
-  const bytes = new Uint8Array(await source.arrayBuffer());
-  if (bytes.byteLength === 0 || bytes.byteLength > FOUNDATION_INTAKE_MAX_BYTES) {
-    return { ok: false, nativeId: item.nativeId, code: "SOURCE_SIZE_UNQUALIFIED" };
-  }
+  const body = await readBoundedSourceBody(source, FOUNDATION_INTAKE_MAX_BYTES);
+  if (!body.ok) return { ok: false, nativeId: item.nativeId, code: body.code };
+  const bytes = body.bytes;
 
   // Deterministic identity. Same (connection, object, revision) -> same document, so an
   // at-least-once retry re-imports rather than duplicates.
