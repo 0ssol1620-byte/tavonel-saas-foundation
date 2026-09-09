@@ -37,6 +37,17 @@ declare
   v_target jsonb := coalesce(new.payload->'target', '{}'::jsonb);
   v_key text;
 begin
+  -- Versioned jobs cannot be advanced by a stale lease or a pre-checkpoint worker.
+  -- This marker is a deployment protocol, not a substitute for service authentication.
+  if new.job_type = 'source_import' and v_reader is not null and old.state = 'leased'
+     and new.state in ('queued','succeeded') then
+    if coalesce(old.leased_by,'') !~ '^worker-sync-v2-[a-f0-9]{16}$' then
+      raise exception 'connector_checkpoint_worker_incompatible';
+    end if;
+    if old.lease_expires_at is null or old.lease_expires_at <= clock_timestamp() then
+      raise exception 'connector_checkpoint_lease_expired';
+    end if;
+  end if;
   if new.job_type <> 'source_import' or new.state <> 'succeeded' or old.state = 'succeeded'
      or v_reader is null or v_reader = 'google-files-v1' then return new; end if;
   select provider::text into v_provider from public.foundation_oauth_connections
@@ -124,4 +135,38 @@ end;
 $$;
 revoke all on function public.enqueue_connector_sync(text,text,uuid,uuid,jsonb) from public, anon, authenticated;
 grant execute on function public.enqueue_connector_sync(text,text,uuid,uuid,jsonb) to service_role;
+-- Old deployed workers can still process legacy jobs, but cannot acquire versioned
+-- source jobs during a rolling deploy or rollback. Unknown future readers stay queued.
+create or replace function public.claim_foundation_job(
+  p_worker_id text, p_lease_seconds integer default 120,
+  p_job_types public.foundation_job_type[] default null
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_job public.foundation_jobs%rowtype;
+begin
+  if p_worker_id is null or char_length(p_worker_id) not between 1 and 100 then
+    raise exception 'foundation_job_worker_invalid';
+  end if;
+  if p_lease_seconds is null or p_lease_seconds not between 10 and 900 then
+    raise exception 'foundation_job_lease_out_of_bounds';
+  end if;
+  select * into v_job from public.foundation_jobs
+  where ((state = 'queued' and available_at <= now()) or (state = 'leased' and lease_expires_at < now()))
+    and (p_job_types is null or job_type = any(p_job_types))
+    and (job_type <> 'source_import' or payload->>'sourceReaderVersion' is null
+      or (p_worker_id ~ '^worker-sync-v2-[a-f0-9]{16}$'
+        and payload->>'sourceReaderVersion' in ('google-files-v1','dropbox-list-v2','graph-delta-v2')))
+  order by available_at asc, created_at asc for update skip locked limit 1;
+  if not found then return jsonb_build_object('claimed', false); end if;
+  update public.foundation_jobs set state='leased', leased_by=p_worker_id,
+    lease_expires_at=now()+make_interval(secs=>p_lease_seconds), attempt=attempt+1,
+    started_at=coalesce(started_at,now()), updated_at=now()
+  where workspace_key=v_job.workspace_key and job_id=v_job.job_id;
+  return jsonb_build_object('claimed',true,'job_id',v_job.job_id,'workspace_key',v_job.workspace_key,
+    'job_type',v_job.job_type,'attempt',v_job.attempt+1,'max_attempts',v_job.max_attempts,
+    'oauth_connection_id',v_job.oauth_connection_id,'collection_id',v_job.collection_id,
+    'payload',v_job.payload,'cursor_token',v_job.cursor_token,'items_seen',v_job.items_seen,'items_done',v_job.items_done);
+end;
+$$;
+revoke all on function public.claim_foundation_job(text,integer,public.foundation_job_type[]) from public,anon,authenticated;
+grant execute on function public.claim_foundation_job(text,integer,public.foundation_job_type[]) to service_role;
 commit;
