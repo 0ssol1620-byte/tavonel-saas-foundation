@@ -1,5 +1,7 @@
 import { createHash, createHmac } from "node:crypto";
 import { FOUNDATION_R2_BUCKET, type R2SignerEnv } from "./r2-synthetic-canary";
+import { assertWorkspaceSanitizedPdfKey } from "./r2-presign";
+import { readBoundedSourceBody } from "./bounded-source-body";
 import {
   immutableWorkspacePrefix,
   isCollectionCandidateKey,
@@ -57,12 +59,30 @@ async function signedS3Get(
   try {
     return await fetch(`https://${host}${canonicalUri}${query}`, {
       method: "GET",
+      redirect: "error",
+      cache: "no-store",
       headers,
       signal: AbortSignal.timeout(8_000),
     });
   } catch {
     return new Response(null, { status: 599 });
   }
+}
+
+export async function getWorkspaceSanitizedPdf(env: R2SignerEnv, workspaceId: string, key: string): Promise<
+  { ok: true; bytes: Uint8Array<ArrayBuffer> } | { ok: false; code: string }
+> {
+  const blocked = assertWorkspaceSanitizedPdfKey(env.bucket, workspaceId, key);
+  if (blocked) return { ok: false, code: blocked };
+  const digest = /\/([a-f0-9]{64})\/sanitized\.pdf$/.exec(key)?.[1];
+  if (!digest) return { ok: false, code: "KEY_NOT_QUALIFIED" };
+  const uri = `/${env.bucket}/${key.split("/").map(encodeURIComponent).join("/")}`;
+  const response = await signedS3Get(env, uri, "");
+  if (!response.ok) return { ok: false, code: response.status === 404 ? "NOT_FOUND" : "SOURCE_READ_FAILED" };
+  const body = await readBoundedSourceBody(response, 32 * 1024 * 1024);
+  if (!body.ok) return body;
+  if (createHash("sha256").update(body.bytes).digest("hex") !== digest) return { ok: false, code: "SOURCE_DIGEST_MISMATCH" };
+  return body;
 }
 
 async function signedS3PutJson(

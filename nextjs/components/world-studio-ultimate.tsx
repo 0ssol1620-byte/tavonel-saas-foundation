@@ -54,7 +54,7 @@ export default function WorldStudioUltimate({ model, initialLens = "overview", s
   const [lens, setLens] = useState<WorldStudioLens>(initialLens);
   const [localEvidenceId, setLocalEvidenceId] = useState<string | null>(null);
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
-  const [sourcePreview, setSourcePreview] = useState<{ url: string; state: "ready" | "loading" | "unavailable" } | null>(null);
+  const [sourcePreview, setSourcePreview] = useState<{ bytes: Uint8Array | null; state: "ready" | "loading" | "unavailable" } | null>(null);
   const activeEvidenceId = selectedEvidenceId === undefined ? localEvidenceId : selectedEvidenceId;
   const selection = selectWorldEvidence(model, activeEvidenceId);
   const selectedObject = model?.objects.find((object) => object.id === selectedObjectId) ?? null;
@@ -67,17 +67,20 @@ export default function WorldStudioUltimate({ model, initialLens = "overview", s
   useEffect(() => {
     if (!selectedSourceId || !selectedSourceVersionId || !selectedSourcePage) { setSourcePreview(null); return; }
     let cancelled = false;
-    setSourcePreview({ url: "", state: "loading" });
+    const controller = new AbortController();
+    setSourcePreview({ bytes: null, state: "loading" });
     void (async () => {
       const client = getSupabaseBrowserClient();
       const { data } = client ? await client.auth.getSession() : { data: { session: null } };
       const token = data.session?.access_token;
-      if (!token) { if (!cancelled) setSourcePreview({ url: "", state: "unavailable" }); return; }
-      const response = await fetch(`/api/documents/${selectedSourceId}/source?version=${encodeURIComponent(selectedSourceVersionId)}`, { headers: { authorization: `Bearer ${token}` }, cache: "no-store" });
-      const body = await response.json().catch(() => ({})) as { readUrl?: string };
-      if (!cancelled) setSourcePreview(response.ok && body.readUrl ? { url: body.readUrl, state: "ready" } : { url: "", state: "unavailable" });
-    })();
-    return () => { cancelled = true; };
+      if (!token) { if (!cancelled) setSourcePreview({ bytes: null, state: "unavailable" }); return; }
+      const response = await fetch(`/api/documents/${encodeURIComponent(selectedSourceId)}/source?version=${encodeURIComponent(selectedSourceVersionId)}&format=pdf`, { headers: { authorization: `Bearer ${token}` }, cache: "no-store", signal: controller.signal });
+      if (!response.ok || !response.headers.get("content-type")?.startsWith("application/pdf")) throw new Error("SOURCE_PREVIEW_UNAVAILABLE");
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      if (cancelled) return;
+      setSourcePreview({ bytes, state: "ready" });
+    })().catch(() => { if (!cancelled) setSourcePreview({ bytes: null, state: "unavailable" }); });
+    return () => { cancelled = true; controller.abort(); };
   }, [selectedSourceId, selectedSourceVersionId, selectedSourcePage]);
 
   const selectEvidence = (evidence: WorldEvidence) => {
@@ -140,7 +143,7 @@ export default function WorldStudioUltimate({ model, initialLens = "overview", s
 
         <aside className={styles.inspector} aria-label="World selection inspector">
           {selection ? (
-            <><div className={styles.inspectorTitle}><span>SELECTED EVIDENCE</span><button type="button" onClick={clearEvidence}>Clear</button></div><strong>{selection.sourceId}</strong><dl><div><dt>PAGE</dt><dd>{selection.page}</dd></div><div><dt>BBOX</dt><dd>[{selection.bbox.join(", ")}]</dd></div></dl><div className={styles.pagePreview} aria-label={`Actual source page ${selection.page} with evidence bounding box`}>{sourcePreview?.state === "ready" ? <PdfEvidenceViewer url={sourcePreview.url} page={selection.page} bbox={selection.bbox} label={`Source ${selection.sourceId}, page ${selection.page}, exact evidence region`} /> : <span>{sourcePreview?.state === "loading" ? "Opening source page…" : `Preview unavailable · page ${selection.page}`}</span>}</div></>
+            <><div className={styles.inspectorTitle}><span>SELECTED EVIDENCE</span><button type="button" onClick={clearEvidence}>Clear</button></div><strong>{selection.sourceId}</strong><dl><div><dt>PAGE</dt><dd>{selection.page}</dd></div><div><dt>BBOX</dt><dd>[{selection.bbox.join(", ")}]</dd></div></dl><div className={styles.pagePreview} aria-label={`Actual source page ${selection.page} with evidence bounding box`}>{sourcePreview?.state === "ready" ? <PdfEvidenceViewer data={sourcePreview.bytes!} page={selection.page} bbox={selection.bbox} label={`Source ${selection.sourceId}, page ${selection.page}, exact evidence region`} /> : <span>{sourcePreview?.state === "loading" ? "Opening source page…" : `Preview unavailable · page ${selection.page}`}</span>}</div></>
           ) : selectedObject ? (
             <><div className={styles.inspectorTitle}><span>SELECTED OBJECT</span></div><strong data-sensitive="content">{selectedObject.label}</strong><dl><div><dt>TYPE</dt><dd>{selectedObject.type}</dd></div><div><dt>STATE</dt><dd>{selectedObject.readState === "read" ? "READY" : "NEEDS REVIEW"}</dd></div><div><dt>RELATIONS</dt><dd>{selectedObject.relations.length}</dd></div><div><dt>EVIDENCE</dt><dd>{selectedObject.evidenceRefs.length}</dd></div></dl></>
           ) : lens === "overview" ? (
@@ -151,3 +154,4 @@ export default function WorldStudioUltimate({ model, initialLens = "overview", s
     </section>
   );
 }
+

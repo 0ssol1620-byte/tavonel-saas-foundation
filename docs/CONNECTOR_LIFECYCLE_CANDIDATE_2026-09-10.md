@@ -28,6 +28,8 @@ Subsequent implementation: Ask now validates active source inventory before new/
 
 DB repair replay: full-chain run34397664300 passed both initial application and repair replay after 0053 was updated to restore SELECT/INSERT for the two known connector tables when they exist. This CI receipt covers commit0ff99ab, not later application changes.
 
+PDF candidate update: source metadata now names an authenticated same-origin API route, not an R2 bearer capability. The `format=pdf` path bounds the R2 read to32 MiB, verifies its immutable SHA256, then rechecks user, product and source access before streaming any bytes. The Studio sends its bearer token only in the API request header and passes received bytes directly to PDF.js; no capability or token is placed in a URL. Existing pre-deployment capabilities expire on their original schedule; already-received bytes cannot be recalled. Final viewer/browser, large-file platform streaming and cost/concurrency qualification remain required before promotion. Streaming follows Vercel's response-size guidance: https://vercel.com/kb/guide/how-to-bypass-vercel-body-size-limit-serverless-functions
+
 1. Persist workspace + connection + provider + native ID bindings and revision observations; support Dropbox path aliases without conflating distinct files.
 2. Apply tombstones and permission shrink to all relevant imported versions and retrieval/export authorization before advancing the provider checkpoint.
 3. Bind source updates to affected Worlds and expose stale/review states; never leave a removed source usable because the sync stopped.
