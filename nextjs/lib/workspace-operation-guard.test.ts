@@ -90,9 +90,9 @@ describe("production durable fail-closed boundary", () => {
     rpc.mockRejectedValue(new Error("network unavailable"));
     expect(await acquireWorkspaceOperation("export", "pilot-a")).toMatchObject({ ok: false, status: 503 });
   });
-  it.each(["IDEMPOTENCY_IN_PROGRESS", "IDEMPOTENCY_CONFLICT", "WORKSPACE_CONCURRENCY_LIMIT"])("propagates the atomic store decision %s", async code => {
+  it.each(["IDEMPOTENCY_IN_PROGRESS", "IDEMPOTENCY_CONFLICT", "WORKSPACE_CONCURRENCY_LIMIT", "WORKSPACE_CACHE_CAPACITY_LIMIT"])("propagates the atomic store decision %s", async code => {
     rpc.mockResolvedValue(json({ code }));
-    expect(await acquireWorkspaceOperation("ask", "pilot-a", request())).toEqual({ ok: false, code, status: code === "WORKSPACE_CONCURRENCY_LIMIT" ? 429 : 409 });
+    expect(await acquireWorkspaceOperation("ask", "pilot-a", request())).toEqual({ ok: false, code, status: code.startsWith("WORKSPACE_") ? 429 : 409 });
   });
   it("stores no raw request/key/answer and authenticates encrypted replay binding", async () => {
     const writes: Record<string, unknown>[] = [];
@@ -119,5 +119,56 @@ describe("production durable fail-closed boundary", () => {
   it("rejects malformed keys before contacting the database", async () => {
     expect(await acquireWorkspaceOperation("ask", "pilot-a", request("short"))).toMatchObject({ code: "IDEMPOTENCY_KEY_INVALID", status: 400 });
     expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("preserves a committed replay when the completion response was lost", async () => {
+    let stored = "";
+    let releases = 0;
+    rpc.mockImplementation(async (_config: unknown, path: string, init: RequestInit) => {
+      const body = JSON.parse(String(init.body));
+      if (path.endsWith("acquire_foundation_operation")) {
+        return json(stored ? { code: "REPLAY", ciphertext: stored } : { code: "ACQUIRED", ownerToken: body.p_owner_token });
+      }
+      if (body.p_ciphertext !== null) {
+        stored = body.p_ciphertext;
+        throw new Error("response lost after database commit");
+      }
+      releases += 1;
+      return json(false); // SQL only releases running rows, never a committed replay.
+    });
+    const lease = await acquireWorkspaceOperation("ask", "pilot-a", request());
+    if (!lease.ok || lease.replay) throw new Error("lease missing");
+    expect(await lease.complete(answer)).toBe(false);
+    await lease.release();
+    expect(releases).toBe(1);
+    expect(await acquireWorkspaceOperation("ask", "pilot-a", request()))
+      .toEqual({ ok: true, replay: true, value: answer });
+  });
+});
+
+describe("bounded replay retention", () => {
+  it("caps distinct live keys without evicting a still-valid replay", async () => {
+    for (let i = 0; i < 300; i += 1) {
+      const lease = await acquireWorkspaceOperation("ask", "bounded", request(`request-${String(i).padStart(4, "0")}`));
+      if (!lease.ok || lease.replay) throw new Error("key admission failed before the bound");
+      expect(await lease.complete(answer)).toBe(true);
+      await lease.release();
+    }
+    expect(await acquireWorkspaceOperation("ask", "bounded", request("request-overflow")))
+      .toEqual({ ok: false, code: "WORKSPACE_CACHE_CAPACITY_LIMIT", status: 429 });
+    expect(await acquireWorkspaceOperation("ask", "bounded", request("request-0000")))
+      .toEqual({ ok: true, replay: true, value: answer });
+    expect((await acquireWorkspaceOperation("ask", "other-workspace", request("request-overflow"))).ok).toBe(true);
+  });
+
+  it("reserves ciphertext capacity before starting large-answer operations", async () => {
+    const large = { status: 200, body: { text: "x".repeat(999_900) } };
+    for (let i = 0; i < 12; i += 1) {
+      const lease = await acquireWorkspaceOperation("ask", "bytes-bounded", request(`request-${String(i).padStart(4, "0")}`));
+      if (!lease.ok || lease.replay) throw new Error("unexpected admission failure");
+      expect(await lease.complete(large)).toBe(true);
+    }
+    expect(await acquireWorkspaceOperation("ask", "bytes-bounded", request("request-overflow")))
+      .toEqual({ ok: false, code: "WORKSPACE_CACHE_CAPACITY_LIMIT", status: 429 });
   });
 });

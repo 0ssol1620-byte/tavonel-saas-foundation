@@ -29,6 +29,8 @@ create or replace function public.acquire_foundation_operation(
 declare
   v_now timestamptz;
   v_limit integer;
+  v_cache_rows integer;
+  v_reserved_bytes bigint;
   v_row public.foundation_operation_leases%rowtype;
 begin
   if p_workspace_key is null or length(p_workspace_key) not between 1 and 256
@@ -61,6 +63,22 @@ begin
   if (select count(*) from public.foundation_operation_leases
       where workspace_key = p_workspace_key and operation_scope = p_scope and state = 'running') >= v_limit then
     return jsonb_build_object('code', 'WORKSPACE_CONCURRENCY_LIMIT');
+  end if;
+  if p_request_key is not null then
+    -- Ten minutes at the existing Ask API allowance (30/min) is 300 key records.
+    -- Reserve the maximum ciphertext for each running keyed call BEFORE work,
+    -- so simultaneous completions cannot overrun the 16 MiB workspace cache.
+    -- Existing keys were handled above: capacity must never evict an unexpired
+    -- replay or execute it twice just to make space for a new key.
+    select count(*), coalesce(sum(case when state = 'running' then 1400000
+      else octet_length(response_ciphertext) end), 0)
+      into v_cache_rows, v_reserved_bytes
+      from public.foundation_operation_leases
+      where workspace_key = p_workspace_key and operation_scope = p_scope
+        and request_key is not null;
+    if v_cache_rows >= 300 or v_reserved_bytes + 1400000 > 16777216 then
+      return jsonb_build_object('code', 'WORKSPACE_CACHE_CAPACITY_LIMIT');
+    end if;
   end if;
   insert into public.foundation_operation_leases
     (workspace_key, operation_scope, owner_token, request_key, body_digest, expires_at)

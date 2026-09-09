@@ -85,6 +85,26 @@ try {
     assert.equal(await sql(`select has_table_privilege(${quote(role)},'public.foundation_contact_windows','select');`),'f');
   }
   passed('contact: direct client roles cannot read buckets or grant admission');
+  await sql(`insert into public.foundation_operation_leases
+    (workspace_key,operation_scope,owner_token,request_key,body_digest,state,response_ciphertext,expires_at)
+    select ${quote(prefix+'-key-cap')},'ask',gen_random_uuid(),md5(i::text)||md5(i::text),
+      ${quote(digest)},'completed',repeat('a',64),now()+interval '10 minutes'
+    from generate_series(1,300) i;`);
+  assert.equal((await acquire(prefix+'-key-cap','ask',randomUUID(),key,digest)).code,'WORKSPACE_CACHE_CAPACITY_LIMIT');
+  const retainedKey=await sql("select md5('1')||md5('1');");
+  assert.equal((await acquire(prefix+'-key-cap','ask',randomUUID(),retainedKey,digest)).code,'REPLAY');
+  passed('300-key cap refuses new keys without evicting valid replay');
+
+  await sql(`insert into public.foundation_operation_leases
+    (workspace_key,operation_scope,owner_token,request_key,body_digest,state,response_ciphertext,expires_at)
+    select ${quote(prefix+'-byte-cap')},'ask',gen_random_uuid(),md5(i::text)||md5(i::text),
+      ${quote(digest)},'completed',repeat('a',1390000),now()+interval '10 minutes'
+    from generate_series(1,10) i;`);
+  const reserved=await Promise.all(Array.from({length:20},(_,i)=>acquire(prefix+'-byte-cap','ask',randomUUID(),
+    createHash('sha256').update(`${prefix}:capacity:${i}`).digest('hex'),digest)));
+  assert.equal(reserved.filter(r=>r.code==='ACQUIRED').length,2);
+  assert.equal(reserved.filter(r=>r.code==='WORKSPACE_CACHE_CAPACITY_LIMIT').length,18);
+  passed('20 writers reserve ciphertext capacity atomically before doing work');
   console.log(JSON.stringify({status:'PASS',checks:checks.length,serverVersion:version,scope:'isolated loopback database; no production test'}));
 } finally {
   // Delete only this run's synthetic rows, never a database or a table.

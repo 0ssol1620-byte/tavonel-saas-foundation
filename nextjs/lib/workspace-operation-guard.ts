@@ -18,8 +18,11 @@ const MAX_RESPONSE_BYTES = 1_000_000;
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 const CACHE_MS = 600_000;
 const LEASE_MS = 75_000; // Longer than the routes' 60s platform execution bound.
+export const WORKSPACE_CACHE_MAX_KEYS = 300;
+export const WORKSPACE_CACHE_MAX_BYTES = 16_777_216;
+const RESERVED_CIPHERTEXT_BYTES = 1_400_000;
 const localKey = randomBytes(32);
-type LocalEntry = { owner: string; digest: string | null; expiresAt: number; value?: GuardAnswer };
+type LocalEntry = { owner: string; digest: string | null; expiresAt: number; cacheBytes?: number; value?: GuardAnswer };
 const localEntries = new Map<string, LocalEntry>();
 
 const unavailable = (): OperationVerdict => ({ ok: false, code: "WORKSPACE_GUARD_UNAVAILABLE", status: 503 });
@@ -94,7 +97,9 @@ export async function acquireWorkspaceOperation(
   if (receipt.code === "IDEMPOTENCY_CONFLICT" || receipt.code === "IDEMPOTENCY_IN_PROGRESS") {
     return { ok: false, code: receipt.code, status: 409 };
   }
-  if (receipt.code === "WORKSPACE_CONCURRENCY_LIMIT") return { ok: false, code: receipt.code, status: 429 };
+  if (receipt.code === "WORKSPACE_CONCURRENCY_LIMIT" || receipt.code === "WORKSPACE_CACHE_CAPACITY_LIMIT") {
+    return { ok: false, code: receipt.code, status: 429 };
+  }
   if (receipt.code !== "ACQUIRED" || receipt.ownerToken !== owner || !UUID.test(owner)) return unavailable();
   let released = false;
   return {
@@ -136,6 +141,13 @@ function acquireLocal(scope: GuardScope, workspaceKey: string, request?: GuardRe
   const limit = scope === "ask" ? WORKSPACE_ASK_CONCURRENCY : WORKSPACE_EXPORT_CONCURRENCY;
   const held = [...localEntries].filter(([key, item]) => key.startsWith(`${bucket}:`) && !item.value).length;
   if (held >= limit) return { ok: false, code: "WORKSPACE_CONCURRENCY_LIMIT", status: 429 };
+  if (request?.key) {
+    const keyed = [...localEntries].filter(([key, item]) => key.startsWith(`${bucket}:`) && item.digest !== null);
+    const reserved = keyed.reduce((sum, [, item]) => sum + (item.cacheBytes ?? RESERVED_CIPHERTEXT_BYTES), 0);
+    if (keyed.length >= WORKSPACE_CACHE_MAX_KEYS || reserved + RESERVED_CIPHERTEXT_BYTES > WORKSPACE_CACHE_MAX_BYTES) {
+      return { ok: false, code: "WORKSPACE_CACHE_CAPACITY_LIMIT", status: 429 };
+    }
+  }
   if (localEntries.size >= 10_000) return unavailable();
   localEntries.set(mapKey, { owner, digest, expiresAt: now + LEASE_MS });
   return {
@@ -144,7 +156,8 @@ function acquireLocal(scope: GuardScope, workspaceKey: string, request?: GuardRe
       const current = localEntries.get(mapKey);
       if (!request?.key || !validAnswer(value) || current?.owner !== owner || current.expiresAt <= Date.now()
           || Buffer.byteLength(JSON.stringify(value)) > MAX_RESPONSE_BYTES) return false;
-      localEntries.set(mapKey, { owner, digest, expiresAt: Date.now() + CACHE_MS, value: structuredClone(value) });
+      const cacheBytes = Math.ceil((Buffer.byteLength(JSON.stringify(value)) + 28) * 4 / 3);
+      localEntries.set(mapKey, { owner, digest, expiresAt: Date.now() + CACHE_MS, cacheBytes, value: structuredClone(value) });
       return true;
     },
     async release() {

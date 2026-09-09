@@ -114,6 +114,16 @@ jobs:
           PGPASSWORD: postgres
         run: node nextjs/scripts/db/operation-guard-race.mjs
 
+      - name: Install and prove scheduled expiry cleanup in the disposable database
+        env:
+          LOCAL_OPERATION_GUARD_TEST: "1"
+          PGPORT: "54322"
+          PGPASSWORD: postgres
+        run: |
+          psql -h 127.0.0.1 -p "$PGPORT" -U postgres -d postgres -v ON_ERROR_STOP=1 -f nextjs/scripts/db/install-operation-guard-maintenance.sql
+          psql -h 127.0.0.1 -p "$PGPORT" -U postgres -d postgres -v ON_ERROR_STOP=1 -f nextjs/scripts/db/install-operation-guard-maintenance.sql
+          node nextjs/scripts/db/verify-operation-guard-maintenance.mjs
+
       # Dumped and uploaded before the tests run, so a red pgTAP suite still leaves the
       # orchestrator the schema it needs for the read-only diff against production (L-2).
       - name: Dump the schema the migrations produced

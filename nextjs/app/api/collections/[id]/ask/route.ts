@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { authorizeFoundationRequest } from "@/lib/developer-auth";
+import { authorizeFoundationRequest, revalidateFoundationAuthorization } from "@/lib/developer-auth";
 import { readBoundedJson } from "@/lib/enterprise-http";
 import { validatePromotableCollectionArtifact } from "@/lib/collection-download";
 import { answerGroundedQuestion } from "@/lib/grounded-ask";
@@ -194,6 +194,10 @@ export async function POST(
   try {
     const answered = lease.replay ? lease.value : await answerQuestion(workspaceKey, id, question, active);
     if (answered.status === 200) {
+      const authorizedNow = await revalidateFoundationAuthorization(request, auth.principal, "ask:read", "observer");
+      if (!authorizedNow.ok) return NextResponse.json({ code: authorizedNow.code }, {
+        status: authorizedNow.status, headers: NO_STORE,
+      });
       const current = await getFoundationActiveWorld(workspaceKey, id);
       if (!current.ok) return NextResponse.json({ code: current.code }, { status: 503, headers: NO_STORE });
       if (current.world.manifestDigest !== active.world.manifestDigest
