@@ -166,10 +166,10 @@ export async function runSourceImportBatch(
       target,
     }));
   } catch (error) {
-    const code = error instanceof Error && ["CONNECTOR_PAGE_STORE_UNAVAILABLE", "CONNECTOR_PAGE_INVALID", "CONNECTOR_PAGE_LEGACY_REVIEW_REQUIRED", "OAUTH_SOURCE_PAGE_INVALID", "OAUTH_SOURCE_CURSOR_INVALID"].includes(error.message)
+    const code = error instanceof Error && ["CONNECTOR_PAGE_STORE_UNAVAILABLE", "CONNECTOR_PAGE_INVALID", "CONNECTOR_PAGE_LEGACY_REVIEW_REQUIRED", "OAUTH_SOURCE_PAGE_INVALID", "OAUTH_SOURCE_CURSOR_INVALID", "OAUTH_SOURCE_CURSOR_STALLED", "OAUTH_SOURCE_TARGET_UNSUPPORTED"].includes(error.message)
       ? error.message : "SOURCE_LIST_FAILED";
     const reported = await completeJobBatch(job.workspaceKey, job.jobId, workerId, {
-      outcome: code === "CONNECTOR_PAGE_INVALID" || code === "CONNECTOR_PAGE_LEGACY_REVIEW_REQUIRED" ? "failed" : "retry",
+      outcome: ["CONNECTOR_PAGE_INVALID", "CONNECTOR_PAGE_LEGACY_REVIEW_REQUIRED", "OAUTH_SOURCE_TARGET_UNSUPPORTED"].includes(code) ? "failed" : "retry",
       errorCode: code,
     });
     return { ok: false, code: reported.ok ? code : reported.code };

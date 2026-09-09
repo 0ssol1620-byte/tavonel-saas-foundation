@@ -297,6 +297,13 @@ describe("failure classification", () => {
     expect(completeJobBatch.mock.calls[0][3]).toEqual({ outcome: "retry", errorCode: code });
   });
 
+  it("fails an unsupported target without advancing or importing a broader selection", async () => {
+    listOAuthSourcePage.mockRejectedValueOnce(new Error("OAUTH_SOURCE_TARGET_UNSUPPORTED"));
+    expect(await runSourceImportBatch(JOB, "worker-1")).toEqual({ ok: false, code: "OAUTH_SOURCE_TARGET_UNSUPPORTED" });
+    expect(importSourceObject).not.toHaveBeenCalled();
+    expect(completeJobBatch.mock.calls[0][3]).toEqual({ outcome: "failed", errorCode: "OAUTH_SOURCE_TARGET_UNSUPPORTED" });
+  });
+
   it("retries a provider listing failure without moving the cursor", async () => {
     listOAuthSourcePage.mockRejectedValue(new Error("429"));
     await runSourceImportBatch({ ...JOB, cursorToken: "page-3" }, "worker-1");

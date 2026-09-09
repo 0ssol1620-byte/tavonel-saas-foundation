@@ -30,12 +30,13 @@ describe("provider listing integrity", () => {
 
   it("preserves a valid empty page as distinct from an invalid response", async () => {
     expect(await read("google_drive", { files: [] })).toEqual({ items: [], cursor: null, complete: true });
+    expect(await read("google_drive", { files: [], nextPageToken: null })).toEqual({ items: [], cursor: null, complete: true });
     expect(await read("dropbox", { entries: [], cursor: "end", has_more: false }))
       .toEqual({ items: [], cursor: "end", complete: true });
   });
 
   it("does not interpret invalid Google continuation as the last page", async () => {
-    for (const nextPageToken of [null, "", 12, "a".repeat(2049), "bad token"]) {
+    for (const nextPageToken of ["", 12, "a".repeat(2049), "bad token"]) {
       await expect(read("google_drive", { files: [], nextPageToken })).rejects.toThrow("OAUTH_SOURCE_CURSOR_INVALID");
     }
   });

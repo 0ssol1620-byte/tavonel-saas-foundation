@@ -151,17 +151,27 @@ async function jsonRequest(
   }
 }
 
-async function listGoogleDrive(accessToken: string, cursor: string | null, fetcher: typeof fetch): Promise<OAuthSourcePage> {
+async function listGoogleDrive(accessToken: string, cursor: string | null, target: OAuthSourceTarget, fetcher: typeof fetch): Promise<OAuthSourcePage> {
+  // rootPath is a Dropbox path; Graph site IDs are not Drive targets. Never turn an
+  // unsupported selection into a broader all-files scan. Folder-tree support is separate.
+  if (target.rootPath || target.siteId || (target.driveId !== undefined && !/^[A-Za-z0-9_-]{1,512}$/.test(target.driveId))) {
+    throw new Error("OAUTH_SOURCE_TARGET_UNSUPPORTED");
+  }
   const url = new URL(`${DRIVE_ORIGIN}/drive/v3/files`);
   url.searchParams.set("pageSize", String(OAUTH_SOURCE_PAGE_SIZE));
   url.searchParams.set("q", "trashed = false");
-  url.searchParams.set("fields", "nextPageToken,files(id,name,mimeType,size,modifiedTime,version,md5Checksum)");
+  url.searchParams.set("fields", "nextPageToken,incompleteSearch,files(id,name,mimeType,size,modifiedTime,version,md5Checksum)");
+  url.searchParams.set("supportsAllDrives", "true");
+  url.searchParams.set("includeItemsFromAllDrives", "true");
+  url.searchParams.set("corpora", target.driveId ? "drive" : "user");
+  if (target.driveId) url.searchParams.set("driveId", target.driveId);
   if (cursor !== null) {
     const pageToken = safeOpaqueContinuation(cursor, 2_048);
     if (pageToken === null) throw new Error("OAUTH_SOURCE_CURSOR_INVALID");
     url.searchParams.set("pageToken", pageToken);
   }
   const payload = await jsonRequest(url.toString(), accessToken, {}, fetcher, LIST_POLICY.google_drive);
+  if (payload.incompleteSearch !== undefined && payload.incompleteSearch !== false) throw new Error("OAUTH_SOURCE_PAGE_INVALID");
   const rows = sourceRows(payload, "files");
   const items = completeObservations(rows.map((row): OAuthSourceItem | null => {
     if (!readableRow(row)) return null;
@@ -174,8 +184,9 @@ async function listGoogleDrive(accessToken: string, cursor: string | null, fetch
     if (!revision) return null;
     return { nativeId, name, revision, mimeType, sizeBytes: folder ? null : boundedSize(row.size), modifiedAt: boundedString(row.modifiedTime, 64), kind: folder ? "folder" : "file" };
   }));
-  const next = payload.nextPageToken === undefined ? null : safeOpaqueContinuation(payload.nextPageToken, 2_048);
-  if (payload.nextPageToken !== undefined && next === null) throw new Error("OAUTH_SOURCE_CURSOR_INVALID");
+  const next = payload.nextPageToken == null ? null : safeOpaqueContinuation(payload.nextPageToken, 2_048);
+  if (payload.nextPageToken != null && next === null) throw new Error("OAUTH_SOURCE_CURSOR_INVALID");
+  if (next !== null && next === cursor) throw new Error("OAUTH_SOURCE_CURSOR_STALLED");
   return { items, cursor: next, complete: next === null };
 }
 
@@ -261,7 +272,7 @@ export async function listOAuthSourcePage(input: {
   const target = input.target ?? {};
   if (!input.accessToken || !validTarget(target)) throw new Error("OAUTH_SOURCE_INPUT_INVALID");
   const fetcher = input.fetcher ?? fetch;
-  if (input.provider === "google_drive") return listGoogleDrive(input.accessToken, input.cursor, fetcher);
+  if (input.provider === "google_drive") return listGoogleDrive(input.accessToken, input.cursor, target, fetcher);
   if (input.provider === "dropbox") return listDropbox(input.accessToken, input.cursor, target, fetcher);
   return listMicrosoftGraph(input.accessToken, input.cursor, target, fetcher);
 }
