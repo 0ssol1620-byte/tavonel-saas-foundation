@@ -36,6 +36,7 @@ export default function PdfEvidenceViewer({ data, page, bbox, label }: Props) {
 
     void (async () => {
       const pdfjs = await import("pdfjs-dist");
+      if (cancelled) return;
       pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
       // The worker may transfer the input buffer; retain the original for resize.
       const task = pdfjs.getDocument({ data: data.slice() });
@@ -43,6 +44,7 @@ export default function PdfEvidenceViewer({ data, page, bbox, label }: Props) {
       const document = await task.promise;
       if (cancelled || page > document.numPages) throw new Error("PDF_PAGE_UNAVAILABLE");
       const pdfPage = await document.getPage(page);
+      if (cancelled) return;
       const natural = pdfPage.getViewport({ scale: 1 });
       const viewport = pdfPage.getViewport({ scale: width / natural.width });
       const ratio = Math.min(window.devicePixelRatio || 1, 2);
