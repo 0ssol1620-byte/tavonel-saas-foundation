@@ -258,7 +258,7 @@ async function listMicrosoftGraph(accessToken: string, cursor: string | null, ta
     };
   }));
   const next = safeGraphContinuation(payload["@odata.nextLink"] ?? payload["@odata.deltaLink"]);
-  if ((payload["@odata.nextLink"] !== undefined || payload["@odata.deltaLink"] !== undefined) && !next) throw new Error("OAUTH_SOURCE_CURSOR_INVALID");
+  if (!next || (payload["@odata.nextLink"] !== undefined && payload["@odata.deltaLink"] !== undefined)) throw new Error("OAUTH_SOURCE_CURSOR_INVALID");
   return { items, cursor: next, complete: !payload["@odata.nextLink"] };
 }
 

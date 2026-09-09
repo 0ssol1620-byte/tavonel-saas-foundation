@@ -55,7 +55,7 @@ describe("OAuth source adapters", () => {
     const dropboxBody = JSON.parse(String((dropboxFetcher as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1]?.body));
     expect(dropboxBody.limit).toBe(OAUTH_SOURCE_PAGE_SIZE);
 
-    const graphFetcher = vi.fn(async () => Response.json({ value: [] })) as unknown as typeof fetch;
+    const graphFetcher = vi.fn(async () => Response.json({ value: [], "@odata.deltaLink": "https://graph.microsoft.com/v1.0/me/drive/root/delta?$deltatoken=end" })) as unknown as typeof fetch;
     await listOAuthSourcePage({ provider: "microsoft_graph", accessToken: "access", cursor: null, fetcher: graphFetcher });
     const graphUrl = new URL(String((graphFetcher as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0]));
     expect(graphUrl.searchParams.get("$top")).toBe(String(OAUTH_SOURCE_PAGE_SIZE));

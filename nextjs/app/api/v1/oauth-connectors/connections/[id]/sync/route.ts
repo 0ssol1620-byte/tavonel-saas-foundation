@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { activationPolicy } from "@/lib/activation-policy";
 import { requireFoundationSession } from "@/lib/developer-auth";
 import { readBoundedJson } from "@/lib/enterprise-http";
-import { enqueueJob, listConnectionJobs } from "@/lib/job-store";
+import { enqueueConnectorSync, listConnectionJobs } from "@/lib/job-store";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -34,7 +34,7 @@ function parseBody(value: unknown) {
   const target: Record<string, string> = {};
   for (const key of ["rootPath", "driveId", "siteId"] as const) {
     if (rawTarget[key] !== undefined) {
-      if (typeof rawTarget[key] !== "string" || (rawTarget[key] as string).length > 1_024) return null;
+      if (typeof rawTarget[key] !== "string" || (rawTarget[key] as string).length > 512) return null;
       target[key] = rawTarget[key] as string;
     }
   }
@@ -53,23 +53,23 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (!Number.isFinite(declaredLength) || declaredLength > 4_096) return NextResponse.json({ code: "REQUEST_TOO_LARGE" }, { status: 413, headers: HEADERS });
   const read = await readBoundedJson(request, 4_096);
   if (!read.ok && read.code === "REQUEST_TOO_LARGE") return NextResponse.json({ code: "REQUEST_TOO_LARGE" }, { status: 413, headers: HEADERS });
-  const parsed = parseBody(read.ok ? read.value : null);
+  if (!read.ok) return NextResponse.json({ code: "OAUTH_SYNC_INPUT_INVALID" }, { status: 400, headers: HEADERS });
+  const parsed = parseBody(read.value);
   if (!parsed) return NextResponse.json({ code: "OAUTH_SYNC_INPUT_INVALID" }, { status: 400, headers: HEADERS });
 
   // The idempotency key is (job type, connection) with no timestamp or nonce. A second
   // click while a sync is running must collapse onto the running job: two concurrent
   // imports of one connection would race on its cursor and duplicate work.
-  const enqueued = await enqueueJob({
+  const enqueued = await enqueueConnectorSync({
     workspaceKey: auth.principal.workspaceKey,
-    jobType: "source_import",
-    idempotencyKey: `source_import:${id}`,
-    createdByUserId: auth.principal.userId,
-    oauthConnectionId: id,
-    payload: { userId: auth.principal.userId, target: parsed.target },
+    userId: auth.principal.userId,
+    connectionId: id,
+    target: parsed.target,
   });
 
   if (!enqueued.ok) {
-    const status = enqueued.code === "JOB_SCOPE_INVALID" ? 400 : 503;
+    const status = enqueued.code === "JOB_SCOPE_INVALID" ? 400 : enqueued.code === "JOB_SYNC_CONFLICT" ? 409
+      : enqueued.code === "JOB_CONNECTION_UNAVAILABLE" ? 404 : 503;
     return NextResponse.json({ code: enqueued.code }, { status, headers: HEADERS });
   }
 

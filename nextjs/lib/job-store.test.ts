@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { claimJob, completeJobBatch, enqueueJob, getJobStatus, listConnectionJobs, newJobId } from "./job-store";
+import { claimJob, completeJobBatch, enqueueJob, enqueueConnectorSync, getJobStatus, listConnectionJobs, newJobId } from "./job-store";
 
 // The application side of the durable job queue. The concurrency invariants live in the
 // database (0025) because only the database can enforce them across simultaneous workers;
@@ -37,6 +37,14 @@ afterEach(() => {
 });
 
 describe("job id", () => {
+  it("uses atomic connector admission and preserves an explicit target conflict", async () => {
+    const input = { workspaceKey: WORKSPACE, userId: USER, connectionId: CONNECTION, target: { rootPath: "/research" } };
+    expect(await enqueueConnectorSync(input)).toEqual({ ok: true, value: { jobId: JOB_ID, created: true } });
+    expect(calls[0].url).toContain("/rpc/enqueue_connector_sync");
+    expect(calls[0].body).toMatchObject({ p_target: input.target, p_workspace_key: WORKSPACE, p_connection_id: CONNECTION });
+    rpcResponse = { code: "JOB_SYNC_CONFLICT" };
+    expect(await enqueueConnectorSync(input)).toEqual({ ok: false, code: "JOB_SYNC_CONFLICT" });
+  });
   it("generates ids the schema CHECK accepts", () => {
     for (let index = 0; index < 20; index += 1) {
       expect(newJobId()).toMatch(/^job-[a-f0-9]{32}$/);

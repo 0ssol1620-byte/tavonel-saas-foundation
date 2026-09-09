@@ -79,6 +79,9 @@ begin
       execute format('revoke all (%s) on table public.%I from service_role', v_columns, v_table);
     end if;
   end loop;
+  if to_regclass('public.foundation_connector_checkpoints') is not null then
+    grant select, insert, update on public.foundation_connector_checkpoints to service_role;
+  end if;
 end;
 $$;
 
