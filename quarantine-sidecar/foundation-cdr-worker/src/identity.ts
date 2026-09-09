@@ -8,7 +8,8 @@ export const PRIVATE_CDR_ORIGIN = "https://tavonel-cdr-validation-0909-jw7bqc3nl
 export const IDENTITY_BROKER = "https://tavonel-saas-foundation.vercel.app/api/internal/cdr/identity";
 
 export class CdrIdentityError extends RetryableError {
-  constructor(readonly stage: "request" | "sign" | "fetch" | "response" | "body" | "json" | "token") {
+  constructor(readonly stage: "request" | "sign" | "fetch" | "response" | "body" | "json" | "token",
+    readonly safeDetail: string) {
     super("CDR identity is unavailable");
     this.name = "CdrIdentityError";
   }
@@ -59,7 +60,9 @@ export async function cdrAuthorization(target: string, secret: string | undefine
     if (!value || value.audience !== PRIVATE_CDR_ORIGIN || typeof value.token !== "string"
       || value.token.length < 16 || value.token.length > 8192 || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(value.token)) throw new Error("invalid");
     return `Bearer ${value.token}`;
-  } catch {
-    throw new CdrIdentityError(stage);
+  } catch (error) {
+    const candidate = error instanceof Error ? `${error.name}: ${error.message}` : "unavailable";
+    const safeDetail = /^[A-Za-z0-9 .:_()-]{1,160}$/.test(candidate) ? candidate : "unavailable";
+    throw new CdrIdentityError(stage, safeDetail);
   }
 }

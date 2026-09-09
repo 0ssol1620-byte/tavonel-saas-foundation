@@ -40,7 +40,7 @@ it("distinguishes a private identity failure without exposing broker output", as
     TAVONEL_CDR_PROVIDER: "tavonel_pdfium_clamav_v1", FOUNDATION_R2_BUCKET: "tavonel-saas-foundation-quarantine",
     FOUNDATION_CDR_IDENTITY_HMAC: FIXTURE_SECRET,
   }, async () => { throw new Error("network down"); });
-  assert.deepEqual(result, { httpStatus: 503, body: { status: "unavailable", reason: "private CDR identity fetch failed" } });
+  assert.deepEqual(result, { httpStatus: 503, body: { status: "unavailable", reason: "private CDR identity fetch failed (Error: network down)" } });
 });
 
 describe("Foundation-only CDR target guards", () => {
