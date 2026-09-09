@@ -5,6 +5,8 @@ const packageRoot = path.resolve(import.meta.dirname);
 
 export default defineConfig({
   root: packageRoot,
+  // Component render tests use the same automatic JSX runtime as Next.js.
+  esbuild: { jsx: "automatic" },
   resolve: {
     alias: { "@": packageRoot },
   },

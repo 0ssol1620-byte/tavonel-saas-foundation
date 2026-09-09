@@ -98,6 +98,7 @@ export function CompileJobPanel({
   onOpenPart?: (jobId: string) => void;
 }) {
   const settled = SETTLED.includes(job.state);
+  const awaitingReview = job.state === "review_required";
   const undecided = job.blocked.length > 0 && !job.blockedResolution && !settled;
   const security = job.blocked.filter((entry) => entry.kind === "security");
   const clean = Math.max(0, job.documentsTotal - job.blocked.length);
@@ -154,9 +155,16 @@ export function CompileJobPanel({
         The sentence this whole change exists to make true. It is worth saying out loud, in the
         place where somebody is deciding whether they can close the laptop.
       */}
-      {settled ? null : (
+      {awaitingReview ? (
+        <p className="fine">Processing has paused for your review. Inspect the evidence package and its review reasons before deciding what to do next.</p>
+      ) : settled ? null : (
         <p className="fine">This runs on our servers. You can close this page and come back to it.</p>
       )}
+      {awaitingReview && job.collectionId && /^collection-[a-f0-9]{32}$/.test(job.collectionId) ? (
+        <div className="workspace-intake-actions">
+          <a className="btn" href={`/workspace?collection=${encodeURIComponent(job.collectionId)}`}>Review evidence package</a>
+        </div>
+      ) : null}
       <progress
         className="workspace-compile-job-progress"
         max={job.documentsTotal}
