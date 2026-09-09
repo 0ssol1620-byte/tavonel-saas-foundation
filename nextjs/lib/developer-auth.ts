@@ -35,6 +35,17 @@ export async function authorizeFoundationRequest(
   scope: DeveloperScope,
   minimumPlan: "observer" | "studio" = "observer",
 ) {
+  return resolveFoundationAuthorization(request, scope, minimumPlan, true);
+}
+
+// A late authorization check is not a second billable/rate-limited request.
+// This switch is private to the module, never caller-controlled over HTTP.
+async function resolveFoundationAuthorization(
+  request: Request,
+  scope: DeveloperScope,
+  minimumPlan: "observer" | "studio",
+  consumeRate: boolean,
+) {
   const authorization = request.headers.get("authorization") ?? "";
   const bearer = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
 
@@ -48,17 +59,19 @@ export async function authorizeFoundationRequest(
     if (!authenticated.principal.scopes.includes(scope)) {
       return { ok: false as const, code: "API_SCOPE_REQUIRED", status: 403 };
     }
-    const principal: FoundationPrincipal = authenticated.principal;
+    const principal: FoundationPrincipal = {
+      ...authenticated.principal, scopes: [...authenticated.principal.scopes],
+    };
     const pilot = foundationPilotAccess(principal.userId);
     if (!pilot || pilot.membership.workspaceId !== principal.workspaceKey) {
       return { ok: false as const, code: "PILOT_ACCESS_REQUIRED", status: 403 };
     }
-    const rate = await consumeDeveloperApiRateLimit({
+    const rate = consumeRate ? await consumeDeveloperApiRateLimit({
       keyId: principal.keyId!,
       workspaceKey: principal.workspaceKey,
       scope,
       limit: SCOPE_RATE_LIMITS[scope],
-    });
+    }) : { ok: true as const };
     if (!rate.ok) return {
       ok: false as const,
       code: rate.code,
@@ -91,6 +104,25 @@ export async function authorizeFoundationRequest(
     accessSource: productAccess.access.source,
   };
   return { ok: true as const, principal };
+}
+
+/** Re-check session/key, membership and product access before returning sensitive output. */
+export async function revalidateFoundationAuthorization(
+  request: Request,
+  expected: FoundationPrincipal,
+  scope: DeveloperScope,
+  minimumPlan: "observer" | "studio" = "observer",
+) {
+  const current = await resolveFoundationAuthorization(request, scope, minimumPlan, false);
+  if (!current.ok) return current;
+  const identity = (principal: FoundationPrincipal) => JSON.stringify([
+    principal.kind, principal.workspaceKey, principal.userId, principal.keyId ?? null,
+    [...principal.scopes].sort(), principal.accessSource ?? null,
+  ]);
+  if (identity(current.principal) !== identity(expected)) {
+    return { ok: false as const, code: "AUTHORIZATION_CHANGED_RETRY", status: 403 };
+  }
+  return current;
 }
 
 export async function requireFoundationSession(request: Request, minimumPlan: "observer" | "studio" = "observer") {

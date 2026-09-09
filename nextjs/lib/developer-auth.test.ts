@@ -23,7 +23,7 @@ vi.mock("./foundation-pilot", () => ({ getRequestUser, foundationPilotAccess }))
 vi.mock("./billing-product-access", () => ({ authorizeFoundationProduct }));
 vi.mock("./self-service-trial", () => ({ authorizeFoundationSessionProduct, trialFeatureBlocked }));
 
-import { authorizeFoundationRequest } from "./developer-auth";
+import { authorizeFoundationRequest, revalidateFoundationAuthorization } from "./developer-auth";
 
 describe("developer request authorization", () => {
   beforeEach(() => {
@@ -132,6 +132,61 @@ describe("developer request authorization", () => {
       headers: { authorization: `Bearer tvnl_live_abcdefghijkl_${"a".repeat(43)}` },
     }), "documents:read");
     expect(result).toEqual({ ok: false, code: "PILOT_ACCESS_REQUIRED", status: 403 });
+    expect(consumeDeveloperApiRateLimit).not.toHaveBeenCalled();
+  });
+
+  it("revalidates a key without spending a second rate allowance", async () => {
+    authenticateDeveloperApiKey.mockResolvedValue({ ok: true, principal: {
+      kind: "api-key", keyId: "key", workspaceKey: "pilot-user", userId: "user", scopes: ["ask:read"],
+    } });
+    const request = new Request("https://tavonel.test/api/ask", {
+      headers: { authorization: `Bearer ${["tvnl", "live", ""].join("_")}${"a".repeat(43)}` },
+    });
+    const initial = await authorizeFoundationRequest(request, "ask:read");
+    if (!initial.ok) throw new Error("initial authorization failed");
+    expect((await revalidateFoundationAuthorization(request, initial.principal, "ask:read")).ok).toBe(true);
+    expect(authenticateDeveloperApiKey).toHaveBeenCalledTimes(2);
+    expect(consumeDeveloperApiRateLimit).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses a revoked key during late authorization", async () => {
+    authenticateDeveloperApiKey.mockResolvedValue({ ok: true, principal: {
+      kind: "api-key", keyId: "key", workspaceKey: "pilot-user", userId: "user", scopes: ["ask:read"],
+    } });
+    const request = new Request("https://tavonel.test/api/ask", {
+      headers: { authorization: `Bearer ${["tvnl", "live", ""].join("_")}${"a".repeat(43)}` },
+    });
+    const initial = await authorizeFoundationRequest(request, "ask:read");
+    if (!initial.ok) throw new Error("initial authorization failed");
+    authenticateDeveloperApiKey.mockResolvedValue({ ok: false, code: "API_KEY_REVOKED" });
+    expect(await revalidateFoundationAuthorization(request, initial.principal, "ask:read"))
+      .toEqual({ ok: false, code: "API_KEY_REVOKED", status: 401 });
+    expect(consumeDeveloperApiRateLimit).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not mutate the original authorization when effective access changes", async () => {
+    authenticateDeveloperApiKey.mockResolvedValue({ ok: true, principal: {
+      kind: "api-key", keyId: "key", workspaceKey: "pilot-user", userId: "user", scopes: ["ask:read"],
+    } });
+    const request = new Request("https://tavonel.test/api/ask", {
+      headers: { authorization: `Bearer ${["tvnl", "live", ""].join("_")}${"a".repeat(43)}` },
+    });
+    const initial = await authorizeFoundationRequest(request, "ask:read");
+    if (!initial.ok) throw new Error("initial authorization failed");
+    authorizeFoundationProduct.mockResolvedValue({ ok: true, source: "owner", billingExempt: true });
+    expect(await revalidateFoundationAuthorization(request, initial.principal, "ask:read"))
+      .toEqual({ ok: false, code: "AUTHORIZATION_CHANGED_RETRY", status: 403 });
+    expect(initial.principal.accessSource).toBe("paid");
+  });
+
+  it("rejects a session that expires after work starts", async () => {
+    getRequestUser.mockResolvedValue({ id: "user" });
+    const request = new Request("https://tavonel.test/api/ask");
+    const initial = await authorizeFoundationRequest(request, "ask:read");
+    if (!initial.ok) throw new Error("initial authorization failed");
+    getRequestUser.mockResolvedValue(null);
+    expect(await revalidateFoundationAuthorization(request, initial.principal, "ask:read"))
+      .toEqual({ ok: false, code: "AUTH_REQUIRED", status: 401 });
     expect(consumeDeveloperApiRateLimit).not.toHaveBeenCalled();
   });
 });
