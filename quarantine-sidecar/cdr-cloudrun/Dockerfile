@@ -22,7 +22,7 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 # NOTICE travels with the distribution it describes, not only with the repository.
-COPY app.py malware.py NOTICE ./
+COPY app.py malware.py request_boundary.py NOTICE ./
 RUN chown -R cdr:cdr /app /home/cdr
 USER cdr
 
