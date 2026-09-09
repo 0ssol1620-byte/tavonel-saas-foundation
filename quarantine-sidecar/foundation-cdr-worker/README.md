@@ -1,6 +1,6 @@
 # tavonel-foundation-cdr
 
-Foundation-only Cloudflare Worker that loads `quarantine/{workspaceId}/{documentId}/source` from R2 and sanitizes it through the IAM-protected PDFium/ClamAV Cloud Run CDR. The Worker obtains a short-lived Google identity token through the bounded Vercel identity broker; file bytes travel directly from the Worker to the private CDR service and never through Vercel.
+Foundation-only Cloudflare Worker that loads `quarantine/{workspaceId}/{documentId}/source` from R2 and sanitizes it through the IAM-protected PDFium/ClamAV Cloud Run CDR. The Worker obtains a short-lived Google identity token through the bounded Vercel identity broker at the canonical project origin; file bytes travel directly from the Worker to the private CDR service and never through Vercel.
 
 After a successful create-once `sanitized.pdf` write, if `FOUNDATION_OCR_URL` is set to a Foundation OCR target (not `tavonel-pdf-cdr` / prod), the Worker GETs the immutable PDF from R2, POSTs `/v1/ocr`, and writes sibling `ocr.json` create-once. If the URL is empty, OCR is skipped and CDR still returns clean.
 

@@ -2,7 +2,10 @@ import { RetryableError } from "./errors";
 import { bytesToUnpaddedBase64Url, hmacSecretIsConfigured } from "./hmac";
 
 export const PRIVATE_CDR_ORIGIN = "https://tavonel-cdr-validation-0909-jw7bqc3nla-du.a.run.app";
-export const IDENTITY_BROKER = "https://tavonel.com/api/internal/cdr/identity";
+// Use the canonical Vercel project origin for this server-to-server hop. The public custom
+// domain is proxied through Cloudflare; calling it from a Worker can be rejected before the
+// signed request reaches Vercel. The broker itself remains HMAC-, replay- and budget-protected.
+export const IDENTITY_BROKER = "https://tavonel-saas-foundation.vercel.app/api/internal/cdr/identity";
 
 export async function cdrAuthorization(target: string, secret: string | undefined,
   fetcher: typeof fetch, now = new Date(), requestId = crypto.randomUUID()): Promise<string | undefined> {
