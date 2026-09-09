@@ -93,6 +93,32 @@ function outputSha256(): string {
   return `sha256:${createHash("sha256").update(SANITIZED_BYTES).digest("hex")}`;
 }
 
+describe("CDR response transport bounds", () => {
+  for (const declared of [null, "1", String(19 * 1024 * 1024)]) {
+    it(`cancels oversized output before persistence (declared ${declared})`, async () => {
+      const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
+      let canceled = false;
+      let calls = 0;
+      const fetcher: typeof fetch = async (_input, init) => {
+        calls += 1;
+        assert.equal(init?.redirect, "error");
+        assert.ok(init?.signal);
+        const headers = new Headers({ "content-type": "application/pdf", "x-tavonel-cdr-status": "clean",
+          "x-tavonel-input-sha256": await sha256DigestHeader(SOURCE_BYTES), "x-tavonel-cdr-output-sha256": outputSha256() });
+        if (declared !== null) headers.set("content-length", declared);
+        return new Response(new ReadableStream({
+          pull(controller) { controller.enqueue(new Uint8Array(1024 * 1024)); },
+          cancel() { canceled = true; },
+        }), { headers });
+      };
+      await assert.rejects(sanitizeObject(envFor(r2), SOURCE_KEY, fetcher), RetryableError);
+      assert.equal(canceled, true);
+      assert.equal(calls, 1);
+      assert.equal(r2.puts.length, 0);
+    });
+  }
+});
+
 describe("persisted CDR trust boundary", () => {
   async function seeded() {
     const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });

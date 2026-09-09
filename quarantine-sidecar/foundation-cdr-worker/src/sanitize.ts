@@ -64,10 +64,41 @@ const MAX_RECEIPT_BYTES = 16 * 1024;
 // Matches the qualified Cloud Run output ceiling, not the smaller source ceiling.
 const MAX_SANITIZED_BYTES = 18 * 1024 * 1024;
 
+async function boundedResponseBytes(response: Response, limit: number): Promise<ArrayBuffer> {
+  const declared = response.headers.get("content-length");
+  if (declared !== null && (!/^\d+$/.test(declared) || Number(declared) > limit)) {
+    await response.body?.cancel();
+    throw new RetryableError("CDR response exceeds its allowed bound");
+  }
+  if (!response.body) throw new RetryableError("CDR response body is missing");
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  try {
+    while (true) {
+      const next = await reader.read();
+      if (next.done) break;
+      length += next.value.byteLength;
+      if (length > limit) throw new RetryableError("CDR response exceeds its allowed bound");
+      chunks.push(next.value);
+    }
+    if (declared !== null && Number(declared) !== length) throw new RetryableError("CDR response length did not match");
+    const bytes = new Uint8Array(length);
+    let offset = 0;
+    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+    return bytes.buffer;
+  } catch {
+    await reader.cancel().catch(() => undefined);
+    throw new RetryableError("CDR response could not be read within its allowed bound");
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 async function safeCdrRejectDetail(response: Response): Promise<string | null> {
   let body: unknown;
   try {
-    body = await response.json();
+    body = JSON.parse(new TextDecoder().decode(await boundedResponseBytes(response, 4096)));
   } catch {
     return null;
   }
@@ -392,6 +423,8 @@ export async function sanitizeObject(
           "x-tavonel-cdr-signature": signature,
         },
         body: form,
+        redirect: "error",
+        signal: AbortSignal.timeout(60_000),
       });
     } catch {
       throw new RetryableError("synthetic CDR request failed");
@@ -431,7 +464,7 @@ export async function sanitizeObject(
       throw refuse("RECEIPT_MISMATCH", "synthetic CDR output digest is missing", observed);
     }
 
-    const sanitized = await response.arrayBuffer();
+    const sanitized = await boundedResponseBytes(response, MAX_SANITIZED_BYTES);
     if (sanitized.byteLength < 1 || sanitized.byteLength > MAX_SANITIZED_BYTES) {
       throw new RetryableError("CDR output is outside the qualified storage bound");
     }
