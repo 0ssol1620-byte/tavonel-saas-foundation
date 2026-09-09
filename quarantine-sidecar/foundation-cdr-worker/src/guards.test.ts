@@ -43,6 +43,17 @@ it("distinguishes a private identity failure without exposing broker output", as
   assert.deepEqual(result, { httpStatus: 503, body: { status: "unavailable", reason: "private CDR identity fetch failed (Error: network down)" } });
 });
 
+it("reports only the bounded private health status", async () => {
+  const result = await evaluateHealth({ TAVONEL_CDR_HMAC: FIXTURE_SECRET,
+    TAVONEL_CDR_URL: `${PRIVATE_CDR_ORIGIN}/v1/disarm`, TAVONEL_CDR_HEALTH_URL: `${PRIVATE_CDR_ORIGIN}/health`,
+    TAVONEL_CDR_PROVIDER: "tavonel_pdfium_clamav_v1", FOUNDATION_R2_BUCKET: "tavonel-saas-foundation-quarantine",
+    FOUNDATION_CDR_IDENTITY_HMAC: FIXTURE_SECRET,
+  }, async (url) => String(url) === IDENTITY_BROKER
+    ? Response.json({ audience: PRIVATE_CDR_ORIGIN, token: "fixture.identity.signature" })
+    : new Response("provider detail must not escape", { status: 403 }));
+  assert.deepEqual(result, { httpStatus: 503, body: { status: "unavailable", reason: "private CDR health returned HTTP 403" } });
+});
+
 describe("Foundation-only CDR target guards", () => {
   it("refuses a production tavonel-pdf-cdr URL", () => {
     assert.equal(isProdCdrUrl(PROD_URL), true);

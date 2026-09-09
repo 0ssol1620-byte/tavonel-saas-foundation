@@ -85,7 +85,8 @@ export async function evaluateHealth(
       signal: AbortSignal.timeout(10_000), headers: authorization ? { authorization } : {} });
     await response.body?.cancel().catch(() => undefined);
     if (!response.ok) {
-      return { httpStatus: 503, body: { status: "unavailable", reason: "synthetic CDR health check failed" } };
+      const reason = privateMode ? `private CDR health returned HTTP ${response.status}` : "synthetic CDR health check failed";
+      return { httpStatus: 503, body: { status: "unavailable", reason } };
     }
   } catch (error) {
     const reason = privateMode && error instanceof CdrIdentityError
