@@ -144,6 +144,19 @@ begin
 end;
 $$;
 
+-- Later connector tables are absent on the initial 0053 pass but must retain their
+-- exact intended grants when this repair is replayed against a newer schema.
+do $$
+declare table_name text;
+begin
+  foreach table_name in array array['connector_document_bindings', 'connector_source_suspensions'] loop
+    if to_regclass(format('public.%I', table_name)) is not null then
+      execute format('grant select, insert on table public.%I to service_role', table_name);
+    end if;
+  end loop;
+end;
+$$;
+
 -- The default privilege itself. `postgres` is the role that owns and creates every table in this
 -- schema (schema-after-0050.sql:6548-6551 shows all four default grants under FOR ROLE "postgres"),
 -- and migrations run as it, so this statement is the one that matters and it is not guarded.
