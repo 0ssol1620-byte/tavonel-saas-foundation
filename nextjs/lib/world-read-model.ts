@@ -2,6 +2,8 @@ import { validateReviewableCollectionArtifact } from "./collection-download";
 import { loadPreferredCollectionCandidate } from "./collection-storage";
 import { COLLECTION_ID_PATTERN } from "./immutable-keys";
 import { readR2SignerEnv } from "./r2-synthetic-canary";
+import { collectionSourceDocumentIds } from "./collection-source-access";
+import { checkConnectorSourceAccess } from "./connector-source-access";
 import {
   getFoundationActiveWorld,
   listFoundationWorldVersions,
@@ -597,6 +599,12 @@ export async function loadWorldReadModel(
   if (!active.ok && active.code !== "ACTIVE_WORLD_NOT_FOUND") return { ok: false, code: active.code, status: 503 };
   const versions = active.ok ? await listFoundationWorldVersions(workspaceKey, collectionId) : { ok: true as const, versions: [] };
   if (!versions.ok) return { ok: false, code: versions.code, status: 503 };
+  const artifact = validateReviewableCollectionArtifact(loaded.value.artifact, collectionId);
+  const documentIds = artifact ? collectionSourceDocumentIds(artifact) : null;
+  if (!documentIds) return { ok: false, code: "COLLECTION_SOURCE_BINDING_INVALID", status: 422 };
+  const sourceAccess = await checkConnectorSourceAccess(workspaceKey, documentIds);
+  if (!sourceAccess.ok) return { ok: false, code: sourceAccess.code,
+    status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503 };
   const model = buildWorldReadModel(loaded.value.artifact, collectionId, {
     activeManifestDigest: active.ok ? active.world.manifestDigest : null,
     activeRevision: active.ok ? active.world.revision : null,

@@ -1,21 +1,24 @@
 import { reserveFoundationCompute } from "./compute-reservation";
 import { estimateBillablePages } from "./usage-pricing";
 import { oauthSourceDownloadRequest, type OAuthSourceItem, type OAuthSourceTarget } from "./connector-oauth-adapters";
-import { sha256Hex, type OAuthConnectorProvider } from "./connector-oauth";
+import { type OAuthConnectorProvider } from "./connector-oauth";
 import { confirmFoundationIntake, reserveFoundationIntake } from "./intake-admission";
 import { validateQualifiedDocumentInput } from "./qualified-input";
 import { FOUNDATION_INTAKE_MAX_BYTES, presignFoundationQuarantinePut } from "./r2-presign";
 import { type R2SignerEnv } from "./r2-synthetic-canary";
-import { deterministicSourceDocumentId } from "./source-intake";
+import { connectorSourceIdentity, type ConnectorSourceIdentity } from "./connector-source-identity";
+import { readBoundedSourceBody } from "./bounded-source-body";
+import { recordConnectorDocumentBinding } from "./connector-binding-store";
+import { createHash } from "node:crypto";
+import { verifyDropboxSource } from "./dropbox-source-integrity";
+import { observeSourceVersion, verifySourceVersion, type SourceVersionObservation } from "./source-version-guard";
 
 // One source object, taken from a provider to quarantine.
 //
-// This is lifted verbatim in behaviour from the connector sync route, which did it inline
-// inside a single HTTP request. The logic was correct and is unchanged: qualify the file,
-// derive a deterministic document id from (connection, native id, revision), reserve intake
-// admission and compute, presign, upload. What changes is only who calls it -- a job worker
-// that can run it for the 4,000th file as easily as the 1st, instead of a request handler
-// bounded to maxImports <= 3 by a 60-second function timeout.
+// Qualify and bound the file, validate available provider version/content proof, persist
+// the immutable source binding, then reserve intake/compute and upload to quarantine.
+// A bounded job worker calls this path repeatedly. Provider version qualification remains
+// separate from deterministic identity: a revision-derived ID alone does not prove bytes.
 //
 // The determinism matters more here than it did before. A worker retries; a lease expires and
 // another worker re-reads the same page. Because the document id is a pure function of
@@ -40,7 +43,7 @@ export function importDescriptor(item: OAuthSourceItem) {
 }
 
 export type ImportOutcome =
-  | { ok: true; nativeId: string; documentId: string; filename: string }
+  | ({ ok: true; nativeId: string; filename: string } & ConnectorSourceIdentity)
   | { ok: false; nativeId: string; code: string };
 
 export type ImportContext = {
@@ -64,17 +67,21 @@ export async function importSourceObject(context: ImportContext, item: OAuthSour
   if (item.sizeBytes !== null && item.sizeBytes > FOUNDATION_INTAKE_MAX_BYTES) {
     return { ok: false, nativeId: item.nativeId, code: "SOURCE_TOO_LARGE" };
   }
+  let identity: ConnectorSourceIdentity;
+  try { identity = await connectorSourceIdentity({ ...context, nativeId: item.nativeId, revision: item.revision }); }
+  catch { return { ok: false, nativeId: item.nativeId, code: "SOURCE_IDENTITY_INVALID" }; }
 
   let download: ReturnType<typeof oauthSourceDownloadRequest>;
   try {
     download = oauthSourceDownloadRequest({
       provider: context.provider,
       nativeId: item.nativeId,
+      revision: item.revision,
       mimeType: item.mimeType,
       target: context.target,
     });
-  } catch {
-    return { ok: false, nativeId: item.nativeId, code: "SOURCE_NATIVE_TYPE_UNSUPPORTED" };
+  } catch (error) {
+    return { ok: false, nativeId: item.nativeId, code: error instanceof Error && error.message === "SOURCE_REVISION_UNQUALIFIED" ? error.message : "SOURCE_NATIVE_TYPE_UNSUPPORTED" };
   }
 
   const downloadHeaders = new Headers();
@@ -82,6 +89,10 @@ export async function importSourceObject(context: ImportContext, item: OAuthSour
     if (typeof value === "string") downloadHeaders.set(name, value);
   }
   downloadHeaders.set("authorization", `Bearer ${context.accessToken}`);
+
+  let observedVersion: SourceVersionObservation | null;
+  try { observedVersion = await observeSourceVersion(context.provider, item, context.target, context.accessToken, fetcher); }
+  catch (error) { return { ok: false, nativeId: item.nativeId, code: error instanceof Error ? error.message : "SOURCE_VERSION_READ_FAILED" }; }
 
   let source: Response;
   try {
@@ -96,16 +107,32 @@ export async function importSourceObject(context: ImportContext, item: OAuthSour
   }
   if (!source.ok) return { ok: false, nativeId: item.nativeId, code: "SOURCE_DOWNLOAD_FAILED" };
 
-  const bytes = new Uint8Array(await source.arrayBuffer());
-  if (bytes.byteLength === 0 || bytes.byteLength > FOUNDATION_INTAKE_MAX_BYTES) {
-    return { ok: false, nativeId: item.nativeId, code: "SOURCE_SIZE_UNQUALIFIED" };
+  const body = await readBoundedSourceBody(source, FOUNDATION_INTAKE_MAX_BYTES);
+  if (!body.ok) return { ok: false, nativeId: item.nativeId, code: body.code };
+  const bytes = body.bytes;
+  if (context.provider === "dropbox") {
+    const rejected = verifyDropboxSource(source, bytes, item);
+    if (rejected) return { ok: false, nativeId: item.nativeId, code: rejected };
+  } else {
+    try {
+      const current = await observeSourceVersion(context.provider, item, context.target, context.accessToken, fetcher);
+      const rejected = verifySourceVersion(observedVersion, current, bytes);
+      if (rejected) return { ok: false, nativeId: item.nativeId, code: rejected };
+    } catch (error) { return { ok: false, nativeId: item.nativeId, code: error instanceof Error ? error.message : "SOURCE_VERSION_READ_FAILED" }; }
   }
 
   // Deterministic identity. Same (connection, object, revision) -> same document, so an
   // at-least-once retry re-imports rather than duplicates.
-  const sourceIdempotencyKey = await sha256Hex(`${context.connectionId}\u001f${item.nativeId}\u001f${item.revision}`);
-  const documentId = await deterministicSourceDocumentId(context.workspaceKey, sourceIdempotencyKey);
+  const { documentId } = identity;
   const objectKey = `quarantine/${context.workspaceKey}/${documentId}/source`;
+
+  const binding = await recordConnectorDocumentBinding({
+    workspaceKey: context.workspaceKey, connectionId: context.connectionId, provider: context.provider,
+    nativeId: item.nativeId, revision: item.revision,
+    contentSha256: `sha256:${createHash("sha256").update(bytes).digest("hex")}`,
+    byteLength: bytes.byteLength, mimeType: descriptor.mimeType,
+  });
+  if (!binding.ok) return { ok: false, nativeId: item.nativeId, code: binding.code };
 
   const admission = await reserveFoundationIntake({
     workspaceKey: context.workspaceKey,
@@ -119,7 +146,7 @@ export async function importSourceObject(context: ImportContext, item: OAuthSour
   // A deterministic source revision that already reached intake is complete for this sync
   // turn. Never reserve compute again or overwrite its create-once quarantine source.
   if (admission.result.idempotentReplay === true) {
-    return { ok: true, nativeId: item.nativeId, documentId, filename: descriptor.filename };
+    return { ok: true, nativeId: item.nativeId, ...identity, filename: descriptor.filename };
   }
 
   const compute = await reserveFoundationCompute({
@@ -158,5 +185,5 @@ export async function importSourceObject(context: ImportContext, item: OAuthSour
   });
   if (!confirmed.ok) return { ok: false, nativeId: item.nativeId, code: confirmed.code };
 
-  return { ok: true, nativeId: item.nativeId, documentId, filename: descriptor.filename };
+  return { ok: true, nativeId: item.nativeId, ...identity, filename: descriptor.filename };
 }

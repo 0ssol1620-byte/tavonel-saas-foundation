@@ -264,6 +264,72 @@ async function withCompiledWorld(page: Page) {
 
 const NARROW_STAGE_MAX = 820;
 
+// Deterministic two-page PDF fixture for renderer mechanics, not product evidence.
+function sourcePreviewPdfFixture() {
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Resources << >> /Contents 5 0 R >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Resources << >> /Contents 6 0 R >>",
+    ...["1 0 0 rg 20 20 100 100 re f", "0 0 1 rg 50 50 100 100 re f"].map(content => `<< /Length ${content.length} >>\nstream\n${content}\nendstream`),
+  ];
+  let pdf = "%PDF-1.4\n";
+  const offsets = [0];
+  objects.forEach((object, index) => { offsets.push(Buffer.byteLength(pdf)); pdf += `${index + 1} 0 obj\n${object}\nendobj\n`; });
+  const xref = Buffer.byteLength(pdf);
+  pdf += `xref\n0 7\n0000000000 65535 f \n${offsets.slice(1).map(offset => `${String(offset).padStart(10, "0")} 00000 n \n`).join("")}trailer\n<< /Size 7 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(pdf);
+}
+
+test("source preview reuses bytes across pages and clears the previous document before a new read", async ({ page }, testInfo) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", error => pageErrors.push(error.message));
+  await installSession(page);
+  await mockWorkspace(page);
+  const model = structuredClone(worldModel);
+  model.evidence.push(
+    { ...model.evidence[0], id: "evidence-page-one", page: 1, excerpt: "Preview fixture page one." },
+    { ...model.evidence[0], id: "evidence-other-source", sourceId: "doc-b", page: 1, excerpt: "Preview fixture other source." },
+  );
+  await page.route(`**/api/v1/world/${collectionId}`, route => route.fulfill({ json: { model } }));
+  let reads = 0;
+  let finishOther: (() => void) | undefined;
+  const otherReady = new Promise<void>(resolve => { finishOther = resolve; });
+  await page.route("**/api/documents/*/source?**", async route => {
+    reads += 1;
+    expect(route.request().headers().authorization).toMatch(/^Bearer /);
+    if (route.request().url().includes("/doc-b/")) await otherReady;
+    await route.fulfill({ contentType: "application/pdf", body: sourcePreviewPdfFixture() });
+  });
+  try {
+    await page.goto(`/workspace/world?collection=${collectionId}`);
+    await page.getByRole("tab", { name: "Evidence", exact: true }).click();
+    await page.getByRole("button", { name: /Total net sales increased/ }).click();
+    const inspector = page.getByRole("complementary", { name: "World selection inspector" });
+    await expect(inspector.locator('[data-state="ready"] canvas')).toBeVisible();
+    const pageTwoPixels = await inspector.locator("canvas").evaluate(canvas => (canvas as HTMLCanvasElement).toDataURL());
+    await page.getByRole("button", { name: /Preview fixture page one/ }).click();
+    await expect(inspector.locator('[data-state="ready"] canvas')).toBeVisible();
+    const pageOnePixels = await inspector.locator("canvas").evaluate(canvas => (canvas as HTMLCanvasElement).toDataURL());
+    expect(pageOnePixels).not.toBe(pageTwoPixels);
+    expect(reads).toBe(1);
+    await page.getByRole("button", { name: /Preview fixture other source/ }).click();
+    await expect(inspector.getByText("Opening source page…")).toBeVisible();
+    await expect(inspector.locator("canvas")).toHaveCount(0);
+    finishOther!();
+    await expect(inspector.locator('[data-state="ready"] canvas')).toBeVisible();
+    expect(reads).toBe(2);
+    const canvasBox = await inspector.locator("canvas").boundingBox();
+    const evidenceBox = await inspector.locator('[aria-label^="Evidence bounding box"]').boundingBox();
+    expect(canvasBox).not.toBeNull();
+    expect(evidenceBox).not.toBeNull();
+    expect(Math.abs(evidenceBox!.y - (canvasBox!.y + canvasBox!.height * 0.2))).toBeLessThan(2);
+    expect(Math.abs(evidenceBox!.height - canvasBox!.height * 0.1)).toBeLessThan(2);
+    await page.screenshot({ path: testInfo.outputPath("source-preview.png"), fullPage: true });
+    expect(pageErrors).toEqual([]);
+  } finally { finishOther?.(); }
+});
+
 test("the workspace World offers the same composition as an accessible list", async ({ page }) => {
   /*
     §20 / program §36. The public Explore has had a parallel representation since it shipped and

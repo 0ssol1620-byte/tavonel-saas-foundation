@@ -121,8 +121,8 @@ describe("worker behaviour", () => {
     await POST(requestWith(SECRET));
     const [first] = claimJob.mock.calls[0];
     const [second] = claimJob.mock.calls[1];
-    expect(first).toMatch(/^worker-[a-f0-9]{16}$/);
-    expect(second).toMatch(/^worker-[a-f0-9]{16}$/);
+    expect(first).toMatch(/^worker-sync-v3-[a-f0-9]{16}$/);
+    expect(second).toMatch(/^worker-sync-v3-[a-f0-9]{16}$/);
     expect(first).not.toBe(second);
   });
 

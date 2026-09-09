@@ -1,0 +1,10 @@
+begin;
+select plan(6);
+select has_table('public', 'connector_document_bindings', 'connector byte bindings exist');
+select ok((select relrowsecurity from pg_class where oid = 'public.connector_document_bindings'::regclass), 'binding RLS enabled');
+select table_privs_are('public', 'connector_document_bindings', 'service_role', array['SELECT', 'INSERT']::text[]);
+select table_privs_are('public', 'connector_document_bindings', 'anon', array[]::text[]);
+select table_privs_are('public', 'connector_document_bindings', 'authenticated', array[]::text[]);
+select ok(exists(select 1 from pg_trigger where tgrelid='public.connector_document_bindings'::regclass and tgname='connector_document_binding_guard' and not tgisinternal), 'binding mutation and connection guard installed');
+select * from finish();
+rollback;

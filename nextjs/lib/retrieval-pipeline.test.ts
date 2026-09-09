@@ -73,6 +73,7 @@ type Scenario = {
 };
 
 let scenario: Scenario;
+let sourceBlocked = false;
 let requests: Array<{ url: string; body: unknown }>;
 
 function jsonResponse(payload: unknown, ok = true) {
@@ -84,6 +85,7 @@ function jsonResponse(payload: unknown, ok = true) {
 }
 
 beforeEach(() => {
+  sourceBlocked = false;
   scenario = {
     runRows: [
       {
@@ -111,6 +113,7 @@ beforeEach(() => {
     const href = typeof url === "string" ? url : url.toString();
     const body = init?.body ? JSON.parse(String(init.body)) : null;
     requests.push({ url: href, body });
+    if (href.includes("/rpc/connector_documents_blocked")) return jsonResponse(sourceBlocked);
 
     if (href.includes("/rpc/search_foundation_retrieval_units_lexical")) {
       if (scenario.failLexicalRpc) return jsonResponse({ message: "boom" }, false);
@@ -211,6 +214,20 @@ const baseInput = () => ({
 });
 
 describe("retrieval pipeline orchestration", () => {
+  it("does not send blocked source text to the reranker", async () => {
+    sourceBlocked = true;
+    const input = baseInput();
+    const rerank = vi.spyOn(input.reranker, "rerank");
+    expect(await runRetrievalPipeline(input)).toEqual({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
+    expect(rerank).not.toHaveBeenCalled();
+  });
+  it("refuses context when access changes while the reranker runs", async () => {
+    const input = baseInput();
+    const original = input.reranker.rerank;
+    input.reranker.rerank = async (...args) => { sourceBlocked = true; return original(...args); };
+    expect(await runRetrievalPipeline(input)).toEqual({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
+    expect(requests.filter(r => r.url.includes("connector_documents_blocked"))).toHaveLength(2);
+  });
   it("runs all three sources, fuses them, and returns a ContextPacket", async () => {
     const result = await runRetrievalPipeline(baseInput());
     expect(result.ok).toBe(true);
@@ -226,7 +243,7 @@ describe("retrieval pipeline orchestration", () => {
     expect(result.diagnostics.fusedCandidateCount).toBeGreaterThan(0);
 
     // Both RPCs were really called, with tenant scope bound.
-    const rpcCalls = requests.filter((request) => request.url.includes("/rpc/"));
+    const rpcCalls = requests.filter((request) => request.url.includes("/rpc/search_foundation_retrieval"));
     expect(rpcCalls.some((call) => call.url.includes("lexical"))).toBe(true);
     expect(rpcCalls.some((call) => call.url.includes("dense"))).toBe(true);
     for (const call of rpcCalls) {

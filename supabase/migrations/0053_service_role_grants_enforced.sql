@@ -79,6 +79,9 @@ begin
       execute format('revoke all (%s) on table public.%I from service_role', v_columns, v_table);
     end if;
   end loop;
+  if to_regclass('public.foundation_connector_checkpoints') is not null then
+    grant select, insert, update on public.foundation_connector_checkpoints to service_role;
+  end if;
 end;
 $$;
 
@@ -140,6 +143,19 @@ begin
       raise exception 'service_role grant matrix names a table that does not exist: %', r.table_name;
     end if;
     execute format('grant %s on table public.%I to service_role', r.verbs, r.table_name);
+  end loop;
+end;
+$$;
+
+-- Later connector tables are absent on the initial 0053 pass but must retain their
+-- exact intended grants when this repair is replayed against a newer schema.
+do $$
+declare table_name text;
+begin
+  foreach table_name in array array['connector_document_bindings', 'connector_source_suspensions', 'foundation_connector_page_snapshots'] loop
+    if to_regclass(format('public.%I', table_name)) is not null then
+      execute format('grant select, insert on table public.%I to service_role', table_name);
+    end if;
   end loop;
 end;
 $$;

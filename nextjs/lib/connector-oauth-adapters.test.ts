@@ -2,6 +2,39 @@ import { describe, expect, it, vi } from "vitest";
 import { listOAuthSourcePage, OAUTH_SOURCE_PAGE_SIZE, oauthSourceDownloadRequest } from "./connector-oauth-adapters";
 
 describe("OAuth source adapters", () => {
+  it("keeps the selected shared drive on the first and following pages", async () => {
+    const fetcher = vi.fn(async () => Response.json({ files: [], nextPageToken: null }));
+    for (const cursor of [null, "next-page"]) {
+      await listOAuthSourcePage({ provider: "google_drive", accessToken: "test", cursor,
+        target: { driveId: "shared-drive_1" }, fetcher });
+    }
+    for (const call of fetcher.mock.calls as unknown as Array<[string]>) {
+      const url = new URL(String(call[0]));
+      expect(url.searchParams.get("driveId")).toBe("shared-drive_1");
+      expect(url.searchParams.get("corpora")).toBe("drive");
+      expect(url.searchParams.get("supportsAllDrives")).toBe("true");
+      expect(url.searchParams.get("includeItemsFromAllDrives")).toBe("true");
+      expect(url.searchParams.get("fields")).toContain("incompleteSearch");
+    }
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it("refuses unsupported Google path/site selections before any all-files request", async () => {
+    const fetcher = vi.fn();
+    for (const target of [{ rootPath: "/Research" }, { siteId: "site-one" }, { driveId: "" }, { driveId: "drive/other" }]) {
+      await expect(listOAuthSourcePage({ provider: "google_drive", accessToken: "test", cursor: null, target, fetcher }))
+        .rejects.toThrow("OAUTH_SOURCE_TARGET_UNSUPPORTED");
+    }
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("does not present an incomplete Drive search or repeated page as finished work", async () => {
+    await expect(listOAuthSourcePage({ provider: "google_drive", accessToken: "test", cursor: null,
+      fetcher: async () => Response.json({ files: [], incompleteSearch: true }) })).rejects.toThrow("OAUTH_SOURCE_PAGE_INVALID");
+    await expect(listOAuthSourcePage({ provider: "google_drive", accessToken: "test", cursor: "same",
+      fetcher: async () => Response.json({ files: [], nextPageToken: "same" }) })).rejects.toThrow("OAUTH_SOURCE_CURSOR_STALLED");
+  });
+
   it("normalizes Google Drive files and preserves bounded pagination", async () => {
     const fetcher = vi.fn(async () => Response.json({
       nextPageToken: "next-google-page",
@@ -22,7 +55,7 @@ describe("OAuth source adapters", () => {
     const dropboxBody = JSON.parse(String((dropboxFetcher as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1]?.body));
     expect(dropboxBody.limit).toBe(OAUTH_SOURCE_PAGE_SIZE);
 
-    const graphFetcher = vi.fn(async () => Response.json({ value: [] })) as unknown as typeof fetch;
+    const graphFetcher = vi.fn(async () => Response.json({ value: [], "@odata.deltaLink": "https://graph.microsoft.com/v1.0/me/drive/root/delta?$deltatoken=end" })) as unknown as typeof fetch;
     await listOAuthSourcePage({ provider: "microsoft_graph", accessToken: "access", cursor: null, fetcher: graphFetcher });
     const graphUrl = new URL(String((graphFetcher as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0]));
     expect(graphUrl.searchParams.get("$top")).toBe(String(OAUTH_SOURCE_PAGE_SIZE));
@@ -112,9 +145,12 @@ describe("connector egress policy", () => {
   });
 
   it("pins each provider download to that provider origin", () => {
+    expect(oauthSourceDownloadRequest({ provider: "microsoft_graph", nativeId: "item-1", target: { siteId: "site,123" } }).url)
+      .toBe("https://graph.microsoft.com/v1.0/sites/site%2C123/drive/items/item-1/content");
+    expect(() => oauthSourceDownloadRequest({ provider: "dropbox", nativeId: "id:file-1" })).toThrow("SOURCE_REVISION_UNQUALIFIED");
     expect(oauthSourceDownloadRequest({ provider: "google_drive", nativeId: "file-1" }).url)
       .toContain("https://www.googleapis.com/drive/v3/files/file-1");
-    expect(oauthSourceDownloadRequest({ provider: "dropbox", nativeId: "file-1" }).url)
+    expect(oauthSourceDownloadRequest({ provider: "dropbox", nativeId: "file-1", revision: "a1c10ce0dd78" }).url)
       .toBe("https://content.dropboxapi.com/2/files/download");
     expect(oauthSourceDownloadRequest({ provider: "microsoft_graph", nativeId: "file-1" }).url)
       .toContain("https://graph.microsoft.com/v1.0/me/drive/items/file-1/content");

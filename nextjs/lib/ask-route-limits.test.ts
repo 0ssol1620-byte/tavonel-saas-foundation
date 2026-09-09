@@ -17,12 +17,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
       rather than a wrong answer served confidently.
 */
 
-const { authorize, revalidate, activeWorld, pipeline } = vi.hoisted(() => ({
+const { authorize, revalidate, activeWorld, pipeline, sourceIds, sourceAccess } = vi.hoisted(() => ({
   authorize: vi.fn(),
   revalidate: vi.fn(),
   activeWorld: vi.fn(),
   pipeline: vi.fn(),
+  sourceIds: vi.fn(), sourceAccess: vi.fn(),
 }));
+vi.mock("@/lib/active-world-source-access", () => ({ loadActiveWorldSourceIds: sourceIds }));
+vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: sourceAccess }));
 
 vi.mock("@/lib/developer-auth", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./developer-auth")>()),
@@ -57,6 +60,8 @@ function question(text: string, idempotencyKey?: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  sourceIds.mockResolvedValue({ ok: true, documentIds: ["source-fixture"] });
+  sourceAccess.mockResolvedValue({ ok: true });
   revalidate.mockImplementation(async (_request, expected) => ({ ok: true, principal: expected }));
   resetWorkspaceCostGuard();
   authorize.mockResolvedValue({
@@ -161,6 +166,29 @@ describe("per-workspace concurrency", () => {
 });
 
 describe("idempotency", () => {
+  it("refuses cached knowledge after its source is suspended", async () => {
+    expect((await ask(question("what changed in the filing?", "source-revoked-0001"), { params })).status).toBe(200);
+    sourceAccess.mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
+    const denied = await ask(question("what changed in the filing?", "source-revoked-0001"), { params });
+    expect(denied.status).toBe(403);
+    expect(await denied.json()).toEqual({ code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
+    expect(denied.headers.get("x-tavonel-idempotent-replay")).toBeNull();
+    expect(pipeline).toHaveBeenCalledTimes(1);
+  });
+  it("refuses knowledge when source access changes after cache completion", async () => {
+    sourceAccess.mockResolvedValueOnce({ ok: true }).mockResolvedValueOnce({ ok: true })
+      .mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
+    const denied = await ask(question("what changed in the filing?", "source-late-0001"), { params });
+    expect(denied.status).toBe(403);
+    expect(await denied.json()).toEqual({ code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
+    expect(sourceAccess).toHaveBeenCalledTimes(3);
+  });
+  it("does not run either answer path when the source binding cannot be resolved", async () => {
+    sourceIds.mockResolvedValue({ ok: false, code: "COLLECTION_SOURCE_BINDING_INVALID" });
+    const denied = await ask(question("what changed in the filing?"), { params });
+    expect(denied.status).toBe(503);
+    expect(pipeline).not.toHaveBeenCalled();
+  });
   it("never returns a cached answer after late authorization is revoked", async () => {
     expect((await ask(question("what changed in the filing?", "revoked-key-0001"), { params })).status).toBe(200);
     revalidate.mockResolvedValueOnce({ ok: false, code: "API_KEY_REVOKED", status: 401 });
