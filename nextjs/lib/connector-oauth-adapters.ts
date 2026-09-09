@@ -257,6 +257,12 @@ const GOOGLE_EXPORTS: Record<string, string> = {
   "application/vnd.google-apps.drawing": "image/png",
 };
 
+export function microsoftGraphItemUrl(nativeId: string, target: OAuthSourceTarget = {}) {
+  const drive = target.driveId ? `drives/${encodeURIComponent(target.driveId)}`
+    : target.siteId ? `sites/${encodeURIComponent(target.siteId)}/drive` : "me/drive";
+  return `${GRAPH_ORIGIN}/v1.0/${drive}/items/${encodeURIComponent(nativeId)}`;
+}
+
 export function oauthSourceDownloadRequest(input: {
   provider: OAuthConnectorProvider;
   nativeId: string;
@@ -287,7 +293,7 @@ export function oauthSourceDownloadRequest(input: {
     const path = exportMime ? "export" : "";
     const url = new URL(`${DRIVE_ORIGIN}/drive/v3/files/${encodeURIComponent(input.nativeId)}${path ? `/${path}` : ""}`);
     if (exportMime) url.searchParams.set("mimeType", exportMime);
-    else url.searchParams.set("alt", "media");
+    else { url.searchParams.set("alt", "media"); url.searchParams.set("supportsAllDrives", "true"); }
     if (input.mimeType?.startsWith("application/vnd.google-apps.") && !exportMime) throw new Error("OAUTH_SOURCE_NATIVE_TYPE_UNSUPPORTED");
     return { url: checked(url.toString()), method: "GET" as const, headers: {} };
   }
@@ -299,9 +305,8 @@ export function oauthSourceDownloadRequest(input: {
       headers: { "Dropbox-API-Arg": JSON.stringify({ path: `rev:${input.revision}` }) },
     };
   }
-  const drive = input.target?.driveId ? `drives/${encodeURIComponent(input.target.driveId)}` : "me/drive";
   return {
-    url: checked(`${GRAPH_ORIGIN}/v1.0/${drive}/items/${encodeURIComponent(input.nativeId)}/content`),
+    url: checked(`${microsoftGraphItemUrl(input.nativeId, input.target)}/content`),
     method: "GET" as const,
     headers: {},
   };

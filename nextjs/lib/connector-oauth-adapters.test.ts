@@ -112,6 +112,8 @@ describe("connector egress policy", () => {
   });
 
   it("pins each provider download to that provider origin", () => {
+    expect(oauthSourceDownloadRequest({ provider: "microsoft_graph", nativeId: "item-1", target: { siteId: "site,123" } }).url)
+      .toBe("https://graph.microsoft.com/v1.0/sites/site%2C123/drive/items/item-1/content");
     expect(() => oauthSourceDownloadRequest({ provider: "dropbox", nativeId: "id:file-1" })).toThrow("SOURCE_REVISION_UNQUALIFIED");
     expect(oauthSourceDownloadRequest({ provider: "google_drive", nativeId: "file-1" }).url)
       .toContain("https://www.googleapis.com/drive/v3/files/file-1");

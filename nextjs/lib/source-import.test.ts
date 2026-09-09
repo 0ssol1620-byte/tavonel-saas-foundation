@@ -17,6 +17,15 @@ vi.mock("./r2-presign", () => ({
 
 const { importSourceObject } = await import("./source-import");
 
+function withGoogleMetadata(fetcher: typeof fetch): typeof fetch {
+  return async (input, init) => {
+    const url = new URL(String(input));
+    if (url.searchParams.has("fields")) return Response.json({ id: url.pathname.split("/").at(-1), version: "1",
+      mimeType: "application/pdf", size: "3", md5Checksum: "5289df737df57326fcdd22597afb1fac", capabilities: { canDownload: true } });
+    return fetcher(input, init);
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   recordConnectorDocumentBinding.mockResolvedValue({ ok: true });
@@ -35,6 +44,21 @@ beforeEach(() => {
 });
 
 describe("source import replay safety", () => {
+  it("refuses a Google change during download before source binding or intake", async () => {
+    const metadata = { id: "file", version: "1", mimeType: "application/pdf", size: "3",
+      md5Checksum: "900150983cd24fb0d6963f7d28e17f72", capabilities: { canDownload: true } };
+    const fetcher = vi.fn().mockResolvedValueOnce(Response.json(metadata))
+      .mockResolvedValueOnce(new Response(new TextEncoder().encode("abc")))
+      .mockResolvedValueOnce(Response.json({ ...metadata, version: "2" }));
+    const result = await importSourceObject({ workspaceKey: "pilot-acme01", userId: "11111111-1111-4111-8111-111111111111",
+      connectionId: "22222222-2222-4222-8222-222222222222", provider: "google_drive", accessToken: "access", target: {},
+      signer: { accountId: "a", bucket: "b", accessKeyId: "k", secretAccessKey: "s" }, fetcher },
+    { nativeId: "file", name: "file.pdf", revision: "1", mimeType: "application/pdf", sizeBytes: 3, modifiedAt: null, kind: "file" });
+    expect(result).toMatchObject({ ok: false, code: "SOURCE_REVISION_MISMATCH" });
+    expect(recordConnectorDocumentBinding).not.toHaveBeenCalled();
+    expect(reserveFoundationIntake).not.toHaveBeenCalled();
+    expect(reserveFoundationCompute).not.toHaveBeenCalled();
+  });
   it.each([false, true])("binds a Dropbox revision before intake (matching=%s)", async matching => {
     const bytes = new TextEncoder().encode("abc");
     const fetcher = vi.fn().mockResolvedValue(new Response(bytes, { headers: {
@@ -62,8 +86,8 @@ describe("source import replay safety", () => {
       workspaceKey: "pilot-acme01", userId: "11111111-1111-4111-8111-111111111111",
       connectionId: "22222222-2222-4222-8222-222222222222", provider: "google_drive",
       accessToken: "access", target: {},
-      signer: { accountId: "a", bucket: "b", accessKeyId: "k", secretAccessKey: "s" }, fetcher,
-    }, { nativeId: "file", name: "file.pdf", revision: "v1", mimeType: "application/pdf",
+      signer: { accountId: "a", bucket: "b", accessKeyId: "k", secretAccessKey: "s" }, fetcher: withGoogleMetadata(fetcher),
+    }, { nativeId: "file", name: "file.pdf", revision: "1", mimeType: "application/pdf",
       sizeBytes: null, modifiedAt: null, kind: "file" });
     expect(result).toEqual({ ok: false, nativeId: "file", code: "SOURCE_DOWNLOAD_FAILED" });
     expect(reserveFoundationIntake).not.toHaveBeenCalled();
@@ -85,11 +109,11 @@ describe("source import replay safety", () => {
       accessToken: "access",
       target: {},
       signer: { accountId: "a", bucket: "b", accessKeyId: "k", secretAccessKey: "s" },
-      fetcher,
+      fetcher: withGoogleMetadata(fetcher),
     }, {
       nativeId: "drive-file",
       name: "Paper.pdf",
-      revision: "revision-1",
+      revision: "1",
       mimeType: "application/pdf",
       sizeBytes: 3,
       modifiedAt: null,
@@ -129,11 +153,11 @@ describe("source import replay safety", () => {
       accessToken: "access",
       target: {},
       signer: { accountId: "a", bucket: "b", accessKeyId: "k", secretAccessKey: "s" },
-      fetcher,
+      fetcher: withGoogleMetadata(fetcher),
     }, {
       nativeId: "drive-file",
       name: "Paper.pdf",
-      revision: "revision-2",
+      revision: "1",
       mimeType: "application/pdf",
       sizeBytes: 3,
       modifiedAt: null,

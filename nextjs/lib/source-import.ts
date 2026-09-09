@@ -11,6 +11,7 @@ import { readBoundedSourceBody } from "./bounded-source-body";
 import { recordConnectorDocumentBinding } from "./connector-binding-store";
 import { createHash } from "node:crypto";
 import { verifyDropboxSource } from "./dropbox-source-integrity";
+import { observeSourceVersion, verifySourceVersion, type SourceVersionObservation } from "./source-version-guard";
 
 // One source object, taken from a provider to quarantine.
 //
@@ -89,6 +90,10 @@ export async function importSourceObject(context: ImportContext, item: OAuthSour
   }
   downloadHeaders.set("authorization", `Bearer ${context.accessToken}`);
 
+  let observedVersion: SourceVersionObservation | null;
+  try { observedVersion = await observeSourceVersion(context.provider, item, context.target, context.accessToken, fetcher); }
+  catch (error) { return { ok: false, nativeId: item.nativeId, code: error instanceof Error ? error.message : "SOURCE_VERSION_READ_FAILED" }; }
+
   let source: Response;
   try {
     source = await fetcher(download.url, {
@@ -108,6 +113,12 @@ export async function importSourceObject(context: ImportContext, item: OAuthSour
   if (context.provider === "dropbox") {
     const rejected = verifyDropboxSource(source, bytes, item);
     if (rejected) return { ok: false, nativeId: item.nativeId, code: rejected };
+  } else {
+    try {
+      const current = await observeSourceVersion(context.provider, item, context.target, context.accessToken, fetcher);
+      const rejected = verifySourceVersion(observedVersion, current, bytes);
+      if (rejected) return { ok: false, nativeId: item.nativeId, code: rejected };
+    } catch (error) { return { ok: false, nativeId: item.nativeId, code: error instanceof Error ? error.message : "SOURCE_VERSION_READ_FAILED" }; }
   }
 
   // Deterministic identity. Same (connection, object, revision) -> same document, so an
