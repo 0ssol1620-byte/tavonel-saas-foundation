@@ -15,6 +15,8 @@ const getOAuthConnectionSecretReference = vi.fn<(...args: any[]) => any>();
 const listOAuthSourcePage = vi.fn<(...args: any[]) => any>();
 const importSourceObject = vi.fn<(...args: any[]) => any>();
 const suspendConnectorSource = vi.fn<(...args: any[]) => any>();
+const loadConnectorSyncPage = vi.fn<(...args: any[]) => any>();
+vi.mock("./connector-sync-page", () => ({ loadConnectorSyncPage }));
 vi.mock("./connector-source-access", () => ({ suspendConnectorSource }));
 const refreshOAuthAccessToken = vi.fn<(...args: any[]) => Promise<any>>(async () => ({ accessToken: "at-1" }));
 const readOAuthProviderRuntime = vi.fn<(...args: any[]) => any>(() => ({ clientSecretReference: "vault://client" }));
@@ -52,6 +54,7 @@ function sourceItem(id: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  loadConnectorSyncPage.mockImplementation(async (_job, _worker, _cursor, _offset, list) => list());
   suspendConnectorSource.mockResolvedValue({ ok: true });
   completeJobBatch.mockResolvedValue({ ok: true as const, value: { state: "leased" as const } });
   getOAuthConnectionSecretReference.mockResolvedValue({ ok: true, provider: "google_drive", refreshTokenReference: "vault://refresh" });
@@ -69,6 +72,20 @@ afterEach(() => {
 });
 
 describe("cursor safety", () => {
+  it("resumes the stored page even if today's provider listing would omit an unprocessed file", async () => {
+    loadConnectorSyncPage.mockResolvedValueOnce({ items: ["a", "b", "c", "d", "e", "f"].map(sourceItem), cursor: "next", complete: true });
+    listOAuthSourcePage.mockResolvedValueOnce({ items: ["b", "c", "d", "e", "f"].map(sourceItem), cursor: "next", complete: true });
+    await runSourceImportBatch({ ...JOB, cursorToken: "tavonel-sync-v1:5:current" }, "worker-1");
+    expect(listOAuthSourcePage).not.toHaveBeenCalled();
+    expect(importSourceObject.mock.calls.map(call => call[1].nativeId)).toEqual(["f"]);
+    expect(completeJobBatch.mock.calls[0][3]).toMatchObject({ outcome: "succeeded", itemsSeen: 1, itemsDone: 1 });
+  });
+  it("fails legacy offsets without advancing or importing when no page was saved", async () => {
+    loadConnectorSyncPage.mockRejectedValueOnce(new Error("CONNECTOR_PAGE_LEGACY_REVIEW_REQUIRED"));
+    await runSourceImportBatch({ ...JOB, cursorToken: "tavonel-sync-v1:5:current" }, "worker-1");
+    expect(importSourceObject).not.toHaveBeenCalled();
+    expect(completeJobBatch.mock.calls[0][3]).toEqual({ outcome: "failed", errorCode: "CONNECTOR_PAGE_LEGACY_REVIEW_REQUIRED" });
+  });
   it.each(["dropbox", "microsoft_graph"])("retains %s removal events before importing any page bytes", async provider => {
     getOAuthConnectionSecretReference.mockResolvedValue({ ok: true, provider, refreshTokenReference: "vault://refresh" });
     const removed = { ...sourceItem("removed"), kind: "deleted" };

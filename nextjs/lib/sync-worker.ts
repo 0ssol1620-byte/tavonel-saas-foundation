@@ -6,6 +6,7 @@ import { completeJobBatch, type ClaimedJob } from "./job-store";
 import { readR2SignerEnv } from "./r2-synthetic-canary";
 import { importSourceObject } from "./source-import";
 import { suspendConnectorSource } from "./connector-source-access";
+import { loadConnectorSyncPage } from "./connector-sync-page";
 
 // The worker that actually moves a connector sync forward.
 //
@@ -146,8 +147,7 @@ export async function runSourceImportBatch(
 
   const target = targetFromPayload(job.payload);
 
-  // Resume exactly where the last committed batch left off. Legacy jobs store only the
-  // provider cursor; newer jobs can also checkpoint an offset inside a large provider page.
+  // Offsets refer to the durably observed provider page, never a new mutable listing.
   const resume = decodeSyncCursor(job.cursorToken);
   if (!resume) {
     await completeJobBatch(job.workspaceKey, job.jobId, workerId, {
@@ -159,18 +159,20 @@ export async function runSourceImportBatch(
 
   let page: { items: OAuthSourceItem[]; cursor: string | null; complete: boolean };
   try {
-    page = await listOAuthSourcePage({
+    page = await loadConnectorSyncPage(job, workerId, resume.providerCursor, resume.pageOffset, () => listOAuthSourcePage({
       provider: binding.provider,
       accessToken,
       cursor: resume.providerCursor,
       target,
+    }));
+  } catch (error) {
+    const code = error instanceof Error && ["CONNECTOR_PAGE_STORE_UNAVAILABLE", "CONNECTOR_PAGE_INVALID", "CONNECTOR_PAGE_LEGACY_REVIEW_REQUIRED"].includes(error.message)
+      ? error.message : "SOURCE_LIST_FAILED";
+    const reported = await completeJobBatch(job.workspaceKey, job.jobId, workerId, {
+      outcome: code === "CONNECTOR_PAGE_INVALID" || code === "CONNECTOR_PAGE_LEGACY_REVIEW_REQUIRED" ? "failed" : "retry",
+      errorCode: code,
     });
-  } catch {
-    await completeJobBatch(job.workspaceKey, job.jobId, workerId, {
-      outcome: "retry",
-      errorCode: "SOURCE_LIST_FAILED",
-    });
-    return { ok: false, code: "SOURCE_LIST_FAILED" };
+    return { ok: false, code: reported.ok ? code : reported.code };
   }
 
   if (resume.pageOffset >= page.items.length && resume.pageOffset > 0) {

@@ -149,7 +149,7 @@ $$;
 do $$
 declare table_name text;
 begin
-  foreach table_name in array array['connector_document_bindings', 'connector_source_suspensions'] loop
+  foreach table_name in array array['connector_document_bindings', 'connector_source_suspensions', 'foundation_connector_page_snapshots'] loop
     if to_regclass(format('public.%I', table_name)) is not null then
       execute format('grant select, insert on table public.%I to service_role', table_name);
     end if;
