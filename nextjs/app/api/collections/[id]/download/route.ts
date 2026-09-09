@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { authorizeFoundationRequest } from "@/lib/developer-auth";
+import { authorizeFoundationRequest, revalidateFoundationAuthorization } from "@/lib/developer-auth";
 import { buildSignedCollectionZip, validateReviewableCollectionArtifact } from "@/lib/collection-download";
 import { readExportSignerEnv } from "@/lib/export-signing";
 import { loadPreferredCollectionCandidate } from "@/lib/collection-storage";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
-import { WORKSPACE_EXPORT_CONCURRENCY, acquireWorkspaceSlot } from "@/lib/workspace-cost-guard";
+import { WORKSPACE_EXPORT_CONCURRENCY } from "@/lib/workspace-cost-guard";
+import { acquireWorkspaceOperation } from "@/lib/workspace-operation-guard";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -35,13 +36,14 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
 
   // Taken after the cheap refusals and before the first expensive one: a malformed id or an
   // unconfigured signer costs nothing and must not consume a workspace's export slot.
-  const lease = acquireWorkspaceSlot("export", auth.principal.workspaceKey, WORKSPACE_EXPORT_CONCURRENCY);
+  const lease = await acquireWorkspaceOperation("export", auth.principal.workspaceKey);
   if (!lease.ok) {
     return NextResponse.json(
       { code: lease.code, concurrencyLimit: WORKSPACE_EXPORT_CONCURRENCY },
-      { status: 429, headers: { ...NO_STORE, "Retry-After": "10" } },
+      { status: lease.status, headers: { ...NO_STORE, "Retry-After": "10" } },
     );
   }
+  let signed: ReturnType<typeof buildSignedCollectionZip>;
   try {
     const manifestDigest = new URL(request.url).searchParams.get("manifest") ?? undefined;
     const loaded = await loadPreferredCollectionCandidate(
@@ -72,8 +74,19 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
         { status: 503, headers: NO_STORE },
       );
     }
-    const signed = buildSignedCollectionZip(artifact, exportSigner);
-    return new Response(signed.archive, {
+    signed = buildSignedCollectionZip(artifact, exportSigner);
+  } finally {
+    // Finish the potentially remote cleanup before the final authorization check.
+    // The complete archive is now in memory and no longer occupies a build slot.
+    if (!lease.replay) await lease.release();
+  }
+  const authorizedNow = await revalidateFoundationAuthorization(
+    request, auth.principal, "collections:download", "observer",
+  );
+  if (!authorizedNow.ok) return NextResponse.json({ code: authorizedNow.code }, {
+    status: authorizedNow.status, headers: NO_STORE,
+  });
+  return new Response(signed.archive, {
       status: 200,
       headers: {
         ...NO_STORE,
@@ -85,10 +98,5 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
         "X-Tavonel-Export-Manifest-Sha256": signed.signature.signedPayloadSha256,
         "X-Tavonel-Export-Key-Id": signed.signature.keyId,
       },
-    });
-  } finally {
-    // The archive is fully built and in memory by the time the Response is constructed, so the
-    // slot is genuinely free here rather than merely returned from.
-    lease.release();
-  }
+  });
 }

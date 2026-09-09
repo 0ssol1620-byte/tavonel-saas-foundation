@@ -60,7 +60,7 @@ const OAUTH = [
     provider: "dropbox",
     level: "Beta",
     description: "Import folders recursively with revision tracking and explicit deleted entries.",
-    deletion: "Deleted entries are surfaced so a World does not keep asserting a source that is gone.",
+    deletion: "The adapter reads deleted entries, but the import worker does not yet apply them to existing sources or Worlds. Deletion propagation is not qualified.",
     cursor: "The provider cursor; malformed continuation is refused.",
   },
   {
@@ -68,7 +68,7 @@ const OAUTH = [
     provider: "microsoft_graph",
     level: "Beta",
     description: "Read Microsoft Graph drives and sites through delta sync with eTag revisions.",
-    deletion: "Deleted facets in the delta are surfaced. Off-origin continuation links are refused.",
+    deletion: "The adapter reads deleted facets in the delta, but the import worker does not yet apply them to existing sources or Worlds. Deletion propagation is not qualified. Off-origin continuation links are refused.",
     cursor: "@odata.nextLink / @odata.deltaLink, origin-validated.",
   },
 ] as const;

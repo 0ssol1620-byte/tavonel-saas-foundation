@@ -60,3 +60,33 @@ The first production smoke exposed a Vercel Analytics script `404` because obser
 Automated evidence confirms rendering, interaction, accessibility, responsive behavior, product contracts, and measured performance. It does not establish aesthetic approval, customer consent, benchmark qualification, certification, or a real paid transaction. Customer stories and benchmarks remain private until qualified evidence exists.
 
 **FOUNDER VISUAL REVIEW REQUIRED**
+
+## 2026-09-10 — consent hydration prerequisite in premium craft QA
+
+The merge-SHA run for bf06a937 failed one 390px pointer-target case twice. Its captured screenshot shows the analytics consent panel still covering the scene controls. The helper used a one-shot visibility probe before client hydration, so it could skip the dismissal and measure behind the subsequently mounted panel.
+
+The helper now waits for the real named consent region, clicks No thanks, and waits for that region to disappear. Geometry and elementFromPoint assertions, target-size floors, project coverage and retries are unchanged. Application code and consent behavior are unchanged.
+
+The corrected premium-craft suite ran against actual https://tavonel.com at 1920, 1440, 1280, 1024, 768, 390, 360 and reduced motion: 27 passed, 5 existing desktop-only scene-mark skips, 0 failed. This is bounded automated public-route evidence, not founder visual acceptance or authenticated customer E2E.
+
+Failure evidence: GitHub Actions run34376893316, job102551856465, artifact10114616623 (product-qa). Local retained screenshot and trace are under D:/tvfix-0909/.chatgpt2codex/merge-product-qa-20260910/. The corrected live-run log is D:/tvfix-0909/.chatgpt2codex/consent-qa-all-widths-20260910.log.
+
+## 2026-09-10 — Detail completion candidate
+
+User screenshot revealed half-empty gray panels in Home Scene 02. Root cause: a two-column `.chain` retained its divider background when it had one child. Candidate fills the final odd child across both columns, preserving multi-item grids. Home instructions use readable prose and link to the real capability manifest; connector and assisted-import panels now offer an actual next action.
+
+Local production build: `.chatgpt2codex/detail-build-0910.log`, lint/typecheck and 199 test files / 2434 unit tests passed. First premium run: 34 passed, 5 existing skips, 1 flaky because 44px was represented as 43.999969 after reveal transform. New regression rounds to hundredth-pixel precision, preserving the 44px requirement. Repeat of all eight input configurations with retries disabled: 8 passed (`detail-input-rerun-0910.log`).
+
+`.chatgpt2codex/detail-audit-0910/` is an IN-PROGRESS local production-build capture of 85 historical route targets at seven widths plus reduced motion. Input screenshots inspected at 1440; no founder visual acceptance claimed. Auth redirects do not qualify Workspace. The capture manifest contains exact baseline and application diff. A subsequent capability-link underline CSS change still requires rebuilt verification. Full route inspection, accessibility, Lighthouse, exact-SHA CI and production verification remain open.
+
+Beta labels remain truthful; connector implementation and real-account qualification are tracked in `D:\TAVONEL_DETAIL_COMPLETION_REGISTER_2026-09-10.md` under the existing active goal.
+
+PR49 full Product QA found a real regression at 390/360: the new Capability Manifest inline link was only 16px tall. The existing 44px mobile test failed both initial and retry runs (400 passed / 2 failed / 86 existing skips). Apply the same `input-next` 44px action treatment to this link; no test exception or threshold change. Rebuild, targeted existing mobile checks and fresh exact-head CI are required before merge. Earlier input-panel checks did not cover this separate inline link.
+
+## 2026-09-10 — Honest processing and review states
+
+Candidate follow-up to PR49. Login now reads customerData.enabled from /api/status before offering immediately usable evaluation processing. Missing or disabled capability shows a clear gate and a 44px public Explore action. Review-required compile jobs explain the paused review state and link to their validated collection ID; existing cancellation behavior is retained. Integrations now states that adapter deletion events are not yet applied downstream by the import worker.
+
+Validation: lint/typecheck passed; component rendering and brand-copy suites 200 passed. Added component tests use Vitest automatic JSX transform, matching Next's runtime (the first SSR attempt exposed the previous classic-transform configuration). The final login capability browser suite passed 24 cases at seven widths plus reduced motion, retries disabled, through a fresh production build. Capability responses in these cases are explicitly mocked: this proves presentation for enabled/disabled/missing states, not production customer activation. Initial port 3119 belonged to another process; tests used verified-free 3137 without disturbing it. Receipt: D:\tvdetail-0910\.chatgpt2codex\login-gate-final-0910.log.
+
+Actual authenticated review-package navigation, final visual review, exact-SHA CI and production verification remain required. Connector deletion/ACL lifecycle implementation remains open; honest copy does not qualify the connector.

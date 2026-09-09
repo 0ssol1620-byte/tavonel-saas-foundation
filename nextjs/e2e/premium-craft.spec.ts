@@ -1,9 +1,34 @@
 import { expect, test } from "@playwright/test";
 
 async function dismissConsent(page: import("@playwright/test").Page) {
-  const decline = page.getByRole("button", { name: "No thanks", exact: true });
-  if (await decline.isVisible()) await decline.click();
+  // Each test starts with fresh storage. The banner mounts after hydration;
+  // an immediate visibility probe can miss it and measure controls underneath it.
+  const panel = page.getByRole("region", { name: "Optional analytics", exact: true });
+  await expect(panel).toBeVisible();
+  await panel.getByRole("button", { name: "No thanks", exact: true }).click();
+  await expect(panel).toBeHidden();
 }
+
+test("input routes fill their panels and provide usable next actions", async ({ page }) => {
+  await page.goto("/");
+  await dismissConsent(page);
+  const panels = page.locator('.chain[aria-label]');
+  await expect(panels).toHaveCount(2);
+  for (const panel of await panels.all()) {
+    await panel.scrollIntoViewIfNeeded();
+    const geometry = await panel.evaluate(element => ({
+      panel: element.getBoundingClientRect().width,
+      content: element.firstElementChild!.getBoundingClientRect().width,
+    }));
+    expect(geometry.panel - geometry.content).toBeLessThanOrEqual(2);
+    const action = panel.getByRole("link");
+    await expect(action).toHaveAttribute("href", "/integrations");
+    // Reveal transforms can produce 43.999969 for a CSS 44px target.
+    // Preserve the 44px threshold at hundredth-pixel measurement precision.
+    expect(Math.round((await action.boundingBox())!.height * 100) / 100).toBeGreaterThanOrEqual(44);
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
 
 test("evidence actions fit the document without clipping long source links", async ({ page }) => {
   await page.goto("/evidence");

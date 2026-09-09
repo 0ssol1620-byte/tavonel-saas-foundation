@@ -17,8 +17,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
       rather than a wrong answer served confidently.
 */
 
-const { authorize, activeWorld, pipeline } = vi.hoisted(() => ({
+const { authorize, revalidate, activeWorld, pipeline } = vi.hoisted(() => ({
   authorize: vi.fn(),
+  revalidate: vi.fn(),
   activeWorld: vi.fn(),
   pipeline: vi.fn(),
 }));
@@ -26,6 +27,7 @@ const { authorize, activeWorld, pipeline } = vi.hoisted(() => ({
 vi.mock("@/lib/developer-auth", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./developer-auth")>()),
   authorizeFoundationRequest: authorize,
+  revalidateFoundationAuthorization: revalidate,
 }));
 vi.mock("@/lib/world-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./world-store")>()),
@@ -55,6 +57,7 @@ function question(text: string, idempotencyKey?: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  revalidate.mockImplementation(async (_request, expected) => ({ ok: true, principal: expected }));
   resetWorkspaceCostGuard();
   authorize.mockResolvedValue({
     ok: true,
@@ -158,6 +161,25 @@ describe("per-workspace concurrency", () => {
 });
 
 describe("idempotency", () => {
+  it("never returns a cached answer after late authorization is revoked", async () => {
+    expect((await ask(question("what changed in the filing?", "revoked-key-0001"), { params })).status).toBe(200);
+    revalidate.mockResolvedValueOnce({ ok: false, code: "API_KEY_REVOKED", status: 401 });
+    const denied = await ask(question("what changed in the filing?", "revoked-key-0001"), { params });
+    expect(denied.status).toBe(401);
+    expect(await denied.json()).toEqual({ code: "API_KEY_REVOKED" });
+    expect(denied.headers.get("x-tavonel-idempotent-replay")).toBeNull();
+    expect(pipeline).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not cache a freshly computed result when authorization changes", async () => {
+    revalidate.mockResolvedValueOnce({ ok: false, code: "AUTHORIZATION_CHANGED_RETRY", status: 403 });
+    expect((await ask(question("what changed in the filing?", "revoked-key-0002"), { params })).status).toBe(403);
+    const retry = await ask(question("what changed in the filing?", "revoked-key-0002"), { params });
+    expect(retry.status).toBe(200);
+    expect(retry.headers.get("x-tavonel-idempotent-replay")).toBeNull();
+    expect(pipeline).toHaveBeenCalledTimes(2);
+  });
+
   it("replays the first answer without running the pipeline again", async () => {
     const first = await ask(question("what changed in the filing?", "retry-key-0001"), { params });
     expect(first.status).toBe(200);

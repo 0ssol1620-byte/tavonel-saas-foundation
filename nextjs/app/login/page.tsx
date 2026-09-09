@@ -28,6 +28,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [commercialMode, setCommercialMode] = useState<"pilot" | "live">("pilot");
   const [selfService, setSelfService] = useState(false);
+  const [customerProcessingEnabled, setCustomerProcessingEnabled] = useState(false);
   /**
    * R1, second half. Someone who arrived by picking a plan is not here to "open a workspace" --
    * they are part-way through a purchase, and the page has to say so or the detour looks like the
@@ -63,10 +64,12 @@ export default function LoginPage() {
           auth?: string;
           commercialMode?: "pilot" | "live";
           selfService?: boolean;
+          activationPolicy?: { customerData?: { enabled?: boolean } };
         };
         if (cancelled) return;
         setCommercialMode(body.commercialMode === "live" ? "live" : "pilot");
         setSelfService(body.selfService === true);
+        setCustomerProcessingEnabled(body.activationPolicy?.customerData?.enabled === true);
         setAuthState(body.auth === "google_oauth_configured" ? "ready" : "unconfigured");
       } catch {
         // Fail closed: if the deployment cannot be asked, do not offer a control that will fail.
@@ -122,10 +125,17 @@ export default function LoginPage() {
               itself once you are in. Nothing is charged by signing in, and access changes only
               after a signed webhook is persisted.
             </p>
-          ) : selfService ? (
+          ) : selfService && customerProcessingEnabled ? (
             <p className="notice static" role="status">
               <strong>Start with a free evaluation.</strong> Use up to 3 files and 50 standard
               pages to compile 1 World for 7 days. No card is required.
+            </p>
+          ) : null}
+
+          {authState === "ready" && !customerProcessingEnabled ? (
+            <p className="notice static" role="status">
+              <strong>Customer file processing is not open yet.</strong> You can sign in to view
+              your workspace, or explore a completed public example.
             </p>
           ) : null}
 
@@ -135,6 +145,9 @@ export default function LoginPage() {
                 authState === "unconfigured" ? "Sign-in unavailable here" :
                 busy ? "Opening Google…" : "Continue with Google"}
             </button>
+            {authState === "ready" && !customerProcessingEnabled ? (
+              <Link className="btn ghost" href="/explore">Explore the public World</Link>
+            ) : null}
             <Link className="btn ghost" href="/">Back to the site</Link>
           </div>
 
@@ -151,7 +164,7 @@ export default function LoginPage() {
             <li><b>Google sign-in.</b> No separate TAVONEL password is created or stored.</li>
             <li><b>Tenant scoped.</b> Workspace access and source processing remain bound to your account.</li>
             <li><b>Human review.</b> Review gates remain visible before a candidate World is activated.</li>
-            {selfService ? <li><b>Bounded evaluation.</b> Free compute is limited before processing begins, so paid workloads remain protected.</li> : null}
+            {selfService && customerProcessingEnabled ? <li><b>Bounded evaluation.</b> Free compute is limited before processing begins, so paid workloads remain protected.</li> : null}
           </ul>
         </div>
       </div>
