@@ -51,6 +51,8 @@ test("connector progress follows real response states and retains uncertainty on
   unavailable = false; state = "succeeded";
   await panel.getByRole("button", { name: "Refresh import progress" }).click();
   await expect(panel).toContainText("Check the workspace for processing and review results");
+  await expect(page.getByText("Connected; awaiting first source scan", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("No cursor committed", { exact: true })).toHaveCount(0);
   // A lost response cannot prove whether a mutation happened on the server.
   await page.route(`**/api/v1/oauth-connectors/connections/${connectionId}/sync`, route =>
     route.request().method() === "POST" ? route.abort("failed") : route.fallback());

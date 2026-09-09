@@ -336,9 +336,6 @@ export default function ConnectionsPanel() {
                 <div className="connection-title"><strong>{connection.displayName}</strong><span data-status={connection.status}>{connection.status}</span></div>
                 <p>{oauthProviderLabel(connection.provider)} · encrypted OAuth</p>
                 <small>{connection.providerAccountLabel ?? "Provider account connected"}</small>
-                <small>{connection.lastSyncAt ? `Last durable sync ${new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(connection.lastSyncAt))}` : "Connected; awaiting first source scan"}</small>
-                <small>{connection.cursorSha256 ?? "No cursor committed"}</small>
-                {connection.lastErrorCode ? <small className="connection-error">{connection.lastErrorCode}</small> : null}
                 <button type="button" disabled={busy} onClick={() => void startImport(connection)}>Import this source</button>
                 <ConnectionSyncStatus connectionId={connection.oauthConnectionId} revision={progressRevision} getToken={sessionToken} />
               </div>
