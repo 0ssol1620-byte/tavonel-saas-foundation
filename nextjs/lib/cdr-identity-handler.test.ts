@@ -33,6 +33,60 @@ it("rejects any request body before claiming", async () => {
   const response = await handleCdrIdentity(new Request("https://tavonel.com", { method: "POST", headers, body: "file" }), deps);
   expect(response.status).toBe(400); expect(deps.claim).not.toHaveBeenCalled();
 });
+it("accepts runtime empty streams without trusting body object presence", async () => {
+  const { headers, deps } = fixture();
+  const request = new Request("https://tavonel.com", { method: "POST", headers, body: "" });
+  expect(request.body).not.toBeNull();
+  expect((await handleCdrIdentity(request, deps)).status).toBe(200);
+  expect(deps.claim).toHaveBeenCalledOnce();
+});
+function streamRequest(body: ReadableStream<Uint8Array>, headers: HeadersInit) {
+  return new Request("https://tavonel.com", { method: "POST", headers, body, duplex: "half" } as RequestInit);
+}
+it.each([false, true])("accepts a closed empty stream (empty chunk %s)", async chunk => {
+  const { headers, deps } = fixture();
+  const request = streamRequest(new ReadableStream({ start(c) { if (chunk) c.enqueue(new Uint8Array()); c.close(); } }), headers);
+  expect((await handleCdrIdentity(request, deps)).status).toBe(200);
+});
+it("refuses previously consumed content even when its stream is now empty", async () => {
+  const { headers, deps } = fixture();
+  const request = new Request("https://tavonel.com", { method: "POST", headers, body: "file" });
+  await request.text();
+  expect((await handleCdrIdentity(request, deps)).status).toBe(400);
+  expect(deps.claim).not.toHaveBeenCalled();
+});
+it("rejects bytes even when Content-Length claims zero", async () => {
+  const { headers, deps } = fixture();
+  const request = streamRequest(new ReadableStream({ start(c) { c.enqueue(new Uint8Array([1])); c.close(); } }),
+    { ...headers, "content-length": "0" });
+  expect((await handleCdrIdentity(request, deps)).status).toBe(400);
+  expect(deps.claim).not.toHaveBeenCalled(); expect(deps.subject).not.toHaveBeenCalled(); expect(deps.mint).not.toHaveBeenCalled();
+});
+it("bounds stalled input even when cancellation never settles", async () => {
+  vi.useFakeTimers();
+  try {
+    const { headers, deps } = fixture();
+    const request = streamRequest(new ReadableStream({ cancel: () => new Promise(() => undefined) }), headers);
+    const pending = handleCdrIdentity(request, deps);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect((await pending).status).toBe(400);
+    expect(deps.claim).not.toHaveBeenCalled(); expect(deps.subject).not.toHaveBeenCalled();
+  } finally { vi.useRealTimers(); }
+});
+it("refuses endless empty chunks without starving the deadline", async () => {
+  const { headers, deps } = fixture();
+  const request = streamRequest(new ReadableStream({ pull(c) { c.enqueue(new Uint8Array()); } }), headers);
+  expect((await handleCdrIdentity(request, deps)).status).toBe(400);
+  expect(deps.claim).not.toHaveBeenCalled();
+});
+it.each(["errored", "locked"])("refuses %s streams before claiming", async mode => {
+  const { headers, deps } = fixture();
+  const body = new ReadableStream<Uint8Array>({ start(c) { if (mode === "errored") c.error(new Error("fixture")); } });
+  const request = streamRequest(body, headers);
+  const lock = mode === "locked" ? request.body!.getReader() : undefined;
+  try { expect((await handleCdrIdentity(request, deps)).status).toBe(400); expect(deps.claim).not.toHaveBeenCalled(); }
+  finally { lock?.releaseLock(); }
+});
 it.each(["preview", "development"])("refuses %s runtime", async environment => {
   const { request, deps } = fixture(); deps.env.VERCEL_ENV = environment;
   expect((await handleCdrIdentity(request, deps)).status).toBe(503); expect(deps.claim).not.toHaveBeenCalled();
