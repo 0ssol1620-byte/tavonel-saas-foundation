@@ -8,6 +8,8 @@ import { FOUNDATION_INTAKE_MAX_BYTES, presignFoundationQuarantinePut } from "./r
 import { type R2SignerEnv } from "./r2-synthetic-canary";
 import { connectorSourceIdentity, type ConnectorSourceIdentity } from "./connector-source-identity";
 import { readBoundedSourceBody } from "./bounded-source-body";
+import { recordConnectorDocumentBinding } from "./connector-binding-store";
+import { createHash } from "node:crypto";
 
 // One source object, taken from a provider to quarantine.
 //
@@ -108,6 +110,14 @@ export async function importSourceObject(context: ImportContext, item: OAuthSour
   // at-least-once retry re-imports rather than duplicates.
   const { documentId } = identity;
   const objectKey = `quarantine/${context.workspaceKey}/${documentId}/source`;
+
+  const binding = await recordConnectorDocumentBinding({
+    workspaceKey: context.workspaceKey, connectionId: context.connectionId, provider: context.provider,
+    nativeId: item.nativeId, revision: item.revision,
+    contentSha256: `sha256:${createHash("sha256").update(bytes).digest("hex")}`,
+    byteLength: bytes.byteLength, mimeType: descriptor.mimeType,
+  });
+  if (!binding.ok) return { ok: false, nativeId: item.nativeId, code: binding.code };
 
   const admission = await reserveFoundationIntake({
     workspaceKey: context.workspaceKey,

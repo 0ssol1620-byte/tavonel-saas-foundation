@@ -5,6 +5,8 @@ const reserveFoundationIntake = vi.fn<(...args: any[]) => Promise<any>>();
 const reserveFoundationCompute = vi.fn<(...args: any[]) => Promise<any>>();
 const confirmFoundationIntake = vi.fn<(...args: any[]) => Promise<any>>();
 const presignFoundationQuarantinePut = vi.fn<(...args: any[]) => any>();
+const recordConnectorDocumentBinding = vi.fn<(...args: any[]) => Promise<any>>();
+vi.mock("./connector-binding-store", () => ({ recordConnectorDocumentBinding }));
 
 vi.mock("./intake-admission", () => ({ confirmFoundationIntake, reserveFoundationIntake }));
 vi.mock("./compute-reservation", () => ({ reserveFoundationCompute }));
@@ -17,6 +19,7 @@ const { importSourceObject } = await import("./source-import");
 
 beforeEach(() => {
   vi.clearAllMocks();
+  recordConnectorDocumentBinding.mockResolvedValue({ ok: true });
   reserveFoundationIntake.mockResolvedValue({
     ok: true,
     result: {
@@ -75,6 +78,7 @@ describe("source import replay safety", () => {
     });
 
     expect(outcome.ok).toBe(true);
+    expect(recordConnectorDocumentBinding).toHaveBeenCalledOnce();
     expect(reserveFoundationCompute).not.toHaveBeenCalled();
     expect(presignFoundationQuarantinePut).not.toHaveBeenCalled();
     expect(fetcher).toHaveBeenCalledTimes(1);
