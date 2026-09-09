@@ -1,6 +1,6 @@
 # tavonel-foundation-cdr
 
-Foundation-only Cloudflare Worker that loads `quarantine/{workspaceId}/{documentId}/source` from R2 and sanitizes it through the synthetic Cloud Run CDR. It never asks Vercel to carry file bytes.
+Foundation-only Cloudflare Worker that loads `quarantine/{workspaceId}/{documentId}/source` from R2 and sanitizes it through the IAM-protected PDFium/ClamAV Cloud Run CDR. The Worker obtains a short-lived Google identity token through the bounded Vercel identity broker; file bytes travel directly from the Worker to the private CDR service and never through Vercel.
 
 After a successful create-once `sanitized.pdf` write, if `FOUNDATION_OCR_URL` is set to a Foundation OCR target (not `tavonel-pdf-cdr` / prod), the Worker GETs the immutable PDF from R2, POSTs `/v1/ocr`, and writes sibling `ocr.json` create-once. If the URL is empty, OCR is skipped and CDR still returns clean.
 
@@ -10,7 +10,7 @@ Production processing requires `FOUNDATION_BILLING_SETTLEMENT_URL` to remain the
 
 The queue consumer is intentionally serialized with `max_batch_size=1` and `max_concurrency=1`. RunPod exposes one paid GPU worker, so horizontal Queue autoscaling would turn a five-file source page into concurrent load-balancer calls and create avoidable timeouts. Transient messages retry ten times and then move to `foundation-quarantine-dead-letter` instead of disappearing.
 
-This Worker is **not deployed** by the OCR-slice commit. Do not `wrangler deploy` from the company PC. Worker name remains `tavonel-foundation-cdr`. Never deploy `tavonel-quarantine-sidecar`.
+Worker name remains `tavonel-foundation-cdr`. Never deploy `tavonel-quarantine-sidecar`. Upload a version first, verify its preview and exact bindings, and only then promote that exact version. Direct `wrangler deploy` from the company PC remains prohibited because it creates and activates an unverified version in one step.
 
 ## Persisted CDR evidence boundary
 
@@ -40,3 +40,12 @@ Cloudflare documents null conditional PUT results and read-after-write consisten
 
 ## Federated health authentication
 When FOUNDATION_CDR_IDENTITY_HMAC is configured, GET /health requires the existing FOUNDATION_MANUAL_TRIGGER_TOKEN (at least 32 characters) in an Authorization: Bearer header. A missing/short operator token disables the route (404); a missing or invalid request token returns 401 before any downstream request. Configure the monitoring client accordingly before enabling federation. Public synthetic health remains unchanged when no identity secret is configured. The operator token is not the identity HMAC. Never put either in query strings or logs.
+
+The private cutover requires these dashboard-only secrets before version upload:
+
+- `TAVONEL_CDR_HMAC`, matching the private CDR service secret;
+- `FOUNDATION_CDR_IDENTITY_HMAC`, matching the Vercel broker secret;
+- `FOUNDATION_MANUAL_TRIGGER_TOKEN`, used only by operator health and manual sanitize calls;
+- the existing billing and OCR secrets required by their configured downstream services.
+
+An uploaded version is still a candidate. Qualification must prove anonymous health denial, authenticated health, a clean queue delivery with immutable PDF and v2 receipt, replay reuse without a second CDR call, and malicious/malformed refusal before the version receives production traffic.
