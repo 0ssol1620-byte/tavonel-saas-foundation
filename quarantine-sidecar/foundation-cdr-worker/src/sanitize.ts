@@ -60,6 +60,7 @@ export type SanitizeEnv = {
 
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{16,160}$/;
 const SAFE_CDR_DETAIL_PATTERN = /^CDR [A-Za-z0-9 ._()-]{1,156}$/;
+const SAFE_CDR_REJECT_CODES = new Set(["MALWARE_DETECTED"]);
 const CDR_RECEIPT_SCHEMA = "tavonel.cdr_receipt.v2";
 const DIGEST_PATTERN = /^sha256:[a-f0-9]{64}$/;
 const MAX_RECEIPT_BYTES = 16 * 1024;
@@ -108,9 +109,11 @@ async function safeCdrRejectDetail(response: Response): Promise<string | null> {
     return null;
   }
   const detail = (body as { detail?: unknown }).detail;
-  if (typeof detail !== "string") {
-    return null;
+  if (detail && typeof detail === "object" && !Array.isArray(detail)) {
+    const code = (detail as { code?: unknown }).code;
+    return typeof code === "string" && SAFE_CDR_REJECT_CODES.has(code) ? code : null;
   }
+  if (typeof detail !== "string") return null;
   const normalized = detail.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 160);
   return SAFE_CDR_DETAIL_PATTERN.test(normalized) ? normalized : null;
 }
@@ -247,6 +250,7 @@ export function asSourceRefusal(error: unknown): SourceRefusal | null {
  * `SOURCE_TOO_LARGE` member is proposed for enums v2 in the lane report.
  */
 export const CDR_DETAIL_FAILURE_CLASS: Record<string, FailureClass> = {
+  "MALWARE_DETECTED": "MALWARE_QUARANTINED",
   "CDR source filename is invalid": "UNSUPPORTED_FORMAT",
   "CDR source format is not qualified for PDF rasterization": "UNSUPPORTED_FORMAT",
   "CDR Office package expansion is not qualified": "UNSUPPORTED_FORMAT",

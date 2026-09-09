@@ -855,6 +855,27 @@ describe("Worker HTTP and queue surface", () => {
  * with nothing written, never a second receipt, never a class somebody guessed.
  */
 describe("permanent refusals leave a receipt", () => {
+  it("preserves the safe malware code without exposing the scanner signature", async () => {
+    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
+    await assert.rejects(
+      () => sanitizeObject(envFor(r2), SOURCE_KEY, async () => new Response(JSON.stringify({
+        detail: {
+          code: "MALWARE_DETECTED",
+          signature: "Win.Test.EICAR_HDB-1",
+          scannedSha256: "sha256:private",
+          message: "CDR source was rejected by the malware scanner",
+        },
+      }), { status: 422, headers: { "content-type": "application/json" } })),
+      (error: unknown) => {
+        assert.equal(error instanceof PermanentReject, true);
+        assert.equal((error as PermanentReject & { failureClass?: string }).failureClass, "MALWARE_QUARANTINED");
+        assert.equal((error as Error).message.includes("Win.Test.EICAR_HDB-1"), false);
+        assert.equal((error as Error).message.includes("sha256:private"), false);
+        return true;
+      },
+    );
+  });
+
   function oversizedR2() {
     const r2 = new FakeR2();
     r2.objects.set(SOURCE_KEY, { bytes: SOURCE_BYTES, contentType: "application/pdf" });
@@ -993,6 +1014,7 @@ describe("permanent refusals leave a receipt", () => {
   });
 
   it("does not invent a class for a refusal it has never seen", () => {
+    assert.equal(cdrRefusalFailureClass(422, "MALWARE_DETECTED"), "MALWARE_QUARANTINED");
     assert.equal(cdrRefusalFailureClass(422, "CDR something nobody has written yet"), "CORRUPT_SOURCE");
     assert.equal(cdrRefusalFailureClass(422, null), "CORRUPT_SOURCE");
     assert.equal(cdrRefusalFailureClass(413, null), "PARSER_OOM");
