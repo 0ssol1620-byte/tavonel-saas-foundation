@@ -17,9 +17,9 @@
     }
   ],
   "vars": {
-    "TAVONEL_CDR_URL": "https://tavonel-cdr-synthetic-317850201666.asia-northeast3.run.app/v1/disarm",
-    "TAVONEL_CDR_HEALTH_URL": "https://tavonel-cdr-synthetic-317850201666.asia-northeast3.run.app/health",
-    "TAVONEL_CDR_PROVIDER": "tavonel_pdf_raster",
+    "TAVONEL_CDR_URL": "https://tavonel-cdr-validation-0909-jw7bqc3nla-du.a.run.app/v1/disarm",
+    "TAVONEL_CDR_HEALTH_URL": "https://tavonel-cdr-validation-0909-jw7bqc3nla-du.a.run.app/health",
+    "TAVONEL_CDR_PROVIDER": "tavonel_pdfium_clamav_v1",
     "FOUNDATION_R2_BUCKET": "tavonel-saas-foundation-quarantine",
     "FOUNDATION_BILLING_SETTLEMENT_URL": "https://tavonel-saas-foundation.vercel.app/api/internal/billing/settle",
     // Dashboard sets FOUNDATION_OCR_URL after the GHCR image / endpoint exists.

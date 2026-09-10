@@ -8,7 +8,7 @@ it("signs a bodyless request accepted by the actual server verifier", async () =
   const now = new Date();
   const id = "11111111-1111-4111-8111-111111111111";
   const result = await cdrAuthorization(`${PRIVATE_CDR_ORIGIN}/v1/disarm`, secret, async (url, init) => {
-    assert.equal(url, IDENTITY_BROKER); assert.equal(init?.body, undefined); assert.equal(init?.redirect, "error");
+    assert.equal(url, IDENTITY_BROKER); assert.equal(init?.body, undefined); assert.equal(init?.redirect, "manual");
     assert.equal(verifyCdrIdentityRequest(new Headers(init?.headers), secret, now.getTime()), id);
     return Response.json({ audience: PRIVATE_CDR_ORIGIN, token: "fixture.identity.signature" });
   }, now, id);
@@ -24,6 +24,15 @@ for (const body of [{ audience: "wrong", token: "fixture.identity.signature" }, 
     await assert.rejects(cdrAuthorization(`${PRIVATE_CDR_ORIGIN}/v1/disarm`, secret, async () => Response.json(body)), RetryableError);
   });
 }
+it("refuses broker redirects without forwarding the signed request", async () => {
+  let calls = 0;
+  await assert.rejects(cdrAuthorization(`${PRIVATE_CDR_ORIGIN}/v1/disarm`, secret, async (_url, init) => {
+    calls += 1;
+    assert.equal(init?.redirect, "manual");
+    return new Response(null, { status: 302, headers: { location: "https://attacker.invalid/capture" } });
+  }), RetryableError);
+  assert.equal(calls, 1);
+});
 it("cancels oversized broker output", async () => {
   let canceled = false;
   await assert.rejects(cdrAuthorization(`${PRIVATE_CDR_ORIGIN}/v1/disarm`, secret, async () => new Response(new ReadableStream({
