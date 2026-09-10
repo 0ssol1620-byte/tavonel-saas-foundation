@@ -129,7 +129,7 @@ describe("CDR response transport bounds", () => {
       let calls = 0;
       const fetcher: typeof fetch = async (_input, init) => {
         calls += 1;
-        assert.equal(init?.redirect, "error");
+        assert.equal(init?.redirect, "manual");
         assert.ok(init?.signal);
         const headers = new Headers({ "content-type": "application/pdf", "x-tavonel-cdr-status": "clean",
           "x-tavonel-input-sha256": await sha256DigestHeader(SOURCE_BYTES), "x-tavonel-cdr-output-sha256": outputSha256() });
@@ -637,6 +637,25 @@ describe("Worker HTTP and queue surface", () => {
     assert.equal(response.headers.get("content-type")?.includes("application/json"), true);
   });
 
+  it("keeps settlement failure terminal while returning bounded persisted-result diagnostics", async () => {
+    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
+    const response = await handleRequest(new Request("https://worker.example/v1/sanitize", {
+      method: "POST", headers: { authorization: `Bearer ${MANUAL_TRIGGER_TOKEN}`, "content-type": "application/json" },
+      body: JSON.stringify({ objectKey: SOURCE_KEY }),
+    }), envFor(r2), async (input, init) => String(input) === SETTLEMENT_URL
+      ? Response.json({ code: "COMPUTE_SETTLEMENT_INVALID", detail: "must not escape" }, { status: 503 })
+      : cleanCdrFetch(input, init));
+    assert.equal(response.status, 503);
+    const payload = await response.json() as Record<string, string>;
+    assert.equal(payload.error, "compute settlement returned HTTP 503 (COMPUTE_SETTLEMENT_INVALID)");
+    assert.equal(payload.sourceKey, SOURCE_KEY);
+    assert.equal(payload.immutableKey, immutableObjectKey("ws_pilot", "doc_1", outputSha256()));
+    assert.equal(payload.status, "clean");
+    assert.equal(payload.cdrReceiptStatus, "written");
+    assert.equal(payload.ocrStatus, "skipped");
+    assert.equal(JSON.stringify(payload).includes("must not escape"), false);
+  });
+
   it("blocks unauthenticated federated health before consuming identity budget", async () => {
     for (const path of ["/health", "/health?probe=1", "/ignored/../health"]) {
       for (const authorization of [undefined, "Bearer invalid", `Basic ${MANUAL_TRIGGER_TOKEN}`]) {
@@ -836,6 +855,27 @@ describe("Worker HTTP and queue surface", () => {
  * with nothing written, never a second receipt, never a class somebody guessed.
  */
 describe("permanent refusals leave a receipt", () => {
+  it("preserves the safe malware code without exposing the scanner signature", async () => {
+    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
+    await assert.rejects(
+      () => sanitizeObject(envFor(r2), SOURCE_KEY, async () => new Response(JSON.stringify({
+        detail: {
+          code: "MALWARE_DETECTED",
+          signature: "Win.Test.EICAR_HDB-1",
+          scannedSha256: "sha256:private",
+          message: "CDR source was rejected by the malware scanner",
+        },
+      }), { status: 422, headers: { "content-type": "application/json" } })),
+      (error: unknown) => {
+        assert.equal(error instanceof PermanentReject, true);
+        assert.equal((error as PermanentReject & { failureClass?: string }).failureClass, "MALWARE_QUARANTINED");
+        assert.equal((error as Error).message.includes("Win.Test.EICAR_HDB-1"), false);
+        assert.equal((error as Error).message.includes("sha256:private"), false);
+        return true;
+      },
+    );
+  });
+
   function oversizedR2() {
     const r2 = new FakeR2();
     r2.objects.set(SOURCE_KEY, { bytes: SOURCE_BYTES, contentType: "application/pdf" });
@@ -974,6 +1014,7 @@ describe("permanent refusals leave a receipt", () => {
   });
 
   it("does not invent a class for a refusal it has never seen", () => {
+    assert.equal(cdrRefusalFailureClass(422, "MALWARE_DETECTED"), "MALWARE_QUARANTINED");
     assert.equal(cdrRefusalFailureClass(422, "CDR something nobody has written yet"), "CORRUPT_SOURCE");
     assert.equal(cdrRefusalFailureClass(422, null), "CORRUPT_SOURCE");
     assert.equal(cdrRefusalFailureClass(413, null), "PARSER_OOM");

@@ -1,6 +1,6 @@
 import { PermanentReject } from "./errors";
 import { hmacSecretIsConfigured } from "./hmac";
-import { cdrAuthorization, PRIVATE_CDR_ORIGIN } from "./identity";
+import { cdrAuthorization, CdrIdentityError, PRIVATE_CDR_ORIGIN } from "./identity";
 
 export const SYNTHETIC_CDR_HOST_MARKER = "tavonel-cdr-synthetic";
 export const PROD_CDR_HOST_MARKER = "tavonel-pdf-cdr";
@@ -81,14 +81,18 @@ export async function evaluateHealth(
   }
   try {
     const authorization = await cdrAuthorization(env.TAVONEL_CDR_HEALTH_URL, env.FOUNDATION_CDR_IDENTITY_HMAC, fetcher);
-    const response = await fetcher(env.TAVONEL_CDR_HEALTH_URL, { method: "GET", redirect: "error",
+    const response = await fetcher(env.TAVONEL_CDR_HEALTH_URL, { method: "GET", redirect: "manual",
       signal: AbortSignal.timeout(10_000), headers: authorization ? { authorization } : {} });
     await response.body?.cancel().catch(() => undefined);
     if (!response.ok) {
-      return { httpStatus: 503, body: { status: "unavailable", reason: "synthetic CDR health check failed" } };
+      const reason = privateMode ? `private CDR health returned HTTP ${response.status}` : "synthetic CDR health check failed";
+      return { httpStatus: 503, body: { status: "unavailable", reason } };
     }
-  } catch {
-    return { httpStatus: 503, body: { status: "unavailable", reason: "synthetic CDR health check failed" } };
+  } catch (error) {
+    const reason = privateMode && error instanceof CdrIdentityError
+      ? `private CDR identity ${error.stage} failed (${error.safeDetail})`
+      : privateMode ? "private CDR health check failed" : "synthetic CDR health check failed";
+    return { httpStatus: 503, body: { status: "unavailable", reason } };
   }
   return {
     httpStatus: 200,

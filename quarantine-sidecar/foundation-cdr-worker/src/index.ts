@@ -122,8 +122,10 @@ export async function handleRequest(request: Request, env: Env, fetcher: typeof 
     } catch {
       return jsonResponse(400, { error: "JSON body with objectKey is required" });
     }
+    let observed: SanitizeResult | null = null;
     try {
       const result = await sanitizeObject(env, objectKey, fetcher);
+      observed = result;
       await settleSanitized(env, objectKey, result, fetcher);
       return jsonResponse(200, result);
     } catch (error) {
@@ -135,7 +137,16 @@ export async function handleRequest(request: Request, env: Env, fetcher: typeof 
           ? jsonResponse(status, { error: message })
           : jsonResponse(503, { error: "refusal could not be recorded" });
       }
-      return jsonResponse(503, { error: message });
+      return jsonResponse(503, {
+        error: message,
+        ...(observed ? {
+          sourceKey: observed.sourceKey,
+          immutableKey: observed.immutableKey,
+          status: observed.status,
+          cdrReceiptStatus: observed.cdrReceipt.status,
+          ocrStatus: observed.ocr.status,
+        } : {}),
+      });
     }
   }
   return jsonResponse(404, { error: "not found" });
