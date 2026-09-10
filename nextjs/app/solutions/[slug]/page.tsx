@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PublicPageShell } from "@/components/public-page-shell";
 import PublicPrimaryCta from "@/components/public-primary-cta";
+import SolutionProofSample from "@/components/solution-proof-sample";
 
 /*
   RESOLVED A-1 (2026-09-06), applied here in the repair pass rather than in the pass that
@@ -116,13 +117,8 @@ export default async function SolutionPage({ params }: { params: Promise<{ slug:
           <div className="stack solution-hero-copy">
             <p className="lede">{solution.lede}</p>
             <p>{solution.problem}</p>
-            <div className="solution-proofline" aria-label="From source to compiled World">
-              <span>SOURCE</span><i aria-hidden="true" />
-              <span>READ</span><i aria-hidden="true" />
-              <span>STRUCTURE</span><i aria-hidden="true" />
-              <span>WORLD</span>
-            </div>
           </div>
+          <SolutionProofSample />
         </div>
 
         <section className="solution-section" aria-labelledby="solution-flow-title">

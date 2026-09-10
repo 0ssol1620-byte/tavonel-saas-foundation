@@ -295,18 +295,27 @@ main { position: relative; z-index: 5; }
   position: relative;
 }
 
-.body { display: grid; grid-template-columns: minmax(0, 380px) minmax(0, 1fr); gap: clamp(28px, 4vw, 72px); align-items: start; }
+.body {
+  display: grid;
+  /* Public pages need enough measure for a real sentence. The former 380px rail turned
+     ordinary six-to-ten-word headings into tall stacks and left the reading column floating
+     in unused space. A wider editorial column still preserves the asymmetric composition,
+     while keeping the supporting column within a comfortable prose measure. */
+  grid-template-columns: minmax(420px, 480px) minmax(0, 1fr);
+  gap: clamp(36px, 4vw, 64px);
+  align-items: start;
+}
 /* The title column held one heading and then several hundred pixels of nothing, because the
    evidence beside it is long. Pinning it is the fix that is also the better reading: the claim
    stays on screen while the thing that supports it scrolls past. Only where there are two
    columns -- below this the scene is one column and there is nothing to pin it against. */
-@media (min-width: 1000px) {
+@media (min-width: 1321px) {
   .body > .stack:first-child { position: sticky; top: 104px; }
 }
-@media (min-width: 1181px) {
+@media (min-width: 1321px) {
   .body > .trust-next { grid-column: 2; }
 }
-.body.split { grid-template-columns: minmax(0, 400px) minmax(0, 1fr); }
+.body.split { grid-template-columns: minmax(440px, 500px) minmax(0, 1fr); }
 .stack { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
 
 /* ============================================================ type */
@@ -330,11 +339,11 @@ h2 {
   font-variation-settings: "wght" 600;
 }
 .document-title {
-  font-size: clamp(34px, 4.5vw, 64px);
-  line-height: 1.06;
+  font-size: clamp(34px, 3.8vw, 56px);
+  line-height: 1.055;
   letter-spacing: -0.038em;
   font-variation-settings: "wght" 590;
-  text-wrap: balance;
+  text-wrap: pretty;
 }
 /* Narrative type is distinct from compact evidence instrumentation. */
 .scene.doc > .shell > .lede {
@@ -2824,7 +2833,7 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
 
 /* ============================================================ responsive */
 
-@media (max-width: 1180px) {
+@media (max-width: 1320px) {
   .body, .body.split { grid-template-columns: minmax(0, 1fr); gap: 24px; }
   .caps, .checks, .plans, .packs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .workspace-grid { grid-template-columns: minmax(0, 1fr); }
