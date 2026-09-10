@@ -61,6 +61,22 @@ Automated evidence confirms rendering, interaction, accessibility, responsive be
 
 **FOUNDER VISUAL REVIEW REQUIRED**
 
+## 2026-09-10 — Odd public record-grid closure
+
+A full-page contact-sheet review of the production-build public route set found two remaining empty visual cells that geometry-only route checks had not classified: the final records on `/security` and `/status` occupied the left half of their two-column grids while the divider background painted the unused right half gray. The existing `/subprocessors` repair used the same component pattern, so the shared rule now makes the final odd record span the full grid on all three routes.
+
+Fresh 1440px captures were inspected before and after the change. The gray half-cells are gone and the final records fill their rows. Evidence is retained under `nextjs/.chatgpt2codex/public-detail-audit/contact-sheets/` and `nextjs/.chatgpt2codex/fixed-*-1440.png`; these artifacts remain untracked.
+
+Verification on the production build:
+
+- full Playwright matrix: **916 passed, 211 intentional project-specific skips, 0 failed** across `1920`, `1440`, `1280`, `1024`, `768`, `390`, `360`, reduced motion, and launch Chromium/Firefox/WebKit projects;
+- focused odd-grid and layout regression: **32 passed, 0 failed** across all seven required widths plus reduced motion;
+- production build: passed, including TypeScript, ESLint, **217 test files / 2,677 unit tests**, and 74 generated static pages.
+
+This closes the concrete empty-cell defect and adds a browser geometry guard for the three affected public routes. Aesthetic acceptance remains a human gate.
+
+**FOUNDER VISUAL REVIEW REQUIRED**
+
 ## 2026-09-10 — consent hydration prerequisite in premium craft QA
 
 The merge-SHA run for bf06a937 failed one 390px pointer-target case twice. Its captured screenshot shows the analytics consent panel still covering the scene controls. The helper used a one-shot visibility probe before client hydration, so it could skip the dismissal and measure behind the subsequently mounted panel.

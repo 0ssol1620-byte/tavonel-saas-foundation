@@ -1161,7 +1161,8 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 .policy-copy p { margin: 0; color: var(--text-lo); line-height: 1.72; }
 .policy-copy a { color: var(--text-hi); text-decoration-thickness: 1px; text-underline-offset: 3px; }
 .processor-list, .status-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; margin: 8px 0 18px; background: var(--hairline); border: 1px solid var(--hairline); }
-.processor-list > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+.processor-list > :last-child:nth-child(odd),
+.status-list > :last-child:nth-child(odd) { grid-column: 1 / -1; }
 .processor-list article, .status-list article { padding: 20px; background: var(--ground); }
 /* `.status-list h3` was missing, so /status rendered its row names unstyled while /security,
    which uses h2 in the same grid, did not. */
