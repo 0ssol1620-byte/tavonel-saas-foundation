@@ -127,6 +127,25 @@ export async function runCollectionCompile(
   }
 
   const verifiedInputs = inputs.filter((item) => item !== null);
+
+  // Re-list immediately before the paid Core dispatch. Immutable keys cannot change, but a newer
+  // version of the same logical document can arrive while OCR JSON is being loaded and validated.
+  // Without this fence the run would knowingly compile a version that is no longer current.
+  const relisted = await listImmutableWorkspaceObjects(signer, workspaceId);
+  if (!relisted.ok) return { ok: false, status: 503, code: relisted.code, payload: {} };
+  const latest = selectCurrentDocumentVersions(groupImmutableDocuments(workspaceId, relisted.objects));
+  const newlyAmbiguous = latest.ambiguousDocumentIds.filter((id) => documentIds.includes(id));
+  if (newlyAmbiguous.length > 0) {
+    return { ok: false, status: 409, code: "SOURCE_VERSION_AMBIGUOUS", payload: { documentIds: newlyAmbiguous } };
+  }
+  const changed = selected.flatMap((item) => {
+    const currentVersion = latest.documents.find((candidate) => candidate.documentId === item!.documentId);
+    return currentVersion?.versionKey === item!.versionKey ? [] : [item!.documentId];
+  });
+  if (changed.length > 0) {
+    return { ok: false, status: 409, code: "SOURCE_VERSION_CHANGED", payload: { documentIds: changed }, retryAfterSeconds: 5 };
+  }
+
   let artifact: CollectionCandidateArtifact;
   let coreExecution: CollectionCompileSuccess["coreExecution"];
   if (coreV2) {

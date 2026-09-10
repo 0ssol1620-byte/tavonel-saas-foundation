@@ -167,4 +167,39 @@ describe("a source read before region capture", () => {
     expect(fetched).not.toHaveBeenCalled();
     expect(dispatched).not.toHaveBeenCalled();
   });
+
+  it("revalidates source versions after OCR load and before Core dispatch", async () => {
+    const newer = "d".repeat(64);
+    const first = [
+      { key: `${PREFIX}/sanitized.pdf`, size: 1024, lastModified: "2026-09-09T00:00:00.000Z" },
+      { key: `${PREFIX}/ocr.json`, size: 512, lastModified: "2026-09-09T00:01:00.000Z" },
+    ];
+    listed.mockResolvedValueOnce({ ok: true, objects: first }).mockResolvedValueOnce({ ok: true, objects: [
+      ...first,
+      { key: `immutable/${WS}/${WS}/${DOCUMENT}/${newer}/sanitized.pdf`, size: 2048,
+        lastModified: "2026-09-10T00:00:00.000Z" },
+    ] });
+    fetched.mockResolvedValue({ ok: true, json: ocrResult("tavonel.ocr_result.v2", [
+      {
+        regionId: "native-p0001",
+        pageIndex0: 0,
+        pageNumber1: 1,
+        order: 0,
+        blockType: "paragraph",
+        bbox1000: [0, 0, 1000, 1000],
+        text: "The pump was inspected and the reading stayed inside the policy limits.",
+        confidence: 1,
+        authority: "official",
+      },
+    ]) });
+
+    const run = await runCollectionCompile(WS, [DOCUMENT]);
+
+    expect(run.ok).toBe(false);
+    if (!run.ok) {
+      expect(run.code).toBe("SOURCE_VERSION_CHANGED");
+      expect(run.payload).toEqual({ documentIds: [DOCUMENT] });
+    }
+    expect(dispatched).not.toHaveBeenCalled();
+  });
 });
