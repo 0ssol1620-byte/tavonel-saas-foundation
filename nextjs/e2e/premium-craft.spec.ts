@@ -12,15 +12,15 @@ async function dismissConsent(page: import("@playwright/test").Page) {
 test("input routes fill their panels and provide usable next actions", async ({ page }) => {
   await page.goto("/");
   await dismissConsent(page);
-  const panels = page.locator('.chain[aria-label]');
+  const routes = page.locator('.source-routes[aria-label]');
+  await expect(routes).toHaveCount(1);
+  await routes.scrollIntoViewIfNeeded();
+  const panels = routes.locator(".source-route");
   await expect(panels).toHaveCount(2);
+  const routeWidth = (await routes.boundingBox())!.width;
   for (const panel of await panels.all()) {
-    await panel.scrollIntoViewIfNeeded();
-    const geometry = await panel.evaluate(element => ({
-      panel: element.getBoundingClientRect().width,
-      content: element.firstElementChild!.getBoundingClientRect().width,
-    }));
-    expect(geometry.panel - geometry.content).toBeLessThanOrEqual(2);
+    const panelWidth = (await panel.boundingBox())!.width;
+    expect(routeWidth - panelWidth).toBeLessThanOrEqual(2);
     const action = panel.getByRole("link");
     await expect(action).toHaveAttribute("href", "/integrations");
     // Reveal transforms can produce 43.999969 for a CSS 44px target.
