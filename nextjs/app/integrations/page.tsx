@@ -42,25 +42,18 @@ const OAUTH = [
     level: "Beta",
     description: "Discover and import Drive files read-only, tracking the file checksum as its revision.",
     /*
-      What the adapter does, not what a deletion contract should do. RESOLVED B-7.
-
-      The listing query is `trashed = false`, and the Drive adapter emits no deleted entry --
-      unlike Dropbox and Graph, which both do. So a trashed file simply stops appearing, and
-      that is indistinguishable from a file that was moved, renamed, hard-deleted, or that the
-      account can no longer see. The row used to claim it was "surfaced as source removal on
-      sync", which is the contract, not the code. B-7 calls this gap unacceptable for a
-      production connector and makes closing it a precondition of qualification, so it is
-      written here rather than smoothed over.
+      The lifecycle reader now binds a pre-snapshot watermark and consumes Drive changes after
+      the snapshot. Qualification remains closed until the same path passes a real-account run.
     */
-    deletion: "A trashed file stops appearing in the listing. It is not distinguished from a file that was deleted outright, moved, renamed, or whose permissions changed — a known gap, and one reason no connector here is qualified.",
-    cursor: "nextPageToken, stored per connection.",
+    deletion: "The versioned changes reader observes renames, content versions and removal or lost-access events. A removal suspends the bound source and stops the sync for review; real-account lifecycle qualification is still required.",
+    cursor: "Versioned snapshot and changes tokens, bound to the selected drive and stored per connection.",
   },
   {
     name: "Dropbox",
     provider: "dropbox",
     level: "Beta",
     description: "Import folders recursively with revision tracking and explicit deleted entries.",
-    deletion: "The adapter reads deleted entries, but the import worker does not yet apply them to existing sources or Worlds. Deletion propagation is not qualified.",
+    deletion: "Deleted entries suspend the bound source and stop the sync for review before its checkpoint advances. Real-account deletion and access-change qualification is still required.",
     cursor: "The provider cursor; malformed continuation is refused.",
   },
   {
@@ -68,7 +61,7 @@ const OAUTH = [
     provider: "microsoft_graph",
     level: "Beta",
     description: "Read Microsoft Graph drives and sites through delta sync with eTag revisions.",
-    deletion: "The adapter reads deleted facets in the delta, but the import worker does not yet apply them to existing sources or Worlds. Deletion propagation is not qualified. Off-origin continuation links are refused.",
+    deletion: "Deleted facets suspend the bound source and stop the sync for review before its checkpoint advances. Off-origin continuation links are refused. Real-account lifecycle qualification is still required.",
     cursor: "@odata.nextLink / @odata.deltaLink, origin-validated.",
   },
 ] as const;

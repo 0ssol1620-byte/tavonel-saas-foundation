@@ -261,78 +261,45 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
             {sourceFamilyChips.map((source) => <li key={source}>{source}</li>)}
           </ul>
           {/*
-            The flat connector list is gone. RESOLVED A-4 (2026-09-06).
-
-            It read "Folders · Google Drive · Dropbox · OneDrive / SharePoint · S3 / R2 / MinIO ·
-            SMB / NFS / SFTP" as one row of equal chips. Three of those are OAuth adapters that
-            exist and are labelled Beta on /integrations; two were not connectors at all. A
-            reader could not tell which half of the row they could actually use, and the
-            homepage was the one surface that dropped the distinction /integrations makes.
-
-            What is left is code-backed and reachable, each with the word that says how far it
-            has got. The OAuth three stay `beta` and not `qualified`: the adapters exist
-            (`connector-oauth-adapters.ts`, three providers, list and download), and RESOLVED
-            B-7 makes Google Drive's deletion semantics a blocker on connector qualification, so
-            no connector here is verified.
-
-            S3-compatible storage and mounted SMB/NFS/SFTP paths are not listed as connectors.
-            There is no import adapter for either in `lib/connector-*`; what exists is a local
-            agent the customer runs themselves, so the row sits outside the connector list and
-            below it, described as the assisted route it is rather than as something you switch
-            on. /integrations and /developers carry the full description.
-
-            ZIP says what actually happens to it. The archive is expanded in the browser and its
-            members are validated and compiled one at a time; the archive itself is never
-            compiled, and writing "ZIP" beside "PDF" implied it was.
-
-            Repair, 2026-09-06. The first version of this block kept four cards and gave two of
-            them status words of their own -- "AVAILABLE TODAY" for upload and for ZIP, "ON
-            REQUEST" for the agent route. Three faults in that. A-4 names four words --
-            qualified, beta, enterprise-assisted, unsupported -- and none of those three is one
-            of them; the same agent route reads "Enterprise-assisted" on /integrations and
-            /workspace, so the homepage was again the odd surface out; and "ZIP archive --
-            AVAILABLE TODAY" printed the opposite word to the one the Capability Manifest and
-            /sources print for `application/zip`, which is UNSUPPORTED and is refused by
-            `validateQualifiedDocumentInput` at upload.
-
-            The two axes were the cause: upload is not a connector, so it has no place in a list
-            whose every row must carry a connector support word, and forcing one on it produced a
-            word from outside the vocabulary. Direct upload and ZIP move into the sentence above
-            the list -- where the ZIP truth is stated in full, including the manifest's word for
-            it -- and the list holds only what A-4 governs: the connectors, each with one of
-            A-4's words. `brand-copy.test.ts` now fails if any other word appears in a status
-            chip on this page.
+            The landing page explains the two source routes by access mode and next action.
+            Detailed qualification labels and provider evidence stay on /integrations, where a
+            reader can inspect the scope instead of reading a status badge without context.
           */}
           <p className="input-guidance rv">
             Upload files or folders, or unpack a ZIP in your browser. Each file is checked
             before storage. The ZIP archive itself is never compiled and is listed as
             UNSUPPORTED in the <Link className="input-next" href="/sources">Capability Manifest</Link>.
           </p>
-          <div className="chain rv" aria-label="Connectors, and how far each has got">
-            <article className="link">
-              <span className="st">BETA</span>
-              <h3>Google Drive · Dropbox · OneDrive / SharePoint</h3>
-              <p>Read-only discovery and import, built and contract-tested. Not qualified: deletion and permission semantics are still being settled, so verify a connection before depending on it.</p>
-              <Link className="input-next" href="/integrations">Review connector capabilities →</Link>
+          <div className="source-routes rv" aria-label="Ways to bring sources into TAVONEL">
+            <article className="source-route">
+              <div className="source-route-heading">
+                <span className="source-route-index" aria-hidden="true">01</span>
+                <div>
+                  <p className="source-route-kind">Cloud systems</p>
+                  <h3>Google Drive · Dropbox · OneDrive / SharePoint</h3>
+                </div>
+              </div>
+              <p>Connect read-only, then run a bounded first sync in Workspace. Provider qualification and last-tested evidence stay visible on Integrations.</p>
+              <dl className="source-route-facts">
+                <div><dt>Access</dt><dd>Read-only OAuth</dd></div>
+                <div><dt>Before use</dt><dd>Verify the connection</dd></div>
+              </dl>
+              <Link className="input-next" href="/integrations">Check connection readiness →</Link>
             </article>
-          </div>
-          {/*
-            Out of the connector list, because it is not a connector. Repair, 2026-09-06.
-
-            The block above argues at length that S3-compatible storage and mounted shares are an
-            agent route rather than something you switch on, and then rendered them as the second
-            row of a list whose accessible name is "Connectors". A screen reader was told the
-            opposite of what the page says in prose, which is the one reading that cannot be
-            argued with. The word stays ENTERPRISE-ASSISTED -- it is A-4's, and it is the word
-            /integrations and /workspace print for the same route -- and the row moves to a list
-            of its own that says what it is.
-          */}
-          <div className="chain rv" aria-label="Assisted import route, not a connector">
-            <article className="link">
-              <span className="st">ENTERPRISE-ASSISTED</span>
-              <h3>Object storage and mounted shares</h3>
-              <p>S3-compatible buckets and SMB, NFS or SFTP paths are imported by an agent you run inside your own network — not a connector you switch on here. Set up with you, not self-serve.</p>
-              <Link className="input-next" href="/integrations">Explore assisted import options →</Link>
+            <article className="source-route">
+              <div className="source-route-heading">
+                <span className="source-route-index" aria-hidden="true">02</span>
+                <div>
+                  <p className="source-route-kind">Private infrastructure</p>
+                  <h3>Object storage and mounted shares</h3>
+                </div>
+              </div>
+              <p>S3-compatible buckets and SMB, NFS or SFTP paths are imported by an agent you run inside your own network. TAVONEL helps configure the route for your environment.</p>
+              <dl className="source-route-facts">
+                <div><dt>Access</dt><dd>Customer-run agent</dd></div>
+                <div><dt>Setup</dt><dd>Assisted</dd></div>
+              </dl>
+              <Link className="input-next" href="/integrations">Explore private import options →</Link>
             </article>
           </div>
         </Scene>

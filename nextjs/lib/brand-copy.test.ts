@@ -466,22 +466,22 @@ describe("public copy", () => {
   /*
     RESOLVED A-4's four words, and no fifth. Repair, 2026-09-06.
 
-    The landing page shipped "AVAILABLE TODAY" on two rows and "ON REQUEST" on a third. None of
-    those is one of A-4's words, and the third named the same S3/SMB agent route that reads
-    "Enterprise-assisted" on /integrations and /workspace, so the one surface A-4 is actually
-    about was the one surface using its own vocabulary. This reads the status chips out of the
-    source, which is where the drift happened: a hand-written chip fails here the moment it is
-    written, whether or not anyone remembers the decision.
+    Qualification belongs on the detailed integration surface where its scope and evidence can
+    be inspected. The landing page now leads with access mode and the next action instead of a
+    context-free support badge, while this vocabulary still governs /integrations.
   */
   const A4_WORDS = ["QUALIFIED", "BETA", "ENTERPRISE-ASSISTED", "UNSUPPORTED"];
 
-  it("labels every connector on the landing page with one of RESOLVED A-4's four words", () => {
+  it("keeps qualification details reachable without leading the landing page with a beta badge", () => {
     const source = read("components/home-page-client.tsx");
-    const chips = [...source.matchAll(/<span className="st">([^<{}]+)<\/span>/g)].map((match) => match[1]!.trim());
-    expect(chips.length, "the landing page still prints connector status chips").toBeGreaterThan(0);
-    for (const chip of chips) {
-      expect(A4_WORDS, `"${chip}" is not one of RESOLVED A-4's connector support words`).toContain(chip.toUpperCase());
-    }
+    const workspace = read("app/workspace/page.tsx");
+    expect(source).not.toContain('<span className="st">BETA</span>');
+    expect(source).not.toContain('<span className="st">ENTERPRISE-ASSISTED</span>');
+    expect(source).toContain("Provider qualification and last-tested evidence stay visible on Integrations.");
+    expect(source).toContain('href="/integrations"');
+    expect(workspace).not.toContain('{ name: "Google Drive", availability: "Beta" }');
+    expect(workspace).toContain('{ name: "Google Drive", availability: "Read-only" }');
+    expect(workspace).toContain('{ name: "File Server", availability: "Assisted setup" }');
   });
 
   /*

@@ -138,20 +138,17 @@ type GroundedAnswer = {
 };
 
 /*
-  One vocabulary with /integrations, which renamed the level it was overstating (RESOLVED A-4).
-
-  "Enterprise" beside "Beta" reads as a higher tier of the same self-serve thing. There is no
-  adapter for any of the last four; they are imported by an agent the customer runs, which is
-  why the label now says assisted rather than implying a switch that is waiting on a plan.
+  These are action labels, not qualification claims. Workspace tells a user how access works;
+  /integrations owns the evidence-backed support level and provider-specific limitations.
 */
 const WORKSPACE_SOURCE_CHOICES = [
-  { name: "Google Drive", availability: "Beta" },
-  { name: "Dropbox", availability: "Beta" },
-  { name: "OneDrive", availability: "Beta" },
-  { name: "File Server", availability: "Enterprise-assisted" },
-  { name: "Amazon S3", availability: "Enterprise-assisted" },
-  { name: "Cloudflare R2", availability: "Enterprise-assisted" },
-  { name: "MinIO", availability: "Enterprise-assisted" },
+  { name: "Google Drive", availability: "Read-only" },
+  { name: "Dropbox", availability: "Read-only" },
+  { name: "OneDrive", availability: "Read-only" },
+  { name: "File Server", availability: "Assisted setup" },
+  { name: "Amazon S3", availability: "Assisted setup" },
+  { name: "Cloudflare R2", availability: "Assisted setup" },
+  { name: "MinIO", availability: "Assisted setup" },
 ] as const;
 
 type BillingAccount = {
