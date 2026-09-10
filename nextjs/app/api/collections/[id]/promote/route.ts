@@ -188,6 +188,19 @@ export async function POST(
       { status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503, headers: NO_STORE }
     );
   }
+  const currentUser = await getRequestUser(request);
+  const currentPilot = currentUser ? foundationPilotAccess(currentUser.id) : null;
+  if (
+    !currentUser || currentUser.id !== user.id ||
+    !currentPilot || currentPilot.membership.workspaceId !== membership.workspaceId ||
+    (currentPilot.membership.role !== "owner" && currentPilot.membership.role !== "admin")
+  ) {
+    return NextResponse.json({ code: "AUTHORIZATION_CHANGED_RETRY" }, { status: 403, headers: NO_STORE });
+  }
+  const currentProductAccess = await authorizeFoundationProduct(membership.workspaceId, user.id, "studio");
+  if (!currentProductAccess.ok) return NextResponse.json({ code: currentProductAccess.code }, {
+    status: currentProductAccess.status, headers: NO_STORE,
+  });
 
   const promoted = await promoteFoundationCandidate({
     workspaceKey: membership.workspaceId,

@@ -13,8 +13,9 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { authorize, signerEnv, listImmutable, reviewJson, listRejects, getReject, sourceAccess } = vi.hoisted(() => ({
+const { authorize, reauthorize, signerEnv, listImmutable, reviewJson, listRejects, getReject, sourceAccess } = vi.hoisted(() => ({
   authorize: vi.fn(),
+  reauthorize: vi.fn(),
   signerEnv: vi.fn(),
   listImmutable: vi.fn(),
   reviewJson: vi.fn(),
@@ -23,7 +24,10 @@ const { authorize, signerEnv, listImmutable, reviewJson, listRejects, getReject,
   sourceAccess: vi.fn(),
 }));
 
-vi.mock("@/lib/developer-auth", () => ({ authorizeFoundationRequest: authorize }));
+vi.mock("@/lib/developer-auth", () => ({
+  authorizeFoundationRequest: authorize,
+  revalidateFoundationAuthorization: reauthorize,
+}));
 vi.mock("@/lib/r2-objects", () => ({
   listImmutableWorkspaceObjects: listImmutable,
   getWorkspaceOcrReviewJson: reviewJson,
@@ -70,6 +74,7 @@ async function documents() {
 
 beforeEach(() => {
   authorize.mockReset().mockResolvedValue({ ok: true, principal: { workspaceKey } });
+  reauthorize.mockReset().mockResolvedValue({ ok: true, principal: { workspaceKey } });
   signerEnv.mockReset().mockReturnValue({
     accountId: "account",
     accessKeyId: "key",
@@ -144,6 +149,13 @@ describe("the documents listing", () => {
     expect(body.status).toBe(403);
     expect(getReject).toHaveBeenCalledOnce();
     expect(sourceAccess).toHaveBeenLastCalledWith(workspaceKey, [readId, refusedId]);
+  });
+
+  it("returns no metadata if API authorization changes while documents load", async () => {
+    reauthorize.mockResolvedValue({ ok: false, code: "API_KEY_REVOKED", status: 401 });
+    const body = await documents();
+    expect(body.status).toBe(401);
+    expect(reauthorize).toHaveBeenCalledOnce();
   });
 
   it("shows nothing at all rather than a refusal it could not validate", async () => {

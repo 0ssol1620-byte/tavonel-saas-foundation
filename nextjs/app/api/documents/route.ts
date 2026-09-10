@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { authorizeFoundationRequest } from "@/lib/developer-auth";
+import { authorizeFoundationRequest, revalidateFoundationAuthorization } from "@/lib/developer-auth";
 import { checkConnectorSourceAccess } from "@/lib/connector-source-access";
 import { groupImmutableDocuments, selectCurrentDocumentVersions } from "@/lib/immutable-keys";
 import { ambiguousPipelineDocument, type PipelineDocument } from "@/lib/pipeline";
@@ -108,6 +108,13 @@ export async function GET(request: Request) {
   const currentAccess = await checkConnectorSourceAccess(workspaceId, returnedDocumentIds);
   if (!currentAccess.ok) return NextResponse.json({ code: currentAccess.code }, {
     status: currentAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503,
+    headers: { "Cache-Control": "no-store" },
+  });
+  const authorizedNow = await revalidateFoundationAuthorization(
+    request, auth.principal, "documents:read", "observer",
+  );
+  if (!authorizedNow.ok) return NextResponse.json({ code: authorizedNow.code }, {
+    status: authorizedNow.status,
     headers: { "Cache-Control": "no-store" },
   });
   return NextResponse.json(

@@ -77,6 +77,16 @@ describe("document derived-data source access", () => {
     expect(sourceAccess).toHaveBeenCalledTimes(2);
   });
 
+  it("returns no OCR data if the session expires while the object loads", async () => {
+    getUser.mockResolvedValueOnce({ id: userId }).mockResolvedValueOnce(null);
+    const response = await candidatesGET(
+      new Request(`https://tavonel.com/api/documents/${documentId}/candidates`),
+      { params: Promise.resolve({ id: documentId }) },
+    );
+    expect(response.status).toBe(401);
+    expect(getOcr).toHaveBeenCalledOnce();
+  });
+
   it("does not mint a progress capability for a suspended connector source", async () => {
     sourceAccess.mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
     const response = await progressGET(
@@ -94,5 +104,15 @@ describe("document derived-data source access", () => {
     );
     expect(response.status).toBe(200);
     expect(presign).toHaveBeenCalledOnce();
+  });
+
+  it("does not mint a progress capability after the session expires", async () => {
+    getUser.mockResolvedValueOnce({ id: userId }).mockResolvedValueOnce(null);
+    const response = await progressGET(
+      new Request(`https://tavonel.com/api/documents/${documentId}/progress`),
+      { params: Promise.resolve({ id: documentId }) },
+    );
+    expect(response.status).toBe(401);
+    expect(presign).not.toHaveBeenCalled();
   });
 });

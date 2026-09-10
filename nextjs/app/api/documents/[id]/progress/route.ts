@@ -65,6 +65,15 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503,
     headers: { "Cache-Control": "no-store" },
   });
+  const currentUser = await getRequestUser(request);
+  if (!currentUser || currentUser.id !== user.id) {
+    return NextResponse.json({ code: "AUTH_REQUIRED" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+  }
+  const currentProductAccess = await authorizeFoundationProduct(membership.workspaceId, user.id, "observer");
+  if (!currentProductAccess.ok) return NextResponse.json({ code: currentProductAccess.code }, {
+    status: currentProductAccess.status,
+    headers: { "Cache-Control": "no-store" },
+  });
   const progressKey = `${match.sanitizedKey.slice(0, -"/sanitized.pdf".length)}/ocr-progress.json`;
   const signed = presignWorkspaceProgressGet(signer, {
     workspaceId: membership.workspaceId,

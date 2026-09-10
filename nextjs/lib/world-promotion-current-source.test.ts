@@ -122,4 +122,12 @@ describe("World promotion source-version gate", () => {
     expect(response.status).toBe(403);
     expect(promote).not.toHaveBeenCalled();
   });
+
+  it("does not activate after the browser session changes", async () => {
+    getUser.mockResolvedValueOnce({ id: userId }).mockResolvedValueOnce(null);
+    const response = await POST(request(), { params: Promise.resolve({ id: artifact.collectionId }) });
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ code: "AUTHORIZATION_CHANGED_RETRY" });
+    expect(promote).not.toHaveBeenCalled();
+  });
 });
