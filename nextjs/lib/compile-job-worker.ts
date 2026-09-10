@@ -9,7 +9,7 @@ import {
   readOpenCompileJobs,
   recordCompileJobDeferral,
 } from "./compile-job-store";
-import { groupImmutableDocuments } from "./immutable-keys";
+import { groupImmutableDocuments, selectCurrentDocumentVersions } from "./immutable-keys";
 import { listImmutableWorkspaceObjects } from "./r2-objects";
 import { readR2SignerEnv } from "./r2-synthetic-canary";
 
@@ -151,9 +151,19 @@ export async function runCompileJobTurn(job: CompileJob): Promise<CompileJobTurn
   const listed = await listImmutableWorkspaceObjects(signer, job.workspaceKey);
   if (!listed.ok) return rest("waiting", job.state, job.documentsReady, job.blocked);
 
-  const documents = groupImmutableDocuments(job.workspaceKey, listed.objects);
+  const selected = selectCurrentDocumentVersions(groupImmutableDocuments(job.workspaceKey, listed.objects));
+  const documents = selected.documents;
   const stalled = Date.now() - Date.parse(job.createdAt) > STALL_AFTER_MS;
   const classified = classify(job, documents, stalled);
+  for (const documentId of selected.ambiguousDocumentIds) {
+    if (!job.documentIds.includes(documentId)) continue;
+    classified.ready = classified.ready.filter((id) => id !== documentId);
+    classified.awaitingReading = classified.awaitingReading.filter((id) => id !== documentId);
+    classified.awaitingUpload = classified.awaitingUpload.filter((id) => id !== documentId);
+    if (!classified.blocked.some((item) => item.documentId === documentId)) {
+      classified.blocked.push({ documentId, kind: "input", reason: "SOURCE_VERSION_AMBIGUOUS" });
+    }
+  }
 
   // Record progress and any newly discovered blockers before deciding anything, so a customer
   // watching the stream sees the same picture the worker is reasoning about.

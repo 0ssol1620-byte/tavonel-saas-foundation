@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { authorizeFoundationProduct } from "@/lib/billing-product-access";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
-import { DOCUMENT_ID_PATTERN, groupImmutableDocuments } from "@/lib/immutable-keys";
+import { DOCUMENT_ID_PATTERN, groupImmutableDocuments, selectCurrentDocumentVersions } from "@/lib/immutable-keys";
 import { presignWorkspaceProgressGet } from "@/lib/r2-presign";
 import { listImmutableWorkspaceObjects } from "@/lib/r2-objects";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
@@ -48,7 +48,12 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     return NextResponse.json({ code: listed.code }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
   // The key is derived from the workspace's own listing, never from anything the caller sent.
-  const match = groupImmutableDocuments(membership.workspaceId, listed.objects).find(
+  const selected = selectCurrentDocumentVersions(groupImmutableDocuments(membership.workspaceId, listed.objects)
+    .filter((item) => item.documentId === id));
+  if (selected.ambiguousDocumentIds.includes(id)) {
+    return NextResponse.json({ code: "SOURCE_VERSION_AMBIGUOUS" }, { status: 409, headers: { "Cache-Control": "no-store" } });
+  }
+  const match = selected.documents.find(
     (item) => item.documentId === id && item.sanitizedKey,
   );
   if (!match?.sanitizedKey) {

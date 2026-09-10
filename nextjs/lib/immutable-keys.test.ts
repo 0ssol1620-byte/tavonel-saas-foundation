@@ -6,6 +6,7 @@ import {
   isCollectionCandidateKey,
   isKeyInsideWorkspacePrefix,
   isOcrJsonKey,
+  selectCurrentDocumentVersions,
 } from "./immutable-keys";
 
 const WS = "pilot-abc";
@@ -66,6 +67,36 @@ describe("immutable workspace prefix escape", () => {
       hasOcrJson: false,
       processingState: "operator_review",
     }));
+  });
+
+  it("selects the newest sanitized representation even while its OCR is still pending", () => {
+    const oldDigest = "11".repeat(32);
+    const newDigest = "22".repeat(32);
+    const versions = groupImmutableDocuments(WS, [
+      { key: `${PREFIX}doc3/${oldDigest}/sanitized.pdf`, size: 12, lastModified: "2026-09-09T00:00:00.000Z" },
+      { key: `${PREFIX}doc3/${oldDigest}/ocr.json`, size: 4, lastModified: "2026-09-09T00:01:00.000Z" },
+      { key: `${PREFIX}doc3/${newDigest}/sanitized.pdf`, size: 13, lastModified: "2026-09-10T00:00:00.000Z" },
+    ]);
+    const selected = selectCurrentDocumentVersions(versions);
+    expect(selected.ambiguousDocumentIds).toEqual([]);
+    expect(selected.documents).toHaveLength(1);
+    expect(selected.documents[0]).toMatchObject({ versionKey: newDigest, hasOcrJson: false });
+  });
+
+  it("refuses to invent version order when multiple sanitized observations are missing or tied", () => {
+    const first = "33".repeat(32);
+    const second = "44".repeat(32);
+    const missing = groupImmutableDocuments(WS, [
+      { key: `${PREFIX}doc4/${first}/sanitized.pdf`, size: 12 },
+      { key: `${PREFIX}doc4/${second}/sanitized.pdf`, size: 13, lastModified: "2026-09-10T00:00:00.000Z" },
+    ]);
+    expect(selectCurrentDocumentVersions(missing)).toEqual({ documents: [], ambiguousDocumentIds: ["doc4"] });
+
+    const tied = groupImmutableDocuments(WS, [
+      { key: `${PREFIX}doc5/${first}/sanitized.pdf`, size: 12, lastModified: "2026-09-10T00:00:00.000Z" },
+      { key: `${PREFIX}doc5/${second}/sanitized.pdf`, size: 13, lastModified: "2026-09-10T00:00:00.000Z" },
+    ]);
+    expect(selectCurrentDocumentVersions(tied)).toEqual({ documents: [], ambiguousDocumentIds: ["doc5"] });
   });
 
   it("scopes collection candidates to one immutable workspace", () => {

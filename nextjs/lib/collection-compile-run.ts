@@ -2,7 +2,7 @@ import { OCR_REGIONS_REQUIRED, documentsWithoutRegions } from "../../shared/comp
 import { type CollectionCandidateArtifact, validateCollectionOcrInput } from "./collection-compiler";
 import { dispatchCoreCompile, readCoreRuntimeEnv } from "./core-runtime";
 import { dispatchProductCoreV2, projectProductCoreV2Candidate, readProductCoreV2Env } from "./core-runtime-v2";
-import { collectionCandidateKey, groupImmutableDocuments } from "./immutable-keys";
+import { collectionCandidateKey, groupImmutableDocuments, selectCurrentDocumentVersions } from "./immutable-keys";
 import { getWorkspaceOcrJson, listImmutableWorkspaceObjects, putWorkspaceCollectionCandidate } from "./r2-objects";
 import { readR2SignerEnv } from "./r2-synthetic-canary";
 
@@ -66,7 +66,13 @@ export async function runCollectionCompile(
   const listed = await listImmutableWorkspaceObjects(signer, workspaceId);
   if (!listed.ok) return { ok: false, status: 503, code: listed.code, payload: {} };
 
-  const documents = groupImmutableDocuments(workspaceId, listed.objects);
+  const grouped = groupImmutableDocuments(workspaceId, listed.objects);
+  const current = selectCurrentDocumentVersions(grouped);
+  if (current.ambiguousDocumentIds.some((id) => documentIds.includes(id))) {
+    return { ok: false, status: 409, code: "SOURCE_VERSION_AMBIGUOUS",
+      payload: { documentIds: current.ambiguousDocumentIds.filter((id) => documentIds.includes(id)) } };
+  }
+  const documents = current.documents;
   const selected = documentIds.map((id) => documents.find((item) => item.documentId === id && item.hasOcrJson));
   if (selected.some((item) => !item?.sanitizedKey || !item.ocrJsonKey)) {
     return { ok: false, status: 409, code: "OCR_NOT_READY", payload: {}, retryAfterSeconds: 5 };

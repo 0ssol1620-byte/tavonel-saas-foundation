@@ -134,9 +134,12 @@ function parseListContents(xml: string): ImmutableObjectMeta[] {
   for (const block of blocks) {
     const key = /<Key>([^<]+)<\/Key>/i.exec(block)?.[1];
     const sizeRaw = /<Size>([^<]+)<\/Size>/i.exec(block)?.[1];
+    const lastModifiedRaw = /<LastModified>([^<]+)<\/LastModified>/i.exec(block)?.[1];
     if (!key) continue;
     const size = Number(sizeRaw ?? "0");
-    items.push({ key: decodeXml(key), size: Number.isFinite(size) ? size : 0 });
+    const lastModified = lastModifiedRaw ? decodeXml(lastModifiedRaw) : undefined;
+    items.push({ key: decodeXml(key), size: Number.isFinite(size) ? size : 0,
+      ...(lastModified ? { lastModified } : {}) });
   }
   return items;
 }

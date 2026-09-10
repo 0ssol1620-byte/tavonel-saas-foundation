@@ -60,6 +60,8 @@ export function isCollectionCandidateKey(workspaceId: string, key: string): bool
 export type ImmutableObjectMeta = {
   key: string;
   size: number;
+  /** R2 ListObjectsV2 observation time. Undefined only for legacy/test callers. */
+  lastModified?: string;
 };
 
 export type DocumentListItem = {
@@ -67,6 +69,8 @@ export type DocumentListItem = {
   versionKey: string;
   sanitizedKey: string | null;
   sanitizedSize: number | null;
+  /** Time the sanitized representation itself became durable, never an OCR sidecar time. */
+  sanitizedObservedAt?: string | null;
   ocrJsonKey: string | null;
   ocrJsonSize: number | null;
   hasOcrJson: boolean;
@@ -103,6 +107,7 @@ export function groupImmutableDocuments(
         versionKey,
         sanitizedKey: null,
         sanitizedSize: null,
+        sanitizedObservedAt: null,
         ocrJsonKey: null,
         ocrJsonSize: null,
         hasOcrJson: false,
@@ -113,6 +118,7 @@ export function groupImmutableDocuments(
     if (filename === "sanitized.pdf") {
       current.sanitizedKey = object.key;
       current.sanitizedSize = object.size;
+      current.sanitizedObservedAt = validInstant(object.lastModified) ? object.lastModified! : null;
     } else if (filename === "ocr.json") {
       current.ocrJsonKey = object.key;
       current.ocrJsonSize = object.size;
@@ -132,4 +138,58 @@ export function groupImmutableDocuments(
     ...item,
     processingState: item.hasOcrJson ? "ocr_ready" : item.ocrReviewKey ? "operator_review" : "sanitized",
   }));
+}
+
+function validInstant(value: string | undefined): value is string {
+  return typeof value === "string" && value.length <= 64 && Number.isFinite(Date.parse(value));
+}
+
+export type CurrentDocumentSelection = {
+  documents: DocumentListItem[];
+  ambiguousDocumentIds: string[];
+};
+
+/**
+ * Choose the current immutable representation for every logical document.
+ *
+ * OCR completion is deliberately not a selector. A finished historical OCR must never outrank a
+ * newer sanitized representation that is still being read. R2's sanitized-object observation
+ * time is the only chronology available on this path today. If more than one version exists and
+ * that chronology is missing or tied, the caller receives an explicit ambiguity rather than an
+ * arbitrary array-order winner.
+ */
+export function selectCurrentDocumentVersions(documents: readonly DocumentListItem[]): CurrentDocumentSelection {
+  const byDocument = new Map<string, DocumentListItem[]>();
+  for (const document of documents) {
+    const versions = byDocument.get(document.documentId) ?? [];
+    versions.push(document);
+    byDocument.set(document.documentId, versions);
+  }
+
+  const current: DocumentListItem[] = [];
+  const ambiguousDocumentIds: string[] = [];
+  for (const [documentId, versions] of byDocument) {
+    if (versions.length === 1) {
+      current.push(versions[0]!);
+      continue;
+    }
+    const observed = versions.map((version) => ({
+      version,
+      instant: validInstant(version.sanitizedObservedAt ?? undefined)
+        ? Date.parse(version.sanitizedObservedAt!)
+        : null,
+    }));
+    if (observed.some((item) => item.instant === null)) {
+      ambiguousDocumentIds.push(documentId);
+      continue;
+    }
+    const latest = Math.max(...observed.map((item) => item.instant!));
+    const winners = observed.filter((item) => item.instant === latest);
+    if (winners.length !== 1) {
+      ambiguousDocumentIds.push(documentId);
+      continue;
+    }
+    current.push(winners[0]!.version);
+  }
+  return { documents: current, ambiguousDocumentIds };
 }

@@ -130,4 +130,41 @@ describe("a source read before region capture", () => {
       expect(run.status).toBe(409);
     }
   });
+
+  it("does not compile an older OCR result when a newer sanitized version is still being read", async () => {
+    const newer = "b".repeat(64);
+    listed.mockResolvedValue({ ok: true, objects: [
+      { key: `${PREFIX}/sanitized.pdf`, size: 1024, lastModified: "2026-09-09T00:00:00.000Z" },
+      { key: `${PREFIX}/ocr.json`, size: 512, lastModified: "2026-09-09T00:01:00.000Z" },
+      { key: `immutable/${WS}/${WS}/${DOCUMENT}/${newer}/sanitized.pdf`, size: 2048,
+        lastModified: "2026-09-10T00:00:00.000Z" },
+    ] });
+
+    const run = await runCollectionCompile(WS, [DOCUMENT]);
+
+    expect(run.ok).toBe(false);
+    if (!run.ok) expect(run.code).toBe("OCR_NOT_READY");
+    expect(fetched).not.toHaveBeenCalled();
+    expect(dispatched).not.toHaveBeenCalled();
+  });
+
+  it("refuses a multi-version source whose current version cannot be ordered", async () => {
+    const newer = "c".repeat(64);
+    listed.mockResolvedValue({ ok: true, objects: [
+      { key: `${PREFIX}/sanitized.pdf`, size: 1024 },
+      { key: `${PREFIX}/ocr.json`, size: 512 },
+      { key: `immutable/${WS}/${WS}/${DOCUMENT}/${newer}/sanitized.pdf`, size: 2048 },
+      { key: `immutable/${WS}/${WS}/${DOCUMENT}/${newer}/ocr.json`, size: 512 },
+    ] });
+
+    const run = await runCollectionCompile(WS, [DOCUMENT]);
+
+    expect(run.ok).toBe(false);
+    if (!run.ok) {
+      expect(run.code).toBe("SOURCE_VERSION_AMBIGUOUS");
+      expect(run.payload).toEqual({ documentIds: [DOCUMENT] });
+    }
+    expect(fetched).not.toHaveBeenCalled();
+    expect(dispatched).not.toHaveBeenCalled();
+  });
 });

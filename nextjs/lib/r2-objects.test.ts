@@ -62,18 +62,21 @@ describe("R2 document listing prefix", () => {
     const secondKey = `${prefix}doc-b/${"cd".repeat(32)}/ocr.json`;
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(
-        `<ListBucketResult><IsTruncated>true</IsTruncated><NextContinuationToken>next page</NextContinuationToken><Contents><Key>${firstKey}</Key><Size>12</Size></Contents></ListBucketResult>`,
+        `<ListBucketResult><IsTruncated>true</IsTruncated><NextContinuationToken>next page</NextContinuationToken><Contents><Key>${firstKey}</Key><LastModified>2026-09-09T00:00:00.000Z</LastModified><Size>12</Size></Contents></ListBucketResult>`,
         { status: 200 },
       ))
       .mockResolvedValueOnce(new Response(
-        `<ListBucketResult><IsTruncated>false</IsTruncated><Contents><Key>${secondKey}</Key><Size>34</Size></Contents></ListBucketResult>`,
+        `<ListBucketResult><IsTruncated>false</IsTruncated><Contents><Key>${secondKey}</Key><LastModified>2026-09-10T00:00:00.000Z</LastModified><Size>34</Size></Contents></ListBucketResult>`,
         { status: 200 },
       ));
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(listImmutableWorkspaceObjects(env, WS)).resolves.toEqual({
       ok: true,
-      objects: [{ key: firstKey, size: 12 }, { key: secondKey, size: 34 }],
+      objects: [
+        { key: firstKey, size: 12, lastModified: "2026-09-09T00:00:00.000Z" },
+        { key: secondKey, size: 34, lastModified: "2026-09-10T00:00:00.000Z" },
+      ],
     });
     expect(String(fetchMock.mock.calls[0][0])).toContain("max-keys=1000");
     expect(String(fetchMock.mock.calls[1][0])).toContain("continuation-token=next%20page");

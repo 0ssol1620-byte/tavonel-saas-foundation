@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
-import { groupImmutableDocuments } from "@/lib/immutable-keys";
-import type { PipelineDocument } from "@/lib/pipeline";
+import { groupImmutableDocuments, selectCurrentDocumentVersions } from "@/lib/immutable-keys";
+import { ambiguousPipelineDocument, type PipelineDocument } from "@/lib/pipeline";
 import { validateOcrReviewReceipt } from "@/lib/processing-receipts";
 import { getWorkspaceOcrReviewJson, listImmutableWorkspaceObjects } from "@/lib/r2-objects";
 import {
@@ -74,7 +74,8 @@ export async function GET(request: Request) {
   if (!listed.ok) {
     return NextResponse.json({ code: listed.code }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
-  const documents = groupImmutableDocuments(workspaceId, listed.objects);
+  const selected = selectCurrentDocumentVersions(groupImmutableDocuments(workspaceId, listed.objects));
+  const documents = selected.documents;
   const reviewDocuments = documents.filter((item) => item.processingState === "operator_review" && item.ocrReviewKey && item.sanitizedKey).slice(0, 20);
   const [reviewReceipts, refused] = await Promise.all([
     Promise.all(reviewDocuments.map(async (item) => ({
@@ -100,7 +101,7 @@ export async function GET(request: Request) {
     {
       code: "OK",
       workspaceId,
-      documents: [...hydrated, ...refused],
+      documents: [...hydrated, ...selected.ambiguousDocumentIds.map(ambiguousPipelineDocument), ...refused],
     },
     { headers: { "Cache-Control": "no-store" } },
   );

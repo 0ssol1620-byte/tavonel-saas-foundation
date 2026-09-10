@@ -106,6 +106,24 @@ describe("the documents listing", () => {
     expect(getReject).not.toHaveBeenCalled();
   });
 
+  it("returns one held row instead of two unordered versions of one document", async () => {
+    const second = "b".repeat(64);
+    listImmutable.mockResolvedValue({ ok: true, objects: [
+      ...immutableObjectsFor(readId),
+      { key: `immutable/${workspaceKey}/${workspaceKey}/${readId}/${second}/sanitized.pdf`, size: 2048 },
+      { key: `immutable/${workspaceKey}/${workspaceKey}/${readId}/${second}/ocr.json`, size: 512 },
+    ] });
+    const body = await documents();
+    expect(body.documents.filter((item) => item.documentId === readId)).toEqual([
+      expect.objectContaining({
+        versionKey: "",
+        hasOcrJson: false,
+        processingState: "operator_review",
+        ocrReviewReasonCode: "SOURCE_VERSION_AMBIGUOUS",
+      }),
+    ]);
+  });
+
   it("shows nothing at all rather than a refusal it could not validate", async () => {
     getReject.mockResolvedValue({ ok: false, code: "NOT_FOUND" });
     const body = await documents();

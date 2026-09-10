@@ -125,13 +125,25 @@ describe("pipeline board", () => {
     expect(rows[0].filename).toBe("handbook.pdf");
   });
 
-  it("prefers the version that carries OCR output when a document has several", () => {
+  it("shows the newest sanitized version even when an older version already carries OCR", () => {
     const rows = buildPipeline([], [
-      doc({ versionKey: "v1", sanitizedKey: "k1/sanitized.pdf" }),
+      doc({ versionKey: "v1", sanitizedKey: "k1/sanitized.pdf", hasOcrJson: true,
+        processingState: "ocr_ready", sanitizedObservedAt: "2026-09-09T00:00:00.000Z" }),
+      doc({ versionKey: "v2", sanitizedKey: "k2/sanitized.pdf", hasOcrJson: false,
+        processingState: "sanitized", sanitizedObservedAt: "2026-09-10T00:00:00.000Z" }),
+    ]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].stages[2].state).toBe("active");
+  });
+
+  it("holds a multi-version document when its chronology is unavailable", () => {
+    const rows = buildPipeline([], [
+      doc({ versionKey: "v1", sanitizedKey: "k1/sanitized.pdf", hasOcrJson: true, processingState: "ocr_ready" }),
       doc({ versionKey: "v2", sanitizedKey: "k2/sanitized.pdf", hasOcrJson: true, processingState: "ocr_ready" }),
     ]);
     expect(rows).toHaveLength(1);
-    expect(rows[0].stages[2].state).toBe("done");
+    expect(rows[0].stages[1]).toMatchObject({ state: "held" });
+    expect(rows[0].needsPerson).toBe(true);
   });
 
   it("summarizes only what the stages already say", () => {
