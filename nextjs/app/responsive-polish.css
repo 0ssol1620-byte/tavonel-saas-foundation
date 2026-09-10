@@ -4,8 +4,7 @@
 .document-meta li,
 .board-list > li,
 .solution-section,
-.product-surface,
-.site-footer-groups nav {
+.product-surface {
   content-visibility: auto;
   contain-intrinsic-size: auto 72px;
 }

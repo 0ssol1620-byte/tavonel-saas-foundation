@@ -83,36 +83,35 @@ const MAXIMUM_PAGE_USD = MAX_UNITS_PER_PAGE * PROCESSING_UNIT_USD;
 const AT_A_GLANCE = [
   [
     "Base subscription",
-    `${BILLING_OFFERS.observer_access.label} is $${BILLING_OFFERS.observer_access.priceUsd} a month and ${BILLING_OFFERS.studio_access.label} is $${BILLING_OFFERS.studio_access.priceUsd} a month. Evaluation is free for seven days and takes no card.`,
+    `${BILLING_OFFERS.observer_access.label}: $${BILLING_OFFERS.observer_access.priceUsd}/month. ${BILLING_OFFERS.studio_access.label}: $${BILLING_OFFERS.studio_access.priceUsd}/month. The seven-day evaluation is free and needs no card.`,
   ],
   [
     "Included pages",
-    `${BILLING_OFFERS.observer_access.includedPages.toLocaleString("en-US")} standard pages a month on ${BILLING_OFFERS.observer_access.label}, ${BILLING_OFFERS.studio_access.includedPages.toLocaleString("en-US")} on ${BILLING_OFFERS.studio_access.label}. A PDF page is a page, one image is one page, a slide is a page-equivalent.`,
+    `${BILLING_OFFERS.observer_access.includedPages.toLocaleString("en-US")} standard pages on ${BILLING_OFFERS.observer_access.label}; ${BILLING_OFFERS.studio_access.includedPages.toLocaleString("en-US")} on ${BILLING_OFFERS.studio_access.label}.`,
   ],
   [
     "Past the included pages",
-    `${formatUsd(STANDARD_PAGE_USD)} per standard page. A page is escalated only when it needs it, and the charge for any page is capped at ${formatUsd(MAXIMUM_PAGE_USD)} — you are shown that maximum before the run starts and never billed above it.`,
+    `${formatUsd(STANDARD_PAGE_USD)} per standard page. Complex-page processing is capped at ${formatUsd(MAXIMUM_PAGE_USD)}, shown before the run starts.`,
   ],
   [
     "Unused pages",
-    "Each renewal adds its included pages to your balance, and nothing in the billing code expires an unused balance today. That is the current behaviour of this deployment, not yet a published rollover term.",
+    "Current billing behavior keeps unused pages in your balance.",
   ],
   [
     "What differs by plan",
-    `API and MCP access is included from ${BILLING_OFFERS.observer_access.label} up. Connector access is not a plan feature: provider qualification and last-tested evidence are published on Integrations, and the agent import route is set up with you. Promoting a candidate world into a live world is enforced at ${BILLING_OFFERS.studio_access.label}.`,
+    `${BILLING_OFFERS.observer_access.label} adds API and MCP access. ${BILLING_OFFERS.studio_access.label} adds approval to promote a candidate World. Source connections are verified separately in Workspace.`,
   ],
   [
     "How to start",
-    "Start a free evaluation with your own files. Nothing is charged until you choose a plan, and the estimate below is shown before any compile begins.",
+    "Start with your own files. Nothing is charged until you choose a plan.",
   ],
 ] as const;
 
 /*
   §54's purchase friction map, answered on the page where the purchase is decided.
 
-  The blueprint lists seventeen objections and asks that every one have a public answer. Fourteen
-  already did, scattered over six pages, and a buyer had to know which page to look on. Three did
-  not: whether this is finished, whether it locks you in, and whether you can delete your data.
+  The blueprint lists seventeen objections and asks that every one have a public answer. The
+  answers were scattered over six pages, so a buyer had to know which page to look on.
 
   Nothing below is a new answer. Each one is the existing sentence from the page that owns it,
   shortened to the length someone reads on a pricing page, with the link to the page that says it
@@ -129,11 +128,8 @@ const AT_A_GLANCE = [
   which is correct -- a barred claim in a comment is one copy-paste from being a barred claim on
   the page.
 
-  The three that had no answer are answered from what exists and nothing more. "Is this finished"
-  is the uncomfortable one, and it is answered with the deployment's own facts -- no format
-  carries a qualification receipt, promotion needs a person, connectors still need real-account qualification -- rather than
-  with a reassurance, because a buyer who finds that out after a pilot is a worse outcome than one
-  who finds it out here.
+  Readiness is answered as a positive inventory of the usable path, with current runtime state on
+  /status. Detailed qualification stays with the source or service it describes.
 */
 const PURCHASE_FAQ: Array<[string, string, Route, string]> = [
   ["Is this just OCR?", "Reading the page is one step of the compile. What you keep is a Compiled World: objects, relations and claims that each carry the source region behind them, under a version you can go back to.", "/knowledge-compiler" as Route, "What a Knowledge Compiler is"],
@@ -146,7 +142,7 @@ const PURCHASE_FAQ: Array<[string, string, Route, string]> = [
   ["Can my agent use it?", "A read-only MCP server and an HTTP API are published, with eight tools over sources, World, search, Ask, objects, relations, evidence and package. There is no write tool.", "/developers" as Route, "API and MCP"],
   ["What does it do when it is uncertain?", "It abstains and says which sources it looked at. A composed answer with no region behind it would be indistinguishable from a correct one, which is the failure the whole contract exists to prevent.", "/knowledge-compiler" as Route, "Questions people ask"],
   ["Is my data safe?", "Your sources go to a tenant-scoped quarantine, are sanitized before anything reads them, and are not used to train shared models. No third-party model API receives your documents in this deployment.", "/security" as Route, "Where your documents go"],
-  ["Is this finished?", "No, and the deployment says where it is not: no accepted format carries a qualification receipt, cloud connectors still require provider-specific real-account qualification, promoting a World is a human decision by design, and three of the thirteen things a security review asks have no published answer yet.", "/trust" as Route, "What is published, and what is not"],
+  ["What is ready to use?", "Upload, security inspection, document reading, reviewed World activation, grounded Ask, API/MCP access and signed export are available. Current source and service status stays visible on the linked pages.", "/status" as Route, "Current service status"],
   ["How much does it cost?", "A monthly subscription with included pages, then a per-page rate past them. Both numbers are above, and the maximum for any page is shown before a run starts.", "/refunds" as Route, "Cancellation and refunds"],
   ["How much setup is required?", "Upload your own files and compile. Evaluation takes no card, and nothing is charged until you choose a plan.", "/docs" as Route, "Documentation"],
   ["Will I be locked in?", "The package is open formats — canonical JSON, Turtle, JSON-LD, CSV and JSONL — and the two verifiers are readable scripts rather than a service, so a package can be checked and loaded without us.", "/docs/exports" as Route, "The package format"],
@@ -276,7 +272,7 @@ export default function PricingPageClient({ initialLiveCheckout, initialSelfServ
               {BILLING_OFFERS.studio_access.label}. Additional compiled pages are billed at{" "}
               {formatUsd(STANDARD_PAGE_USD)} per standard page.
             </p>
-            <div className="plans" ref={plansRef}>
+            <div className="plans" ref={plansRef} data-visual>
               {PLANS.map((plan) => (
                 <article className="plan" key={plan.name} data-featured={plan.name === "Developer" ? 1 : 0}>
                   <span className="tag">{plan.name === "Developer" ? "START HERE" : plan.name === "Evaluation" ? "TRY IT FREE" : " "}</span>
@@ -320,7 +316,7 @@ export default function PricingPageClient({ initialLiveCheckout, initialSelfServ
               ))}
             </div>
             </section>
-            <section className="usage-estimator" aria-labelledby="usage-estimator-title">
+            <section className="usage-estimator" aria-labelledby="usage-estimator-title" data-visual>
               <div>
                 <p className="slate"><b>RUN ESTIMATE</b><span />BEFORE COMPILE</p>
                 <h3 id="usage-estimator-title">What will this corpus cost?</h3>

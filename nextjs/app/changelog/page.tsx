@@ -30,6 +30,6 @@ export default function ChangelogPage() {
         changes carry the migration beside them. <a href="/changelog/feed.xml">Atom feed</a>.
       </p>
     </div>
-    <ChangelogList />
+    <div className="stack"><ChangelogList /></div>
   </div></div></section></PublicPageShell>;
 }

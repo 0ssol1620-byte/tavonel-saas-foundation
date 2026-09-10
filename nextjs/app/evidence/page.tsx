@@ -119,14 +119,13 @@ export default function EvidencePage() {
                   </article>
                 ))}
               </div>
-              <p className="fine">
-                That is the model, not a support list. This deployment reads one of these today —
-                PDF page and region, through the sanitize-to-PDF reading path — and every other
-                format it accepts is read through that same path.{" "}
-                <Link href={"/sources" as Route}>The capability manifest at /sources</Link> is the
-                truth about which representations are read here; nothing above should be taken as
-                a locator that has been qualified.
-              </p>
+              <details className="status-fold">
+                <summary>See current locator coverage</summary>
+                <p>
+                  These tiles describe the evidence model. Current input and locator support is
+                  published in the <Link href={"/sources" as Route}>capability manifest</Link>.
+                </p>
+              </details>
 
               <p className="slate"><span />HOW EVIDENCE IS BOUND</p>
               <div className="tiles">

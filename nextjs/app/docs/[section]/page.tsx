@@ -145,14 +145,13 @@ export default async function DocsSectionPage({ params }: { params: Promise<{ se
           <h1 className="document-title">{entry.title}</h1>
         </div>
 
-        <div className="stack docs-body">
-          <p className="lede">{entry.summary}</p>
-          {entry.blocks.map((block, position) => (
-            <Block key={position} block={block} endpoints={endpoints} />
-          ))}
-        </div>
-
         <div className="stack">
+          <div className="stack docs-body">
+            <p className="lede">{entry.summary}</p>
+            {entry.blocks.map((block, position) => (
+              <Block key={position} block={block} endpoints={endpoints} />
+            ))}
+          </div>
           <nav className="docs-pager">
             {previous ? <Link href={`/docs/${previous.slug}` as Route}>← {previous.title}</Link> : <span />}
             {next ? <Link href={`/docs/${next.slug}` as Route}>{next.title} →</Link> : <span />}

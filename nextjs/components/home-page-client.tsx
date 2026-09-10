@@ -245,7 +245,7 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
         </section>
 
         <Scene id={2} band="structure" eyebrow="INPUT" title="Bring the knowledge you already have.">
-          <p className="lede rv">Upload files, folders or a ZIP archive, or connect a cloud document system.</p>
+          <p className="lede rv">Start with files or connect the systems where your knowledge lives.</p>
           {/*
             Named formats, not a category, and named by the manifest rather than by this file.
 
@@ -265,10 +265,22 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
             Detailed qualification labels and provider evidence stay on /integrations, where a
             reader can inspect the scope instead of reading a status badge without context.
           */}
+          <ol className="intake-flow rv" aria-label="How sources enter a compiled world" data-visual>
+            <li>
+              <span className="intake-flow-index" aria-hidden="true">01</span>
+              <div><strong>Choose</strong><span>Files · folders · ZIP</span></div>
+            </li>
+            <li>
+              <span className="intake-flow-index" aria-hidden="true">02</span>
+              <div><strong>Inspect</strong><span>Security and format checks</span></div>
+            </li>
+            <li>
+              <span className="intake-flow-index" aria-hidden="true">03</span>
+              <div><strong>Compile</strong><span>Supported content enters your World</span></div>
+            </li>
+          </ol>
           <p className="input-guidance rv">
-            Upload files or folders, or unpack a ZIP in your browser. Each file is checked
-            before storage. The ZIP archive itself is never compiled and is listed as
-            UNSUPPORTED in the <Link className="input-next" href="/sources">Capability Manifest</Link>.
+            ZIPs open locally. Only supported files inside are uploaded. <Link className="input-next" href="/sources">See supported formats →</Link>
           </p>
           <div className="source-routes rv" aria-label="Ways to bring sources into TAVONEL">
             <article className="source-route">
@@ -279,12 +291,12 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
                   <h3>Google Drive · Dropbox · OneDrive / SharePoint</h3>
                 </div>
               </div>
-              <p>Connect read-only, then run a bounded first sync in Workspace. Provider qualification and last-tested evidence stay visible on Integrations.</p>
+              <p>Bring documents in with read-only access. Changes return through the same review flow.</p>
               <dl className="source-route-facts">
                 <div><dt>Access</dt><dd>Read-only OAuth</dd></div>
                 <div><dt>Before use</dt><dd>Verify the connection</dd></div>
               </dl>
-              <Link className="input-next" href="/integrations">Check connection readiness →</Link>
+              <Link className="input-next" href="/integrations">See cloud connections →</Link>
             </article>
             <article className="source-route">
               <div className="source-route-heading">
@@ -294,12 +306,12 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
                   <h3>Object storage and mounted shares</h3>
                 </div>
               </div>
-              <p>S3-compatible buckets and SMB, NFS or SFTP paths are imported by an agent you run inside your own network. TAVONEL helps configure the route for your environment.</p>
+              <p>Keep private repositories inside your network with a customer-run import agent.</p>
               <dl className="source-route-facts">
                 <div><dt>Access</dt><dd>Customer-run agent</dd></div>
                 <div><dt>Setup</dt><dd>Assisted</dd></div>
               </dl>
-              <Link className="input-next" href="/integrations">Explore private import options →</Link>
+              <Link className="input-next" href="/integrations">Plan a private connection →</Link>
             </article>
           </div>
         </Scene>

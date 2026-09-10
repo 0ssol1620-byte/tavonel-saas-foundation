@@ -303,6 +303,9 @@ main { position: relative; z-index: 5; }
 @media (min-width: 1000px) {
   .body > .stack:first-child { position: sticky; top: 104px; }
 }
+@media (min-width: 1181px) {
+  .body > .trust-next { grid-column: 2; }
+}
 .body.split { grid-template-columns: minmax(0, 400px) minmax(0, 1fr); }
 .stack { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
 
@@ -1021,8 +1024,8 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
   Four groups, laid out as four groups.
 
   The footer was one flat row of fourteen links that wrapped into an unreadable block on a
-  phone. These collapse to two columns and then one, keeping their headings, so the grouping
-  survives the narrowest screen.
+  phone. These collapse to two columns, keeping their headings and avoiding a full screen of
+  vertical link rows at the narrowest width.
 */
 .site-footer-groups {
   display: grid;
@@ -1048,7 +1051,7 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
   .site-footer-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 480px) {
-  .site-footer-groups { grid-template-columns: minmax(0, 1fr); }
+  .site-footer-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); gap-inline: 18px; }
   .compile-film-viewport { max-height: calc(100svh - 260px); }
 }
 .evidence-path {
@@ -1158,6 +1161,7 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 .policy-copy p { margin: 0; color: var(--text-lo); line-height: 1.72; }
 .policy-copy a { color: var(--text-hi); text-decoration-thickness: 1px; text-underline-offset: 3px; }
 .processor-list, .status-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; margin: 8px 0 18px; background: var(--hairline); border: 1px solid var(--hairline); }
+.processor-list > :last-child:nth-child(odd) { grid-column: 1 / -1; }
 .processor-list article, .status-list article { padding: 20px; background: var(--ground); }
 /* `.status-list h3` was missing, so /status rendered its row names unstyled while /security,
    which uses h2 in the same grid, did not. */
@@ -1666,6 +1670,40 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
   .input-guidance { margin: 0; max-width: 68ch; font-size: 14px; line-height: 1.75; color: var(--text-mid); }
   .input-guidance a { color: var(--text-hi); text-underline-offset: 4px; }
   .input-next { display: inline-flex; align-items: center; min-height: 44px; font-size: 14px; color: var(--text-hi); text-underline-offset: 4px; }
+  .intake-flow {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding: 0;
+    margin: 0;
+    list-style: none;
+    border-block: 1px solid var(--hairline);
+  }
+  .intake-flow li {
+    position: relative;
+    display: grid;
+    grid-template-columns: 30px minmax(0, 1fr);
+    gap: 12px;
+    min-width: 0;
+    padding: clamp(18px, 2vw, 26px) clamp(16px, 2vw, 28px);
+  }
+  .intake-flow li + li { border-left: 1px solid var(--hairline); }
+  .intake-flow li:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    z-index: 1;
+    top: 50%;
+    right: -4px;
+    width: 7px;
+    height: 7px;
+    border-top: 1px solid var(--verified);
+    border-right: 1px solid var(--verified);
+    background: var(--g0);
+    transform: translateY(-50%) rotate(45deg);
+  }
+  .intake-flow-index { padding-top: 4px; color: var(--verified); font: 500 10px/1 var(--f-mono); letter-spacing: 0.12em; }
+  .intake-flow div { display: grid; gap: 7px; min-width: 0; }
+  .intake-flow strong { color: var(--text-hi); font-size: clamp(15px, 1.2vw, 18px); font-weight: 520; line-height: 1.2; }
+  .intake-flow div span { color: var(--text-lo); font-size: 12.5px; line-height: 1.45; }
   .source-routes {
     display: grid;
     gap: 1px;
@@ -1708,6 +1746,14 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 
 @media (max-width: 720px) {
   @layer detail-completion {
+    .intake-flow { grid-template-columns: 1fr; }
+    .intake-flow li + li { border-top: 1px solid var(--hairline); border-left: 0; }
+    .intake-flow li:not(:last-child)::after {
+      top: auto;
+      right: 24px;
+      bottom: -4px;
+      transform: rotate(135deg);
+    }
     .source-route { grid-template-columns: 1fr; gap: 15px; padding: 20px 18px; }
     .source-route-facts,
     .source-route .input-next { grid-column: 1; }
@@ -2024,6 +2070,7 @@ footer.site .shell { display: flex; flex-direction: column; gap: 14px; }
 .docs-index a:hover { background: var(--g1); }
 .docs-index strong { font-size: 14px; font-weight: 500; color: var(--text-hi); }
 .docs-index span { font-size: 12px; color: var(--text-lo); }
+.docs-groups { display: grid; gap: 30px; }
 
 .docs-search { display: grid; gap: 10px; }
 .docs-search-field { display: flex; align-items: center; gap: 9px; padding: 10px 12px; border: 1px solid var(--hairline-hi); color: var(--text-xlo); }

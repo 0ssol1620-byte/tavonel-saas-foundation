@@ -7,7 +7,13 @@ test("source routes use the full content width without empty grid panels", async
 
   await page.goto("/");
   const scene = page.locator("#s2");
+  const flow = scene.locator(".intake-flow");
   const routes = scene.locator(".source-routes");
+  await expect(flow.locator("li")).toHaveCount(3);
+  await expect(flow).toContainText("Choose");
+  await expect(flow).toContainText("Inspect");
+  await expect(flow).toContainText("Compile");
+  await expect(scene).not.toContainText("UNSUPPORTED");
   await routes.scrollIntoViewIfNeeded();
   await expect(routes).toBeVisible();
   await expect(routes.locator(".source-route")).toHaveCount(2);
@@ -28,8 +34,9 @@ test("source routes use the full content width without empty grid panels", async
     expect(row.width).toBeGreaterThan(geometry.outer.width - 4);
   }
 
-  await expect(routes.getByRole("link", { name: "Check connection readiness" })).toHaveAttribute("href", "/integrations");
-  await expect(routes.getByRole("link", { name: "Explore private import options" })).toHaveAttribute("href", "/integrations");
+  await expect(scene.getByRole("link", { name: "See supported formats" })).toHaveAttribute("href", "/sources");
+  await expect(routes.getByRole("link", { name: "See cloud connections" })).toHaveAttribute("href", "/integrations");
+  await expect(routes.getByRole("link", { name: "Plan a private connection" })).toHaveAttribute("href", "/integrations");
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   expect(errors).toEqual([]);
 });
