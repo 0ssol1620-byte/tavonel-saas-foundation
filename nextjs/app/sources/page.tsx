@@ -125,10 +125,10 @@ export default function SourcesPage() {
                 that has already arrived. For a connected system, &ldquo;supported&rdquo; has to
                 mean the whole lifecycle: create, update, rename, move, delete, permission
                 change, tombstone behaviour, source-version propagation, world update and ACL
-                enforcement. No connector on this deployment has been qualified for that set —
-                deletion and permission semantics are still being settled — which is why the
-                connectors are labelled beta rather than qualified everywhere they appear, and
-                why nothing here is called verified.
+                enforcement. The current readers checkpoint provider changes, suspend a bound
+                source when deletion or lost access is observed, and fail closed before governed
+                use. Real-account lifecycle runs are still required, so the detailed connector
+                surfaces mark them as not yet qualified.
               </p>
                 </div>
               </details>

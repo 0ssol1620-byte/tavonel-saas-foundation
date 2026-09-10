@@ -33,25 +33,23 @@ export default function DocsPage() {
             on our servers, then read the World and the evidence under every object.
           </p>
           <DocsSearch entries={docsSearchIndex()} />
-        </div>
-
-        {DOCS_GROUPS.map((group) => (
-          <div className="stack" key={group}>
-            <p className="slate"><b>{group.toUpperCase()}</b></p>
-            <ul className="docs-index">
-              {DOCS_SECTIONS.filter((section) => section.group === group).map((section) => (
-                <li key={section.slug}>
-                  <Link href={`/docs/${section.slug}` as Route}>
-                    <strong>{section.title}</strong>
-                    <span>{section.summary}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+          <div className="docs-groups">
+            {DOCS_GROUPS.map((group) => (
+              <div className="stack" key={group}>
+                <p className="slate"><b>{group.toUpperCase()}</b></p>
+                <ul className="docs-index">
+                  {DOCS_SECTIONS.filter((section) => section.group === group).map((section) => (
+                    <li key={section.slug}>
+                      <Link href={`/docs/${section.slug}` as Route}>
+                        <strong>{section.title}</strong>
+                        <span>{section.summary}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
-        ))}
-
-        <div className="stack">
           <p className="fine">
             API version {DOCS_VERSION} · documentation reviewed {DOCS_REVIEWED} ·{" "}
             <a href="/api/openapi">machine-readable contract</a> ·{" "}

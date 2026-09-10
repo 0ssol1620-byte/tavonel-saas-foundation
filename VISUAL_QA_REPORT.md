@@ -102,3 +102,21 @@ Actual authenticated review-package navigation, final visual review, exact-SHA C
 ## Connection progress UI candidate — 2026-09-10
 Production-build fixture browser suite passed8/8: seven widths plus reduced motion. Receipt .chatgpt2codex/connection-sync-browser-0910.log; captures .chatgpt2codex/connection-sync-captures-0910/. Directly inspected360/1440: import state/counters and permission recovery prose wrap within the card; diagnostic code wraps on mobile. Full-page captures include sticky shell/navigation at capture scroll positions and are not proof of viewport occlusion behavior. The other six captures have automated checks only. Fixture labels and synthetic auth/provider responses are intentional; no customer/provider or founder visual acceptance claimed.
 Further whole-page typography, shell positioning, keyboard/accessibility and actual authenticated production checks remain required. Beta status unchanged pending complete provider lifecycle qualification.
+
+## 2026-09-10 — Public layout balance and buyer-facing source paths
+
+The user-supplied `/integrations` capture exposed a shared two-column composition failure: the section lede and card grid were separate `.body` children, so CSS grid auto-placement trapped the cards in the narrow title column and left most of the desktop canvas unused. The same contract was repaired on `/docs`, `/docs/[section]`, and `/changelog`; supporting Trust navigation now remains in the reading column, and an odd final subprocessor card spans the available row.
+
+Home source intake now presents a three-step Choose → Inspect → Compile visual, with shorter source-route copy and direct next actions. `/integrations` presents read-only and customer-run access modes in place of unexplained maturity badges, while security and lifecycle detail remains available in the per-provider disclosure. Pricing and enterprise copy were shortened, and Evidence locator scope moved to an explicit disclosure. The footer no longer defers off-screen navigation paint and retains two grouped columns at 390/360 so the links are visible without an empty capture region.
+
+Verification on a fresh production build:
+
+- `pnpm build`: TypeScript and ESLint passed; 217 test files / 2,677 tests passed; 74 static pages generated.
+- Public geometry census: 54 sitemap routes × 7 widths (`1920`, `1440`, `1280`, `1024`, `768`, `390`, `360`) = 378 production renders, 0 status, overflow, narrow-paragraph, or broken body-grid findings.
+- Focused Playwright regression: 24 passed across all seven required widths plus reduced motion. It checks the shared body contract, narrow desktop paragraphs, buyer-facing integration labels, footer overlap/painting, mobile two-column grouping, and 44px link targets.
+- Home source-route matrix: 8 passed across all required widths and reduced motion.
+- Direct visual review: final `/integrations` captures at 1778 and 390 show full-width cloud/private source cards, readable line lengths, no gray empty panels, and a fully painted compact mobile footer. Local evidence is under `nextjs/.chatgpt2codex/copy-visual-20260910/` and is intentionally untracked.
+
+This is production-build and automated layout evidence. Provider real-account qualification, authenticated customer E2E, and aesthetic acceptance are separate gates.
+
+**FOUNDER VISUAL REVIEW REQUIRED**

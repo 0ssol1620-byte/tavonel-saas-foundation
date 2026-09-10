@@ -59,6 +59,8 @@ describe("2026-09-05 production hardening", () => {
     const css = read("app/tavonel.css");
     expect(css).toContain(".input-formats > :last-child:nth-child(odd)");
     expect(css).toContain(".tiles > :last-child:nth-child(odd)");
+    expect(css).toContain(".source-routes {");
+    expect(css).toContain(".source-route {");
     expect(css).toContain(".docs-code { width: 100%; max-width: 100%; min-width: 0;");
     expect(css).toContain(".docs-endpoint { width: 100%; max-width: 100%; min-width: 0;");
   });

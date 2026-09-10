@@ -40,7 +40,7 @@ export default function ProductPage() {
             </div>
           </div>
 
-          <div className="product-flow" aria-label="TAVONEL product flow">
+          <div className="product-flow" aria-label="TAVONEL product flow" data-visual>
             {PRODUCT_FLOW.map(([stage, detail], index) => (
               <article key={stage}>
                 <span>{String(index + 1).padStart(2, "0")} · {stage}</span>

@@ -463,51 +463,32 @@ describe("public copy", () => {
     expect(stage).not.toContain("SOURCE_CENSUS");
   });
 
-  /*
-    RESOLVED A-4's four words, and no fifth. Repair, 2026-09-06.
-
-    The landing page shipped "AVAILABLE TODAY" on two rows and "ON REQUEST" on a third. None of
-    those is one of A-4's words, and the third named the same S3/SMB agent route that reads
-    "Enterprise-assisted" on /integrations and /workspace, so the one surface A-4 is actually
-    about was the one surface using its own vocabulary. This reads the status chips out of the
-    source, which is where the drift happened: a hand-written chip fails here the moment it is
-    written, whether or not anyone remembers the decision.
-  */
+  /* Qualification words remain valid internal states, but a buyer-facing source path uses the
+     access mode and an actionable connection check instead of an unexplained maturity badge. */
   const A4_WORDS = ["QUALIFIED", "BETA", "ENTERPRISE-ASSISTED", "UNSUPPORTED"];
 
-  it("labels every connector on the landing page with one of RESOLVED A-4's four words", () => {
+  it("keeps qualification details reachable without leading the landing page with a beta badge", () => {
     const source = read("components/home-page-client.tsx");
-    const chips = [...source.matchAll(/<span className="st">([^<{}]+)<\/span>/g)].map((match) => match[1]!.trim());
-    expect(chips.length, "the landing page still prints connector status chips").toBeGreaterThan(0);
-    for (const chip of chips) {
-      expect(A4_WORDS, `"${chip}" is not one of RESOLVED A-4's connector support words`).toContain(chip.toUpperCase());
-    }
+    const workspace = read("app/workspace/page.tsx");
+    expect(source).not.toContain('<span className="st">BETA</span>');
+    expect(source).not.toContain('<span className="st">ENTERPRISE-ASSISTED</span>');
+    expect(source).not.toContain("Provider qualification and last-tested evidence stay visible on Integrations.");
+    expect(source).not.toContain("The ZIP archive itself is never compiled");
+    expect(source).toContain("Only supported files inside are uploaded.");
+    expect(source).toContain('className="intake-flow rv"');
+    expect(source).toContain('href="/integrations"');
+    expect(workspace).not.toContain('{ name: "Google Drive", availability: "Beta" }');
+    expect(workspace).toContain('{ name: "Google Drive", availability: "Read-only" }');
+    expect(workspace).toContain('{ name: "File Server", availability: "Assisted setup" }');
   });
 
-  /*
-    Repair, 2026-09-06: the guard above read the landing page only, and the surface that defines
-    the vocabulary was the one drifting from it. /integrations printed a four-level legend whose
-    first and last words -- "Available" and "Planned" -- are not A-4's, so the page teaching the
-    reader what the labels mean taught two labels the rest of the site does not use. The words
-    live in three places in that file (the legend, `level:` on each OAuth connector, and the
-    middle column of INFRA) and all three are read here.
-  */
-  it("uses only RESOLVED A-4's four words as the support vocabulary on /integrations", () => {
+  it("keeps internal qualification vocabulary out of the integration buying path", () => {
     const source = read("app/integrations/page.tsx").replace(/\/\*[\s\S]*?\*\//g, " ");
-    const block = (name: string) => {
-      const match = source.match(new RegExp(`const ${name} = \\[([\\s\\S]*?)\\n\\] as const;`));
-      expect(match, `${name} is still declared in app/integrations/page.tsx`).not.toBeNull();
-      return match![1]!;
-    };
-    const legend = [...block("SUPPORT_LEVELS").matchAll(/\["([^"]+)",/g)].map((match) => match[1]!);
-    expect(legend.length, "the support-level legend still has four entries").toBe(4);
-    const infra = [...block("INFRA").matchAll(/\["[^"]+",\s*"([^"]+)",/g)].map((match) => match[1]!);
-    expect(infra.length, "the infrastructure rows still carry a support word").toBeGreaterThan(0);
-    const connectors = [...source.matchAll(/\blevel:\s*"([^"]+)"/g)].map((match) => match[1]!);
-    expect(connectors.length, "the OAuth connectors still carry a support word").toBeGreaterThan(0);
-    for (const word of [...legend, ...infra, ...connectors]) {
-      expect(A4_WORDS, `"${word}" is not one of RESOLVED A-4's connector support words`).toContain(word.toUpperCase());
-    }
+    for (const word of A4_WORDS) expect(source.toUpperCase()).not.toContain(`>${word}<`);
+    expect(source).not.toContain("SUPPORT_LEVELS");
+    expect(source).toContain('access: "Read-only"');
+    expect(source).toContain("Security & sync details");
+    expect(source).toContain("Verify the provider account in Workspace before the first sync.");
   });
 
   /*
@@ -684,7 +665,7 @@ describe("public copy", () => {
   const PURCHASE_OBJECTIONS = [
     "just OCR", "vector database", "exactly is a World", "relate to RAG", "verify an answer",
     "source document changes", "Office files", "agent use it", "uncertain", "data safe",
-    "Is this finished", "much does it cost", "setup is required", "locked in", "Can I export",
+    "What is ready to use", "much does it cost", "setup is required", "locked in", "Can I export",
     "delete my data", "security review approve",
   ];
 
