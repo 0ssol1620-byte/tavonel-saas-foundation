@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { authorizeFoundationProduct } from "@/lib/billing-product-access";
 import { validatePromotableCollectionArtifact } from "@/lib/collection-download";
+import { checkConnectorSourceAccess } from "@/lib/connector-source-access";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
 import {
   checkCurrentSourceVersions,
@@ -175,6 +176,16 @@ export async function POST(
     return NextResponse.json(
       { code: currentSources.code, documentIds: currentSources.documentIds },
       { status: 409, headers: NO_STORE }
+    );
+  }
+  const sourceAccess = await checkConnectorSourceAccess(
+    membership.workspaceId,
+    sourceDocuments.map((item) => item.documentId as string)
+  );
+  if (!sourceAccess.ok) {
+    return NextResponse.json(
+      { code: sourceAccess.code },
+      { status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503, headers: NO_STORE }
     );
   }
 

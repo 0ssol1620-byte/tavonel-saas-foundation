@@ -13,13 +13,14 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { authorize, signerEnv, listImmutable, reviewJson, listRejects, getReject } = vi.hoisted(() => ({
+const { authorize, signerEnv, listImmutable, reviewJson, listRejects, getReject, sourceAccess } = vi.hoisted(() => ({
   authorize: vi.fn(),
   signerEnv: vi.fn(),
   listImmutable: vi.fn(),
   reviewJson: vi.fn(),
   listRejects: vi.fn(),
   getReject: vi.fn(),
+  sourceAccess: vi.fn(),
 }));
 
 vi.mock("@/lib/developer-auth", () => ({ authorizeFoundationRequest: authorize }));
@@ -32,6 +33,7 @@ vi.mock("@/lib/r2-synthetic-canary", () => ({
   listFoundationQuarantineRejects: listRejects,
   getFoundationQuarantineReject: getReject,
 }));
+vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: sourceAccess }));
 
 import { GET } from "../app/api/documents/route";
 
@@ -78,6 +80,7 @@ beforeEach(() => {
   reviewJson.mockReset().mockResolvedValue({ ok: false, code: "NOT_FOUND" });
   listRejects.mockReset().mockResolvedValue({ ok: true, documentIds: [refusedId], truncated: false });
   getReject.mockReset().mockResolvedValue({ ok: true, receipt });
+  sourceAccess.mockReset().mockResolvedValue({ ok: true });
 });
 
 describe("the documents listing", () => {
@@ -108,6 +111,7 @@ describe("the documents listing", () => {
 
   it("returns one held row instead of two unordered versions of one document", async () => {
     const second = "b".repeat(64);
+    listRejects.mockResolvedValue({ ok: true, documentIds: [readId], truncated: false });
     listImmutable.mockResolvedValue({ ok: true, objects: [
       ...immutableObjectsFor(readId),
       { key: `immutable/${workspaceKey}/${workspaceKey}/${readId}/${second}/sanitized.pdf`, size: 2048 },
@@ -122,6 +126,14 @@ describe("the documents listing", () => {
         ocrReviewReasonCode: "SOURCE_VERSION_AMBIGUOUS",
       }),
     ]);
+    expect(getReject).not.toHaveBeenCalled();
+  });
+
+  it("returns no document metadata after connector access is revoked", async () => {
+    sourceAccess.mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
+    const body = await documents();
+    expect(body.status).toBe(403);
+    expect(getReject).not.toHaveBeenCalled();
   });
 
   it("shows nothing at all rather than a refusal it could not validate", async () => {

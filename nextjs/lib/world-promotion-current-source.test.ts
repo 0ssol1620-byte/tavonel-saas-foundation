@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { compileCollectionCandidate, type CollectionOcrInput } from "./collection-compiler";
 
-const { getUser, pilotAccess, productAccess, getCandidate, listObjects, promote } = vi.hoisted(() => ({
+const { getUser, pilotAccess, productAccess, getCandidate, listObjects, promote, sourceAccess } = vi.hoisted(() => ({
   getUser: vi.fn(),
   pilotAccess: vi.fn(),
   productAccess: vi.fn(),
   getCandidate: vi.fn(),
   listObjects: vi.fn(),
   promote: vi.fn(),
+  sourceAccess: vi.fn(),
 }));
 
 vi.mock("@/lib/foundation-pilot", () => ({ getRequestUser: getUser, foundationPilotAccess: pilotAccess }));
@@ -21,6 +22,7 @@ vi.mock("@/lib/r2-synthetic-canary", () => ({
   readR2SignerEnv: () => ({ accountId: "account", bucket: "tavonel-foundation", accessKeyId: "key", secretAccessKey: "secret" }),
 }));
 vi.mock("@/lib/world-store", () => ({ promoteFoundationCandidate: promote }));
+vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: sourceAccess }));
 
 import { POST } from "../app/api/collections/[id]/promote/route";
 
@@ -80,6 +82,7 @@ beforeEach(() => {
     ]),
   });
   promote.mockReset().mockResolvedValue({ ok: true, result: { status: "active" } });
+  sourceAccess.mockReset().mockResolvedValue({ ok: true });
 });
 
 describe("World promotion source-version gate", () => {
@@ -110,6 +113,13 @@ describe("World promotion source-version gate", () => {
     listObjects.mockResolvedValue({ ok: false, code: "LIST_LIMIT_EXCEEDED" });
     const response = await POST(request(), { params: Promise.resolve({ id: artifact.collectionId }) });
     expect(response.status).toBe(503);
+    expect(promote).not.toHaveBeenCalled();
+  });
+
+  it("does not activate a source whose connector access was revoked", async () => {
+    sourceAccess.mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
+    const response = await POST(request(), { params: Promise.resolve({ id: artifact.collectionId }) });
+    expect(response.status).toBe(403);
     expect(promote).not.toHaveBeenCalled();
   });
 });

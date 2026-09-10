@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
+import { checkConnectorSourceAccess } from "@/lib/connector-source-access";
 import { groupImmutableDocuments, selectCurrentDocumentVersions } from "@/lib/immutable-keys";
 import { ambiguousPipelineDocument, type PipelineDocument } from "@/lib/pipeline";
 import { validateOcrReviewReceipt } from "@/lib/processing-receipts";
@@ -76,6 +77,12 @@ export async function GET(request: Request) {
   }
   const selected = selectCurrentDocumentVersions(groupImmutableDocuments(workspaceId, listed.objects));
   const documents = selected.documents;
+  const visibleDocumentIds = [...documents.map((item) => item.documentId), ...selected.ambiguousDocumentIds];
+  const sourceAccess = await checkConnectorSourceAccess(workspaceId, visibleDocumentIds);
+  if (!sourceAccess.ok) return NextResponse.json({ code: sourceAccess.code }, {
+    status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503,
+    headers: { "Cache-Control": "no-store" },
+  });
   const reviewDocuments = documents.filter((item) => item.processingState === "operator_review" && item.ocrReviewKey && item.sanitizedKey).slice(0, 20);
   const [reviewReceipts, refused] = await Promise.all([
     Promise.all(reviewDocuments.map(async (item) => ({
@@ -84,7 +91,7 @@ export async function GET(request: Request) {
       immutableKey: item.sanitizedKey!,
       loaded: await getWorkspaceOcrReviewJson(signer, workspaceId, item.ocrReviewKey!),
     }))),
-    listRefusedDocuments(signer, workspaceId, new Set(documents.map((item) => item.documentId))),
+    listRefusedDocuments(signer, workspaceId, new Set(visibleDocumentIds)),
   ]);
   const reasonCodes = new Map(reviewReceipts.flatMap((item) => {
     if (!item.loaded.ok) return [];
@@ -97,6 +104,11 @@ export async function GET(request: Request) {
       ? { ocrReviewReasonCode: reasonCodes.get(`${item.documentId}/${item.versionKey}`) }
       : {}),
   }));
+  const currentAccess = await checkConnectorSourceAccess(workspaceId, visibleDocumentIds);
+  if (!currentAccess.ok) return NextResponse.json({ code: currentAccess.code }, {
+    status: currentAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503,
+    headers: { "Cache-Control": "no-store" },
+  });
   return NextResponse.json(
     {
       code: "OK",

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { authorizeFoundationProduct } from "@/lib/billing-product-access";
+import { checkConnectorSourceAccess } from "@/lib/connector-source-access";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
 import { DOCUMENT_ID_PATTERN, groupImmutableDocuments, selectCurrentDocumentVersions } from "@/lib/immutable-keys";
 import { presignWorkspaceProgressGet } from "@/lib/r2-presign";
@@ -59,6 +60,11 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   if (!match?.sanitizedKey) {
     return NextResponse.json({ code: "NOT_FOUND" }, { status: 404, headers: { "Cache-Control": "no-store" } });
   }
+  const sourceAccess = await checkConnectorSourceAccess(membership.workspaceId, [id]);
+  if (!sourceAccess.ok) return NextResponse.json({ code: sourceAccess.code }, {
+    status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503,
+    headers: { "Cache-Control": "no-store" },
+  });
   const progressKey = `${match.sanitizedKey.slice(0, -"/sanitized.pdf".length)}/ocr-progress.json`;
   const signed = presignWorkspaceProgressGet(signer, {
     workspaceId: membership.workspaceId,

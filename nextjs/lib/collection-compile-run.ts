@@ -1,5 +1,6 @@
 import { OCR_REGIONS_REQUIRED, documentsWithoutRegions } from "../../shared/compiledWorldValidation";
 import { type CollectionCandidateArtifact, validateCollectionOcrInput } from "./collection-compiler";
+import { checkConnectorSourceAccess } from "./connector-source-access";
 import { dispatchCoreCompile, readCoreRuntimeEnv } from "./core-runtime";
 import { dispatchProductCoreV2, projectProductCoreV2Candidate, readProductCoreV2Env } from "./core-runtime-v2";
 import { checkCurrentSourceVersions, collectionCandidateKey, groupImmutableDocuments, selectCurrentDocumentVersions } from "./immutable-keys";
@@ -130,6 +131,15 @@ export async function runCollectionCompile(
 
   const expectedVersions = selected.map((item) => ({ documentId: item!.documentId, versionKey: item!.versionKey }));
   const revalidate = async (): Promise<CollectionCompileRun | null> => {
+    const sourceAccess = await checkConnectorSourceAccess(workspaceId, expectedVersions.map((item) => item.documentId));
+    if (!sourceAccess.ok) {
+      return {
+        ok: false,
+        status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503,
+        code: sourceAccess.code,
+        payload: {},
+      };
+    }
     const relisted = await listImmutableWorkspaceObjects(signer, workspaceId);
     if (!relisted.ok) return { ok: false, status: 503, code: relisted.code, payload: {} };
     const checked = checkCurrentSourceVersions(workspaceId, relisted.objects, expectedVersions);
