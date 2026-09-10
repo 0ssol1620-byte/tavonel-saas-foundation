@@ -54,6 +54,28 @@ test("integration marketing copy uses access modes instead of beta badges", asyn
   await expect(main.getByText("Customer-run", { exact: true })).toHaveCount(2);
 });
 
+test("odd two-column record grids do not expose an empty placeholder cell", async ({ page }) => {
+  for (const route of ["/security", "/status", "/subprocessors"] as const) {
+    await page.goto(route);
+    const grid = page.locator(route === "/subprocessors" ? ".processor-list" : ".status-list").last();
+    const geometry = await grid.evaluate((element) => {
+      const last = element.lastElementChild;
+      if (!(last instanceof HTMLElement)) throw new Error("record grid has no final item");
+      const parentRect = element.getBoundingClientRect();
+      const itemRect = last.getBoundingClientRect();
+      return {
+        childCount: element.children.length,
+        leftGap: Math.abs(itemRect.left - parentRect.left),
+        rightGap: Math.abs(itemRect.right - parentRect.right),
+      };
+    });
+
+    expect(geometry.childCount % 2, `${route} exercises the odd-card case`).toBe(1);
+    expect(geometry.leftGap, `${route} final card begins at the grid edge`).toBeLessThanOrEqual(1);
+    expect(geometry.rightGap, `${route} final card fills the former empty cell`).toBeLessThanOrEqual(1);
+  }
+});
+
 test("the public footer stays compact and fully painted on narrow screens", async ({ page }) => {
   await page.goto("/integrations");
   const footer = page.locator("footer.site");
