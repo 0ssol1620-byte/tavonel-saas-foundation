@@ -82,6 +82,40 @@ describe("R2 document listing prefix", () => {
     expect(String(fetchMock.mock.calls[1][0])).toContain("continuation-token=next%20page");
   });
 
+  it("refuses an inventory that is still truncated after the eighth page", async () => {
+    const env = {
+      accountId: "acct",
+      bucket: FOUNDATION_R2_BUCKET,
+      accessKeyId: "AKIAEXAMPLE",
+      secretAccessKey: "secret",
+    };
+    const prefix = `immutable/${WS}/${WS}/`;
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(
+      `<ListBucketResult><IsTruncated>true</IsTruncated><NextContinuationToken>more</NextContinuationToken><Contents><Key>${prefix}doc-a/${"ab".repeat(32)}/sanitized.pdf</Key><Size>12</Size></Contents></ListBucketResult>`,
+      { status: 200 },
+    )));
+
+    await expect(listImmutableWorkspaceObjects(env, WS)).resolves.toEqual({
+      ok: false,
+      code: "LIST_LIMIT_EXCEEDED",
+    });
+  });
+
+  it("refuses a truncated response without a continuation token", async () => {
+    const env = {
+      accountId: "acct",
+      bucket: FOUNDATION_R2_BUCKET,
+      accessKeyId: "AKIAEXAMPLE",
+      secretAccessKey: "secret",
+    };
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(
+      "<ListBucketResult><IsTruncated>true</IsTruncated></ListBucketResult>",
+      { status: 200 },
+    )));
+
+    await expect(listImmutableWorkspaceObjects(env, WS)).resolves.toEqual({ ok: false, code: "LIST_INVALID" });
+  });
+
   it("writes a create-once collection candidate with a signed workspace key", async () => {
     const env = {
       accountId: "acct",

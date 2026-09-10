@@ -190,9 +190,17 @@ export async function listImmutableWorkspaceObjects(
     objects.push(
       ...parseListContents(xml).filter((item) => isKeyInsideWorkspacePrefix(workspaceId, item.key)),
     );
-    const truncated = /<IsTruncated>\s*true\s*<\/IsTruncated>/i.test(xml);
+    const truncation = /<IsTruncated>\s*(true|false)\s*<\/IsTruncated>/i.exec(xml)?.[1]?.toLowerCase();
+    if (!truncation) return { ok: false, code: "LIST_INVALID" };
+    const truncated = truncation === "true";
     continuation = /<NextContinuationToken>([^<]+)<\/NextContinuationToken>/i.exec(xml)?.[1];
-    if (!truncated || !continuation) break;
+    if (!truncated) break;
+    if (!continuation) return { ok: false, code: "LIST_INVALID" };
+    // A partial inventory is not an inventory. Returning the first 8,000 keys as a success can
+    // hide a newer source version and make every current-version fence agree on the same stale
+    // answer. The caller must move to a durable source ledger before this workspace can grow past
+    // the bounded R2 fallback.
+    if (page === 7) return { ok: false, code: "LIST_LIMIT_EXCEEDED" };
   }
   return { ok: true, objects };
 }

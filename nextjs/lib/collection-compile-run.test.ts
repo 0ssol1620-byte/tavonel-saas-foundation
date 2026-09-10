@@ -31,6 +31,7 @@ vi.mock("./core-runtime-v2", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./core-runtime-v2")>()),
   readProductCoreV2Env: () => ({ url: "https://core-v2.example", hmac: "x".repeat(32) }),
   dispatchProductCoreV2: (...args: unknown[]) => dispatched(...args),
+  projectProductCoreV2Candidate: () => ({}),
 }));
 
 const { runCollectionCompile } = await import("./collection-compile-run");
@@ -201,5 +202,50 @@ describe("a source read before region capture", () => {
       expect(run.payload).toEqual({ documentIds: [DOCUMENT] });
     }
     expect(dispatched).not.toHaveBeenCalled();
+  });
+
+  it("refuses persistence when a source changes during Core execution", async () => {
+    const newer = "e".repeat(64);
+    const first = [
+      { key: `${PREFIX}/sanitized.pdf`, size: 1024, lastModified: "2026-09-09T00:00:00.000Z" },
+      { key: `${PREFIX}/ocr.json`, size: 512, lastModified: "2026-09-09T00:01:00.000Z" },
+    ];
+    listed
+      .mockResolvedValueOnce({ ok: true, objects: first })
+      .mockResolvedValueOnce({ ok: true, objects: first })
+      .mockResolvedValueOnce({ ok: true, objects: [
+        ...first,
+        { key: `immutable/${WS}/${WS}/${DOCUMENT}/${newer}/sanitized.pdf`, size: 2048,
+          lastModified: "2026-09-10T00:00:00.000Z" },
+      ] });
+    fetched.mockResolvedValue({ ok: true, json: ocrResult("tavonel.ocr_result.v2", [
+      {
+        regionId: "native-p0001",
+        pageIndex0: 0,
+        pageNumber1: 1,
+        order: 0,
+        blockType: "paragraph",
+        bbox1000: [0, 0, 1000, 1000],
+        text: "The pump was inspected and the reading stayed inside the policy limits.",
+        confidence: 1,
+        authority: "official",
+      },
+    ]) });
+    dispatched.mockResolvedValue({
+      ok: true,
+      result: {
+        status: "completed",
+        runtime: "tavonel-python-core-v2",
+        candidate: { worldStateId: "world-1", reviewReasons: [] },
+        receipt: { requestId: "request-1", outputSha256: `sha256:${"f".repeat(64)}`, candidatePromotion: false },
+      },
+    });
+
+    const run = await runCollectionCompile(WS, [DOCUMENT]);
+
+    expect(run.ok).toBe(false);
+    if (!run.ok) expect(run.code).toBe("SOURCE_VERSION_CHANGED");
+    expect(dispatched).toHaveBeenCalledOnce();
+    expect(put).not.toHaveBeenCalled();
   });
 });

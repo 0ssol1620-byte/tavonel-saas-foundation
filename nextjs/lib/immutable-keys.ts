@@ -149,6 +149,36 @@ export type CurrentDocumentSelection = {
   ambiguousDocumentIds: string[];
 };
 
+export type SourceVersionReference = {
+  documentId: string;
+  versionKey: string;
+};
+
+export type CurrentSourceVersionCheck =
+  | { ok: true }
+  | { ok: false; code: "SOURCE_VERSION_AMBIGUOUS" | "SOURCE_VERSION_CHANGED"; documentIds: string[] };
+
+/** Compare a source-bound candidate with one complete workspace inventory. */
+export function checkCurrentSourceVersions(
+  workspaceId: string,
+  objects: readonly ImmutableObjectMeta[],
+  expected: readonly SourceVersionReference[],
+): CurrentSourceVersionCheck {
+  const selected = selectCurrentDocumentVersions(groupImmutableDocuments(workspaceId, [...objects]));
+  const expectedIds = new Set(expected.map((item) => item.documentId));
+  const ambiguous = selected.ambiguousDocumentIds.filter((id) => expectedIds.has(id)).sort();
+  if (ambiguous.length > 0) {
+    return { ok: false, code: "SOURCE_VERSION_AMBIGUOUS", documentIds: ambiguous };
+  }
+  const changed = expected.flatMap((item) => {
+    const current = selected.documents.find((candidate) => candidate.documentId === item.documentId);
+    return current?.versionKey === item.versionKey ? [] : [item.documentId];
+  });
+  return changed.length > 0
+    ? { ok: false, code: "SOURCE_VERSION_CHANGED", documentIds: [...new Set(changed)].sort() }
+    : { ok: true };
+}
+
 /**
  * Choose the current immutable representation for every logical document.
  *

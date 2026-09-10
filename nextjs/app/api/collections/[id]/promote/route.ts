@@ -3,10 +3,12 @@ import { authorizeFoundationProduct } from "@/lib/billing-product-access";
 import { validatePromotableCollectionArtifact } from "@/lib/collection-download";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
 import {
+  checkCurrentSourceVersions,
   collectionCandidateKey,
   COLLECTION_ID_PATTERN,
+  DOCUMENT_ID_PATTERN,
 } from "@/lib/immutable-keys";
-import { getWorkspaceCollectionCandidate } from "@/lib/r2-objects";
+import { getWorkspaceCollectionCandidate, listImmutableWorkspaceObjects } from "@/lib/r2-objects";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
 import { promoteFoundationCandidate } from "@/lib/world-store";
 
@@ -117,6 +119,7 @@ export async function POST(
   const artifact = validatePromotableCollectionArtifact(loaded.json, id);
   const stored = loaded.json as {
     manifestDigest?: unknown;
+    sourceDocuments?: Array<{ documentId?: unknown; versionKey?: unknown }>;
     coreExecution?: {
       runtime?: unknown;
       worldStateId?: unknown;
@@ -138,6 +141,40 @@ export async function POST(
     return NextResponse.json(
       { code: "WORLD_CANDIDATE_NOT_PROMOTABLE" },
       { status: 422, headers: NO_STORE }
+    );
+  }
+
+
+  const sourceDocuments = stored.sourceDocuments;
+  if (
+    !Array.isArray(sourceDocuments) ||
+    sourceDocuments.length === 0 ||
+    sourceDocuments.some((item) =>
+      typeof item?.documentId !== "string" || !DOCUMENT_ID_PATTERN.test(item.documentId) ||
+      typeof item?.versionKey !== "string" || !/^[a-f0-9]{32,64}$/i.test(item.versionKey)
+    )
+  ) {
+    return NextResponse.json(
+      { code: "WORLD_CANDIDATE_SOURCE_BINDING_INVALID" },
+      { status: 422, headers: NO_STORE }
+    );
+  }
+  const currentObjects = await listImmutableWorkspaceObjects(signer, membership.workspaceId);
+  if (!currentObjects.ok) {
+    return NextResponse.json(
+      { code: currentObjects.code },
+      { status: 503, headers: NO_STORE }
+    );
+  }
+  const currentSources = checkCurrentSourceVersions(
+    membership.workspaceId,
+    currentObjects.objects,
+    sourceDocuments as Array<{ documentId: string; versionKey: string }>
+  );
+  if (!currentSources.ok) {
+    return NextResponse.json(
+      { code: currentSources.code, documentIds: currentSources.documentIds },
+      { status: 409, headers: NO_STORE }
     );
   }
 
