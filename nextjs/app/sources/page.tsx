@@ -127,8 +127,8 @@ export default function SourcesPage() {
                 change, tombstone behaviour, source-version propagation, world update and ACL
                 enforcement. The current readers checkpoint provider changes, suspend a bound
                 source when deletion or lost access is observed, and fail closed before governed
-                use. Real-account lifecycle runs are still required, which is why the detailed
-                connector surfaces label them beta rather than qualified.
+                use. Real-account lifecycle runs are still required, so the detailed connector
+                surfaces mark them as not yet qualified.
               </p>
                 </div>
               </details>

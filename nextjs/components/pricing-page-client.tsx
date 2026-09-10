@@ -99,7 +99,7 @@ const AT_A_GLANCE = [
   ],
   [
     "What differs by plan",
-    `API and MCP access is included from ${BILLING_OFFERS.observer_access.label} up. Connectors are not a plan feature: the OAuth three are beta for everyone and the agent import route is set up with you. Promoting a candidate world into a live world is enforced at ${BILLING_OFFERS.studio_access.label}.`,
+    `API and MCP access is included from ${BILLING_OFFERS.observer_access.label} up. Connector access is not a plan feature: provider qualification and last-tested evidence are published on Integrations, and the agent import route is set up with you. Promoting a candidate world into a live world is enforced at ${BILLING_OFFERS.studio_access.label}.`,
   ],
   [
     "How to start",
@@ -131,7 +131,7 @@ const AT_A_GLANCE = [
 
   The three that had no answer are answered from what exists and nothing more. "Is this finished"
   is the uncomfortable one, and it is answered with the deployment's own facts -- no format
-  carries a qualification receipt, promotion needs a person, connectors are beta -- rather than
+  carries a qualification receipt, promotion needs a person, connectors still need real-account qualification -- rather than
   with a reassurance, because a buyer who finds that out after a pilot is a worse outcome than one
   who finds it out here.
 */
@@ -146,7 +146,7 @@ const PURCHASE_FAQ: Array<[string, string, Route, string]> = [
   ["Can my agent use it?", "A read-only MCP server and an HTTP API are published, with eight tools over sources, World, search, Ask, objects, relations, evidence and package. There is no write tool.", "/developers" as Route, "API and MCP"],
   ["What does it do when it is uncertain?", "It abstains and says which sources it looked at. A composed answer with no region behind it would be indistinguishable from a correct one, which is the failure the whole contract exists to prevent.", "/knowledge-compiler" as Route, "Questions people ask"],
   ["Is my data safe?", "Your sources go to a tenant-scoped quarantine, are sanitized before anything reads them, and are not used to train shared models. No third-party model API receives your documents in this deployment.", "/security" as Route, "Where your documents go"],
-  ["Is this finished?", "No, and the deployment says where it is not: no accepted format carries a qualification receipt, the connectors are beta, promoting a World is a human decision by design, and three of the thirteen things a security review asks have no published answer yet.", "/trust" as Route, "What is published, and what is not"],
+  ["Is this finished?", "No, and the deployment says where it is not: no accepted format carries a qualification receipt, cloud connectors still require provider-specific real-account qualification, promoting a World is a human decision by design, and three of the thirteen things a security review asks have no published answer yet.", "/trust" as Route, "What is published, and what is not"],
   ["How much does it cost?", "A monthly subscription with included pages, then a per-page rate past them. Both numbers are above, and the maximum for any page is shown before a run starts.", "/refunds" as Route, "Cancellation and refunds"],
   ["How much setup is required?", "Upload your own files and compile. Evaluation takes no card, and nothing is charged until you choose a plan.", "/docs" as Route, "Documentation"],
   ["Will I be locked in?", "The package is open formats — canonical JSON, Turtle, JSON-LD, CSV and JSONL — and the two verifiers are readable scripts rather than a service, so a package can be checked and loaded without us.", "/docs/exports" as Route, "The package format"],
