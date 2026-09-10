@@ -136,6 +136,16 @@ describe("the documents listing", () => {
     expect(getReject).not.toHaveBeenCalled();
   });
 
+  it("revalidates access for a refusal loaded after the first check", async () => {
+    sourceAccess.mockResolvedValueOnce({ ok: true }).mockResolvedValueOnce({
+      ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED",
+    });
+    const body = await documents();
+    expect(body.status).toBe(403);
+    expect(getReject).toHaveBeenCalledOnce();
+    expect(sourceAccess).toHaveBeenLastCalledWith(workspaceKey, [readId, refusedId]);
+  });
+
   it("shows nothing at all rather than a refusal it could not validate", async () => {
     getReject.mockResolvedValue({ ok: false, code: "NOT_FOUND" });
     const body = await documents();

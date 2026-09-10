@@ -104,7 +104,8 @@ export async function GET(request: Request) {
       ? { ocrReviewReasonCode: reasonCodes.get(`${item.documentId}/${item.versionKey}`) }
       : {}),
   }));
-  const currentAccess = await checkConnectorSourceAccess(workspaceId, visibleDocumentIds);
+  const returnedDocumentIds = [...visibleDocumentIds, ...refused.map((item) => item.documentId)];
+  const currentAccess = await checkConnectorSourceAccess(workspaceId, returnedDocumentIds);
   if (!currentAccess.ok) return NextResponse.json({ code: currentAccess.code }, {
     status: currentAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503,
     headers: { "Cache-Control": "no-store" },
