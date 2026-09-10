@@ -3,12 +3,10 @@
 /* Skip expensive layout/paint for long off-screen collections while preserving intrinsic size. */
 .document-meta li,
 .board-list > li,
-.solution-section,
 .product-surface {
   content-visibility: auto;
   contain-intrinsic-size: auto 72px;
 }
-.solution-section { contain-intrinsic-size: auto 420px; }
 .product-surface { contain-intrinsic-size: auto 250px; }
 
 /* Interactive surfaces move subtly; no decorative animation competes with the product film. */

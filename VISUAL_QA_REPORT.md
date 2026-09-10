@@ -136,3 +136,33 @@ Verification on a fresh production build:
 This is production-build and automated layout evidence. Provider real-account qualification, authenticated customer E2E, and aesthetic acceptance are separate gates.
 
 **FOUNDER VISUAL REVIEW REQUIRED**
+
+## 2026-09-10 — Public composition and source-bound proof candidate
+
+The user-supplied `/solutions/ai-ready-knowledge` capture exposed a second composition defect after the shared body repair: at intermediate desktop widths the title rail and evidence cards still competed for space, so long records could collapse below 330px while unused canvas remained elsewhere. The shared editorial body now keeps its two-column composition only above 1320px and becomes one readable column at 1280px and below. Wide screens retain the asymmetric editorial composition and sticky claim; intermediate and mobile widths give evidence, records, and actions the full reading measure.
+
+The solution family now opens with an inspectable, source-bound product visual built from the existing public Apple SEC fixture: 5 filings / 290 pages, 1,281 evidence regions, 6,300 compiled objects, and the W0 to W4 version chain. It links to the actual Explore evidence surface. This replaces an abstract text-only strip without inventing customer, model, or benchmark proof. Workflow and outcome sections use a denser, responsive visual sequence; the fifth workflow item closes the mobile grid instead of leaving an empty cell. Public Knowledge Compiler registry heroes were rebalanced around a wider claim and explanation measure.
+
+Official Reducto, Glean, Unstructured, and LlamaParse public surfaces were reviewed for information hierarchy. The useful shared pattern is rapid movement from the input and outcome to proof and a concrete next action. TAVONEL applies that pattern with its own evidence vocabulary and public source data; no competitor artwork, copy, or unsupported comparison claim was introduced.
+
+Fresh production-build verification:
+
+- Next.js production build preflight: TypeScript and ESLint passed; **217 test files / 2,677 unit tests** passed; 74 static pages generated.
+- Full Playwright matrix: **936 passed, 215 intentional project-specific skips, 0 failed** across `1920`, `1440`, `1280`, `1024`, `768`, `390`, `360`, reduced motion, and launch Chromium/Firefox/WebKit projects.
+- Public geometry census: 54 sitemap routes at `1440`, `1280`, and `390` = **162 full-page renders**, 0 non-200 responses, page errors, horizontal overflow, or long paragraphs trapped below 330px.
+- Direct visual inspection covered the repaired `/evidence` page at 1280px and the source-bound solution page at 1280px and 390px. Captures and the complete census are retained under `nextjs/.chatgpt2codex/public-composition-census/` and remain untracked.
+- Lighthouse 12.8, three-run median per route, passed every enforced launch budget:
+
+| Route | Performance | Accessibility | Best practices | SEO | LCP | CLS | TBT |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `/` | 0.95 | 1.00 | 1.00 | 0.92 | 2396 ms | 0.00127 | 6 ms |
+| `/privacy` | 0.97 | 1.00 | 0.96 | 1.00 | 2057 ms | 0.00023 | 72 ms |
+| `/security` | 0.97 | 1.00 | 0.96 | 1.00 | 2159 ms | 0.00146 | 8 ms |
+| `/pricing` | 0.97 | 0.98 | 1.00 | 0.91 | 2170 ms | 0.00022 | 14 ms |
+| `/explore` | 0.95 | 0.98 | 0.93 | 1.00 | 2158 ms | 0.00126 | 129 ms |
+
+The repository does not define `interactions:check` or an Impeccable script; their coverage is represented by the checked-in Playwright interaction, accessibility, visual continuity, and production-hardening suites rather than reported as a command that ran.
+
+This evidence validates the candidate bytes locally. Exact-SHA CI, merge, production deployment, and live route verification remain release gates. Automated evidence does not constitute aesthetic approval.
+
+**FOUNDER VISUAL REVIEW REQUIRED**
