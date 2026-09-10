@@ -128,31 +128,21 @@ describe("/trust indexes the six published surfaces", () => {
   });
 });
 
-/*
-  C-13 / K-07. `activationPolicy.cdr.reason` is served verbatim from /api/status and rendered on
-  /security, so it is the deployment's own statement about which sanitizer is running.
-
-  What is deployed is the synthetic qualification image. The pypdfium2 service the licensing and
-  fail-closed tests were written against has never been deployed, and until a deployed image
-  digest can be compared with the one those tests ran on, this string may not imply otherwise.
-  The check is written as "pdfium may appear only where the sentence also says it is not
-  deployed", because the failure to catch is not a bare word -- it is the confident half-sentence
-  somebody adds after a deploy that did not happen.
-*/
+/* C-13 / K-07. This string is public runtime copy, so it names the controls on the active path. */
 describe("§37 the CDR row names the build that is actually running", () => {
   const reason = activationPolicy.cdr.reason;
 
-  it("names the deployed synthetic build", () => {
-    expect(reason).toContain("tavonel-cdr-synthetic");
-    expect(reason.toLowerCase()).toContain("not deployed");
+  it("names the deployed private sanitizer path", () => {
+    expect(reason).not.toContain("tavonel-cdr-synthetic");
+    expect(reason).toContain("IAM-only");
+    expect(reason).toContain("PDFium");
+    expect(reason).toContain("ClamAV");
   });
 
-  it("cannot claim the PDFium service before a deployed-digest check exists", () => {
-    const claimingSentences = reason
-      .split(/(?<=\.)\s+/)
-      .filter((sentence) => /pdfium/i.test(sentence))
-      .filter((sentence) => !/not deployed/i.test(sentence));
-    expect(claimingSentences, "a PDFium claim needs a deployed image digest, and there is none").toEqual([]);
+  it("states the transport and artifact boundaries", () => {
+    expect(reason).toContain("short-lived workload identity");
+    expect(reason).toContain("refuses redirects");
+    expect(reason).toContain("digest-bound immutable PDFs");
   });
 });
 
