@@ -128,6 +128,19 @@ describe("document source PDF route", () => {
     expect(signPdf).not.toHaveBeenCalled();
   });
 
+  it("refuses an unpinned read when multiple source versions have no authoritative order", async () => {
+    const second = "cd".repeat(32);
+    listObjects.mockResolvedValue({ ok: true, objects: [
+      { key, size: 20 },
+      { key: `immutable/${workspaceId}/${workspaceId}/${documentId}/${second}/sanitized.pdf`, size: 21 },
+    ] });
+    const response = await GET(new Request(`https://tavonel.com/api/documents/${documentId}/source`),
+      { params: Promise.resolve({ id: documentId }) });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ code: "SOURCE_VERSION_AMBIGUOUS" });
+    expect(signPdf).not.toHaveBeenCalled();
+  });
+
   it("blocks unauthenticated requests before listing tenant objects", async () => {
     getUser.mockResolvedValue(null);
     const response = await GET(request(), { params: Promise.resolve({ id: documentId }) });

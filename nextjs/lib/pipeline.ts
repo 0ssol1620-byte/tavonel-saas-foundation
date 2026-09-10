@@ -21,7 +21,7 @@
  */
 
 import { PROCESSING_CEILING_SENTENCE } from "../../shared/intakeCeiling";
-import type { DocumentListItem } from "./immutable-keys";
+import { selectCurrentDocumentVersions, type DocumentListItem } from "./immutable-keys";
 
 export type StageKey = "quarantine" | "sanitize" | "read" | "compile";
 
@@ -53,6 +53,23 @@ export type PipelineDocument = Omit<DocumentListItem, "processingState"> & {
   processingState: DocumentListItem["processingState"] | "refused";
   refusal?: DocumentRefusal;
 };
+
+export function ambiguousPipelineDocument(documentId: string): PipelineDocument {
+  return {
+    documentId,
+    versionKey: "",
+    sanitizedKey: null,
+    sanitizedSize: null,
+    sanitizedObservedAt: null,
+    ocrJsonKey: null,
+    ocrJsonSize: null,
+    hasOcrJson: false,
+    cdrReceiptKey: null,
+    ocrReviewKey: null,
+    processingState: "operator_review",
+    ocrReviewReasonCode: "SOURCE_VERSION_AMBIGUOUS",
+  };
+}
 
 /**
  * What a person should read when their source was refused.
@@ -150,10 +167,18 @@ export function buildPipeline(
 ): PipelineRow[] {
   const compiled = new Set(compiledDocumentIds);
   const byDocumentId = new Map<string, PipelineDocument>();
-  for (const item of documents ?? []) {
-    // A document can have several versions; the one carrying OCR output is the one to report.
-    const existing = byDocumentId.get(item.documentId);
-    if (!existing || (!existing.hasOcrJson && item.hasOcrJson)) byDocumentId.set(item.documentId, item);
+  const listed = documents ?? [];
+  const immutable = listed.filter(
+    (item): item is PipelineDocument & { processingState: DocumentListItem["processingState"] } =>
+      item.processingState !== "refused",
+  );
+  const selected = selectCurrentDocumentVersions(immutable);
+  for (const item of selected.documents) byDocumentId.set(item.documentId, item);
+  for (const documentId of selected.ambiguousDocumentIds) {
+    byDocumentId.set(documentId, ambiguousPipelineDocument(documentId));
+  }
+  for (const item of listed.filter((candidate) => candidate.processingState === "refused")) {
+    if (!byDocumentId.has(item.documentId)) byDocumentId.set(item.documentId, item);
   }
 
   const rows: PipelineRow[] = [];
@@ -189,7 +214,7 @@ function rowFor(
     filename: upload?.filename ?? null,
     transfer: upload && upload.phase === "sending" ? { loaded: upload.loaded, total: upload.bytes } : null,
     stages: [quarantine, sanitize, read, compile],
-    needsPerson: read.state === "held",
+    needsPerson: [quarantine, sanitize, read, compile].some((item) => item.state === "held"),
   };
 }
 
@@ -213,6 +238,9 @@ function sanitizeStage(previous: StageState, server: PipelineDocument | null): S
     return previous === "done"
       ? stage("sanitize", "active", "preparing a safe source copy")
       : stage("sanitize", "waiting");
+  }
+  if (server.ocrReviewReasonCode === "SOURCE_VERSION_AMBIGUOUS") {
+    return stage("sanitize", "held", "current source version could not be ordered safely; review is required");
   }
   /*
    * Terminal, and terminal in the vocabulary the board already understands.

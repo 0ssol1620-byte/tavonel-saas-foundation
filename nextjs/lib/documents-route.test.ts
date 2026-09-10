@@ -13,16 +13,21 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { authorize, signerEnv, listImmutable, reviewJson, listRejects, getReject } = vi.hoisted(() => ({
+const { authorize, reauthorize, signerEnv, listImmutable, reviewJson, listRejects, getReject, sourceAccess } = vi.hoisted(() => ({
   authorize: vi.fn(),
+  reauthorize: vi.fn(),
   signerEnv: vi.fn(),
   listImmutable: vi.fn(),
   reviewJson: vi.fn(),
   listRejects: vi.fn(),
   getReject: vi.fn(),
+  sourceAccess: vi.fn(),
 }));
 
-vi.mock("@/lib/developer-auth", () => ({ authorizeFoundationRequest: authorize }));
+vi.mock("@/lib/developer-auth", () => ({
+  authorizeFoundationRequest: authorize,
+  revalidateFoundationAuthorization: reauthorize,
+}));
 vi.mock("@/lib/r2-objects", () => ({
   listImmutableWorkspaceObjects: listImmutable,
   getWorkspaceOcrReviewJson: reviewJson,
@@ -32,6 +37,7 @@ vi.mock("@/lib/r2-synthetic-canary", () => ({
   listFoundationQuarantineRejects: listRejects,
   getFoundationQuarantineReject: getReject,
 }));
+vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: sourceAccess }));
 
 import { GET } from "../app/api/documents/route";
 
@@ -68,6 +74,7 @@ async function documents() {
 
 beforeEach(() => {
   authorize.mockReset().mockResolvedValue({ ok: true, principal: { workspaceKey } });
+  reauthorize.mockReset().mockResolvedValue({ ok: true, principal: { workspaceKey } });
   signerEnv.mockReset().mockReturnValue({
     accountId: "account",
     accessKeyId: "key",
@@ -78,6 +85,7 @@ beforeEach(() => {
   reviewJson.mockReset().mockResolvedValue({ ok: false, code: "NOT_FOUND" });
   listRejects.mockReset().mockResolvedValue({ ok: true, documentIds: [refusedId], truncated: false });
   getReject.mockReset().mockResolvedValue({ ok: true, receipt });
+  sourceAccess.mockReset().mockResolvedValue({ ok: true });
 });
 
 describe("the documents listing", () => {
@@ -104,6 +112,50 @@ describe("the documents listing", () => {
     expect(body.documents).toHaveLength(1);
     expect(body.documents[0]).toMatchObject({ documentId: readId, processingState: "ocr_ready" });
     expect(getReject).not.toHaveBeenCalled();
+  });
+
+  it("returns one held row instead of two unordered versions of one document", async () => {
+    const second = "b".repeat(64);
+    listRejects.mockResolvedValue({ ok: true, documentIds: [readId], truncated: false });
+    listImmutable.mockResolvedValue({ ok: true, objects: [
+      ...immutableObjectsFor(readId),
+      { key: `immutable/${workspaceKey}/${workspaceKey}/${readId}/${second}/sanitized.pdf`, size: 2048 },
+      { key: `immutable/${workspaceKey}/${workspaceKey}/${readId}/${second}/ocr.json`, size: 512 },
+    ] });
+    const body = await documents();
+    expect(body.documents.filter((item) => item.documentId === readId)).toEqual([
+      expect.objectContaining({
+        versionKey: "",
+        hasOcrJson: false,
+        processingState: "operator_review",
+        ocrReviewReasonCode: "SOURCE_VERSION_AMBIGUOUS",
+      }),
+    ]);
+    expect(getReject).not.toHaveBeenCalled();
+  });
+
+  it("returns no document metadata after connector access is revoked", async () => {
+    sourceAccess.mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
+    const body = await documents();
+    expect(body.status).toBe(403);
+    expect(getReject).not.toHaveBeenCalled();
+  });
+
+  it("revalidates access for a refusal loaded after the first check", async () => {
+    sourceAccess.mockResolvedValueOnce({ ok: true }).mockResolvedValueOnce({
+      ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED",
+    });
+    const body = await documents();
+    expect(body.status).toBe(403);
+    expect(getReject).toHaveBeenCalledOnce();
+    expect(sourceAccess).toHaveBeenLastCalledWith(workspaceKey, [readId, refusedId]);
+  });
+
+  it("returns no metadata if API authorization changes while documents load", async () => {
+    reauthorize.mockResolvedValue({ ok: false, code: "API_KEY_REVOKED", status: 401 });
+    const body = await documents();
+    expect(body.status).toBe(401);
+    expect(reauthorize).toHaveBeenCalledOnce();
   });
 
   it("shows nothing at all rather than a refusal it could not validate", async () => {

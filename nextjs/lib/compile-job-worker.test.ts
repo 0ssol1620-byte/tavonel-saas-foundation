@@ -37,7 +37,7 @@ vi.mock("./compile-job-store", async (importOriginal) => {
 });
 vi.mock("./collection-compile-run", () => ({
   runCollectionCompile: (...args: unknown[]) => runCompile(...args),
-  isCompileWaitingOnReading: (code: string) => code === "OCR_NOT_READY",
+  isCompileWaitingOnReading: (code: string) => code === "OCR_NOT_READY" || code === "SOURCE_VERSION_CHANGED",
 }));
 vi.mock("./r2-objects", () => ({ listImmutableWorkspaceObjects: (...args: unknown[]) => listObjects(...args) }));
 vi.mock("./r2-synthetic-canary", () => ({ readR2SignerEnv: () => ({ bucket: "test" }) }));
@@ -215,6 +215,15 @@ describe("the durable compile worker", () => {
     const turn = await runCompileJobTurn(job());
     expect(turn.note).toBe("waiting");
     expect(advance).not.toHaveBeenCalledWith(expect.objectContaining({ state: "failed" }));
+  });
+
+  it("retries when the current source version changes during compilation", async () => {
+    group.mockReturnValue([DOCUMENT("doc-a", "ocr_ready"), DOCUMENT("doc-b", "ocr_ready")]);
+    runCompile.mockResolvedValue({ ok: false, status: 409, code: "SOURCE_VERSION_CHANGED", payload: {} });
+    const turn = await runCompileJobTurn(job());
+    expect(turn.note).toBe("waiting");
+    expect(advance).not.toHaveBeenCalledWith(expect.objectContaining({ state: "failed" }));
+    expect(recordDeferral).toHaveBeenCalled();
   });
 
   it("gives up on a document that never arrived, rather than waiting forever", async () => {

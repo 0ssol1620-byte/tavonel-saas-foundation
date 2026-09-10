@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { authorizeFoundationProduct } from "@/lib/billing-product-access";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
-import { DOCUMENT_ID_PATTERN, groupImmutableDocuments } from "@/lib/immutable-keys";
+import { DOCUMENT_ID_PATTERN, groupImmutableDocuments, selectCurrentDocumentVersions } from "@/lib/immutable-keys";
 import { getWorkspaceSanitizedPdf, listImmutableWorkspaceObjects } from "@/lib/r2-objects";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
 import { checkConnectorSourceAccess } from "@/lib/connector-source-access";
@@ -28,7 +28,11 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const version = new URL(request.url).searchParams.get("version");
   const candidates = groupImmutableDocuments(access.membership.workspaceId, listed.objects)
     .filter((item) => item.documentId === id && item.sanitizedKey);
-  const match = (version ? candidates.find((item) => item.versionKey === version) : candidates[0]) ?? null;
+  const selected = selectCurrentDocumentVersions(candidates);
+  if (!version && selected.ambiguousDocumentIds.includes(id)) {
+    return NextResponse.json({ code: "SOURCE_VERSION_AMBIGUOUS" }, { status: 409, headers: { "Cache-Control": "no-store" } });
+  }
+  const match = (version ? candidates.find((item) => item.versionKey === version) : selected.documents[0]) ?? null;
   if (!match?.sanitizedKey) return NextResponse.json({ code: "NOT_FOUND" }, { status: 404 });
   const sourceAccess = await checkConnectorSourceAccess(access.membership.workspaceId, [id]);
   if (!sourceAccess.ok) return NextResponse.json({ code: sourceAccess.code }, {
