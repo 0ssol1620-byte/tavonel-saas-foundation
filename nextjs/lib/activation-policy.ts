@@ -26,23 +26,19 @@
 export const activationPolicy = {
   customerIntake: { enabled: true, reason: "Customer intake is open. Files go to the TAVONEL quarantine bucket before processing, and no other part of the deployment reads them there." },
   /*
-    C-13. The old sentence -- "The CDR worker sanitizes quarantine source objects and writes
-    immutable PDFs before downstream reading" -- was true about the code and silent about which
-    build is running, and a reader of /security or /api/status took it as a statement about the
-    running service. What is deployed is the synthetic qualification image on Cloud Run
-    (`tavonel-cdr-synthetic`, the PyMuPDF-era build). The pypdfium2 service that the licensing
-    and fail-closed tests were written against has never been deployed: there is no Artifact
-    Registry repository for it and `tavonel-pdf-raster-cdr` does not exist as a service.
+    C-13 names the path that is actually carrying production Worker traffic.
 
-    So the row names the build instead of the intention. It goes back to naming the renderer
-    when a deployed image digest can be checked against the one the tests ran on -- which is what
-    `lib/trust-page-answers.test.ts` holds this string to, rather than trusting an edit.
+    The private PDFium/ClamAV revision was first exercised behind IAM with the same HMAC and
+    digest checks as the Worker, then the exact zero-traffic Worker version was promoted after
+    its repository checks passed. The public sentence states the controls a customer can rely on
+    without publishing service names, image digests or broker identifiers. Customer-data
+    activation stays a separate gate; this row describes the sanitizer path, not permission to
+    send customer files through it.
 
     It deliberately avoids the word "qualification", which the A-6 rule in
-    `activation-policy.test.ts` treats as a promise of a receipt the reader can open. There is no
-    such receipt for the deployed image, and there should not be a word implying one.
+    `activation-policy.test.ts` treats as a promise of a public receipt.
   */
-  cdr: { enabled: true, reason: "Quarantine source objects are sanitized before anything downstream reads them. The sanitizer running today is the synthetic build, tavonel-cdr-synthetic; the pypdfium2 sanitizer service is not deployed, so this row describes the interim path and not the renderer it will become." },
+  cdr: { enabled: true, reason: "Quarantine source objects are sanitized by an IAM-only PDFium and ClamAV service before anything downstream reads them. The production Worker uses short-lived workload identity, refuses redirects, and stores only digest-bound immutable PDFs for downstream reading." },
   ocrGpu: { enabled: true, reason: "GPU OCR is open, with scale-to-zero and candidate-only review controls enforced." },
   candidatePromotion: { enabled: false, reason: "Promotion is always an explicit human decision." },
   customerData: { enabled: false, reason: "Customer-data processing is gated until the security suite passes and the founder records an approval receipt." },
