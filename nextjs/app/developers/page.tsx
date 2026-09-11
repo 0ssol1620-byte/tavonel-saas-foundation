@@ -225,7 +225,10 @@ export default function DevelopersPage() {
                       .slice()
                       .sort((a, b) => a.localeCompare(b))
                       .map((path) => (
-                        <tr key={path}><td><code>{path}</code></td><td>{packagePurpose(path)}</td></tr>
+                        <tr key={path}>
+                          <td data-label="Path"><code>{path}</code></td>
+                          <td data-label="Use it for">{packagePurpose(path)}</td>
+                        </tr>
                       ))}
                   </tbody>
                 </table>

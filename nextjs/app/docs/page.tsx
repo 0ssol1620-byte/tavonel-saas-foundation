@@ -3,7 +3,18 @@ import Link from "next/link";
 import type { Route } from "next";
 import { PublicPageShell } from "@/components/public-page-shell";
 import { DocsSearch } from "@/components/docs-search";
-import { DOCS_GROUPS, DOCS_REVIEWED, DOCS_SECTIONS, DOCS_VERSION, docsSearchIndex, formatReviewDate } from "@/lib/docs-content";
+import { DOCS_GROUPS, DOCS_REVIEWED, DOCS_SECTIONS, DOCS_VERSION, docsSearchIndex, findDocsSection, formatReviewDate } from "@/lib/docs-content";
+
+/*
+  The two sections a reader almost always wants first (BA-218).
+
+  Twenty-two index rows in one full-width column, every one of them the same box with the same
+  13px title and the same one-line summary, meant Quickstart and Changelog had identical weight.
+  These two are promoted above the groups -- they are also still in their own group below, because
+  the index is the index -- and they are read from the section data rather than written again here,
+  so a retitled section cannot disagree with its own feature card.
+*/
+const FEATURED = ["quickstart", "use-with-ai"] as const;
 
 export const metadata: Metadata = {
   title: "Documentation — TAVONEL",
@@ -33,6 +44,19 @@ export default function DocsPage() {
             on our servers, then read the World and the evidence under every object.
           </p>
           <DocsSearch entries={docsSearchIndex()} />
+          <div className="tiles">
+            {FEATURED.map((slug) => {
+              const section = findDocsSection(slug);
+              // Fail closed rather than render an empty card: a renamed slug is a build failure.
+              if (!section) throw new Error(`/docs features ${slug}, which is not a section`);
+              return (
+                <article className="tile" key={slug}>
+                  <h2><Link href={`/docs/${section.slug}` as Route}>{section.title}</Link></h2>
+                  <p>{section.summary}</p>
+                </article>
+              );
+            })}
+          </div>
           <div className="docs-groups">
             {DOCS_GROUPS.map((group) => (
               <div className="stack" key={group}>

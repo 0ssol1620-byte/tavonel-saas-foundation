@@ -91,7 +91,10 @@ function Endpoint({ endpoint, id }: { endpoint: DocsEndpoint; id?: string }) {
         <thead><tr><th>Status</th><th>Response</th></tr></thead>
         <tbody>
           {endpoint.responses.map((response) => (
-            <tr key={response.status}><td><code>{response.status}</code></td><td>{response.description}</td></tr>
+            <tr key={response.status}>
+              <td data-label="Status"><code>{response.status}</code></td>
+              <td data-label="Response">{response.description}</td>
+            </tr>
           ))}
         </tbody>
       </table>
@@ -141,7 +144,11 @@ function Block({ block, endpoints, id }: { block: DocsBlock; endpoints: Map<stri
           <thead><tr>{block.head.map((cell) => <th key={cell}>{cell}</th>)}</tr></thead>
           <tbody>
             {block.rows.map((row) => (
-              <tr key={row.join("|")}>{row.map((cell, index) => <td key={index}>{withEmphasis(cell)}</td>)}</tr>
+              <tr key={row.join("|")}>
+                {row.map((cell, index) => (
+                  <td key={index} data-label={block.head[index]}>{withEmphasis(cell)}</td>
+                ))}
+              </tr>
             ))}
           </tbody>
         </table>
