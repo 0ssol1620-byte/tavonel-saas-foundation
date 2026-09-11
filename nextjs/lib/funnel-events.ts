@@ -170,6 +170,16 @@ export function allowedDetail(detail?: FunnelDetail): Record<string, string> | u
   per job, per World or per decision -- not on a poll, which is why `candidate_ready` fires from
   the worker turn that compiled the package and not from the status endpoint a browser calls
   every few seconds while it waits.
+
+  Delivery into this deployment is at-least-once, so every caller closes the redelivery case
+  with the record it already has rather than firing on a 200: the compile routes fire only when
+  `enqueueCompileJob` reports `created`, the ask route skips an idempotent replay, and the
+  Paddle handler skips an event the billing projection answered as a `duplicate`. A retried
+  request that changed nothing is not a second start.
+
+  One key to read carefully in the log: `plan` on a server event carries the request's
+  `SessionAccessSource` -- "owner" | "paid" | "trial" | "unknown", an access tier -- and not a
+  billing plan name such as Developer or Team.
 */
 export function recordServerFunnel(event: ServerFunnelEvent, detail?: FunnelDetail) {
   console.info(JSON.stringify({ event, ...allowedDetail(detail) }));

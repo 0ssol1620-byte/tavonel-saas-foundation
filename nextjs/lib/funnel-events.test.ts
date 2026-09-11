@@ -184,6 +184,32 @@ describe("server funnel events", () => {
     expect(serverEvents).not.toContain("package_verified");
   });
 
+  /*
+    At-least-once delivery, made checkable at the three call sites where a redelivered request
+    would inflate a funnel step. Every one of them has a record that already distinguishes a
+    fresh application from a replay, and the whole point of an idempotent write is that the
+    retry succeeds -- so a handler that fires on its own 200 counts one start twice.
+
+    `compile_started` is the one that matters most: it is the numerator of
+    `starts_without_candidate_or_approval` in `activation-cohorts.ts`, so an inflated count reads
+    as compiles that never reached a candidate, which is a product failure that did not happen.
+
+    Source text rather than a route invocation: the fact worth pinning is that the guard is in
+    the shipped handler, and exercising these three routes needs an auth, a Supabase and a
+    Paddle-signature harness that would pin the mocks instead.
+  */
+  it("fires no server event for a redelivered request that changed nothing", () => {
+    const route = (path: string) => readFileSync(resolve(import.meta.dirname, "..", path), "utf8");
+    const compileJobs = route("app/api/compile-jobs/route.ts");
+    // `enqueueCompileJob` returns `created: false` when the idempotency key matched a job that
+    // is already enqueued; `enqueueCorpusCompile` passes the same flag up per part.
+    expect(compileJobs).toContain("corpus.value.parts.some((part) => part.created)");
+    expect(compileJobs).toContain("if (enqueued.value.created) {");
+    expect(route("app/api/collections/[id]/ask/route.ts")).toContain("!lease.replay");
+    // The billing projection answers an event it has already stored with this status.
+    expect(route("app/api/paddle/webhook/route.ts")).toContain('applied.result.status !== "duplicate"');
+  });
+
   it.each(serverEvents)("%s fires from a route handler, not from a control", (event) => {
     expect(routeHandlers.includes(`"${event}"`), `${event} has no call site under app/api -- a server event fired from a component reports a click as an outcome`).toBe(true);
   });

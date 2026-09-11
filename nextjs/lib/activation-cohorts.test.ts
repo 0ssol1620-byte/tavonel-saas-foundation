@@ -147,9 +147,10 @@ describe("§15.4 decision table", () => {
   });
 
   /*
-    The column that keeps the table honest. Three rows cannot be computed here -- two because
-    their halves live in the consent-gated browser domain with no shared identifier, one because
-    no per-workspace cost is recorded -- and a row reported as actionable would be answered from
+    The column that keeps the table honest. Four of the seven rows cannot be computed here --
+    two because their halves live in the consent-gated browser domain with no shared identifier,
+    two because neither a Search Console property nor a per-workspace cost record exists in this
+    deployment -- which leaves three. A row reported as actionable would be answered from
     somebody's impression of the traffic instead.
   */
   it("marks the rows this deployment cannot compute, with a reason", () => {

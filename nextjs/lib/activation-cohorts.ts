@@ -195,11 +195,16 @@ export function cohortCounts(reading: CohortReading): Record<CohortName, number>
   §15.4's decision table, with a third column the blueprint leaves implicit: whether this
   deployment can compute the row at all.
 
-  Four of the seven are computable from what now exists -- the server events in
-  `lib/funnel-events.ts` and the cohorts above. The other three are not, for three different
-  reasons, and saying so is the point of the column. A table whose first row reads "impressions
-  are there but clicks are not" against no Search Console access is a row that will be answered
-  from somebody's impression of the traffic.
+  Three of the seven are computable from what now exists -- the server events in
+  `lib/funnel-events.ts` and the cohorts above. The other four are not, for two different
+  reasons: two rows are `not_joinable` (their halves live in the consent-gated browser domain
+  and share no identifier with a server record) and two are `needs_founder_access` (no Search
+  Console property, no per-workspace cost record). Saying so is the point of the column. A table
+  whose first row reads "impressions are there but clicks are not" against no Search Console
+  access is a row that will be answered from somebody's impression of the traffic.
+
+  `computableDecisionRows()` is that subset of three, and `activation-cohorts.test.ts` pins it
+  by id -- so this paragraph cannot drift away from the data again without a test failing.
 
   `availability` is about the measurement, not about the advice. Every `priorityAction` stands on
   its own; what is missing is the observation that would tell an operator the row applies.
