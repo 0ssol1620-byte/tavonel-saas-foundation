@@ -149,9 +149,14 @@ function measureContrast(): { violations: ContrastFinding[]; unmeasured: number;
   /product paints the flow label "04 · WORLD" in `--text-xlo` (#78828a) on #101b19, which
   measures **4.49:1**. One hundredth under, at 9px.
 
-  Recorded with `test.fail()` rather than patched: the styles belong to the truth lane. The exact
-  two-line fix is in the QA lane report under CROSS-LANE REQUESTS. The threshold is WCAG AA as
-  published and is not relaxed to make these pass.
+  Both were fixed at integration (stage 2 C1 and C2) and the list below is empty, which is what
+  this design was for: the defects were recorded as expected failures against the real WCAG AA
+  threshold rather than skipped or softened, so closing them was a deletion and not one
+  assertion here had to be re-derived. Those two surfaces use `--text-lo`, the body token that
+  was already beside them.
+
+  The list and the `test.fail()` stay. An empty allow-list with a live mechanism is what lets the
+  next defect be recorded honestly instead of the threshold being relaxed to ship.
 */
 const KNOWN_CONTRAST_DEFECT: readonly string[] = [];
 

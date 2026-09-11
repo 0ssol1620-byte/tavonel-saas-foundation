@@ -24,15 +24,17 @@ const routes = [
 ] as const;
 
 /*
-  One of the six routes added above does not meet the baseline today.
+  All six routes meet the baseline now, and the list below is empty.
 
-  /pricing renders its four plan cards as `<h3>` directly under the page `<h1>` (see
-  `components/pricing-page-client.tsx:279`), so a screen-reader user moving by heading level
-  drops from h1 to h3 with nothing between. The page belongs to another lane, so the defect is
-  recorded here rather than patched: `test.fail()` keeps it in CI as a failing expectation, and
-  the run turns red the moment it is fixed and this entry is not removed. It is not skipped, and
-  no assertion is weakened to accommodate it. The one-line fix is in the QA lane report under
-  CROSS-LANE REQUESTS.
+  /pricing rendered its four plan cards as `<h3>` directly under the page `<h1>`, so a
+  screen-reader user moving by heading level dropped from h1 to h3 with nothing between. Fixed
+  at integration (stage 2 C4), together with the CSS selector that carried the card treatment,
+  so the accessibility fix did not become a visual regression.
+
+  A second instance of the same defect was found on `/` by running this spec against the merged
+  branch: the landing page had gained three `<h3>` job cards directly under its hero. Neither
+  lane could have seen that one -- the QA lane audited production main, where the block did not
+  exist. Both are fixed; the list and the `test.fail()` mechanism stay for the next one.
 */
 const KNOWN_HEADING_DEFECT: readonly string[] = [];
 
