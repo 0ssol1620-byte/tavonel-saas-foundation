@@ -8,6 +8,7 @@ import {
   RESOURCE_WORKFLOWS,
   resourceFilterHref,
 } from "./site-navigation";
+import { COOKBOOKS } from "./cookbook-content";
 
 /*
   WG-048 / WG-051 / WG-074: the two ways the hub's filter can quietly stop working.
@@ -102,5 +103,43 @@ describe("a solution page hands the reader on to the hub and the docs", () => {
 
   it("builds the fragment the hub's controls answer to", () => {
     expect(resourceFilterHref("build")).toBe("/resources#find-build");
+  });
+});
+
+/*
+  B3. No route reaches a draft cookbook, asserted over the files rather than over one array.
+
+  Two assertions above already cover the two ways it nearly happened: a `/cookbooks` href in
+  `RESOURCE_LINKS`, and a `href=` to one in the solutions template. Neither covers a link written
+  directly into the resources page's own markup, and neither covers the rest of
+  `site-navigation.ts` -- `RESOURCE_LINKS` is one of several arrays in that file, and the footer and
+  the nav are the other ways a page gets linked from everywhere at once.
+
+  So the check is the file text with its comments removed, because all three files discuss
+  `/cookbooks/*` in prose on purpose and a prose mention is not a link. It is conditioned on the
+  records: the day one is approved this fails, and failing is correct -- approval is a deliberate
+  edit in three places (the record, the sitemap's ROUTES, and this test), not a silent unlocking.
+*/
+describe("nothing links a draft cookbook", () => {
+  const withoutComments = (source: string) =>
+    source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+
+  const linkSources = [
+    "../app/resources/page.tsx",
+    "../app/resources/resources.module.css",
+    "../app/solutions/[slug]/page.tsx",
+    "./site-navigation.ts",
+  ];
+
+  it("holds only while every record is a draft", () => {
+    expect(COOKBOOKS.map((record) => record.publication)).toEqual(Array(6).fill("draft"));
+  });
+
+  it.each(linkSources)("%s names no cookbook route outside a comment", (file) => {
+    const source = withoutComments(read(file));
+    expect(source, `${file} links a draft cookbook`).not.toContain("/cookbooks");
+    // The stripper has to be doing something, or this test is vacuous on the two files that
+    // discuss the route in prose.
+    if (file.endsWith("page.tsx")) expect(source.length).toBeLessThan(read(file).length);
   });
 });
