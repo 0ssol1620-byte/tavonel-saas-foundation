@@ -52,7 +52,7 @@ export default function DocsPage() {
           </div>
           <p className="fine">
             API version {DOCS_VERSION} · documentation reviewed {formatReviewDate(DOCS_REVIEWED)} ·{" "}
-            <a href="/api/openapi">machine-readable contract</a> ·{" "}
+            <a href="/api/openapi">OpenAPI contract</a> ·{" "}
             <a href="/llms.txt">llms.txt</a>
           </p>
           {/*
@@ -65,8 +65,13 @@ export default function DocsPage() {
           */}
           <div className="actions">
             <Link className="btn" href={"/docs/quickstart" as Route}>Run the quickstart</Link>
-            <Link className="btn ghost" href={"/developers" as Route}>Choose an access path</Link>
-            <a className="btn ghost" href="/api">API reference</a>
+            {/*
+              BA-199: "Choose an access path" read like the name of the destination, so
+              /developers had three names across the site. This one describes what the page does.
+              BA-184: the third action pointed at /api, a four-tile stub that this site linked to
+              as its "API reference" while the reference itself is these twenty-two sections.
+            */}
+            <Link className="btn ghost" href={"/developers" as Route}>Compare access paths</Link>
           </div>
         </div>
       </div></div></section>
