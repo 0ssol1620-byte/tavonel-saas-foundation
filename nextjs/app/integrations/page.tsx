@@ -52,6 +52,28 @@ const INFRA = [
   ["S3-compatible object storage", "Customer-run", "Import a selected bucket and prefix while credentials stay with your agent."],
 ] as const;
 
+/*
+  I04. The rows above say "Customer-run" and stopped there, which is the honest label and not
+  yet an answer: the reader who accepts it immediately needs install, permissions, restart,
+  outage and update behaviour, and none of it was written anywhere on the site or in
+  docs/runbooks.
+
+  Each answer below is read off `public/developer/tavonel-source-agent.py` and
+  `public/developer/channel.json` rather than described from intent. Two of them are the ones
+  a reader will be surprised by, so they are stated plainly instead of softened: one run is
+  one sync and exits, so the customer's scheduler is the whole schedule; and there is no retry
+  inside the agent, so the customer's scheduler is also the whole retry. The long form, with
+  the error-message table, is docs/runbooks/source-agent-operations.md in the repository.
+*/
+const AGENT_OPERATIONS: Array<[string, string]> = [
+  ["Install", "Python 3.12 or newer. Verify the download against the sha256 in the distribution record at /developer/channel.json, create the connection in Workspace to get its id, and put the API key in the TAVONEL_API_KEY environment variable \u2014 the agent reads it from nowhere else. S3-compatible mode additionally needs boto3, which you install; the agent stops and says so if it is missing."],
+  ["Permissions", "Read on the directory tree, or ListObjectsV2 and GetObject on the bucket and prefix. Nothing more: the agent never writes to your source. Storage credentials are resolved on your host and are never sent to us. It skips symbolic links and refuses a path that resolves outside the root you gave it. Outbound HTTPS only, no inbound port."],
+  ["One run", "One invocation performs one sync and exits. It is not a service and has no internal timer: cron, a systemd timer or Task Scheduler is what makes it periodic, and that interval is your import latency. Do not run two against one connection at once."],
+  ["Restart and network outage", "The local cursor file is written only after we have committed the batch, so a killed process, a reboot or a dropped connection leaves it untouched and the next run sends the same work again; per-file upload keys are derived from the connection, path and revision, so a repeat resolves to the same document rather than a duplicate. There is no retry inside the agent: a failure exits non-zero and waits for your scheduler."],
+  ["Update", "The distribution record at /developer/channel.json carries the current version, the minimum Python and the sha256 of the agent. Compare, download, verify the hash, replace the file, keep the cursor state. There is no self-update and no notification, so checking that record is a task you schedule."],
+  ["Responsibility", "The host, its uptime, the scheduler, the credentials and noticing a failed run are yours, because the agent runs inside your network on your machine. We do not monitor it: an agent that stopped looks to us like a source with no changes. We are responsible for the API it calls, the upload capability, the cursor commit and everything after the upload."],
+] as const;
+
 export default function IntegrationsPage() {
   return (
     <PublicPageShell>
@@ -92,6 +114,11 @@ export default function IntegrationsPage() {
           <div className="stack">
             <p className="lede">Use a <a href="/developer/tavonel-source-agent.py" download>local source agent</a> for repositories that stay inside your network. We configure the first route with you.</p>
             <div className="chain">{INFRA.map(([name, level, description]) => <article className="link" key={name}><span className="st">{level}</span><h3>{name}</h3><p>{description}</p></article>)}</div>
+            <details className="integration-technical">
+              <summary>Operating the agent</summary>
+              <dl className="integration-facts">{AGENT_OPERATIONS.map(([term, detail]) => <div key={term}><dt>{term}</dt><dd>{detail}</dd></div>)}</dl>
+            </details>
+            <p className="fine">No customer-run install of this agent has been qualified end to end on real infrastructure yet, so the timings from a run on your own corpus are the only ones that exist. There is no health endpoint or heartbeat for it either: its liveness is whatever your scheduler reports.</p>
           </div>
         </div>
 

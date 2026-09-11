@@ -53,6 +53,33 @@ export default function ResearchNotesPage() {
                 ))}
               </div>
 
+              {/*
+                B04. Five hubs answered five different questions with nothing saying which was
+                which, so a reader looking for one of them read parts of three. One line, the
+                same shape on each: what this page answers, and where the next question goes.
+              */}
+              <p className="fine">
+                <b>This page answers one question:</b> what has actually been measured, and what
+                has not. Which problems are still open is on <Link href={"/research" as Route}>Research</Link>;
+                how a citation stays bound to its source is on <Link href={"/evidence" as Route}>Evidence</Link>;
+                what a number has to carry before it is published is on <Link href={"/benchmarks" as Route}>Benchmarks</Link>;
+                the security and compliance status is on <Link href={"/trust" as Route}>Trust</Link>.
+              </p>
+
+              {/*
+                E02/E05. The two measured entries now state their figures and name the receipt
+                each figure came from. A named receipt a reader cannot reach is only half an
+                answer, so this says where they are and how to get one — rather than linking a
+                URL that does not exist.
+              */}
+              <p className="fine">
+                The receipts named above are files in the compiler repository, under
+                <code> docs/evidence/artifacts/</code>, each bound by sha256 in the campaign&rsquo;s
+                claims pack. They are not published at a public URL yet. Ask
+                <a href="mailto:hello@tavonel.com">hello@tavonel.com</a> for the file whose hash is
+                named here, and check the hash yourself.
+              </p>
+
               <p className="fine">
                 No number here is placed beside a competitor&rsquo;s result as though it were
                 reproduced under the same conditions. Comparative work is published only after a

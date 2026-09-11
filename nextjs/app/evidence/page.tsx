@@ -106,6 +106,28 @@ export default function EvidencePage() {
                 our word for it.
               </p>
 
+              {/*
+                B04. Five hubs answered five different questions with nothing saying which was
+                which, so a reader looking for one of them read parts of three. One line, the
+                same shape on each: what this page answers, and where the next question goes.
+              */}
+              <p className="fine">
+                <b>This page answers one question:</b> how a compiled result stays bound to the
+                source it came from, and how to check that yourself. What was measured and what
+                failed is on <Link href={"/research/notes" as Route}>Research notes</Link>; what a
+                result has to carry before it is published as a number is on <Link href={"/benchmarks" as Route}>Benchmarks</Link>;
+                the frozen fixtures you can rerun are on <Link href={"/reproducibility" as Route}>Reproducibility</Link>;
+                the security and compliance status is on <Link href={"/trust" as Route}>Trust</Link>.
+              </p>
+              {/*
+                B07. The audit's point is that the trust case is made of architecture rather than
+                of customer outcomes, and it is right. The honest fix is not a case study; it is
+                saying why there is none, in the place a reader looks for one. There are no
+                consented customer cases, so there is no section — and an absence with no label
+                reads as an oversight rather than as a state.
+              */}
+              <p className="fine">Customer results are published only with written consent, and no customer has given it, so there is no customer case on this site and no operating figure taken from one. A named customer, a before-and-after time or a logo appears here when a customer has signed off on the wording, and not before.</p>
+
               <p className="slate"><span />WHAT AN EXACT SOURCE LOCATION IS</p>
               <p className="fine">
                 A location is whatever addresses one place inside that kind of source. These are

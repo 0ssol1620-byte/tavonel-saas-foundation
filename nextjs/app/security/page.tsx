@@ -56,8 +56,23 @@ const CONTROLS = [
   ["Tenant isolation", "Workspace identity is derived server-side from an authenticated session, never from an identifier the browser supplies. Storage prefixes, database rows and signed capabilities are all scoped to it."],
   ["Encryption and secrets", "Transport is TLS throughout, and stored objects are encrypted at rest by the storage provider. Authentication, billing, storage and disarm credentials are server-side secrets; the browser may hold a provider's own publishable token and nothing else."],
   ["AI training", "Your documents are not used to train shared models. Models read your sources to compile your world, and for nothing else."],
-  ["Retention and deletion", "Source material, derived artifacts and compiled packages can be deleted on request. The categories, purposes and retention are set out in the privacy notice."],
+  ["Retention and deletion", "Source material, derived artifacts and compiled packages can be deleted on request, and that request is carried out by a person rather than by a self-service control. Which parts of it happen the moment you act, which wait on a provider backup schedule, and where no number is published yet, are set out step by step in the privacy notice."],
   ["Reliability", "A control opens only after the one before it is qualified, so a partial failure stops the pipeline rather than emitting an incomplete world. There is no best-effort path that publishes anyway."],
+  /*
+    O01. "No tested restore" was true when it was written and stopped being true on 2026-09-10.
+
+    Written from the execution record of that day: the production database was restored from
+    its 2026-09-08 16:33:31 UTC backup into a separate temporary project in the same region,
+    the catalog of the original and the restored copy was compared object by object, all 431
+    matched, and the temporary project was deleted afterwards. The record's own caution
+    travels with it -- a database restore is not a service disaster-recovery exercise -- and
+    so does the scope: the document bytes live in object storage and were not part of it.
+
+    What this row deliberately does not do is turn one drill into a recovery objective. The
+    RPO and RTO targets are a commitment the founder makes, they are not made, and they stay
+    in the unanswered block below until they are.
+  */
+  ["Backup and restore", "One restore has been performed and checked. On 2026-09-10 the production database was restored from its backup of 2026-09-08 16:33:31 UTC into a separate temporary project in the same region; the catalog of the original and the restored copy was compared object by object and all 431 matched; the temporary project was deleted when the check finished. That drill covered the database. It did not cover the document bytes in object storage, a full service recovery, or a run through the customer-facing application, and one drill is a demonstration rather than a practice. The catalog-fingerprint receipt (approved-db-catalog-receipt-20260910.json) is kept with the execution record and is not published at a URL; ask for it."],
   /*
     §17.1 asks "who can access it" and "audit", and this page answered neither.
 
@@ -69,6 +84,21 @@ const CONTROLS = [
   */
   ["Access and audit", "Access is a workspace membership checked server-side on every request; there are no roles, no SSO and no seat model in this deployment, so the account that owns a workspace is the account that reaches it. Creating, rotating and revoking a developer key writes an append-only audit row naming the workspace, the action, the target and whether a person or a key acted."],
   /*
+    I03. The audit asked whether a permission on a source propagates into the objects, the
+    excerpts, the answers and the exports derived from it. It does, and the grain of it is
+    narrower than the phrase suggests.
+
+    Written from `lib/connector-source-access.ts`: `checkConnectorSourceAccess` is called on
+    the answer path, the source-byte read, the export signing and candidate promotion, and it
+    returns a denial when the check itself cannot be completed rather than allowing on error.
+    What it reads is a (source_id, workspace_key) suspension row, so the decision is made per
+    workspace and not per person -- worth saying out loud, because a buyer reading
+    \"source-level access control\" will assume per-member unless told otherwise. The
+    two-users-with-different-permissions case the audit wants tested is not a state this
+    deployment can be put into: a workspace has one member.
+  */
+  ["Source-level access", "A suspended or unreachable source is refused on the same requests that would otherwise use it: an answer, a source-byte read, an export and a promotion each re-check it, and a check that cannot complete counts as a refusal rather than a pass. The grain of that decision is the workspace, not the person — a source is reachable for the whole workspace or for none of it, and a workspace has exactly one member here. Per-member source permissions arrive with membership, which this deployment does not have."],
+  /*
     §17.1 asks two more questions this page did not answer: which model providers see a document,
     and what a model is allowed to do with it.
 
@@ -79,21 +109,40 @@ const CONTROLS = [
     about the product, because wiring a provider is a decision that will change the answer.
   */
   ["Model providers", "No third-party model API receives your documents in this deployment: no such integration is wired, and document reading runs on GPU workers TAVONEL operates. Every service permitted to process any class of data is named on the subprocessors page, and a new one is recorded there before it processes anything."],
+  /*
+    S08. Scanning a file for malware and defending against instructions written inside it are
+    two different problems, and this page answered only the first.
+
+    Written from what is wired rather than from what is intended. The answer route replies on
+    the excerpt path: citations are assembled from evidence records, so there is no
+    model-composed sentence for a document to steer. `lib/generator-adapter.ts` is the seam
+    where that would change and carries no implementation. `lib/prompt-injection.test.ts`
+    exercises the nine injection classes against the contract and holds that the answer path
+    exposes no write tool at all.
+
+    The honest shape of this is a fact plus a gate, not a defence. The reason an instruction
+    inside a document cannot rewrite an answer today is that no model writes the answer, and
+    that reason stops holding the day a generator is wired -- so the gate is named here, where
+    a reader deciding whether to trust it can hold us to it later.
+  */
+  ["Instructions written inside a document", "No model writes prose from your documents in this deployment. An answer is assembled from evidence excerpts and the source locations they came from, so a sentence hidden inside a document has no model output to redirect, and the answer path offers it no write tool to reach. That is a statement about what is wired today and not a defence that survives wiring a generation model: the generator seam is a contract with nothing behind it, and the injection classes are re-run against a real generator, with the result written on this page, before one of them answers a request."],
 ] as const;
 
 /*
-  §17.1's last question, left open rather than answered comfortably.
+  §17.1's last question, now split in two, because half of it got answered.
 
-  A buyer asking about backup and recovery is asking whether their compiled world survives a
-  provider incident, and this deployment has no published answer: no tested restore, no stated
-  recovery objective, no documented backup retention. Every sentence available to fill the gap is
-  reassurance -- "stored durably", "the storage provider replicates" -- and each answers a
-  different, easier question than the one being asked. Saying the answer is not ready is worth
-  more than saying something true about a question nobody asked. Founder item F-10 owns the real
-  answer; until it lands, this stays where a reader looking for it will find it.
+  The restore happened (see the Backup and restore control above, 2026-09-10). The objectives
+  did not, and those are the harder half: an RPO and an RTO are numbers somebody promises, and
+  a single successful drill does not imply either one. Every sentence available to close the
+  gap anyway is reassurance -- "stored durably", "the storage provider replicates" -- and each
+  answers a different, easier question than the one being asked.
+
+  So the row below narrowed from the whole subject to the part that is still missing, rather
+  than being deleted once the drill gave it something friendly to say. Founder item F-10 owns
+  the targets; until they are set, this stays where a reader looking for them will find it.
 */
 const UNANSWERED = [
-  ["Backup and recovery", "Not yet answered. This deployment publishes no recovery objective, no backup retention period and no tested restore. Ask before you depend on one, and read the absence of a number here as the state of it."],
+  ["Recovery objectives", "Not yet answered. There is no recovery point objective, no recovery time objective and no published backup retention period for this deployment. Those are commitments somebody has to make and nobody has: the restore above shows the database came back once, which is a different statement from how much work or how much time you would lose. Ask before you depend on either number, and read their absence here as the state of it."],
 ] as const;
 
 export default function SecurityPage() {
