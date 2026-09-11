@@ -109,11 +109,34 @@ function inspectCentralDirectory(archive) {
 }
 
 /*
+  The declared size is a claim, so it is also the ceiling.
+
+  The central directory's sum bounds what the archive *says* it expands to. It cannot bound what
+  a deflate stream actually produces: an entry may declare twelve bytes and inflate to gigabytes,
+  and with no cap `inflateRawSync` materializes every one of them before the size comparison
+  below ever runs. `maxOutputLength` turns the declared size into an enforced one -- a byte over
+  and zlib throws instead of allocating -- and the throw is reported as the size disagreement it
+  is, with the same message and the same exit code as any other directory mismatch.
+*/
+function inflateBounded(raw, declared, path) {
+  try {
+    // zlib rejects a zero ceiling, and a legitimately empty entry is caught by the size compare.
+    return inflateRawSync(raw, { maxOutputLength: Math.max(1, declared) });
+  } catch (error) {
+    if (error?.code === "ERR_BUFFER_TOO_LARGE") {
+      throw new Error(`ZIP entry size disagrees with its directory record for ${path}`);
+    }
+    throw error;
+  }
+}
+
+/*
   Extraction, from node:zlib rather than a decoder dependency.
 
-  The central directory above has already bounded everything this reads: the entry count, the
-  per-entry sizes, the total expansion and every path. So this walk only has to locate each
-  entry's bytes and inflate them, and it trusts the central directory's sizes over the local
+  The central directory above has bounded what the archive declares: the entry count, the
+  declared per-entry sizes, the declared total expansion and every path. A declaration is not a
+  decompression, so the inflate itself is capped separately, entry by entry, by `inflateBounded`.
+  This walk locates each entry's bytes and trusts the central directory's sizes over the local
   header's -- a streamed entry writes zeros there and defers the real numbers to a data
   descriptor after the payload.
 
@@ -133,7 +156,9 @@ function extractEntries(archive, entries) {
     const end = start + entry.compressedSize;
     if (end > archive.byteLength) throw new Error(`ZIP entry data is truncated for ${entry.path}`);
     const raw = archive.subarray(start, end);
-    const content = entry.method === 0 ? Buffer.from(raw) : inflateRawSync(raw);
+    const content = entry.method === 0
+      ? Buffer.from(raw)
+      : inflateBounded(raw, entry.uncompressedSize, entry.path);
     if (content.byteLength !== entry.uncompressedSize) {
       throw new Error(`ZIP entry size disagrees with its directory record for ${entry.path}`);
     }

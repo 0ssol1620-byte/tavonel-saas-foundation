@@ -3,6 +3,7 @@ import { createHash, generateKeyPairSync } from "node:crypto";
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { crc32, deflateRawSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import { readCapabilities } from "./capabilities";
 import { CLAIM_STATE } from "./claim-state";
@@ -593,6 +594,128 @@ describe("contract promises", () => {
     }
     // Compiling the explore sample and running several child processes does not fit the 5 s default.
   }, 300_000);
+
+  /*
+    A declared size is a claim, and a downloaded archive is hostile until it has been checked.
+
+    Every other ZIP bound in these three verifiers reads the central directory: the entry count,
+    the declared per-entry sizes, their sum, every path. None of that constrains what a deflate
+    stream actually produces -- an entry may declare sixty-four bytes and inflate to gigabytes.
+    So each verifier caps the decompression itself at the size the directory declared, and a
+    stream that keeps going is refused with the same message and the same exit code as any other
+    directory mismatch. The two `.mjs` readers are ours and needed the cap added; the Python one
+    reads through `zipfile`, which caps at the declared size already -- measured below, not
+    assumed, because "the standard library handles it" is exactly the sentence that is wrong half
+    the time.
+
+    What this test shows, and what it cannot. The refusal is exercised for real, on a hand-built
+    archive whose single entry declares 64 bytes and inflates to 128 MiB. It does not
+    *discriminate* the bound from its absence: at 128 MiB an unbounded inflate lands on the same
+    size comparison with the same message, and the size where the two genuinely diverge -- past
+    `buffer.kMaxLength` -- is not a size any unit test should allocate. The bound itself is
+    therefore pinned by reading the published bytes: no inflate call in a published verifier may
+    run without a ceiling. Both halves are needed here; neither is sufficient alone.
+  */
+  it("refuses a ZIP entry that inflates past the size its directory declares", () => {
+    const asset = (name: string) => resolve(import.meta.dirname, `../public/developer/${name}`);
+
+    for (const name of ["tavonel-verify-export.mjs", "tavonel-verify-package.mjs"]) {
+      const source = read(`../public/developer/${name}`);
+      const calls = [...source.matchAll(/inflateRawSync\([^)]*/g)].map((match) => match[0]);
+      expect(calls.length, `${name} does not inflate anything any more`).toBeGreaterThan(0);
+      for (const call of calls) {
+        expect(call, `${name} inflates without a ceiling: ${call}`).toContain("maxOutputLength");
+      }
+    }
+
+    /*
+      One entry, method 8, 128 MiB of zeros, and a central directory that swears it is 64 bytes.
+
+      The CRC is the CRC of the 64 bytes the record claims, not of the 128 MiB the stream holds.
+      Neither .mjs reader checks a CRC at all, but `zipfile` checks one at the point it stops
+      reading -- so a zero CRC here would have the Python verifier refuse the archive for the
+      wrong reason and leave the mismatch under test unexercised. An attacker writes this CRC too.
+    */
+    const payload = deflateRawSync(Buffer.alloc(128 * 1024 * 1024));
+    const truncatedCrc = crc32(Buffer.alloc(64));
+    const name = Buffer.from("manifest/export-manifest.json", "utf8");
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt16LE(8, 8);
+    local.writeUInt32LE(truncatedCrc, 14);
+    local.writeUInt32LE(payload.byteLength, 18);
+    local.writeUInt32LE(64, 22);
+    local.writeUInt16LE(name.byteLength, 26);
+    const central = Buffer.alloc(46);
+    central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt16LE(20, 4);
+    central.writeUInt16LE(20, 6);
+    central.writeUInt16LE(8, 10);
+    central.writeUInt32LE(truncatedCrc, 16);
+    central.writeUInt32LE(payload.byteLength, 20);
+    central.writeUInt32LE(64, 24);
+    central.writeUInt16LE(name.byteLength, 28);
+    const eocd = Buffer.alloc(22);
+    eocd.writeUInt32LE(0x06054b50, 0);
+    eocd.writeUInt16LE(1, 8);
+    eocd.writeUInt16LE(1, 10);
+    eocd.writeUInt32LE(central.byteLength + name.byteLength, 12);
+    eocd.writeUInt32LE(local.byteLength + name.byteLength + payload.byteLength, 16);
+    const archive = Buffer.concat([local, name, payload, central, name, eocd]);
+
+    const directory = mkdtempSync(join(tmpdir(), "tavonel-zip-bomb-"));
+    try {
+      const archivePath = join(directory, "lying.zip");
+      writeFileSync(archivePath, archive);
+      const run = (args: string[]) => spawnSync(process.execPath, args, { encoding: "utf8", timeout: 120_000 });
+
+      const exportRun = run([asset("tavonel-verify-export.mjs"), "--archive", archivePath, "--trusted-fingerprint", `sha256:${"0".repeat(64)}`]);
+      expect(exportRun.status, "a lying directory record was accepted").toBe(1);
+      expect(exportRun.stderr).toContain("size disagrees with its directory record");
+
+      const packageRun = run([asset("tavonel-verify-package.mjs"), "--package", archivePath]);
+      expect(packageRun.status, "a lying directory record was accepted").toBe(1);
+      expect(packageRun.stderr).toContain("size disagrees with its directory record");
+
+      /*
+        The Python verifier needs no cap of its own, and this is the measurement that says so.
+
+        `zipfile` bounds decompression by the directory record already: CPython's
+        `ZipExtFile._read1` decrements `_left` by what it produced and sets `_eof` the moment it
+        reaches zero, so `ZipFile.read` on this entry returns the 64 bytes the record declares
+        and the remaining 128 MiB of the deflate stream is never produced. The first assertion
+        below is that measurement, taken from the interpreter on this machine rather than from
+        the documentation -- 64, not 134217728. The second is the verifier's own behaviour on the
+        same archive: it reads the truncated 64 bytes, finds no package in them, and refuses.
+
+        A `len(raw) != info.file_size` guard was written here first and then deleted: with the
+        bound in `zipfile`, it can never fire, and a check that cannot fail is a claim of
+        protection that is not being provided.
+      */
+      const interpreter = ["py", "python3", "python"]
+        .find((candidate) => spawnSync(candidate, ["--version"], { encoding: "utf8" }).status === 0);
+      if (!interpreter) {
+        console.warn("SKIPPED: no Python interpreter on PATH, so the bounded ZIP read was not measured");
+      } else {
+        const produced = spawnSync(interpreter, [
+          "-c",
+          "import sys, zipfile;"
+          + " a = zipfile.ZipFile(sys.argv[1]);"
+          + " print(len(a.read(a.infolist()[0])))",
+          archivePath,
+        ], { encoding: "utf8", timeout: 120_000 });
+        expect(produced.status, produced.stderr).toBe(0);
+        expect(produced.stdout.trim(), "zipfile produced more than the directory record declared").toBe("64");
+
+        const pythonRun = spawnSync(interpreter, [asset("tavonel-verify-roundtrip.py"), "--package", archivePath], { encoding: "utf8", timeout: 120_000 });
+        expect(pythonRun.status, "a 64-byte fragment was accepted as a package").toBe(1);
+        expect(pythonRun.stderr).toContain("package is missing");
+      }
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  }, 60_000);
 
   /*
     What is left of the portable-world promise once the tool is gone.

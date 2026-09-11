@@ -117,6 +117,28 @@ async function readDirectoryPackage(root) {
   single-file downloads is the point -- a shared module would make each verifier two files a
   customer has to fetch and pin. If a third verifier ever needs it, extract then.
 */
+/*
+  The declared size is a claim, so it is also the ceiling.
+
+  The central directory's sum bounds what the archive *says* it expands to. It cannot bound what
+  a deflate stream actually produces: an entry may declare twelve bytes and inflate to gigabytes,
+  and with no cap `inflateRawSync` materializes every one of them before the size comparison
+  below ever runs. `maxOutputLength` turns the declared size into an enforced one -- a byte over
+  and zlib throws instead of allocating -- and the throw is reported as the size disagreement it
+  is, with the same message and the same exit code as any other directory mismatch.
+*/
+function inflateBounded(raw, declared, path) {
+  try {
+    // zlib rejects a zero ceiling, and a legitimately empty entry is caught by the size compare.
+    return inflateRawSync(raw, { maxOutputLength: Math.max(1, declared) });
+  } catch (error) {
+    if (error?.code === "ERR_BUFFER_TOO_LARGE") {
+      throw new Error(`ZIP entry size disagrees with its directory record for ${path}`);
+    }
+    throw error;
+  }
+}
+
 function readZipEntries(archive) {
   if (archive.byteLength > MAX_ARCHIVE_BYTES) throw new Error("archive exceeds the 64 MiB validation limit");
   const minimumEocd = 22;
@@ -163,7 +185,7 @@ function readZipEntries(archive) {
     const start = localOffset + 30 + archive.readUInt16LE(localOffset + 26) + archive.readUInt16LE(localOffset + 28);
     if (start + compressedSize > archive.byteLength) throw new Error(`ZIP entry data is truncated for ${path}`);
     const raw = archive.subarray(start, start + compressedSize);
-    const content = method === 0 ? Buffer.from(raw) : inflateRawSync(raw);
+    const content = method === 0 ? Buffer.from(raw) : inflateBounded(raw, uncompressedSize, path);
     if (content.byteLength !== uncompressedSize) {
       throw new Error(`ZIP entry size disagrees with its directory record for ${path}`);
     }
