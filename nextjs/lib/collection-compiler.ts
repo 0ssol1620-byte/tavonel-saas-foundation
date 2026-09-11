@@ -43,11 +43,19 @@ const PACKAGE_ROOTS = [
  * Moved from 5,000 to 7,000 on 2026-09-08, together with the ceiling it is derived from
  * (program §24). The old pair was 5,000 against 16 MiB, where the 5,000 came from the same
  * 2.5 KiB estimate minus an unmeasured reserve "for the source text that sits beside them".
- * Measured on the largest corpus this product has compiled -- Apple's five 2025/2026 SEC
+ * Measured with THIS engine on the largest corpus it has compiled -- Apple's five 2025/2026 SEC
  * filings, 290 pages, 1,281 regions -- that reserve is 2,826,476 B and the object-scaled files
  * cost 1,781 B per object: the worst-case estimate held and the reserve was the guess. The
- * corpus yields 6,300 candidates, so 7,000 is a round number above it rather than one tuned to
- * it, and `collection-download.ts` carries the arithmetic that took the ceiling to 24 MiB.
+ * corpus yields 6,300 candidates *here*, so 7,000 is a round number above it rather than one
+ * tuned to it, and `collection-download.ts` carries the arithmetic that took the ceiling to
+ * 24 MiB.
+ *
+ * Which engine is not a footnote. A customer's compile is dispatched to Core V2, and on the same
+ * bytes the live engine computes 8,477 objects and delivers 4,402 after the projection -- so
+ * 6,300 is 1.4x what a customer receives and 0.74x what the engine computes, and describes
+ * neither. It is the right number for this constant, because this constant bounds this engine;
+ * it is the wrong number for any sentence about what the product produces. Receipt:
+ * `eval/k08-live-engine/results/` (evidence lane, 2026-09-11).
  *
  * One number in the previous measurement was read under the cap and is corrected here: this
  * corpus was recorded as 6,457 candidates, which is what `candidatesConsidered` reports when

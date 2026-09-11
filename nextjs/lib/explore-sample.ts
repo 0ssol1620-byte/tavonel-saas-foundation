@@ -74,9 +74,11 @@ import rawSources from "./explore-sample.sources.json";
   - W1, W2 and W3 are new. They were declared data with `file: null` until now; nothing about
     them moved, they did not exist.
   - All five artifacts are `lifecycle: candidate` with `candidatesConsidered` equal to what was
-    emitted, which is the measurable form of "nothing was dropped to fit". W4 is 6,300 objects;
-    the 6,457 recorded for this corpus previously was `candidatesConsidered` read under the old
-    cap, which is not a measurement of the corpus.
+    emitted, which is the measurable form of "nothing was dropped to fit". W4 is 6,300 objects as
+    THIS engine compiles it -- /explore is built by `compileCollectionCandidate`, not by the Core a
+    customer's compile is dispatched to, which delivers 4,402 on the same bytes. The 6,457 recorded
+    for this corpus previously was `candidatesConsidered` read under the old cap, which is not a
+    measurement of the corpus either.
 
   2026-09-11: all five moved, and the cause is one package file rather than the compiler.
 
