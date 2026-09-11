@@ -14,6 +14,7 @@ Indexing: public product, documentation, research and trust pages are indexable.
 
 - [Home](https://tavonel.com/): Knowledge Compiler. Your AI needs more than searchable files; it needs a current, traceable world. TAVONEL compiles your own sources into one.
 - [Product](https://tavonel.com/product): Product overview — document understanding, compilation, evidence and Compiled Worlds.
+- [Solutions](https://tavonel.com/solutions): The five documented uses, each linking to its own page: who it is for, the path from source to World, what the workflow leaves behind, and where it stops. A described use, not a completed customer case.
 - [Knowledge Compiler guide](https://tavonel.com/knowledge-compiler): What a Knowledge Compiler is, how it differs from RAG/search/graphs, and when to use one.
 - [Explore a Compiled World](https://tavonel.com/explore): Inspect a deterministic source-to-world sample and follow a compiled fact back to its exact source location.
 - [Research](https://tavonel.com/research): Research areas, methods and current findings.
