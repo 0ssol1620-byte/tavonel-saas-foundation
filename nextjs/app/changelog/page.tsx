@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import type { Route } from "next";
 import { ChangelogList } from "@/components/changelog-list";
 import { PublicPageShell } from "@/components/public-page-shell";
 
@@ -25,11 +27,22 @@ export default function ChangelogPage() {
     <div className="stack">
       <p className="slate"><b>CHANGELOG</b><span />PRODUCT</p>
       <h1 className="document-title">What changed, without the noise.</h1>
+      {/*
+        BA-108. The feed link moved out of the lede and into the action row below, because
+        subscribing is an action and this page had none: it ended at `<ChangelogList />` with
+        nothing offered to a reader who had just read what changed.
+      */}
       <p className="fine">
         Grouped as added, improved and fixed, with the surface each change touched. Breaking
-        changes carry the migration beside them. <a href="/changelog/feed.xml">Atom feed</a>.
+        changes carry the migration beside them.
       </p>
     </div>
     <div className="stack"><ChangelogList /></div>
+    <div className="stack">
+      <div className="actions">
+        <a className="btn" href="/changelog/feed.xml">Subscribe to the Atom feed</a>
+        <Link className="btn ghost" href={"/docs/errors" as Route}>Read the API contract</Link>
+      </div>
+    </div>
   </div></div></section></PublicPageShell>;
 }
