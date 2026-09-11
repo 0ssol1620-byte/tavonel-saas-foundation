@@ -63,11 +63,15 @@ const HISTORY: Frame[] = [
  * `cutStream` makes the next stream request fail the way a dropped connection does, which is the
  * case `observeCompileJob`'s backoff exists for.
  */
-async function installJobRoutes(page: import("@playwright/test").Page, state: { posts: number; cutStream: boolean }) {
+async function installJobRoutes(page: import("@playwright/test").Page, state: { posts: number; cutStream: boolean; openJobs?: Record<string, unknown>[] }) {
   await page.route("**/api/compile-jobs", route => {
     if (route.request().method() !== "POST") {
-      // The open-jobs list a returning tab reads when it has no URL.
-      return route.fulfill({ json: { code: "OK", jobs: [] } });
+      /*
+        The open-jobs list a returning tab reads when it has no URL. Empty by default, because
+        every case above starts its own compile; `state.openJobs` is how the closed-tab case
+        (stage 2 C19, workspace lane step 8) puts a job there that this browser never started.
+      */
+      return route.fulfill({ json: { code: "OK", jobs: state.openJobs ?? [] } });
     }
     state.posts += 1;
     /* The same document set is the same run: one job id, however many times it is asked for. */
@@ -181,4 +185,38 @@ test("a compile survives a reload, a second tab and a dropped connection without
   } finally {
     await context.close();
   }
+});
+
+/*
+  Step 8 of the workspace lane's scenario, requested at integration (stage 2 C19): the tab that
+  was closed while a compile ran.
+
+  It is the only way into the panel that does not go through this browser -- no ?job= in the URL,
+  no POST, nothing in local state -- so it is the case that proves the job lives on the server and
+  not in the tab. The POST count is the assertion that matters: picking a run back up must never
+  be indistinguishable from starting a second one, because the second one is a second bill.
+*/
+test("a tab that never started the compile picks it up from the server", async ({ page }) => {
+  const state = { posts: 0, cutStream: false, openJobs: [{
+    jobId: JOB_ID,
+    state: "structuring",
+    documentsTotal: 2,
+    documentsReady: 1,
+    collectionId: null,
+    documentIds: DOCUMENTS.map((document) => document.documentId),
+    settledAt: null,
+    errorCode: null,
+  }] };
+  await installFixtureSession(page);
+  await installWorkspaceRoutes(page, { documents: DOCUMENTS });
+  await installJobRoutes(page, state);
+
+  // No ?job=, and no compile started here.
+  await page.goto("/workspace", { waitUntil: "domcontentloaded" });
+  await expect(progress(page)).toBeVisible({ timeout: 20_000 });
+  // The panel does not print the job id, so what is asserted is that this tab is watching a
+  // real run: the observer replays the history from the server and lands on its resting state.
+  await expect(progress(page)).toHaveAttribute("data-state", "review_required", { timeout: 30_000 });
+  await expect(progress(page)).toContainText("2 of 2 read");
+  expect(state.posts, "picking up an open job posted a new compile").toBe(0);
 });
