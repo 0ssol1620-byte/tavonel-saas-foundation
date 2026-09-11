@@ -29,6 +29,51 @@ export function publicPageLocation(path: string): string | null {
   return PUBLIC_MARKETING_PATHS.has(path) ? `https://tavonel.com${path}` : null;
 }
 
+/*
+  The consent banner's own words, in the language of the page it appears on.
+
+  Stage-A integration made `/ko` a measured public page, which is also what made it show this
+  banner -- in English, on the one page whose whole purpose is to be read in Korean, asking for
+  a privacy choice. A consent prompt a reader cannot read is not consent.
+
+  What is translated is this banner's own four sentences and nothing else. No claim moves: the
+  two choices are the same two choices, the storage key, the 180-day expiry, the cookie clearing
+  and the vendor gate are all outside this function, and `/privacy` stays the English notice the
+  Korean entry page already says is the single source. The selector is the pathname prefix rather
+  than a header or a cookie, because the site has exactly one Korean subtree and no geo redirect.
+*/
+export type ConsentCopy = {
+  readonly region: string;
+  readonly prompt: string;
+  readonly privacy: string;
+  readonly refuse: string;
+  readonly allow: string;
+  readonly settings: string;
+};
+
+const CONSENT_COPY_EN: ConsentCopy = {
+  region: "Optional analytics",
+  prompt: "Help us improve TAVONEL? With your permission, Google Analytics measures visits and public-page interactions using cookies. Workspace content is excluded.",
+  privacy: "Privacy notice",
+  refuse: "No thanks",
+  allow: "Allow analytics",
+  settings: "Analytics preferences",
+};
+
+const CONSENT_COPY_KO: ConsentCopy = {
+  region: "선택 분석",
+  prompt: "TAVONEL 개선에 도움을 주시겠습니까? 허용하시면 Google Analytics가 쿠키를 사용해 방문과 공개 페이지에서의 상호작용을 측정합니다. 워크스페이스 내용은 측정하지 않습니다.",
+  privacy: "개인정보 처리방침",
+  refuse: "허용하지 않음",
+  allow: "분석 허용",
+  settings: "분석 설정",
+};
+
+/** The banner's copy for one pathname. Korean on the `/ko` subtree, English everywhere else. */
+export function consentCopy(path: string): ConsentCopy {
+  return path === "/ko" || path.startsWith("/ko/") ? CONSENT_COPY_KO : CONSENT_COPY_EN;
+}
+
 export function referralOrigin(referrer: string): string {
   try {
     const url = new URL(referrer);

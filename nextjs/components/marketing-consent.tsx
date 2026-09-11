@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { CONSENT_KEY, GA_ID, MARKETING_EVENTS, publicPageLocation, readConsent, referralOrigin } from "@/lib/marketing-analytics";
+import { CONSENT_KEY, GA_ID, MARKETING_EVENTS, consentCopy, publicPageLocation, readConsent, referralOrigin } from "@/lib/marketing-analytics";
 import styles from "./marketing-consent.module.css";
 
 type AnalyticsWindow = Window & {
@@ -20,6 +20,9 @@ function disableAnalytics() {
 export default function MarketingConsent() {
   const pathname = usePathname();
   const location = publicPageLocation(pathname);
+  // The banner's own sentences in the language of the page. Behaviour is identical either way --
+  // the same two choices, the same storage, the same vendor gate; only these strings differ.
+  const copy = consentCopy(pathname);
   const [consent, setConsent] = useState<boolean | null>(null);
   const [ready, setReady] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -90,12 +93,12 @@ export default function MarketingConsent() {
   }
 
   if (!ready || !location) return null;
-  if (consent !== null && !editing) return <button className={styles.settings} onClick={() => setEditing(true)}>Analytics preferences</button>;
-  return <section className={styles.panel} aria-label="Optional analytics">
-    <p>Help us improve TAVONEL? With your permission, Google Analytics measures visits and public-page interactions using cookies. Workspace content is excluded. <a href="/privacy">Privacy notice</a></p>
+  if (consent !== null && !editing) return <button className={styles.settings} onClick={() => setEditing(true)}>{copy.settings}</button>;
+  return <section className={styles.panel} aria-label={copy.region}>
+    <p>{copy.prompt} <a href="/privacy">{copy.privacy}</a></p>
     <div className={styles.actions}>
-      <button onClick={() => choose(false)}>No thanks</button>
-      <button onClick={() => choose(true)}>Allow analytics</button>
+      <button onClick={() => choose(false)}>{copy.refuse}</button>
+      <button onClick={() => choose(true)}>{copy.allow}</button>
     </div>
   </section>;
 }

@@ -80,3 +80,28 @@ test("only successful commercial inquiries produce a lead event", async ({ page 
   expect(await records()).toContainEqual({ event: "generate_lead" });
   expect(JSON.stringify(await records())).not.toMatch(/test@example|Test Visitor|production delivery/);
 });
+
+/*
+  Stage-A open risk 5, proven where it actually renders.
+
+  `/ko` became a measured public page, and the banner it then showed was the English one. The
+  unit test beside `consentCopy` holds the selection; this holds the render, because the failure
+  was visible in a screenshot and invisible to every assertion in the repository.
+*/
+test("the Korean entry page asks for consent in Korean, and other pages do not", async ({ page }) => {
+  await page.goto("/ko");
+  const korean = page.getByRole("region", { name: "선택 분석" });
+  await expect(korean).toBeVisible();
+  await expect(page.getByRole("button", { name: "분석 허용", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "허용하지 않음", exact: true })).toBeVisible();
+  // The same two choices, and the same behaviour behind them.
+  await expect(page.getByRole("button", { name: "Allow analytics" })).toHaveCount(0);
+  await page.getByRole("button", { name: "허용하지 않음", exact: true }).click();
+  await expect(korean).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "분석 설정" })).toBeVisible();
+
+  // And the refusal is one choice for the whole site, not one per language.
+  await page.goto("/");
+  await expect(page.getByRole("region", { name: "Optional analytics" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Analytics preferences" })).toBeVisible();
+});
