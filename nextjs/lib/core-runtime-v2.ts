@@ -568,6 +568,8 @@ export function projectProductCoreV2Candidate(
  * used for a revision compile" -- never "compile it as if it were the first time", which is the
  * silent fallback that would let a recompile report every unit as new.
  */
+const isStringArray = (value: unknown) => Array.isArray(value) && value.every((item) => typeof item === "string");
+
 export function readRevisionCompileSnapshot(
   stored: unknown,
   expected: { worldStateId: string; manifestDigest: string },
@@ -592,7 +594,17 @@ export function readRevisionCompileSnapshot(
       ["logicalId", "sourceId", "sourceVersionId", "sourceContentSha256", "text", "anchor", "evidenceId", "identityState"]
         .every((field) => typeof (unit as Record<string, unknown>)[field] === "string") &&
       Number.isSafeInteger((unit as Record<string, unknown>).pageNumber1) &&
-      Array.isArray((unit as Record<string, unknown>).documentPath))
+      /*
+        `documentPath` and `neighbourAnchors` are `tuple[str, ...]` on `PreviousUnit`, so the
+        element type is checked here too: a corrupted stored unit is refused with this lane's
+        own `REVISION_COMPILE_PRIOR_WORLD_UNREADABLE` rather than left for the Core to answer
+        with a 422 an operator then has to trace back to object storage. `neighbourAnchors`
+        carries a default on the contract, so absent is legal; present and not a tuple of
+        strings is not.
+      */
+      isStringArray((unit as Record<string, unknown>).documentPath) &&
+      ((unit as Record<string, unknown>).neighbourAnchors === undefined ||
+        isStringArray((unit as Record<string, unknown>).neighbourAnchors)))
   ) return null;
   return {
     worldStateId: expected.worldStateId,
