@@ -55,6 +55,10 @@ const CLAIM_SURFACES = [
   "components/pricing-page-client.tsx",
   "app/pricing/page.tsx",
   "app/product/page.tsx",
+  // Added at integration (stage 2 C14): the page carrying the worst version of the abstention
+  // claim was not on this list at all, so the guard could not have caught it. A category page
+  // that says where its category stops is exactly the page a buyer reads for the limits.
+  "app/knowledge-compiler/page.tsx",
   "app/product/compiled-world/page.tsx",
   "app/product/document-understanding/page.tsx",
   "app/solutions/[slug]/page.tsx",
@@ -86,6 +90,21 @@ const OVERCLAIM_PHRASES = [
     compiler run. `/docs` still needs to be able to *name* identity resolution to say it is what
     joining two corpora would require, so the banned forms are the ones that assert it happens.
   */
+  /*
+    Abstention is an ELIGIBILITY test, never a relevance or entailment one (evidence lane
+    finding 1): grounded-ask abstains only when no chunk matched any token, and the compiled
+    pipeline only when no source returned a candidate or the World Gate rejected every one.
+    Measured on deliberately unanswerable questions, both paths answered every one of them with
+    the nearest matching regions. So a page may say Ask declines when nothing matched; it may not
+    say or imply it declines when the World cannot answer, which is a different and unbuilt
+    capability. The banned forms are the assertive ones -- "abstains" and "abstention" stay
+    usable, because the behaviour they name is real.
+  */
+  "abstains where the sources do not support",
+  "abstains rather than composing",
+  "support is insufficient",
+  "declines when the world cannot answer",
+  "cannot answer, it abstains",
   "resolves aliases",
   "alias matching",
   "aliases are matched",

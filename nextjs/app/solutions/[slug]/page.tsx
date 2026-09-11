@@ -66,10 +66,10 @@ const SOLUTIONS = {
     title: "Let an answer travel all the way back to the source.",
     lede: "Ask, API and MCP consume the same current World and return evidence from the same version.",
     problem: "An answer can sound confident while depending on stale, conflicting or untraceable source material.",
-    flow: ["Ask the active World", "Retrieve qualified objects", "Generate with version context", "Attach evidence", "Abstain when support is insufficient"],
+    flow: ["Ask the active World", "Retrieve qualified objects", "Generate with version context", "Attach evidence", "Decline when nothing matched"],
     outcomes: ["Answer and evidence share one World version", "Citation inspection at the exact source location", "Explicit abstention", "Model-independent knowledge"],
     limitations: [
-      "The World abstains where the sources do not support an answer.",
+      "The World declines when no evidence matched the question at all. It does not judge whether what matched answers it, so a question these sources cannot answer returns the nearest matching regions and their locators, not a refusal.",
       "Ask, the API and MCP read the same active revision, so an assistant is as current as the last promotion.",
       "Model choice is yours; the World is the contract.",
     ],
