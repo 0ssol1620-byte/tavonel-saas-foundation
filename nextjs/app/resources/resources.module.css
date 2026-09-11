@@ -1,0 +1,78 @@
+/*
+  WG-048 / WG-051: the hub's purpose filter, with no JavaScript and no second URL.
+
+  Three things ruled out the obvious implementations. A `?purpose=` query string filtered on the
+  server would mint eight thin near-duplicate URLs for a crawler to find, each needing a
+  canonical the seo lane owns. A client component would take the page's `metadata` export with
+  it and ship a bundle to narrow nine links. Either way, server-side narrowing removes the other
+  entries from the HTML, and WG-074 asks the opposite: the body stays searchable, which means all
+  nine descriptions stay in the document at every filter state, for Ctrl+F and for a crawler.
+
+  So the control is a fragment link and the narrowing is `:target`. `/resources#find-build` is
+  a sendable link, is the same document to a crawler, and works with scripting off. Each tile
+  publishes its tags in `data-tags`, and one rule per tag hides the tiles that do not carry it.
+
+  Two details the rules depend on. CSS Modules rewrites an id selector the way it rewrites a
+  class, so the ids are wrapped in `:global()` -- without it the rule looks for
+  #resources_find-build__hash and the filter silently never matches. `[data-tags]` needs no
+  wrapping, because an attribute selector is never rewritten.
+
+  ponytail: the rules below enumerate the tag slugs, because CSS cannot compare `:target`'s id
+  to an attribute value. `lib/resources-hub.test.ts` fails if a tag exists with no rule here, so
+  the duplication cannot drift; if the tag list ever grows past a screenful, generate this block.
+*/
+
+.hub { display: grid; gap: 20px; }
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+}
+
+.filters a {
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
+  padding: 6px 11px;
+  font-size: 11.5px;
+  line-height: 1.3;
+  color: var(--text-mid);
+  text-decoration: none;
+}
+
+.filters a:hover { border-color: var(--hairline-hi); color: var(--text-hi); }
+
+/* The targeted control is the one describing what you are looking at. */
+.filters a:target { border-color: var(--text-mid); color: var(--text-hi); }
+
+.groupLabel {
+  align-self: center;
+  margin: 0 2px 0 0;
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  color: var(--text-xlo);
+}
+
+/* The tags a tile carries, printed on the tile so the filter's vocabulary is visible in the body. */
+.tileTags { margin: 0; font-family: var(--f-mono); font-size: 9.5px; letter-spacing: 0.1em; color: var(--text-xlo); }
+
+.representative { margin: 0; font-size: 11.5px; color: var(--text-mid); }
+
+.hub:has(:global(#find-evaluate):target) [data-tags]:not([data-tags~="evaluate"]),
+.hub:has(:global(#find-build):target) [data-tags]:not([data-tags~="build"]),
+.hub:has(:global(#find-verify):target) [data-tags]:not([data-tags~="verify"]),
+.hub:has(:global(#find-learn):target) [data-tags]:not([data-tags~="learn"]),
+.hub:has(:global(#find-compile-and-review):target) [data-tags]:not([data-tags~="compile-and-review"]),
+.hub:has(:global(#find-use-elsewhere):target) [data-tags]:not([data-tags~="use-elsewhere"]),
+.hub:has(:global(#find-handle-a-revision):target) [data-tags]:not([data-tags~="handle-a-revision"]) {
+  display: none;
+}
+
+/*
+  A browser without `:has()` gets the unfiltered list rather than a broken one: the rules above
+  never match, every tile stays visible, and the controls become ordinary in-page links. That is
+  the whole fallback, and it is why the filter is not allowed to be the only way to read the hub.
+*/

@@ -17,6 +17,61 @@
 
 export type SiteLink = { href: string; label: string };
 
+/*
+  WG-048 / WG-051: what each resource is *for*, declared beside the link rather than on the hub.
+
+  The hub had nine links and no way to narrow them, so a reader who wanted "can I build on this"
+  read nine descriptions to find three. The tags live here because `e2e/overflow-audit.spec.ts`
+  already reads this file and `lib/resources-hub.test.ts` fails on an untagged entry: a tenth
+  link arrives tagged, or the hub's filter silently drops it out of every view but "Everything".
+
+  The three workflow tags are the growth blueprint's own three demonstrations (§4), not new
+  product names, and an entry carries one only where the page actually helps with that workflow
+  today. `/explore` is tagged `compile-and-review` and deliberately not `handle-a-revision`:
+  its four 2026 filings are corpus growth, which the blueprint separates from a revision of the
+  same source.
+*/
+export type ResourcePurpose = "evaluate" | "build" | "verify" | "learn";
+export type ResourceWorkflow = "compile-and-review" | "use-elsewhere" | "handle-a-revision";
+export type ResourceTag = ResourcePurpose | ResourceWorkflow;
+export type ResourceLink = SiteLink & {
+  purposes: readonly ResourcePurpose[];
+  workflows: readonly ResourceWorkflow[];
+  /*
+    A representative case is a page that already publishes a real compiled result. Nothing is
+    promoted to one on the strength of a plan: `/explore` qualifies because its World is
+    compiled at build time from committed public filings and refuses to load if a digest moves.
+  */
+  representativeCase?: true;
+};
+
+export const RESOURCE_PURPOSES: readonly ResourcePurpose[] = ["evaluate", "build", "verify", "learn"] as const;
+export const RESOURCE_WORKFLOWS: readonly ResourceWorkflow[] = [
+  "compile-and-review",
+  "use-elsewhere",
+  "handle-a-revision",
+] as const;
+
+/** One label per tag, so the hub, its filter and a solution page cannot describe a tag differently. */
+export const RESOURCE_TAG_LABELS: Record<ResourceTag, string> = {
+  evaluate: "See what it does",
+  build: "Build on it",
+  verify: "Check the evidence",
+  learn: "Understand the idea",
+  "compile-and-review": "Documents to reviewable output",
+  "use-elsewhere": "Use a World somewhere else",
+  "handle-a-revision": "Handle a source revision",
+};
+
+/**
+ * The hub's filter is a fragment, not a query string.
+ *
+ * `/resources#find-build` is a link anyone can send and a crawler treats as the same document,
+ * so the filter adds no thin duplicate URL to the sitemap and needs no canonical of its own.
+ * `app/resources/resources.module.css` does the narrowing with `:target`.
+ */
+export const resourceFilterHref = (tag: ResourceTag) => `/resources#find-${tag}`;
+
 export const PRIMARY_NAV: readonly SiteLink[] = [
   { href: "/product", label: "Product" },
   { href: "/solutions/ai-ready-knowledge", label: "Solutions" },
@@ -29,16 +84,32 @@ export const PRIMARY_NAV: readonly SiteLink[] = [
 ] as const;
 
 /** What the Resources hub collects. Also the Resources dropdown, when there is one. */
-export const RESOURCE_LINKS: readonly SiteLink[] = [
-  { href: "/explore", label: "Explore a Compiled World" },
-  { href: "/knowledge-compiler", label: "Knowledge Compiler guide" },
-  { href: "/docs", label: "Documentation" },
-  { href: "/api", label: "API" },
-  { href: "/changelog", label: "Changelog" },
-  { href: "/research", label: "Research" },
-  { href: "/benchmarks", label: "Benchmarks" },
-  { href: "/evidence", label: "Technical evidence" },
-  { href: "/reproducibility", label: "Reproducibility" },
+export const RESOURCE_LINKS: readonly ResourceLink[] = [
+  {
+    href: "/explore",
+    label: "Explore a Compiled World",
+    purposes: ["evaluate", "verify"],
+    workflows: ["compile-and-review"],
+    representativeCase: true,
+  },
+  { href: "/knowledge-compiler", label: "Knowledge Compiler guide", purposes: ["learn"], workflows: [] },
+  {
+    href: "/docs",
+    label: "Documentation",
+    purposes: ["build"],
+    workflows: ["compile-and-review", "use-elsewhere", "handle-a-revision"],
+  },
+  { href: "/api", label: "API", purposes: ["build"], workflows: ["use-elsewhere"] },
+  { href: "/changelog", label: "Changelog", purposes: ["build"], workflows: [] },
+  { href: "/research", label: "Research", purposes: ["learn"], workflows: [] },
+  { href: "/benchmarks", label: "Benchmarks", purposes: ["verify"], workflows: [] },
+  {
+    href: "/evidence",
+    label: "Technical evidence",
+    purposes: ["verify"],
+    workflows: ["compile-and-review", "use-elsewhere"],
+  },
+  { href: "/reproducibility", label: "Reproducibility", purposes: ["verify"], workflows: [] },
 ] as const;
 
 /**
