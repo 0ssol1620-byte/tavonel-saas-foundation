@@ -140,6 +140,37 @@ describe("the durable compile worker", () => {
     expect(runCompile).toHaveBeenCalledWith("pilot-alpha", ["doc-a"]);
   });
 
+  it("records the digest of the artifact it produced, on whichever advance lands", async () => {
+    /*
+      `candidateAwaitingActivation` was computable only from versions the workspace had already
+      promoted, plus the candidate the current request happened to have loaded -- so a compiled
+      World waiting for approval could read as "nothing is waiting". The digest is the one value
+      that identifies that artifact, and this is the only place that knows it.
+
+      Both settling advances carry it because either can be the one that lands: a redelivery
+      whose building_world advance is refused for moving backwards would otherwise settle with
+      no record of what it built. The RPC coalesces, so writing it twice writes it once.
+    */
+    group.mockReturnValue([DOCUMENT("doc-a", "ocr_ready"), DOCUMENT("doc-b", "ocr_ready")]);
+    const manifestDigest = `sha256:${"c".repeat(64)}`;
+    runCompile.mockResolvedValue({
+      ok: true,
+      status: 200,
+      payload: { collectionId: "collection-" + "b".repeat(32), manifestDigest, lifecycle: "candidate" },
+    });
+
+    const turn = await runCompileJobTurn(job());
+    expect(turn.note).toBe("compiled");
+
+    const calls = advance.mock.calls as unknown as Array<[{ state: CompileState; candidateManifestDigest?: string }]>;
+    // The lease into `structuring` has no artifact yet and must not claim one.
+    expect(calls.map(([input]) => [input.state, input.candidateManifestDigest ?? null])).toEqual([
+      ["structuring", null],
+      ["building_world", manifestDigest],
+      ["ready", manifestDigest],
+    ]);
+  });
+
   it("does not compile twice when two workers pick up the same job", async () => {
     group.mockReturnValue([DOCUMENT("doc-a", "ocr_ready"), DOCUMENT("doc-b", "ocr_ready")]);
     // The lease is the transition into `structuring`: the loser's advance changes nothing.

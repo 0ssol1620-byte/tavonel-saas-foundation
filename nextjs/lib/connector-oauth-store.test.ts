@@ -66,6 +66,45 @@ describe("markOAuthConnectionReauthorizationRequired", () => {
     expect(typeof body.updated_at).toBe("string");
   });
 
+  it("audits the transition under the action the constraint now allows", async () => {
+    /*
+      The status a workspace owner is asked to act on, with a record of who set it and why.
+      `foundation_developer_audit_events.action` is a closed CHECK and had no value for this
+      transition until 20260911120100 added one, which is why the flag first shipped
+      unaudited: a refused constraint plus a fail-closed write would have made it unreachable
+      again.
+    */
+    configure();
+    const fetcher = respond([{ oauth_connection_id: INPUT.oauthConnectionId }]);
+    await expect(markOAuthConnectionReauthorizationRequired(INPUT)).resolves.toEqual({ ok: true });
+
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    const [url, init] = fetcher.mock.calls[1] as unknown as [string, RequestInit];
+    expect(url).toContain("/rest/v1/foundation_developer_audit_events");
+    expect(JSON.parse(String(init.body))).toMatchObject({
+      workspace_key: INPUT.workspaceKey,
+      action: "oauth_connection_reauthorization_required",
+      target_id: INPUT.oauthConnectionId,
+      actor_user_id: INPUT.userId,
+      // The terminal code and nothing else: `details` may not carry a token or a document.
+      details: { errorCode: INPUT.errorCode },
+    });
+  });
+
+  it("refuses when the flag landed but the audit row did not, rather than reporting success", async () => {
+    // The window PostgREST cannot close. Reported, because a state change nobody can attribute
+    // is exactly what the audit ledger exists to prevent -- and the caller logs the refusal.
+    configure();
+    let call = 0;
+    vi.stubGlobal("fetch", vi.fn(async () => (call++ === 0
+      ? Response.json([{ oauth_connection_id: INPUT.oauthConnectionId }])
+      : Response.json({ code: "23514" }, { status: 400 }))));
+    await expect(markOAuthConnectionReauthorizationRequired(INPUT)).resolves.toEqual({
+      ok: false,
+      code: "DEVELOPER_AUDIT_WRITE_FAILED",
+    });
+  });
+
   it("refuses when the filter matched nothing, as it does for a revoked connection", async () => {
     configure();
     respond([]);
