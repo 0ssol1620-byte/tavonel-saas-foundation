@@ -6,6 +6,15 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { readPublicOperations } from "./operations";
+
+// The billing row is the one check that consults a readiness helper reading ambient process
+// state. It is mocked so the test can say "billing is configured on this host" without the
+// seven real variables, which is exactly the production-build condition that broke the probe.
+vi.mock("./operations", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./operations")>();
+  return { ...actual, readPublicOperations: vi.fn(actual.readPublicOperations) };
+});
 import {
   FIXTURE_E2E_REFUSAL,
   PROBE_DEPENDENCIES,
@@ -152,6 +161,16 @@ describe("synthetic probe run", () => {
     expect(run.ok).toBe(false);
   });
 
+  it("does not let the host environment decide whether billing was exercised", async () => {
+    // The production build failed on exactly this: Paddle is configured on Vercel, the billing
+    // row read it from process state, and a probe handed an empty environment reported one
+    // green configuration row. The injected environment is the only one a check may consult.
+    vi.mocked(readPublicOperations).mockReturnValueOnce({ readiness: { billingConfigured: true } } as never);
+    vi.stubGlobal("fetch", router([]));
+    const run = await runSyntheticProbe({});
+    expect(check(run, "billing")).toMatchObject({ status: "not_probed", errorClass: "not_configured", kind: "configuration" });
+    expect(run.ok).toBe(false);
+  });
   it("leaves the GPU OCR endpoint alone unless someone has accepted the cold-start cost", async () => {
     const env = configured({ FOUNDATION_OCR_URL: OCR_URL });
     const fetcher = router([["core-v2", coreHealthy], ["supabase.co", dbHealthy]]);

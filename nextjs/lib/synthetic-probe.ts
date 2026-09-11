@@ -304,7 +304,12 @@ async function checkOcr(
   return timed("ocr", async () => healthOk(await health(`${url.replace(/\/$/, "")}/health`)), clock);
 }
 
-function checkBilling(): ProbeCheck {
+function checkBilling(env: ProbeEnv): ProbeCheck {
+  // The decision to look at billing at all comes from the injected environment, like every other
+  // row. The readiness helper below reads ambient process state; consulting it from a probe that
+  // was handed an empty environment made the "nothing exercised" case impossible to test and
+  // failed the production build, where Paddle is configured, while passing everywhere else.
+  if (!env.PADDLE_WEBHOOK_SECRET?.trim()) return notProbed("billing", "not_configured", "configuration");
   // Configuration, and labelled as configuration. There is no safe synthetic charge: a probe
   // through Paddle checkout would be a real transaction against a real card.
   const configured = readPublicOperations().readiness.billingConfigured;
@@ -327,7 +332,7 @@ export async function runSyntheticProbe(deps: ProbeDependencies = {}): Promise<P
     await checkCoreV2(env, clock),
     await checkR2(env, canary, clock),
     await checkDatabase(env, clock),
-    checkBilling(),
+    checkBilling(env),
   ];
 
   const fixtureEnabled = env.TAVONEL_PROBE_FIXTURE_E2E === "1";
