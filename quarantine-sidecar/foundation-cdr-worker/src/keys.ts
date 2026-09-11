@@ -3,7 +3,15 @@ import { PermanentReject } from "./errors";
 export const SOURCE_KEY_PATTERN = /^quarantine\/([^/]+)\/([^/]+)\/source$/;
 export const MAX_SOURCE_BYTES = 5 * 1024 * 1024;
 
-const MIME_FALLBACK_EXTENSION: Record<string, string> = {
+/**
+ * One extension per accepted MIME, for an object that arrived without a filename.
+ *
+ * Held to `shared/capabilityInputs.generated.json` by `keys.test.ts`: this map and the Cloud Run
+ * service's `ALLOWED_INPUTS` are the two places that actually refuse a byte, and neither can
+ * import the site's capability manifest -- one is a separate Worker bundle, the other is Python.
+ * They agreed by memory until a test said so.
+ */
+export const MIME_FALLBACK_EXTENSION: Record<string, string> = {
   "application/pdf": ".pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
@@ -15,6 +23,9 @@ const MIME_FALLBACK_EXTENSION: Record<string, string> = {
   "image/png": ".png",
   "image/tiff": ".tiff",
   "image/gif": ".gif",
+  "text/plain": ".txt",
+  "text/csv": ".csv",
+  "text/html": ".html",
 };
 
 export type SourceKeyParts = {
