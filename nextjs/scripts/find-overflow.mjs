@@ -10,7 +10,14 @@ const browser = await chromium.launch({ headless: true });
 */
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
 const page = await ctx.newPage();
-await page.goto("http://127.0.0.1:3056/", { waitUntil: "networkidle", timeout: 60_000 });
+/*
+  The URL is an env var with the old hard-coded default kept, so an existing invocation is
+  unchanged and a run against the port the rest of the suite uses (3117) does not need a second
+  server started just for this script. The hard-coded 3056 is the drift overflow-audit.spec.ts
+  names in its own header.
+*/
+const target = process.env.FIND_OVERFLOW_URL ?? "http://127.0.0.1:3056/";
+await page.goto(target, { waitUntil: "networkidle", timeout: 60_000 });
 await page.waitForTimeout(1200);
 
 const report = await page.evaluate(() => {
