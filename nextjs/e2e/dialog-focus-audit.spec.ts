@@ -14,8 +14,10 @@
  *    effects run in declaration order -- so by the time the hook records the opener,
  *    `document.activeElement` is already a button inside the panel. On unmount it restores focus
  *    to an element that no longer exists, which is no restore at all.
- *  - Command palette: focus moves in and Escape closes it. Tab is **not** trapped and focus does
- *    **not** return. It renders `aria-modal="true"` while implementing neither half.
+ *  - Command palette: fixed at integration (stage 2 C5). It now mounts useDialogFocus from a
+ *    child that lives only while the palette is open, so the hook records the opener and restores
+ *    focus on close, and the separate focus-the-input effect is gone -- claiming the first
+ *    focusable is that input. The expectation below is live.
  *
  * Both fixes are one line each, in files this lane does not own, and both are written out in the
  * lane report under CROSS-LANE REQUESTS. The failing expectations stay in CI as `test.fail()`
@@ -101,12 +103,6 @@ test.describe("the workspace command palette", () => {
   });
 
   test("traps Tab and returns focus to its opener", async ({ page }) => {
-    // Declared inside the test body: at describe scope this modifier would mark every test in
-    // the group, including the one above that passes.
-    test.fail(
-      true,
-      "workspace-ultimate-shell.tsx does not call useDialogFocus; see CROSS-LANE REQUESTS in CA_LANE_REPORT_qa.md",
-    );
     await page.goto("/workspace", { waitUntil: "domcontentloaded" });
     const opener = page.getByRole("button", { name: /Search \/ Command/ });
     await opener.click();

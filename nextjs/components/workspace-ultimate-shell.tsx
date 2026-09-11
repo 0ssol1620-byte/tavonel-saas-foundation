@@ -4,8 +4,9 @@ import Link from "next/link";
 import {
   Activity, Braces, CircleHelp, Command, FileStack, GitCompareArrows, Home, Inbox, Network, Plug, Search, Settings, Upload, X,
 } from "lucide-react";
-import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import Logomark from "@/components/logomark";
+import { useDialogFocus } from "@/components/world-visual/use-dialog-focus";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import styles from "@/app/workspace/workspace-ultimate.module.css";
 
@@ -58,6 +59,22 @@ type Props = {
   onSignOut: () => void;
 };
 
+/*
+  useDialogFocus as a child, because its effect IS the lifecycle: it records
+  document.activeElement as the opener on mount and returns focus there on cleanup. Called up in
+  the shell it would run once at page load with an empty ref and never fire again; mounted inside
+  the panel it runs on open and cleans up on close, however the palette was closed.
+
+  It renders nothing, so the panel keeps its focus order and the search input is still the first
+  focusable element in it -- which is why the separate focus-the-input effect could go rather than
+  be reordered: claiming the first focusable IS focusing that input, and one mechanism that does
+  both cannot get the two out of order the way ask-overlay.tsx did.
+*/
+function PaletteFocus({ panel }: { panel: RefObject<HTMLElement | null> }) {
+  useDialogFocus(panel);
+  return null;
+}
+
 export default function WorkspaceUltimateShell({
   surface, children, headerAction, activeRevision, candidateReady, reviewCount, activityCount, truthGates,
   stateTitle, stateDescription, nextAction, onNavigate, onUpload, onRefresh, onSignOut,
@@ -67,11 +84,7 @@ export default function WorkspaceUltimateShell({
   const [privacyMode, setPrivacyMode] = useState(false);
   const [access, setAccess] = useState<AccessSummary | null>(null);
   const pendingGo = useRef(false);
-  const paletteInput = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (paletteOpen) paletteInput.current?.focus();
-  }, [paletteOpen]);
+  const paletteRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     let current = true;
@@ -225,8 +238,9 @@ export default function WorkspaceUltimateShell({
 
       {paletteOpen ? (
         <div className={styles.paletteBackdrop} role="presentation" onMouseDown={() => setPaletteOpen(false)}>
-          <section className={styles.palette} role="dialog" aria-modal="true" aria-label="Workspace command palette" onMouseDown={(event) => event.stopPropagation()}>
-            <div className={styles.paletteSearch}><Command size={17} aria-hidden="true" /><input ref={paletteInput} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Jump to a surface or run an action" aria-label="Search commands" /><button type="button" onClick={() => setPaletteOpen(false)} aria-label="Close command palette"><X size={16} /></button></div>
+          <section ref={paletteRef} className={styles.palette} role="dialog" aria-modal="true" aria-label="Workspace command palette" onMouseDown={(event) => event.stopPropagation()}>
+            <PaletteFocus panel={paletteRef} />
+            <div className={styles.paletteSearch}><Command size={17} aria-hidden="true" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Jump to a surface or run an action" aria-label="Search commands" /><button type="button" onClick={() => setPaletteOpen(false)} aria-label="Close command palette"><X size={16} /></button></div>
             <p>COMMANDS · ? TO OPEN</p>
             <div className={styles.paletteResults}>
               {paletteActions.map((action) => <button key={action.label} type="button" onClick={() => runAction(action)}><span><small>{action.group}</small>{action.label}</span><kbd>{action.hint}</kbd></button>)}
