@@ -65,6 +65,8 @@ const SALES_SURFACES = [
     reasons to defend itself is the page that most needs the rule.
   */
   "cookbooks/[slug]",
+  // And the index that lists them (BA-210), held to the same purge for the same reason.
+  "cookbooks",
   /*
     `ko` is the §12.4 Korean entry page: indexable, in the sitemap, in llms.txt, and the first
     TAVONEL page a Korean-language searcher lands on. That makes it a sales surface. It is on

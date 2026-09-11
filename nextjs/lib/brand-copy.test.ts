@@ -175,6 +175,8 @@ const COPY_SURFACES = [
   */
   "lib/cookbook-content.ts",
   "app/cookbooks/[slug]/page.tsx",
+  // The cookbook index, 2026-09-11 (BA-210). Its lede and card copy are written on the page.
+  "app/cookbooks/page.tsx",
   /*
     The §12.4 Korean entry page. A barred phrase does not stop being barred in translation, and
     the list below is matched against source text, so the row is here for the English words this

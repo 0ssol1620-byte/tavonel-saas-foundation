@@ -347,14 +347,37 @@ describe("the route publishes a draft as a draft", () => {
 });
 
 describe("the copy guards cover the new surfaces", () => {
-  it("registers both files where public copy is checked", () => {
+  it("registers every file where public copy is checked", () => {
     const brand = read("lib/brand-copy.test.ts");
     expect(brand).toContain('"lib/cookbook-content.ts"');
     expect(brand).toContain('"app/cookbooks/[slug]/page.tsx"');
+    // The index (BA-210) writes copy of its own -- a lede and six cards -- so it is a surface too.
+    expect(brand).toContain('"app/cookbooks/page.tsx"');
   });
 
-  it("registers the route as a sales surface", () => {
-    expect(read("lib/public-copy-purge.test.ts")).toContain('"cookbooks/[slug]"');
+  it("registers both routes as sales surfaces", () => {
+    const purge = read("lib/public-copy-purge.test.ts");
+    expect(purge).toContain('"cookbooks/[slug]"');
+    expect(purge).toContain('"cookbooks",');
+  });
+
+  /*
+    BA-210. The index exists, and this is the pair that keeps it honest: it lists the six records
+    from the data rather than a hand-written set, it puts no number, customer or outcome on a card,
+    and it declares the same refusal to be indexed that its entries declare.
+  */
+  it("lists the six records from the data, and advertises none of them as a case", () => {
+    const index = read("app/cookbooks/page.tsx");
+    expect(index).toContain("COOKBOOKS.map");
+    for (const record of COOKBOOKS) {
+      expect(index, record.slug + " is hand-written into the index").not.toContain('"' + record.slug + '"');
+      expect(index, record.title + " is hand-written into the index").not.toContain(record.title);
+    }
+    expect(index).toMatch(/robots:.*index: false/s);
+    expect(index, "a figure on a card is a result, and there is no run").not.toMatch(/d+s?%|$s?d/);
+    for (const pattern of ["<img", "<Image", "next/image", "<form", 'type="email"']) {
+      expect(index, pattern + ": the index gates nothing and illustrates nothing").not.toContain(pattern);
+    }
   });
 
   it("registers the content as a claim surface", () => {

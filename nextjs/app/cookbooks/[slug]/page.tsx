@@ -26,9 +26,12 @@ import anchor from "@/components/docs/page-toc.module.css";
 
   Three decisions worth reading before editing this page.
 
-  There is no `/cookbooks` index. Every record is a draft, a draft is not linked from Resources
-  as a representative case, and an index page listing six drafts is that link with extra steps.
-  The index arrives with the first approved record.
+  `/cookbooks` is the index, and this page's breadcrumb names it (BA-210). The argument that used
+  to stand here -- every record is a draft, a draft is not linked from Resources as a
+  representative case, so an index listing six drafts is that link with extra steps -- produced six
+  pages reachable from nowhere, each emitting a one-node trail for a parent that answered 404. The
+  index carries the same `noindex` the records do, which is the honest half of that argument
+  without the unreachability.
 
   There is no image, no video and no raw-HTML sink here except the breadcrumb graph the whole
   site emits. Only a real capture of a real run may illustrate one of these workflows and none
@@ -132,7 +135,9 @@ export default async function CookbookPage({ params }: { params: Promise<{ slug:
 
   return (
     <PublicPageShell>
-      <BreadcrumbJsonLd trail={[{ name: record.title, path: `/cookbooks/${record.slug}` }]} />
+      <BreadcrumbJsonLd
+        trail={[{ name: "Cookbooks", path: "/cookbooks" }, { name: record.title, path: `/cookbooks/${record.slug}` }]}
+      />
       <section className="scene doc"><div className="shell"><div className="body">
         <div className="stack">
           <p className="slate"><b>COOKBOOK</b><span aria-hidden="true" />· {WORKFLOW_LABEL[record.workflowId]}</p>
