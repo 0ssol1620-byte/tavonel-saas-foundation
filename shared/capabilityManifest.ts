@@ -1,4 +1,8 @@
-import { PROCESSING_CEILING_LIMITATIONS } from "./intakeCeiling";
+import {
+  PROCESSING_CEILING,
+  PROCESSING_CEILING_LIMITATIONS,
+  PROCESSING_CEILING_MIB,
+} from "./intakeCeiling";
 import {
   capabilityStatusesAcceptedAtUpload,
   type CapabilityStatus,
@@ -536,4 +540,114 @@ export function deriveCanonicalInputs() {
 /** Exactly the bytes of the checked-in artifact, so a comparison is a string comparison. */
 export function serializeCanonicalInputs(): string {
   return `${JSON.stringify(deriveCanonicalInputs(), null, 2)}\n`;
+}
+
+/*
+  BA-060 / BA-062 / BA-064: the public projection, and the words a reader gets.
+
+  Three findings with one cause. `/sources` handed the whole manifest to a client component, so
+  every visitor's RSC payload carried `readerPlan` (the internal pipeline component ids and their
+  revisions), `qualificationReceipt: null` per format, `qualifiedAt` and `defaultStatus` -- none
+  of it rendered, all of it serialized. This repository already separates a public DTO from an
+  internal one for route features; the manifest was the surface that had not.
+
+  So the projection below is what may cross to a client, and the internal fields stay on the
+  server. `/api/v1/capabilities` is unchanged: it is a documented machine contract with its own
+  digest, and a caller pinning `contentSha256` is entitled to the whole record.
+
+  The labels are the other half. `words()` in the table used to render a snake_case key by
+  swapping underscores for spaces, which printed machine identifiers dressed as English: "read
+  through cdr sanitized pdf and ocr", "at most 5 mib per source", "bbox1000". A key is a key; a
+  label is written. Both are here so the manifest stays the one list and neither the table nor
+  the API has a second opinion.
+
+  The two ceiling labels are derived from `PROCESSING_CEILING`, not typed out, because the tokens
+  they label are generated from the same constant -- a hand-typed "5 MB" would drift the day the
+  deployed processors change.
+*/
+export type PublicCapabilityRow = {
+  readonly sourceFamily: SourceFamily;
+  readonly mime: string;
+  readonly extensions: readonly string[];
+  readonly status: CapabilityStatus;
+  readonly preserved: readonly string[];
+  readonly knownLimitations: readonly string[];
+};
+
+export function publicCapabilityRows(
+  manifest: CapabilityManifest = CAPABILITY_MANIFEST,
+): readonly PublicCapabilityRow[] {
+  return manifest.entries.map((entry) => ({
+    sourceFamily: entry.sourceFamily,
+    mime: entry.mime,
+    extensions: entry.extensions,
+    status: entry.status,
+    preserved: entry.preserved,
+    knownLimitations: entry.knownLimitations,
+  }));
+}
+
+/**
+ * The limitations every accepted format carries, so the table states them once instead of
+ * twelve times.
+ *
+ * Measured over the rows accepted at upload rather than over every row: the archive row shares
+ * none of them, because nothing about an archive is read. A sentence above the table can only
+ * say "every accepted format", so that is the population this is computed over.
+ */
+export function sharedAcceptedLimitations(
+  manifest: CapabilityManifest = CAPABILITY_MANIFEST,
+): readonly string[] {
+  const accepted = manifest.entries.filter((entry) => isAcceptedAtUpload(entry.status));
+  const first = accepted[0];
+  if (!first) return [];
+  return first.knownLimitations.filter((limitation) =>
+    accepted.every((entry) => entry.knownLimitations.includes(limitation)),
+  );
+}
+
+/** A tier, as a reader reads it. The frozen enum stays the enum; this is its label. */
+export const CAPABILITY_TIER_LABEL: Record<CapabilityStatus, string> = {
+  VERIFIED_NATIVE: "Verified, native reader",
+  VERIFIED_HYBRID: "Verified, native and checked",
+  BEST_EFFORT: "Best effort",
+  METADATA_ONLY: "Metadata only",
+  REVIEW_REQUIRED: "Needs review",
+  UNSUPPORTED: "Not read",
+};
+
+/** A manifest token, as a reader reads it. */
+export const CAPABILITY_TOKEN_LABEL: Record<string, string> = {
+  // preserved
+  page: "Page",
+  paragraph_text: "Paragraph text",
+  bbox1000: "Exact region",
+  // limitations
+  read_through_cdr_sanitized_pdf_and_ocr: "Read as sanitized PDF, then OCR",
+  converted_to_pdf_before_reading: "Converted to PDF before reading",
+  converted_from_text_before_reading: "Rendered from text before reading",
+  decoded_as_utf8_before_conversion: "Decoded as UTF-8",
+  comma_delimiter_and_utf8_encoding_assumed: "Comma delimiter and UTF-8 assumed",
+  cells_are_read_back_as_rendered_text: "Cells are read back as rendered text",
+  no_document_structure_in_plain_text: "Plain text carries no document structure",
+  external_references_and_active_content_refused_before_conversion:
+    "External references and active content are refused",
+  laid_out_by_libreoffice_not_by_a_browser: "Laid out by LibreOffice, not by a browser",
+  no_native_structure_reader_yet: "No native structure reader yet",
+  no_table_or_formula_extraction: "No table or formula extraction",
+  no_visual_native_reconciliation: "No visual reconciliation of the native file",
+  page_count_not_defined_for_spreadsheets: "Spreadsheets have no defined page unit",
+  expanded_in_the_browser_before_upload: "Expanded in your browser before upload",
+  members_validated_individually_against_this_manifest: "Each member is checked against this table",
+  encrypted_or_nested_archives_refused_at_expansion: "Encrypted or nested archives are refused",
+  at_most_128_files_and_500_mb_expanded: "Up to 128 files and 500 MB expanded",
+  the_archive_itself_is_never_compiled: "The archive itself is never compiled",
+  not_included_in_free_evaluation: "Not included in a free evaluation",
+  [PROCESSING_CEILING_LIMITATIONS[0]]: `Up to ${PROCESSING_CEILING_MIB} MB per source`,
+  [PROCESSING_CEILING_LIMITATIONS[1]]: `Up to ${PROCESSING_CEILING.maxSourcePages} pages per source`,
+};
+
+/** A token with no written label is a bug, not a reason to print the identifier. */
+export function capabilityTokenLabel(token: string): string {
+  return CAPABILITY_TOKEN_LABEL[token] ?? token.replaceAll("_", " ");
 }

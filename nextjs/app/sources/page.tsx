@@ -3,10 +3,14 @@ import Link from "next/link";
 import type { Route } from "next";
 import { PublicSitePage } from "@/components/public-site-chrome";
 import SourceCapabilityTable from "@/components/source-capability-table";
-import { CAPABILITY_MANIFEST, isAcceptedAtUpload } from "../../../shared/capabilityManifest";
+import {
+  capabilityTokenLabel,
+  publicCapabilityRows,
+  sharedAcceptedLimitations,
+} from "../../../shared/capabilityManifest";
 
 /*
-  What this deployment can read, published as the thing the deployment reads.
+  Every source TAVONEL reads, published as the thing it reads.
 
   The support list used to exist five times -- twice as a MIME map, once as the file picker's
   `accept` attribute, once inside a rejection sentence and once as a row of marketing chips --
@@ -14,26 +18,47 @@ import { CAPABILITY_MANIFEST, isAcceptedAtUpload } from "../../../shared/capabil
   `shared/capabilityManifest.ts`, and so do the other five, so a format cannot be advertised
   here and refused at upload.
 
-  It is deliberately unflattering. Every row today says BEST_EFFORT, preserves three things, and
-  verifies nothing visually, because that is what the pipeline emits: sanitize to PDF, read with
-  OCR, carry page, paragraph text and a bounding box. A support matrix whose only job is to look
-  strong is a marketing page with a table in it.
+  It is precise rather than flattering. Every accepted row is read the same way -- sanitize to
+  PDF, read with OCR, carry the page, the paragraph text and the exact region -- and says so.
+  A support matrix whose only job is to look strong is a marketing page with a table in it.
+
+  What the 2026-09-11 brand audit changed here, and why:
+
+  BA-063  "this deployment" is our operations vocabulary, and it appeared four times. A buyer
+          does not know what a deployment is or why there might be several. The product has a
+          name.
+  BA-058  The first thing under the lede was a bordered callout saying nothing here is verified.
+          Nothing requires it: the table states a tier on every row, and what a tier costs to
+          earn belongs in the fold that explains how a row is filled in.
+  BA-059  The dominant content of the table was the same six negations printed twelve times,
+          plus two columns whose every cell was identical. What is true of every accepted format
+          is one sentence above the table; a row now carries what is true of that format.
+  BA-068  The refusal rule was a tracked-uppercase line floating between two folds, where it
+          read as a system error. It is a clause of the lede, which is where a policy belongs.
+  BA-069  The primary action on a primary-navigation page was a link to the documentation, so a
+          reader who was convinced had no way to start.
 */
 
 export const metadata: Metadata = {
   title: "Supported sources — TAVONEL",
   description:
-    "The capability manifest this deployment reads: every source format, its support tier, what survives into the compiled world, and the limitations that come with it.",
+    "Every source format TAVONEL reads, its support tier, what survives into the compiled world, and the limits that come with it.",
   alternates: { canonical: "/sources" },
   openGraph: { url: "/sources" },
   robots: { index: true, follow: true },
 };
 
 export default function SourcesPage() {
-  const qualified = CAPABILITY_MANIFEST.entries.filter(
-    (entry) => entry.qualificationReceipt !== null,
-  );
-  const accepted = CAPABILITY_MANIFEST.entries.filter((entry) => isAcceptedAtUpload(entry.status));
+  /*
+    BA-060: the projection, not the manifest.
+
+    `SourceCapabilityTable` is a client component, so whatever it is handed is serialized into
+    the page every visitor downloads. It was handed the manifest, which carries the reader
+    plan's internal component ids and revisions, a per-format receipt state and the default
+    status -- none of it rendered, all of it shipped. `publicCapabilityRows` is what may cross.
+  */
+  const rows = publicCapabilityRows();
+  const shared = sharedAcceptedLimitations();
 
   return (
     <PublicSitePage>
@@ -42,31 +67,34 @@ export default function SourcesPage() {
           <div className="body">
             <div className="stack">
               <p className="slate"><b>SOURCES</b><span />CAPABILITY MANIFEST</p>
-              <h1 className="document-title">What this deployment<br />can actually read.</h1>
+              <h1 className="document-title">Every source TAVONEL reads,<br />and what survives the read.</h1>
             </div>
 
             <div className="stack">
               <p className="lede">
                 One list decides what the upload route accepts, what the file picker offers, what
                 a rejection says and what this page prints. <b>They cannot disagree, because they
-                are the same list.</b> Each row states its support tier, what survives into the
-                compiled world, and what does not.
+                are the same list.</b> Each row states its support tier and what survives into the
+                compiled world; anything not listed here is refused at upload rather than accepted
+                and quietly mishandled.
               </p>
 
-              <p className="src-state">
-                <b>
-                  {qualified.length === 0
-                    ? "No format on this deployment carries a qualification receipt."
-                    : `${qualified.length} of ${accepted.length} accepted formats carry a qualification receipt.`}
-                </b>{" "}
-                A verified tier requires a receipt from a qualification run and the date it was
-                produced. Until one exists, the highest tier a format may claim is best effort,
-                and no row below claims more.
+              {/*
+                BA-059. The sentence that used to be seventy-two table cells.
+
+                The shared limitations are computed from the manifest rather than typed out, so
+                this cannot go on saying "no table extraction" after a reader lands that does.
+                The two ceilings come from `shared/intakeCeiling.ts` through the same labels the
+                table uses, so a change to the deployed processors rewrites this sentence.
+              */}
+              <p className="src-para">
+                <b>Every accepted format is read the same way.</b> It is sanitized to PDF and read
+                by the OCR reader, so every row below preserves the page, the paragraph text and
+                the exact region that binds a result back to its source. What that path does not
+                do, it does not do for any of them: {shared.map(capabilityTokenLabel).join(" · ")}.
               </p>
 
-              <SourceCapabilityTable manifest={CAPABILITY_MANIFEST} />
-
-              <p className="src-refusal">Formats not listed are refused at upload.</p>
+              <SourceCapabilityTable rows={rows} shared={shared} />
 
               {/*
                 The four paragraphs explaining the table are technical detail, and §14.3 asks for
@@ -77,21 +105,21 @@ export default function SourcesPage() {
 
                 §14.4's lifecycle definition belongs in here too, because it is the caveat the
                 table cannot state row by row. The table is about formats; "supported" for a
-                *connector* means the ten behaviours listed below, and no connector on this
-                deployment has been qualified for them (RESOLVED B-7). Without the paragraph a
-                reader can take a format's tier as a statement about a Drive folder staying in
-                step, which is a different claim entirely.
+                *connector* means the ten behaviours listed below (RESOLVED B-7). Without the
+                paragraph a reader can take a format's tier as a statement about a Drive folder
+                staying in step, which is a different claim entirely.
+
+                BA-067: the summary is the label, not the definition. A definition typed into a
+                tracked-uppercase mono string rendered its own curly quotes as debris, and "will
+                mean" was a future tense for a word the page uses in the present.
               */}
               <details className="status-fold">
-                <summary>How a row is filled in, and what &ldquo;supported&rdquo; will mean</summary>
+                <summary>How a row is filled in</summary>
                 <div className="stack">
               <p className="src-para">
                 <b>What is preserved</b> is what the compile request carries today, not what the
-                file format contains. Every source here is sanitized to PDF and read by the OCR
-                reader, so every row preserves the same three things: the page, the paragraph
-                text and the bounding box that binds it back to an exact source location. A
-                spreadsheet&rsquo;s cells and formulas are in the file and are not in that list,
-                so the row says so rather than implying otherwise.
+                file format contains. A spreadsheet&rsquo;s cells and formulas are in the file and
+                are not in that list, so the row says so rather than implying otherwise.
               </p>
               <p className="src-para">
                 <b>Known limitations</b> are read out of the code that enforces them, not written
@@ -99,10 +127,15 @@ export default function SourcesPage() {
                 one at a time; the archive itself is never compiled, which is why it appears
                 below the tier that refuses it and still appears in the file picker.
               </p>
+              {/*
+                BA-058's other half. The qualification definition is what the deleted callout was
+                actually for, written forwards: what earns a tier, rather than what nothing has.
+              */}
               <p className="src-para">
-                A format moves up a tier when a native reader for it exists and a qualification
-                run produces a receipt. That is a measurement, not a decision, and this page
-                changes when the measurement does.
+                <b>A tier is earned by a measurement.</b> A format moves up when a native reader
+                for it exists and a qualification run produces a receipt with the date it was
+                produced. That is a measurement, not a decision, and this page changes when the
+                measurement does.
               </p>
               {/*
                 Named because a Korean reader will look for it and find silence otherwise.
@@ -115,28 +148,39 @@ export default function SourcesPage() {
               */}
               <p className="src-para">
                 <b>Legacy binary HWP</b> (<i>application/x-hwp</i>, .hwp) is not in the table. It
-                has no reader here, and this deployment cannot hold an unlisted format for
-                review: the upload route refuses it before any file is stored. Listing it under
-                review would describe a queue that does not exist, so it is refused with
-                everything else that is absent, and it appears here instead.
+                has no reader here, and an unlisted format cannot be held for review: the upload
+                route refuses it before any file is stored. Listing it under review would describe
+                a queue that does not exist, so it is refused with everything else that is absent,
+                and it appears here instead.
               </p>
+              {/*
+                BA-065's counterpart. The lifecycle definition stays; what left is the sentence
+                that ended it on our internal qualification state. What each connector does at
+                each of those events is written on /integrations, read off the adapters.
+              */}
               <p className="src-para">
                 <b>A format is not a connector.</b> Every row above is about reading one file
-                that has already arrived. For a connected system, &ldquo;supported&rdquo; has to
-                mean the whole lifecycle: create, update, rename, move, delete, permission
-                change, tombstone behaviour, source-version propagation, world update and ACL
-                enforcement. The current readers checkpoint provider changes, suspend a bound
-                source when deletion or lost access is observed, and fail closed before governed
-                use. Real-account lifecycle runs are still required, so the detailed connector
-                surfaces mark them as not yet qualified.
+                that has already arrived. Supported, for a connected system, means the whole
+                lifecycle: create, update, rename, move, delete, permission change, tombstone
+                behaviour, source-version propagation, world update and ACL enforcement. The
+                current readers checkpoint provider changes, suspend a bound source when deletion
+                or lost access is observed, and fail closed before governed use. What each
+                connector does at each of those events is on{" "}
+                <Link href="/integrations">Integrations</Link>.
               </p>
                 </div>
               </details>
 
+              {/*
+                BA-069. A primary-navigation page whose primary action was a documentation link
+                left a convinced reader with nowhere to go, so the primary is now the conversation
+                this page leads to. The third ghost went with it: /developers owns the API path
+                and already says so.
+              */}
               <div className="actions">
-                <Link className="btn" href={"/docs/files-and-formats" as Route}>Files and formats</Link>
+                <Link className="btn" href="/contact">Talk to us about your sources</Link>
+                <Link className="btn ghost" href={"/docs/files-and-formats" as Route}>Files and formats</Link>
                 <Link className="btn ghost" href="/evidence">How evidence is bound</Link>
-                <Link className="btn ghost" href={"/api" as Route}>API</Link>
               </div>
             </div>
           </div>

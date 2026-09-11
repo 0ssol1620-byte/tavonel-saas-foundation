@@ -24,6 +24,23 @@ const { expect, test } = "test" in playwrightModule ? playwrightModule : playwri
 
 const SCHEMA_VERSION = "tavonel.capability_manifest.v1";
 
+/*
+  BA-062: the enum the API serves, and the label the page prints for it.
+
+  The API still serves the frozen identifiers -- it is a machine contract with its own digest --
+  and the page renders a written label, because a `SCREAMING_SNAKE_CASE` badge on a
+  primary-navigation page is a machine word shown to a buyer. Both halves are needed here, since
+  this file's whole job is to check the page and the API are the same list.
+*/
+const TIER_LABEL: Record<string, string> = {
+  VERIFIED_NATIVE: "Verified, native reader",
+  VERIFIED_HYBRID: "Verified, native and checked",
+  BEST_EFFORT: "Best effort",
+  METADATA_ONLY: "Metadata only",
+  REVIEW_REQUIRED: "Needs review",
+  UNSUPPORTED: "Not read",
+};
+
 type ManifestEntry = { mime: string; status: string };
 type Manifest = { schemaVersion: string; defaultStatus: string; entries: ManifestEntry[] };
 
@@ -49,7 +66,14 @@ test("serves /sources and names a support status on it", async ({ page }) => {
 
   const statuses = await page.locator("table.src-matrix .src-tier").allInnerTexts();
   expect(statuses.length, "the page names no source status at all").toBeGreaterThan(0);
-  for (const status of statuses) expect(status.trim()).toMatch(/^[A-Z_]{5,}$/);
+  /*
+    Pinning the six labels is stricter than the shape check it replaces: that one accepted any
+    new uppercase word, this one accepts exactly six strings and bars an identifier outright.
+  */
+  for (const status of statuses) {
+    expect(Object.values(TIER_LABEL)).toContain(status.trim());
+    expect(status.trim(), "a manifest identifier is being printed as a badge").not.toMatch(/[A-Z]_[A-Z]/);
+  }
 });
 
 /*
@@ -77,11 +101,13 @@ test("prints exactly the MIME rows the manifest serves", async ({ page }) => {
 
   await page.goto("/sources");
   /*
-    Each row prints its MIME type and then its source family, both in an `i`; the first is the
-    MIME, and matching both would compare the page's families against the API's types. Reading
-    the tier from inside the same row is what binds them: `tbody` alone keeps the legend's own
-    .src-tier chips out, and the row scope keeps a tier from being paired with another row's
-    format.
+    Each row prints its MIME type in an `i` inside the row header. Reading the tier from inside
+    the same row is what binds them: `tbody` alone keeps the legend's own .src-tier chips out,
+    and the row scope keeps a tier from being paired with another row's format.
+
+    BA-059 removed the source-family `i` that used to sit beside the MIME type -- the family is
+    what the filter above the table selects, so printing it in every row said it twice. `.first()`
+    stays, because it is the assertion that fails if a second `i` reappears in a row header.
   */
   const rows = page.locator("table.src-matrix tbody tr");
   const rowCount = await rows.count();
@@ -94,6 +120,6 @@ test("prints exactly the MIME rows the manifest serves", async ({ page }) => {
   }
 
   expect(printed.sort()).toEqual(
-    manifest.entries.map((entry) => `${entry.mime} ${entry.status}`).sort(),
+    manifest.entries.map((entry) => `${entry.mime} ${TIER_LABEL[entry.status]}`).sort(),
   );
 });

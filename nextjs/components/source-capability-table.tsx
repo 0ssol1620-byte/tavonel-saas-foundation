@@ -1,13 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { CLAIM_STATE, type ClaimStateKey } from "@/lib/claim-state";
 import { trackFunnel } from "@/lib/funnel-events";
-import type { CapabilityManifest, CapabilityManifestEntry } from "../../shared/capabilityManifest";
+import {
+  CAPABILITY_TIER_LABEL,
+  capabilityTokenLabel,
+  type PublicCapabilityRow,
+} from "../../shared/capabilityManifest";
 import { capabilityStatuses, type CapabilityStatus, type SourceFamily } from "../../shared/uskcEnums";
 
 /*
-  The support matrix, printed from the manifest.
+  The support matrix, printed from the manifest's public projection.
 
   Six tiers, four colours. `tavonel.css` has exactly four status tokens and this page does not
   get a fifth: a new hue would have to mean something, and the thing it would mean is already
@@ -19,79 +22,71 @@ import { capabilityStatuses, type CapabilityStatus, type SourceFamily } from "..
     --changed     a person has to decide before it proceeds      REVIEW_REQUIRED
     --reused      inert; nothing is compiled                     UNSUPPORTED
 
-  -- which is the same partition `lib/claim-state.ts` makes over claims, so each tier also names
-  the claim state a row licenses. That file had no production consumer until this page.
-*/
-type Tier = {
-  meaning: string;
-  claim: ClaimStateKey;
-  token: "verified" | "unresolved" | "changed" | "reused";
-};
+  BA-060 / BA-062 / BA-064 changed three things about how it prints.
 
-const TIERS: Record<CapabilityStatus, Tier> = {
+  It takes `PublicCapabilityRow[]`, not the manifest: the internal fields -- the reader plan's
+  component ids and revisions, the per-format receipt state, the default status -- were crossing
+  to the client in the RSC payload of a page that rendered none of them.
+
+  Each row shows one status, and it shows a written label. Two badges per row printed the tier
+  enum and then a claim-state word for the same fact, which on the archive row said "Not read"
+  twice in two vocabularies; and `SCREAMING_SNAKE_CASE` is an identifier, not a label.
+
+  The limitations shared by every accepted format are hoisted into one sentence above the table
+  by the page, so a row carries only what is true of *it*. The column used to print the same six
+  negations twelve times, which on a phone was the greater part of an 8,000px page.
+*/
+const TIERS: Record<CapabilityStatus, { meaning: string; token: "verified" | "unresolved" | "changed" | "reused" }> = {
   VERIFIED_NATIVE: {
     meaning: "Read by a native reader for the format, with a qualification receipt behind it.",
-    claim: "qualified",
     token: "verified",
   },
   VERIFIED_HYBRID: {
     meaning: "Read natively and cross-checked against a render or OCR pass, with a qualification receipt behind it.",
-    claim: "qualified",
     token: "verified",
   },
   BEST_EFFORT: {
     meaning: "Extracted by a general-purpose path. Useful, and not a guarantee that every structure in the source survived.",
-    claim: "demonstrated",
     token: "unresolved",
   },
   METADATA_ONLY: {
     meaning: "Handled at the type, metadata or container level only. No content is read.",
-    claim: "demonstrated",
     token: "unresolved",
   },
   REVIEW_REQUIRED: {
     meaning: "Encrypted, damaged or proprietary in a way that needs a person before anything is compiled.",
-    claim: "humanGate",
     token: "changed",
   },
   UNSUPPORTED: {
     meaning: "Refused. Nothing about the source is compiled.",
-    claim: "blocked",
     token: "reused",
   },
 };
 
-/** Manifest tokens are snake_case so they can be compared; a reader gets them as words. */
-function words(token: string) {
-  return token.replaceAll("_", " ");
-}
-
 function TokenList({ values }: { values: readonly string[] }) {
-  if (values.length === 0) return <span className="src-none">none</span>;
+  if (values.length === 0) return <span className="src-none">nothing beyond the shared read</span>;
   return (
     <ul className="src-tokens">
-      {values.map((value) => <li key={value}>{words(value)}</li>)}
+      {values.map((value) => <li key={value}>{capabilityTokenLabel(value)}</li>)}
     </ul>
   );
 }
 
-function Row({ entry }: { entry: CapabilityManifestEntry }) {
-  const tier = TIERS[entry.status];
+function Row({ row, shared }: { row: PublicCapabilityRow; shared: readonly string[] }) {
+  const tier = TIERS[row.status];
+  // What is true of this format and not of every accepted one. The rest is the sentence above.
+  const specific = row.knownLimitations.filter((limitation) => !shared.includes(limitation));
   return (
     <tr>
       <th scope="row" data-label="Source">
-        <b>{entry.extensions.map((extension) => `.${extension}`).join(" ")}</b>
-        <i>{entry.mime}</i>
-        <i>{words(entry.sourceFamily)}</i>
+        <b>{row.extensions.map((extension) => `.${extension}`).join(" ")}</b>
+        <i>{row.mime}</i>
       </th>
       <td data-label="Support tier">
-        <span className="src-tier" data-token={tier.token}>{entry.status}</span>
-        <i>{CLAIM_STATE[tier.claim].label}</i>
+        <span className="src-tier" data-token={tier.token}>{CAPABILITY_TIER_LABEL[row.status]}</span>
       </td>
-      <td data-label="What is preserved"><TokenList values={entry.preserved} /></td>
-      <td data-label="Visual verification"><TokenList values={entry.visual} /></td>
-      <td data-label="Evidence locator"><TokenList values={entry.evidenceLocatorKinds} /></td>
-      <td data-label="Known limitations"><TokenList values={entry.knownLimitations} /></td>
+      <td data-label="What is preserved"><TokenList values={row.preserved} /></td>
+      <td data-label="Specific to this format"><TokenList values={specific} /></td>
     </tr>
   );
 }
@@ -124,9 +119,15 @@ function familyRank(family: SourceFamily) {
   return at === -1 ? FAMILY_ORDER.length : at;
 }
 
-export default function SourceCapabilityTable({ manifest }: { manifest: CapabilityManifest }) {
+export default function SourceCapabilityTable({
+  rows: all,
+  shared,
+}: {
+  rows: readonly PublicCapabilityRow[];
+  shared: readonly string[];
+}) {
   const [family, setFamily] = useState<SourceFamily | "all">("all");
-  const ordered = [...manifest.entries].sort((a, b) => familyRank(a.sourceFamily) - familyRank(b.sourceFamily));
+  const ordered = [...all].sort((a, b) => familyRank(a.sourceFamily) - familyRank(b.sourceFamily));
   const families = FAMILY_ORDER.filter((name) => ordered.some((entry) => entry.sourceFamily === name));
   const rows = family === "all" ? ordered : ordered.filter((entry) => entry.sourceFamily === family);
 
@@ -160,7 +161,7 @@ export default function SourceCapabilityTable({ manifest }: { manifest: Capabili
             aria-pressed={family === name}
             onClick={() => choose(name)}
           >
-            {FAMILY_LABEL[name] ?? words(name)}{" "}
+            {FAMILY_LABEL[name] ?? name}{" "}
             <i>{ordered.filter((entry) => entry.sourceFamily === name).length}</i>
           </button>
         ))}
@@ -168,22 +169,22 @@ export default function SourceCapabilityTable({ manifest }: { manifest: Capabili
 
       <div className="src-scroll">
         <table className="src-matrix">
-          <caption>
-            Generated from {manifest.generatedFrom}. Anything not listed is{" "}
-            {manifest.defaultStatus.toLowerCase()}.
-          </caption>
+          {/*
+            BA-057. The caption used to print `shared/qualifiedDocumentInputs.ts@4c18e86` and a
+            second source path, on a primary-navigation page. The provenance a reader needs is
+            that the table is not a second list -- not which file and which commit it is.
+          */}
+          <caption>This table is generated from the same list the upload route enforces.</caption>
           <thead>
             <tr>
               <th scope="col">Source</th>
               <th scope="col">Support tier</th>
               <th scope="col">What is preserved</th>
-              <th scope="col">Visual verification</th>
-              <th scope="col">Evidence locator</th>
-              <th scope="col">Known limitations</th>
+              <th scope="col">Specific to this format</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((entry) => <Row key={entry.mime} entry={entry} />)}
+            {rows.map((row) => <Row key={row.mime} row={row} shared={shared} />)}
           </tbody>
         </table>
       </div>
@@ -203,7 +204,7 @@ export default function SourceCapabilityTable({ manifest }: { manifest: Capabili
           {capabilityStatuses.map((status) => (
             <div key={status}>
               <dt>
-                <span className="src-tier" data-token={TIERS[status].token}>{status}</span>
+                <span className="src-tier" data-token={TIERS[status].token}>{CAPABILITY_TIER_LABEL[status]}</span>
               </dt>
               <dd>{TIERS[status].meaning}</dd>
             </div>
