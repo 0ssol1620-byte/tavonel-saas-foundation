@@ -63,7 +63,8 @@ const INFRA = [
   a reader will be surprised by, so they are stated plainly instead of softened: one run is
   one sync and exits, so the customer's scheduler is the whole schedule; and there is no retry
   inside the agent, so the customer's scheduler is also the whole retry. The long form, with
-  the error-message table, is docs/runbooks/source-agent-operations.md in the repository.
+  the error-message table, is served at /developer/source-agent-operations.md (copied verbatim
+  from docs/runbooks/ at integration) and linked from the panel below.
 */
 const AGENT_OPERATIONS: Array<[string, string]> = [
   ["Install", "Python 3.12 or newer. Verify the download against the sha256 in the distribution record at /developer/channel.json, create the connection in Workspace to get its id, and put the API key in the TAVONEL_API_KEY environment variable \u2014 the agent reads it from nowhere else. S3-compatible mode additionally needs boto3, which you install; the agent stops and says so if it is missing."],
@@ -117,6 +118,8 @@ export default function IntegrationsPage() {
             <details className="integration-technical">
               <summary>Operating the agent</summary>
               <dl className="integration-facts">{AGENT_OPERATIONS.map(([term, detail]) => <div key={term}><dt>{term}</dt><dd>{detail}</dd></div>)}</dl>
+              <p className="fine">The full runbook, with the error-message table, is
+                <a href="/developer/source-agent-operations.md">source-agent-operations.md</a>.</p>
             </details>
             <p className="fine">No customer-run install of this agent has been qualified end to end on real infrastructure yet, so the timings from a run on your own corpus are the only ones that exist. There is no health endpoint or heartbeat for it either: its liveness is whatever your scheduler reports.</p>
           </div>
