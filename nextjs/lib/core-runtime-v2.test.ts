@@ -769,10 +769,15 @@ describe("the revision-compile request", () => {
   });
 
   it("is off unless the flag is exactly 1", () => {
-    expect(revisionCompileEnabled({})).toBe(false);
-    expect(revisionCompileEnabled({ [CORE_V2_REVISION_COMPILE_FLAG]: "0" })).toBe(false);
-    expect(revisionCompileEnabled({ [CORE_V2_REVISION_COMPILE_FLAG]: "true" })).toBe(false);
-    expect(revisionCompileEnabled({ [CORE_V2_REVISION_COMPILE_FLAG]: "1" })).toBe(true);
+    // NODE_ENV is required on ProcessEnv (next/types/global), so each literal carries it.
+    const env = (value?: string) => ({
+      NODE_ENV: "test" as const,
+      ...(value === undefined ? {} : { [CORE_V2_REVISION_COMPILE_FLAG]: value }),
+    });
+    expect(revisionCompileEnabled(env())).toBe(false);
+    expect(revisionCompileEnabled(env("0"))).toBe(false);
+    expect(revisionCompileEnabled(env("true"))).toBe(false);
+    expect(revisionCompileEnabled(env("1"))).toBe(true);
   });
 });
 
