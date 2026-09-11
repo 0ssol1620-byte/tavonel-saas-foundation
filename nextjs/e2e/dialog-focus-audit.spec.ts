@@ -7,22 +7,21 @@
  * the three properties that make either usable by keyboard: focus moves in, Tab stays inside,
  * focus returns to the control that opened it.
  *
- * Measured, both fail the third one.
+ * Measured, both failed the third one; both pass it now.
  *
- *  - Ask overlay: focus moves in and Tab is trapped. Focus does **not** return. `ask-overlay.tsx`
- *    declares its own `useEffect(() => firstRef.current?.focus())` *before* `useDialogFocus`, and
- *    effects run in declaration order -- so by the time the hook records the opener,
- *    `document.activeElement` is already a button inside the panel. On unmount it restores focus
- *    to an element that no longer exists, which is no restore at all.
+ *  - Ask overlay: fixed at integration (stage 2 C6). `useDialogFocus` is now declared before the
+ *    self-focus effect, so it records the Ask bar as the opener rather than a button inside the
+ *    panel. The expectation below is live.
  *  - Command palette: fixed at integration (stage 2 C5). It now mounts useDialogFocus from a
  *    child that lives only while the palette is open, so the hook records the opener and restores
  *    focus on close, and the separate focus-the-input effect is gone -- claiming the first
  *    focusable is that input. The expectation below is live.
  *
- * Both fixes are one line each, in files this lane does not own, and both are written out in the
- * lane report under CROSS-LANE REQUESTS. The failing expectations stay in CI as `test.fail()`
- * rather than being softened to the behaviour that ships: the run goes red the day either is
- * fixed and the annotation is not removed.
+ * Both were fixed at integration and both `test.fail()` modifiers are gone, which is the outcome
+ * this design was built for: the expectations were written against the behaviour that SHOULD
+ * ship, marked expected-to-fail rather than softened, so flipping them was a deletion and no
+ * assertion here had to be weakened or re-derived. What the four tests assert is unchanged from
+ * what the qa lane wrote.
  */
 
 import { test, expect } from "@playwright/test";
@@ -72,10 +71,6 @@ test.describe("the Explore Ask overlay", () => {
   });
 
   test("returns focus to the control that opened it", async ({ page }) => {
-    test.fail(
-      true,
-      "ask-overlay.tsx focuses its first question before useDialogFocus records the opener; see CROSS-LANE REQUESTS in CA_LANE_REPORT_qa.md",
-    );
     const opener = await openExploreAsk(page);
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog")).toHaveCount(0);
