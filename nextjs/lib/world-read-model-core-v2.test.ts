@@ -2,10 +2,11 @@ import { createHash } from "node:crypto";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import type { CollectionOcrInput } from "./collection-compiler";
+import { compileCollectionCandidate, type CollectionOcrInput } from "./collection-compiler";
 import { validatePromotableCollectionArtifact } from "./collection-download";
 import { COLLECTION_SOURCE_MANIFEST, collectionSourceDocumentIds } from "./collection-source-access";
 import { projectProductCoreV2Candidate, PRODUCT_CORE_RESPONSE_SCHEMA } from "./core-runtime-v2";
+import { compileRetrievalUnits } from "./retrieval-units";
 import { buildWorldReadModel, type WorldReadModel } from "./world-read-model";
 import WorldGraphCanvas from "../components/world-graph-canvas";
 import WorldOntologyViewer from "../components/world-ontology-viewer";
@@ -529,5 +530,65 @@ describe("the World UI reads a Core V2 World", () => {
     const html = renderToStaticMarkup(createElement(WorldOntologyViewer, { ontology: read.ontology }));
     expect(html).toContain("mentions");
     expect(html).not.toContain("No compiled ontology to read");
+  });
+});
+
+/*
+  Compiled retrieval over the same World (worldread CROSS-LANE 4, now live).
+
+  R4-01 gave `compileRetrievalArtifacts` a production caller, which made the namespace question
+  in this file reach the index as well as the World: a unit's `documentId` and
+  `documentVersionKey` are what a citation carries out to a customer and what
+  `/api/documents/<id>/source` is asked to open. The chunk rows name the Core's `src_` and `dv_`
+  ids, so without a translation every compiled citation on a V2 world points at a document this
+  product cannot find -- the connector-ACL mistake one layer down.
+*/
+describe("compiled retrieval units on a Core V2 World", () => {
+  const views = ["section", "claim", "entity"] as const;
+
+  it("names the product's documents, not the Core's source ids", () => {
+    const { units, refusal } = compileRetrievalUnits(storedArtifact(), [...views]);
+    expect(refusal).toBeUndefined();
+    expect(units.length).toBeGreaterThan(0);
+    for (const unit of units) {
+      expect(unit.documentId).toBe("doc-1");
+      expect(unit.documentVersionKey).toBe(VERSION_KEY);
+      expect(unit.documentId).not.toBe(SRC);
+      expect(unit.documentVersionKey).not.toBe(DV);
+    }
+  });
+
+  it("refuses to index a Core package whose sources do not resolve to this workspace", () => {
+    /*
+      The digest join is the only key both sides carry. A manifest whose digest names no product
+      document leaves the units unbuildable, and an index built anyway would publish citations
+      in an identity scheme nothing else here resolves -- so it refuses under its own code
+      rather than looking like a corpus with nothing in it.
+    */
+    const unjoinable = `${JSON.stringify([{
+      documentId: SRC,
+      documentVersionId: DV,
+      sourceSha256: `sha256:${"9".repeat(64)}`,
+    }])}\n`;
+    const artifact = {
+      ...storedArtifact(),
+      package: {
+        ...storedArtifact().package,
+        files: packageFiles({ [COLLECTION_SOURCE_MANIFEST]: unjoinable }),
+      },
+    };
+    const result = compileRetrievalUnits(artifact, [...views]);
+    expect(result.refusal).toBe("SOURCE_BINDING_UNRESOLVED");
+    expect(result.units).toEqual([]);
+  });
+
+  it("leaves a fallback-compiled package exactly as it was", () => {
+    // No translation for the TS compiler's own packages: the two namespaces are one there, and
+    // a translation that touched them would be a behaviour change to the shipped path.
+    const fallback = compileCollectionCandidate(inputs());
+    const { units, refusal } = compileRetrievalUnits(fallback, [...views]);
+    expect(refusal).toBeUndefined();
+    expect(units.length).toBeGreaterThan(0);
+    for (const unit of units) expect(unit.documentId).toBe("doc-1");
   });
 });

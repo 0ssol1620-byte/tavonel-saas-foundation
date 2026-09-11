@@ -47,18 +47,10 @@ function isCoreSourceManifest(rows: readonly unknown[]) {
     ("documentVersionId" in row || "sourceSha256" in row));
 }
 
-/**
- * Read a Core V2 package's source manifest, joined to the product's documents by content digest.
- *
- * `null` when this is not a Core manifest, and when any row fails to resolve to exactly one
- * product document. Never a partial binding: a source that cannot be named in the product's
- * namespace is a source whose permissions cannot be checked and whose pages cannot be opened,
- * and both of those refuse rather than proceed on an id the rest of the product cannot resolve.
- */
-export function coreCollectionSourceBinding(artifact: unknown): CollectionSourceBinding[] | null {
+/** The manifest rows, or null when there is no readable manifest at the reserved path. */
+function sourceManifestRows(artifact: unknown): unknown[] | null {
   if (!artifact || typeof artifact !== "object") return null;
-  const value = artifact as Record<string, unknown>;
-  const files = (value.package as { files?: unknown } | undefined)?.files;
+  const files = ((artifact as Record<string, unknown>).package as { files?: unknown } | undefined)?.files;
   if (!Array.isArray(files)) return null;
   const manifest = files.find((file) =>
     Boolean(file) && typeof file === "object" &&
@@ -71,6 +63,35 @@ export function coreCollectionSourceBinding(artifact: unknown): CollectionSource
     return null;
   }
   if (!Array.isArray(rows) || rows.length === 0 || rows.length > 2_000) return null;
+  return rows;
+}
+
+/**
+ * Whether this package names its sources in the Core's identity scheme.
+ *
+ * Exported because `coreCollectionSourceBinding` answers `null` to two different questions --
+ * "not a Core package" and "a Core package whose join failed" -- and a caller that cannot tell
+ * those apart reads the Core's ids as the product's on exactly the packages where that is wrong.
+ * Reading the *shape* off the manifest is safe; reading the ids off it is not, which is the
+ * distinction the note on `isCoreSourceManifest` draws.
+ */
+export function isCoreCollectionPackage(artifact: unknown): boolean {
+  const rows = sourceManifestRows(artifact);
+  return rows !== null && isCoreSourceManifest(rows);
+}
+
+/**
+ * Read a Core V2 package's source manifest, joined to the product's documents by content digest.
+ *
+ * `null` when this is not a Core manifest, and when any row fails to resolve to exactly one
+ * product document. Never a partial binding: a source that cannot be named in the product's
+ * namespace is a source whose permissions cannot be checked and whose pages cannot be opened,
+ * and both of those refuse rather than proceed on an id the rest of the product cannot resolve.
+ */
+export function coreCollectionSourceBinding(artifact: unknown): CollectionSourceBinding[] | null {
+  const rows = sourceManifestRows(artifact);
+  if (rows === null) return null;
+  const value = artifact as Record<string, unknown>;
   if (!isCoreSourceManifest(rows)) return null;
   if (!Array.isArray(value.sourceDocuments) || value.sourceDocuments.length === 0) return null;
 
