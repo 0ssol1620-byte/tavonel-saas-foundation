@@ -5,6 +5,12 @@ import type { DocumentListItem } from "@/lib/immutable-keys";
 import type { PipelineRow } from "@/lib/pipeline";
 import { buildOperationsSnapshot, type OperationsGate } from "@/lib/operations-view-model";
 import { displayName, type DocumentNames } from "@/lib/document-names";
+import {
+  buildPreflightSummary,
+  describePreflightFile,
+  describePreflightSummary,
+  isReportableFileName,
+} from "@/lib/preflight-report";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import styles from "./operations-ultimate.module.css";
 
@@ -19,6 +25,25 @@ export default function OperationsUltimate({ mode, rows, documents, names, gates
   onRefresh?: () => void;
 }) {
   const snapshot = buildOperationsSnapshot(rows, documents, gates);
+  /*
+    D10. The counts above say how many sources there are; this says what each one will lose.
+
+    Derived from the manifest row, not from the file: the report is available before the upload
+    is spent, which is the only time it is worth anything. A row whose filename this browser
+    does not hold is counted as unreported rather than reported as refused -- see
+    `isReportableFileName`.
+  */
+  const reportable = rows
+    .map((row) => ({ row, fileName: displayName(row.id, names, row.filename) }))
+    .filter((item) => isReportableFileName(item.fileName));
+  const preflight = buildPreflightSummary(
+    reportable.map((item) => ({
+      fileName: item.fileName,
+      bytes: item.row.transfer?.total ?? null,
+      reviewRequired: item.row.needsPerson,
+    })),
+    rows.length - reportable.length,
+  );
   const [selected, setSelected] = useState<string | null>(null);
   const [events, setEvents] = useState<AuditEvent[] | null>(null);
   const [auditState, setAuditState] = useState("NOT READ YET");
@@ -99,6 +124,8 @@ export default function OperationsUltimate({ mode, rows, documents, names, gates
       <section className={styles.preflight} aria-labelledby="preflight-title">
         <div className={styles.head}><div><p>PREFLIGHT · OBSERVED INPUTS</p><h2 id="preflight-title">Know the boundary before compute starts.</h2></div><output className={styles.state} data-ok={snapshot.compileEligible}>{snapshot.compileEligible ? "ELIGIBLE" : "HELD"}</output></div>
         <dl className={styles.metrics}><div><dt>SOURCES</dt><dd>{snapshot.sourceCount}</dd></div><div><dt>OCR READY</dt><dd>{snapshot.readyCount}</dd></div><div><dt>RUNNING</dt><dd>{snapshot.runningCount}</dd></div><div><dt>REVIEW</dt><dd>{snapshot.heldCount}</dd></div><div><dt>COST</dt><dd title="No compute quote has been issued">—</dd></div></dl>
+        {preflight.files.length > 0 || preflight.unreportedCount > 0 ? <p className={styles.clear} role="status">{describePreflightSummary(preflight)}.</p> : null}
+        {preflight.files.length > 0 ? <ul className={styles.events}>{preflight.files.map((file, index) => <li key={reportable[index].row.id}><strong>{file.fileName}</strong><span>{describePreflightFile(file)}</span><span className={styles.eventMeta}>{file.mime ?? "MIME UNRESOLVED"}</span></li>)}</ul> : null}
         {snapshot.blockers.length > 0 ? <ul className={styles.blockers}>{snapshot.blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}</ul> : <p className={styles.clear}>All observable source checks are clear. Cost remains unquoted until the server issues a compute reservation.</p>}
       </section>
       <section className={styles.theater} aria-labelledby="run-theater-title">
