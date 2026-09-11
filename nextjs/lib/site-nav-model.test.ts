@@ -2,10 +2,15 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import sitemap from "@/app/sitemap";
+import { exploreSampleDocuments } from "./explore-sample";
 import {
+  EXPLORE_CTA,
+  FOOTER_GROUPS,
+  FOOTER_LEGAL_ROW,
   NAV_GROUPS,
   NAV_PENDING_HREFS,
   NAV_PRICING,
+  PRIMARY_NAV,
   RESOURCE_LINKS,
   navHrefs,
   navSectionForPath,
@@ -90,6 +95,61 @@ describe("the global menu's destinations", () => {
   it("advertises no draft route", () => {
     // A draft cookbook is not offered to a reader from the site's own menu.
     expect(navHrefs().filter((href) => href.startsWith("/cookbooks"))).toEqual([]);
+  });
+
+  /*
+    BA-039's other half: the flat inventory and the footer point at the section too.
+
+    `NAV_PENDING_HREFS` was emptied and the panels were repointed when the hub landed, but the two
+    lists that are not the panel kept `/solutions/ai-ready-knowledge` -- so the footer's
+    "Solutions" was one workflow wearing the section's name on every page of the site. This is the
+    assertion that fails if either list drifts back to a detail page.
+  */
+  it("sends every link labelled Solutions to the hub, not to one of its five pages", () => {
+    for (const list of [PRIMARY_NAV, FOOTER_GROUPS.flatMap((group) => group.links)]) {
+      const solutions = list.filter((link) => link.label === "Solutions");
+      expect(solutions, "a list labelled Solutions with no Solutions link").not.toHaveLength(0);
+      for (const link of solutions) expect(link.href).toBe("/solutions");
+    }
+  });
+
+  /*
+    BA-244: the panel's last row names a real corpus, and these are its real numbers.
+
+    The Product panel had two columns of names in a full-width sheet with the right half empty,
+    and the honest thing to put in that space is what is behind the link. Which makes it a
+    numerical claim, so it is recomputed here from the committed sample rather than trusted --
+    every figure gets a receipt, and this one's receipt is the corpus itself.
+  */
+  it("states the public sample's corpus in the figures the sample actually has", () => {
+    const featured = NAV_GROUPS.find((group) => group.section === "product")?.featured;
+    expect(featured?.href).toBe(EXPLORE_CTA.href);
+    const regions = exploreSampleDocuments.reduce((total, document) => total + document.regionCount, 0);
+    expect(featured?.description, "the corpus line is missing").toBeDefined();
+    expect(featured!.description).toBe(
+      `Apple SEC corpus · ${exploreSampleDocuments.length} filings · ${regions.toLocaleString("en-US")} regions`,
+    );
+  });
+
+  /*
+    BA-250: the footer's last row, and the two things it may not contain.
+
+    The entity and the jurisdiction are the founder's to confirm (contract §2), and a footer line
+    naming a party this deployment cannot read would be the invention the brief bars. The empty
+    slot is asserted empty so that filling it is a deliberate act by the lane that owns the
+    operator record, and not something that arrives with an unrelated edit.
+  */
+  it("closes the footer with the copyright, the Korean entry and the security inbox", () => {
+    expect(FOOTER_LEGAL_ROW.copyright).toBe("© 2026 TAVONEL");
+    expect(FOOTER_LEGAL_ROW.language).toEqual({ href: "/ko", label: "한국어" });
+    expect(SITEMAP_PATHS.has(FOOTER_LEGAL_ROW.language.href), "the Korean entry is a published route").toBe(true);
+    expect(FOOTER_LEGAL_ROW.security).toBe("security@tavonel.com");
+    expect(Object.keys(FOOTER_LEGAL_ROW).sort()).toEqual(["copyright", "language", "security"]);
+    const chrome = read("../components/public-site-chrome.tsx");
+    expect(chrome, "the row is rendered, not just declared").toContain("FOOTER_LEGAL_ROW.copyright");
+    for (const invented of ["Co., Ltd", "Inc.", "Republic of Korea", "governed by the laws"]) {
+      expect(chrome, `the footer may not name ${invented} until the founder confirms it`).not.toContain(invented);
+    }
   });
 });
 
