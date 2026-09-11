@@ -3,7 +3,18 @@ import Link from "next/link";
 import type { Route } from "next";
 import { PublicPageShell } from "@/components/public-page-shell";
 import { DocsSearch } from "@/components/docs-search";
-import { DOCS_GROUPS, DOCS_REVIEWED, DOCS_SECTIONS, DOCS_VERSION, docsSearchIndex } from "@/lib/docs-content";
+import { DOCS_GROUPS, DOCS_REVIEWED, DOCS_SECTIONS, DOCS_VERSION, docsSearchIndex, findDocsSection, formatReviewDate } from "@/lib/docs-content";
+
+/*
+  The two sections a reader almost always wants first (BA-218).
+
+  Twenty-two index rows in one full-width column, every one of them the same box with the same
+  13px title and the same one-line summary, meant Quickstart and Changelog had identical weight.
+  These two are promoted above the groups -- they are also still in their own group below, because
+  the index is the index -- and they are read from the section data rather than written again here,
+  so a retitled section cannot disagree with its own feature card.
+*/
+const FEATURED = ["quickstart", "use-with-ai"] as const;
 
 export const metadata: Metadata = {
   title: "Documentation — TAVONEL",
@@ -24,7 +35,7 @@ export default function DocsPage() {
     <PublicPageShell>
       <section className="scene doc"><div className="shell"><div className="body">
         <div className="stack">
-          <p className="slate"><b>DOCUMENTATION</b><span />API {DOCS_VERSION}</p>
+          <p className="slate"><b>DOCUMENTATION</b><span aria-hidden="true" />· API {DOCS_VERSION}</p>
           <h1 className="document-title">From sources to a Compiled World.</h1>
         </div>
         <div className="stack">
@@ -33,6 +44,19 @@ export default function DocsPage() {
             on our servers, then read the World and the evidence under every object.
           </p>
           <DocsSearch entries={docsSearchIndex()} />
+          <div className="tiles">
+            {FEATURED.map((slug) => {
+              const section = findDocsSection(slug);
+              // Fail closed rather than render an empty card: a renamed slug is a build failure.
+              if (!section) throw new Error(`/docs features ${slug}, which is not a section`);
+              return (
+                <article className="tile" key={slug}>
+                  <h2><Link href={`/docs/${section.slug}` as Route}>{section.title}</Link></h2>
+                  <p>{section.summary}</p>
+                </article>
+              );
+            })}
+          </div>
           <div className="docs-groups">
             {DOCS_GROUPS.map((group) => (
               <div className="stack" key={group}>
@@ -51,8 +75,8 @@ export default function DocsPage() {
             ))}
           </div>
           <p className="fine">
-            API version {DOCS_VERSION} · documentation reviewed {DOCS_REVIEWED} ·{" "}
-            <a href="/api/openapi">machine-readable contract</a> ·{" "}
+            API version {DOCS_VERSION} · documentation reviewed {formatReviewDate(DOCS_REVIEWED)} ·{" "}
+            <a href="/api/openapi">OpenAPI contract</a> ·{" "}
             <a href="/llms.txt">llms.txt</a>
           </p>
           {/*
@@ -65,8 +89,13 @@ export default function DocsPage() {
           */}
           <div className="actions">
             <Link className="btn" href={"/docs/quickstart" as Route}>Run the quickstart</Link>
-            <Link className="btn ghost" href={"/developers" as Route}>Choose an access path</Link>
-            <a className="btn ghost" href="/api">API reference</a>
+            {/*
+              BA-199: "Choose an access path" read like the name of the destination, so
+              /developers had three names across the site. This one describes what the page does.
+              BA-184: the third action pointed at /api, a four-tile stub that this site linked to
+              as its "API reference" while the reference itself is these twenty-two sections.
+            */}
+            <Link className="btn ghost" href={"/developers" as Route}>Compare access paths</Link>
           </div>
         </div>
       </div></div></section>

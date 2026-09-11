@@ -8,7 +8,9 @@ import {
   COOKBOOK_SLUGS,
   READING_LIMIT_SENTENCE,
   RECIPE_VERSION,
+  SECTION_LABEL,
   SECTION_ORDER,
+  WORKFLOW_LABEL,
   docsSectionTitle,
   findCookbook,
   orderedSections,
@@ -75,12 +77,21 @@ describe("cookbook records", () => {
 });
 
 describe("locked sections carry nothing to print", () => {
-  it("gives every locked section a reason and an empty body", () => {
+  it("gives every locked section a forward item and an empty body", () => {
     for (const record of COOKBOOKS) {
       for (const section of record.sections) {
         if (section.status !== "locked") continue;
         expect(section.body, `${record.slug}/${section.key}: a locked section with a body is a placeholder`).toBe("");
-        expect(section.lockedReason.length, `${record.slug}/${section.key}: no reason given`).toBeGreaterThan(40);
+        expect(section.whenRun.length, `${record.slug}/${section.key}: nothing said about what a run adds`).toBeGreaterThan(40);
+        /*
+          BA-178/179. The field used to be `lockedReason`, and the page printed each one under its
+          own 32px heading -- so the wording drifted towards apology, and one of them named a
+          founder decision on six sales pages. It is now the forward item in the closing block,
+          and this is the pin: no governance vocabulary, and no item whose subject is the absence.
+        */
+        for (const leak of ["founder", "decision log", "has not been run", "there is no run", "no measurement"]) {
+          expect(section.whenRun.toLowerCase(), `${record.slug}/${section.key} carries "${leak}"`).not.toContain(leak);
+        }
       }
     }
   });
@@ -163,12 +174,26 @@ describe("the limits are read from the product, and sit above the calls to actio
     ]);
   });
 
-  it("puts that limit in the prerequisites and the limits of every record", () => {
+  /*
+    BA-209. The same three sentences were injected into both the prerequisites and the limits, so
+    every page printed the reading limit twice -- which is how a reader learns to skip it. It is
+    stated once, in the prerequisites, which still sit above every call to action (the ordering
+    assertion below is the half that matters), and the limits section back-references it by the
+    heading a reader can see rather than dropping it.
+
+    Pinned at least as tightly as before: the full sentence in the prerequisites, the
+    back-reference in the limits, and a failure if either half goes missing.
+  */
+  it("states that limit once, in the prerequisites, and has the limits point back at it", () => {
     for (const record of COOKBOOKS) {
-      for (const key of ["prerequisites", "limits"] as const) {
-        const section = record.sections.find((candidate) => candidate.key === key)!;
-        expect(section.body, `${record.slug}/${key} does not carry the reading limit`).toContain(READING_LIMIT_SENTENCE);
-      }
+      const prerequisites = record.sections.find((candidate) => candidate.key === "prerequisites")!;
+      const limits = record.sections.find((candidate) => candidate.key === "limits")!;
+      expect(prerequisites.body, `${record.slug}/prerequisites does not carry the reading limit`)
+        .toContain(READING_LIMIT_SENTENCE);
+      expect(limits.body, `${record.slug}/limits restates the reading limit instead of referring to it`)
+        .not.toContain(READING_LIMIT_SENTENCE);
+      expect(limits.body, `${record.slug}/limits drops the reading limit instead of referring to it`)
+        .toContain('under "' + SECTION_LABEL.prerequisites + '"');
     }
   });
 
@@ -199,12 +224,23 @@ describe("the limits are read from the product, and sit above the calls to actio
     }
   });
 
-  it("summarises the World Build scope as DRAFT, prices none of it, and invents no deal term", () => {
+  it("summarises the World Build scope, prices none of it, and invents no deal term", () => {
     const next = findCookbook("documents-to-grounded-work")!.sections.find((section) => section.key === "next")!;
     // The offer's own step names, flattened into a sentence rather than softened into a promise.
     expect(next.body).toContain("customer provides representative corpus, TAVONEL compiles");
     expect(next.body).toContain("one update/change test");
-    expect(next.body, "the commercial terms are a founder decision and must read as DRAFT").toContain("DRAFT");
+    /*
+      BA-182. This pinned the word DRAFT, which was the page telling a buyer that our commercial
+      terms are unsettled, followed by "No fee appears here, because none has been approved". The
+      fact underneath -- that nobody but the founder sets a price, so this page states none -- is
+      pinned harder now: the routing sentence has to be present, and no fee, rate or unit price
+      may appear in any form.
+    */
+    expect(next.body, "a price is set with the customer, not written on a content page")
+      .toContain("pricing is set with you");
+    for (const money of [/\bfees?\b/i, /\brates?\b/i, /\bper page\b/i, /\bper document\b/i, /\bdiscount\b/i]) {
+      expect(next.body, String(money) + ": a commercial term here is the founder's to write").not.toMatch(money);
+    }
     /*
       The repair. `WORLD_BUILD_OFFER.md` marks exactly three commercial terms FOUNDER DECISION --
       the fee, whether the fee credits against a plan, and the minimum corpus and engagement. A
@@ -222,6 +258,24 @@ describe("the limits are read from the product, and sit above the calls to actio
     expect(index("limits")).toBeLessThan(index("next"));
     // And on the page itself: the action row is rendered after the section body.
     expect(PAGE.indexOf("docs-body")).toBeLessThan(PAGE.indexOf('className="actions"'));
+  });
+
+  /*
+    BA-208. Four equal-width buttons at the foot of the page, one filled and three ghost, two of
+    them duplicating links the prose above already carries. Two is a decision: start it, or talk
+    to us about a corpus. The prose links are asserted too, because "un-promoted out of the action
+    row" and "deleted" are different acts and only the first one is this fix.
+  */
+  it("offers two actions, and keeps the docs and the sample reachable from the prose", () => {
+    const actions = PAGE.slice(PAGE.indexOf('className="actions"'));
+    expect([...actions.matchAll(/className="btn/g)]).toHaveLength(2);
+    expect(actions).toContain("loginUrlForRecipe(record.recipeId)");
+    expect(actions).toContain('href="/contact"');
+    for (const record of COOKBOOKS) {
+      const next = record.sections.find((section) => section.key === "next")!;
+      expect(next.body.toLowerCase(), record.slug + ": the next action names neither the docs nor the sample")
+        .toMatch(/sample|documentation|docs|quickstart|section/);
+    }
   });
 
   it("points every code section at a documentation section that exists", () => {
@@ -250,11 +304,38 @@ describe("the route publishes a draft as a draft", () => {
 
   it("renders every body through the sanitiser and opens no raw-HTML sink", () => {
     expect(PAGE).toContain("sanitizeDocumentText(paragraph)");
-    expect(PAGE).toContain("sanitizeDocumentText(section.lockedReason)");
+    expect(PAGE).toContain("sanitizeDocumentText(section.whenRun)");
     // `lib/output-escaping.test.ts` holds this app to two raw-HTML sinks. The breadcrumb component
     // is one of them; this page adds none, and adding one is that file's decision, not this one's.
     expect(PAGE).not.toContain("dangerouslySetInnerHTML");
     expect(PAGE, "structured data beyond the breadcrumb needs a real verified date").not.toContain("@type");
+  });
+
+  /*
+    BA-177/180. The kicker read "COOKBOOK / DRAFT / NOT YET RUN" and the foot of the page printed
+    five internal record fields, three of them reading "none recorded", "no run recorded" and
+    "unverified". Both are gone and both facts are kept: the kicker is the workflow family the
+    record already declares, and the absent run is one closing line -- which this pins, because
+    deleting that line rather than moving it is the failure the fix would become.
+  */
+  it("names the workflow family above the title, and the missing run once at the foot", () => {
+    expect(PAGE).toContain("WORKFLOW_LABEL[record.workflowId]");
+    for (const record of COOKBOOKS) {
+      expect(WORKFLOW_LABEL[record.workflowId], record.slug + ": no kicker for its workflow").toBeTruthy();
+      expect(WORKFLOW_LABEL[record.workflowId]).not.toMatch(/DRAFT|NOT YET|NOT RUN/);
+    }
+    expect(PAGE).toContain("This guide is published ahead of a recorded run");
+    expect(PAGE).toContain("Guide revision {formatReviewDate(record.recipeVersion)}");
+    /*
+      The five internal fields, checked against what the component renders rather than the whole
+      file: `publication` is still read in `generateMetadata` and must be, because it is what
+      declares a draft noindex. Reaching the rendered JSX is the point -- a field printed there is
+      copy, a field read in metadata is a flag.
+    */
+    const rendered = PAGE.slice(PAGE.indexOf("export default async function CookbookPage"));
+    for (const field of ["record.publication", "record.verifiedBuild", "record.lastVerifiedAt", "record.sourceRights", "{record.recipeId}"]) {
+      expect(rendered, field + " is an internal record field, not public copy").not.toContain(field);
+    }
   });
 
   it("shows no image, no video and no email gate", () => {

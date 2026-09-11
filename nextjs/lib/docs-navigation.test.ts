@@ -62,9 +62,15 @@ describe("in-page table of contents", () => {
   it("is wired into the section page from the same data as the blocks", () => {
     expect(sectionPage).toContain("<PageToc entries={toc} />");
     expect(sectionPage).toContain("id={anchorIds.get(position)}");
-    // The label comes from the contract for an endpoint, so an unpublished operation -- which
-    // renders no block at all -- is never offered as a destination.
-    expect(sectionPage).toContain("return endpoint ? `${endpoint.method} ${endpoint.path}` : null;");
+    /*
+      BA-201. The label used to come from a code block's caption or an endpoint's method and
+      path, because those were the only labelled blocks the section data had -- so the jump list
+      on the quickstart named three languages and no concept. The sections carry real
+      subheadings now, and the rail lists those and nothing else; a code block or an endpoint is
+      reached through the heading that introduces it.
+    */
+    expect(sectionPage).toContain('return block.kind === "heading" ? block.text : null;');
+    expect(sectionPage, "a code caption is not a landmark").not.toContain("if (block.kind === \"code\") return block.label;");
   });
 
   /*
@@ -93,16 +99,63 @@ describe("in-page table of contents", () => {
     const cookbook = read("../app/cookbooks/[slug]/page.tsx");
     expect(cookbook).toContain('import { PageToc, tocEntries } from "@/components/docs/page-toc";');
     expect(cookbook).toContain("<PageToc entries={toc} />");
-    expect(cookbook).toContain("const toc = tocEntries(sections.map((section) => SECTION_LABEL[section.key]));");
+    /*
+      BA-178 moved the six run-dependent sections out of the body and into one closing block, so
+      the jump list is the ready sections plus that block rather than all twelve labels. Still one
+      `tocEntries` call and still one derivation: the ids are joined back by the same order the
+      page renders, which is what this pins.
+    */
+    expect(cookbook).toContain("const toc = tocEntries([...ready.map((section) => SECTION_LABEL[section.key]), PENDING_HEADING]);");
+    expect(cookbook).toContain("id={toc[ready.length]!.id}");
     // The id and the anchor class sit on the element the link points at.
     expect(cookbook).toContain('<h2 id={id} className={anchor.anchor}>');
     expect(cookbook).toContain("id={toc[order]!.id}");
     expect(cookbook).not.toContain("#cookbook-");
     expect(cookbook).not.toContain('aria-label="Sections on this page"');
-    // Twelve sections, so the component's three-entry threshold cannot silence this page.
+    // Six ready sections and the closing block, so the component's three-entry threshold cannot
+    // silence this page. The label set is still checked for collisions across all twelve, because
+    // a run opening a locked section brings its label back into the same list.
     expect(Object.keys(SECTION_LABEL).length).toBeGreaterThanOrEqual(3);
     expect(tocEntries(Object.values(SECTION_LABEL)).map((entry) => entry.id))
       .toHaveLength(Object.keys(SECTION_LABEL).length);
+  });
+});
+
+/*
+  BA-202. The eyebrow above every title on these five pages was `<b>LABEL</b><span />TEXT`, with
+  the empty span styled as a 34px rule. A rule is not a character: the accessible name and every
+  text extraction read the two clauses as one word -- "DEVELOPERSONE WORLD",
+  "DOCUMENTATIONAPI 2026-09-02.1", "DOCUMENTATIONAll sections".
+
+  The fix is the audit's second option: mark the rule decorative, and put a real separator in the
+  text. So the pattern this pins is the absence of a bare `<span />` between two clauses.
+*/
+describe("eyebrow labels read as two clauses", () => {
+  const SURFACES = [
+    "../app/developers/page.tsx",
+    "../app/docs/page.tsx",
+    "../app/docs/[section]/page.tsx",
+    "../app/cookbooks/[slug]/page.tsx",
+    "../app/ko/page.tsx",
+  ];
+
+  it.each(SURFACES)("%s separates the label from the text it sits beside", (surface) => {
+    const source = read(surface);
+    /*
+      Every `.slate` eyebrow on the page, and what follows the rule inside it. A two-clause
+      eyebrow (one with a <b>) has to carry a separator; a one-clause eyebrow, where the rule
+      leads and there is nothing before it, needs none -- but the rule is decorative either way.
+    */
+    const eyebrows = [...source.matchAll(/<p className="slate">([\s\S]*?)<\/p>/g)].map((match) => match[1]!);
+    expect(eyebrows.length, surface + " renders no eyebrow -- the pattern has moved").toBeGreaterThan(0);
+    for (const eyebrow of eyebrows) {
+      expect(eyebrow, "the rule is decorative and says so: " + eyebrow).not.toContain("<span />");
+      // A separator is owed only where there are two clauses: a label, the rule, and text after
+      // it. A one-clause eyebrow -- a bare label, or a rule that leads -- has nothing to separate.
+      const after = eyebrow.split('<span aria-hidden="true" />')[1] ?? "";
+      if (!eyebrow.includes("<b>") || after.trim() === "") continue;
+      expect(eyebrow, "two clauses fused into one accessible name: " + eyebrow).toMatch(/\/>·/);
+    }
   });
 });
 

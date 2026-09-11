@@ -8,11 +8,13 @@ import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
 import {
   COOKBOOK_SLUGS,
   SECTION_LABEL,
+  WORKFLOW_LABEL,
   docsSectionTitle,
   findCookbook,
   orderedSections,
   type CookbookSection,
 } from "@/lib/cookbook-content";
+import { formatReviewDate } from "@/lib/docs-content";
 import { loginUrlForRecipe } from "@/lib/recipe-intent";
 import { sanitizeDocumentText } from "@/lib/sanitize-html";
 import { PageToc, tocEntries } from "@/components/docs/page-toc";
@@ -64,7 +66,17 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   };
 }
 
-function SectionBlock({ section, id }: { section: CookbookSection; id: string }) {
+/*
+  The one closing block that replaced six "not run" sections (BA-178).
+
+  It is last, it is positive, and it is stated once. Six headings whose whole body was a grey box
+  saying the section had not been run made half of every page an apology, and put the first of them
+  two screens above the first thing the product actually does. What a run adds is still published
+  -- a reader deciding whether to wait for one needs exactly this list -- it is just not the page.
+*/
+const PENDING_HEADING = "What a recorded run will add";
+
+function SectionBlock({ section, id }: { section: Extract<CookbookSection, { status: "ready" }>; id: string }) {
   return (
     <Fragment>
       {/*
@@ -75,25 +87,16 @@ function SectionBlock({ section, id }: { section: CookbookSection; id: string })
         `:target`.
       */}
       <h2 id={id} className={anchor.anchor}>{SECTION_LABEL[section.key]}</h2>
-      {section.status === "locked" ? (
-        /*
-          The whole of what a locked section renders. No placeholder figure, no sample answer and
-          no greyed-out screenshot: the reader is told it has not been run and why, which is a
-          fact, where an example would be a fabrication.
-        */
-        <p className="docs-note">This section has not been run. {sanitizeDocumentText(section.lockedReason)}</p>
-      ) : (
-        /*
-          Keyed by position, not by the paragraph text: two identical sentences in one section are
-          a duplicate key, and React's answer to a duplicate key is to render one of them. A
-          repeated sentence is an editing mistake worth seeing on the page, not one worth hiding.
-          The list is static content and never reorders, so position is the stable key here.
-        */
-        section.body
-          .split("\n\n")
-          .map((paragraph, index) => <p key={`${section.key}-${index}`}>{sanitizeDocumentText(paragraph)}</p>)
-      )}
-      {section.status === "ready" && section.docsSlug ? (
+      {/*
+        Keyed by position, not by the paragraph text: two identical sentences in one section are
+        a duplicate key, and React's answer to a duplicate key is to render one of them. A
+        repeated sentence is an editing mistake worth seeing on the page, not one worth hiding.
+        The list is static content and never reorders, so position is the stable key here.
+      */}
+      {section.body
+        .split("\n\n")
+        .map((paragraph, index) => <p key={`${section.key}-${index}`}>{sanitizeDocumentText(paragraph)}</p>)}
+      {section.docsSlug ? (
         <p className="fine">
           The exact contract:{" "}
           <Link href={`/docs/${section.docsSlug}` as Route}>{docsSectionTitle(section.docsSlug) ?? section.docsSlug}</Link>
@@ -111,19 +114,28 @@ export default async function CookbookPage({ params }: { params: Promise<{ slug:
 
   const sections = orderedSections(record);
   /*
-    One jump list for the twelve sections, from the documentation template's own component rather
-    than a second one written here. `tocEntries` owns the slug, the duplicate suffix and the
-    empty-label fallback; the ids it returns are joined back to the sections by order, which is
-    safe because `orderedSections` is the order this page renders.
+    The six sections that describe the product, and the six a run will fill in.
+
+    `orderedSections` is still the single source of both the order and the twelve-section
+    contract; this split is only about where each half renders. The ready six are the page; the
+    locked six are one closing list under `PENDING_HEADING`.
   */
-  const toc = tocEntries(sections.map((section) => SECTION_LABEL[section.key]));
+  const ready = sections.filter((section) => section.status === "ready");
+  const pending = sections.filter((section) => section.status === "locked");
+  /*
+    One jump list, from the documentation template's own component rather than a second one
+    written here. `tocEntries` owns the slug, the duplicate suffix and the empty-label fallback;
+    the ids it returns are joined back by order -- the ready sections, then the closing block,
+    which is exactly the order rendered below.
+  */
+  const toc = tocEntries([...ready.map((section) => SECTION_LABEL[section.key]), PENDING_HEADING]);
 
   return (
     <PublicPageShell>
       <BreadcrumbJsonLd trail={[{ name: record.title, path: `/cookbooks/${record.slug}` }]} />
       <section className="scene doc"><div className="shell"><div className="body">
         <div className="stack">
-          <p className="slate"><b>COOKBOOK</b><span />DRAFT · NOT YET RUN</p>
+          <p className="slate"><b>COOKBOOK</b><span aria-hidden="true" />· {WORKFLOW_LABEL[record.workflowId]}</p>
           <h1 className="document-title">{record.title}</h1>
         </div>
 
@@ -131,16 +143,34 @@ export default async function CookbookPage({ params }: { params: Promise<{ slug:
           <PageToc entries={toc} />
 
           <div className="stack docs-body">
-            {sections.map((section, order) => (
+            {ready.map((section, order) => (
               <SectionBlock key={section.key} section={section} id={toc[order]!.id} />
+            ))}
+            <h2 id={toc[ready.length]!.id} className={anchor.anchor}>{PENDING_HEADING}</h2>
+            {/*
+              Paragraphs with a bold lead-in rather than a list, so the six items inherit the
+              measure, colour and line height `.docs-body p` already sets. A <ul> here would need
+              its own rule in `app/tavonel.css`, which this lane does not own, and would render
+              at the browser default until it got one.
+            */}
+            {pending.map((section) => (
+              <p key={section.key}>
+                <strong>{SECTION_LABEL[section.key]}</strong>{" — "}{sanitizeDocumentText(section.whenRun)}
+              </p>
             ))}
           </div>
 
-          {/* The record's own state, printed from its fields rather than written into the copy. */}
+          {/*
+            BA-180. What was here printed five record fields -- publication state, verified build,
+            verified date, source-rights state and the raw recipe slug -- three of them reading
+            "none recorded", "no run recorded" and "unverified". Those are the fields of an
+            internal record and a reader cannot act on one of them. The guide's own revision is
+            the single fact on that line a reader can use, so it is the one that stays; the
+            record's state is still asserted in `cookbook-content.test.ts`, where it belongs.
+          */}
           <p className="fine">
-            Publication {record.publication} · verified build {record.verifiedBuild ?? "none recorded"} ·
-            {" "}verified on {record.lastVerifiedAt ?? "no run recorded"} · source rights {record.sourceRights} ·
-            {" "}recipe {record.recipeId} at version {record.recipeVersion}
+            This guide is published ahead of a recorded run; the run-dependent sections appear when
+            one exists. Guide revision {formatReviewDate(record.recipeVersion)}.
           </p>
 
           {/*
@@ -160,10 +190,14 @@ export default async function CookbookPage({ params }: { params: Promise<{ slug:
             The three routes the `next` section's prose names all stay, because the prose points
             at them; the recipe link is added in front of them, not in place of one.
           */}
+          {/*
+            Two, not four (BA-208). Four same-width buttons stacked at the foot of a 5,300px phone
+            page is a choice with no wrong answer, which is no choice at all. The documentation and
+            the read-only sample are both named, with links, in the Next action prose directly
+            above -- they were never lost, only un-promoted out of the decision row.
+          */}
           <div className="actions">
             <Link className="btn" href={loginUrlForRecipe(record.recipeId) as Route}>Start this recipe</Link>
-            <Link className="btn ghost" href="/explore">Open the read-only sample</Link>
-            <Link className="btn ghost" href="/docs">Read the documentation</Link>
             <Link className="btn ghost" href="/contact">Talk to us about your corpus</Link>
           </div>
         </div>

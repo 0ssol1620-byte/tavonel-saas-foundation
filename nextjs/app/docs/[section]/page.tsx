@@ -11,6 +11,7 @@ import {
   DOCS_SECTIONS,
   DOCS_VERSION,
   findDocsSection,
+  formatReviewDate,
   type DocsBlock,
 } from "@/lib/docs-content";
 import { readDocsEndpoints, snippetFor, SNIPPET_LANGUAGES, type DocsEndpoint } from "@/lib/docs-endpoints";
@@ -71,7 +72,11 @@ function Endpoint({ endpoint, id }: { endpoint: DocsEndpoint; id?: string }) {
       <header>
         <b data-method={endpoint.method}>{endpoint.method}</b>
         <code>{endpoint.path}</code>
-        {endpoint.scope ? <em>{endpoint.scope}</em> : null}
+        {/*
+          BA-216. The scope used to render as a bare em after the path -- `collections:read`
+          with nothing saying what it was, which a reader either already knew or could not guess.
+        */}
+        {endpoint.scope ? <em>Scope <code>{endpoint.scope}</code></em> : null}
       </header>
       {endpoint.description ? <p>{endpoint.description}</p> : null}
       <DocsSnippet
@@ -86,7 +91,10 @@ function Endpoint({ endpoint, id }: { endpoint: DocsEndpoint; id?: string }) {
         <thead><tr><th>Status</th><th>Response</th></tr></thead>
         <tbody>
           {endpoint.responses.map((response) => (
-            <tr key={response.status}><td><code>{response.status}</code></td><td>{response.description}</td></tr>
+            <tr key={response.status}>
+              <td data-label="Status"><code>{response.status}</code></td>
+              <td data-label="Response">{response.description}</td>
+            </tr>
           ))}
         </tbody>
       </table>
@@ -95,38 +103,52 @@ function Endpoint({ endpoint, id }: { endpoint: DocsEndpoint; id?: string }) {
 }
 
 /*
-  The blocks a reader can jump to.
+  The blocks a reader can jump to (BA-201).
 
-  The documentation is data, and the only titled landmarks it carries are code samples (their
-  label) and endpoints (the method and path the published contract gives them). Those are what
-  "On this page" lists, and nothing invents a heading the source does not have -- a section with
-  fewer than three of them gets no jump list at all. An endpoint naming an operation the
-  contract does not carry renders nothing, so it is not offered as a destination either.
+  Headings, and only headings. This used to fall back to code captions and endpoint signatures,
+  because those were the only labelled blocks the data had -- so "On this page" on the quickstart
+  read "Steps 1 to 4 — bash / Steps 1 to 4 — Python / Steps 1 to 4 — TypeScript", six entries
+  that named no concept at all. The section data carries real subheadings now
+  (`{ kind: "heading" }`), and they are what the rail lists.
+
+  Code blocks and endpoints keep no anchor of their own: each one sits under the heading that
+  introduces it, which is the destination a reader wants anyway.
 */
-function headingLabel(block: DocsBlock, endpoints: Map<string, DocsEndpoint>): string | null {
-  if (block.kind === "code") return block.label;
-  if (block.kind !== "endpoint") return null;
-  const endpoint = endpoints.get(block.operationId);
-  return endpoint ? `${endpoint.method} ${endpoint.path}` : null;
+function headingLabel(block: DocsBlock): string | null {
+  return block.kind === "heading" ? block.text : null;
 }
 
 function Block({ block, endpoints, id }: { block: DocsBlock; endpoints: Map<string, DocsEndpoint>; id?: string }) {
   switch (block.kind) {
+    case "heading":
+      return <h2 id={id} className={anchor.anchor}>{block.text}</h2>;
     case "prose":
       return <p>{withEmphasis(block.text)}</p>;
     case "note":
-      return <p className="docs-note">{withEmphasis(block.text)}</p>;
+      /*
+        BA-217. The accent bar was doing two opposite jobs across the site -- real guidance here,
+        and "this section has not been run" on every cookbook. The cookbook use is gone
+        (BA-178); the label is what keeps this one legible without relying on the colour.
+      */
+      return <p className="docs-note"><strong>Note</strong> {withEmphasis(block.text)}</p>;
     case "steps":
       return <ol className="docs-steps">{block.items.map((item) => <li key={item}>{item}</li>)}</ol>;
     case "code":
       return <CodeBlock label={block.label} body={block.body} id={id} />;
+    case "snippets":
+      // One figure with a tab per language, the same control the endpoint blocks use.
+      return <DocsSnippet snippets={block.items.map((item) => ({ ...item }))} />;
     case "table":
       return (
         <table className="docs-table">
           <thead><tr>{block.head.map((cell) => <th key={cell}>{cell}</th>)}</tr></thead>
           <tbody>
             {block.rows.map((row) => (
-              <tr key={row.join("|")}>{row.map((cell, index) => <td key={index}>{withEmphasis(cell)}</td>)}</tr>
+              <tr key={row.join("|")}>
+                {row.map((cell, index) => (
+                  <td key={index} data-label={block.head[index]}>{withEmphasis(cell)}</td>
+                ))}
+              </tr>
             ))}
           </tbody>
         </table>
@@ -156,7 +178,7 @@ export default async function DocsSectionPage({ params }: { params: Promise<{ se
     to the block that carries the id.
   */
   const labelled = entry.blocks
-    .map((block, position) => ({ position, label: headingLabel(block, endpoints) }))
+    .map((block, position) => ({ position, label: headingLabel(block) }))
     .filter((item): item is { position: number; label: string } => item.label !== null);
   const toc = tocEntries(labelled.map((item) => item.label));
   const anchorIds = new Map(labelled.map((item, order) => [item.position, toc[order]!.id]));
@@ -172,7 +194,7 @@ export default async function DocsSectionPage({ params }: { params: Promise<{ se
         <div className="body">
           <div className="stack">
             <p className="slate">
-              <b>DOCUMENTATION</b><span /><Link href="/docs">All sections</Link>
+              <b>DOCUMENTATION</b><span aria-hidden="true" />· <Link href="/docs">All sections</Link>
             </p>
             <h1 className="document-title">{entry.title}</h1>
           </div>
@@ -190,13 +212,16 @@ export default async function DocsSectionPage({ params }: { params: Promise<{ se
               {next ? <Link href={`/docs/${next.slug}` as Route}>{next.title} →</Link> : <span />}
             </nav>
             <p className="fine">
-              API version {DOCS_VERSION} · reviewed {DOCS_REVIEWED} ·{" "}
+              API version {DOCS_VERSION} · reviewed {formatReviewDate(DOCS_REVIEWED)} ·{" "}
               {/*
                 Feedback goes to an address that exists and is read. A form posting to an endpoint
                 nobody had built would look like feedback and be a hole in the floor.
+
+                BA-221: the label asked "Something wrong on this page?", which opens by assuming
+                the page is wrong. It is the same mailto, phrased as an action.
               */}
               <a href={`mailto:support@tavonel.com?subject=${encodeURIComponent(`Docs feedback: ${entry.title}`)}`}>
-                Something wrong on this page?
+                Report an issue with this page →
               </a>
             </p>
           </div>
