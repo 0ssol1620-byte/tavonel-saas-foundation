@@ -5,6 +5,56 @@ import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { trackFunnelOnce } from "@/lib/funnel-events";
 import ConnectionSyncStatus from "@/components/connection-sync-status";
+import { formatTimestamp } from "@/lib/format";
+import { formatElapsed } from "@/lib/review-queue";
+
+/*
+  Lag, said in both directions (audit I06).
+
+  The panel printed the timestamp of the last durable sync, which answers "when" and not "how
+  long ago" -- and "how long ago" is the question a reader actually has, because a date on its
+  own reads as fresh until you work out today's. Both are printed. A connection that has never
+  synced says so; it is never given a substituted time.
+*/
+export function describeSyncLag(lastSyncAt: string | null, now: number = Date.now()): string {
+  if (!lastSyncAt) return "No durable sync has completed yet";
+  const stamp = formatTimestamp(lastSyncAt);
+  const at = Date.parse(lastSyncAt);
+  if (stamp === null || Number.isNaN(at)) return "Last durable sync time could not be read";
+  const elapsed = formatElapsed(now - at);
+  return elapsed === null ? `Last durable sync ${stamp}` : `Last durable sync ${stamp} · ${elapsed} ago`;
+}
+
+/*
+  A revoked scope is not a transient error, and it must not read like one.
+
+  `reauthorization_required` means the provider withdrew the grant: no retry, no backoff and no
+  amount of waiting fixes it, and the only thing that does is a person re-authorizing. The
+  wording is exact about what that takes here, because re-authorizing the same account while
+  the connection row still exists is refused by a unique constraint on
+  (workspace, provider, provider account) -- the connection has to be disconnected first.
+*/
+export const REAUTHORIZATION_NOTICE =
+  "Access to this source was withdrawn at the provider. Imports have stopped and will not resume on their own. "
+  + "Disconnect this connection, then connect the same account again to issue a new credential.";
+
+/**
+ * What a connection status needs a person to do, or null when it needs nothing.
+ *
+ * Only the withdrawn-grant status gets a resolving action. `error` and `paused` are handled by
+ * the per-job recovery advice the progress panel already prints, and duplicating them here
+ * would put two different sentences about one problem on the same card.
+ */
+export function oauthConnectionAttention(status: OAuthConnection["status"]) {
+  if (status !== "reauthorization_required") return null;
+  return {
+    label: "access withdrawn",
+    notice: REAUTHORIZATION_NOTICE,
+    action: "Disconnect so this account can be re-authorized",
+    /* Starting an import cannot succeed without a credential, so it is not offered. */
+    importDisabled: true,
+  };
+}
 
 type Connection = {
   connectionId: string;
@@ -329,19 +379,30 @@ export default function ConnectionsPanel() {
         <div className="connection-list" aria-live="polite">
           {connections === null || oauthConnections === null ? <p className="world-empty">Connection state has not been read yet.</p> : null}
           {connections?.length === 0 && oauthConnections?.length === 0 ? <p className="world-empty">Create a connection, then use OAuth or a scoped sync key with the local source agent.</p> : null}
-          {oauthConnections?.map((connection) => (
-            <article key={connection.oauthConnectionId}>
+          {oauthConnections?.map((connection) => {
+            const attention = oauthConnectionAttention(connection.status);
+            return (
+            <article key={connection.oauthConnectionId} data-status={connection.status}>
               <span className="connection-icon" aria-hidden="true"><Link2 size={18} /></span>
               <div>
-                <div className="connection-title"><strong>{connection.displayName}</strong><span data-status={connection.status}>{connection.status}</span></div>
+                <div className="connection-title"><strong>{connection.displayName}</strong><span data-status={connection.status}>{attention?.label ?? connection.status}</span></div>
                 <p>{oauthProviderLabel(connection.provider)} · encrypted OAuth</p>
                 <small>{connection.providerAccountLabel ?? "Provider account connected"}</small>
-                <button type="button" disabled={busy} onClick={() => void startImport(connection)}>Import this source</button>
+                <small>{describeSyncLag(connection.lastSyncAt)}</small>
+                {attention ? (
+                  <>
+                    <p className="fine held" role="alert">{attention.notice}</p>
+                    <button type="button" disabled={busy} onClick={() => void revokeOAuth(connection)}>{attention.action}</button>
+                  </>
+                ) : null}
+                {connection.lastErrorCode ? <small className="connection-error">{connection.lastErrorCode}</small> : null}
+                <button type="button" disabled={busy || attention?.importDisabled} onClick={() => void startImport(connection)}>Import this source</button>
                 <ConnectionSyncStatus connectionId={connection.oauthConnectionId} revision={progressRevision} getToken={sessionToken} />
               </div>
               <button type="button" className="icon-action" disabled={busy} onClick={() => void revokeOAuth(connection)} aria-label={`Revoke ${connection.displayName}`}><Trash2 size={15} /></button>
             </article>
-          ))}
+            );
+          })}
           {connections?.map((connection) => (
             <article key={connection.connectionId}>
               <span className="connection-icon" aria-hidden="true">{connection.provider === "file_server" ? <Server size={18} /> : <Cloud size={18} />}</span>
@@ -349,7 +410,7 @@ export default function ConnectionsPanel() {
                 <div className="connection-title"><strong>{connection.displayName}</strong><span data-status={connection.status}>{connection.status}</span></div>
                 <p>{providerLabel(connection.provider)} · {connection.mode === "local_agent" ? "local agent" : "managed cloud pull"}</p>
                 <small><code>{connection.connectionId}</code></small>
-                <small>{connection.lastSyncAt ? `Last durable sync ${new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(connection.lastSyncAt))}` : "Awaiting first signed cursor batch"}</small>
+                <small>{describeSyncLag(connection.lastSyncAt)}</small>
                 <small>{connection.cursorSha256 ?? "No cursor committed"}</small>
                 {connection.lastErrorCode ? <small className="connection-error">{connection.lastErrorCode}</small> : null}
               </div>
