@@ -187,6 +187,14 @@ const COPY_SURFACES = [
     it now fails the same way it does on a page.
   */
   "public/llms.txt",
+  /*
+    The published support target. It is one exported string rendered on `/status` and `/contact`,
+    and neither page's own source contains the words -- so without a row here the only support
+    commitment on the site would be guarded by nothing in this file.
+  */
+  "lib/support-targets.ts",
+  // `/contact` carries three addresses and the support target, and had no row.
+  "app/contact/page.tsx",
 ];
 
 const BARRED = [

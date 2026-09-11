@@ -126,6 +126,16 @@ const CONTROLS = [
     a reader deciding whether to trust it can hold us to it later.
   */
   ["Instructions written inside a document", "No model writes prose from your documents in this deployment. An answer is assembled from evidence excerpts and the source locations they came from, so a sentence hidden inside a document has no model output to redirect, and the answer path offers it no write tool to reach. That is a statement about what is wired today and not a defence that survives wiring a generation model: the generator seam is a contract with nothing behind it, and the injection classes are re-run against a real generator, with the result written on this page, before one of them answers a request."],
+  /*
+    Where the data physically is, which /privacy answered and this page did not.
+
+    It belongs in the controls rather than in the unanswered block below, because it is answered:
+    the answer is a configured region and no guarantee. The two halves have to stay together --
+    "the database is in Seoul" alone reads as residency, and a buyer who needs residency would
+    plan around a promise nobody made. The provider list and the per-provider data class stay on
+    /subprocessors, which is the page that maintains them.
+  */
+  ["Where the data is", "The database is configured in Seoul. No data residency is guaranteed: Vercel, Cloudflare, RunPod, Resend, Google and Paddle may process limited data through global infrastructure or support systems outside Korea, and the object-storage location hint is best-effort rather than a promise. Which provider is permitted to process which class of data is on the subprocessors page, and the privacy notice carries the same statement about international processing."],
 ] as const;
 
 /*
@@ -143,6 +153,19 @@ const CONTROLS = [
 */
 const UNANSWERED = [
   ["Recovery objectives", "Not yet answered. There is no recovery point objective, no recovery time objective and no published backup retention period for this deployment. Those are commitments somebody has to make and nobody has: the restore above shows the database came back once, which is a different statement from how much work or how much time you would lose. Ask before you depend on either number, and read their absence here as the state of it."],
+  /*
+    The question a procurement reader asks before any of the controls above, which this page left
+    to /trust. It has to be answerable on the page a buyer is sent to, because the controls above
+    are all "checked by us" and that phrase only means something next to the absence of anyone
+    else having checked.
+
+    One sentence of sequencing, no date. An external test after the first paying customer is an
+    order of events; "Q1", "by year end" or "under way" would each be the commitment this row
+    refuses, and nothing has been commissioned. SOC 2 has no timing at all because none is chosen.
+    `lib/trust-page-answers.test.ts` allows these three artefact names only inside this block and
+    fails on a date appearing in it.
+  */
+  ["Third-party certification and audit", "Not yet answered, because nothing exists to answer it with. No SOC 2 report, no ISO 27001 certificate and no independent penetration-test report exists for this deployment, and no such review has been commissioned — which is why no badge appears anywhere on this site. An external penetration test is planned after the first paying customer; SOC 2 timing is not set. That sequencing is a delegated decision pending the founder's confirmation (decision log, FD-12). Every control above is enforced and checked by us, and that is the whole of what is being claimed."],
 ] as const;
 
 export default function SecurityPage() {

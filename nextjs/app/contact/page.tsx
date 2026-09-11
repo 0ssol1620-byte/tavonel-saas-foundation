@@ -4,6 +4,7 @@ import Link from "next/link";
 import Logomark from "@/components/logomark";
 import ContactForm from "@/components/contact-form";
 import MobilePrimaryNav from "@/components/mobile-primary-nav";
+import { SUPPORT_ACKNOWLEDGEMENT } from "@/lib/support-targets";
 
 export const metadata: Metadata = {
   // Each page declares its own address. Without this every route inherited the root
@@ -54,6 +55,8 @@ export default function ContactPage() {
                   <span>Vulnerability reports</span>
                   <a href="mailto:security@tavonel.com">security@tavonel.com</a>
                 </div>
+                {/* One constant, printed here and on /status. See lib/support-targets.ts. */}
+                <p className="fine">{SUPPORT_ACKNOWLEDGEMENT}</p>
               </div>
               <div className="stack">
                 <p className="lede">
