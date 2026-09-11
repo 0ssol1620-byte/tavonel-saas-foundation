@@ -53,6 +53,17 @@ const COPY_SURFACES = [
   // Most of what /benchmarks says is written in the registry, not in the page that arranges it.
   "lib/benchmark-registry.ts",
   "app/developers/page.tsx",
+  /*
+    /docs, added at integration (stage 2 C23c) as the root fix for devx finding 2.
+
+    The whole of /docs is written in docs-content.ts and arranged by one dynamic route, and
+    neither was on this list -- so the largest body of prose on the site was checked by nothing
+    here, and docs-content.test.ts grew its own copy of the barred-phrase list to compensate.
+    One list, checked once.
+  */
+  "lib/docs-content.ts",
+  "app/docs/[section]/page.tsx",
+  "app/docs/page.tsx",
   "app/pricing/page.tsx",
   "app/product/page.tsx",
   "app/product/knowledge-compiler/page.tsx",

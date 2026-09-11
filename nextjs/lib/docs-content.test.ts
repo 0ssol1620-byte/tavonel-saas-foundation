@@ -293,6 +293,13 @@ describe("search", () => {
   phrase *added* there will not appear here until someone adds it, which is the reason the
   cross-lane request exists.
 */
+/*
+  Kept after brand-copy.test.ts took on all three /docs surfaces (stage 2 C23c), because it is not
+  redundant: brand-copy scans SOURCE text, and the second test below scans every section as it
+  RENDERS. A phrase assembled at render time out of pieces no grep finds in the source is exactly
+  what that reaches and a source scan cannot. The third test pins this list to brand-copy.test.ts,
+  so the two cannot drift even though both exist.
+*/
 const BARRED = [
   "unlock your data",
   "second brain",
