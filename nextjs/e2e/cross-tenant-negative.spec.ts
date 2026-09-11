@@ -61,33 +61,24 @@ function assertNoLeak(body: string, where: string) {
   }
 }
 
-/* One route's refusal ships without `Cache-Control: no-store`; measured, see the test below. */
-const MISSING_NO_STORE = "/api/v1/reviews";
 
 test("no tenant-scoped read is reachable without a credential, whoever the id belongs to", async ({ request }) => {
   for (const path of readPaths(FOREIGN_COLLECTION)) {
     const response = await request.get(path);
     expect(response.status(), path).toBe(401);
     expect(await response.json(), path).toEqual({ code: "AUTH_REQUIRED" });
-    if (path !== MISSING_NO_STORE) {
-      expect(response.headers()["cache-control"], path).toContain("no-store");
-    }
+    expect(response.headers()["cache-control"], path).toContain("no-store");
     assertNoLeak(await response.text(), path);
   }
 });
 
 test("every refusal is uncacheable", async ({ request }) => {
   /*
-    Known defect, kept visible on purpose.
-
-    `/api/v1/reviews` answers its 401 with no `Cache-Control` header at all, while every other
-    tenant-scoped route sends `no-store` -- the rule `launch-qa-api-security.spec.ts` already
-    asserts for the public contracts. An authorization refusal that an intermediary may cache is
-    a refusal that can be served to the wrong caller later. The one-line fix is in CROSS-LANE
-    REQUESTS in CA_LANE_REPORT_qa.md.
+    Fixed at integration (stage 2 C9): /api/v1/reviews sends no-store on all eighteen of its
+    early returns, through one `refuse` helper so a nineteenth cannot omit it. The exemption
+    this file carried for the route is gone from the test above as well.
   */
-  test.fail(true, `${MISSING_NO_STORE} sends no Cache-Control on its 401`);
-  const response = await request.get(MISSING_NO_STORE);
+  const response = await request.get("/api/v1/reviews");
   expect(response.status()).toBe(401);
   expect(response.headers()["cache-control"] ?? "").toContain("no-store");
 });

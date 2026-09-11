@@ -12,6 +12,19 @@ import { loadWorldReadModel } from "@/lib/world-read-model";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+/*
+  Every answer this route gives is uncacheable, refusals included.
+
+  It was the one tenant-scoped route whose 401 carried no Cache-Control at all, while the rest
+  send no-store -- and an authorization refusal an intermediary may keep is a refusal that can be
+  served to a different caller later. It is also a stored fact about who asked for what.
+
+  `refuse` exists so the header cannot be forgotten on one branch: there are eighteen early
+  returns here and adding the header to each is a rule that holds until the next one is written.
+*/
+const NO_STORE = { "Cache-Control": "no-store" } as const;
+const refuse = (code: string, status: number) => NextResponse.json({ code }, { status, headers: NO_STORE });
+
 const ACTIONS = new Set(["accept", "edit", "reject"]);
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
 const EVIDENCE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/;
@@ -44,16 +57,16 @@ async function readBoundedJson(request: Request) {
 
 export async function POST(request: Request) {
   if (!request.headers.get("content-type")?.toLowerCase().startsWith("application/json")) {
-    return NextResponse.json({ code: "REVIEW_REQUEST_INVALID" }, { status: 415 });
+    return refuse("REVIEW_REQUEST_INVALID", 415);
   }
   const declaredLength = request.headers.get("content-length");
   if (declaredLength !== null && (!/^\d+$/.test(declaredLength) || Number(declaredLength) > MAX_REVIEW_BODY_BYTES)) {
-    return NextResponse.json({ code: "REVIEW_REQUEST_TOO_LARGE" }, { status: 413 });
+    return refuse("REVIEW_REQUEST_TOO_LARGE", 413);
   }
   const auth = await requireFoundationSession(request, "observer");
-  if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status });
+  if (!auth.ok) return refuse(auth.code, auth.status);
   const parsed = await readBoundedJson(request);
-  if (parsed.tooLarge) return NextResponse.json({ code: "REVIEW_REQUEST_TOO_LARGE" }, { status: 413 });
+  if (parsed.tooLarge) return refuse("REVIEW_REQUEST_TOO_LARGE", 413);
   const body = parsed.value;
   const collectionId = typeof body?.collectionId === "string" ? body.collectionId : "";
   const manifestDigest = typeof body?.manifestDigest === "string" ? body.manifestDigest : "";
@@ -62,15 +75,15 @@ export async function POST(request: Request) {
   const reason = typeof body?.reason === "string" ? body.reason.trim() : "";
   if (!COLLECTION_ID_PATTERN.test(collectionId) || !SHA256.test(manifestDigest) || !EVIDENCE_ID.test(evidenceId)
     || !ACTIONS.has(action) || reason.length < 8 || reason.length > 1_000) {
-    return NextResponse.json({ code: "REVIEW_REQUEST_INVALID" }, { status: 400 });
+    return refuse("REVIEW_REQUEST_INVALID", 400);
   }
   const loaded = await loadWorldReadModel(auth.principal.workspaceKey, collectionId);
-  if (!loaded.ok) return NextResponse.json({ code: loaded.code }, { status: loaded.status });
+  if (!loaded.ok) return refuse(loaded.code, loaded.status);
   if (loaded.model.world.manifestDigest !== manifestDigest) {
-    return NextResponse.json({ code: "REVIEW_WORLD_CHANGED" }, { status: 409 });
+    return refuse("REVIEW_WORLD_CHANGED", 409);
   }
   const evidence = loaded.model.evidence.find((item) => item.id === evidenceId);
-  if (!evidence) return NextResponse.json({ code: "REVIEW_EVIDENCE_NOT_FOUND" }, { status: 404 });
+  if (!evidence) return refuse("REVIEW_EVIDENCE_NOT_FOUND", 404);
 
   /*
     An edit that carries a correction applies it, and produces a new candidate.
@@ -91,13 +104,13 @@ export async function POST(request: Request) {
     const before = typeof requested.before === "string" ? requested.before : "";
     const after = typeof requested.after === "string" ? requested.after : "";
     if (!OBJECT_ID.test(objectId) || before.length === 0 || after.trim().length === 0) {
-      return NextResponse.json({ code: "REVIEW_PATCH_INVALID" }, { status: 400 });
+      return refuse("REVIEW_PATCH_INVALID", 400);
     }
     const signer = readR2SignerEnv();
-    if (!signer) return NextResponse.json({ code: "SIGNER_NOT_CONFIGURED" }, { status: 503 });
+    if (!signer) return refuse("SIGNER_NOT_CONFIGURED", 503);
     const stored = await loadPreferredCollectionCandidate(signer, auth.principal.workspaceKey, collectionId, manifestDigest);
     if (!stored.ok) {
-      return NextResponse.json({ code: stored.code }, { status: stored.code === "NOT_FOUND" ? 404 : 503 });
+      return refuse(stored.code, stored.code === "NOT_FOUND" ? 404 : 503);
     }
     const applied = applyCandidatePatch(stored.value.artifact, { objectId, before, after }, {
       evidenceId,
@@ -108,16 +121,16 @@ export async function POST(request: Request) {
       // A mismatch is a conflict, not a malformed request: the reviewer saw a label that is no
       // longer there, which means someone else corrected it first.
       const status = applied.code === "PATCH_BEFORE_MISMATCH" ? 409 : 422;
-      return NextResponse.json({ code: applied.code }, { status });
+      return refuse(applied.code, status);
     }
     const key = collectionCandidateKey(
       auth.principal.workspaceKey,
       collectionId,
       applied.artifact.manifestDigest.replace("sha256:", ""),
     );
-    if (!key) return NextResponse.json({ code: "COLLECTION_KEY_INVALID" }, { status: 500 });
+    if (!key) return refuse("COLLECTION_KEY_INVALID", 500);
     const written = await putWorkspaceCollectionCandidate(signer, auth.principal.workspaceKey, key, applied.artifact);
-    if (!written.ok) return NextResponse.json({ code: written.code }, { status: 503 });
+    if (!written.ok) return refuse(written.code, 503);
     patch = {
       objectId,
       before,
@@ -140,8 +153,8 @@ export async function POST(request: Request) {
     actorUserId: auth.principal.userId,
     patch,
   });
-  if (!recorded.ok) return NextResponse.json({ code: recorded.code }, { status: 503 });
-  return NextResponse.json({ code: "RECORDED", ...recorded.receipt }, { status: 201, headers: { "Cache-Control": "no-store" } });
+  if (!recorded.ok) return refuse(recorded.code, 503);
+  return NextResponse.json({ code: "RECORDED", ...recorded.receipt }, { status: 201, headers: NO_STORE });
 }
 
 /*
@@ -153,13 +166,13 @@ export async function POST(request: Request) {
 */
 export async function GET(request: Request) {
   const auth = await requireFoundationSession(request, "observer");
-  if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status });
+  if (!auth.ok) return refuse(auth.code, auth.status);
   const collectionId = new URL(request.url).searchParams.get("collectionId") ?? "";
   if (!COLLECTION_ID_PATTERN.test(collectionId)) {
-    return NextResponse.json({ code: "REVIEW_REQUEST_INVALID" }, { status: 400 });
+    return refuse("REVIEW_REQUEST_INVALID", 400);
   }
   const listed = await listFoundationReviewDecisions(auth.principal.workspaceKey, collectionId, REVIEW_DECISION_READ_LIMIT);
-  if (!listed.ok) return NextResponse.json({ code: listed.code }, { status: 503 });
+  if (!listed.ok) return refuse(listed.code, 503);
   /*
     `truncated` is not decoration. The read is `created_at.desc` and bounded, so a World with
     more decisions than the window returns rows that do not include the first decision on an
@@ -170,5 +183,5 @@ export async function GET(request: Request) {
     code: "OK",
     decisions: listed.decisions,
     truncated: listed.decisions.length >= REVIEW_DECISION_READ_LIMIT,
-  }, { headers: { "Cache-Control": "no-store" } });
+  }, { headers: NO_STORE });
 }
