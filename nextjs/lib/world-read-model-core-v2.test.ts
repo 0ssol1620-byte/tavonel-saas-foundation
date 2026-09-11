@@ -1,10 +1,14 @@
 import { createHash } from "node:crypto";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { CollectionOcrInput } from "./collection-compiler";
 import { validatePromotableCollectionArtifact } from "./collection-download";
 import { COLLECTION_SOURCE_MANIFEST, collectionSourceDocumentIds } from "./collection-source-access";
 import { projectProductCoreV2Candidate, PRODUCT_CORE_RESPONSE_SCHEMA } from "./core-runtime-v2";
-import { buildWorldReadModel } from "./world-read-model";
+import { buildWorldReadModel, type WorldReadModel } from "./world-read-model";
+import WorldGraphCanvas from "../components/world-graph-canvas";
+import WorldOntologyViewer from "../components/world-ontology-viewer";
 
 /*
   Can the World a customer promoted from the live engine be read back at all?
@@ -446,5 +450,84 @@ describe("an unreadable Core V2 artifact still refuses", () => {
       sourceImmutableKey: inputs()[0].sanitizedKey,
     }])}\n`;
     expect(buildWorldReadModel(storedArtifact({ files: { [COLLECTION_SOURCE_MANIFEST]: fallbackShaped } }), COLLECTION)).toBeNull();
+  });
+});
+
+/*
+  The World UI, against the data range this fixture introduced (worldread CROSS-LANE 2).
+
+  Three things changed shape for the renderers when a Core V2 World became readable: the
+  predicates are `mentions` and `contradicts` rather than the fallback's three, object ids are
+  68-76 characters instead of 39, and there is no `Topic` object at all. None of that is a
+  contract change, so nothing would have failed to compile -- it is the kind of change that
+  shows up as a blank filter, a mislabelled edge or a crash in front of a customer.
+
+  Rendered to static markup, which is the first paint: the graph canvas derives its predicate
+  filter from the edges it is handed, so the first paint is exactly where a missing predicate
+  would be missing.
+*/
+describe("the World UI reads a Core V2 World", () => {
+  const model = () => {
+    const read = buildWorldReadModel(storedArtifact(), COLLECTION);
+    if (!read) throw new Error("a promoted Core V2 World is still unreadable");
+    return read;
+  };
+
+  const markup = (world: WorldReadModel) => renderToStaticMarkup(createElement(WorldGraphCanvas, {
+    model: world,
+    selectedObjectId: null,
+    onObjectSelect: () => {},
+  }));
+
+  it("offers the Core's predicates as filters and labels the edge with the predicate", () => {
+    const html = markup(model());
+    expect(html).toContain("mentions");
+    // The label is the predicate with its underscores spaced, never the raw id of either end.
+    expect(html).not.toContain("relation-undefined");
+    expect(html).toContain("evidence");
+  });
+
+  it("renders a contradicts relation rather than dropping it or mislabelling it", () => {
+    /*
+      The projection's `contradicts` edge is pinned in core-runtime-v2.test.ts; this is the
+      renderer's half of the same question. It is added to the read model rather than to the
+      fixture's Core response because a contradiction is between two claims and this corpus has
+      one -- and inventing a second claim to satisfy a renderer test would put a fact in the
+      fixture that the compiler never produced.
+    */
+    const read = model();
+    const contradiction = {
+      ...read.relations[0]!,
+      id: "relation-contradiction-fixture",
+      predicate: "contradicts",
+    };
+    const html = markup({ ...read, relations: [...read.relations, contradiction] });
+    expect(html).toContain("contradicts");
+    expect(html).toContain("mentions");
+  });
+
+  it("draws a World with no Topic object without inventing one", () => {
+    const read = model();
+    expect(read.objects.some((object) => object.type === "Topic")).toBe(false);
+    const html = markup(read);
+    expect(html).not.toContain(">Topic<");
+    // The classes that are there still render, so an absent class is absent and not an error.
+    for (const type of ["Claim", "Entity", "Document", "Evidence"]) expect(html).toContain(type);
+  });
+
+  it("keeps a 68-character Core id readable instead of printing it whole", () => {
+    const read = model();
+    expect(CLAIM.length).toBeGreaterThanOrEqual(68);
+    const html = markup(read);
+    // The canvas truncates its node labels at 28 characters, so the full id is never a label.
+    expect(html).not.toContain(`>${CLAIM}<`);
+    expect(html).toContain("Feedwater Pump 200");
+  });
+
+  it("reads the compiled ontology of a World whose classes are the Core's four", () => {
+    const read = model();
+    const html = renderToStaticMarkup(createElement(WorldOntologyViewer, { ontology: read.ontology }));
+    expect(html).toContain("mentions");
+    expect(html).not.toContain("No compiled ontology to read");
   });
 });
