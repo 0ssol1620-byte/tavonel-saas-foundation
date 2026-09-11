@@ -93,11 +93,33 @@ test("is a real page, in the sitemap, and offered to crawlers", async ({ page })
   const robotsText = await robots.text();
   expect(robotsText).not.toContain("Disallow: /benchmarks");
   expect(robotsText).not.toContain("Disallow: /product/continuous-knowledge");
-  // Named search crawlers are declared; training crawlers stay a founder decision (Blueprint 8.4).
+  /*
+    Named search crawlers are declared, and the training block is no longer silence.
+
+    This asserted that no training token appeared at all, which was right while the policy was
+    undecided -- naming one would have been deciding it in a commit about SEO. FD-61 decided it
+    (a delegated decision, 2026-09-11, reversible by the founder; the reasoning is in
+    `docs/policy/CRAWLER_POLICY.md`), so the assertion is inverted rather than dropped, and it
+    now pins the served file to the whole list *and* its refusal -- which a single negative on one
+    token could not do. `lib/seo-surface.test.ts` holds the same rule on the source.
+  */
   expect(robotsText).toContain("User-Agent: OAI-SearchBot");
   expect(robotsText).toContain("User-Agent: PerplexityBot");
-  expect(robotsText).not.toContain("Google-Extended");
-  // Private surfaces are still withheld from every one of them, named or not.
+  for (const token of [
+    "GPTBot", "CCBot", "ClaudeBot", "anthropic-ai",
+    "Google-Extended", "Applebot-Extended", "Bytespider", "Meta-ExternalAgent",
+  ]) {
+    expect(robotsText, `${token} must be refused at the root`).toContain(
+      `User-Agent: ${token}\nDisallow: /\n`,
+    );
+  }
+  // A fetch a person asked for is a visit, not a corpus crawl: those tokens are not in the block
+  // at all, so they fall to `*`, which allows them. A copy-paste into the list would remove a
+  // reader's own assistant from the site, and this is what notices.
+  for (const token of ["Claude-User", "Claude-SearchBot", "ChatGPT-User"]) {
+    expect(robotsText, `${token} is a person's own fetch, not a training crawl`).not.toContain(`User-Agent: ${token}\n`);
+  }
+  // Private surfaces are still withheld from every named search crawler and from `*`.
   expect(robotsText.match(/Disallow: \/workspace/g)?.length).toBe(4);
 
   await page.goto("/benchmarks");
