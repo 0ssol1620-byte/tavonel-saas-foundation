@@ -16,7 +16,7 @@
 -- case. EXECUTE on v1 is revoked from every role including service_role (0009); this fixture runs
 -- as the database owner, which is also why nothing here proves anything about who may call it.
 begin;
-select plan(34);
+select plan(35);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -213,6 +213,19 @@ select is(
   )->>'status',
   'duplicate',
   'the renewal event redelivered is answered as a duplicate'
+);
+
+-- A duplicate is a no-op in both its balance effects and its per-call receipt.
+select is(
+  public.apply_foundation_billing_event_v4(
+    'evt_' || rpad('exp2', 26, 'c'), 'transaction.completed', '2026-09-11T07:00:00Z',
+    'sha256:' || repeat('3', 64), 'allowance',
+    'pilot-expiry01', '88888888-8888-8888-8888-888888888888',
+    'observer_access', 'txn_' || rpad('exp2', 26, 'c'), 'ctm_' || rpad('exp1', 26, 'a'),
+    null, null, 2000, null
+  )->>'expiredIncludedUnits',
+  '0',
+  'a redelivered successful renewal explicitly reports zero newly expired units'
 );
 select is(
   (select credit_balance from public.foundation_billing_accounts where workspace_key = 'pilot-expiry01'),

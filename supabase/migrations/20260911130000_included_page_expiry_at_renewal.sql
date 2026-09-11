@@ -129,7 +129,9 @@ begin
     if existing.payload_sha256 <> p_payload_sha256 or existing.action <> p_action then
       raise exception 'foundation_billing_event_id_conflict';
     end if;
-    return jsonb_build_object('status', 'duplicate', 'eventId', p_event_id);
+    -- No ledger or balance change occurred in this invocation. Keep the same explicit
+    -- receipt field as the grant/duplicate-transaction path, including repeat delivery.
+    return jsonb_build_object('status', 'duplicate', 'eventId', p_event_id, 'expiredIncludedUnits', 0);
   end if;
 
   if p_action = 'reversal' then
