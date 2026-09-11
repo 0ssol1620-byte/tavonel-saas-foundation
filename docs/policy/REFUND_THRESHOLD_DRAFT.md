@@ -1,6 +1,15 @@
-# DRAFT — not in force — founder/legal review required
+# Refund threshold — numbers fixed by the owner, legal review of §5 still open
 
-**A proposal for one sentence.** Not published, not in force. Audit item **P07**.
+**The owner fixed the two numbers on 2026-09-11: a 14-day window and a 10% consumed-pages
+line.** They now live as `REFUND_WINDOW_DAYS` and `REFUND_MAX_CONSUMED_FRACTION` in
+`nextjs/lib/billing-catalog.ts`, and `/pricing` and the billing documentation render them rather
+than restating them. Audit item **P07**.
+
+What is *not* settled is §5, which is a lawyer's to answer, and the live `/refunds` template,
+which still carries the "substantial processing" sentence this record was opened against — that
+page is outside the lane that landed these numbers, and its patch is in the lane report. The
+sections below keep the reasoning as it was written, so the decision can be read against the
+argument that produced it.
 
 The live refund template says:
 
@@ -18,8 +27,12 @@ above ships verbatim the moment checkout opens**, which is why this is worth set
 than on launch day.
 
 - Drafted: 2026-09-11 KST, competitive-audit remediation campaign, lane L9.
-- Status: `PROPOSED`. Legal review required before the live template changes.
-- Would land on: `nextjs/app/refunds/page.tsx`, live template only.
+- Status: `PROPOSED` until 2026-09-11, then `DECIDED` at 14 days / 10% by the owner, website-growth
+  campaign, lane `entitlements` (E4). Legal review of §5 is still required before the live
+  `/refunds` template changes.
+- Landed on: `nextjs/lib/billing-catalog.ts` (the two constants), `/pricing` and the
+  `billing-and-limits` documentation block, which render them.
+- Still to land on: `nextjs/app/refunds/page.tsx`, live template only.
 
 ---
 
@@ -40,34 +53,38 @@ it and produces the compiled world and its signed export.
 A percentage of pages is measurable from data the service already has. A "promoted world" is a
 single recorded event. Both are checkable by the customer before they buy and by us afterwards.
 
-## 2. Proposed bright line
+## 2. The bright line, as decided
 
-> **Within 14 calendar days of a purchase or a renewal you may request a full refund.** We will
-> decline that request only if, at the time you ask, either of the following is true:
+> **Within 14 calendar days of payment you may request a full refund**, provided fewer than **10%
+> of the plan's included pages** have been consumed at the time you ask — 50 pages on Developer,
+> 250 on Team. Past that line the payment is not refunded. Unused pages are not refunded on
+> cancellation. Subject to the terms as updated.
 >
-> 1. **more than 20% of the plan's included pages have been processed** on the current billing
->    period, or
-> 2. **a compiled world has been promoted to active**, which is the point at which the compiled
->    result and its signed export are yours to keep.
->
-> Whichever happens first is the line. Below it, the refund is full and unconditional. Above it,
-> we may decline the voluntary 14-day refund — and your statutory rights are unaffected: a
-> service that is defective, was not as described, or was unavailable is refunded regardless of
-> how much of it you processed, and is assessed separately from this window.
+> Your statutory rights are unaffected: a service that is defective, was not as described, or was
+> unavailable is refunded regardless of how much of it you processed, and is assessed separately
+> from this window.
 
-`[FOUNDER + LEGAL]` — **the 20% is the number that needs a decision.** It is a proposal, not a
-measurement, and nothing in this repository supports it yet. The trade is visible:
+Two things the proposal had that the decision does not.
+
+The **promotion condition is gone.** The draft would have declined a refund once a world had been
+promoted to active, on the reasoning that promotion is delivery. It is also the single action this
+campaign has just opened to the self-serve Developer plan (E1), which makes a first promotion both
+the thing we want a new customer to do and the thing that would forfeit their refund. One
+countable quantity, stated once, is the line.
+
+The **percentage moved from 20% to 10%**, which is the generous end of the trade the draft laid
+out — a real evaluation fits inside it, and it does not require a customer to reason about what
+"substantial" means:
 
 | Threshold | Effect |
 |---|---:|
 | Any processing at all | Simplest to state, harshest — a customer who tried one document forfeits |
-| 10% (50 / 250 pages) | Generous; a real evaluation fits inside it |
-| **20% (100 / 500 pages)** | Proposed; a genuine trial fits, a full corpus run does not |
+| **10% (50 / 250 pages)** | Decided; a real evaluation fits inside it |
+| 20% (100 / 500 pages) | Was proposed; a genuine trial fits, a full corpus run does not |
 | 50% | Half the value delivered before the line; hard to defend as "substantial" being *reached* |
 
-At Developer, 20% is 100 pages. A customer evaluating with a handful of documents is safely below
-it; a customer who has run a real corpus is above it. That is the distinction the clause is
-trying to draw, and stating it as a number is the whole point of this document.
+`[LEGAL]` — the number is fixed, §5 is not. The figures in the table are computed from the
+catalog's `includedPages`, not typed into the copy.
 
 ## 3. Why a bright line rather than a better adjective
 
@@ -134,8 +151,10 @@ launch is the same exposure with worse optics. Neither is an agent's call.
 ## Checklist before the live template changes
 
 - [ ] Legal reviewed §2 and answered §5; jurisdictions in scope named
-- [ ] Founder fixed the percentage (proposal: 20%)
-- [ ] Threshold exists as one exported constant, not as prose in two places
-- [ ] `/refunds` live template renders the constant
-- [ ] A test pins the rendered threshold string and fails if it is silently changed
+- [x] Founder fixed the percentage — **10%**, 2026-09-11, with the 14-day window
+- [x] Threshold exists as exported constants, not as prose in two places
+      (`REFUND_WINDOW_DAYS`, `REFUND_MAX_CONSUMED_FRACTION`, `refundablePageAllowance`)
+- [x] `/pricing` and the `billing-and-limits` documentation block render them
+- [ ] `/refunds` live template renders them — patch in the lane report, not this lane's path
+- [ ] A test pins the rendered `/refunds` threshold string and fails if it is silently changed
 - [ ] Checkout presents the same wording before a payment method can be entered

@@ -281,15 +281,23 @@ describe("product claims sync", () => {
     drift is the level written on each row, so each named route is grepped for the level it
     demands -- a route that tightens its gate fails here rather than leaving the table promising
     the old one.
+
+    `activation` joined the two plan-only levels when World activation stopped being a plan-only
+    question. A row advertised at that level has to be enforced by a route that asks for
+    `activation` *and hands over a role*: the level on its own would admit a Developer-plan
+    member, which is the row this table would then be promising wrongly.
   */
   it("states a plan capability at the level the route enforcing it demands", () => {
     const page = read("app/pricing/page.tsx");
-    const rows = [...page.matchAll(/route: "([^"]+)", level: "(observer|studio)"/g)];
+    const rows = [...page.matchAll(/route: "([^"]+)", level: "(observer|studio|activation)"/g)];
     expect(rows.length, "the capability table is still declared on the pricing page")
       .toBeGreaterThanOrEqual(5);
     for (const [, route, level] of rows) {
       const source = read(route!);
-      if (level === "studio") {
+      if (level === "activation") {
+        expect(source, `${route} is advertised as World activation and does not require it`)
+          .toMatch(/authorizeFoundationProduct\([^)]*"activation",\s*\w+(?:\.\w+)*\.role\s*\)/s);
+      } else if (level === "studio") {
         expect(source, `${route} is advertised as Team-only and does not require it`)
           .toMatch(/(?:authorizeFoundationProduct|authorizeFoundationRequest|requireFoundationSession)\([^)]*"studio"/s);
       } else {
@@ -298,7 +306,7 @@ describe("product claims sync", () => {
       }
     }
     expect(page, "the cells are decided by the function the API calls")
-      .toContain("billingProductDecision(account(code), row.level).ok");
+      .toContain("billingProductDecision(account(code), row.level, TABLE_ROLE).ok");
   });
 
   /*
@@ -333,13 +341,25 @@ describe("product claims sync", () => {
 
   /*
     Audit P06 and P08: two facts a buyer could only find by reading SQL, and a link.
+
+    P06 used to be pinned as *behaviour read out of the billing code* -- "nothing in the billing
+    code removes a balance you already hold", which was true of `apply_foundation_billing_event_v4`
+    and said nothing about what the customer had bought. The owner has since settled the term:
+    included pages belong to their billing month, do not roll over, and are not refunded on
+    cancellation. So this pins the published term instead, and the rate beside it stays derived
+    from the constants the reservation code charges against rather than typed.
+
+    The gap is deliberate and recorded in the lane report: no migration expires a balance at the
+    period boundary yet, so the term is ahead of its enforcement.
   */
-  it("states the cancellation balance behaviour and points Enterprise at the trust index", () => {
+  it("states the page-expiry term and points Enterprise at the trust index", () => {
     const pricing = read("components/pricing-page-client.tsx");
-    expect(pricing, "P06: what happens to a balance on cancellation")
-      .toContain("nothing in the billing code removes a balance you already hold");
-    expect(pricing, "P06: and that it is only spendable while a plan is active")
-      .toContain("only be spent while a plan is active");
+    expect(pricing, "P06: unused included pages do not roll over")
+      .toContain("expire at the end of each billing month and do not roll over");
+    expect(pricing, "P06: and are not refunded on cancellation")
+      .toContain("they are not refunded if you cancel");
+    expect(pricing, "P06: the overage rate is derived, not typed")
+      .toContain("published rate of ${formatUsd(STANDARD_PAGE_USD)} per standard page");
     expect(pricing, "P03: whether Ask and search consume pages")
       .toContain("What does not consume pages");
     expect(pricing, "P08: the Enterprise card reaches the trust index")

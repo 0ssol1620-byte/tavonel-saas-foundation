@@ -24,24 +24,43 @@ describe("page-based compile pricing", () => {
     expect(quoteCompilePages(pages)).toBeNull();
   });
 
-  it("uses one page for an image and a conservative byte bound otherwise", () => {
+  it("uses one page for an image", () => {
     expect(estimateBillablePages({ bytes: 8_000_000, mimeType: "image/png" }))
       .toEqual({ pages: 1, basis: "image", confidence: "verified" });
-    expect(estimateBillablePages({ bytes: 131_073, mimeType: "application/pdf" }))
-      .toEqual({ pages: 3, basis: "byte_upper_bound", confidence: "provisional" });
   });
 
   /*
-    The byte bound is a spend ceiling, not a page count. It is the only basis derived from file
-    size rather than read from the document, so it must never be presented under a heading that
-    asserts a fact, and must never back a final charge authorisation.
+    The failure path this module exists for: no count, and no number invented to stand in.
+
+    `ceil(bytes / 65,536)` used to answer here, labelled an estimate. The label was honest and
+    the number was not -- a 40MB scan and a 40MB text-layer report quoted the same -- so the
+    answer is now the absence itself, and every caller has to show it rather than fill it in.
   */
-  it("refuses to call a byte-derived count verified", () => {
-    const bytes = estimateBillablePages({ bytes: 131_073, mimeType: "application/pdf" })!;
-    expect(bytes.confidence).toBe("provisional");
-    expect(canAuthorizeCharge(bytes)).toBe(false);
-    expect(canReserveAgainst(bytes)).toBe(false);
-    expect(pageCountLabel(bytes.confidence)).toBe("Estimated page-equivalents");
+  it.each([
+    ["application/pdf"],
+    ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"],
+    ["text/csv"],
+    ["application/vnd.oasis.opendocument.spreadsheet"],
+    ["text/plain"],
+  ])("returns no estimate at all for %s with no counted pages", (mimeType) => {
+    expect(estimateBillablePages({ bytes: 8_000_000, mimeType })).toBeNull();
+  });
+
+  it("rejects a file whose byte length is not a usable integer", () => {
+    expect(estimateBillablePages({ bytes: 0, mimeType: "image/png" })).toBeNull();
+    expect(estimateBillablePages({ bytes: 1.5, mimeType: "image/png" })).toBeNull();
+  });
+
+  /*
+    `provisional` no longer describes a basis, only a set with nothing counted in it -- which is
+    exactly the set that may not hold a reservation or close a charge.
+  */
+  it("refuses to reserve or charge against a set with nothing counted", () => {
+    const nothingCounted = weakestConfidence([]);
+    expect(nothingCounted).toBe("provisional");
+    expect(canAuthorizeCharge({ pages: 0, basis: "pdf_page_tree", confidence: nothingCounted })).toBe(false);
+    expect(canReserveAgainst({ pages: 0, basis: "pdf_page_tree", confidence: nothingCounted })).toBe(false);
+    expect(pageCountLabel(nothingCounted)).toBe("Pages not counted yet");
   });
 
   it("treats a counted page tree as verified and chargeable", () => {
@@ -100,7 +119,6 @@ describe("page-based compile pricing", () => {
     ["image", "verified"],
     ["pptx_slides", "verified"],
     ["docx_declared", "declared"],
-    ["byte_upper_bound", "provisional"],
   ] as const)("maps %s to %s", (basis, confidence) => {
     expect(pageEstimateConfidence(basis)).toBe(confidence);
   });
