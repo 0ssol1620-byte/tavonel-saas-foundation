@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import io
 import json
+import logging
 import math
 import os
 import re
@@ -111,6 +112,15 @@ ODF_MIMES: Final = {
 #
 # The *export* filter stays `pdf:writer_pdf_Export` for every source, which is what the deployed
 # image already does for XLSX and ODS and what `test_office_conversion.py` qualifies.
+#
+# Passed as `--infilter=<name>`, one argv element. That is the syntax `soffice --help`
+# documents ("--infilter=\"Text (encoded):UTF8,LF,,,\""), and the separated `--infilter`
+# `<name>` pair this used to build is not: an argument that does not start with `-` is taken
+# as another file to open, so the filter name became a second input path that does not exist
+# and the conversion produced nothing under the name the caller then looked for. It failed only
+# for these three MIMEs, because they are the only ones that pass an import filter at all --
+# DOCX, XLSX, PPTX and the ODF trio name their own type and get no `--infilter`, which is why
+# they pass in the same image.
 OFFICE_IMPORT_FILTERS: Final = {
     "text/plain": "Text (encoded):UTF8",
     "text/csv": "Text - txt - csv (StarCalc):44,34,76,1",
@@ -447,6 +457,50 @@ def office_process_environment(work_dir: Path) -> dict[str, str]:
     return environment
 
 
+#: Enough of a soffice stream to identify a filter or module error, bounded so a chatty
+#: failure cannot fill the log. Server-side only: the HTTP detail stays one frozen string.
+SOFFICE_LOG_TAIL: Final = 1_500
+
+logger = logging.getLogger("tavonel.cdr")
+
+
+def log_soffice_failure(
+    command: list[str],
+    *,
+    reason: str,
+    returncode: int | None,
+    stdout: bytes | None,
+    stderr: bytes | None,
+    output_dir: Path,
+) -> None:
+    """Record why a conversion failed, where an operator can read it.
+
+    The refusal a caller receives is deliberately one frozen string for every conversion failure,
+    which makes the HTTP response useless for diagnosis -- as the three text formats proved: they
+    returned "CDR source could not be converted safely" and nothing anywhere said why. The detail
+    stays frozen; what was missing is the server-side record, so this writes the argv, the exit
+    status, bounded stream tails, and what the output directory actually received. That last one
+    separates "soffice wrote nothing" from "soffice wrote a name the caller did not look for".
+
+    Not part of the response, and not a place for document content: the tails are LibreOffice's
+    own diagnostics and the argv holds temporary paths this service created.
+    """
+    def tail(stream: bytes | None) -> str:
+        if not stream:
+            return "<empty>"
+        text = stream.decode("utf-8", errors="replace").strip()
+        return text[-SOFFICE_LOG_TAIL:] if len(text) > SOFFICE_LOG_TAIL else text
+
+    try:
+        produced = sorted(item.name for item in output_dir.iterdir())
+    except OSError:
+        produced = []
+    logger.warning(
+        "cdr conversion failed reason=%s returncode=%s produced=%s argv=%r stderr=%s stdout=%s",
+        reason, returncode, produced, command, tail(stderr), tail(stdout),
+    )
+
+
 def convert_to_pdf(source: Path, source_mime: str, work_dir: Path) -> Path:
     if source_mime in IMAGE_MIMES:
         return convert_image_to_pdf(source, work_dir)
@@ -465,7 +519,7 @@ def convert_to_pdf(source: Path, source_mime: str, work_dir: Path) -> Path:
         "--nodefault",
         "--nolockcheck",
         f"-env:UserInstallation={profile.resolve().as_uri()}",
-        *(["--infilter", import_filter] if import_filter else []),
+        *([f"--infilter={import_filter}"] if import_filter else []),
         "--convert-to",
         "pdf:writer_pdf_Export",
         "--outdir",
@@ -475,13 +529,34 @@ def convert_to_pdf(source: Path, source_mime: str, work_dir: Path) -> Path:
     try:
         completed = subprocess.run(
             command, check=False, stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=45,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=45,
             env=office_process_environment(work_dir),
         )
-    except (OSError, subprocess.TimeoutExpired) as exc:
+    except subprocess.TimeoutExpired as exc:
+        log_soffice_failure(
+            command, reason="timeout", returncode=None,
+            stdout=exc.stdout if isinstance(exc.stdout, bytes) else None,
+            stderr=exc.stderr if isinstance(exc.stderr, bytes) else None,
+            output_dir=output_dir,
+        )
+        raise HTTPException(422, "CDR source could not be converted safely") from exc
+    except OSError as exc:
+        log_soffice_failure(
+            command, reason="spawn_failed", returncode=None,
+            stdout=None, stderr=str(exc).encode("utf-8", errors="replace"), output_dir=output_dir,
+        )
         raise HTTPException(422, "CDR source could not be converted safely") from exc
     converted = output_dir / f"{source.stem}.pdf"
-    if completed.returncode != 0 or not converted.is_file() or converted.stat().st_size == 0:
+    returncode = getattr(completed, "returncode", None)
+    if returncode != 0 or not converted.is_file() or converted.stat().st_size == 0:
+        log_soffice_failure(
+            command,
+            reason="exit_status" if returncode != 0 else "no_output_under_expected_name",
+            returncode=returncode,
+            stdout=getattr(completed, "stdout", None),
+            stderr=getattr(completed, "stderr", None),
+            output_dir=output_dir,
+        )
         raise HTTPException(422, "CDR source could not be converted safely")
     return converted
 

@@ -128,7 +128,15 @@ class TextInputRoutingTest(unittest.TestCase):
             OFFICE_IMPORT_FILTERS,
         )
 
-    def test_the_import_filter_reaches_soffice_as_its_own_argv_pair(self) -> None:
+    def test_the_import_filter_reaches_soffice_in_the_documented_syntax(self) -> None:
+        """`--infilter=<name>`, one argv element.
+
+        This asserted the separated `--infilter` `<name>` pair, and passed, because it records
+        the argv against a stub and never runs soffice. In the image the three text formats it
+        covers returned 422 for every input. `soffice --help` documents the `=` form, and an
+        argv element that does not start with `-` is taken as a file to open, so the filter name
+        was being handed to LibreOffice as a second input path.
+        """
         recorded: list[list[str]] = []
 
         class _Completed:
@@ -158,8 +166,10 @@ class TextInputRoutingTest(unittest.TestCase):
                 finally:
                     app_module.subprocess.run = original_run  # type: ignore[assignment]
                 command = recorded[0]
-                self.assertIn("--infilter", command)
-                self.assertEqual(command[command.index("--infilter") + 1], expected)
+                self.assertIn(f"--infilter={expected}", command)
+                # ...and not as two elements, which is the form that produced a 422 for every
+                # text input in the qualification image.
+                self.assertNotIn("--infilter", command)
                 self.assertEqual(command[command.index("--convert-to") + 1], "pdf:writer_pdf_Export")
 
 
