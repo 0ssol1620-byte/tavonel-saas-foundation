@@ -32,6 +32,13 @@ const PRIVATE_PATHS = ["/api/", "/auth/", "/login", "/workspace", "/customers", 
   a user-agent for search appearance, and each gets the same public/private split as `*`. The
   training tokens -- Google-Extended, GPTBot, CCBot and the rest -- are deliberately absent. That
   is an IP and legal decision, and a default written here would make it by accident.
+
+  §12.5 asked for the two policies to be separated rather than decided, so the separation is
+  written down where a decision can be made against it: `docs/policy/CRAWLER_POLICY_DRAFT.md`
+  lists each token, what allowing or refusing it would mean, and what is already settled by
+  other means (no crawler reaches a customer document -- that is authorization, not this file).
+  Nothing in this file changes until an owner answers it, and `lib/seo-surface.test.ts` fails
+  if a training token appears here in the meantime.
 */
 const SEARCH_CRAWLERS = ["OAI-SearchBot", "PerplexityBot", "Googlebot"];
 
