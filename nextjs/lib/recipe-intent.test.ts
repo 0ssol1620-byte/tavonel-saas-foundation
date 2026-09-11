@@ -14,11 +14,15 @@
  * them together.
  */
 
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RecipePreflight } from "../components/recipe-preflight";
 import { BILLING_OFFERS } from "./billing-catalog";
+import { COOKBOOKS, COOKBOOK_SLUGS, RECIPE_VERSION as COOKBOOK_RECIPE_VERSION } from "./cookbook-content";
+import { COOKBOOK_WORKFLOW_IDS, WORKFLOW_IDS } from "./keyword-map";
 import {
   ATTRIBUTION_FIELDS,
   RECIPE_IDS,
@@ -309,5 +313,69 @@ describe("recipe preflight", () => {
     const html = render({ intent: intentFor(RECIPE_IDS[2]) });
     expect(html).toContain("Promotion is always an explicit human decision");
     expect(html).toContain(defaultReturnTo(RECIPE_IDS[2]));
+  });
+});
+
+/*
+  The one closed list, asserted across the three modules that name it.
+
+  Three lanes each needed the six slugs and only one of them could own the list: the cookbooks
+  lane wrote `COOKBOOK_SLUGS`, and both `RECIPE_IDS` here and `COOKBOOK_WORKFLOW_IDS` in
+  `lib/keyword-map.ts` were typed out again because `lib/cookbook-content.ts` did not exist on
+  their branches. At integration both derive from it, so these assertions are not comparing two
+  hand-kept lists -- they are the guard that stops the next author from re-typing one. A retyped
+  list is not a type error: every spelling of these six strings type-checks, and drift only shows
+  up as a cookbook whose CTA carries a recipe id the carrier refuses.
+*/
+describe("the six slugs have one owner", () => {
+  it("is the same list under all three names", () => {
+    expect([...RECIPE_IDS]).toEqual([...COOKBOOK_SLUGS]);
+    expect([...COOKBOOK_WORKFLOW_IDS]).toEqual([...COOKBOOK_SLUGS]);
+    // Order too, not only membership: `defaultReturnTo` and the keyword rows index by position.
+    expect(RECIPE_IDS[0]).toBe(COOKBOOK_SLUGS[0]);
+    expect(RECIPE_IDS).toHaveLength(6);
+  });
+
+  it("keeps the non-cookbook keyword bucket out of the cookbook list", () => {
+    // `category-and-trust` holds the queries that belong to no work package. It is a workflow id
+    // and never a slug, and folding it in would make a keyword row claim a cookbook that has no
+    // record, no route and no CTA.
+    expect(WORKFLOW_IDS).toContain("category-and-trust");
+    expect([...COOKBOOK_WORKFLOW_IDS]).not.toContain("category-and-trust");
+    expect(WORKFLOW_IDS).toHaveLength(COOKBOOK_WORKFLOW_IDS.length + 1);
+  });
+
+  it("carries the version the records were written against", () => {
+    expect(RECIPE_VERSION).toBe("2026-09-11");
+    expect(RECIPE_VERSION).toBe(COOKBOOK_RECIPE_VERSION);
+    for (const record of COOKBOOKS) expect(record.recipeVersion, record.slug).toBe(RECIPE_VERSION);
+  });
+
+  it("accepts every cookbook route as a return path, and no other cookbook path", () => {
+    for (const slug of COOKBOOK_SLUGS) {
+      expect(isAllowedReturnTo(`/cookbooks/${slug}`), slug).toBe(true);
+    }
+    expect(isAllowedReturnTo("/cookbooks")).toBe(false);
+    expect(isAllowedReturnTo("/cookbooks/not-a-record")).toBe(false);
+    expect(isAllowedReturnTo("/cookbooks/documents-to-grounded-work/")).toBe(false);
+  });
+
+  it("builds the cookbook page's primary control from the carrier, not from a typed URL", () => {
+    const page = readFileSync(resolve(import.meta.dirname, "../app/cookbooks/[slug]/page.tsx"), "utf8");
+    // The function, not the string: a URL written into the page is a fourth copy of the contract.
+    expect(page).toContain("loginUrlForRecipe(record.recipeId)");
+    expect(page).not.toMatch(/href="\/login\?/);
+    for (const slug of COOKBOOK_SLUGS) {
+      const url = loginUrlForRecipe(slug);
+      expect(url).toBe(
+        `/login?next=recipe&recipe=${slug}&v=${RECIPE_VERSION}&returnTo=${encodeURIComponent(`/cookbooks/${slug}`)}`,
+      );
+      // And the round trip the button exists for: the URL it produces parses back to the intent.
+      expect(readRecipeParams(url.slice(url.indexOf("?")))).toEqual({
+        recipeId: slug,
+        recipeVersion: RECIPE_VERSION,
+        returnTo: `/cookbooks/${slug}`,
+      });
+    }
   });
 });

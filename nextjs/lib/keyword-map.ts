@@ -33,25 +33,22 @@
  * The day a page prints one of these strings, that page joins the copy guards -- not this file.
  */
 
+import { COOKBOOK_SLUGS } from "@/lib/cookbook-content";
+
 /* ------------------------------------------------------------------ vocabulary */
 
 /**
  * The six work packages, spelled as the cookbook slugs they share, plus the one bucket that
  * belongs to no single workflow.
  *
- * The six are the same closed list `lib/cookbook-content.ts` (cookbooks lane) and
- * `lib/recipe-intent.ts` (recipe-intent lane) carry. They are written out here rather than
- * imported because neither module exists on this branch; integration reconciles the three with
- * one equality test, and this comment is the reason that test has three arguments and not two.
+ * The six were typed out here in the lane that wrote this file, because neither
+ * `lib/cookbook-content.ts` nor `lib/recipe-intent.ts` existed on that branch and a keyword row
+ * still needed a workflow id. Both exist now, so the list is imported rather than carried a
+ * third time -- one closed list with one owner, instead of three copies and a test to keep them
+ * agreeing. The extra bucket below is deliberately *not* a cookbook and must never join that
+ * list: it holds the queries that belong to no single work package.
  */
-export const COOKBOOK_WORKFLOW_IDS = [
-  "documents-to-grounded-work",
-  "financial-report-figures-with-provenance",
-  "manual-grounded-support-answers",
-  "connect-external-ai-mcp-api",
-  "portable-package-local-ai",
-  "source-revision-reuse",
-] as const;
+export const COOKBOOK_WORKFLOW_IDS = COOKBOOK_SLUGS;
 
 export const WORKFLOW_IDS = [...COOKBOOK_WORKFLOW_IDS, "category-and-trust"] as const;
 

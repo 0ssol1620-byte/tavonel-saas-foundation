@@ -13,6 +13,7 @@ import {
   orderedSections,
   type CookbookSection,
 } from "@/lib/cookbook-content";
+import { loginUrlForRecipe } from "@/lib/recipe-intent";
 import { sanitizeDocumentText } from "@/lib/sanitize-html";
 
 /*
@@ -135,13 +136,24 @@ export default async function CookbookPage({ params }: { params: Promise<{ slug:
 
           {/*
             The calls to action come after the prerequisites and the limits, which is the order
-            the section list fixes. All three destinations exist today, none of them asks for an
+            the section list fixes. Every destination exists today, none of them asks for an
             email, and none implies a self-serve path to an activated World -- the plan that
             activation needs is named in the prerequisites above, and /contact is where that
             conversation starts.
+
+            The primary control is the recipe carrier, built by `loginUrlForRecipe` rather than
+            written out here: the parameter names, the version and the return path are one
+            function in `lib/recipe-intent.ts`, and a URL typed into this file is a fourth copy
+            of a contract that already has one. A reader who signs in from here comes back to
+            this page, and the sign-in page's preflight is where the plan requirement and the
+            maximum cost of a run are stated before anything is spent.
+
+            The three routes the `next` section's prose names all stay, because the prose points
+            at them; the recipe link is added in front of them, not in place of one.
           */}
           <div className="actions">
-            <Link className="btn" href="/explore">Open the read-only sample</Link>
+            <Link className="btn" href={loginUrlForRecipe(record.recipeId) as Route}>Start this recipe</Link>
+            <Link className="btn ghost" href="/explore">Open the read-only sample</Link>
             <Link className="btn ghost" href="/docs">Read the documentation</Link>
             <Link className="btn ghost" href="/contact">Talk to us about your corpus</Link>
           </div>

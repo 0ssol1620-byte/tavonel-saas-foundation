@@ -34,19 +34,14 @@
  * attribution reports every conversion as "direct".
  */
 
-/** The six cookbook slugs. `COOKBOOK_SLUGS` in `cookbook-content.ts` is the same closed list. */
-export const RECIPE_IDS = [
-  "documents-to-grounded-work",
-  "financial-report-figures-with-provenance",
-  "manual-grounded-support-answers",
-  "connect-external-ai-mcp-api",
-  "portable-package-local-ai",
-  "source-revision-reuse",
-] as const;
+import { COOKBOOK_SLUGS, RECIPE_VERSION as COOKBOOK_RECIPE_VERSION } from "@/lib/cookbook-content";
+
+/** The six cookbook slugs, read from the module that owns them rather than typed again here. */
+export const RECIPE_IDS = COOKBOOK_SLUGS;
 
 export type RecipeId = (typeof RECIPE_IDS)[number];
 
-export const RECIPE_VERSION = "2026-09-11";
+export const RECIPE_VERSION = COOKBOOK_RECIPE_VERSION;
 export type RecipeVersion = typeof RECIPE_VERSION;
 
 export function isRecipeId(value: unknown): value is RecipeId {
