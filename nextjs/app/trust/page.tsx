@@ -23,9 +23,20 @@ export const metadata: Metadata = {
   §45 lists thirteen elements a Trust Center carries. Ten of them are published somewhere on this
   site today and three are not, so the page has two sections rather than one list with a hopeful
   tone: a reader who stops at a missing element should see that it is missing, not scroll looking
-  for it. The absent three are absent because the work behind them has not been done -- there is
-  no tested restore, no DPA to hand over and no written incident procedure -- and a Trust Center
-  that phrases those as "coming soon" is worth less than one that phrases them as "no".
+  for it. A fourth absence joined the list in the 2026-09-11 audit remediation: third-party
+  certification and audit, which §45 does not name and every procurement reader asks first.
+
+  The absent four are absent because the work behind them has not been done -- there is no DPA to
+  hand over, no written incident procedure, no recovery objective and no external audit -- and a
+  Trust Center that phrases those as "coming soon" is worth less than one that phrases them as
+  "no".
+
+  One of the four used to say more than that. The backup row asserted three absences at once,
+  including "no tested restore", and a restore was performed and verified on 2026-09-10. So the
+  row narrowed to the objectives rather than being deleted: the drill is real and is stated on
+  /security, and the objectives are the half a buyer is actually asking about. A stated absence
+  that is no longer absent is the same failure as a claim with no receipt, pointing the other
+  way, and it is corrected the same way -- by making the sentence match what happened.
 */
 
 const DESTINATIONS: Array<[string, string, Route]> = [

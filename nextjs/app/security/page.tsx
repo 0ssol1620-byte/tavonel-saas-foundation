@@ -97,7 +97,7 @@ const CONTROLS = [
     two-users-with-different-permissions case the audit wants tested is not a state this
     deployment can be put into: a workspace has one member.
   */
-  ["Source-level access", "A suspended or unreachable source is refused on the same requests that would otherwise use it: an answer, a source-byte read, an export and a promotion each re-check it, and a check that cannot complete counts as a refusal rather than a pass. The grain of that decision is the workspace, not the person -- a source is reachable for the whole workspace or for none of it, and a workspace has exactly one member here. Per-member source permissions arrive with membership, which this deployment does not have."],
+  ["Source-level access", "A suspended or unreachable source is refused on the same requests that would otherwise use it: an answer, a source-byte read, an export and a promotion each re-check it, and a check that cannot complete counts as a refusal rather than a pass. The grain of that decision is the workspace, not the person — a source is reachable for the whole workspace or for none of it, and a workspace has exactly one member here. Per-member source permissions arrive with membership, which this deployment does not have."],
   /*
     §17.1 asks two more questions this page did not answer: which model providers see a document,
     and what a model is allowed to do with it.
