@@ -44,7 +44,7 @@ jobs:
         run: pnpm exec playwright test e2e/marketing-consent.spec.ts
       - name: Preserve browser failure evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: launch-qa-${{ matrix.browser }}
           path: |
@@ -113,7 +113,7 @@ jobs:
           --project=audit --project=audit-768 --project=audit-1280
       - name: Preserve product failure evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: product-qa
           path: |
