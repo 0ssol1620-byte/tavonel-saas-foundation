@@ -15,6 +15,7 @@ import {
   referencedDocsSlugs,
 } from "./cookbook-content";
 import { COOKBOOK_WORKFLOW_IDS } from "./keyword-map";
+import { PACKAGE_CONTRACT } from "../scripts/journey/acceptance-checker.mjs";
 import { CAPABILITY_MANIFEST } from "../../shared/capabilityManifest";
 
 /*
@@ -332,6 +333,67 @@ describe("a claim id on a record resolves to a receipt", () => {
         `${record.slug}: the journey id is not a keyword workflow id`,
       ).not.toContain(record.workflowId);
       expect(record.workflowId).toMatch(/^j[123]-/);
+    }
+  });
+});
+
+/*
+  B6. WG-055's cookbook half, which was blocked on this file existing.
+
+  The journey lane closed the harness half: step 13 downloads the signed archive and checks it
+  against `PACKAGE_CONTRACT`, the eleven paths a customer download must carry. The other half of
+  WG-055's wording -- "matches the actual cookbook output" -- had nothing to compare against,
+  because no cookbook record existed on that branch. It does now.
+
+  What is wired is exactly that and no more. The records' `output` sections are locked, so no
+  record promises a file list yet and there is no list to diff; what a record *does* already do is
+  name package files in prose (the J2-file record names README and AGENTS), and a prose filename is
+  a promise about a download just as much as a list would be. So every package filename any body
+  names is held to the contract. It binds before the copy ships, which is the point of writing it
+  now rather than the day the output sections open.
+
+  The requested patch was `record.outputFiles ?? []`; there is no such field on `CookbookRecord`
+  and inventing one to hold a list nothing can fill would be a field with no run behind it. When
+  the output sections do open, the list belongs in the section body this test already reads.
+*/
+describe("a cookbook promises no file the download route does not write", () => {
+  /*
+    Package files as a body can name them: a bare `README`/`AGENTS` (how the prose refers to them)
+    or a `<dir>/<name>.<ext>` path in one of the package's own formats. Not a bare `.json` --
+    `manifest.json` on its own is as likely to be a caller's file as a package member, and a guess
+    either way would make this test about the regex rather than about the contract.
+  */
+  const PACKAGE_FILE = /\b(README|AGENTS)\b(?:\.md)?|\b[a-z]+\/[a-z-]+\.(?:jsonld|ttl|csv|jsonl|json)\b/g;
+  const normalise = (match: string) => (match === "README" || match === "AGENTS" ? `${match}.md` : match);
+
+  it("reads the contract it is asserting against", () => {
+    expect(PACKAGE_CONTRACT).toContain("README.md");
+    expect(PACKAGE_CONTRACT).toContain("manifest/ai-entrypoint.json");
+    expect(PACKAGE_CONTRACT).toHaveLength(11);
+  });
+
+  it("names only contract paths, in every body of every record", () => {
+    let named = 0;
+    for (const record of COOKBOOKS) {
+      for (const section of orderedSections(record)) {
+        for (const [match] of section.body.matchAll(PACKAGE_FILE)) {
+          named += 1;
+          expect(
+            PACKAGE_CONTRACT,
+            `${record.slug}/${section.key} names ${match}, which no download carries`,
+          ).toContain(normalise(match));
+        }
+      }
+    }
+    // The J2-file record names two of them today. A zero here means the extraction stopped working
+    // and the test became an assertion about nothing.
+    expect(named, "no package filename found in any body -- the extraction has gone blind").toBeGreaterThan(0);
+  });
+
+  it("keeps the output sections locked, so there is no file list to diff yet", () => {
+    for (const record of COOKBOOKS) {
+      const output = orderedSections(record).find((section) => section.key === "output")!;
+      expect(output.status, `${record.slug}: an output list is a claim about a run`).toBe("locked");
     }
   });
 });
