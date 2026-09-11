@@ -556,8 +556,26 @@ describe("public copy", () => {
     for (const word of A4_WORDS) expect(source.toUpperCase()).not.toContain(`>${word}<`);
     expect(source).not.toContain("SUPPORT_LEVELS");
     expect(source).toContain('access: "Read-only"');
-    expect(source).toContain("Security & sync details");
+    // BA-071: "and", like every other fold label on the site.
+    expect(source).toContain("Security and sync details");
     expect(source).toContain("Verify the provider account in Workspace before the first sync.");
+
+    /*
+      BA-061 / BA-065. This test's own subject, pinned the other way round.
+
+      Every connector's Deletion row ended on our internal qualification state, and the page's
+      last paragraph before "Connect a source" said no customer install had ever been qualified
+      end to end. Each row now states what the adapter does at that event; the monitoring fact
+      -- a real buying input -- moved into the fold as "Monitoring", written as where a failed
+      run surfaces. So: none of that vocabulary comes back, and the behaviour it displaced is
+      still on the page.
+    */
+    expect(source).not.toMatch(/qualification is still required/);
+    expect(source).not.toContain("No customer-run install of this agent has been qualified");
+    expect(source.match(/nothing compiles from a source we can no longer read/g), "one per connector")
+      .toHaveLength(3);
+    expect(source).toContain("your scheduler is where a failed run surfaces");
+    expect(source).toContain("no inbound port");
   });
 
   /*
