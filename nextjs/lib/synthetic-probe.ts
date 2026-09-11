@@ -136,8 +136,28 @@ export type ProbeRun = {
 */
 export const FIXTURE_E2E_REFUSAL = "PROBE_FIXTURE_E2E_NOT_IMPLEMENTED" as const;
 
+/*
+  The environment a probe run reads, which is any subset of the real one.
+
+  `NodeJS.ProcessEnv` is augmented to require NODE_ENV, so it cannot describe "nothing is
+  configured" -- and that is the case this module has to be able to express. Every reader here
+  only ever asks for optional string keys.
+*/
+export type ProbeEnv = Partial<NodeJS.ProcessEnv>;
+
 export type ProbeDependencies = {
-  env?: NodeJS.ProcessEnv;
+  /**
+   * The environment to read configuration from. Absent means nothing is configured.
+   *
+   * Deliberately not defaulted to `process.env` here. It was, and that made every caller that
+   * did not pass one read whatever the host happened to have exported: the probe's own tests
+   * asserted "storage is unconfigured" and passed locally only because no R2 variables were set
+   * in the shell. On Vercel, where they are set, the same assertion saw a configured signer,
+   * attempted a real canary against a stubbed fetch, and failed the build. A library function
+   * that silently reads ambient process state cannot be tested for the unconfigured case at all,
+   * so the ambient read lives at the route boundary and nowhere else.
+   */
+  env?: ProbeEnv;
   /** Injected so a test can force each outcome; production passes the real canary. */
   r2Canary?: (env: R2SignerEnv) => Promise<SyntheticCanaryResult>;
   /** Vercel OIDC. Absent outside Vercel, which makes the CDR row `not_probed`. */
@@ -195,8 +215,8 @@ function health(url: string, headers?: Record<string, string>) {
   });
 }
 
-async function checkCoreV2(clock: () => number): Promise<ProbeCheck> {
-  const core = readProductCoreV2Env();
+async function checkCoreV2(env: ProbeEnv, clock: () => number): Promise<ProbeCheck> {
+  const core = readProductCoreV2Env(env);
   if (!core) return notProbed("coreV2", "not_configured");
   return timed("coreV2", async () => {
     const response = await health(`${core.url}/health`);
@@ -212,7 +232,7 @@ async function checkCoreV2(clock: () => number): Promise<ProbeCheck> {
 }
 
 async function checkR2(
-  env: NodeJS.ProcessEnv,
+  env: ProbeEnv,
   canary: (signer: R2SignerEnv) => Promise<SyntheticCanaryResult>,
   clock: () => number,
 ): Promise<ProbeCheck> {
@@ -224,7 +244,7 @@ async function checkR2(
 }
 
 async function checkDatabase(
-  env: NodeJS.ProcessEnv,
+  env: ProbeEnv,
   clock: () => number,
 ): Promise<ProbeCheck> {
   const config = readSupabaseAdminConfig(env);
@@ -248,7 +268,7 @@ async function checkDatabase(
 }
 
 async function checkCdr(
-  env: NodeJS.ProcessEnv,
+  env: ProbeEnv,
   deps: ProbeDependencies,
   clock: () => number,
 ): Promise<ProbeCheck> {
@@ -274,7 +294,7 @@ async function checkCdr(
 }
 
 async function checkOcr(
-  env: NodeJS.ProcessEnv,
+  env: ProbeEnv,
   clock: () => number,
 ): Promise<ProbeCheck> {
   // Off unless someone decided to pay for it. See the spend note in the file header.
@@ -294,7 +314,7 @@ function checkBilling(): ProbeCheck {
 }
 
 export async function runSyntheticProbe(deps: ProbeDependencies = {}): Promise<ProbeRun> {
-  const env = deps.env ?? process.env;
+  const env = deps.env ?? {};
   const clock = deps.now ?? Date.now;
   const canary = deps.r2Canary ?? runSyntheticR2Canary;
   const startedAtMs = clock();
@@ -304,7 +324,7 @@ export async function runSyntheticProbe(deps: ProbeDependencies = {}): Promise<P
   const checks: ProbeCheck[] = [
     await checkCdr(env, deps, clock),
     await checkOcr(env, clock),
-    await checkCoreV2(clock),
+    await checkCoreV2(env, clock),
     await checkR2(env, canary, clock),
     await checkDatabase(env, clock),
     checkBilling(),

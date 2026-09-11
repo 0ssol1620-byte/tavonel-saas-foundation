@@ -158,9 +158,16 @@ function canonicalize(value: unknown): string {
     .join(",")}}`;
 }
 
-export function readProductCoreV2Env(): ProductCoreV2Env | null {
-  const url = process.env.FOUNDATION_CORE_V2_URL?.trim() ?? "";
-  const hmac = process.env.FOUNDATION_CORE_V2_HMAC ?? "";
+/*
+  `env` is a parameter for the same reason `revisionCompileEnabled` above takes one: a caller that
+  has already been handed an environment has to be able to read that one. The synthetic probe is
+  the caller that proved it -- reading ambient state here made its "compiler core is not
+  configured" row depend on what the host happened to export, which passed locally and failed on
+  Vercel. The default leaves every other caller unchanged.
+*/
+export function readProductCoreV2Env(env: Partial<NodeJS.ProcessEnv> = process.env): ProductCoreV2Env | null {
+  const url = env.FOUNDATION_CORE_V2_URL?.trim() ?? "";
+  const hmac = env.FOUNDATION_CORE_V2_HMAC ?? "";
   if (!/^https:\/\/[A-Za-z0-9.-]+(?::\d+)?$/.test(url) || hmac.length < 32) return null;
   return { url: url.replace(/\/$/, ""), hmac };
 }

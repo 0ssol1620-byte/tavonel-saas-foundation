@@ -58,6 +58,9 @@ async function probe(request: Request) {
   }
 
   const run = await runSyntheticProbe({
+    // The route is the boundary, so this is where the real environment is read. Passed explicitly
+    // rather than defaulted inside the probe, so that an absent variable is absent in a test too.
+    env: process.env,
     // Both only work on Vercel. Off Vercel the CDR row is `not_probed`, because the check is
     // gated on FOUNDATION_CDR_IDENTITY_ENABLED before either is called.
     cdrSubject: getVercelOidcToken,

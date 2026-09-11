@@ -14,17 +14,32 @@ import {
   runSyntheticProbe,
   validateProbeRun,
   type ProbeDependency,
+  type ProbeEnv,
 } from "./synthetic-probe";
 
 const CORE_URL = "https://core-v2.example.invalid";
 const OCR_URL = "https://ocr.example.invalid";
 
-function configured(extra: Record<string, string> = {}) {
-  vi.stubEnv("FOUNDATION_CORE_V2_URL", CORE_URL);
-  vi.stubEnv("FOUNDATION_CORE_V2_HMAC", "c".repeat(48));
-  vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://project.supabase.co");
-  vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", `sb_secret_${"s".repeat(31)}`);
-  for (const [key, value] of Object.entries(extra)) vi.stubEnv(key, value);
+const DATABASE_ONLY = {
+  NEXT_PUBLIC_SUPABASE_URL: "https://project.supabase.co",
+  SUPABASE_SERVICE_ROLE_KEY: `sb_secret_${"s".repeat(31)}`,
+};
+
+/*
+  The environment a run is given, built rather than exported.
+
+  This used to call `vi.stubEnv` and let the probe read `process.env`, which made the
+  unconfigured cases depend on what the host had not set -- green on a laptop, red on Vercel,
+  where R2 credentials are real. The probe now takes its environment as an argument, so a test
+  says what is configured and nothing else is.
+*/
+function configured(extra: Record<string, string> = {}): ProbeEnv {
+  return {
+    FOUNDATION_CORE_V2_URL: CORE_URL,
+    FOUNDATION_CORE_V2_HMAC: "c".repeat(48),
+    ...DATABASE_ONLY,
+    ...extra,
+  };
 }
 
 const r2Env = {
@@ -68,9 +83,9 @@ describe("synthetic probe run", () => {
   afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
   it("passes when every configured dependency answers, and keeps billing labelled configuration", async () => {
-    configured(r2Env);
     vi.stubGlobal("fetch", router([["core-v2", coreHealthy], ["supabase.co", dbHealthy]]));
     const run = await runSyntheticProbe({
+      env: configured(r2Env),
       r2Canary: async () => ({ ok: true, code: "SYNTHETIC_CANARY_OK" }),
       now: (() => { let t = 1_757_000_000_000; return () => (t += 25); })(),
     });
@@ -93,18 +108,16 @@ describe("synthetic probe run", () => {
     ["a body from something else on that host", json({ status: "ok", runtime: "nginx" }), "unexpected_response"],
     ["no answer inside the limit", timeout(), "timeout"],
   ])("fails the compiler-core check on %s", async (_label, handler, errorClass) => {
-    configured();
     vi.stubGlobal("fetch", router([["core-v2", handler], ["supabase.co", dbHealthy]]));
-    const run = await runSyntheticProbe({ r2Canary: async () => ({ ok: true, code: "SYNTHETIC_CANARY_OK" }) });
+    const run = await runSyntheticProbe({ env: configured(), r2Canary: async () => ({ ok: true, code: "SYNTHETIC_CANARY_OK" }) });
     expect(check(run, "coreV2")).toMatchObject({ status: "failed", errorClass });
     // One failed dependency fails the run. There is no partial pass.
     expect(run.ok).toBe(false);
   });
 
   it("fails the storage check when the canary round trip does not complete", async () => {
-    configured(r2Env);
     vi.stubGlobal("fetch", router([["core-v2", coreHealthy], ["supabase.co", dbHealthy]]));
-    const run = await runSyntheticProbe({ r2Canary: async () => ({ ok: false, code: "PUT_FAILED", put: 403 }) });
+    const run = await runSyntheticProbe({ env: configured(r2Env), r2Canary: async () => ({ ok: false, code: "PUT_FAILED", put: 403 }) });
     expect(check(run, "r2")).toMatchObject({ status: "failed", errorClass: "http_error" });
     expect(run.ok).toBe(false);
   });
@@ -114,19 +127,17 @@ describe("synthetic probe run", () => {
     ["a body that is not rows", json({ policy_key: "default" }), "unexpected_response"],
     ["no answer inside the limit", timeout(), "timeout"],
   ])("fails the database check on %s", async (_label, handler, errorClass) => {
-    configured();
     vi.stubGlobal("fetch", router([["core-v2", coreHealthy], ["supabase.co", handler]]));
-    const run = await runSyntheticProbe({ r2Canary: async () => ({ ok: true, code: "SYNTHETIC_CANARY_OK" }) });
+    const run = await runSyntheticProbe({ env: configured(), r2Canary: async () => ({ ok: true, code: "SYNTHETIC_CANARY_OK" }) });
     expect(check(run, "db")).toMatchObject({ status: "failed", errorClass });
     expect(run.ok).toBe(false);
   });
 
   it("reports an unconfigured dependency as not probed, which is neither a pass nor a failure", async () => {
-    // Core V2 and storage absent; only the database is configured.
-    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://project.supabase.co");
-    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", `sb_secret_${"s".repeat(31)}`);
+    // Core V2 and storage absent; only the database is configured. Said, not assumed from a
+    // variable the host did not happen to export.
     vi.stubGlobal("fetch", router([["supabase.co", dbHealthy]]));
-    const run = await runSyntheticProbe({});
+    const run = await runSyntheticProbe({ env: DATABASE_ONLY });
     expect(check(run, "coreV2")).toMatchObject({ status: "not_probed", errorClass: "not_configured", latencyMs: null });
     expect(check(run, "r2")).toMatchObject({ status: "not_probed", errorClass: "not_configured" });
     expect(check(run, "db").status).toBe("ok");
@@ -142,25 +153,27 @@ describe("synthetic probe run", () => {
   });
 
   it("leaves the GPU OCR endpoint alone unless someone has accepted the cold-start cost", async () => {
-    configured({ FOUNDATION_OCR_URL: OCR_URL });
+    const env = configured({ FOUNDATION_OCR_URL: OCR_URL });
     const fetcher = router([["core-v2", coreHealthy], ["supabase.co", dbHealthy]]);
     vi.stubGlobal("fetch", fetcher);
-    const gated = await runSyntheticProbe({ r2Canary: async () => ({ ok: true, code: "SYNTHETIC_CANARY_OK" }) });
+    const gated = await runSyntheticProbe({ env, r2Canary: async () => ({ ok: true, code: "SYNTHETIC_CANARY_OK" }) });
     expect(check(gated, "ocr")).toMatchObject({ status: "not_probed", errorClass: "gpu_spend_gate" });
     expect(fetcher.mock.calls.every(([input]) => !String(input).includes("ocr.example"))).toBe(true);
 
-    vi.stubEnv("TAVONEL_PROBE_OCR_HEALTH", "1");
     vi.stubGlobal("fetch", router([
       ["core-v2", coreHealthy],
       ["supabase.co", dbHealthy],
       ["ocr.example", json({ status: "ok", gpu: true, engine: "rapidocr" })],
     ]));
-    const enabled = await runSyntheticProbe({ r2Canary: async () => ({ ok: true, code: "SYNTHETIC_CANARY_OK" }) });
+    const enabled = await runSyntheticProbe({
+      env: { ...env, TAVONEL_PROBE_OCR_HEALTH: "1" },
+      r2Canary: async () => ({ ok: true, code: "SYNTHETIC_CANARY_OK" }),
+    });
     expect(check(enabled, "ocr")).toMatchObject({ kind: "request", status: "ok" });
   });
 
   it("mints a workload-identity token for the sanitizer and reports its failures", async () => {
-    configured({
+    const env = configured({
       FOUNDATION_CDR_IDENTITY_ENABLED: "1",
       FOUNDATION_CDR_WIF_PROVIDER: "projects/317850201666/locations/global/workloadIdentityPools/pool/providers/provider",
       FOUNDATION_CDR_WIF_SERVICE_ACCOUNT: "cdr-probe@tavonel-saas-foundation.iam.gserviceaccount.com",
@@ -176,6 +189,7 @@ describe("synthetic probe run", () => {
       return dbHealthy();
     }));
     const healthy = await runSyntheticProbe({
+      env,
       r2Canary: async () => ({ ok: true, code: "SYNTHETIC_CANARY_OK" }),
       cdrSubject: async () => "vercel-oidc-subject-token",
       cdrMint: async () => "cdr-id-token",
@@ -185,6 +199,7 @@ describe("synthetic probe run", () => {
     expect(authorizations).toEqual(["Bearer cdr-id-token"]);
 
     const minting = await runSyntheticProbe({
+      env,
       r2Canary: async () => ({ ok: true, code: "SYNTHETIC_CANARY_OK" }),
       cdrSubject: async () => "vercel-oidc-subject-token",
       cdrMint: async () => { throw new Error("CDR_IDENTITY_UNAVAILABLE"); },
@@ -194,9 +209,11 @@ describe("synthetic probe run", () => {
   });
 
   it("refuses the fixture end-to-end run rather than reporting a pass it did not earn", async () => {
-    configured({ ...r2Env, TAVONEL_PROBE_FIXTURE_E2E: "1" });
     vi.stubGlobal("fetch", router([["core-v2", coreHealthy], ["supabase.co", dbHealthy]]));
-    const run = await runSyntheticProbe({ r2Canary: async () => ({ ok: true, code: "SYNTHETIC_CANARY_OK" }) });
+    const run = await runSyntheticProbe({
+      env: configured({ ...r2Env, TAVONEL_PROBE_FIXTURE_E2E: "1" }),
+      r2Canary: async () => ({ ok: true, code: "SYNTHETIC_CANARY_OK" }),
+    });
     expect(run.fixtureE2E).toEqual({ enabled: true, status: "refused", code: FIXTURE_E2E_REFUSAL });
     // Every dependency answered, and the run still does not pass, because the operator asked for
     // something else. This is the assertion that stops the flag becoming a lie.
@@ -260,9 +277,8 @@ describe("stored probe run validation", () => {
   afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
   it("accepts a run it produced and rejects anything else", async () => {
-    configured(r2Env);
     vi.stubGlobal("fetch", router([["core-v2", coreHealthy], ["supabase.co", dbHealthy]]));
-    const run = await runSyntheticProbe({ r2Canary: async () => ({ ok: true, code: "SYNTHETIC_CANARY_OK" }) });
+    const run = await runSyntheticProbe({ env: configured(r2Env), r2Canary: async () => ({ ok: true, code: "SYNTHETIC_CANARY_OK" }) });
     expect(validateProbeRun(JSON.parse(JSON.stringify(run)))).toEqual(run);
 
     expect(validateProbeRun(null)).toBeNull();
