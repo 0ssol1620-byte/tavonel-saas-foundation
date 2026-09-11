@@ -91,14 +91,26 @@ const PLANS: ReadonlyArray<{
   PROCESSING_UNIT_USD`, the same two constants the estimator quotes and the reservation code
   charges against, and the included pages are the catalog's `includedPages`.
 
-  Two of these tiles state a published term rather than a behaviour read out of the code, and
-  they say so nowhere on the page because a customer buys the term, not the implementation.
-  Page expiry (§40 item 1) and the refund bright line (P07) were both settled by the owner; the
-  billing code does not yet expire a `credit_balance` at the period boundary and does not compute
-  a consumed-page share, so the lane report carries both as the gap between the published term
-  and the enforcing code. The numbers themselves are still derived -- the rate from the two
-  constants the reservation code charges against, the refund figures from the catalog -- so a
-  moved rate moves this copy instead of leaving it stale.
+  REPAIR ROUND, 2026-09-11. The first pass of the "Unused pages" tile published FD-03's
+  page-expiry term -- "unused pages expire at the end of each billing month and do not roll
+  over" -- while nothing in the billing code reduces a `credit_balance`: no migration, job,
+  trigger or route. FD-03 says the opposite of shipping that early: "Ledger enforcement of the
+  expiry is a separate item (LEDGER-EXPIRY) and the copy is held to the code until it lands." So
+  the tile states the behaviour again and the term is held. It ships in the release that ships
+  the LEDGER-EXPIRY migration, not before.
+
+  The refund bright line (P07, FD-04) is a term rather than a behaviour and it stays: no route
+  could enforce it -- refunds are issued by a person through Paddle -- and `liveChargesEnabled`
+  is false, so no payment exists to refund yet.
+
+  FD-03 and FD-04 are both a delegated decision, 2026-09-11 (orchestrator, under the founder's
+  delegation), and not the founder's own statements;
+  `D:\CodexProjects\growth-lanes\DECISION_LOG_2026-09-11.md` requires that attribution, and the
+  lane report carries the founder's direct ratification as a merge condition.
+
+  The numbers stay derived -- the rate from the two constants the reservation code charges
+  against, the refund figures from the catalog -- so a moved rate moves this copy instead of
+  leaving it stale.
 */
 const STANDARD_PAGE_USD = STANDARD_UNITS_PER_PAGE * PROCESSING_UNIT_USD;
 const MAXIMUM_PAGE_USD = MAX_UNITS_PER_PAGE * PROCESSING_UNIT_USD;
@@ -130,7 +142,7 @@ function glanceRows(planCapabilities: readonly PlanCapabilityRow[]) {
     ],
     [
       "Unused pages",
-      `Included pages belong to the billing month they are granted in. Unused pages expire at the end of each billing month and do not roll over, and they are not refunded if you cancel. Pages past the included allowance are billed at the published rate of ${formatUsd(STANDARD_PAGE_USD)} per standard page.`,
+      `Current billing behaviour keeps unused pages in your balance: cancelling stops the renewal that adds to it, nothing in the billing code removes a balance you already hold, and a balance can only be spent while a plan is active. Unused pages are not refunded if you cancel. Pages past the included allowance are billed at the published rate of ${formatUsd(STANDARD_PAGE_USD)} per standard page.`,
     ],
     [
       "What differs by plan",

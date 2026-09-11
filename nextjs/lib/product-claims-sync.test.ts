@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { BILLING_OFFERS } from "./billing-catalog";
 import { CLAIM_STATE } from "./claim-state";
@@ -342,28 +342,49 @@ describe("product claims sync", () => {
   /*
     Audit P06 and P08: two facts a buyer could only find by reading SQL, and a link.
 
-    P06 used to be pinned as *behaviour read out of the billing code* -- "nothing in the billing
-    code removes a balance you already hold", which was true of `apply_foundation_billing_event_v4`
-    and said nothing about what the customer had bought. The owner has since settled the term:
-    included pages belong to their billing month, do not roll over, and are not refunded on
-    cancellation. So this pins the published term instead, and the rate beside it stays derived
-    from the constants the reservation code charges against rather than typed.
+    P06 is pinned as *behaviour read out of the billing code* -- "nothing in the billing code
+    removes a balance you already hold" -- which is what `apply_foundation_billing_event_v4` does:
+    it adds each renewal's allowance and no job, trigger or route reduces the balance.
 
-    The gap is deliberate and recorded in the lane report: no migration expires a balance at the
-    period boundary yet, so the term is ahead of its enforcement.
+    REPAIR ROUND, 2026-09-11. One pass replaced that with FD-03's page-expiry term, which no
+    migration enforces, and pinned the unenforced sentence here so CI would keep it published.
+    FD-03 holds the copy to the code -- "Ledger enforcement of the expiry is a separate item
+    (LEDGER-EXPIRY) and the copy is held to the code until it lands" -- so the last assertion is
+    that rule, runnable: while no migration writes the expiry, no buyer surface may state it, and
+    the moment one does the guard releases on its own rather than needing this test edited.
   */
-  it("states the page-expiry term and points Enterprise at the trust index", () => {
+  it("states the cancellation balance behaviour and points Enterprise at the trust index", () => {
     const pricing = read("components/pricing-page-client.tsx");
-    expect(pricing, "P06: unused included pages do not roll over")
-      .toContain("expire at the end of each billing month and do not roll over");
-    expect(pricing, "P06: and are not refunded on cancellation")
-      .toContain("they are not refunded if you cancel");
+    expect(pricing, "P06: what happens to a balance on cancellation")
+      .toContain("nothing in the billing code removes a balance you already hold");
+    expect(pricing, "P06: and that it is only spendable while a plan is active")
+      .toContain("only be spent while a plan is active");
+    expect(pricing, "P06: and that unused pages are not refunded on cancellation")
+      .toContain("not refunded if you cancel");
     expect(pricing, "P06: the overage rate is derived, not typed")
       .toContain("published rate of ${formatUsd(STANDARD_PAGE_USD)} per standard page");
     expect(pricing, "P03: whether Ask and search consume pages")
       .toContain("What does not consume pages");
     expect(pricing, "P08: the Enterprise card reaches the trust index")
       .toContain('href: "/trust" as Route');
+  });
+
+  /*
+    FD-03's hold, as a test. `allowance_expired` is the ledger `kind` an expiry has to write --
+    the balance is a scalar and an expiry that is not a ledger row is a silent UPDATE -- so the
+    presence of that token in a migration is the enforcement existing, and its absence is the
+    enforcement not existing. Failure path: publish the term with no migration and this fails;
+    land the migration and the copy becomes sayable without touching this file.
+  */
+  it("does not publish the page-expiry term until a migration enforces it", () => {
+    const migrations = new URL("../supabase/migrations/", root);
+    const enforced = readdirSync(migrations)
+      .some((file) => file.endsWith(".sql") && readFileSync(new URL(file, migrations), "utf8").includes("allowance_expired"));
+    if (enforced) return;
+    for (const surface of ["components/pricing-page-client.tsx", "lib/docs-content.ts"] as const) {
+      expect(strip(read(surface)), `${surface}: FD-03 holds the expiry copy until LEDGER-EXPIRY lands`)
+        .not.toMatch(/do not roll over|expires? at the end of each billing month/i);
+    }
   });
 
   /*

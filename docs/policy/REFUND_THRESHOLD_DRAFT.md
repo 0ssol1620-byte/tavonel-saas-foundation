@@ -1,9 +1,18 @@
-# Refund threshold — numbers fixed by the owner, legal review of §5 still open
+# Refund threshold — numbers set by a delegated decision, founder ratification and §5 still open
 
-**The owner fixed the two numbers on 2026-09-11: a 14-day window and a 10% consumed-pages
-line.** They now live as `REFUND_WINDOW_DAYS` and `REFUND_MAX_CONSUMED_FRACTION` in
+**FD-04 set the two numbers on 2026-09-11 — a 14-day window and a 10% consumed-pages line — as a
+delegated decision, 2026-09-11 (orchestrator, under the founder's delegation), per
+`D:\CodexProjects\growth-lanes\DECISION_LOG_2026-09-11.md`. It is not the founder's own
+statement.** They now live as `REFUND_WINDOW_DAYS` and `REFUND_MAX_CONSUMED_FRACTION` in
 `nextjs/lib/billing-catalog.ts`, and `/pricing` and the billing documentation render them rather
 than restating them. Audit item **P07**.
+
+`CLAUDE.md` puts pricing, refund and contract terms outside an agent's authority — "Ask the
+founder; do not decide and do not infer from the masterplan" — and bars a session from approving
+its own result. The delegation covered judging the item and doing the work; it did not turn the
+outcome into founder approval. So these two numbers need the founder's **direct ratification**
+before the live `/refunds` template or a checkout carries them, and the lane report lists that as
+a merge condition rather than a footnote.
 
 What is *not* settled is §5, which is a lawyer's to answer, and the live `/refunds` template,
 which still carries the "substantial processing" sentence this record was opened against — that
@@ -27,9 +36,11 @@ above ships verbatim the moment checkout opens**, which is why this is worth set
 than on launch day.
 
 - Drafted: 2026-09-11 KST, competitive-audit remediation campaign, lane L9.
-- Status: `PROPOSED` until 2026-09-11, then `DECIDED` at 14 days / 10% by the owner, website-growth
-  campaign, lane `entitlements` (E4). Legal review of §5 is still required before the live
-  `/refunds` template changes.
+- Status: `PROPOSED` until 2026-09-11, then `DECIDED` at 14 days / 10% by a delegated decision,
+  2026-09-11 (orchestrator, under the founder's delegation) — FD-04 — implemented in the
+  website-growth campaign, lane `entitlements` (E4). The founder's direct ratification is
+  outstanding, and legal review of §5 is still required before the live `/refunds` template
+  changes.
 - Landed on: `nextjs/lib/billing-catalog.ts` (the two constants), `/pricing` and the
   `billing-and-limits` documentation block, which render them.
 - Still to land on: `nextjs/app/refunds/page.tsx`, live template only.
@@ -83,7 +94,8 @@ out — a real evaluation fits inside it, and it does not require a customer to 
 | 20% (100 / 500 pages) | Was proposed; a genuine trial fits, a full corpus run does not |
 | 50% | Half the value delivered before the line; hard to defend as "substantial" being *reached* |
 
-`[LEGAL]` — the number is fixed, §5 is not. The figures in the table are computed from the
+`[LEGAL]` — the number is set by delegation and awaiting the founder's ratification; §5 is
+neither. The figures in the table are computed from the
 catalog's `includedPages`, not typed into the copy.
 
 ## 3. Why a bright line rather than a better adjective
@@ -136,7 +148,8 @@ Three reasons, in the order they matter.
 This clause is unreachable until `liveChargesEnabled` is true. Ordering:
 
 1. `[LEGAL]` reviews §2 and answers §5.
-2. `[FOUNDER]` fixes the percentage.
+2. `[FOUNDER]` ratifies the percentage. The delegated decision set it; the founder has not
+   confirmed it directly, and an agent cannot supply that confirmation for them.
 3. The threshold lands as a constant, the live template renders it, and a test pins the string.
 4. Checkout must show the same wording before a payment method can be entered — which is already
    what the pilot template promises: "Cancellation and refund terms will be published here, and
@@ -151,7 +164,9 @@ launch is the same exposure with worse optics. Neither is an agent's call.
 ## Checklist before the live template changes
 
 - [ ] Legal reviewed §2 and answered §5; jurisdictions in scope named
-- [x] Founder fixed the percentage — **10%**, 2026-09-11, with the 14-day window
+- [x] Percentage set — **10%**, 2026-09-11, with the 14-day window, by a delegated decision
+      (orchestrator, under the founder's delegation), **not** by the founder
+- [ ] Founder ratified the two numbers directly (FD-04) — the delegation did not supply this
 - [x] Threshold exists as exported constants, not as prose in two places
       (`REFUND_WINDOW_DAYS`, `REFUND_MAX_CONSUMED_FRACTION`, `refundablePageAllowance`)
 - [x] `/pricing` and the `billing-and-limits` documentation block render them
