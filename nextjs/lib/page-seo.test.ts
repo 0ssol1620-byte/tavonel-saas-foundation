@@ -159,6 +159,30 @@ describe("the Korean entry page stands on a fact, not a translation", () => {
     expect(source, "a paid plan is the bar, and the page must say so").toContain("유료 플랜");
   });
 
+  /*
+    BA-224/225/227. What the page led with, and what it gave a reader to do.
+
+    The first Korean sentence was "지금 한국어 페이지는 이 한 장입니다" -- there is one Korean page,
+    this one -- and six of the eight cards carried an "(EN)" suffix, so a Korean buyer's first
+    impression was an inventory of what we had not translated. The page also ended in prose with
+    one English-labelled inline link, while every English page in the lens ends in a button row.
+
+    Pinned here because these are properties a reviewer who does not read Korean can still check.
+  */
+  it("leads with what a Korean reader gets, and ends on a Korean call to action", () => {
+    const copy = source.replace(/\/\*[\s\S]*?\*\//g, " ");
+    expect(copy, "the page may not open on what is missing in Korean")
+      .not.toContain("지금 한국어 페이지는 이 한 장입니다");
+    expect(copy, "an absence is not a card heading").not.toContain("한국어로 있는 것");
+    expect(copy, "the heading may not hedge").not.toContain("아는 편이 나은");
+    // One action row, Korean labels, and the contact route as the primary.
+    expect(copy, "the Korean entry page needs its own action row").toContain('className="actions"');
+    expect(copy).toContain('<Link className="btn" href="/contact">문의하기</Link>');
+    // The language fact survives, once, rather than six times as a suffix.
+    expect(copy, "a per-tile (EN) suffix is the inventory again").not.toContain('<span lang="en">(EN)</span>');
+    expect(copy).toContain("링크는 영문 페이지로 연결됩니다");
+  });
+
   it("quotes no price, page count or limit it would have to keep in step", () => {
     const copy = source.replace(/\/\*[\s\S]*?\*\//g, " ");
     expect(copy).not.toMatch(/\$\d|\d{2,}\s*(페이지|장|MiB|MB|일)/);
