@@ -182,7 +182,9 @@ export function allowedDetail(detail?: FunnelDetail): Record<string, string> | u
   billing plan name such as Developer or Team.
 */
 export function recordServerFunnel(event: ServerFunnelEvent, detail?: FunnelDetail) {
-  console.info(JSON.stringify({ event, ...allowedDetail(detail) }));
+  try {
+    console.info(JSON.stringify({ event, ...allowedDetail(detail) }));
+  } catch { /* logging must never break an action that already succeeded */ }
 }
 
 const LOG_KEY = "tavonel.funnel-log";

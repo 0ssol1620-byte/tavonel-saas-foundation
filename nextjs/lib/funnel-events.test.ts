@@ -243,6 +243,22 @@ describe("server funnel events", () => {
     expect(body).toContain("console.info");
     expect(body.slice(0, body.indexOf("\n}"))).not.toContain("track(");
   });
+
+  /*
+    And it swallows its own failure. Nine routes call this after the work is already durable -- a
+    job enqueued, a Paddle event applied, a World promoted, a package signed -- and before the
+    response is returned. A sink that threw there would report an action that succeeded as a 500,
+    and on the Paddle webhook it would report an applied billing event to Paddle as a failed
+    delivery. Same rule `trackFunnel` follows one function below, now on the server twin too.
+  */
+  it("does not fail the caller when the log write throws", () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => { throw new Error("stdout is gone"); });
+    try {
+      expect(() => recordServerFunnel("world_activated", { status: "compiled" })).not.toThrow();
+    } finally {
+      info.mockRestore();
+    }
+  });
 });
 
 /*

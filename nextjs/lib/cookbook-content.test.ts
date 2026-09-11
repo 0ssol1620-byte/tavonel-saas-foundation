@@ -289,7 +289,7 @@ describe("the copy guards cover the new surfaces", () => {
 describe("a claim id on a record resolves to a receipt", () => {
   const registry = read("../docs/gtm/CLAIMS_REGISTRY.yaml");
   const rows = new Map(
-    [...registry.matchAll(/^ {2}- claimId: (CLM-\d{3})\r?$([\s\S]*?)(?=^ {2}- claimId:|\Z)/gm)].map(
+    [...registry.matchAll(/^ {2}- claimId: (CLM-\d{3})\r?$([\s\S]*?)(?=^ {2}- claimId:|$(?![\s\S]))/gm)].map(
       ([, id, body]) => [id!, body!],
     ),
   );
@@ -303,7 +303,7 @@ describe("a claim id on a record resolves to a receipt", () => {
   it("reads the registry it is asserting against", () => {
     // If the shape of the file changes, this test must fail loudly rather than pass over an empty
     // map -- a lookup that resolves nothing would accept every id, which is the inverse of its job.
-    expect(rows.size).toBeGreaterThanOrEqual(44);
+    expect(rows.size).toBe((registry.match(/^ {2}- claimId:/gm) ?? []).length);
     expect(resolvesToAnArtifact("CLM-001"), "CLM-001 names an artifact and must resolve").toBe(true);
     expect(resolvesToAnArtifact("CLM-999"), "an id that is in no row must not resolve").toBe(false);
   });
