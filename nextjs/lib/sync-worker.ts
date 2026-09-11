@@ -147,6 +147,10 @@ export async function runSourceImportBatch(
     // attempt speaks for the connection: sending an owner to a re-authorization screen
     // because the secret broker was briefly unreachable would be a worse lie than silence.
     // The queue owns the ceiling, so this reads its answer instead of re-deriving it.
+    // ponytail: the terminal attempt is a heuristic for "the grant is gone" -- a broker that
+    // is down for the whole backoff window flips a valid connection. Upgrade path is reading
+    // `error=invalid_grant` out of the token response in connector-oauth.ts and classifying
+    // it apart from every transport failure; then this can flag on the first refusal.
     if (reported.ok && reported.value.state === "dead") {
       const marked = await markOAuthConnectionReauthorizationRequired({
         workspaceKey: job.workspaceKey,
