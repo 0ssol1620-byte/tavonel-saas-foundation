@@ -28,7 +28,18 @@ test("solution workflow is five complete steps with no orphan cell", async ({ pa
   await expect(steps).toHaveCount(5);
   for (let index = 0; index < 5; index += 1) await expect(steps.nth(index)).not.toHaveText(/^\s*$/);
   await expect(page.getByRole("heading", { name: "What it does not do." })).toHaveCount(0);
-  await expect(page.getByText("Things to know before you compile")).toBeVisible();
+  /*
+    BA-044 retitled the limits fold: "WHERE THIS STOPS · Things to know before you compile" is
+    internal scope vocabulary that reads to a buyer as a warning label. Same fold, same content,
+    titled as the decision input it is.
+
+    BA-045: and the fifth step stopped being tinted green. Decorative colour is barred in a
+    system where colour reports state, and the tint said the last step is a different kind of
+    thing when nothing makes it one.
+  */
+  await expect(page.getByText("Before your first compile")).toBeVisible();
+  const tints = await steps.evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).backgroundColor));
+  expect([...new Set(tints)], "one of the five steps carries decorative colour").toHaveLength(1);
   await testInfo.attach("solution-polish", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
 });
 

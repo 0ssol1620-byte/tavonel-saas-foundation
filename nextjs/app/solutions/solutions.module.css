@@ -82,3 +82,77 @@
 @media (prefers-reduced-motion: reduce) {
   .card { transition: none; }
 }
+
+/* --------------------------------------------------------------- detail page */
+
+/*
+  BA-045. `.solution-flow li` in `app/ux-polish.css` is a 190px box with
+  `justify-content: space-between`, so the step number sat at the top, its title at the bottom and
+  about 60px between them was dead -- and `:last-child` carried a green tint, which is decorative
+  colour in a system where colour reports state and told the reader the fifth step is a different
+  kind of thing when nothing makes it one.
+
+  These override those two rules rather than editing them, because `ux-polish.css` belongs to
+  design-assets this week. `.flow .flowStep:last-child` is three class-level selectors against
+  that file's `.solution-flow li:last-child`, which is two plus an element, so the override does
+  not depend on stylesheet order.
+*/
+.flow .flowStep {
+  min-height: 0;
+  justify-content: flex-start;
+  gap: 9px;
+  padding: 18px 20px;
+}
+
+.flow .flowStep:last-child { background: var(--g1); }
+
+/*
+  2+2+1 at 390 gave three different card heights and stretched the fifth to full width. This
+  replaces exactly that one rule and leaves the wider layouts alone, and it compounds the global
+  class because `ux-polish.css`'s `.solution-flow` at this width is a single class like `.flow` --
+  a tie that whichever stylesheet the bundler emits second would win.
+*/
+@media (max-width: 560px) {
+  :global(.solution-flow).flow { grid-template-columns: minmax(0, 1fr); }
+}
+
+/*
+  BA-046. Four 136px cards each holding one vertically-centred heading and nothing else is a
+  section-shaped container for a four-item list. It is a list.
+*/
+.outcomes {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--hairline);
+}
+
+.outcomes li {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--hairline);
+  color: var(--text-hi);
+  font-size: clamp(15px, 1.3vw, 17px);
+  line-height: 1.4;
+}
+
+/*
+  BA-047. This line was 11px mono under the CTA row, competing with it, and 14px tall on a phone.
+  It is above the actions now, in the text face, at a size that is a sentence rather than a
+  footnote, and its link clears WCAG 2.5.8 on its own line height.
+*/
+.next {
+  margin: 0 0 22px;
+  max-width: 66ch;
+  color: var(--text-lo);
+  font-size: 13px;
+  line-height: 1.85;
+}
+
+.next a {
+  color: var(--text-hi);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
