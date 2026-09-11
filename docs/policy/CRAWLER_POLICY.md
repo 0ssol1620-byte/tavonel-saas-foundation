@@ -1,7 +1,9 @@
 # Crawler policy — search is welcome, corpus collection is not
 
-Decided 2026-09-11. Implemented in `nextjs/app/robots.ts`, in a delimited block, and pinned by
-`nextjs/lib/seo-surface.test.ts`.
+**Delegated decision, 2026-09-11 (orchestrator, under the founder's delegation) — see
+`docs/policy/DECISION_LOG_2026-09-11.md`** (FD-61). Not the founder's own statement; the founder
+may reverse it, and a reversal is a new entry in that log. Implemented in `nextjs/app/robots.ts`,
+in a delimited block, and pinned by `nextjs/lib/seo-surface.test.ts`.
 
 ## The distinction
 
@@ -29,6 +31,14 @@ Allowed the whole public surface, with the same private-path list as `*`:
 | `Googlebot` | Google | Search index |
 | `*` | everyone else | Default; the public surface is public |
 
+**User-triggered fetchers stay allowed**, and that is part of the decision rather than an
+oversight. `Claude-User`, `Claude-SearchBot`, `ChatGPT-User`, `OAI-SearchBot` and `PerplexityBot`
+fetch a page because a person asked a question about it. That is closer to a visit than to a
+corpus crawl: the value returns to the site, the person can be sent here, and nothing is retained
+for training. Two of the five are named in the table above; the other three are allowed by the
+`*` group and are deliberately **not** in the disallow list below. `seo-surface.test.ts` fails if
+one of them arrives there.
+
 `llms.txt` exists for the same reason and keeps the same role: it is a discovery aid for a tool
 that needs to find the right page, not a ranking signal and not a grant.
 
@@ -40,15 +50,23 @@ Disallowed everywhere (`Disallow: /`, no `Allow` line):
 |---|---|---|
 | `GPTBot` | OpenAI | Model training crawl |
 | `CCBot` | Common Crawl | Corpus collection redistributed to third parties |
-| `anthropic-ai` | Anthropic | Model training crawl |
+| `ClaudeBot` | Anthropic | Model training crawl; the token the current crawler sends |
+| `anthropic-ai` | Anthropic | Model training crawl; the older token, kept because a crawler that still sends it would otherwise be allowed |
 | `Google-Extended` | Google | Controls use of fetched content for generative-model training; it is not a crawler and not a search signal |
 | `Applebot-Extended` | Apple | Controls use of fetched content for generative-model training |
+| `Bytespider` | ByteDance | Model training crawl |
+| `Meta-ExternalAgent` | Meta | Documented for training-corpus and product indexing |
 
-Two of those five — `Google-Extended` and `Applebot-Extended` — are not crawlers at all. They are
+Two of those eight — `Google-Extended` and `Applebot-Extended` — are not crawlers at all. They are
 tokens their operators read as a use-permission signal for content their search crawlers already
 fetched, which is why `Googlebot` stays allowed on the line above while `Google-Extended` is
 refused here. Blocking the search crawler to refuse the training use would cost the site its search
 presence and refuse nothing.
+
+Two more are one operator's old and current token. `ClaudeBot` is what Anthropic's crawler sends
+now and `anthropic-ai` is the earlier one; both are listed, because refusing only the retired
+token would leave the one in use allowed by the `*` default — which is exactly what this file
+recorded as an open gap before FD-61 closed it.
 
 ## What this policy is not
 
@@ -62,17 +80,23 @@ presence and refuse nothing.
 - **It is not a claim that the corpus is clean.** It states what this site asks of a crawler. It
   says nothing about where any third party's model got its data.
 
-## Open, and a founder decision
+## Closed, and still open
 
-- **`ClaudeBot` is not on the list.** It is the token Anthropic's current crawler sends;
-  `anthropic-ai` is the older one, and only the older one was named in the decision this file
-  records. As it stands, the disallowed token is the one largely out of use and the one in use is
-  allowed by default. Adding it is a founder call, and `seo-surface.test.ts` keeps the gap named so
-  it cannot quietly become the answer.
-- **Other tokens not considered**: `Bytespider`, `Amazonbot`, `Meta-ExternalAgent`,
-  `Diffbot`, `Omgilibot`, `Timpibot`, `PanguBot`, and the user-triggered fetchers some assistants
-  send under their own tokens. A user-triggered fetch on someone's behalf is closer to a search
-  visit than to a corpus crawl, and it is a separate decision from this one.
+**Closed** by FD-61 in `docs/policy/DECISION_LOG_2026-09-11.md`, as a delegated decision the
+founder may reverse:
+
+- **Token coverage for the eight tokens in the table above.** `ClaudeBot` was the gap this file
+  used to record as open — the disallowed Anthropic token was the retired one and the one in use
+  was allowed by default. Both are now listed, as are `Bytespider` and `Meta-ExternalAgent`.
+- **User-triggered fetchers stay allowed**, for the reason in *What is allowed*: a fetch a person
+  asked for is a visit, not a corpus crawl.
+
+**Still open**, and not defaulted here:
+
+- **Tokens still not considered**: `Amazonbot`, `Diffbot`, `Omgilibot`, `Timpibot`, `PanguBot`,
+  and any operator that crawls under a token nobody has published. The decision closed the list it
+  named; it did not adopt a rule for the ones it did not. Adding one is a new decision, and
+  `seo-surface.test.ts` keeps this paragraph named so the gap cannot quietly become the answer.
 - **Whether to enforce rather than ask.** A rate limit, a WAF rule or a token check at the edge is
   the only thing that makes a refusal binding. None exists, and this file does not imply one.
 

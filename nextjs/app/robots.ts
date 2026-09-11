@@ -36,10 +36,11 @@ const SEARCH_CRAWLERS = ["OAI-SearchBot", "PerplexityBot", "Googlebot"];
 
 /* ─── TRAINING-CRAWLER BLOCK — begin (trust-policy lane; self-contained) ──────────────────────
 
-  These tokens are disallowed everywhere. The decision is the founder's and the reasoning is in
-  `docs/policy/CRAWLER_POLICY.md`: the repository is published for reading under a proprietary
-  licence, the site's copy is the licensed work, and a corpus crawl is a different act from a
-  search crawl even when the same company performs both.
+  These tokens are disallowed everywhere. Delegated decision, 2026-09-11 (orchestrator, under the
+  founder's delegation) -- FD-61 in `docs/policy/DECISION_LOG_2026-09-11.md`, reversible by the
+  founder -- and the reasoning is in `docs/policy/CRAWLER_POLICY.md`: the repository is published
+  for reading under a proprietary licence, the site's copy is the licensed work, and a corpus crawl
+  is a different act from a search crawl even when the same company performs both.
 
   Search and training are separated by token, not by path, because that is the only distinction
   robots.txt can express. Two consequences a reader of this file must not lose:
@@ -50,11 +51,18 @@ const SEARCH_CRAWLERS = ["OAI-SearchBot", "PerplexityBot", "Googlebot"];
     adding one costs nothing in search. `lib/seo-surface.test.ts` pins both groups so neither
     drifts into the other, and so a search crawler cannot arrive in this list by copy-paste.
 
-  The list is exactly what the founder named on 2026-09-11. Notably absent: `ClaudeBot`, which is
-  the token Anthropic's current crawler sends -- `anthropic-ai` is the older one. Whether to add it
-  is a founder decision and it is recorded as open in the crawler policy, not defaulted here.
+  The list is exactly the eight tokens FD-61 names, and it carries both of Anthropic's: `ClaudeBot`
+  is what the current crawler sends and `anthropic-ai` is the older one, so listing only the retired
+  token would have left the one in use allowed by the `*` group below.
+
+  Deliberately absent, and not an oversight: the user-triggered fetchers -- `Claude-User`,
+  `Claude-SearchBot`, `ChatGPT-User`, and the two named in `SEARCH_CRAWLERS` above. A fetch a person
+  asked for is a visit, not a corpus crawl, so the three unnamed ones are allowed by `*` and
+  `lib/seo-surface.test.ts` fails if any of the five arrives in this list. Tokens nobody has ruled
+  on yet (`Amazonbot`, `Diffbot`, `Omgilibot`, `Timpibot`, `PanguBot`) stay open in the crawler
+  policy rather than being defaulted here.
 */
-const TRAINING_CRAWLERS = ["GPTBot", "CCBot", "anthropic-ai", "Google-Extended", "Applebot-Extended"];
+const TRAINING_CRAWLERS = ["GPTBot", "CCBot", "ClaudeBot", "anthropic-ai", "Google-Extended", "Applebot-Extended", "Bytespider", "Meta-ExternalAgent"];
 /* ─── TRAINING-CRAWLER BLOCK — end ────────────────────────────────────────────────────────────── */
 
 export default function robots(): MetadataRoute.Robots {

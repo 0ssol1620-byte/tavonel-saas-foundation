@@ -174,16 +174,24 @@ describe("public surface: robots, sitemap and llms.txt agree", () => {
   });
 
   /*
-    Training-crawler policy was a founder decision and it has been made: the five tokens below are
-    disallowed everywhere, and the reasoning is in `docs/policy/CRAWLER_POLICY.md`. This test no
-    longer refuses the position -- it pins it, in both directions.
+    Training-crawler policy is a delegated decision, 2026-09-11 (orchestrator, under the founder's
+    delegation) -- FD-61 in `docs/policy/DECISION_LOG_2026-09-11.md`, reversible by the founder --
+    and the reasoning is in `docs/policy/CRAWLER_POLICY.md`. The eight tokens below are disallowed
+    everywhere. This test no longer refuses the position -- it pins it, in both directions.
 
     Both directions, because the two ways this drifts are opposite and each is silent. A training
     token that loses its Disallow gives away a licence position in a commit about SEO; a search
     crawler that arrives in the training list by copy-paste removes the site from search, and every
     other assertion in this file would still pass.
   */
-  const TRAINING_TOKENS = ["GPTBot", "CCBot", "anthropic-ai", "Google-Extended", "Applebot-Extended"];
+  const TRAINING_TOKENS = ["GPTBot", "CCBot", "ClaudeBot", "anthropic-ai", "Google-Extended", "Applebot-Extended", "Bytespider", "Meta-ExternalAgent"];
+
+  /*
+    A fetch a person asked for is a visit, not a corpus crawl, so these five stay allowed. Two are
+    named groups; the other three fall to `*`, which allows them -- and that is the assertion that
+    matters, because "allowed by default" is one careless list edit away from "refused".
+  */
+  const USER_TRIGGERED_TOKENS = ["Claude-User", "Claude-SearchBot", "ChatGPT-User", "OAI-SearchBot", "PerplexityBot"];
 
   it("disallows every training crawler everywhere", () => {
     expect(TRAINING_RULES.map((rule) => rule.userAgent)).toEqual(TRAINING_TOKENS);
@@ -207,15 +215,36 @@ describe("public surface: robots, sitemap and llms.txt agree", () => {
   });
 
   /*
-    ClaudeBot is the token Anthropic's current crawler sends; `anthropic-ai` is the older one, and
-    only the older one is on the founder's list. That gap is recorded as open in the crawler policy,
-    so the document has to keep naming it -- an open decision that stops being written down is an
-    open decision nobody makes.
+    Both of Anthropic's tokens are on the list: `ClaudeBot` is what the current crawler sends and
+    `anthropic-ai` is the older one, so listing only the retired token would leave the one in use
+    allowed by `*`. FD-61 closed that gap, and it closed only the tokens it named -- the rest stay
+    open in the crawler policy, because an open decision that stops being written down is an open
+    decision nobody makes.
   */
-  it("records the tokens it does not list, rather than letting them look decided", () => {
-    expect(TRAINING_TOKENS, "ClaudeBot is an open founder decision, not a default").not.toContain("ClaudeBot");
-    expect(crawlerPolicy, "the policy must name the token it leaves out").toContain("ClaudeBot");
+  it("refuses both of the operator's tokens, not just the retired one", () => {
+    for (const token of ["ClaudeBot", "anthropic-ai"]) {
+      expect(TRAINING_TOKENS, `${token} is named by FD-61`).toContain(token);
+    }
+    expect(crawlerPolicy, "the policy must name what it refuses").toContain("ClaudeBot");
     expect(crawlerPolicy, "robots.txt is a request, not a technical measure").toContain("not access control");
+  });
+
+  it("keeps user-triggered fetchers allowed, and says so where it can be read", () => {
+    const trainingAgents = TRAINING_RULES.map((rule) => String(rule.userAgent));
+    for (const token of USER_TRIGGERED_TOKENS) {
+      expect(TRAINING_TOKENS, `${token} fetches because a person asked; refusing it is a visit refused`)
+        .not.toContain(token);
+      expect(trainingAgents, `${token} must not reach robots.txt as a disallow-all group`).not.toContain(token);
+      expect(crawlerPolicy, `${token} is allowed on purpose and the policy has to say which ones`).toContain(token);
+    }
+  });
+
+  it("records the tokens FD-61 did not rule on, rather than letting them look decided", () => {
+    for (const token of ["Amazonbot", "Diffbot", "Omgilibot", "Timpibot", "PanguBot"]) {
+      expect(TRAINING_TOKENS, `${token} was not decided and must not arrive by default`).not.toContain(token);
+      expect(crawlerPolicy, `${token} has to stay named as open`).toContain(token);
+    }
+    expect(crawlerPolicy, "the document has to keep an open list at all").toContain("Still open");
   });
 });
 
