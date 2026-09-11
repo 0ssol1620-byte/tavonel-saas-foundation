@@ -107,7 +107,18 @@ export default function DesktopPrimaryNav() {
                     data-overview={group.featured.href === group.overviewHref ? "" : undefined}
                     onClick={() => setOpen(null)}
                   >
-                    {group.featured.label}
+                    <b>{group.featured.label}</b>
+                    {/*
+                      BA-244: what is behind the link, in the panel's own last row.
+
+                      The Product panel is two columns of names inside a full-width sheet, and the
+                      audit measured the right half of it empty. There is no product capture in
+                      `public/` to crop into that space and the brief bars drawing one, so the row
+                      carries the one true thing about the destination instead: the corpus the
+                      public sample is compiled from, recomputed from `lib/explore-sample.ts` by
+                      `lib/site-nav-model.test.ts`.
+                    */}
+                    {group.featured.description ? <i>{group.featured.description}</i> : null}
                   </Link>
                 </p>
               ) : null}
@@ -116,10 +127,18 @@ export default function DesktopPrimaryNav() {
         </span>
       ))}
       <Link
+        className="site-nav-direct"
         href={NAV_PRICING.href as Route}
         aria-current={current === "pricing" ? "true" : undefined}
       >
         {NAV_PRICING.label}
+        {/*
+          BA-247: Pricing is the one bar item that opens nothing, so it is the one without a
+          caret -- which gave it a different line box and sat it about 5px above the other four.
+          This reserves the caret's width and leaves the row aligned, without promising a
+          disclosure that is not there. `.site-nav-trigger::after` is the caret it matches.
+        */}
+        <span className="site-nav-caret-space" aria-hidden="true" />
       </Link>
     </nav>
   );

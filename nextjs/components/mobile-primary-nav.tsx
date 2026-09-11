@@ -4,7 +4,8 @@ import Link from "next/link";
 import type { Route } from "next";
 import { useCallback, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
-import { NAV_GROUPS, NAV_PRICING, navSectionForPath } from "@/lib/site-navigation";
+import { NAV_OPEN_EVENT } from "@/lib/marketing-analytics";
+import { NAV_GROUPS, NAV_PRICING, navSectionForPath, type SiteLink } from "@/lib/site-navigation";
 
 /*
   A disclosure, kept a disclosure, with the sections grouped inside it.
@@ -29,7 +30,15 @@ import { NAV_GROUPS, NAV_PRICING, navSectionForPath } from "@/lib/site-navigatio
   The desktop panel's two-column layout is deliberately not carried over. Two columns narrowed to
   a phone's width are two unreadable columns; a group's links are one stack here.
 */
-export default function MobilePrimaryNav() {
+/**
+ * `cta` is the header's own action, handed down so the two widths cannot disagree about it.
+ *
+ * It is optional for one caller: `/contact` still hand-rolls its header (BA-250, a cross-lane
+ * request to the lane that owns that page), and `/contact` is where the action goes anyway -- a
+ * sheet that offers "Request access" on the request-access page is a button back to the page you
+ * are reading. No caller may pass a label of its own: the object comes from the header.
+ */
+export default function MobilePrimaryNav({ cta }: { cta?: SiteLink }) {
   const ref = useRef<HTMLDetailsElement | null>(null);
   const pathname = usePathname();
   const current = navSectionForPath(pathname);
@@ -83,8 +92,19 @@ export default function MobilePrimaryNav() {
     }
   };
 
+  /*
+    BA-245: the sheet says when it is open, and the consent banner stops drawing over it.
+
+    On the element's own `toggle` rather than on the summary's click, so the state announced is
+    the state the element is in however it got there -- Escape, a link, a route change and the
+    `close()` calls above all route through here.
+  */
+  const onSheetToggle = (event: React.SyntheticEvent<HTMLDetailsElement>) => {
+    window.dispatchEvent(new CustomEvent(NAV_OPEN_EVENT, { detail: { open: event.currentTarget.open } }));
+  };
+
   return (
-    <details className="mobile-primary-nav" ref={ref}>
+    <details className="mobile-primary-nav" ref={ref} onToggle={onSheetToggle}>
       <summary aria-label="Open site navigation">Menu</summary>
       <nav aria-label="Mobile sections">
         {NAV_GROUPS.map((group) => (
@@ -113,6 +133,19 @@ export default function MobilePrimaryNav() {
         >
           {NAV_PRICING.label}
         </Link>
+        {/*
+          BA-232 / BA-245: the same action as the header bar, from the same object.
+
+          The phone header offered "Request access" while the desktop bar said "Contact", because
+          the two read different constants. They read one now, and the sheet ends on it -- the
+          phone spec's bottom action, which is also the only control a reader reaches without
+          closing the menu first.
+        */}
+        {cta ? (
+          <Link className="mobile-nav-cta btn small" href={cta.href as Route} onClick={close}>
+            {cta.label}
+          </Link>
+        ) : null}
       </nav>
     </details>
   );
