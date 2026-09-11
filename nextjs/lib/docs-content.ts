@@ -904,10 +904,12 @@ export const DOCS_SECTIONS: DocsSection[] = [
       */
       { kind: "prose", text: "A spreadsheet is billed on the page count of the sanitized PDF it is converted to, counted after that conversion. Before it, there is no page count: preflight names xlsx, ods and csv files and shows no number for them rather than quoting one from file size. What is charged is settled against the pages the read actually produced, and never above the maximum shown before the run." },
       /*
-        REPAIR ROUND, 2026-09-11. This paragraph published FD-03's page-expiry term while nothing
-        in the billing code reduces a `credit_balance`. FD-03 holds that copy to the code -- the
-        enforcement is LEDGER-EXPIRY's migration -- so the balance behaviour is stated again here,
-        in the same words /pricing uses, and the expiry sentence ships with the migration.
+        Stage-B integration, 2026-09-11. The entitlements lane held FD-03's page-expiry term back
+        here because nothing on that branch reduced a `credit_balance`. LEDGER-EXPIRY's
+        `20260911130000_included_page_expiry_at_renewal.sql` is now merged, so the term is stated
+        -- in the ledger lane's wording, which names the moment the code keeps (the next grant)
+        rather than a period-end boundary the schema records nowhere. Same words as /pricing, and
+        `lib/product-claims-sync.test.ts` P06 pins both surfaces so they cannot drift apart.
 
         P07 / FD-04's refund numbers stay: `REFUND_WINDOW_DAYS`,
         `REFUND_MAX_CONSUMED_FRACTION` and the catalog's own `includedPages`, with the rate from
@@ -916,11 +918,11 @@ export const DOCS_SECTIONS: DocsSection[] = [
         `liveChargesEnabled` is false.
 
         FD-03 and FD-04 are a delegated decision, 2026-09-11 (orchestrator, under the founder's
-        delegation) -- see `D:\CodexProjects\growth-lanes\DECISION_LOG_2026-09-11.md`, which bars
+        delegation) -- see `docs/policy/DECISION_LOG_2026-09-11.md`, which bars
         attributing them to the founder -- and the lane report makes the founder's direct
         ratification a merge condition.
       */
-      { kind: "prose", text: `Current billing behaviour keeps unused pages in your balance: cancelling stops the renewal that adds to it, nothing in the billing code removes a balance you already hold, and a balance can only be spent while a plan is active. Unused pages are not refunded if you cancel. Pages past the included allowance are billed at the published rate of ${formatUsd(STANDARD_UNITS_PER_PAGE * PROCESSING_UNIT_USD)} per standard page.` },
+      { kind: "prose", text: `Included pages belong to the billing month they are granted in: when the next month's pages are granted, whatever is left of the previous month expires. Unused pages do not roll over and are not refunded if you cancel. A balance can only be spent while a plan is active. Pages past the included allowance are billed at the published rate of ${formatUsd(STANDARD_UNITS_PER_PAGE * PROCESSING_UNIT_USD)} per standard page.` },
       { kind: "prose", text: `Refunds: ask within ${REFUND_WINDOW_DAYS} days of payment and the payment is refunded in full, provided fewer than ${Math.round(REFUND_MAX_CONSUMED_FRACTION * 100)}% of the plan's included pages have been consumed — ${refundablePageAllowance(BILLING_OFFERS.observer_access)} pages on ${BILLING_OFFERS.observer_access.label}, ${refundablePageAllowance(BILLING_OFFERS.studio_access)} on ${BILLING_OFFERS.studio_access.label}. Past that, the payment is not refunded. Unused pages are not refunded on cancellation. Subject to the terms as updated.` },
       {
         kind: "table",

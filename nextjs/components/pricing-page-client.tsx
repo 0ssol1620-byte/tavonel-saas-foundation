@@ -91,22 +91,26 @@ const PLANS: ReadonlyArray<{
   PROCESSING_UNIT_USD`, the same two constants the estimator quotes and the reservation code
   charges against, and the included pages are the catalog's `includedPages`.
 
-  REPAIR ROUND, 2026-09-11. The first pass of the "Unused pages" tile published FD-03's
-  page-expiry term -- "unused pages expire at the end of each billing month and do not roll
-  over" -- while nothing in the billing code reduces a `credit_balance`: no migration, job,
-  trigger or route. FD-03 says the opposite of shipping that early: "Ledger enforcement of the
-  expiry is a separate item (LEDGER-EXPIRY) and the copy is held to the code until it lands." So
-  the tile states the behaviour again and the term is held. It ships in the release that ships
-  the LEDGER-EXPIRY migration, not before.
+  The "Unused pages" tile is the one to read carefully, and it is the one thing this merge had to
+  decide. The entitlements lane held FD-03's term back -- "unused pages expire at the end of each
+  billing month and do not roll over" -- because on its branch nothing reduced a `credit_balance`:
+  no migration, job, trigger or route. That is no longer the state of this tree. LEDGER-EXPIRY's
+  `20260911130000_included_page_expiry_at_renewal.sql` is merged, and the next month's grant
+  expires whatever is left of the previous month as its own ledger row, taking nothing that is not
+  that plan's included pages. So the term is stated -- in the ledger lane's wording, which is the
+  wording the code keeps. The stronger "at the end of each billing month" promises a boundary the
+  schema does not record (Paddle sends a period end; nothing stores it) and a job that does not
+  exist, so it would say a balance was gone while the balance was still spendable;
+  `product-claims-sync.test.ts` P06 fails if it comes back.
 
   The refund bright line (P07, FD-04) is a term rather than a behaviour and it stays: no route
   could enforce it -- refunds are issued by a person through Paddle -- and `liveChargesEnabled`
   is false, so no payment exists to refund yet.
 
   FD-03 and FD-04 are both a delegated decision, 2026-09-11 (orchestrator, under the founder's
-  delegation), and not the founder's own statements;
-  `D:\CodexProjects\growth-lanes\DECISION_LOG_2026-09-11.md` requires that attribution, and the
-  lane report carries the founder's direct ratification as a merge condition.
+  delegation), and not the founder's own statements; `docs/policy/DECISION_LOG_2026-09-11.md`
+  requires that attribution, and the founder's direct ratification is a merge condition the lane
+  reports carry.
 
   The numbers stay derived -- the rate from the two constants the reservation code charges
   against, the refund figures from the catalog -- so a moved rate moves this copy instead of
@@ -142,7 +146,7 @@ function glanceRows(planCapabilities: readonly PlanCapabilityRow[]) {
     ],
     [
       "Unused pages",
-      `Current billing behaviour keeps unused pages in your balance: cancelling stops the renewal that adds to it, nothing in the billing code removes a balance you already hold, and a balance can only be spent while a plan is active. Unused pages are not refunded if you cancel. Pages past the included allowance are billed at the published rate of ${formatUsd(STANDARD_PAGE_USD)} per standard page.`,
+      `Included pages belong to the billing month they are granted in: when the next month's pages are granted, whatever is left of the previous month expires. Unused pages do not roll over and are not refunded if you cancel. Pages past the included allowance are billed at the published rate of ${formatUsd(STANDARD_PAGE_USD)} per standard page.`,
     ],
     [
       "What differs by plan",

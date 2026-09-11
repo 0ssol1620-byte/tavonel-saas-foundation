@@ -349,25 +349,38 @@ describe("product claims sync", () => {
   /*
     Audit P06 and P08: two facts a buyer could only find by reading SQL, and a link.
 
-    P06 is pinned as *behaviour read out of the billing code* -- "nothing in the billing code
-    removes a balance you already hold" -- which is what `apply_foundation_billing_event_v4` does:
-    it adds each renewal's allowance and no job, trigger or route reduces the balance.
+    P06 used to be pinned as *behaviour read out of the billing code* -- "nothing in the billing
+    code removes a balance you already hold", which was true of `apply_foundation_billing_event_v4`
+    as 0035 wrote it and said nothing about what the customer had bought. FD-03 settled the term:
+    included pages belong to their billing month, do not roll over, and are not refunded on
+    cancellation. So this pins the published term instead, and the rate beside it stays derived
+    from the constants the reservation code charges against rather than typed.
 
-    REPAIR ROUND, 2026-09-11. One pass replaced that with FD-03's page-expiry term, which no
-    migration enforces, and pinned the unenforced sentence here so CI would keep it published.
-    FD-03 holds the copy to the code -- "Ledger enforcement of the expiry is a separate item
-    (LEDGER-EXPIRY) and the copy is held to the code until it lands" -- so the last assertion is
-    that rule, runnable: while no migration writes the expiry, no buyer surface may state it, and
-    the moment one does the guard releases on its own rather than needing this test edited.
+    The term is no longer ahead of its enforcement:
+    `supabase/migrations/20260911130000_included_page_expiry_at_renewal.sql` expires the previous
+    month's remainder when the next month's grant lands, as a ledger row, and
+    `lib/included-page-expiry-migration.test.ts` guards that. So these assertions pin the moment
+    the code actually keeps -- *at the next grant* -- and not "at the end of each billing month",
+    which is a boundary no column records and no job enforces. If a later edit puts the stronger
+    sentence back on the page, this test is what fails.
+
+    Stage-B integration: `lib/docs-content.ts`'s billing block carried the entitlements lane's
+    behaviour sentence ("nothing in the billing code removes a balance you already hold"), which
+    this merge made false -- git auto-merged that file because the ledger lane never touched it.
+    Both buyer surfaces now state the same moment and both are pinned here, so they cannot drift
+    apart again in one direction. The FD-03 hold test below releases itself on this tree, because
+    a migration now writes `allowance_expired`; it stays because it is the rule, not the state.
   */
-  it("states the cancellation balance behaviour and points Enterprise at the trust index", () => {
+  it("states the page-expiry term and points Enterprise at the trust index", () => {
     const pricing = read("components/pricing-page-client.tsx");
-    expect(pricing, "P06: what happens to a balance on cancellation")
-      .toContain("nothing in the billing code removes a balance you already hold");
-    expect(pricing, "P06: and that it is only spendable while a plan is active")
-      .toContain("only be spent while a plan is active");
-    expect(pricing, "P06: and that unused pages are not refunded on cancellation")
-      .toContain("not refunded if you cancel");
+    expect(pricing, "P06: the expiry moment is the next grant, not a period-end clock")
+      .toContain("when the next month's pages are granted, whatever is left of the previous month expires");
+    expect(pricing, "P06: unused included pages do not roll over, and are not refunded on cancellation")
+      .toContain("do not roll over and are not refunded if you cancel");
+    expect(pricing, "P06: the page does not promise a period-end boundary the schema has no column for")
+      .not.toContain("expire at the end of each billing month");
+    expect(read("lib/docs-content.ts"), "P06: the billing docs state the same expiry moment as the page")
+      .toContain("when the next month's pages are granted, whatever is left of the previous month expires");
     expect(pricing, "P06: the overage rate is derived, not typed")
       .toContain("published rate of ${formatUsd(STANDARD_PAGE_USD)} per standard page");
     expect(pricing, "P03: whether Ask and search consume pages")
