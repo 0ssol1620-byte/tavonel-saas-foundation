@@ -364,6 +364,63 @@ describe("the validation record is derived from the package it describes", () =>
     });
     expect(report.counts).toEqual(artifact.validation.counts);
   });
+
+  /*
+    Audit U05 on the export surface. The package said `review_required` and left the customer to
+    work out which document caused it, while the workspace and GET /api/collections/[id] both
+    name it.
+
+    The two per-document facts are the two per-document checks the validator already makes, so
+    the list cannot disagree with the reasons above it. `excluded` and `unprocessed` are absent
+    deliberately: a document the compiler never received leaves no trace in this package, and
+    `documentsNotCompiled` says that rather than letting the absence read as "nothing was".
+  */
+  it("names every document it compiled, and why one of them is in review", () => {
+    const read = (candidate: { package: { files: readonly { path: string; content: string }[] } }) =>
+      JSON.parse(candidate.package.files.find((file) => file.path === "validation/report.json")!.content);
+
+    const report = read(artifact);
+    expect(report.documents).toEqual([
+      { documentId: "doc-a", sourceVersionId: "1".repeat(64), status: "read", reasons: [] },
+      { documentId: "doc-b", sourceVersionId: "2".repeat(64), status: "read", reasons: [] },
+    ]);
+    expect(report.documentsNotCompiled).toContain("not in this package");
+
+    // A document with no regions produces no anchored unit, which is the package's own
+    // EVIDENCE_COVERAGE_INCOMPLETE reason -- here attributed to the document that caused it.
+    const withGap = compileCollectionCandidate([
+      input("doc-a", "1".repeat(64), "The pump was inspected and the reading stayed inside the governance policy limits."),
+      input("doc-b", "2".repeat(64), "Security access control protects the private research evidence of the site.", null),
+    ]);
+    const gapped = read(withGap);
+    expect(gapped.documents).toEqual([
+      { documentId: "doc-a", sourceVersionId: "1".repeat(64), status: "read", reasons: [] },
+      {
+        documentId: "doc-b",
+        sourceVersionId: "2".repeat(64),
+        status: "under_review",
+        reasons: ["EVIDENCE_COVERAGE_INCOMPLETE"],
+      },
+    ]);
+    // Every reason a document carries is one the package already gives for itself.
+    for (const document of gapped.documents as { reasons: string[] }[]) {
+      for (const reason of document.reasons) expect(withGap.validation.reviewReasons).toContain(reason);
+    }
+  });
+
+  /* And the export gate cross-checks it: a list nobody checks is a claim nobody verified. */
+  it("refuses a package whose document list disagrees with the binding it was compiled from", () => {
+    const candidate = stored(artifact);
+    // The baseline, so the refusal below is the list and not something else about the fixture.
+    expect(validateDownloadableCollectionArtifact(candidate, artifact.collectionId)).not.toBeNull();
+
+    const tampered = JSON.parse(JSON.stringify(candidate)) as typeof candidate;
+    const file = tampered.package.files.find((entry) => entry.path === "validation/report.json")!;
+    const report = JSON.parse(file.content) as { documents: { documentId: string }[] };
+    report.documents = report.documents.filter((row) => row.documentId !== "doc-b");
+    file.content = JSON.stringify(report, null, 2) + "\n";
+    expect(validateDownloadableCollectionArtifact(tampered, tampered.collectionId)).toBeNull();
+  });
 });
 
 /*

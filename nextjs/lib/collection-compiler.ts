@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import {
   regionsOrNone,
   validationCheckReviewReasons,
+  VALIDATION_CHECK_REVIEW_REASON,
   type CompiledWorldValidationChecks,
 } from "../../shared/compiledWorldValidation";
 import { validateCompiledWorldPackage } from "../scripts/compiled-world/validate.mjs";
@@ -770,7 +771,45 @@ export function compileCollectionCandidate(inputs: CollectionOcrInput[]): Collec
     ...errorCodes,
   ])].sort();
   const status = reviewReasons.length === 0 ? "passed" as const : "review_required" as const;
-  files.push(packageFile("validation/report.json", JSON.stringify({ status, counts, checks, reviewReasons }, null, 2) + "\n"));
+  /*
+    Audit U05 on the export surface: per document, not only per package.
+
+    The workspace and `GET /api/collections/[id]` both show a customer which documents are still
+    in review; the package they download said `review_required` and left them to work out which
+    document caused it. The two per-document facts here are derived, not decided: a document with
+    no Document node failed `sourceCoverage`, and one that produced no anchored unit failed
+    `evidenceCoverage`. Each carries the package's own reason token for the check it failed, so
+    the list cannot disagree with `reviewReasons` above it.
+
+    `excluded` and `unprocessed` -- two of the four states the workspace shows -- cannot appear
+    here and are not faked: a document the compiler never received is not in this binding and
+    leaves no trace in this package. `documentsNotCompiled` says that in words rather than
+    letting the absence read as "nothing was excluded".
+  */
+  const documents = inputBinding.map((item) => {
+    const reasons = [
+      ...(nodes.some((node) => node.kind === "Document" && node.documentId === item.documentId)
+        ? [] : [VALIDATION_CHECK_REVIEW_REASON.sourceCoverage]),
+      ...(groundedDocuments.has(item.documentId) ? [] : [VALIDATION_CHECK_REVIEW_REASON.evidenceCoverage]),
+    ].sort();
+    return {
+      documentId: item.documentId,
+      sourceVersionId: item.versionKey,
+      status: reasons.length === 0 ? "read" as const : "under_review" as const,
+      reasons,
+    };
+  });
+  files.push(packageFile("validation/report.json", JSON.stringify({
+    status,
+    counts,
+    checks,
+    reviewReasons,
+    documents,
+    documentsNotCompiled:
+      "Documents excluded by a safety check, or never read, are not in this package at all."
+      + " This list describes the binding this World was compiled from; the compile job breakdown"
+      + " in the workspace is where a document that did not reach the compiler is accounted for.",
+  }, null, 2) + "\n"));
 
   const withoutDigest = {
     schemaVersion: COLLECTION_CANDIDATE_SCHEMA,

@@ -78,6 +78,19 @@ import rawSources from "./explore-sample.sources.json";
     the 6,457 recorded for this corpus previously was `candidatesConsidered` read under the old
     cap, which is not a measurement of the corpus.
 
+  2026-09-11: all five moved, and the cause is one package file rather than the compiler.
+
+  Audit U05 added a per-document `documents` list and a `documentsNotCompiled` note to
+  `validation/report.json`, so someone auditing a downloaded package can see which document put
+  it in review instead of only that the package is in review. That file is inside the manifest
+  digest by design -- it is part of what a signed export signs -- so every digest a fallback
+  compile produces moves with it. Nothing about extraction, identity, the ontology or the counts
+  changed: `counts`, `checks` and `reviewReasons` hold the values they held, and
+  `collection-compiler.test.ts` asserts the new list agrees with them rather than restating them.
+
+  Re-derived from a new measurement for a deliberate content change, which is a different act
+  from moving a recorded number to make a build pass. The values they replace are below.
+
   Previous values, kept so the moves are traceable rather than merely different:
     2026-09-06  current world (2025 10-K)     sha256:b2aaebd8dd73b8d161d7fc23e4cf649f6c009bce87ee107bab8311a28a268978
     2026-09-06  revision B (2024 10-K)        sha256:2682d467ac1fd98d7570ace2053b7e9e9231d0b9f9c0715f81a011a8089c31bc
@@ -86,18 +99,23 @@ import rawSources from "./explore-sample.sources.json";
     2026-09-08  W0, three-page 10-K slice     sha256:b2aaebd8dd73b8d161d7fc23e4cf649f6c009bce87ee107bab8311a28a268978
     2026-09-08  W4, three pages per filing    sha256:50b61e20484c1a06cbf7b2a9ce7aa4c8926bc5819a59f60d8fec1f8096aba7e8
     2026-09-08  W4, 233 of 290 pages          sha256:277df1a439a8806ebb290b77f31ffdaf0a61b59e5efca3641d9cb7596aca9d20
+    2026-09-08  W0, before the U05 list       sha256:1db0e4c5ef2f89655e57d478a3761ce36c871ea9f1dfcd1a801aa8e1719b3597
+    2026-09-08  W1, before the U05 list       sha256:aec94176876a0db8d2c2284ffb633b86672080ba0041e0d18a0c2a3ce55f4187
+    2026-09-08  W2, before the U05 list       sha256:364b38dbfd36d4ce524bf7702117817d17a4dba84ef7249cbd5de98ceeb9c5af
+    2026-09-08  W3, before the U05 list       sha256:05adb2a5f5f3401ac6293040162b73b21966625834efa5a74f602f1a89bdfbeb
+    2026-09-08  W4, before the U05 list       sha256:328d3ef3a6ee0153b14e9a782cdb4e9f499a6443b1f5dbf2898ace1cb4915b7f
 */
 
 /** W4: the compiled World the Explore page shows. Recorded so that it cannot change unobserved. */
-export const EXPLORE_SAMPLE_DIGEST = "sha256:328d3ef3a6ee0153b14e9a782cdb4e9f499a6443b1f5dbf2898ace1cb4915b7f";
+export const EXPLORE_SAMPLE_DIGEST = "sha256:aff67d5c6d0e3e119433446ed003545a942ad5638de8e7b51c93c6ca1a847091";
 
 /** W0: the same annual filing alone, before the four 2026 filings arrived. */
-export const EXPLORE_SAMPLE_BASELINE_DIGEST = "sha256:1db0e4c5ef2f89655e57d478a3761ce36c871ea9f1dfcd1a801aa8e1719b3597";
+export const EXPLORE_SAMPLE_BASELINE_DIGEST = "sha256:b553f3e4b90b991f6555eae8047064cf5930143878a111f134d2d4426186f1ef";
 
 /* The three intermediate Worlds, one per arriving filing. Frozen on the same terms as the ends. */
-export const EXPLORE_SAMPLE_W1_DIGEST = "sha256:aec94176876a0db8d2c2284ffb633b86672080ba0041e0d18a0c2a3ce55f4187";
-export const EXPLORE_SAMPLE_W2_DIGEST = "sha256:364b38dbfd36d4ce524bf7702117817d17a4dba84ef7249cbd5de98ceeb9c5af";
-export const EXPLORE_SAMPLE_W3_DIGEST = "sha256:05adb2a5f5f3401ac6293040162b73b21966625834efa5a74f602f1a89bdfbeb";
+export const EXPLORE_SAMPLE_W1_DIGEST = "sha256:c1714be053752138e59a1a80599b89852f308bac8ae67ad6a2fdc793baa1200e";
+export const EXPLORE_SAMPLE_W2_DIGEST = "sha256:a902ada378c9f6c1d91cd6de0e9323e5d344f415d41c3ab202f7a91cc9fa2d06";
+export const EXPLORE_SAMPLE_W3_DIGEST = "sha256:76eda2ed020039cef776c89b5d2e4f391e062bb361224b1fc77573dedc9cf6fc";
 
 export const EXPLORE_SAMPLE_SOURCE_DIRECTORY = "public/explore-sample";
 
