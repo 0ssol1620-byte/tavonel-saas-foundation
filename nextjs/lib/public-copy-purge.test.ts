@@ -52,6 +52,9 @@ const SALES_SURFACES = [
   "knowledge-compiler",
   "changelog",
   "status",
+  // `trust` answers buyer questions and is linked from the footer, so it is a sales surface and
+  // is held to the same purge as the rest of them (trust lane CROSS-LANE 3).
+  "trust",
 ] as const;
 
 /*
