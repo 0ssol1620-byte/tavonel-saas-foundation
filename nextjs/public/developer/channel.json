@@ -17,6 +17,14 @@
     "sourceAgent": {
       "url": "https://tavonel.com/developer/tavonel-source-agent.py",
       "sha256": "sha256:f8d4bbd8fa622d65812f31a8359ede04bac6d886d5dead3fa46e89d18b9fc7c4"
+    },
+    "verifyExport": {
+      "url": "https://tavonel.com/developer/tavonel-verify-export.mjs",
+      "sha256": "sha256:50d69a351a9766f0b899f71db8ed305cfd478ca35c78ec2f0e8e2f4444f97ba0"
+    },
+    "verifyPackage": {
+      "url": "https://tavonel.com/developer/tavonel-verify-package.mjs",
+      "sha256": "sha256:c99588be85b892366ed770af32a8aba203031a5ec28bbf0bfebc2acba3d820e3"
     }
   }
 }

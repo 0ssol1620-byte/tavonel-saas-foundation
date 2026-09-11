@@ -1,5 +1,8 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { spawnSync } from "node:child_process";
+import { createHash, generateKeyPairSync } from "node:crypto";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { readCapabilities } from "./capabilities";
 import { CLAIM_STATE } from "./claim-state";
@@ -337,12 +340,18 @@ describe("contract promises", () => {
     No sentence a visitor reads may name a tool only this repository can run.
 
     The page told a reader to run `pnpm verify:export` against a downloaded archive. That script
-    is `scripts/verify-signed-export.mjs` in the private site repository: it is not in the package,
-    not in `public/developer/`, and not a command in the published CLI. It was the only pnpm script
-    named in the visible copy of any page in this app, so it was not a convention a reader would
-    discount -- it was an instruction that fails. The `evidence` field is exempt on purpose: it is
-    declared as a pointer into this repository, and "WHERE TO CHECK IT" is addressed to someone
-    reading the source, not to someone holding a zip.
+    is `scripts/verify-signed-export.mjs` in the private site repository: it was not in the
+    package, not in `public/developer/`, and not a command in the published CLI. It was the only
+    pnpm script named in the visible copy of any page in this app, so it was not a convention a
+    reader would discount -- it was an instruction that fails. The `evidence` field is exempt on
+    purpose: it is declared as a pointer into this repository, and "WHERE TO CHECK IT" is
+    addressed to someone reading the source, not to someone holding a zip.
+
+    The rule survives; its second half inverted. Audit 2026-09-11 M07/R4-03 found /docs/cli
+    telling every reader to run two scripts that existed only here, which is the same failure on
+    a different page. Both verifiers are now published downloads, so what this asserts is that
+    they are there -- and the pnpm ban stands, because `pnpm verify:export` is still not a
+    command anyone outside this repository has.
   */
   it("names no repository-only script in a sentence addressed to a reader", () => {
     for (const entry of CONTRACT_CLAUSES) {
@@ -352,14 +361,121 @@ describe("contract promises", () => {
     expect(stripComments(read("../app/product/continuous-knowledge/page.tsx")), "the page names a pnpm script")
       .not.toMatch(/\bpnpm\s/);
 
-    // And the verifier is still absent from everything a holder receives.
+    // And the verifier a holder is told to run is now one a holder can actually download.
     const shipped = readdirSync(resolve(import.meta.dirname, "../public/developer"));
-    expect(shipped.filter((file) => file.toLowerCase().includes("verify")), "a verifier now ships to /developer; the portable-world copy can be re-derived")
-      .toEqual([]);
+    expect(shipped.filter((file) => file.toLowerCase().includes("verify")).sort())
+      .toEqual(["tavonel-verify-export.mjs", "tavonel-verify-package.mjs"]);
     expect(read("../public/developer/tavonel-cli.mjs")).not.toContain("verify:export");
     expect(read("./collection-download.ts"), "the archive no longer writes the README the clause describes")
       .toContain("Verify manifest/export-manifest.json against signatures/export-manifest.ed25519.json");
   });
+
+  /*
+    The published verifier is the repository's verifier, byte for byte.
+
+    Two copies of a checker is how a checker rots: the repository's runs in CI, the customer's
+    runs on the download, and the day they differ nobody finds out from either one. So the
+    published file is a copy rather than a port, and this asserts the copy. When it fails, the
+    fix is to re-copy and re-pin, never to edit the public file:
+
+      cp scripts/verify-signed-export.mjs public/developer/tavonel-verify-export.mjs
+      cp scripts/compiled-world/validate.mjs public/developer/tavonel-verify-package.mjs
+      # then write the sha256 of each into public/developer/channel.json
+
+    Every import is asserted to be a `node:` built-in, because a verifier whose first step is
+    `pnpm install` is not one a customer on a clean machine can run -- which was the defect.
+  */
+  it("publishes the two verifiers as byte-identical, dependency-free, sha256-pinned downloads", () => {
+    const channel = JSON.parse(read("../public/developer/channel.json")) as {
+      assets: Record<string, { url: string; sha256: string }>;
+    };
+    const published = {
+      verifyExport: ["tavonel-verify-export.mjs", "../scripts/verify-signed-export.mjs"],
+      verifyPackage: ["tavonel-verify-package.mjs", "../scripts/compiled-world/validate.mjs"],
+    } as const;
+
+    for (const [key, [filename, origin]] of Object.entries(published)) {
+      const source = read(`../public/developer/${filename}`);
+      expect(source, `${filename} has drifted from ${origin}`).toBe(read(origin));
+      expect(channel.assets[key]?.url).toBe(`https://tavonel.com/developer/${filename}`);
+      expect(channel.assets[key]?.sha256, `${filename} is not pinned to its own bytes in channel.json`)
+        .toBe(`sha256:${createHash("sha256").update(readFileSync(resolve(import.meta.dirname, `../public/developer/${filename}`))).digest("hex")}`);
+      for (const match of source.matchAll(/^import\s[^;]*?from\s+"([^"]+)"/gm)) {
+        expect(match[1], `${filename} imports ${match[1]}, which a downloaded file cannot resolve`)
+          .toMatch(/^node:/);
+      }
+    }
+  });
+
+  /*
+    Does the published verifier verify? Run it, on a real archive, from the public copy.
+
+    M07's completion bar is evidence that a machine holding only the public downloads can check
+    both halves of an export. The archive here is built by the same `buildSignedCollectionZip` a
+    customer download goes through, signed with a throwaway key, and handed to the two files that
+    are served from /developer -- not to the repository scripts.
+
+    The failure paths are asserted too, because a verifier that cannot fail is a verifier that
+    does not work: the wrong trusted fingerprint is rejected, and running the package validator
+    with no arguments exits non-zero rather than printing nothing and passing. That last one is
+    not hypothetical -- the repository copy detected "am I the CLI" by matching its own path, so
+    the renamed public copy would have loaded, checked nothing and exited 0.
+
+    This is also the only coverage of the archive reader in the package validator, which is the
+    path a customer hits and the one nothing exercised while fflate did the reading.
+  */
+  it("verifies a real signed archive using only the two published downloads", async () => {
+    const { exploreSampleArtifact } = await import("./explore-sample");
+    const { buildSignedCollectionZip, validateDownloadableCollectionArtifact } = await import("./collection-download");
+    const { createExportSigner } = await import("./export-signing");
+
+    const keys = generateKeyPairSync("ed25519");
+    const signer = createExportSigner({
+      keyId: "devx-published-verifier-probe",
+      privateKeyPkcs8DerBase64: keys.privateKey.export({ format: "der", type: "pkcs8" }).toString("base64"),
+    });
+    if (!signer) throw new Error("the export signer refused a freshly generated Ed25519 key");
+
+    const artifact = validateDownloadableCollectionArtifact(
+      JSON.parse(JSON.stringify(exploreSampleArtifact)),
+      exploreSampleArtifact.collectionId,
+    );
+    if (!artifact) throw new Error("the explore sample is not a downloadable artifact");
+    const signed = buildSignedCollectionZip(artifact, signer);
+
+    const directory = mkdtempSync(join(tmpdir(), "tavonel-devx-verify-"));
+    const archivePath = join(directory, "world.zip");
+    writeFileSync(archivePath, signed.archive);
+    const asset = (name: string) => resolve(import.meta.dirname, `../public/developer/${name}`);
+    const run = (args: string[]) => spawnSync(process.execPath, args, { encoding: "utf8", timeout: 120_000 });
+
+    try {
+      const exportOk = run([asset("tavonel-verify-export.mjs"), "--archive", archivePath, "--trusted-fingerprint", signer.publicKeySpkiSha256]);
+      expect(exportOk.status, exportOk.stderr).toBe(0);
+      expect(JSON.parse(exportOk.stdout)).toEqual(expect.objectContaining({
+        ok: true,
+        collectionId: exploreSampleArtifact.collectionId,
+        keyId: "devx-published-verifier-probe",
+      }));
+
+      const wrongKey = run([asset("tavonel-verify-export.mjs"), "--archive", archivePath, "--trusted-fingerprint", `sha256:${"0".repeat(64)}`]);
+      expect(wrongKey.status).toBe(1);
+      expect(wrongKey.stderr).toContain("trusted fingerprint");
+
+      const packageOk = run([asset("tavonel-verify-package.mjs"), "--package", archivePath, "--require-signature", "--json"]);
+      expect(packageOk.status, `${packageOk.stdout}${packageOk.stderr}`).toBe(0);
+      const report = JSON.parse(packageOk.stdout) as { ok: boolean; files: number; errors: unknown[] };
+      expect(report).toEqual(expect.objectContaining({ ok: true, errors: [] }));
+      expect(report.files).toBeGreaterThan(10);
+
+      const usage = run([asset("tavonel-verify-package.mjs")]);
+      expect(usage.status, "the published validator ran with no arguments and reported nothing").toBe(2);
+      expect(usage.stderr).toContain("tavonel-verify-package.mjs --package");
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+    // Compiling the explore sample and running four child processes does not fit the 5 s default.
+  }, 180_000);
 
   /*
     What is left of the portable-world promise once the tool is gone.
