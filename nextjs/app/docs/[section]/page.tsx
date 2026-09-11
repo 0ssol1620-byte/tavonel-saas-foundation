@@ -14,6 +14,10 @@ import {
   type DocsBlock,
 } from "@/lib/docs-content";
 import { readDocsEndpoints, snippetFor, SNIPPET_LANGUAGES, type DocsEndpoint } from "@/lib/docs-endpoints";
+import { DocsToc } from "@/components/docs/docs-toc";
+import { PageToc, tocEntries } from "@/components/docs/page-toc";
+import layout from "@/components/docs/docs-toc.module.css";
+import anchor from "@/components/docs/page-toc.module.css";
 
 export function generateStaticParams() {
   return DOCS_SECTIONS.map((section) => ({ section: section.slug }));
@@ -46,9 +50,9 @@ function withEmphasis(text: string) {
   ));
 }
 
-function CodeBlock({ label, body }: { label: string; body: string }) {
+function CodeBlock({ label, body, id }: { label: string; body: string; id?: string }) {
   return (
-    <figure className="docs-code">
+    <figure className={id ? `docs-code ${anchor.anchor}` : "docs-code"} id={id}>
       <figcaption>
         <span>{label}</span>
         <DocsCopyButton value={body} />
@@ -61,9 +65,9 @@ function CodeBlock({ label, body }: { label: string; body: string }) {
 /* The names people call them, rather than the identifiers the generator uses. */
 const LANGUAGE_LABELS = { curl: "cURL", python: "Python", typescript: "TypeScript" } as const;
 
-function Endpoint({ endpoint }: { endpoint: DocsEndpoint }) {
+function Endpoint({ endpoint, id }: { endpoint: DocsEndpoint; id?: string }) {
   return (
-    <article className="docs-endpoint">
+    <article className={id ? `docs-endpoint ${anchor.anchor}` : "docs-endpoint"} id={id}>
       <header>
         <b data-method={endpoint.method}>{endpoint.method}</b>
         <code>{endpoint.path}</code>
@@ -90,7 +94,23 @@ function Endpoint({ endpoint }: { endpoint: DocsEndpoint }) {
   );
 }
 
-function Block({ block, endpoints }: { block: DocsBlock; endpoints: Map<string, DocsEndpoint> }) {
+/*
+  The blocks a reader can jump to.
+
+  The documentation is data, and the only titled landmarks it carries are code samples (their
+  label) and endpoints (the method and path the published contract gives them). Those are what
+  "On this page" lists, and nothing invents a heading the source does not have -- a section with
+  fewer than three of them gets no jump list at all. An endpoint naming an operation the
+  contract does not carry renders nothing, so it is not offered as a destination either.
+*/
+function headingLabel(block: DocsBlock, endpoints: Map<string, DocsEndpoint>): string | null {
+  if (block.kind === "code") return block.label;
+  if (block.kind !== "endpoint") return null;
+  const endpoint = endpoints.get(block.operationId);
+  return endpoint ? `${endpoint.method} ${endpoint.path}` : null;
+}
+
+function Block({ block, endpoints, id }: { block: DocsBlock; endpoints: Map<string, DocsEndpoint>; id?: string }) {
   switch (block.kind) {
     case "prose":
       return <p>{withEmphasis(block.text)}</p>;
@@ -99,7 +119,7 @@ function Block({ block, endpoints }: { block: DocsBlock; endpoints: Map<string, 
     case "steps":
       return <ol className="docs-steps">{block.items.map((item) => <li key={item}>{item}</li>)}</ol>;
     case "code":
-      return <CodeBlock label={block.label} body={block.body} />;
+      return <CodeBlock label={block.label} body={block.body} id={id} />;
     case "table":
       return (
         <table className="docs-table">
@@ -119,7 +139,7 @@ function Block({ block, endpoints }: { block: DocsBlock; endpoints: Map<string, 
         the runtime half of a check that is meant to be caught before deploy -- it exists so a
         stale name is an absent block, never an invented endpoint.
       */
-      return endpoint ? <Endpoint endpoint={endpoint} /> : null;
+      return endpoint ? <Endpoint endpoint={endpoint} id={id} /> : null;
     }
   }
 }
@@ -130,6 +150,16 @@ export default async function DocsSectionPage({ params }: { params: Promise<{ se
   if (!entry) notFound();
 
   const endpoints = await readDocsEndpoints();
+  /*
+    Ids by position, so a block's anchor does not depend on how many unlabelled paragraphs sit
+    above it. `tocEntries` owns the slug and the duplicate suffix; the map is only the join back
+    to the block that carries the id.
+  */
+  const labelled = entry.blocks
+    .map((block, position) => ({ position, label: headingLabel(block, endpoints) }))
+    .filter((item): item is { position: number; label: string } => item.label !== null);
+  const toc = tocEntries(labelled.map((item) => item.label));
+  const anchorIds = new Map(labelled.map((item, order) => [item.position, toc[order]!.id]));
   const index = DOCS_SECTIONS.findIndex((item) => item.slug === section);
   const previous = DOCS_SECTIONS[index - 1];
   const next = DOCS_SECTIONS[index + 1];
@@ -137,35 +167,39 @@ export default async function DocsSectionPage({ params }: { params: Promise<{ se
   return (
     <PublicPageShell>
       <BreadcrumbJsonLd trail={[{ name: "Documentation", path: "/docs" }, { name: entry.title, path: `/docs/${section}` }]} />
-      <section className="scene doc"><div className="shell"><div className="body">
-        <div className="stack">
-          <p className="slate">
-            <b>DOCUMENTATION</b><span /><Link href="/docs">All sections</Link>
-          </p>
-          <h1 className="document-title">{entry.title}</h1>
-        </div>
-
-        <div className="stack">
-          <div className="stack docs-body">
-            <p className="lede">{entry.summary}</p>
-            {entry.blocks.map((block, position) => (
-              <Block key={position} block={block} endpoints={endpoints} />
-            ))}
+      <section className="scene doc"><div className="shell"><div className={layout.layout}>
+        <DocsToc current={section} />
+        <div className="body">
+          <div className="stack">
+            <p className="slate">
+              <b>DOCUMENTATION</b><span /><Link href="/docs">All sections</Link>
+            </p>
+            <h1 className="document-title">{entry.title}</h1>
           </div>
-          <nav className="docs-pager">
-            {previous ? <Link href={`/docs/${previous.slug}` as Route}>← {previous.title}</Link> : <span />}
-            {next ? <Link href={`/docs/${next.slug}` as Route}>{next.title} →</Link> : <span />}
-          </nav>
-          <p className="fine">
-            API version {DOCS_VERSION} · reviewed {DOCS_REVIEWED} ·{" "}
-            {/*
-              Feedback goes to an address that exists and is read. A form posting to an endpoint
-              nobody had built would look like feedback and be a hole in the floor.
-            */}
-            <a href={`mailto:support@tavonel.com?subject=${encodeURIComponent(`Docs feedback: ${entry.title}`)}`}>
-              Something wrong on this page?
-            </a>
-          </p>
+
+          <div className="stack">
+            <div className="stack docs-body">
+              <p className="lede">{entry.summary}</p>
+              <PageToc entries={toc} />
+              {entry.blocks.map((block, position) => (
+                <Block key={position} block={block} endpoints={endpoints} id={anchorIds.get(position)} />
+              ))}
+            </div>
+            <nav className="docs-pager">
+              {previous ? <Link href={`/docs/${previous.slug}` as Route}>← {previous.title}</Link> : <span />}
+              {next ? <Link href={`/docs/${next.slug}` as Route}>{next.title} →</Link> : <span />}
+            </nav>
+            <p className="fine">
+              API version {DOCS_VERSION} · reviewed {DOCS_REVIEWED} ·{" "}
+              {/*
+                Feedback goes to an address that exists and is read. A form posting to an endpoint
+                nobody had built would look like feedback and be a hole in the floor.
+              */}
+              <a href={`mailto:support@tavonel.com?subject=${encodeURIComponent(`Docs feedback: ${entry.title}`)}`}>
+                Something wrong on this page?
+              </a>
+            </p>
+          </div>
         </div>
       </div></div></section>
     </PublicPageShell>

@@ -54,7 +54,7 @@ export type DocsBlock =
 export type DocsSection = {
   slug: string;
   title: string;
-  group: "Start" | "Concepts" | "API" | "Operations";
+  group: (typeof DOCS_GROUPS)[number];
   summary: string;
   blocks: DocsBlock[];
 };
@@ -85,7 +85,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
   {
     slug: "quickstart",
     title: "Quickstart",
-    group: "Start",
+    group: "Getting started",
     summary: "From an API key to a verified evidence-bound answer, with the one step no key can take.",
     blocks: [
       { kind: "prose", text: "Every request is tenant-scoped by the key it carries. There is no account switch and no impersonation header: a key belongs to one workspace and reaches nothing else." },
@@ -297,7 +297,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
   {
     slug: "use-with-ai",
     title: "Use your results with AI",
-    group: "Start",
+    group: "External AI",
     summary: "Choose live MCP/API access or the signed portable package, and keep answers grounded in the same evidence.",
     blocks: [
       {
@@ -357,7 +357,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
   {
     slug: "ontology-output",
     title: "Use the ontology output",
-    group: "Start",
+    group: "External AI",
     summary: "Import the Compiled World ontology into RDF, linked-data and graph systems without losing validation, evidence or stable identity.",
     blocks: [
       { kind: "prose", text: "Every portable package includes **ontology/knowledge.jsonld** and **ontology/knowledge.ttl**. They are semantic projections of the Compiled World. The current export is RDF/JSON-LD with TAVONEL node kinds and compiled relation predicates; it should not be described as a hand-authored OWL/TBox schema. Keep provenance and validation beside the ontology, because the ontology is for semantic navigation and integration rather than a replacement for source evidence." },
@@ -423,7 +423,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
   {
     slug: "concepts",
     title: "Concepts",
-    group: "Concepts",
+    group: "Getting started",
     summary: "Sources, Compiled Worlds, candidate and active versions, and evidence.",
     blocks: [
       { kind: "prose", text: "A **source** is an immutable document version. Uploading the same file twice produces two documents with two source records that share one content digest; nothing merges them, each citation names one of the documents carrying those bytes, and editing the file produces a second version without rewriting the first." },
@@ -445,7 +445,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
   {
     slug: "authentication",
     title: "Authentication",
-    group: "API",
+    group: "Getting started",
     summary: "Bearer keys, the scopes they carry, and what no key can do.",
     blocks: [
       { kind: "prose", text: "Send the key as a bearer token. Keys are workspace-scoped and carry an explicit scope set; a request outside its scopes is refused with 403 rather than silently returning less." },
@@ -461,7 +461,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
   {
     slug: "files-and-formats",
     title: "Files and formats",
-    group: "Operations",
+    group: "Input and compile",
     summary: "What can be uploaded, what is expanded in the browser, and the ceilings on both.",
     blocks: [
       { kind: "prose", text: `${describeAcceptedFormats(CAPABILITY_MANIFEST)} are accepted, and nothing else is. A ZIP archive is expanded before upload so its contents arrive as individual sources, which is why the archive ceilings below are browser limits rather than server ones.` },
@@ -508,7 +508,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
   {
     slug: "upload",
     title: "Upload",
-    group: "API",
+    group: "Input and compile",
     summary: "Direct-to-storage upload, and why bytes never reach the application server.",
     blocks: [
       { kind: "prose", text: "Uploads are direct. The capability endpoint returns a short-lived URL to object storage; you PUT the bytes there. The application server sees the request for permission and the receipt afterwards, and never the document." },
@@ -519,7 +519,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
   {
     slug: "collections-and-compile",
     title: "Collections and compile",
-    group: "API",
+    group: "Input and compile",
     summary: `A compile carries up to ${COMPILE_MAX_DOCUMENTS} documents; a run carries up to ${CORPUS_MAX_DOCUMENTS}.`,
     blocks: [
       { kind: "prose", text: `A compile takes between ${COMPILE_MIN_DOCUMENTS} and ${COMPILE_MAX_DOCUMENTS} documents. That is one Core request and one artifact, and it is not the limit on how much you can compile: a selection larger than that is partitioned server-side into parts of that size and answered as a corpus, up to ${CORPUS_MAX_DOCUMENTS} documents in one run.` },
@@ -533,7 +533,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
   {
     slug: "run-events",
     title: "Run events",
-    group: "API",
+    group: "Input and compile",
     summary: "The persisted transition log, and how to resume it after a disconnect.",
     blocks: [
       { kind: "prose", text: "A compile publishes its transitions to an append-only ledger. The event stream replays that ledger from `Last-Event-ID` and then follows it, so a client that reconnects sees everything it missed rather than the current state alone." },
@@ -551,7 +551,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
   {
     slug: "review",
     title: "Review",
-    group: "Operations",
+    group: "Input and compile",
     summary: "Partial failures, the four decisions, and the one that cannot be taken casually.",
     blocks: [
       { kind: "prose", text: "A compile that cannot read every source stops and waits. Nothing is skipped automatically: a World quietly missing documents you believe are in it is worse than a compile that asks." },
@@ -573,7 +573,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
   {
     slug: "world-api",
     title: "World API",
-    group: "API",
+    group: "World and questions",
     summary: "Reading a compiled World, its objects, relations and evidence.",
     blocks: [
       { kind: "prose", text: "A World is read by collection id. Objects carry their stable keys, the relations they participate in and the evidence they rest on; evidence carries the source version, the page and the region." },
@@ -595,7 +595,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
   {
     slug: "search",
     title: "Search",
-    group: "API",
+    group: "World and questions",
     summary: "Hybrid retrieval — lexical, dense and structure, RRF-fused and reranked — over the active World.",
     blocks: [
       { kind: "prose", text: "Search runs against the active version. A workspace with no promoted World returns nothing rather than falling back to a candidate — an answer from a version nobody accepted is not a smaller answer, it is a different one." },
@@ -621,7 +621,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
   {
     slug: "ask",
     title: "Ask",
-    group: "API",
+    group: "World and questions",
     summary: "Grounded answers, their citations, which retrieval runtime answered, and when the system abstains.",
     blocks: [
       { kind: "prose", text: "Ask retrieves regions from the active World and answers from them. Every answer carries the regions it used, with the source version, page and bounding box of each. The answer text is those regions' excerpts, concatenated in the order the retriever ranked them — `answerMode` is `evidence_excerpts`, and no language model writes any part of it. That is a deliberate boundary, not a gap waiting to be filled quietly: the day a model does generate an answer, `answerMode` will say a different word, and you will be able to tell from the response rather than from a changelog." },
@@ -657,7 +657,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
   {
     slug: "connections",
     title: "Connections",
-    group: "Operations",
+    group: "Operations and errors",
     summary: "Connected sources, their cursors, and what a revoke does immediately.",
     blocks: [
       { kind: "prose", text: "A connection carries a durable cursor, so a re-sync collects what changed rather than everything. Access removal takes effect on the next request rather than waiting for a background reindex." },
@@ -667,7 +667,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
   {
     slug: "exports",
     title: "Exports",
-    group: "Operations",
+    group: "World and questions",
     summary: "The signed package: what is in it, and what the signature covers.",
     blocks: [
       { kind: "prose", text: "A compiled World exports as a package containing the canonical model, the ontology in Turtle and JSON-LD, the graph as CSV, the retrieval chunks, the evidence and a validation report. Every file carries its own sha256 and the manifest digest covers the set." },
@@ -702,7 +702,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
   {
     slug: "mcp",
     title: "MCP",
-    group: "API",
+    group: "External AI",
     summary: "The read-only tools an agent gets, and the two the server deliberately does not offer.",
     blocks: [
       { kind: "prose", text: "A read-only MCP server is published on the Developers page as tavonel-mcp.mjs, pinned by sha256 in the channel manifest. It speaks JSON-RPC over stdio with no dependency and no build step, so it can be read before it is pointed at anything. Set TAVONEL_API_KEY and register it; TAVONEL_BASE_URL defaults to https://tavonel.com. Run `node tavonel-mcp.mjs --doctor` first: it checks the key, the channel pin and one real read, so a failure names which of the three is wrong instead of surfacing as a silent agent." },
@@ -729,7 +729,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
   {
     slug: "cli",
     title: "CLI",
-    group: "API",
+    group: "External AI",
     summary: "The five published files, how to pin them, and how to verify an export with nothing but a download.",
     blocks: [
       { kind: "prose", text: "The developer distribution is published on the Developers page and pinned by sha256 in `/developer/channel.json`. Six files: `tavonel-cli.mjs` covers the upload and compile path from a terminal, `tavonel-mcp.mjs` is the read-only MCP bridge, `tavonel-source-agent.py` walks a folder or bucket, and `tavonel-verify-export.mjs`, `tavonel-verify-package.mjs` and `tavonel-verify-roundtrip.py` check an export offline." },
@@ -810,7 +810,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
   {
     slug: "integration-recipes",
     title: "Integration recipes",
-    group: "API",
+    group: "External AI",
     summary: "Three paths pinned to a specific tool, each with a smoke script that runs them.",
     blocks: [
       { kind: "prose", text: "A general integration guide ages badly and cannot be checked. These three are pinned to a named tool, and each one is executed by `scripts/developer-recipes/smoke.mjs` in this repository, so a recipe that has drifted from the product fails a check rather than a customer's afternoon. Three is the number on purpose: two or three verified recipes are worth more than a dozen plausible ones." },
@@ -887,7 +887,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
   {
     slug: "billing-and-limits",
     title: "Billing and limits",
-    group: "Operations",
+    group: "Operations and errors",
     summary: "What is counted, what is not decided, and the ceilings that apply.",
     blocks: [
       { kind: "prose", text: "Processing is quoted in pages before a compile starts, with the maximum charge shown alongside the estimate. A page count read from the document itself is labelled verified; a count the document only declares — the number Word saved — is labelled declared. A file whose format states no count at all is quoted at nothing: it is named in the preflight with the reason and left out of the total, because a page count derived from file size is an invented number." },
@@ -940,7 +940,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
   {
     slug: "errors",
     title: "Errors",
-    group: "API",
+    group: "Operations and errors",
     summary: "The codes a client has to branch on, and what each one means.",
     blocks: [
       { kind: "prose", text: "Failures return a machine code alongside the HTTP status. Branch on the code: the status says what kind of problem it is, and the code says which one." },
@@ -966,7 +966,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
   {
     slug: "security",
     title: "Security",
-    group: "Operations",
+    group: "Operations and errors",
     summary: "Where bytes live, what the parsing models can reach, and what fails closed.",
     blocks: [
       { kind: "prose", text: "Uploaded bytes go to quarantine storage and are disarmed before anything reads them. Parsing models get no tools, no broad credentials and no outbound network: every document is treated as hostile input." },
@@ -977,7 +977,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
   {
     slug: "changelog",
     title: "Changelog",
-    group: "Operations",
+    group: "Operations and errors",
     summary: "What changed in the product and the public interfaces.",
     blocks: [
       { kind: "prose", text: "Product changes are listed on the Changelog page. The API contract carries its own version, shown at the top of every page here, and the machine-readable document is the authority for what a version contains." },
@@ -986,7 +986,18 @@ export const DOCS_SECTIONS: DocsSection[] = [
 ];
 
 
-export const DOCS_GROUPS = ["Start", "Concepts", "API", "Operations"] as const;
+/*
+  Five groups, named after what a reader is trying to do rather than after the interface that
+  answers them.
+
+  The four they replace -- Start, Concepts, API, Operations -- split by implementation surface,
+  which put `files-and-formats` under Operations and `upload` under API even though they are the
+  same question asked twice, and left Concepts holding one section. The order below is the order
+  a reader meets them: get a key, put documents in, ask the World, hand the result to something
+  else, run it. Every slug and URL is unchanged -- this is a `group` field edit and nothing else,
+  because a regroup that moved a page would break every link published against it.
+*/
+export const DOCS_GROUPS = ["Getting started", "Input and compile", "World and questions", "External AI", "Operations and errors"] as const;
 
 export const DOCS_VERSION = API_VERSION;
 

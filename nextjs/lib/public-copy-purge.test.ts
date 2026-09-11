@@ -36,6 +36,9 @@ const SALES_SURFACES = [
   "product/continuous-knowledge",
   "product/document-understanding",
   "product/knowledge-compiler",
+  // The hub and the five detail pages. The hub reads its cards from the detail page record, so
+  // the two entries check one body of copy from both ends.
+  "solutions",
   "solutions/[slug]",
   "integrations",
   "pricing",

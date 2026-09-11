@@ -1,0 +1,54 @@
+/*
+  Above the article, not beside it.
+
+  The section page already spends its left column on the documentation index, and a third column
+  at 1080px leaves the prose under 40ch. "At the top" is the layout the content allows, and it is
+  the rendering that also works on a phone without a second set of rules.
+*/
+
+.toc {
+  margin: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  background: var(--g1);
+}
+
+.title {
+  margin: 0 0 8px;
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  color: var(--text-xlo);
+}
+
+.toc ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 2px;
+}
+
+.toc a {
+  display: block;
+  padding: 3px 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-lo);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.toc a:hover { color: var(--text-hi); }
+
+@media (pointer: coarse) {
+  .toc a { min-height: 44px; display: flex; align-items: center; }
+}
+
+/*
+  The header is `position: fixed`, so an anchored block lands under it without this. Applied to
+  the anchor targets themselves (`app/docs/[section]/page.tsx` puts this class on every block it
+  gives an id) rather than to `:target`, which Safari has historically applied late.
+*/
+.anchor { scroll-margin-top: 96px; }

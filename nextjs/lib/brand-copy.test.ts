@@ -151,6 +151,10 @@ const COPY_SURFACES = [
   */
   "app/solutions/[slug]/page.tsx",
   "app/api/page.tsx",
+  // The /solutions hub, added with the route. Its cards are read from the record on the detail
+  // page above, so the only copy of its own it carries is the title, the intro and the closing
+  // pointer -- which is exactly the kind of sentence this file exists to hold to the rules.
+  "app/solutions/page.tsx",
   /*
     The conversion pass, 2026-09-08. Three surfaces a buyer reads in order, none of which had a
     row. The pricing client is the one that matters: the plan cards, the six §12.1 answers and
