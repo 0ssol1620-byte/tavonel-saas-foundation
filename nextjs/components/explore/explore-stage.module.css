@@ -970,6 +970,8 @@
 }
 
 .drawerBody dt { color: var(--text-xlo); font: 8px var(--f-mono); letter-spacing: 0.1em; }
+/* BA-034: the engine qualifier rides on the label it qualifies, in the text face so it reads. */
+.drawerBody dt small { display: block; margin-top: 3px; font: 12px/1.4 var(--f-sans); letter-spacing: 0; text-transform: none; }
 .drawerBody dd {
   margin: 0;
   color: var(--text-lo);

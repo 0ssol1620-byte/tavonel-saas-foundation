@@ -99,39 +99,85 @@ function findArrivals() {
   return arrived;
 }
 
+/*
+  The two structural filters that keep an arrival card off the filing's front matter (BA-031).
+
+  `COVER_SHEET` is a list of the markers that appear on an SEC cover, a check-box block or an
+  item index, and nowhere else in a filing. It is a document-structure rule, not a content
+  preference: it says "this is the wrapper", never "this paragraph is the good one".
+
+  `FIGURE` is a number a reader can carry back to the filing and check -- a thousands-separated
+  amount or a dollar figure. A region carrying three of them is a statement the corpus makes.
+*/
+const COVER_SHEET =
+  /[☒☐]|PURSUANT TO SECTION|Check the appropriate box|Commission File|IRS Employer|Securities registered pursuant|^Page Part I/i;
+const FIGURE = /\$\s?[0-9][0-9,]{2,}|[0-9]{1,3}(?:,[0-9]{3})+/g;
+
 /**
  * The one region of an arriving filing the Act puts on screen.
  *
- * A presentation choice, and a deliberately dumb one so that it stays a choice about layout
- * rather than about meaning: the longest region on the first compiled page that carries text the
- * baseline World did not already have. Nothing here reads a number, a phrase or a page out of
- * the filing to decide, so a different corpus shows a different region rather than the wrong one.
+ * A presentation choice about layout rather than about meaning, in four layers, all structural:
+ * text the baseline World did not already have, text no *other* arriving filing also carries,
+ * not the filing's cover or index, and carrying at least three checkable figures. Among what
+ * survives, the earliest page and then the longest region -- so a different corpus shows a
+ * different region rather than the wrong one, and no rule here looks for a phrase.
  *
- * The "not already in W0" clause earns its place. An SEC filing opens on a cover sheet, and now
- * that W0 is the whole 2025 Form 10-K instead of three of its pages, the longest line on a
- * 10-Q's cover -- the Commission's own address block -- is text the baseline already contained.
- * An arrival card answers "what arrived", so quoting a line that did not arrive would be the
- * wrong answer told convincingly. `explore-change.test.ts` asserts exactly this property.
+ * BA-031 added the last three layers, and the first two are why. The rule used to be "longest
+ * region on the first page that is new", and an SEC filing's first new page is its cover: three
+ * of the four arrival cards quoted the identical Section 12(b) registration block, so the page
+ * whose whole purpose is to show that a claim resolves to a meaningful region proved it with the
+ * least meaningful text in the corpus. Now each card carries its own filing's own figures.
+ *
+ * The "not already in W0" clause still earns its place on its own. An arrival card answers "what
+ * arrived", and now that W0 is the whole 2025 Form 10-K, the longest line on a 10-Q cover -- the
+ * Commission's address block -- is text the baseline already contained; quoting it would be the
+ * wrong answer told convincingly. `explore-change.test.ts` asserts every layer.
+ *
+ * The layers narrow and then fall back rather than failing, because they are about which true
+ * sentence to show and not about whether to show one. A corpus of filings with no figures at all
+ * still gets a real region from its own filing; it does not get a blank card.
  */
-function openingRegion(input: CollectionOcrInput, baselineText: string): CollectionOcrRegion {
+function openingRegion(
+  input: CollectionOcrInput,
+  baselineText: string,
+  siblingText: string,
+): CollectionOcrRegion {
   const regions = regionsOf(input);
   if (regions.length === 0) throw new Error(`explore_change_document_has_no_regions: ${input.documentId}`);
   const arrived = regions.filter((region) => !baselineText.includes(region.text));
   if (arrived.length === 0) throw new Error(`explore_change_arrival_adds_no_text: ${input.documentId}`);
-  const firstPage = Math.min(...arrived.map((region) => region.pageNumber1));
-  return arrived
+  const own = arrived.filter((region) => !siblingText.includes(region.text));
+  const stating = own.filter(
+    (region) =>
+      region.text.length >= 180 &&
+      region.text.length <= 900 &&
+      !COVER_SHEET.test(region.text) &&
+      (region.text.match(FIGURE) ?? []).length >= 3,
+  );
+  const pool = stating.length > 0 ? stating : own.length > 0 ? own : arrived;
+  const firstPage = Math.min(...pool.map((region) => region.pageNumber1));
+  return pool
     .filter((region) => region.pageNumber1 === firstPage)
     .reduce((longest, region) => (region.text.length > longest.text.length ? region : longest));
 }
 
 const baselineText = exploreSampleBaselineInputs.map((input) => input.text).join("\n");
 
-function arrivalOf(input: CollectionOcrInput): ExploreChangeArrival {
+function arrivalOf(input: CollectionOcrInput, siblings: readonly CollectionOcrInput[]): ExploreChangeArrival {
   const document = exploreSampleDocuments.find((entry) => entry.documentId === input.documentId);
   if (!document?.form || !document.filingDate || !document.reportDate || !document.accession) {
     throw new Error(`explore_change_arrival_has_no_source_record: ${input.documentId}`);
   }
-  const region = openingRegion(input, baselineText);
+  /*
+    BA-031. The other arriving filings' text, so a region that all four of them carry -- every SEC
+    cover block -- is not the region any of them is quoted on. Computed per filing rather than
+    accumulated while mapping, so the four cards do not depend on the order they were built in.
+  */
+  const siblingText = siblings
+    .filter((sibling) => sibling.documentId !== input.documentId)
+    .map((sibling) => sibling.text)
+    .join("\n");
+  const region = openingRegion(input, baselineText, siblingText);
   return {
     documentId: input.documentId,
     label: `${document.form} · filed ${document.filingDate}`,
@@ -151,8 +197,9 @@ function arrivalOf(input: CollectionOcrInput): ExploreChangeArrival {
   };
 }
 
-const arrivals = findArrivals()
-  .map(arrivalOf)
+const arrived = findArrivals();
+const arrivals = arrived
+  .map((input) => arrivalOf(input, arrived))
   .sort((left, right) => left.filingDate.localeCompare(right.filingDate));
 const diff = diffWorldVersions(exploreSampleBaselineWorld, exploreSampleWorld);
 

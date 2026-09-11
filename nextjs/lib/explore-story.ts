@@ -137,6 +137,24 @@ export const EXPLORE_COPY = {
   askPlaceholder: "Ask this World…",
   askNote:
     "This sample answers four prepared questions. Each answer is the source text the retriever scored, not a rewrite of it.",
+  /*
+    BA-034. What the object, relation and region counts of this sample are counts *of*.
+
+    The gap is real and is recorded in `explore-sample.ts`: /explore is compiled by
+    `compileCollectionCandidate` in this repository, and the Core a customer's compile is
+    dispatched to does not emit the same number of objects over the same bytes. Until the sample
+    is recompiled by the customer engine -- a run, not a copy edit -- the figure must not be
+    published as though it were what a customer's own compile would report, so the qualifier
+    travels with the figure instead of sitting two clicks away on /product/compiled-world.
+
+    One string, because the figure has three points of use on public surfaces and three
+    separately-worded labels is how one of them ends up unlabelled: the technical drawer here,
+    `components/solution-proof-sample.tsx` (design-assets) and
+    `app/product/compiled-world/page.tsx` (copy-home-product). It lives in this file rather than
+    in `explore-sample.ts` because that module pulls the compiler and `node:crypto` with it and
+    two of the three consumers are reachable from a client bundle.
+  */
+  countsQualifier: "as this repository’s TypeScript collection compiler emits them",
   technical: "TECHNICAL DETAILS",
   /*
     The Entity qualifier, moved here from the object list by §49.

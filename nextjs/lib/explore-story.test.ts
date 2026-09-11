@@ -6,7 +6,13 @@ import {
   exploreChangeStory,
   exploreChangeTimeline,
 } from "./explore-change";
-import { exploreSampleAnswers, exploreSampleDocuments, exploreSampleWorld } from "./explore-sample";
+import {
+  exploreSampleAnswers,
+  exploreSampleArtifact,
+  exploreSampleDocuments,
+  exploreSampleWorld,
+} from "./explore-sample";
+import { STATE_WORD } from "../components/explore/parallel-view";
 import {
   DEEP_LINK_ACTS,
   EXPLORE_ACTS,
@@ -259,5 +265,37 @@ describe("public copy on this lane's surfaces", () => {
     expect(EXPLORE_COPY.enter).toBe("ENTER WORLD");
     expect(EXPLORE_COPY.worldHint).toBe("SELECT AN OBJECT");
     expect(EXPLORE_COPY.endHeading).toBe("Try the same path with your own knowledge.");
+  });
+
+  /*
+    BA-032. /knowledge-compiler publishes the glossary entry: a CANDIDATE is "a compiled result
+    that has not been promoted ... nothing answers from it". Every object in this fixture is one,
+    so the badge told a reader in our own words that the Ask act beside it answers from a World
+    that answers nothing. The lifecycle is deliberately unchanged -- that is a product decision,
+    not a copy one -- so this asserts both halves: the visitor-facing word changed and the
+    artifact's own lifecycle did not.
+  */
+  it("labels the sample's objects for a visitor, not with the lifecycle enum", () => {
+    expect(STATE_WORD.candidate).toBe("PUBLISHED SAMPLE");
+    expect(exploreSampleArtifact.lifecycle, "the lifecycle itself is untouched").toBe("candidate");
+    for (const surface of ["components/explore/parallel-view.tsx", "components/explore/evidence-act.tsx"]) {
+      const rendered = read(surface).replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^\s*\/\/.*$/gm, " ");
+      expect(rendered, `${surface} prints the enum at a visitor`).not.toContain('"CANDIDATE"');
+    }
+  });
+
+  /*
+    BA-034. /explore is compiled by this repository's TypeScript collection compiler and the Core
+    a customer's compile is dispatched to does not emit the same object count over the same bytes.
+    The figure may be published; it may not be published bare, as though it were what a customer's
+    compile would report. The qualifier is one shared string so that the three public points of
+    use cannot drift into three differently-hedged labels, or into two and one unlabelled.
+  */
+  it("labels the sample's object count with the engine that produced it", () => {
+    expect(EXPLORE_COPY.countsQualifier).toContain("TypeScript collection compiler");
+    const drawer = read("components/explore/technical-details.tsx");
+    expect(drawer).toContain("EXPLORE_COPY.countsQualifier");
+    // Named beside the count, not in a paragraph somewhere under it.
+    expect(drawer).toMatch(/<dt>Objects[^<]*<small>\{EXPLORE_COPY\.countsQualifier\}<\/small><\/dt>/);
   });
 });
