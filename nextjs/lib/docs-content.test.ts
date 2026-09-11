@@ -79,6 +79,36 @@ describe("the information architecture", () => {
     }
   });
 
+  /*
+    The regroup, pinned per section rather than per group.
+
+    The assertion above passes for any grouping at all, including the four that split by
+    implementation surface and put "what files can I send" under Operations and "how do I send
+    one" under API. This one names where each of the twenty-two sections belongs and in what
+    order the index prints it, so moving a section is a deliberate edit here and not a silent
+    reshuffle of the documentation a reader has learned.
+
+    Slugs are deliberately not part of the expectation's shape: the group field is the only
+    thing this campaign changed, and a renamed slug is a broken URL that fails the
+    reachability test above.
+  */
+  it("groups the sections by what the reader is trying to do", () => {
+    const expected: Record<string, string[]> = {
+      "Getting started": ["quickstart", "concepts", "authentication"],
+      "Input and compile": ["files-and-formats", "upload", "collections-and-compile", "run-events", "review"],
+      "World and questions": ["world-api", "search", "ask", "exports"],
+      "External AI": ["use-with-ai", "ontology-output", "mcp", "cli", "integration-recipes"],
+      "Operations and errors": ["connections", "billing-and-limits", "errors", "security", "changelog"],
+    };
+    expect([...DOCS_GROUPS]).toEqual(Object.keys(expected));
+    for (const group of DOCS_GROUPS) {
+      const rendered = DOCS_SECTIONS.filter((section) => section.group === group).map((section) => section.slug);
+      expect(rendered, group).toEqual(expected[group]);
+    }
+    // And nothing fell out of the five while the per-group lists still matched.
+    expect(Object.values(expected).flat()).toHaveLength(DOCS_SECTIONS.length);
+  });
+
   it("gives every section a summary long enough to be a description", () => {
     for (const section of DOCS_SECTIONS) {
       expect(section.summary.length, section.slug).toBeGreaterThanOrEqual(40);

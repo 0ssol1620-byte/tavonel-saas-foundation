@@ -37,6 +37,16 @@ const ROUTES = [
     "/explore",
     "/pricing",
     "/docs",
+    /*
+      Two routes the navigation does not declare, and which this list therefore missed.
+      PRIMARY_NAV points "Solutions" at one detail page, so the hub is reachable from every
+      solution page and from the panel without ever appearing in a map above; and no
+      /docs/[section] page was audited at all, although that template carries the widest
+      content on the site -- code samples, endpoint tables, and now an index column beside
+      them. "quickstart" is the longest of the twenty-two.
+    */
+    "/solutions",
+    "/docs/quickstart",
     "/sources",
     "/status",
     "/security",
