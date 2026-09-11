@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { authorizeFoundationProduct } from "@/lib/billing-product-access";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { foundationPilotAccess } from "@/lib/foundation-pilot";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
@@ -30,16 +31,24 @@ const NO_STORE = { "Cache-Control": "no-store" };
   nobody accepted -- the manifest comes from `foundation_active_worlds`, so this endpoint
   cannot be used to make an unpromoted candidate queryable.
 
-  Authorization is deliberately stricter than /ask. Rebuilding an index spends embedder time,
-  so it takes the compile scope and the same owner/admin bar promotion takes, checked through
-  the same helpers (`authorizeFoundationRequest` for scope and plan, `foundationPilotAccess`
-  for the role). It is not a promotion and it changes no knowledge: a derived cache is rebuilt.
+  Authorization is deliberately stricter than /ask. Rebuilding an index spends embedder time, so
+  it takes the compile scope and exactly the bar promotion takes -- the `activation` level, asked
+  with the caller's real workspace role -- because this is the recovery path for a promotion that
+  half-succeeded. A plan that may promote and may not rebuild the index its own promote compiles
+  would leave that plan's Worlds answering from the fallback with no way back. It is not a
+  promotion and it changes no knowledge: a derived cache is rebuilt.
+
+  The scope check therefore asks `authorizeFoundationRequest` for `observer`, and the plan
+  question is the activation one below, where the membership role is known --
+  `authorizeFoundationRequest` resolves the principal before any membership row is read and
+  cannot ask it. R9 finding #2: the `studio` argument that used to sit here was also the whole
+  plan gate, undocumented on the Search page, and it refused a Developer owner who could promote.
 
   GET is not offered here. The index state is already on the World read model, on /ask and on
   /search; a fourth place to read it from is a fourth place for it to disagree.
 */
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
-  const auth = await authorizeFoundationRequest(request, "collections:compile", "studio");
+  const auth = await authorizeFoundationRequest(request, "collections:compile", "observer");
   if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: NO_STORE });
   const { id } = await context.params;
   if (!COLLECTION_ID_PATTERN.test(id)) {
@@ -49,6 +58,15 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const pilot = foundationPilotAccess(auth.principal.userId);
   if (!pilot || pilot.membership.workspaceId !== auth.principal.workspaceKey) {
     return NextResponse.json({ code: "PILOT_ACCESS_REQUIRED" }, { status: 403, headers: NO_STORE });
+  }
+  // Before the role refusal, so the plan answer a caller gets here is the plan answer promotion
+  // gives them: an evaluation trial, and a plan that cannot activate at all, are told that rather
+  // than told their role is wrong.
+  const activation = await authorizeFoundationProduct(
+    auth.principal.workspaceKey, auth.principal.userId, "activation", pilot.membership.role,
+  );
+  if (!activation.ok) {
+    return NextResponse.json({ code: activation.code }, { status: activation.status, headers: NO_STORE });
   }
   if (pilot.membership.role !== "owner" && pilot.membership.role !== "admin") {
     return NextResponse.json({ code: "RETRIEVAL_COMPILE_ROLE_REQUIRED" }, { status: 403, headers: NO_STORE });

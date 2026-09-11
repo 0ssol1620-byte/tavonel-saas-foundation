@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { BILLING_OFFERS } from "./billing-catalog";
 import { CLAIM_STATE } from "./claim-state";
@@ -288,15 +288,23 @@ describe("product claims sync", () => {
     drift is the level written on each row, so each named route is grepped for the level it
     demands -- a route that tightens its gate fails here rather than leaving the table promising
     the old one.
+
+    `activation` joined the two plan-only levels when World activation stopped being a plan-only
+    question. A row advertised at that level has to be enforced by a route that asks for
+    `activation` *and hands over a role*: the level on its own would admit a Developer-plan
+    member, which is the row this table would then be promising wrongly.
   */
   it("states a plan capability at the level the route enforcing it demands", () => {
     const page = read("app/pricing/page.tsx");
-    const rows = [...page.matchAll(/route: "([^"]+)", level: "(observer|studio)"/g)];
+    const rows = [...page.matchAll(/route: "([^"]+)", level: "(observer|studio|activation)"/g)];
     expect(rows.length, "the capability table is still declared on the pricing page")
       .toBeGreaterThanOrEqual(5);
     for (const [, route, level] of rows) {
       const source = read(route!);
-      if (level === "studio") {
+      if (level === "activation") {
+        expect(source, `${route} is advertised as World activation and does not require it`)
+          .toMatch(/authorizeFoundationProduct\([^)]*"activation",\s*\w+(?:\.\w+)*\.role\s*\)/s);
+      } else if (level === "studio") {
         expect(source, `${route} is advertised as Team-only and does not require it`)
           .toMatch(/(?:authorizeFoundationProduct|authorizeFoundationRequest|requireFoundationSession)\([^)]*"studio"/s);
       } else {
@@ -305,7 +313,7 @@ describe("product claims sync", () => {
       }
     }
     expect(page, "the cells are decided by the function the API calls")
-      .toContain("billingProductDecision(account(code), row.level).ok");
+      .toContain("billingProductDecision(account(code), row.level, TABLE_ROLE).ok");
   });
 
   /*
@@ -340,6 +348,17 @@ describe("product claims sync", () => {
 
   /*
     Audit P06 and P08: two facts a buyer could only find by reading SQL, and a link.
+
+    P06 is pinned as *behaviour read out of the billing code* -- "nothing in the billing code
+    removes a balance you already hold" -- which is what `apply_foundation_billing_event_v4` does:
+    it adds each renewal's allowance and no job, trigger or route reduces the balance.
+
+    REPAIR ROUND, 2026-09-11. One pass replaced that with FD-03's page-expiry term, which no
+    migration enforces, and pinned the unenforced sentence here so CI would keep it published.
+    FD-03 holds the copy to the code -- "Ledger enforcement of the expiry is a separate item
+    (LEDGER-EXPIRY) and the copy is held to the code until it lands" -- so the last assertion is
+    that rule, runnable: while no migration writes the expiry, no buyer surface may state it, and
+    the moment one does the guard releases on its own rather than needing this test edited.
   */
   it("states the cancellation balance behaviour and points Enterprise at the trust index", () => {
     const pricing = read("components/pricing-page-client.tsx");
@@ -347,10 +366,32 @@ describe("product claims sync", () => {
       .toContain("nothing in the billing code removes a balance you already hold");
     expect(pricing, "P06: and that it is only spendable while a plan is active")
       .toContain("only be spent while a plan is active");
+    expect(pricing, "P06: and that unused pages are not refunded on cancellation")
+      .toContain("not refunded if you cancel");
+    expect(pricing, "P06: the overage rate is derived, not typed")
+      .toContain("published rate of ${formatUsd(STANDARD_PAGE_USD)} per standard page");
     expect(pricing, "P03: whether Ask and search consume pages")
       .toContain("What does not consume pages");
     expect(pricing, "P08: the Enterprise card reaches the trust index")
       .toContain('href: "/trust" as Route');
+  });
+
+  /*
+    FD-03's hold, as a test. `allowance_expired` is the ledger `kind` an expiry has to write --
+    the balance is a scalar and an expiry that is not a ledger row is a silent UPDATE -- so the
+    presence of that token in a migration is the enforcement existing, and its absence is the
+    enforcement not existing. Failure path: publish the term with no migration and this fails;
+    land the migration and the copy becomes sayable without touching this file.
+  */
+  it("does not publish the page-expiry term until a migration enforces it", () => {
+    const migrations = new URL("../supabase/migrations/", root);
+    const enforced = readdirSync(migrations)
+      .some((file) => file.endsWith(".sql") && readFileSync(new URL(file, migrations), "utf8").includes("allowance_expired"));
+    if (enforced) return;
+    for (const surface of ["components/pricing-page-client.tsx", "lib/docs-content.ts"] as const) {
+      expect(strip(read(surface)), `${surface}: FD-03 holds the expiry copy until LEDGER-EXPIRY lands`)
+        .not.toMatch(/do not roll over|expires? at the end of each billing month/i);
+    }
   });
 
   /*

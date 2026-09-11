@@ -7,7 +7,13 @@ import Logomark from "@/components/logomark";
 import MobilePrimaryNav from "@/components/mobile-primary-nav";
 import { useCheckout } from "@/lib/use-checkout";
 import { loginUrlForOffer } from "@/lib/checkout-intent";
-import { BILLING_OFFERS, type BillingOfferCode } from "@/lib/billing-catalog";
+import {
+  BILLING_OFFERS,
+  REFUND_MAX_CONSUMED_FRACTION,
+  REFUND_WINDOW_DAYS,
+  refundablePageAllowance,
+  type BillingOfferCode,
+} from "@/lib/billing-catalog";
 import { trackFunnel } from "@/lib/funnel-events";
 import { FOOTER_GROUPS, PRIMARY_NAV } from "@/lib/site-navigation";
 import {
@@ -85,57 +91,81 @@ const PLANS: ReadonlyArray<{
   PROCESSING_UNIT_USD`, the same two constants the estimator quotes and the reservation code
   charges against, and the included pages are the catalog's `includedPages`.
 
-  The rollover line is the one to read carefully. Nothing in the billing code expires a
-  balance: `apply_foundation_billing_event_v4` grants each renewal's allowance into
-  `credit_balance` and no job, trigger or route ever resets it. So the sentence states that as
-  the current behaviour and stops there. Whether unused capacity is *contractually* carried is
-  §40 item 1 and belongs to the founder; this page will say more when there is a term to say.
+  REPAIR ROUND, 2026-09-11. The first pass of the "Unused pages" tile published FD-03's
+  page-expiry term -- "unused pages expire at the end of each billing month and do not roll
+  over" -- while nothing in the billing code reduces a `credit_balance`: no migration, job,
+  trigger or route. FD-03 says the opposite of shipping that early: "Ledger enforcement of the
+  expiry is a separate item (LEDGER-EXPIRY) and the copy is held to the code until it lands." So
+  the tile states the behaviour again and the term is held. It ships in the release that ships
+  the LEDGER-EXPIRY migration, not before.
+
+  The refund bright line (P07, FD-04) is a term rather than a behaviour and it stays: no route
+  could enforce it -- refunds are issued by a person through Paddle -- and `liveChargesEnabled`
+  is false, so no payment exists to refund yet.
+
+  FD-03 and FD-04 are both a delegated decision, 2026-09-11 (orchestrator, under the founder's
+  delegation), and not the founder's own statements;
+  `D:\CodexProjects\growth-lanes\DECISION_LOG_2026-09-11.md` requires that attribution, and the
+  lane report carries the founder's direct ratification as a merge condition.
+
+  The numbers stay derived -- the rate from the two constants the reservation code charges
+  against, the refund figures from the catalog -- so a moved rate moves this copy instead of
+  leaving it stale.
 */
 const STANDARD_PAGE_USD = STANDARD_UNITS_PER_PAGE * PROCESSING_UNIT_USD;
 const MAXIMUM_PAGE_USD = MAX_UNITS_PER_PAGE * PROCESSING_UNIT_USD;
+const REFUND_MAX_CONSUMED_PERCENT = Math.round(REFUND_MAX_CONSUMED_FRACTION * 100);
 
-const AT_A_GLANCE = [
-  [
-    "Base subscription",
-    `${BILLING_OFFERS.observer_access.label}: $${BILLING_OFFERS.observer_access.priceUsd}/month. ${BILLING_OFFERS.studio_access.label}: $${BILLING_OFFERS.studio_access.priceUsd}/month. The seven-day evaluation is free and needs no card.`,
-  ],
-  [
-    "Included pages",
-    `${BILLING_OFFERS.observer_access.includedPages.toLocaleString("en-US")} standard pages on ${BILLING_OFFERS.observer_access.label}; ${BILLING_OFFERS.studio_access.includedPages.toLocaleString("en-US")} on ${BILLING_OFFERS.studio_access.label}.`,
-  ],
-  [
-    "Past the included pages",
-    `${formatUsd(STANDARD_PAGE_USD)} per standard page. Complex-page processing is capped at ${formatUsd(MAXIMUM_PAGE_USD)}, shown before the run starts.`,
-  ],
-  /*
-    Audit P06, second half. Rollover was already stated from the code; what happens to a balance
-    when a subscription ends was stated nowhere. Read from the same place: no job, trigger or
-    route reduces `credit_balance` on cancellation -- only a refund adjustment does -- and
-    `reserve_foundation_compute_v3` spends a balance only while `subscription_status` is
-    `active` or `trialing`. So the balance is neither removed nor spendable, and both halves are
-    said rather than the flattering one.
-  */
-  [
-    "Unused pages",
-    "Current billing behavior keeps unused pages in your balance. Cancelling stops the renewal that adds to it; nothing in the billing code removes a balance you already hold, and a balance can only be spent while a plan is active.",
-  ],
-  [
-    "What differs by plan",
-    `${BILLING_OFFERS.observer_access.label} adds API and MCP access. ${BILLING_OFFERS.studio_access.label} adds approval to promote a candidate World and to roll one back. ${BILLING_OFFERS.studio_access.label} is sold through a conversation, not a checkout. Source connections are verified separately in Workspace.`,
-  ],
-  [
-    "What does not consume pages",
-    "Pages are reserved when a source is admitted for reading, once per document. Ask, search and recompiling sources already read reserve none — they check your plan, not your balance.",
-  ],
-  [
-    "Spreadsheets",
-    "A spreadsheet has no decided billable unit. Preflight names those files as undecided instead of quoting a unit nobody has chosen, and the page total beside them is a byte-derived upper bound labelled as an estimate.",
-  ],
-  [
-    "How to start",
-    "Start with your own files. Nothing is charged until you choose a plan.",
-  ],
-] as const;
+/*
+  The tiles, with the one row that is an entitlement answered by the entitlement function.
+
+  "What differs by plan" used to be a typed sentence beside a table computed from
+  `billingProductDecision`, which is how a page comes to promise the gate it had last quarter.
+  It is now read off the same rows the table renders: the plans listed as reaching World
+  activation are the plans the function admits, and nothing here can say otherwise.
+*/
+function glanceRows(planCapabilities: readonly PlanCapabilityRow[]) {
+  const activation = planCapabilities.find((row) => row.level === "activation");
+  const activationPlans = activation?.plans.filter((plan) => plan.allowed).map((plan) => plan.label) ?? [];
+  return [
+    [
+      "Base subscription",
+      `${BILLING_OFFERS.observer_access.label}: $${BILLING_OFFERS.observer_access.priceUsd}/month. ${BILLING_OFFERS.studio_access.label}: $${BILLING_OFFERS.studio_access.priceUsd}/month. The seven-day evaluation is free and needs no card.`,
+    ],
+    [
+      "Included pages",
+      `${BILLING_OFFERS.observer_access.includedPages.toLocaleString("en-US")} standard pages on ${BILLING_OFFERS.observer_access.label}; ${BILLING_OFFERS.studio_access.includedPages.toLocaleString("en-US")} on ${BILLING_OFFERS.studio_access.label}.`,
+    ],
+    [
+      "Past the included pages",
+      `${formatUsd(STANDARD_PAGE_USD)} per standard page. Complex-page processing is capped at ${formatUsd(MAXIMUM_PAGE_USD)}, shown before the run starts.`,
+    ],
+    [
+      "Unused pages",
+      `Current billing behaviour keeps unused pages in your balance: cancelling stops the renewal that adds to it, nothing in the billing code removes a balance you already hold, and a balance can only be spent while a plan is active. Unused pages are not refunded if you cancel. Pages past the included allowance are billed at the published rate of ${formatUsd(STANDARD_PAGE_USD)} per standard page.`,
+    ],
+    [
+      "What differs by plan",
+      `${activationPlans.join(" and ")} reach World activation — promoting a candidate to the active World, and rolling one back. On ${BILLING_OFFERS.observer_access.label} that is the workspace owner; ${BILLING_OFFERS.studio_access.label} keeps shared membership and roles, and is sold through a conversation rather than a checkout. Source connections are verified separately in Workspace.`,
+    ],
+    [
+      "What does not consume pages",
+      "Pages are reserved when a source is admitted for reading, once per document. Ask, search and recompiling sources already read reserve none — they check your plan, not your balance.",
+    ],
+    [
+      "Spreadsheets",
+      "A spreadsheet is billed on the pages of the sanitized PDF it is converted to, counted after conversion. Before that conversion there is no page count to show, so preflight names those files and shows no number beside them rather than quoting one from file size.",
+    ],
+    [
+      "Refunds",
+      `Ask within ${REFUND_WINDOW_DAYS} days of payment and you get a full refund, provided you have used fewer than ${REFUND_MAX_CONSUMED_PERCENT}% of the plan's included pages — ${refundablePageAllowance(BILLING_OFFERS.observer_access)} pages on ${BILLING_OFFERS.observer_access.label}, ${refundablePageAllowance(BILLING_OFFERS.studio_access)} on ${BILLING_OFFERS.studio_access.label}. Past that, the payment is not refunded. Unused pages are not refunded when you cancel. Subject to the terms as updated.`,
+    ],
+    [
+      "How to start",
+      "Start with your own files. Nothing is charged until you choose a plan.",
+    ],
+  ] as const;
+}
 
 /*
   Audit P03. Four volumes, every figure computed from the same two constants the reservation code
@@ -174,7 +204,7 @@ export type PlanCapabilityRow = {
   capability: string;
   /** The route file whose access check this row's level is taken from. */
   route: string;
-  level: "observer" | "studio";
+  level: "observer" | "studio" | "activation";
   plans: ReadonlyArray<{ label: string; saleChannel: string; allowed: boolean }>;
 };
 
@@ -406,7 +436,7 @@ export default function PricingPageClient({
             <section className="pricing-details" aria-labelledby="pricing-details-title">
               <h2 id="pricing-details-title">How your plan works</h2>
             <div className="tiles pricing-glance">
-              {AT_A_GLANCE.map(([title, body]) => (
+              {glanceRows(planCapabilities).map(([title, body]) => (
                 <article className="tile" key={title}>
                   <h3>{title}</h3>
                   <p>{body}</p>
@@ -445,9 +475,11 @@ export default function PricingPageClient({
               </tbody>
             </table>
             <p className="fine">
-              Evaluation reaches the {BILLING_OFFERS.observer_access.label} row of this table
-              inside its file and page limits. Nothing an Ask answer returns is invented for it:
-              every answer names the retrieval path it took, and{" "}
+              Every row is answered for the workspace owner, the role a buyer of either plan holds
+              in their own workspace. The free evaluation reaches the{" "}
+              {BILLING_OFFERS.observer_access.label} columns that do not activate a World, inside
+              its file and page limits; activating one needs a paid plan. Nothing an Ask answer
+              returns is invented for it: every answer names the retrieval path it took, and{" "}
               <Link href={"/docs/ask" as Route}>the Ask reference</Link> states which paths exist
               and what each one reads.
             </p>

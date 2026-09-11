@@ -3,6 +3,13 @@ import { COMPILE_MAX_DOCUMENTS, COMPILE_MIN_DOCUMENTS, CORPUS_MAX_DOCUMENTS } fr
 import { MAX_FILES, MAX_SYNC_ARCHIVE_BYTES, MAX_WORKER_ARCHIVE_BYTES } from "./archive-expand";
 import { DEVELOPER_SCOPES } from "./developer-contracts";
 import { CAPABILITY_MANIFEST, describeAcceptedFormats } from "../../shared/capabilityManifest";
+import {
+  BILLING_OFFERS,
+  REFUND_MAX_CONSUMED_FRACTION,
+  REFUND_WINDOW_DAYS,
+  refundablePageAllowance,
+} from "./billing-catalog";
+import { PROCESSING_UNIT_USD, STANDARD_UNITS_PER_PAGE, formatUsd } from "./usage-pricing";
 
 /*
   The documentation, as data.
@@ -96,7 +103,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
       },
       {
         kind: "note",
-        text: "Step 5 is the one that stops a script, and it stops for two separate reasons. Promotion is human-only by design — a candidate is not organizational truth until a person says so. Separately, the activation surface requires the workspace to hold the **Team** plan (`studio_access`): a Developer-plan workspace compiles, reviews and exports, and `authorizeFoundationProduct(..., \"studio\")` refuses its promote with `STUDIO_SUBSCRIPTION_REQUIRED`. Team is sold through a conversation today rather than self-serve checkout, so getting past step 5 on a new workspace means talking to us first.",
+        text: "Step 5 is the one that stops a script, and it stops for two separate reasons. Promotion is human-only by design — a candidate is not organizational truth until a person says so, and no API key of any plan has a promote or rollback path to call. Separately, the activation surface is plan-gated: it takes the **Developer** plan held by the workspace **owner**, or the **Team** plan under its usual workspace roles. `authorizeFoundationProduct(..., \"activation\", role)` refuses anything else with `STUDIO_SUBSCRIPTION_REQUIRED`, and an evaluation trial with `SUBSCRIPTION_REQUIRED`. So a self-serve Developer workspace can reach an active World on its own; Team remains sold through a conversation rather than self-serve checkout.",
       },
       {
         kind: "code",
@@ -487,7 +494,15 @@ export const DOCS_SECTIONS: DocsSection[] = [
           ["Archive size, with a worker", `${MAX_WORKER_ARCHIVE_BYTES / 1_048_576} MB`, "Expansion off-thread, where the ceiling is memory rather than responsiveness."],
         ],
       },
-      { kind: "note", text: "Encrypted archives, nested archives and paths that escape the archive root are refused at expansion time, not after upload. A spreadsheet's billable unit is not decided, so page counts for spreadsheets are reported as unknown rather than estimated." },
+      /*
+        R9 finding #4. This note used to say a spreadsheet's billable unit "is not decided, so
+        page counts for spreadsheets are reported as unknown rather than estimated", while
+        `billing-and-limits` in this same file said they were in the estimate as a byte-derived
+        upper bound. Both were describing the code of their own moment and they contradicted each
+        other. The unit is now decided -- the pages of the sanitized PDF -- and the byte bound is
+        gone from `estimateBillablePages` entirely, so the two sections say one thing.
+      */
+      { kind: "note", text: "Encrypted archives, nested archives and paths that escape the archive root are refused at expansion time, not after upload. A spreadsheet is billed on the pages of the sanitized PDF it is converted to, counted after that conversion — so before a compile there is no page number for one, and preflight shows its absence rather than a figure derived from the file size." },
     ],
   },
   {
@@ -562,7 +577,18 @@ export const DOCS_SECTIONS: DocsSection[] = [
     summary: "Reading a compiled World, its objects, relations and evidence.",
     blocks: [
       { kind: "prose", text: "A World is read by collection id. Objects carry their stable keys, the relations they participate in and the evidence they rest on; evidence carries the source version, the page and the region." },
-      { kind: "endpoint", operationId: "getCollection" },
+      /*
+        R9 finding #3. This block named `getCollection`, which is a different artifact: `GET
+        /collections/{id}`, scope `collections:read`, "reviewable candidate artifact" -- the raw
+        compile package, not a World read model. So the page's only endpoint sent an integrator to
+        a route that does not return what the sentence above it describes.
+
+        The scope table on this same page already said which one was meant: `worlds:read` reads
+        "the active World, its objects, relations and evidence". Both World operations are named
+        now, because the per-lens read is how anyone consuming one lens at a time uses this page.
+      */
+      { kind: "endpoint", operationId: "getWorldReadModel" },
+      { kind: "endpoint", operationId: "getWorldLens" },
       { kind: "note", text: "Route features, scores, thresholds and the cost matrix are not in any public response. They are internal, and a public DTO that filtered them would be one refactor away from leaking them." },
     ],
   },
@@ -588,7 +614,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
         ],
       },
       { kind: "prose", text: "A degradation is reported, never hidden. `dense retrieval skipped: no embedder configured` means the answer came from lexical and structure alone; a reranker outage returns the fused order and says so. Reading `degradations` is how you tell a full-pipeline result from a partial one — the two otherwise look identical." },
-      { kind: "note", text: "Search requires a compiled retrieval index for the active World. Without one the response is 409 with the code RETRIEVAL_RUN_NOT_FOUND (or RETRIEVAL_PROFILE_NOT_FOUND), carrying `retrievalIndex` and `retrievalNotice` to say which state the index is in. It is not a 200 with fewer results: Search has no fallback, and a weaker answer presented as the real one is worse than a refusal you can act on. POST /v1/collections/{id}/retrieval-index rebuilds the index; it needs the collections:compile scope and the owner or admin role." },
+      { kind: "note", text: "Search requires a compiled retrieval index for the active World. Without one the response is 409 with the code RETRIEVAL_RUN_NOT_FOUND (or RETRIEVAL_PROFILE_NOT_FOUND), carrying `retrievalIndex` and `retrievalNotice` to say which state the index is in. It is not a 200 with fewer results: Search has no fallback, and a weaker answer presented as the real one is worse than a refusal you can act on. POST /v1/collections/{id}/retrieval-index rebuilds the index. It takes the collections:compile scope, the owner or admin role, and the same plan bar activating a World takes: **Team**, or **Developer** held by the workspace owner. The two bars are identical on purpose — this endpoint is the recovery path for a promote whose index did not compile, so a plan that may promote and may not rebuild would leave its own Worlds answering from the fallback with nothing to call. Naming the plan here at all is R9 finding #2: this sentence used to give the scope and the role and leave the plan out." },
       { kind: "endpoint", operationId: "searchActiveWorld" },
     ],
   },
@@ -654,6 +680,10 @@ export const DOCS_SECTIONS: DocsSection[] = [
           ["ontology/knowledge.jsonld", "The same graph as JSON-LD."],
           ["graph/nodes.csv, graph/relationships.csv", "Tabular form for spreadsheet and BI tools."],
           ["rag/chunks.jsonl", "Retrieval chunks, each bound to a page and region."],
+          // Both are in `REQUIRED_PACKAGE_PATHS` and were listed on the use-with-ai page but not
+          // here, so this table described a package smaller than the one that ships (R9).
+          ["rag/documents.jsonl", "Document-level retrieval records."],
+          ["provenance/activities.jsonl", "Lineage for every compiled artifact."],
           ["validation/report.json", "The validation status and any review reasons."],
         ],
       },
@@ -675,7 +705,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
     group: "API",
     summary: "The read-only tools an agent gets, and the two the server deliberately does not offer.",
     blocks: [
-      { kind: "prose", text: "A read-only MCP server is published on the Developers page as tavonel-mcp.mjs, pinned by sha256 in the channel manifest. It speaks JSON-RPC over stdio with no dependency and no build step, so it can be read before it is pointed at anything. Set TAVONEL_API_KEY and register it; TAVONEL_BASE_URL defaults to https://tavonel.com." },
+      { kind: "prose", text: "A read-only MCP server is published on the Developers page as tavonel-mcp.mjs, pinned by sha256 in the channel manifest. It speaks JSON-RPC over stdio with no dependency and no build step, so it can be read before it is pointed at anything. Set TAVONEL_API_KEY and register it; TAVONEL_BASE_URL defaults to https://tavonel.com. Run `node tavonel-mcp.mjs --doctor` first: it checks the key, the channel pin and one real read, so a failure names which of the three is wrong instead of surfacing as a silent agent." },
       {
         kind: "table",
         head: ["Tool", "What it returns"],
@@ -860,18 +890,38 @@ export const DOCS_SECTIONS: DocsSection[] = [
     group: "Operations",
     summary: "What is counted, what is not decided, and the ceilings that apply.",
     blocks: [
-      { kind: "prose", text: "Processing is quoted in pages before a compile starts, with the maximum charge shown alongside the estimate. A quote derived from file size is labelled an estimate; a page count read from the document itself is labelled verified." },
+      { kind: "prose", text: "Processing is quoted in pages before a compile starts, with the maximum charge shown alongside the estimate. A page count read from the document itself is labelled verified; a count the document only declares — the number Word saved — is labelled declared. A file whose format states no count at all is quoted at nothing: it is named in the preflight with the reason and left out of the total, because a page count derived from file size is an invented number." },
       /*
-        Audit P01. The mechanism is honest and the number does not exist, so this says both.
-        `countXlsxPages()` returns `{ pages: null, reason: "XLSX_BILLABLE_UNIT_UNDECIDED" }` for
-        every xlsx and ods, the workspace preflight counts those files and names them, and
-        `estimateBillablePages` then falls through to `ceil(bytes / 65,536)` with
-        `confidence: "provisional"` -- which is what "Estimated page-equivalents" in the panel
-        means. Saying only "reported as undecided" left a reader thinking a spreadsheet is
-        excluded from the quote, and it is not: it is in the estimate as a byte-derived upper
-        bound. Choosing the unit is a founder decision, not a wording one.
+        Audit P01, second pass. The unit is now decided, so this states it instead of stating
+        that nobody had chosen one.
+
+        `countSpreadsheetPages()` returns `{ pages: null, reason:
+        "SPREADSHEET_COUNTED_AFTER_CONVERSION" }` for xlsx, ods and csv alike, and
+        `estimateBillablePages` returns null for the same file rather than falling through to
+        `ceil(bytes / 65,536)`. The byte bound is gone from the module, not relabelled: a
+        spreadsheet is billed on the pages of the sanitized PDF it is converted to, counted after
+        the conversion, and before that there is no number to show.
       */
-      { kind: "prose", text: "Spreadsheets have no decided billable unit. Rather than quote one from file size and let that number become the charge, the preflight panel counts those files and names them as undecided. They are not excluded from the estimate: the page-equivalents beside them are the same byte-derived upper bound any file without a declared page count gets, labelled as an estimate rather than as pages. What is charged is settled afterwards against the processing the read actually consumed, and never above the maximum shown before the run. A published spreadsheet unit — so a quote can be a quote rather than a ceiling — is still undecided." },
+      { kind: "prose", text: "A spreadsheet is billed on the page count of the sanitized PDF it is converted to, counted after that conversion. Before it, there is no page count: preflight names xlsx, ods and csv files and shows no number for them rather than quoting one from file size. What is charged is settled against the pages the read actually produced, and never above the maximum shown before the run." },
+      /*
+        REPAIR ROUND, 2026-09-11. This paragraph published FD-03's page-expiry term while nothing
+        in the billing code reduces a `credit_balance`. FD-03 holds that copy to the code -- the
+        enforcement is LEDGER-EXPIRY's migration -- so the balance behaviour is stated again here,
+        in the same words /pricing uses, and the expiry sentence ships with the migration.
+
+        P07 / FD-04's refund numbers stay: `REFUND_WINDOW_DAYS`,
+        `REFUND_MAX_CONSUMED_FRACTION` and the catalog's own `includedPages`, with the rate from
+        the two constants the reservation code charges against. Nothing here is typed as a figure.
+        No route enforces the refund rule because a person issues refunds through Paddle, and
+        `liveChargesEnabled` is false.
+
+        FD-03 and FD-04 are a delegated decision, 2026-09-11 (orchestrator, under the founder's
+        delegation) -- see `D:\CodexProjects\growth-lanes\DECISION_LOG_2026-09-11.md`, which bars
+        attributing them to the founder -- and the lane report makes the founder's direct
+        ratification a merge condition.
+      */
+      { kind: "prose", text: `Current billing behaviour keeps unused pages in your balance: cancelling stops the renewal that adds to it, nothing in the billing code removes a balance you already hold, and a balance can only be spent while a plan is active. Unused pages are not refunded if you cancel. Pages past the included allowance are billed at the published rate of ${formatUsd(STANDARD_UNITS_PER_PAGE * PROCESSING_UNIT_USD)} per standard page.` },
+      { kind: "prose", text: `Refunds: ask within ${REFUND_WINDOW_DAYS} days of payment and the payment is refunded in full, provided fewer than ${Math.round(REFUND_MAX_CONSUMED_FRACTION * 100)}% of the plan's included pages have been consumed — ${refundablePageAllowance(BILLING_OFFERS.observer_access)} pages on ${BILLING_OFFERS.observer_access.label}, ${refundablePageAllowance(BILLING_OFFERS.studio_access)} on ${BILLING_OFFERS.studio_access.label}. Past that, the payment is not refunded. Unused pages are not refunded on cancellation. Subject to the terms as updated.` },
       {
         kind: "table",
         head: ["Limit", "Value"],
@@ -879,6 +929,8 @@ export const DOCS_SECTIONS: DocsSection[] = [
           ["Documents per compile", `${COMPILE_MIN_DOCUMENTS}–${COMPILE_MAX_DOCUMENTS}`],
           ["Documents per run", String(CORPUS_MAX_DOCUMENTS)],
           ["Files per archive", String(MAX_FILES)],
+          ["Refund window", `${REFUND_WINDOW_DAYS} days from payment`],
+          ["Refundable if consumed under", `${Math.round(REFUND_MAX_CONSUMED_FRACTION * 100)}% of included pages`],
         ],
       },
     ],
@@ -943,7 +995,7 @@ export const DOCS_VERSION = API_VERSION;
  * it was checked today, which is exactly the assurance a reader is looking for and exactly the
  * one nobody gave. This moves when a person moves it.
  */
-export const DOCS_REVIEWED = "2026-09-03";
+export const DOCS_REVIEWED = "2026-09-11";
 
 export function findDocsSection(slug: string) {
   return DOCS_SECTIONS.find((section) => section.slug === slug) ?? null;

@@ -14,13 +14,17 @@ export type CompileQuote = {
 /**
  * How a page count was arrived at, and therefore what may be said about it.
  *
- * A PDF that does not declare a page count falls back to `ceil(bytes / 65,536)`. That number is
- * a defensible spend ceiling and a terrible fact: it is derived from file size and has no
- * relationship to how many pages the document has. It was reaching the customer under the
- * heading "Pages", next to a dollar figure they were being asked to authorise.
+ * There used to be a fourth basis: `ceil(bytes / 65,536)`, for a file whose format states no page
+ * count. It was a defensible spend ceiling and a terrible fact -- derived from file size, with no
+ * relationship to how many pages the document has -- and it was reaching the customer under the
+ * heading "Pages", next to a dollar figure they were being asked to authorise. Labelling it an
+ * estimate made the label honest and left the number invented, which this repository forbids
+ * outright, so it is gone: a file nobody can count yet has no page number at all, and the
+ * spreadsheet whose count it mostly served is now billed on the pages of the sanitized PDF,
+ * counted after conversion.
  *
- * A byte-derived count is `provisional` and must be labelled as an estimate wherever it is
- * shown.
+ * `provisional` therefore no longer describes a basis. It survives as the confidence of a set
+ * with nothing counted in it, which is what `canReserveAgainst` has to refuse.
  *
  * "Read out of the document" is not one thing, and treating it as one is how a Word file's
  * stale metadata came to be shown as "Verified pages":
@@ -45,8 +49,7 @@ export type PageEstimateBasis =
   | "pdf_page_tree"
   | "image"
   | "pptx_slides"
-  | "docx_declared"
-  | "byte_upper_bound";
+  | "docx_declared";
 export type PageEstimateConfidence = "provisional" | "declared" | "verified";
 
 export type PageEstimate = {
@@ -56,7 +59,6 @@ export type PageEstimate = {
 };
 
 export function pageEstimateConfidence(basis: PageEstimateBasis): PageEstimateConfidence {
-  if (basis === "byte_upper_bound") return "provisional";
   if (basis === "docx_declared") return "declared";
   return "verified";
 }
@@ -65,7 +67,7 @@ export function pageEstimateConfidence(basis: PageEstimateBasis): PageEstimateCo
 export function pageCountLabel(confidence: PageEstimateConfidence) {
   if (confidence === "verified") return "Verified pages";
   if (confidence === "declared") return "Declared pages";
-  return "Estimated page-equivalents";
+  return "Pages not counted yet";
 }
 
 /**
@@ -145,10 +147,9 @@ export function estimateBillablePages(value: {
   if (value.mimeType.toLowerCase().startsWith("image/")) {
     return { pages: 1, basis: "image", confidence: "verified" };
   }
-  return {
-    pages: Math.min(MAX_QUOTED_PAGES, Math.max(1, Math.ceil(value.bytes / 65_536))),
-    basis: "byte_upper_bound",
-    confidence: "provisional",
-  };
+  // No count, and no invented one. A spreadsheet is counted on the sanitized PDF after
+  // conversion; any other format that states no page count is counted when it is read. Callers
+  // show the absence -- they never fill it in from the file size.
+  return null;
 }
 
