@@ -2,6 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { primaryCallToAction } from "./commercial-state";
+import { ACCESS_CTA, EXPLORE_CTA, PRODUCT_NOUNS, SELF_SERVE_CTA } from "./site-navigation";
 
 /**
  * SPEC 13.3 -- phrases the product may not use, enforced.
@@ -214,6 +216,9 @@ const COPY_SURFACES = [
   "components/mobile-primary-nav.tsx",
   "components/public-site-chrome.tsx",
   "components/policy-layout.tsx",
+  // BA-232: the header's action is a rendered button on every public page, so it is a copy
+  // surface. It wrote three labels of its own; it reads the shared two now.
+  "components/public-primary-cta.tsx",
 ];
 
 const BARRED = [
@@ -931,5 +936,107 @@ describe("public copy", () => {
       .toContain('href="/sources"');
     expect(read("components/explore/explore-stage.module.css"))
       .toMatch(/\.entryNote \{[^}]*font-size: 1[5-9]px/);
+  });
+});
+
+/* ============================================================ BA-232 / BA-252: one verb, one name
+
+  The site-wide vocabulary rules, owned here because this file is where the naming rules that
+  apply to every surface already live (audit §5 rule 1: other lanes send their additions here
+  rather than editing the shared lists in parallel).
+
+  These assertions are scoped to the chrome -- the navigation data, the two nav components, the
+  shared header and footer, the header's action and the policy layout. That is where the same
+  action was spelled two ways at two widths, and it is the whole of what this lane can make true:
+  the page-level strings the audit lists (`app/product/page.tsx`, `app/login/page.tsx`,
+  `lib/explore-story.ts`, `app/trust/page.tsx`, `app/solutions/[slug]/page.tsx`) belong to four
+  other lanes and arrive as cross-lane patches. The list widens to `CONVERSION_SURFACES` in the
+  commit that lands the last of them; widening it before is a red suite, not a stricter rule.
+*/
+
+/** Spellings that were in use for one of `PRODUCT_NOUNS` and are retired. */
+const RETIRED_NAMES = [
+  "Trust center",
+  "Technical evidence",
+  "Explore a World",
+  "Explore the public World",
+  "Explore a public sample",
+  "ENTER WORLD",
+  "Get started",
+  "Start with the data path",
+  "Start free",
+] as const;
+
+/** The chrome: rendered on every public page, and the only surfaces this lane owns. */
+const CHROME_SURFACES = [
+  "lib/site-navigation.ts",
+  "components/site-nav/desktop-primary-nav.tsx",
+  "components/mobile-primary-nav.tsx",
+  "components/public-site-chrome.tsx",
+  "components/public-primary-cta.tsx",
+  "components/policy-layout.tsx",
+] as const;
+
+/** Comments explain what a name replaced and must not count as the name. */
+const prose = (surface: string) =>
+  read(surface)
+    .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, " ")
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/^[ \t]*\/\/.*$/gm, " ");
+
+describe("the site's own vocabulary", () => {
+  it("declares two access actions and one Explore action, and no more", () => {
+    expect(ACCESS_CTA).toEqual({ href: "/contact", label: "Request access" });
+    expect(SELF_SERVE_CTA).toEqual({ href: "/login", label: "Start with your files" });
+    expect(EXPLORE_CTA).toEqual({ href: "/explore", label: "Explore a Compiled World" });
+    // The two names the audit found spelled four ways between them, in the table every surface
+    // is held to. `RETIRED_NAMES` below is the other half of the same rule.
+    expect(PRODUCT_NOUNS).toContain("Compiled World");
+    expect(PRODUCT_NOUNS).toContain("Trust Center");
+    // The commercial posture chooses between the two; it does not write a third.
+    expect(primaryCallToAction({})).toEqual(ACCESS_CTA);
+    expect(primaryCallToAction({ COMMERCIAL_MODE: "live", TAVONEL_BILLING_LAUNCH_APPROVED: "true", VERCEL_ENV: "production" }))
+      .toEqual(SELF_SERVE_CTA);
+  });
+
+  it.each(CHROME_SURFACES)("publishes no retired name in %s", (surface) => {
+    const source = prose(surface);
+    for (const name of RETIRED_NAMES) {
+      expect(source, `"${name}" is a retired spelling; the table is PRODUCT_NOUNS`).not.toContain(name);
+    }
+  });
+
+  /*
+    The failure the audit measured: the desktop bar said "Contact" and the 390 header said
+    "Request access", because the two chromes read two different constants. One object reaches
+    both now, so neither may carry a label of its own.
+  */
+  it("gives the two widths one action, from one object", () => {
+    const chrome = prose("components/public-site-chrome.tsx");
+    expect(chrome, "the header renders the action it was given").toContain("{cta.label}");
+    expect(chrome, "and hands the same object to the phone sheet").toContain("<MobilePrimaryNav cta={cta} />");
+    const sheet = prose("components/mobile-primary-nav.tsx");
+    expect(sheet, "the sheet renders the object, not a label of its own").toContain("{cta.label}");
+    for (const literal of ["Contact<", "Request access", "Start with your files"]) {
+      expect(sheet, `the phone sheet writes "${literal}" instead of reading it`).not.toContain(literal);
+    }
+  });
+
+  /*
+    BA-232's other half: no page paints a placeholder action and then replaces it.
+
+    `PublicPrimaryCta` painted "Get started", asked `/api/status` from the browser and swapped the
+    label -- on the most prominent control of every page that used the header's fallback. The
+    commercial state is read where it lives instead, which is also why this component must stay
+    off the client: `process.env` flags without the public prefix inline as `undefined` there.
+  */
+  it("resolves the access action on the server, with no placeholder to replace", () => {
+    const cta = read("components/public-primary-cta.tsx");
+    expect(cta, "a client component cannot read the commercial flags").not.toContain('"use client"');
+    expect(cta, "and must not ask the browser for them").not.toContain("fetch(");
+    expect(cta).toContain("primaryCallToAction()");
+    const chrome = prose("components/public-site-chrome.tsx");
+    expect(chrome, "the header takes the resolved action rather than a component that guesses it")
+      .not.toContain("PublicPrimaryCta");
   });
 });

@@ -2,9 +2,9 @@ import Link from "next/link";
 import type { Route } from "next";
 import Logomark from "@/components/logomark";
 import MobilePrimaryNav from "@/components/mobile-primary-nav";
-import PublicPrimaryCta from "@/components/public-primary-cta";
 import DesktopPrimaryNav from "@/components/site-nav/desktop-primary-nav";
-import { FOOTER_GROUPS } from "@/lib/site-navigation";
+import { primaryCallToAction } from "@/lib/commercial-state";
+import { FOOTER_GROUPS, FOOTER_LEGAL_ROW, type SiteLink } from "@/lib/site-navigation";
 
 /**
  * The header, once, for every public surface including the three that used to hand-roll one.
@@ -18,6 +18,12 @@ import { FOOTER_GROUPS } from "@/lib/site-navigation";
  * `signedIn` suppresses Sign in rather than the action beside it. A reader who is already
  * authenticated does not need the link, and offering both put the same destination in the row
  * twice on the landing page.
+ *
+ * BA-232: `cta` is required. It was optional, and the fallback was a client component that
+ * painted a placeholder label and then replaced it once `/api/status` answered -- on every page
+ * that took the fallback, which was every page but three. The caller resolves the action instead,
+ * which every caller can: two of them are client components that already receive the commercial
+ * state as a prop, and the rest reach this file through `PublicSitePage` below.
  */
 export function PublicSiteHeader({
   cta,
@@ -25,7 +31,7 @@ export function PublicSiteHeader({
   signedIn,
   stuck = true,
 }: {
-  cta?: { label: string; href: string };
+  cta: SiteLink;
   mode?: { label: string; title: string };
   signedIn?: boolean;
   stuck?: boolean;
@@ -43,9 +49,15 @@ export function PublicSiteHeader({
         </span>
       ) : null}
       <DesktopPrimaryNav />
-      <MobilePrimaryNav />
+      <MobilePrimaryNav cta={cta} />
       <span className="nav-actions">
-        {cta ? <Link className="btn small" href={cta.href as Route}>{cta.label}</Link> : <PublicPrimaryCta />}
+        {/*
+          BA-249: ghost, not filled. On /product and /developers the header's filled button and
+          the hero's filled button were the same action, twice, in one viewport -- and a view with
+          two filled primaries has none. The hero keeps the fill; the header keeps the action
+          available on every scroll position, which is what it is for.
+        */}
+        <Link className="btn small ghost" href={cta.href as Route}>{cta.label}</Link>
         {signedIn ? null : <Link className="nav-signin" href="/login">Sign in</Link>}
       </span>
     </header>
@@ -68,15 +80,39 @@ export function PublicSiteFooter() {
           ))}
         </div>
         <p className="fine">Knowledge compiled with a traceable path back to every source.</p>
+        {/*
+          BA-250: the row a procurement reader looks for. Copyright, the Korean entry and the
+          security inbox -- the last two are pages and an address this site already publishes, so
+          nothing here is a new commitment. The legal entity and the governing jurisdiction are
+          deliberately absent; see `FOOTER_LEGAL_ROW`.
+        */}
+        <p className="fine site-footer-legal">
+          {FOOTER_LEGAL_ROW.copyright}
+          {" · "}
+          <Link href={FOOTER_LEGAL_ROW.language.href as Route} hrefLang="ko">
+            {FOOTER_LEGAL_ROW.language.label}
+          </Link>
+          {" · "}
+          <a href={`mailto:${FOOTER_LEGAL_ROW.security}`}>{FOOTER_LEGAL_ROW.security}</a>
+        </p>
       </div>
     </footer>
   );
 }
 
 export function PublicSitePage({ children }: { children: React.ReactNode }) {
+  /*
+    The commercial posture, read once per page rather than fetched once per visitor.
+
+    This module is also reached from two client components (`home-page-client`,
+    `pricing-page-client`), each of which passes its own already-resolved `cta` and never renders
+    `PublicSitePage`. That is why the call is here and not inside `PublicSiteHeader`: a client
+    render of this function would inline the unprefixed flags as `undefined` and quietly return
+    the closed posture.
+  */
   return (
     <div className="page public-page">
-      <PublicSiteHeader />
+      <PublicSiteHeader cta={primaryCallToAction()} />
       <main id="main" tabIndex={-1}>{children}</main>
       <PublicSiteFooter />
     </div>

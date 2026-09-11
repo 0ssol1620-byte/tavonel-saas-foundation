@@ -2,6 +2,7 @@ import Link from "next/link";
 import LegalOperatorDisclosure from "@/components/legal-operator-disclosure";
 import Logomark from "@/components/logomark";
 import { PublicSiteHeader } from "@/components/public-site-chrome";
+import { primaryCallToAction } from "@/lib/commercial-state";
 
 /*
   BA-174. The eyebrow group was PUBLIC RECORD, which is a registry's word for a filing and not a
@@ -42,7 +43,9 @@ export default function PolicyLayout({
         The two destinations it did carry, Service status and Contact, moved into the legal footer
         below so nothing on these pages became harder to reach.
       */}
-      <PublicSiteHeader />
+      {/* BA-232 (nav-global CROSS-LANE 1): the header's action is resolved here now. The
+          placeholder-then-replace client fallback that used to supply it is gone. */}
+      <PublicSiteHeader cta={primaryCallToAction()} />
       <main id="main" tabIndex={-1}>
         <section className="scene doc policy-page">
           <div className="shell"><div className="body">

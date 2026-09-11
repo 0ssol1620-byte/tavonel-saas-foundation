@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import type { Route } from "next";
 import Link from "next/link";
 import { PublicSiteFooter, PublicSiteHeader } from "@/components/public-site-chrome";
+import { primaryCallToAction } from "@/lib/commercial-state";
 import styles from "./public-proof-registry.module.css";
 
 export type RegistryRow = { key: string; description: string; state: string };
@@ -86,7 +87,9 @@ export default function PublicProofRegistry({ title, eyebrow, summary, state, in
   footer?: ReactNode;
 }) {
   return <div className={styles.page}>
-    <PublicSiteHeader />
+    {/* BA-232 (nav-global CROSS-LANE 2): the header's action is resolved here now. The
+        placeholder-then-replace client fallback that used to supply it is gone. */}
+    <PublicSiteHeader cta={primaryCallToAction()} />
     <main id="main">
       <section className={styles.hero}><div><p className={styles.eyebrow}>{eyebrow}</p><h1>{title}</h1></div><aside>{state ? <span className={styles.status}>{state}</span> : null}<p>{summary}</p></aside></section>
       <div className={styles.body}>

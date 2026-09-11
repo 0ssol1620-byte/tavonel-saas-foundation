@@ -30,6 +30,20 @@ export const PUBLIC_MARKETING_PATHS = new Set([
   */
   "/solutions",
   "/trust",
+  /*
+    BA-211's other half, decided rather than left open: the six `/cookbooks/*` drafts are **not**
+    here, and that is the answer, not an omission.
+
+    The audit's rule is the right one -- a page public enough to link is public enough to measure
+    and to ask about. These are not linked. Every record in `lib/cookbook-content.ts` is
+    `publication: "draft"`, which means `robots: { index: false }`, absent from `app/sitemap.ts`,
+    and advertised by no menu (`lib/site-nav-model.test.ts` fails if one appears in the nav). A
+    page a reader can only reach by knowing its URL is not a marketing surface, and measuring it
+    would mean asking a privacy question in order to count visits nobody was invited to make.
+
+    The promotion is where this becomes wrong, so that is what is guarded:
+    `lib/marketing-analytics.test.ts` fails if a cookbook is `approved` and missing from this set.
+  */
 ]);
 export const MARKETING_EVENTS = new Set([
   "generate_lead",
@@ -64,9 +78,23 @@ export type ConsentCopy = {
   readonly settings: string;
 };
 
+/*
+  BA-256: the prompt states what happens. It does not ask a favour.
+
+  "Help us improve TAVONEL?" put the reader in the position of doing the company a kindness, which
+  is the one register a consent prompt may not use -- the choice has to be free, and a request is
+  pressure however politely it is phrased. The two buttons, the storage, the 180-day expiry and
+  the vendor gate are all unchanged; only these words are.
+
+  Two departures from the audit's own sentence, both because a consent prompt that names less than
+  it takes is worse than one with the wrong tone. It stopped at "visits to public pages", so
+  "and the interactions on them" is kept: `MARKETING_EVENTS` above is a list of click events. And
+  it dropped the vendor's name, which `lib/marketing-analytics.test.ts` pins in both languages --
+  the reader is being asked about a third party and gets to know which one.
+*/
 const CONSENT_COPY_EN: ConsentCopy = {
   region: "Optional analytics",
-  prompt: "Help us improve TAVONEL? With your permission, Google Analytics measures visits and public-page interactions using cookies. Workspace content is excluded.",
+  prompt: "Google Analytics cookies measure visits to public pages and the interactions on them. Workspace content is never included.",
   privacy: "Privacy notice",
   refuse: "No thanks",
   allow: "Allow analytics",
@@ -75,7 +103,7 @@ const CONSENT_COPY_EN: ConsentCopy = {
 
 const CONSENT_COPY_KO: ConsentCopy = {
   region: "선택 분석",
-  prompt: "TAVONEL 개선에 도움을 주시겠습니까? 허용하시면 Google Analytics가 쿠키를 사용해 방문과 공개 페이지에서의 상호작용을 측정합니다. 워크스페이스 내용은 측정하지 않습니다.",
+  prompt: "Google Analytics 쿠키는 공개 페이지 방문과 그 페이지에서의 상호작용을 측정합니다. 워크스페이스 내용은 포함되지 않습니다.",
   privacy: "개인정보 처리방침",
   refuse: "허용하지 않음",
   allow: "분석 허용",
@@ -85,6 +113,45 @@ const CONSENT_COPY_KO: ConsentCopy = {
 /** The banner's copy for one pathname. Korean on the `/ko` subtree, English everywhere else. */
 export function consentCopy(path: string): ConsentCopy {
   return path === "/ko" || path.startsWith("/ko/") ? CONSENT_COPY_KO : CONSENT_COPY_EN;
+}
+
+/* ============================================================= BA-245: who owns the top layer
+
+  The phone menu and the consent banner were both fixed to the viewport and neither knew about the
+  other, so at 390 an open menu had the banner drawn across it: three layers stacked -- the
+  drawer, the live page still visible under it, and the banner over both. A navigation that covers
+  the page is modal while it is open, and nothing may sit on top of it.
+
+  The banner is suppressed rather than re-stacked. Raising its z-index over the sheet would leave
+  it covering the menu's own bottom row; a reader who opened the menu asked for the menu, and the
+  choice they have not made yet is still there when they close it.
+
+  `MobilePrimaryNav` announces the sheet's state on this event and `MarketingConsent` listens. It
+  is a window event and not a shared store because these two components have no common ancestor
+  below the root layout, and it is a constant here because two files spelling the same event name
+  is exactly how that connection breaks silently.
+*/
+export const NAV_OPEN_EVENT = "tavonel:nav";
+
+/** What the consent surface shows: nothing at all, the prompt, or the reopen control. */
+export type ConsentSurface = "nothing" | "prompt" | "settings";
+
+/**
+ * The consent surface for one page state, as a decision rather than three JSX conditions.
+ *
+ * `measured` is `publicPageLocation() !== null` -- a page that is not measured never asks, which
+ * is why the workspace has no banner. `ready` is false until local storage has been read, because
+ * asking a reader who already answered is the one failure this component must not have.
+ */
+export function consentSurface(state: {
+  measured: boolean;
+  ready: boolean;
+  consent: boolean | null;
+  editing: boolean;
+  navOpen: boolean;
+}): ConsentSurface {
+  if (!state.ready || !state.measured || state.navOpen) return "nothing";
+  return state.consent !== null && !state.editing ? "settings" : "prompt";
 }
 
 export function referralOrigin(referrer: string): string {

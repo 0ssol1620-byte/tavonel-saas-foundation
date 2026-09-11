@@ -17,6 +17,62 @@
 
 export type SiteLink = { href: string; label: string };
 
+/* ==================================================================== BA-232 / BA-252: vocabulary
+
+  Two site-wide actions and one casing table, declared here because every chrome already reads
+  this file.
+
+  The 2026-09-11 brand audit inventoried 22 routes and found six verbs pointing at `/contact`
+  ("Contact" on fifteen pages, "Request access", "Request evaluation", "Talk about a pilot",
+  "Start a conversation", "Ask a security review question") and four names for `/explore`
+  ("Explore a Compiled World", "Explore a World", "Explore the public World", "ENTER WORLD"). A
+  reader cannot learn one verb for one action from that, and the desktop and phone headers read
+  two different constants, so the same navigation made a different offer at two widths.
+
+  `ACCESS_CTA` and `SELF_SERVE_CTA` are the two commercial postures, not two choices: which one
+  applies is `lib/commercial-state.ts`'s answer and nothing else's. They live here so the header,
+  the phone sheet and `primaryCallToAction` cannot drift apart -- that function returns these
+  objects now rather than repeating their strings.
+
+  A context variant is allowed only where the destination is genuinely different (a security
+  question, scoping a pilot) and only phrased as an action. "Contact" is not an action.
+*/
+
+/** The access action while checkout is closed. `lib/commercial-state.ts` decides when it applies. */
+export const ACCESS_CTA: SiteLink = { href: "/contact", label: "Request access" };
+
+/** The access action once a real card can be charged. The same action, live posture. */
+export const SELF_SERVE_CTA: SiteLink = { href: "/login", label: "Start with your files" };
+
+/** The one name for the public sample, everywhere it is linked. */
+export const EXPLORE_CTA: SiteLink = { href: "/explore", label: "Explore a Compiled World" };
+
+/**
+ * How the product's own nouns are spelled in public copy.
+ *
+ * The audit found the central noun lower-cased in one sentence and capitalised in the next on the
+ * page named after it, and four objects carrying two names each. This is the table those surfaces
+ * read; `lib/brand-copy.test.ts` fails on a retired spelling beside it. Ordinary English keeps
+ * ordinary casing -- "a real-world thing" is not this noun.
+ */
+export const PRODUCT_NOUNS = [
+  "World",
+  "Compiled World",
+  "Trust Center",
+  "Explore",
+  "Ask",
+  "Evidence",
+  "Sources",
+  "Studio",
+] as const;
+
+/*
+  The spellings these replace are listed in `lib/brand-copy.test.ts` as `RETIRED_NAMES`, not here.
+
+  A runtime module that carries the strings it forbids is a module every sweep over it matches,
+  and nothing at run time needs to know what the old name was -- only the guard does.
+*/
+
 /*
   WG-048 / WG-051: what each resource is *for*, declared beside the link rather than on the hub.
 
@@ -89,7 +145,15 @@ export const resourceFilterHref = (tag: ResourceTag) => `/resources#find-${tag}`
 
 export const PRIMARY_NAV: readonly SiteLink[] = [
   { href: "/product", label: "Product" },
-  { href: "/solutions/ai-ready-knowledge", label: "Solutions" },
+  /*
+    BA-039: the label "Solutions" now goes to the section, not to one of its five detail pages.
+
+    The hub was built on a sibling branch, so both the bar and the footer pointed "Solutions" at
+    `/solutions/ai-ready-knowledge` -- one workflow wearing the whole section's name, while the
+    hub itself was reachable from nothing. Stage-B integration landed the route and put it in
+    `app/sitemap.ts`; this is the other half, and `lib/site-nav-model.test.ts` pins it.
+  */
+  { href: "/solutions", label: "Solutions" },
   { href: "/integrations", label: "Integrations" },
   { href: "/developers", label: "Developers" },
   { href: "/security", label: "Security" },
@@ -120,8 +184,13 @@ export const RESOURCE_LINKS: readonly ResourceLink[] = [
   { href: "/research", label: "Research", purposes: ["learn"], workflows: [], column: "verify" },
   { href: "/benchmarks", label: "Benchmarks", purposes: ["verify"], workflows: [], column: "verify" },
   {
+    /*
+      BA-252: "Evidence", the one name. The page carried three -- "Technical evidence" here, its
+      own h1, and "Evidence" in prose -- and a reader cannot tell whether those are one page or
+      three. "Technical" also narrowed it to the audience least in need of the label.
+    */
     href: "/evidence",
-    label: "Technical evidence",
+    label: "Evidence",
     purposes: ["verify"],
     workflows: ["compile-and-review", "use-elsewhere"],
   },
@@ -140,7 +209,8 @@ export const FOOTER_GROUPS: readonly { title: string; links: readonly SiteLink[]
     title: "Product",
     links: [
       { href: "/product", label: "Product" },
-      { href: "/solutions/ai-ready-knowledge", label: "Solutions" },
+      // BA-039: the section, not one of its five pages. Same change as `PRIMARY_NAV` above.
+      { href: "/solutions", label: "Solutions" },
       { href: "/integrations", label: "Integrations" },
       /*
         Added when the bar stopped carrying a flat "Sources" link (IA redesign, 2026-09-11).
@@ -184,6 +254,31 @@ export const FOOTER_GROUPS: readonly { title: string; links: readonly SiteLink[]
     ],
   },
 ] as const;
+
+/* ================================================================== BA-250: the footer's last row
+
+  Four link columns and a tagline was the whole footer. A security or procurement reviewer looks
+  at the bottom of a page for the copyright, the language entry and the security address, and
+  finding none of the three is what reads as unfinished -- so the row exists and carries exactly
+  what is true.
+
+  What it does **not** carry is the legal entity and the governing jurisdiction. Those are
+  published, from the environment, by `components/legal-operator-disclosure.tsx` on the policy
+  pages, and the contract's §2 decision on BA-250 is that the footer renders nothing until the
+  founder confirms the contracting party. A footer line naming a party the running deployment
+  cannot read would be exactly the invention that is barred; the slot is here and empty, named so
+  that the lane which owns the operator record can fill it in one place.
+
+  `security@tavonel.com` is the address already published on /contact, /privacy, /status and
+  /trust. It is not a new commitment; it is the same inbox, reachable from every page.
+*/
+export const FOOTER_LEGAL_ROW = {
+  /** The brand, which is what this site is published as. No entity, no jurisdiction -- see above. */
+  copyright: "© 2026 TAVONEL",
+  /** The §12.4 Korean entry, in Korean, because that is who it is for. */
+  language: { href: "/ko", label: "한국어" },
+  security: "security@tavonel.com",
+} as const;
 
 /* ==================================================== the global menu (IA redesign, 2026-09-11)
 
@@ -286,15 +381,36 @@ export const NAV_GROUPS: readonly NavGroup[] = [
           two pages keep their separate jobs -- `/trust` summarises, `/security` is the detail --
           so neither is duplicated to give the menu a second entry.
         */
-        title: "Input, connections, trust",
+        /*
+          BA-244: a purpose, not a comma-separated list of nouns. BA-248: the page is called
+          Sources everywhere else on the site, so the menu calls it Sources and puts the five-word
+          sentence in the description row the panel already renders. BA-252: "Trust Center" is one
+          spelling, and it is the footer's too -- a procurement reader who finds it in one place
+          and not the other has found half a Trust Center.
+
+          `/trust` stays in this column rather than moving under Resources: the column is named for
+          it, and Resources is the reading material rather than the commitments.
+        */
+        title: "Sources, connections and trust",
         items: [
-          { href: "/sources", label: "Supported files and what is preserved" },
+          { href: "/sources", label: "Sources", description: "What TAVONEL reads, and what survives the read" },
           { href: "/integrations", label: "Connect sources" },
-          { href: "/trust", label: "Trust center" },
+          { href: "/trust", label: "Trust Center" },
         ],
       },
     ],
-    featured: { href: "/explore", label: "Explore a public sample" },
+    /*
+      BA-232 / BA-244: one name for `/explore`, and the panel's last row says what is behind it.
+
+      The counts are the corpus `/explore` actually publishes, not a marketing figure --
+      `lib/site-nav-model.test.ts` recomputes both from `lib/explore-sample.ts` and fails if
+      either moves. The panel is not the place for a picture: there is no product capture in
+      `public/` to crop, and an invented one is what the brief bars.
+    */
+    featured: {
+      ...EXPLORE_CTA,
+      description: "Apple SEC corpus · 5 filings · 1,281 regions",
+    },
   },
   {
     section: "solutions",
