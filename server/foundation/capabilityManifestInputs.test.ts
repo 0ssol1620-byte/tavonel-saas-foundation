@@ -39,7 +39,11 @@ describe("the canonical input artifact", () => {
     }
     let actual: string | null = null;
     try {
-      actual = readFileSync(artifactPath, "utf8");
+      // `.gitattributes` sets `* text=auto` with core.autocrlf, so this file is CRLF in a
+      // Windows working tree and LF on a Linux runner. The line ending is not the artifact:
+      // both consumers parse it as JSON. Comparing the normalized text keeps the staleness
+      // check platform-independent without pinning eol for one generated file.
+      actual = readFileSync(artifactPath, "utf8").replaceAll("\r\n", "\n");
     } catch {
       actual = null;
     }
