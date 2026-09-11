@@ -1,6 +1,6 @@
 {
   "schema": "tavonel.k08.core-v2-counts.v1",
-  "ranAt": "2026-09-11T02:50:19.952683+00:00",
+  "ranAt": "2026-09-11T02:52:23.964630+00:00",
   "status": "IMPLEMENTED_NOT_PROVEN",
   "engine": "tavonel-python-core-v2 (the engine the product dispatches to)",
   "engineCheckout": "D:\\CodexProjects\\ai-knowledge-compiler-p0p2-productization",
@@ -11,7 +11,7 @@
   "collectionId": "collection-cae6b8c9990e72d703aa95be0190c9f3",
   "documents": 5,
   "regions": 1281,
-  "elapsedSeconds": 15.134124599979259,
+  "elapsedSeconds": 14.444047300028615,
   "status_returned": "review_required",
   "lifecycle": "review_required",
   "reviewReasons": [
@@ -58,11 +58,40 @@
     "mentions": 2765
   },
   "validationRecordTotal": 23,
+  "projectedToCustomer": {
+    "nodeTotal": 4402,
+    "nodeKinds": {
+      "claim": 2088,
+      "document": 5,
+      "entity": 1028,
+      "evidence": 1281
+    },
+    "edgeTotal": 2088,
+    "edgeTypes": {
+      "supported_by": 2088
+    },
+    "topics": 0,
+    "topicsNote": "hard-coded 0 in the projection; Core V2's 5 ontology_term objects do not survive it",
+    "droppedKinds": {
+      "block": 1281,
+      "collection": 1,
+      "ontology_term": 5,
+      "relation": 2765,
+      "validation_record": 23
+    }
+  },
   "duplicateLabels": {
     "labelledNodes": 4402,
     "distinctLabels": 3896,
     "nodesSharingALabel": 731,
     "rate": 0.16606088141753747,
+    "population": "nodes carrying a non-empty label"
+  },
+  "duplicateLabelsProjected": {
+    "labelledNodes": 3121,
+    "distinctLabels": 2776,
+    "nodesSharingALabel": 519,
+    "rate": 0.16629285485421338,
     "population": "nodes carrying a non-empty label"
   },
   "unitTotal": 1281,

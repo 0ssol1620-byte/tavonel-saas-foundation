@@ -133,6 +133,43 @@ def main() -> None:
     )
     validation_records = [item for item in objects if str(item.get("kind")) == "validation_record"]
 
+    # What a customer actually receives. `projectProductCoreV2Candidate`
+    # (nextjs/lib/core-runtime-v2.ts) keeps four object kinds and rebuilds the edge set as
+    # claim -> evidence `supported_by` links only; `counts.topics` is hard-coded 0. Everything else
+    # Core V2 computed is dropped before the customer package (audit R3-K09). Derived here with the
+    # same rule rather than asserted, so this row cannot drift from the projection it describes.
+    projection_kinds = {"document", "entity", "claim", "evidence"}
+    projected = [item for item in objects if str(item.get("kind")) in projection_kinds]
+    evidence_object_ids = {
+        str(item.get("stableId")) for item in objects if str(item.get("kind")) == "evidence"
+    }
+    projected_edges = sum(
+        1
+        for item in objects
+        if str(item.get("kind")) == "claim"
+        for link in (item.get("links") or [])
+        if str(link) in evidence_object_ids
+    )
+    projected_counts = {
+        "nodeTotal": len(projected),
+        "nodeKinds": dict(
+            sorted(Counter(str(item.get("kind")) for item in projected).items())
+        ),
+        "edgeTotal": projected_edges,
+        "edgeTypes": {"supported_by": projected_edges},
+        "topics": 0,
+        "topicsNote": "hard-coded 0 in the projection; Core V2's 5 ontology_term objects do not survive it",
+        "droppedKinds": dict(
+            sorted(
+                Counter(
+                    str(item.get("kind"))
+                    for item in objects
+                    if str(item.get("kind")) not in projection_kinds
+                ).items()
+            )
+        ),
+    }
+
     payload = {
         "schema": "tavonel.k08.core-v2-counts.v1",
         "ranAt": datetime.now(timezone.utc).isoformat(),
@@ -157,7 +194,9 @@ def main() -> None:
         "relationTotal": len(relations),
         "relationPredicates": dict(sorted(relation_predicates.items())),
         "validationRecordTotal": len(validation_records),
+        "projectedToCustomer": projected_counts,
         "duplicateLabels": duplicate_label_rate(objects),
+        "duplicateLabelsProjected": duplicate_label_rate(projected),
         "unitTotal": len(candidate.units),
         "artifactHashes": dict(sorted(candidate.artifact_hashes.items())),
         "packageFiles": [file.path for file in candidate.package.files],
