@@ -51,15 +51,29 @@ const EVALUATION = {
   offerCode: null,
 } as const;
 
+/*
+  Audit P08. The card claims nothing it cannot deliver -- SSO, SCIM and seats came off it in an
+  earlier pass -- but a buyer evaluating Enterprise had no way from here to the page that lists
+  what enterprise readiness still lacks. /trust already publishes that split by name. The card now
+  links to it at the moment the decision is made, rather than after a pilot has started.
+*/
 const ENTERPRISE = {
   name: "Enterprise",
   price: "Custom",
-  description: "For larger corpora and knowledge operations run by a team.",
+  description: "An assisted pilot for larger corpora and knowledge operations run by a team, scoped in a conversation.",
   features: ["Custom volume", "Custom retention review", "Audit export", "Dedicated onboarding and support"],
   offerCode: null,
+  note: { href: "/trust" as Route, label: "What an enterprise security review will and will not find" },
 } as const;
 
-const PLANS = [EVALUATION, ...PAID_PLANS, ENTERPRISE];
+const PLANS: ReadonlyArray<{
+  name: string;
+  price: string;
+  description: string;
+  features: readonly string[];
+  offerCode: BillingOfferCode | null;
+  note?: { href: Route; label: string };
+}> = [EVALUATION, ...PAID_PLANS, ENTERPRISE];
 
 /*
   The usage details, after the plan choices, derived rather than retyped.
@@ -93,19 +107,76 @@ const AT_A_GLANCE = [
     "Past the included pages",
     `${formatUsd(STANDARD_PAGE_USD)} per standard page. Complex-page processing is capped at ${formatUsd(MAXIMUM_PAGE_USD)}, shown before the run starts.`,
   ],
+  /*
+    Audit P06, second half. Rollover was already stated from the code; what happens to a balance
+    when a subscription ends was stated nowhere. Read from the same place: no job, trigger or
+    route reduces `credit_balance` on cancellation -- only a refund adjustment does -- and
+    `reserve_foundation_compute_v3` spends a balance only while `subscription_status` is
+    `active` or `trialing`. So the balance is neither removed nor spendable, and both halves are
+    said rather than the flattering one.
+  */
   [
     "Unused pages",
-    "Current billing behavior keeps unused pages in your balance.",
+    "Current billing behavior keeps unused pages in your balance. Cancelling stops the renewal that adds to it; nothing in the billing code removes a balance you already hold, and a balance can only be spent while a plan is active.",
   ],
   [
     "What differs by plan",
-    `${BILLING_OFFERS.observer_access.label} adds API and MCP access. ${BILLING_OFFERS.studio_access.label} adds approval to promote a candidate World. Source connections are verified separately in Workspace.`,
+    `${BILLING_OFFERS.observer_access.label} adds API and MCP access. ${BILLING_OFFERS.studio_access.label} adds approval to promote a candidate World and to roll one back. ${BILLING_OFFERS.studio_access.label} is sold through a conversation, not a checkout. Source connections are verified separately in Workspace.`,
+  ],
+  [
+    "What does not consume pages",
+    "Pages are reserved when a source is admitted for reading, once per document. Ask, search and recompiling sources already read reserve none — they check your plan, not your balance.",
+  ],
+  [
+    "Spreadsheets",
+    "A spreadsheet has no decided billable unit. Preflight names those files as undecided instead of quoting a unit nobody has chosen, and the page total beside them is a byte-derived upper bound labelled as an estimate.",
   ],
   [
     "How to start",
     "Start with your own files. Nothing is charged until you choose a plan.",
   ],
 ] as const;
+
+/*
+  Audit P03. Four volumes, every figure computed from the same two constants the reservation code
+  charges against and the catalog's own `includedPages`. The volumes themselves are derived from
+  those included-page numbers rather than picked, so no number on this table is typed by hand and
+  a rate change moves the table instead of leaving it stale. `product-claims-sync.test.ts`
+  recomputes it.
+*/
+const SCENARIO_PAGES = [
+  Math.round(BILLING_OFFERS.observer_access.includedPages * 0.6),
+  BILLING_OFFERS.observer_access.includedPages,
+  BILLING_OFFERS.observer_access.includedPages * 2,
+  BILLING_OFFERS.studio_access.includedPages,
+] as const;
+
+export function monthlyTotalUsd(offer: { priceUsd: number; includedPages: number }, pages: number) {
+  const extra = Math.max(0, pages - offer.includedPages);
+  return offer.priceUsd + extra * STANDARD_PAGE_USD;
+}
+
+const SCENARIOS = SCENARIO_PAGES.map((pages) => ({
+  pages,
+  developer: monthlyTotalUsd(BILLING_OFFERS.observer_access, pages),
+  team: monthlyTotalUsd(BILLING_OFFERS.studio_access, pages),
+}));
+
+export type PurchaseGate = {
+  id: "customerData" | "candidatePromotion";
+  /** The sentence this gate leads with; each gate is a different kind of closed. */
+  lead: string;
+  enabled: boolean;
+  reason: string;
+};
+
+export type PlanCapabilityRow = {
+  capability: string;
+  /** The route file whose access check this row's level is taken from. */
+  route: string;
+  level: "observer" | "studio";
+  plans: ReadonlyArray<{ label: string; saleChannel: string; allowed: boolean }>;
+};
 
 /*
   §54's purchase friction map, answered on the page where the purchase is decided.
@@ -151,7 +222,18 @@ const PURCHASE_FAQ: Array<[string, string, Route, string]> = [
   ["Can an enterprise security review approve it?", "Ten of the thirteen things such a review asks are published in one index, and the three that are not are listed there by name rather than left to be discovered after a pilot.", "/trust" as Route, "Trust Center"],
 ];
 
-export default function PricingPageClient({ initialLiveCheckout, initialSelfService }: { initialLiveCheckout: boolean; initialSelfService: boolean }) {
+export default function PricingPageClient({
+  initialLiveCheckout,
+  initialSelfService,
+  gates,
+  planCapabilities,
+}: {
+  initialLiveCheckout: boolean;
+  initialSelfService: boolean;
+  /** Read on the server from `lib/activation-policy`, the object /api/status serves verbatim. */
+  gates: readonly PurchaseGate[];
+  planCapabilities: readonly PlanCapabilityRow[];
+}) {
   const [notice, setNotice] = useState<string | null>(null);
   const [signedIn, setSignedIn] = useState(false);
   /*
@@ -272,6 +354,19 @@ export default function PricingPageClient({ initialLiveCheckout, initialSelfServ
               {BILLING_OFFERS.studio_access.label}. Additional compiled pages are billed at{" "}
               {formatUsd(STANDARD_PAGE_USD)} per standard page.
             </p>
+            {/*
+              Audit M04: the two gates, before the card, in the policy's own words.
+
+              Every string below is `activationPolicy`'s, read on the server from the object
+              /api/status serves. A gate that opens stops printing here by itself.
+            */}
+            {gates.filter((gate) => !gate.enabled).map((gate) => (
+              <p className="notice static" role="status" key={gate.id} data-purchase-gate={gate.id}>
+                <strong>{gate.lead}</strong>
+                {gate.reason}{" "}
+                <Link href={"/status" as Route}>Current deployment state</Link>
+              </p>
+            ))}
             <div className="plans" ref={plansRef} data-visual>
               {PLANS.map((plan) => (
                 <article className="plan" key={plan.name} data-featured={plan.name === "Developer" ? 1 : 0}>
@@ -280,6 +375,9 @@ export default function PricingPageClient({ initialLiveCheckout, initialSelfServ
                   <span className="price">{plan.price}{plan.price !== "$0" && plan.price.startsWith("$") ? <small> / month</small> : null}</span>
                   <p>{plan.description}</p>
                   <ul>{plan.features.map((feature) => <li key={feature}>{feature}</li>)}</ul>
+                  {plan.note ? (
+                    <p className="fine"><Link href={plan.note.href}>{plan.note.label}</Link></p>
+                  ) : null}
                   <button
                     className="btn ghost"
                     type="button"
@@ -315,6 +413,74 @@ export default function PricingPageClient({ initialLiveCheckout, initialSelfServ
                 </article>
               ))}
             </div>
+            {/*
+              Audit P05 / M04. Which plan reaches which capability, answered by the function the
+              API calls rather than by a sentence about it. Every cell is
+              `billingProductDecision(plan, level)` from the server component, and the level on
+              each row is read from the route that enforces it.
+            */}
+            <h3 id="plan-capability-title">What each plan can do</h3>
+            <table className="docs-table" aria-labelledby="plan-capability-title">
+              <thead>
+                <tr>
+                  <th scope="col">Capability</th>
+                  {planCapabilities[0]?.plans.map((plan) => (
+                    <th scope="col" key={plan.label}>
+                      {plan.label}{plan.saleChannel === "contact" ? " (contact)" : ""}
+                    </th>
+                  ))}
+                  <th scope="col">Enterprise</th>
+                </tr>
+              </thead>
+              <tbody>
+                {planCapabilities.map((row) => (
+                  <tr key={row.capability}>
+                    <th scope="row">{row.capability}</th>
+                    {row.plans.map((plan) => (
+                      <td key={plan.label}>{plan.allowed ? "Yes" : "No"}</td>
+                    ))}
+                    <td>Scoped in the pilot</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="fine">
+              Evaluation reaches the {BILLING_OFFERS.observer_access.label} row of this table
+              inside its file and page limits. Nothing an Ask answer returns is invented for it:
+              every answer names the retrieval path it took, and{" "}
+              <Link href={"/docs/ask" as Route}>the Ask reference</Link> states which paths exist
+              and what each one reads.
+            </p>
+            {/*
+              Audit P03. Four volumes, derived from the catalog's included pages, priced with the
+              two constants the reservation code charges against. No figure below is typed.
+            */}
+            <h3 id="pricing-scenarios-title">What four volumes cost</h3>
+            <table className="docs-table" aria-labelledby="pricing-scenarios-title">
+              <thead>
+                <tr>
+                  <th scope="col">Pages read in a month</th>
+                  <th scope="col">{BILLING_OFFERS.observer_access.label}</th>
+                  <th scope="col">{BILLING_OFFERS.studio_access.label}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {SCENARIOS.map((scenario) => (
+                  <tr key={scenario.pages}>
+                    <th scope="row">{scenario.pages.toLocaleString("en-US")}</th>
+                    <td>{formatUsd(scenario.developer)}</td>
+                    <td>{formatUsd(scenario.team)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="fine">
+              Subscription plus {formatUsd(STANDARD_PAGE_USD)} for every standard page past the
+              plan&apos;s included pages. A page is counted when a source is admitted for reading,
+              so re-asking, searching and recompiling sources already read do not appear in this
+              table. Complex-page processing is capped at {formatUsd(MAXIMUM_PAGE_USD)} per page
+              and is shown before the run starts. Tax is not included.
+            </p>
             </section>
             <section className="usage-estimator" aria-labelledby="usage-estimator-title" data-visual>
               <div>

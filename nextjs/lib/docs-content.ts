@@ -167,6 +167,30 @@ export const DOCS_SECTIONS: DocsSection[] = [
     summary: "Import the Compiled World ontology into RDF, linked-data and graph systems without losing validation, evidence or stable identity.",
     blocks: [
       { kind: "prose", text: "Every portable package includes **ontology/knowledge.jsonld** and **ontology/knowledge.ttl**. They are semantic projections of the Compiled World. The current export is RDF/JSON-LD with TAVONEL node kinds and compiled relation predicates; it should not be described as a hand-authored OWL/TBox schema. Keep provenance and validation beside the ontology, because the ontology is for semantic navigation and integration rather than a replacement for source evidence." },
+      /*
+        Audit K01/K05: the predicate set, named as what the engine emits rather than as an
+        ontology's vocabulary.
+        - The live engine (Core V2) projects one relation into the candidate: `supported_by`,
+          from a claim to one exact document version, with the evidence id. Its knowledge model
+          has no Topic kind at all, so the candidate reports `topics: 0` and no `discusses_topic`
+          edge is produced on this path.
+        - `discusses_topic` and `mentions_entity` come from the TypeScript fallback engine, which
+          is what builds the public Explore sample. Both are document-level text heuristics: a
+          keyword rule set and a capitalised-token scan.
+        A reader planning a SPARQL query needs the emitted set, not the intended one. This table
+        is written by hand today; it is regenerated from the emitter's own predicate constant once
+        that constant exists, which is tracked with the projection fix (audit R3-K09).
+      */
+      {
+        kind: "table",
+        head: ["Predicate", "Emitted by", "How it is derived"],
+        rows: [
+          ["supported_by", "Live engine and fallback engine", "A claim to the evidence for one exact document version, carrying the evidence id"],
+          ["mentions_entity", "Fallback engine only", "Document-level co-occurrence from a capitalised-token scan, not read semantics"],
+          ["discusses_topic", "Fallback engine only", "Document-level co-occurrence from a small keyword rule set; the live engine has no Topic kind"],
+        ],
+      },
+      { kind: "note", text: "Relations the ontology vocabulary could express and no engine emits — `supports`, `supersedes`, `depends_on`, `contradicts` — are not in a package. Query for a predicate that is not in the table above and the result is empty rather than wrong." },
       {
         kind: "table",
         head: ["Target", "Use", "Important companion"],
@@ -497,7 +521,17 @@ export const DOCS_SECTIONS: DocsSection[] = [
     summary: "What is counted, what is not decided, and the ceilings that apply.",
     blocks: [
       { kind: "prose", text: "Processing is quoted in pages before a compile starts, with the maximum charge shown alongside the estimate. A quote derived from file size is labelled an estimate; a page count read from the document itself is labelled verified." },
-      { kind: "prose", text: "Spreadsheets have no decided billable unit. Rather than quote one from file size and let that number become the charge, they are reported as undecided in the preflight panel." },
+      /*
+        Audit P01. The mechanism is honest and the number does not exist, so this says both.
+        `countXlsxPages()` returns `{ pages: null, reason: "XLSX_BILLABLE_UNIT_UNDECIDED" }` for
+        every xlsx and ods, the workspace preflight counts those files and names them, and
+        `estimateBillablePages` then falls through to `ceil(bytes / 65,536)` with
+        `confidence: "provisional"` -- which is what "Estimated page-equivalents" in the panel
+        means. Saying only "reported as undecided" left a reader thinking a spreadsheet is
+        excluded from the quote, and it is not: it is in the estimate as a byte-derived upper
+        bound. Choosing the unit is a founder decision, not a wording one.
+      */
+      { kind: "prose", text: "Spreadsheets have no decided billable unit. Rather than quote one from file size and let that number become the charge, the preflight panel counts those files and names them as undecided. They are not excluded from the estimate: the page-equivalents beside them are the same byte-derived upper bound any file without a declared page count gets, labelled as an estimate rather than as pages. What is charged is settled afterwards against the processing the read actually consumed, and never above the maximum shown before the run. A published spreadsheet unit — so a quote can be a quote rather than a ceiling — is still undecided." },
       {
         kind: "table",
         head: ["Limit", "Value"],

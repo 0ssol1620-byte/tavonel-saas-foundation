@@ -26,6 +26,38 @@ const SCENES = [
   { id: 5, label: "START" },
 ] as const;
 
+/*
+  The three jobs, each pointing at the solution page that already carries its limits.
+
+  Written as input -> usable result -> where to check it, and deliberately without a number:
+  nothing here is measured, and a "40% faster" on a landing page is the kind of figure §35 bars
+  and this repository has no receipt for. The destinations are the existing
+  `app/solutions/[slug]` slugs; `brand-copy.test.ts` checks each one resolves.
+*/
+const JOBS = [
+  {
+    eyebrow: "TECHNICAL SUPPORT",
+    title: "Answer from the manual that is current",
+    body: "In: the manuals, scans and service notes your team already keeps. Out: a reviewed World where every answer opens the document version and the place inside it that the answer was read from. What the read does and does not recover is on the solution page.",
+    href: "/solutions/document-intelligence" as Route,
+    action: "Reading difficult documents",
+  },
+  {
+    eyebrow: "CONTRACT AND ANNEX REVIEW",
+    title: "See what the annex changed before you sign",
+    body: "In: a contract and the annexes that amend it. Out: one knowledge asset every AI project reads instead of re-cleaning the same files, with the source behind each claim. Where a compile is not worth it is stated on the solution page.",
+    href: "/solutions/ai-ready-knowledge" as Route,
+    action: "One grounded knowledge asset",
+  },
+  {
+    eyebrow: "CHANGE IMPACT",
+    title: "Know what a revised source moved",
+    body: "In: a source that has been revised. Out: a candidate version beside the active one, promoted only by a person, with the previous revision still readable. What rollback does not undo is stated on the solution page.",
+    href: "/solutions/knowledge-operations" as Route,
+    action: "Running knowledge as an operation",
+  },
+] as const;
+
 type BandName = "scatter" | "structure" | "world" | "change" | "rebuild" | "answer" | "access";
 
 /*
@@ -241,6 +273,27 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
               <li><Link href="/security">Reviewed before it goes live</Link></li>
               <li><Link href={"/developers" as Route}>MCP · API · signed export</Link></li>
             </ul>
+            {/*
+              Audit B01 / U02 / B02: three jobs, before the vocabulary.
+
+              The locked hero names the gap and the lede defines the two adjectives, and then the
+              page went straight into World, compile, candidate and ontology -- five scenes of
+              machinery before a visitor could tell whether any of it was about their work. These
+              three cards are the first thing under the hero for that reason: each names a job,
+              what goes in, what comes back out usable, and the page that carries its limits and
+              its worked sample. No card carries a figure, because none is measured; each links to
+              an existing solution page rather than inventing a new one.
+            */}
+            <div className="tiles" aria-label="Three jobs this is built for">
+              {JOBS.map((job) => (
+                <article className="tile" key={job.href}>
+                  <span className="n">{job.eyebrow}</span>
+                  <h3>{job.title}</h3>
+                  <p>{job.body}</p>
+                  <Link className="input-next" href={job.href}>{job.action} →</Link>
+                </article>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -318,6 +371,28 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
 
         <Scene id={3} film band="change" eyebrow="COMPILE FILM" title="Watch knowledge take shape.">
           <CompileStagePlayer onStageChange={handleStageChange} />
+          {/*
+            Audit B06. Four evidence levels share this page -- a directed film, a research
+            fixture, the public Apple sample and a customer's own run -- and the film is the one a
+            visitor is most likely to read as a screen recording of the product. It is not one.
+            Saying so in one line, next to the thing itself, is cheaper than any disclaimer and
+            points at the surface where the real interface is: /explore renders a World compiled
+            from committed public filings by the same compiler.
+          */}
+          {/*
+            The caption carries no inline link, for the reason the evidence scene records below:
+            `mobile-landing.spec.ts` measures every a/button/summary on `/` under a coarse pointer
+            against a 44px floor, and a link inside a 14px `.fine` paragraph is about 18px. The
+            pointer to the real interface goes in the actions row, where the floor is met.
+          */}
+          <p className="fine rv">
+            These four cuts are a directed recreation of a compile, not a screen recording of the
+            product. The working interface runs over a World compiled from committed public
+            filings by the same compiler.
+          </p>
+          <div className="actions rv">
+            <ExploreLink className="btn ghost" label="See the working interface" />
+          </div>
         </Scene>
 
         {/*

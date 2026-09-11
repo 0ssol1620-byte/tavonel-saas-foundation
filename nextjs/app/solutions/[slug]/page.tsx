@@ -17,6 +17,7 @@ import SolutionProofSample from "@/components/solution-proof-sample";
 */
 const SOLUTIONS = {
   "ai-ready-knowledge": {
+    audience: "AI and platform engineers",
     eyebrow: "AI-READY KNOWLEDGE",
     title: "Give every AI project the same grounded knowledge asset.",
     lede: "Compile document collections into a versioned World before retrieval, assistants or agent workflows consume them.",
@@ -30,6 +31,7 @@ const SOLUTIONS = {
     ],
   },
   "document-intelligence": {
+    audience: "Document and operations teams",
     eyebrow: "DOCUMENT INTELLIGENCE",
     title: "Read the source before asking AI to reason over it.",
     lede: "Move from difficult PDFs and scans to reviewable structure, without losing the page and region each result came from.",
@@ -43,6 +45,7 @@ const SOLUTIONS = {
     ],
   },
   "knowledge-graph": {
+    audience: "Data and knowledge architects",
     eyebrow: "KNOWLEDGE GRAPH",
     title: "Compile a graph people can inspect and machines can reuse.",
     lede: "Turn document facts into stable semantic objects and evidence-bound relations inside a versioned World.",
@@ -56,6 +59,7 @@ const SOLUTIONS = {
     ],
   },
   "source-grounded-assistants": {
+    audience: "Application and agent developers",
     eyebrow: "GROUNDED ASSISTANTS",
     title: "Let an answer travel all the way back to the source.",
     lede: "Ask, API and MCP consume the same current World and return evidence from the same version.",
@@ -69,6 +73,7 @@ const SOLUTIONS = {
     ],
   },
   "knowledge-operations": {
+    audience: "Knowledge owners and security reviewers",
     eyebrow: "KNOWLEDGE OPERATIONS",
     title: "Review, promote and govern knowledge as an operational asset.",
     lede: "Separate candidate compilation from the active World, preserve change history and keep human decisions explicit.",
@@ -115,6 +120,15 @@ export default async function SolutionPage({ params }: { params: Promise<{ slug:
             <h1 className="document-title">{solution.title}</h1>
           </div>
           <div className="stack solution-hero-copy">
+            {/*
+              Audit B02. Five solution pages repeat the same concepts and the same sample figures,
+              and nothing told a reader which of the five answers *their* question -- a developer,
+              an operations owner and a security reviewer were handed the same five doors. The
+              audience is a field on the solution rather than a sentence written into each page, so
+              it cannot drift from the copy under it, and it renders as a wrapping paragraph rather
+              than a mono label because the longest of them is wider than a 360px phone.
+            */}
+            <p className="fine">For: {solution.audience}</p>
             <p className="lede">{solution.lede}</p>
             <p>{solution.problem}</p>
           </div>

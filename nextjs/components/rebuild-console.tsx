@@ -108,9 +108,22 @@ export default function RebuildConsole({ active }: { active: boolean }) {
           </span>
         </div>
       </div>
+      {/*
+        Audit B03. "Direction" is this repository's word for "built and shown, not offered as a
+        shipped capability" -- `lib/capabilities.ts` sets it and `lib/compiler-contract.ts` reuses
+        it -- and a customer reading a bare label has no way to know that. The definition is one
+        clause and it goes next to the label, not on a glossary page.
+
+        Nothing mounts this component: `brand-copy.test.ts` asserts the landing page does not
+        reference it and `prohibited-phrases.test.ts` exempts it on that ground. It is still the
+        copy surface both tests guard, so the label it would render is defined here. Deleting the
+        file needs a coordinated edit to `prohibited-phrases.test.ts`, which this lane does not
+        own; the exact patch is in the lane report.
+      */}
       <p className="panel-note">
         <b>Direction</b>
-        Selective recompilation is a research direction on declared fixture data.
+        Selective recompilation is a research direction on declared fixture data. Direction means
+        built and shown here, and not offered as a shipped capability in this deployment.
       </p>
     </div>
   );
