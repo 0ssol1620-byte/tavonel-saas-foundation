@@ -650,7 +650,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
           ["candidateAwaitingActivation / candidateManifestDigest", "True, with the digest, when a newer compiled version exists that nobody has activated. You are reading the previous active World until a person promotes it."],
         ],
       },
-      { kind: "note", text: "A null in the freshness block means that value is not recorded, or could not be read. It is never a substitute drawn from one of the other clocks. `candidateAwaitingActivation` is also conservative: it is computed from versions the workspace has promoted at least once plus the candidate this request already loaded, so it can read false while an unpromoted candidate exists that this request did not see." },
+      { kind: "note", text: "A null in the freshness block means that value is not recorded, or could not be read. It is never a substitute drawn from one of the other clocks. `candidateAwaitingActivation` is also conservative: it is computed from versions the workspace has promoted at least once, the manifest digest the latest compile recorded, and the candidate this request already loaded, so it can read false for a compile that ran before that digest was recorded." },
       { kind: "endpoint", operationId: "askActiveWorld" },
     ],
   },
