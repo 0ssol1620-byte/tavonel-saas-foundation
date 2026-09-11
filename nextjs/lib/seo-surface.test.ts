@@ -211,3 +211,92 @@ describe("public surface: every disallowed path is deliberate", () => {
     expect(pages.find((page) => page.route === "/product/continuous-knowledge")?.alwaysNotFound, "a live page that describes the stub pattern is being read as a stub").toBe(false);
   });
 });
+
+/*
+  §12.1: only an approved page goes in the sitemap -- checked as the contradiction it produces
+  rather than as a list of drafts.
+
+  There is no publication flag in the content layer, and this campaign deliberately does not add
+  one: a page that is not approved yet declares `robots: { index: false }` and stays out of
+  `sitemap.ts`, and both change in the commit that approves it. What was missing is the direction
+  nothing read. The guards above ask whether an advertised path exists and whether robots.txt
+  withholds it; none of them asked whether the page itself says no. So a draft added to `ROUTES`
+  by a hand that forgot the other half rendered a sitemap asking a crawler to index a page whose
+  own head refuses, and every assertion in this file was green.
+
+  That is the entire draft gate for `/cookbooks/[slug]`, whose records carry
+  `publication: 'draft'`. It needs no new classification file -- `route-classification.json` is
+  the CSRF credential matrix for API routes and has nothing to do with page publication -- and no
+  new list here.
+*/
+describe("public surface: the sitemap advertises only approved pages", () => {
+  it("lists no page that declares itself noindex", () => {
+    const contradictions = sitemapPaths.filter((path) => isNoindex(path));
+    expect(contradictions, "in the sitemap and noindex: the site asks a crawler to index a page whose own head refuses").toEqual([]);
+  });
+
+  /* The reader, both ways. A noindex test that stopped recognising noindex would pass everything. */
+  it("still knows a noindex page when it reads one", () => {
+    expect(isNoindex("/reproducibility"), "the standing noindex example no longer reads as noindex").toBe(true);
+    expect(sitemapPaths).not.toContain("/reproducibility");
+    expect(sitemapPaths).toContain("/ko");
+  });
+
+  /*
+    The one place the llms.txt exemption must not reach.
+
+    A noindex page is allowed in `llms.txt` -- `/reproducibility` is there on purpose, and the
+    guard above admits exactly that case. A draft is different in kind: it is unapproved copy,
+    not approved copy withheld from search, so advertising it to models is publishing it. The
+    set below is empty until the cookbooks lane lands its six draft records, which makes this a
+    gate rather than a measurement, and it is written as a gate on purpose.
+  */
+  it("offers a /cookbooks URL to models only once it is approved", () => {
+    for (const path of [...new Set(llmsPaths)].filter((path) => path.startsWith("/cookbooks"))) {
+      expect(isRealRoute(path), `${ORIGIN}${path} is in llms.txt but no page resolves it`).toBe(true);
+      expect(sitemapPaths, `${ORIGIN}${path} is offered to models while it is still a draft`).toContain(path);
+    }
+  });
+});
+
+/*
+  §12.4 -- the Korean subtree, and the three ways an hreflang scaffold is wrong.
+
+  It can annotate a language the document does not declare, it can omit the page carrying it
+  from its own alternate set, and it can be enforced by a redirect that hides the other language
+  from the reader who wanted it. `lib/page-seo.ts` refuses the second at build time; the first
+  and the third are facts about files, so they are read here.
+*/
+describe("public surface: the Korean subtree", () => {
+  const koreanPages = pages.filter((page) => page.route === "/ko" || page.route.startsWith("/ko/"));
+
+  it("is the one Korean URL this campaign ships, and it is approved", () => {
+    expect(koreanPages.map((page) => page.route)).toEqual(["/ko"]);
+    expect(sitemapPaths).toContain("/ko");
+    expect(isNoindex("/ko")).toBe(false);
+  });
+
+  it("declares Korean on the subtree it renders", () => {
+    expect(readFileSync(join(appDirectory, "ko", "layout.tsx"), "utf8"), 'the /ko layout must carry lang="ko" -- the root layout says lang="en"').toMatch(/lang="ko"/);
+  });
+
+  it("names itself and the English entry in its own hreflang set", () => {
+    const source = readFileSync(join(appDirectory, "ko", "page.tsx"), "utf8");
+    expect(source).toMatch(/canonical:\s*"\/ko"/);
+    expect(source).toMatch(/ko:\s*"\/ko"/);
+    expect(source).toMatch(/en:\s*"\/"/);
+    expect(source).toMatch(/"x-default":\s*"\/"/);
+  });
+
+  /*
+    No forced geo redirect. `middleware.ts` mints a CSP nonce and routes nothing, and the build
+    uses no Next `i18n` block -- which is the feature that would prefix and redirect every URL.
+    A general 301 is not forbidden here; §12.1 asks for accurate ones. Sending a reader to a
+    language because of where they connected from is what is forbidden.
+  */
+  it("sends nobody to a language they did not ask for", () => {
+    const middleware = readFileSync(resolve(import.meta.dirname, "../middleware.ts"), "utf8");
+    expect(middleware).not.toMatch(/NextResponse\.redirect|accept-language|acceptLanguage|locale/i);
+    expect(readFileSync(resolve(import.meta.dirname, "../next.config.mjs"), "utf8")).not.toMatch(/\bi18n\b/);
+  });
+});

@@ -4,6 +4,8 @@
 
 This file is a curated map of public TAVONEL pages for language models. It does not request preferential indexing.
 
+Role of this file: a reading map for tools, and not a ranking signal. Google's 2026-07-10 guidance states that AI-specific files of this kind are not used as a Google ranking signal, and nothing here is written as if they were: every page listed below is reachable from the sitemap and the site navigation, and deleting this file would change what a tool has to crawl to find them, not whether they can be found. Search-crawler and training-crawler access are separate questions and neither is decided here — robots.txt names the search crawlers it addresses, and the training-crawler policy is unresolved.
+
 TAVONEL offers self-service evaluation and paid Developer access. Product and research claims should be read from the public pages below; measured evidence and methodology are published separately from product descriptions.
 
 Indexing: public product, documentation, research and trust pages are indexable. Authenticated, API-internal and workspace surfaces are excluded from search indexing.
@@ -25,6 +27,7 @@ Indexing: public product, documentation, research and trust pages are indexable.
 - [Benchmarks](https://tavonel.com/benchmarks): The metric families and receipt fields a knowledge-compilation result must satisfy before a number is published.
 - [Reproducibility](https://tavonel.com/reproducibility): Frozen public fixtures and digest-bound sample artifacts.
 - [Status](https://tavonel.com/status): Current service status.
+- [Korean entry page](https://tavonel.com/ko): The site's Korean-language entry point — what is compiled, what activating a reviewed World requires today, and which English page is the single source for pricing, documentation and supported formats. The only Korean URL; every other page is English at its existing address.
 
 ## Product
 
