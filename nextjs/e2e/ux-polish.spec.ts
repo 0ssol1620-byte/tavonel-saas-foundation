@@ -58,8 +58,18 @@ test("compilation film is autoplay-first without a blocking play control", async
     const media = await video.evaluate((element: HTMLVideoElement) => ({ autoplay: element.autoplay, muted: element.muted, inline: element.playsInline, controls: element.controls }));
     expect(media).toEqual({ autoplay: true, muted: true, inline: true, controls: false });
   }
-  await expect(frame.getByRole("button", { name: /^Play$/i })).toHaveCount(0);
-  await expect(frame.getByRole("button", { name: /Pause compilation film|Resume compilation film/ })).toHaveCount(1);
+  /*
+    film-01 -- the control is always rendered now, and says which of three things it does.
+
+    What this case is about is unchanged: on a default browser the film starts by itself and
+    nothing blocks the frame waiting for a click. So the control must read Pause here -- if it
+    ever reads Play at these media settings, autoplay-first has regressed.
+  */
+  const control = frame.locator(".compile-film-motion-control");
+  await expect(control).toHaveCount(1);
+  await expect(control).toHaveAttribute("data-control", "pause");
+  await expect(control).toHaveAttribute("aria-label", "Pause the compilation film");
+  await expect(frame.getByRole("button", { name: /^Play/i })).toHaveCount(0);
 });
 
 test("Explore reaches the actual interactive instrument without a hero-length detour", async ({ page }, testInfo) => {

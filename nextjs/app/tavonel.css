@@ -1123,7 +1123,16 @@ h3 { font-size: 19px; letter-spacing: -0.014em; font-variation-settings: "wght" 
   .site-footer-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 480px) {
-  .site-footer-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); gap-inline: 18px; }
+  .site-footer-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 18px; margin: 14px 0 4px; }
+  /*
+    The footer earns its height back.
+
+    `public-layout-balance.spec.ts` holds the phone footer under 90% of the viewport, and the
+    12px floor on the group titles plus text-type fine print pushed it to 759.7 of a 759.6
+    budget. The 44px link rows are the part that may not shrink, so the padding gives way
+    instead: the block above the groups is what was generous, not the targets inside them.
+  */
+  footer.site { padding-top: 26px; padding-bottom: calc(var(--bar) + 22px); }
   .compile-film-viewport { max-height: calc(100svh - 260px); }
 }
 .evidence-path {
