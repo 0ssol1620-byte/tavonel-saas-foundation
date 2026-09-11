@@ -65,6 +65,13 @@ const CLAIM_SURFACES = [
   "app/explore/page.tsx",
   "components/explore/explore-stage.tsx",
   "lib/docs-content.ts",
+  /*
+    The cookbooks, 2026-09-11. Six drafts whose ready sections describe what the product does
+    today -- what the reader preserves, which plan activates a World, what Ask does when nothing
+    matched. That is the present tense this file exists to keep honest, and the route that
+    arranges them holds no copy of its own.
+  */
+  "lib/cookbook-content.ts",
 ] as const;
 
 /*

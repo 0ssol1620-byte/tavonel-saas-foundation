@@ -155,6 +155,13 @@ const COPY_SURFACES = [
   "components/trust-next.tsx",
   // `/trust` stopped being a redirect and became a page, which makes it a copy surface.
   "app/trust/page.tsx",
+  /*
+    The cookbooks, 2026-09-11. Six drafts, and almost every word of them is in the library rather
+    than in the one route that arranges them -- the same shape as /docs, and the same reason both
+    files are listed: `read` takes a literal path and never follows an import.
+  */
+  "lib/cookbook-content.ts",
+  "app/cookbooks/[slug]/page.tsx",
 ];
 
 const BARRED = [
