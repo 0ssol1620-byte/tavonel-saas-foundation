@@ -10,9 +10,13 @@ cannot claim yet. Source: site pages read for this lane, `shared/capabilityManif
 the website-growth `keyword-claims-data` lane and checked against HEAD `38d957d`. Four things
 moved under it, and each is marked **[2026-09-11]** where it appears:
 
-1. Ask does not abstain. Four public sentences claiming or implying abstention were replaced on
-   2026-09-11; retrieval declines only when nothing matched at all, and deciding that what
-   matched does not answer the question is the reader's work (`CLM-047`).
+1. Ask's abstention is an eligibility test, not a relevance one. Four public sentences implying
+   it declines *because* the sources do not support an answer were replaced on 2026-09-11;
+   retrieval declines only when nothing matched at all, and deciding that what matched does not
+   answer the question is the reader's work (`CLM-047`). The words "abstains" and "abstention"
+   stay usable and are live copy today (`/docs` /concepts and /ask, `/api`, and "Explicit
+   abstention" on `/solutions/<slug>`); what a cluster may not write is a sentence asserting the
+   World judges whether the sources support the answer.
 2. The live engine's relation set is published: `supported_by`, `mentions`, `contradicts`, the
    last as a review candidate with a stated scope (`CLM-046`).
 3. Nothing dedupes. Two identical uploads are two documents sharing one digest (`CLM-048`).
@@ -32,7 +36,7 @@ self-serve path to a first success (`CLM-016`, FD-02/FD-14).
 
 | # | Cluster (§11 keywords) | Owning route today | Gap |
 |---|---|---|---|
-| 1 | Knowledge Compiler (what is a KC / KC vs RAG / KC for agents / compiled world for AI) | `/knowledge-compiler` (category guide, RAG/graph/search comparison, glossary, FAQ) | Owns the definition well; no dedicated "compiled world for AI" long-form beyond the glossary row. **[2026-09-11]** The row that says where the category stops now reads "declines only when nothing matched" — content in this cluster must not restore the abstention wording it replaced |
+| 1 | Knowledge Compiler (what is a KC / KC vs RAG / KC for agents / compiled world for AI) | `/knowledge-compiler` (category guide, RAG/graph/search comparison, glossary, FAQ) | Owns the definition well; no dedicated "compiled world for AI" long-form beyond the glossary row. **[2026-09-11]** The row that says where the category stops now reads "declines only when nothing matched" — content in this cluster may use the word "abstention" for that real behaviour, but must not restore the wording that made declining a judgement about whether the sources support the answer |
 | 2 | Document intelligence (best parser for RAG / parsing benchmark / OCR comparison / complex PDF / table extraction) | `/benchmarks` (protocol only, no scored table yet) | No published number to cite for any of these queries — `lib/benchmark-registry.records.json` still holds `records: []` at `38d957d`, and the page says so in its own copy |
 | 3 | Source grounding (grounded RAG / exact citation / evidence provenance / evidence locator) | `/evidence` | Strong owner — mechanism, locator model, and self-verification steps are all published |
 | 4 | Temporal / change (keep RAG current / incremental updates / temporal knowledge graph / source-version-aware RAG) | `/product/continuous-knowledge` (in `app/sitemap.ts` ROUTES and in `PUBLIC_MARKETING_PATHS`; linked from `/` hero proof strip as "Version-aware") | `/research/notes` flags selective recompilation as `unproven` (fixture-only demo) — do not claim production-measured recompile precision |

@@ -182,7 +182,7 @@ describe("rankByDemand", () => {
 });
 
 describe("hardGateBlockers", () => {
-  it("blocks every seed today, and names rights and the security gate on all of them", () => {
+  it("always names the two external gates, whatever the record says", () => {
     for (const record of KEYWORD_SEEDS) {
       const blockers = hardGateBlockers(record);
       expect(blockers, record.query).toContain("source_rights_cleared");
@@ -190,13 +190,27 @@ describe("hardGateBlockers", () => {
     }
   });
 
-  it("keeps the two record-derived gates honest", () => {
-    expect(hardGateBlockers(seed({ product_ready: "not_live", evidence_available: false }))).toEqual([
-      "product_capability_live",
-      "journey_completed_end_to_end",
-      "source_rights_cleared",
-      "security_gate_open",
-    ]);
+  /*
+    The loop above is true of every record by construction -- rights and the security gate are
+    pushed unconditionally -- so on its own it proves nothing about the two gates that *are*
+    record-derived. These six rows are the whole branch table of `product_ready` x
+    `evidence_available`: each one fails if either condition is dropped, inverted, or made to
+    depend on the other. `activation_needs_team_plan` is the value every real seed carries and
+    is not "live", which is the case a `=== "not_live"` test would have missed.
+  */
+  it.each([
+    ["not_live", false, ["product_capability_live", "journey_completed_end_to_end"]],
+    ["not_live", true, ["product_capability_live"]],
+    ["activation_needs_team_plan", false, ["product_capability_live", "journey_completed_end_to_end"]],
+    ["activation_needs_team_plan", true, ["product_capability_live"]],
+    ["live", false, ["journey_completed_end_to_end"]],
+    ["live", true, []],
+  ] as const)("derives the record gates from product_ready=%s and evidence_available=%s alone", (product_ready, evidence_available, expected) => {
+    // `category-and-trust` because a cookbook workflow may not be `live`: every row here is a
+    // record the validator accepts, not a combination the map is barred from holding.
+    const record = seed({ workflow_id: "category-and-trust", product_ready, evidence_available });
+    expect(validateKeywordRecord(record)).toEqual([]);
+    expect(hardGateBlockers(record)).toEqual([...expected, "source_rights_cleared", "security_gate_open"]);
   });
 
   it("clears a row only when the external gates are named as verified", () => {

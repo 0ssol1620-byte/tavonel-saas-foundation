@@ -89,7 +89,7 @@
 #
 #   CLM-045  TXT/CSV/HTML declared and withheld behind `TEXT_INPUTS_LIVE = false`.
 #   CLM-046  The live engine's relation set (supported_by, mentions, contradicts).
-#   CLM-047  Ask/retrieval declines only when nothing matched — not an abstention claim.
+#   CLM-047  Ask/retrieval declines only when nothing matched — eligibility, not relevance.
 #   CLM-048  Two identical uploads are two documents. Nothing dedupes.
 #   CLM-049  WG-012: the native-structure/table/formula sentences are computed from the manifest.
 #
@@ -903,17 +903,26 @@ claims:
   - claimId: CLM-047
     claim: "Retrieval declines only when nothing matched at all. It is an eligibility test, not a judgement about whether what matched answers the question."
     surface: "/knowledge-compiler, /solutions/<slug>, /docs"
-    evidence: "Corrected on 2026-09-11 (integration C14) after the evidence lane measured both the grounded-ask and compiled paths answering deliberately unanswerable questions with the nearest matching regions. Four public sentences claiming or implying abstention were replaced."
+    evidence: "Corrected on 2026-09-11 (integration C14) after the evidence lane measured both the grounded-ask and compiled paths answering deliberately unanswerable questions with the nearest matching regions. Four public sentences implying it declines because the sources do not support an answer were replaced."
     artifact: "nextjs/app/knowledge-compiler/page.tsx:56; nextjs/app/solutions/[slug]/page.tsx:69; nextjs/lib/product-claims-sync.test.ts"
     runtime: "This deployment."
     scope: "What the product does when the sources do not support an answer: it returns the nearest matching regions with their locators, and deciding they do not answer the question is the reader's work."
     limitations: >-
-      This is the opposite of a feature sentence and must not be softened back into one. Any
-      cookbook, solutions page or Ask description that says the World "abstains", "declines when
-      the sources do not support an answer" or "knows when it does not know" re-introduces the
-      claim C14 removed. `lib/product-claims-sync.test.ts` fails on the sales-page surfaces it
-      lists; it cannot see a surface that is not on that list, so a new page carries the risk
-      until it is registered there.
+      This is the opposite of a feature sentence and must not be softened back into one. What is
+      barred is any phrasing that asserts a relevance or entailment judgement -- that the World
+      declines *because* the sources do not support the answer, or that it knows when it does not
+      know. "Abstains" and "abstention" are not themselves barred words: grounded-ask really does
+      abstain when no chunk matched any token, and the compiled path when no source returned a
+      candidate or the World Gate rejected every one, so both words are in live copy today
+      (`lib/docs-content.ts` /concepts and /ask, `app/api/page.tsx`, `app/api/openapi/route.ts`,
+      and "Explicit abstention" in `app/solutions/[slug]/page.tsx:70`) and pass the guard.
+      `lib/product-claims-sync.test.ts` matches only the literal fragments in its
+      OVERCLAIM_PHRASES list -- "abstains where the sources do not support", "abstains rather than
+      composing", "support is insufficient", "declines when the world cannot answer", "cannot
+      answer, it abstains" -- so a fresh wording of the same judgement passes the guard and still
+      breaks this claim: the judgement is what is banned, the list is only the tripwire. The guard
+      also fails only on the sales-page surfaces it enumerates and cannot see a surface that is
+      not on that list, so a new page carries both risks until it is registered there.
     status: SUPPORTED
     public_private: PUBLIC
     owner: founder
