@@ -112,19 +112,24 @@ const AT_A_GLANCE = [
     Audit P06, second half, and FD-03/FD-04. This tile is the published term, and the term is now
     enforced by `20260911130000_included_page_expiry_at_renewal.sql` rather than merely stated.
 
-    One thing the term rounds off, and it rounds in the customer's favour: expiry is applied when
-    the next month's grant arrives, not by a clock at midnight. Between a period ending and its
-    renewal transaction landing, the previous month's remainder is still spendable -- minutes,
-    normally, and never into a month whose payment failed, because
-    `reserve_foundation_compute_v3` spends a balance only while `subscription_status` is `active`
-    or `trialing`. The lane report carries that window as an open item for the owner; it is not a
-    second behaviour this page is hiding.
+    The sentence describes the *mechanism*, because the mechanism is what the code does: expiry is
+    applied when the next month's grant arrives, not by a clock at midnight. "Expire at the end of
+    each billing month" -- the entitlements lane's stronger wording, which this file carried until
+    the honesty review -- promises a boundary the schema does not record (Paddle sends a period end;
+    nothing stores it) and a job that does not exist, so between a period ending and its renewal
+    transaction landing that sentence said a balance was gone while the balance was still spendable.
+    The weaker sentence is the true one, and no behaviour hides behind it: the remainder is never
+    spendable into a month whose payment failed, because `reserve_foundation_compute_v3` spends a
+    balance only while `subscription_status` is `active` or `trialing`.
 
-    The wording is the entitlements lane's, kept verbatim so the two branches state one term.
+    Two consequences, both carried in the lane report: the stricter wording stays the owner's to
+    choose, and choosing it means a period-end column and a job before it would be true; and this
+    string is no longer byte-identical with `agent/wg-entitlements`, so that conflict resolves to
+    this branch's text -- the other branch's text is the one the code does not keep.
   */
   [
     "Unused pages",
-    `Included pages belong to the billing month they are granted in. Unused pages expire at the end of each billing month and do not roll over, and they are not refunded if you cancel. Pages past the included allowance are billed at the published rate of ${formatUsd(STANDARD_PAGE_USD)} per standard page.`,
+    `Included pages belong to the billing month they are granted in: when the next month's pages are granted, whatever is left of the previous month expires. Unused pages do not roll over and are not refunded if you cancel. Pages past the included allowance are billed at the published rate of ${formatUsd(STANDARD_PAGE_USD)} per standard page.`,
   ],
   [
     "What differs by plan",

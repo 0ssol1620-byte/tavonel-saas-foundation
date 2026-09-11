@@ -344,16 +344,19 @@ describe("product claims sync", () => {
     The term is no longer ahead of its enforcement:
     `supabase/migrations/20260911130000_included_page_expiry_at_renewal.sql` expires the previous
     month's remainder when the next month's grant lands, as a ledger row, and
-    `lib/included-page-expiry-migration.test.ts` guards that. What is still approximate is the
-    moment -- at the renewal grant, not at midnight on the period end -- and that window is the
-    lane report's open item.
+    `lib/included-page-expiry-migration.test.ts` guards that. So these assertions pin the moment
+    the code actually keeps -- *at the next grant* -- and not "at the end of each billing month",
+    which is a boundary no column records and no job enforces. If a later edit puts the stronger
+    sentence back on the page, this test is what fails.
   */
   it("states the page-expiry term and points Enterprise at the trust index", () => {
     const pricing = read("components/pricing-page-client.tsx");
-    expect(pricing, "P06: unused included pages do not roll over")
-      .toContain("expire at the end of each billing month and do not roll over");
-    expect(pricing, "P06: and are not refunded on cancellation")
-      .toContain("they are not refunded if you cancel");
+    expect(pricing, "P06: the expiry moment is the next grant, not a period-end clock")
+      .toContain("when the next month's pages are granted, whatever is left of the previous month expires");
+    expect(pricing, "P06: unused included pages do not roll over, and are not refunded on cancellation")
+      .toContain("do not roll over and are not refunded if you cancel");
+    expect(pricing, "P06: the page does not promise a period-end boundary the schema has no column for")
+      .not.toContain("expire at the end of each billing month");
     expect(pricing, "P06: the overage rate is derived, not typed")
       .toContain("published rate of ${formatUsd(STANDARD_PAGE_USD)} per standard page");
     expect(pricing, "P03: whether Ask and search consume pages")
