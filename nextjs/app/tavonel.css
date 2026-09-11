@@ -3642,7 +3642,7 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
 .pricing-page .plan { padding: clamp(22px, 2vw, 30px); gap: 16px; border: 1px solid var(--hairline-hi); border-radius: 8px; min-width: 0; background: var(--g1); }
 .pricing-page .plan[data-featured="1"] { background: var(--g2); border-color: var(--text-lo); }
 .pricing-page .plan .tag { min-height: 16px; color: var(--text-mid); font-size: 10px; }
-.pricing-page .plan h3 { font-size: 21px; margin: 0; }
+.pricing-page .plan h2 { font-size: 21px; margin: 0; }
 .pricing-page .price { font-size: clamp(38px, 3.5vw, 48px); letter-spacing: -0.05em; line-height: 1.12; font-variant-numeric: tabular-nums; }
 .pricing-page .price small { font: 12px var(--f-sans); letter-spacing: 0; }
 .pricing-page .plan p { font-size: 14px; line-height: 1.6; color: var(--text-mid); }

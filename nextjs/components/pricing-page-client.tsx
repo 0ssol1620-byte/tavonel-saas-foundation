@@ -371,7 +371,7 @@ export default function PricingPageClient({
               {PLANS.map((plan) => (
                 <article className="plan" key={plan.name} data-featured={plan.name === "Developer" ? 1 : 0}>
                   <span className="tag">{plan.name === "Developer" ? "START HERE" : plan.name === "Evaluation" ? "TRY IT FREE" : " "}</span>
-                  <h3>{plan.name}</h3>
+                  <h2>{plan.name}</h2>
                   <span className="price">{plan.price}{plan.price !== "$0" && plan.price.startsWith("$") ? <small> / month</small> : null}</span>
                   <p>{plan.description}</p>
                   <ul>{plan.features.map((feature) => <li key={feature}>{feature}</li>)}</ul>

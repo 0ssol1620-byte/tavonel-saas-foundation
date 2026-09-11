@@ -34,7 +34,7 @@ const routes = [
   no assertion is weakened to accommodate it. The one-line fix is in the QA lane report under
   CROSS-LANE REQUESTS.
 */
-const KNOWN_HEADING_DEFECT: readonly string[] = ["/pricing"];
+const KNOWN_HEADING_DEFECT: readonly string[] = [];
 
 for (const route of routes) {
   test(`${route} meets the launch semantic accessibility baseline`, async ({ page }) => {
