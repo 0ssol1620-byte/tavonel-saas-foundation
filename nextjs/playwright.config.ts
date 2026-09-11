@@ -7,6 +7,17 @@ const { defineConfig } =
     : playwrightModule.default;
 
 const widths = [1920, 1440, 1280, 1024, 768, 390, 360] as const;
+
+/*
+  The specs added by the 2026-09-11 competitive-audit QA lane (V01-V05, V08, S07, U06).
+
+  Named as a set because they are run by their own projects: each drives the viewport, context or
+  media it needs from inside the test, so running them once per width project would repeat the
+  same measurement seven times. `auditWidthSpecs` is the subset for which the viewport is the
+  variable rather than something the spec sets itself.
+*/
+const auditSpecs = /(overflow-audit|contrast-zoom-audit|dialog-focus-audit|film-fallback-audit|failure-states-audit|billing-lifecycle|cross-tenant-negative|compile-resume)\.spec\.ts/;
+const auditWidthSpecs = /(contrast-zoom-audit|failure-states-audit|billing-lifecycle)\.spec\.ts/;
 const testPort = Number(process.env.PLAYWRIGHT_PORT ?? "3117");
 /*
   PLAYWRIGHT_BASE_URL points the suite at a deployment instead of the local server.
@@ -35,17 +46,40 @@ export default defineConfig({
   projects: [
     ...widths.map(width => ({
       name: `${width}`,
-      testIgnore: /launch-qa.*\.spec\.ts/,
+      testIgnore: [/launch-qa.*\.spec\.ts/, auditSpecs],
       use: { viewport: { width, height: width <= 390 ? 844 : 900 } },
     })),
     {
       name: "reduced-motion",
-      testIgnore: /launch-qa.*\.spec\.ts/,
+      testIgnore: [/launch-qa.*\.spec\.ts/, auditSpecs],
       use: {
         viewport: { width: 1440, height: 900 },
         reducedMotion: "reduce" as const,
       },
     },
+    /*
+      The competitive-audit QA specs, run once rather than once per width.
+
+      They are excluded from the seven width projects above because each of them drives the
+      viewports, contexts and media it needs -- `overflow-audit` walks all seven widths itself,
+      `film-fallback-audit` opens 899 and 901, `contrast-zoom-audit` builds a 640px/2x context
+      for 200% zoom. Running them in the width projects as well would multiply 544 tests by
+      seven to re-measure what the spec already measured.
+
+      `audit-768` and `audit-1280` add the two viewports the product-qa job never covered --
+      the tablet edge and the small laptop -- for the specs where viewport is the variable.
+      `overflow-audit` is not among them: it covers both widths from the inside.
+    */
+    {
+      name: "audit",
+      testMatch: auditSpecs,
+      use: { viewport: { width: 1440, height: 900 } },
+    },
+    ...([768, 1280] as const).map(width => ({
+      name: `audit-${width}`,
+      testMatch: auditWidthSpecs,
+      use: { viewport: { width, height: width === 768 ? 1024 : 900 } },
+    })),
     ...(["chromium", "firefox", "webkit"] as const).map(browserName => ({
       name: `launch-${browserName}`,
       testMatch: /launch-qa.*\.spec\.ts/,
