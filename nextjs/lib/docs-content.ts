@@ -170,27 +170,33 @@ export const DOCS_SECTIONS: DocsSection[] = [
       /*
         Audit K01/K05: the predicate set, named as what the engine emits rather than as an
         ontology's vocabulary.
-        - The live engine (Core V2) projects one relation into the candidate: `supported_by`,
-          from a claim to one exact document version, with the evidence id. Its knowledge model
-          has no Topic kind at all, so the candidate reports `topics: 0` and no `discusses_topic`
-          edge is produced on this path.
+        - The live engine (Core V2) projects three relations into the candidate: `supported_by`
+          from a claim to one exact document version, `mentions` from a claim to an entity, and
+          `contradicts` between two claims. The first two were always computed; R3-K09 is why
+          the last two now reach the package at all -- the projection used to discard every
+          RELATION and VALIDATION_RECORD object the Core produced. Its knowledge model has no
+          Topic kind, so the candidate reports `topics: 0` and no `discusses_topic` edge is
+          produced on this path.
         - `discusses_topic` and `mentions_entity` come from the TypeScript fallback engine, which
           is what builds the public Explore sample. Both are document-level text heuristics: a
-          keyword rule set and a capitalised-token scan.
+          keyword rule set and a capitalised-token scan. They are not the live engine's
+          `mentions`, whose subject is a claim rather than a document.
         A reader planning a SPARQL query needs the emitted set, not the intended one. This table
         is written by hand today; it is regenerated from the emitter's own predicate constant once
-        that constant exists, which is tracked with the projection fix (audit R3-K09).
+        that constant exists (`CORE_RELATION_PREDICATES` covers the live engine's half).
       */
       {
         kind: "table",
         head: ["Predicate", "Emitted by", "How it is derived"],
         rows: [
           ["supported_by", "Live engine and fallback engine", "A claim to the evidence for one exact document version, carrying the evidence id"],
+          ["mentions", "Live engine only", "A claim to an entity, from a case-folded match over capitalised phrases, acronyms and Korean organisation names in that claim's own sentence"],
+          ["contradicts", "Live engine only", "Two claims that disagree on a number or on whether something is the case, inside one topic and one time reference. A candidate for review, not a resolution, and blind to jurisdiction, units and exception clauses"],
           ["mentions_entity", "Fallback engine only", "Document-level co-occurrence from a capitalised-token scan, not read semantics"],
           ["discusses_topic", "Fallback engine only", "Document-level co-occurrence from a small keyword rule set; the live engine has no Topic kind"],
         ],
       },
-      { kind: "note", text: "Relations the ontology vocabulary could express and no engine emits — `supports`, `supersedes`, `depends_on`, `contradicts` — are not in a package. Query for a predicate that is not in the table above and the result is empty rather than wrong." },
+      { kind: "note", text: "Relations the ontology vocabulary could express and no engine emits — `supports`, `supersedes`, `depends_on` — are not in a package. Query for a predicate that is not in the table above and the result is empty rather than wrong. `contradicts` is in a package now and was not before, so a query written against an older export finds nothing rather than nothing being there; and a `contradicts` row is a flagged pair awaiting a person, never a decided conflict." },
       {
         kind: "table",
         head: ["Target", "Use", "Important companion"],

@@ -177,15 +177,27 @@ describe("product claims sync", () => {
 
   it("names only relation predicates some engine emits", () => {
     const card = strip(read("app/product/compiled-world/page.tsx"));
-    // `lib/core-runtime-v2.ts` projects exactly one relation type into a live candidate; the
-    // TypeScript fallback engine adds the two document-level heuristics.
-    expect(read("lib/core-runtime-v2.ts"), "the live projection emits supported_by")
-      .toContain('type: "supported_by" as const');
+    /*
+      `lib/core-runtime-v2.ts` projects three relation types into a live candidate since audit
+      R3-K09: the claim-to-evidence edge, the claim-to-entity `mentions` relation and the
+      `contradicts` candidate built from a validation_record. The TypeScript fallback engine
+      emits a different set, whose two heuristics have a *document* as their subject -- which is
+      why `mentions` and `mentions_entity` are not the same claim and are not written as one.
+    */
+    const live = read("lib/core-runtime-v2.ts");
+    expect(live, "the live projection emits supported_by").toContain('type: "supported_by" as const');
+    expect(live, "the live relation allowlist is the Core's own predicate")
+      .toContain('const CORE_RELATION_PREDICATES = new Set(["mentions"])');
+    expect(live, "a validation_record becomes a contradicts edge").toContain('type: "contradicts"');
     for (const predicate of ["supported_by", "mentions_entity", "discusses_topic"]) {
       expect(read("lib/collection-compiler.ts"), `the fallback engine emits ${predicate}`)
         .toContain(predicate);
     }
-    expect(card, "the card names the emitted set").toContain("supported_by");
+    for (const predicate of ["supported_by", "mentions", "contradicts"]) {
+      expect(card, `the card names the emitted predicate ${predicate}`).toContain(predicate);
+    }
+    // A contradiction is a candidate a person resolves; the card may not say it is resolved.
+    expect(card, "the contradiction limit travels with the predicate").toContain("candidate and sent to review");
   });
 
   /*

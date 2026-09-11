@@ -68,7 +68,15 @@ const PARTS: readonly Part[] = [
   {
     state: "RELATIONS",
     title: "What connects to what",
-    body: "Every edge is typed and carries the evidence ids that justify it — an edge naming no evidence is not a row this emitter can produce. What a compile emits on this deployment is the claim-to-evidence edge: a claim is supported_by one exact document version. The engine behind the public Explore sample also emits two document-level edges from text heuristics, mentions_entity from a capitalised-token scan and discusses_topic from a small set of keyword rules. Business relations — what supports, what replaces what, what depends on what — and detecting that two claims conflict are directions: the gate in front of retrieval does not check them.",
+    /*
+      The live engine's set, re-derived after audit R3-K09 stopped the projection discarding two
+      thirds of it. The edges are the Core's own, read from semantics.py: `mentions` runs from a
+      claim to an entity found by a case-folded match over capitalised phrases, acronyms and
+      Korean organisation names in that claim's sentence, and `contradicts` is a candidate a
+      person resolves, never a resolution. The fallback's two document-level heuristics keep
+      their own sentence because they are a different engine with different subjects.
+    */
+    body: "Every edge is typed and carries the evidence ids that justify it — an edge naming no evidence is not a row this emitter can produce. What a compile emits on this deployment is the claim-to-evidence edge — a claim is supported_by one exact document version — and a claim mentions an entity, from a case-folded match over capitalised phrases, acronyms and Korean organisation names in that claim's own sentence. Two claims that disagree on a number or on whether something is the case, inside one topic and one time reference, are emitted as a contradicts candidate and sent to review: the compiler flags the pair, a person resolves it, and it knows nothing about jurisdiction, units or exception clauses. The engine behind the public Explore sample instead emits two document-level edges from text heuristics, mentions_entity from a capitalised-token scan and discusses_topic from a small set of keyword rules. Business relations — what supports, what replaces what, what depends on what — are still directions: the gate in front of retrieval does not check them.",
     clause: RELATIONS,
   },
   /*
