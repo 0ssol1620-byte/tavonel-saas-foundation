@@ -22,7 +22,7 @@ vi.mock("./compile-job-store", () => ({ listWorkspaceCompileJobs: mocks.jobs }))
 vi.mock("./review-store", () => ({ listFoundationReviewDecisions: mocks.decisions }));
 
 import { GET as collectionGet } from "../app/api/collections/[id]/route";
-import type { ReviewQueueBreakdown } from "./review-queue";
+import { REVIEW_DECISION_READ_LIMIT, type ReviewQueueBreakdown } from "./review-queue";
 
 const TEXT = "Acme Corporation shall deliver the audit report within thirty days of the effective date.";
 const compiled = compileCollectionCandidate([{
@@ -112,6 +112,38 @@ it("still returns the breakdown when the decision ledger cannot be read, with no
   mocks.decisions.mockResolvedValue({ ok: false, code: "REVIEW_STORE_READ_FAILED" });
   const { body } = await read();
   expect(body.documentBreakdown.rows[0]).toMatchObject({ firstReviewAt: null, timeToFirstReviewMs: null });
+});
+
+/*
+  The decision read is `created_at.desc` and bounded. Reading the default window would return
+  the 50 *newest* decisions, so on a heavily reviewed World a document decided before the window
+  opened reads as undecided and sorts ahead of one reviewed more recently -- inverting the very
+  order U03 exists to produce. So: ask for the full window, and when it comes back full, say so.
+*/
+it("asks for the whole decision window instead of the store's default page", async () => {
+  mocks.jobs.mockResolvedValue({ ok: true, value: [{
+    collectionId: compiled.collectionId, documentIds: ["breakdown-read"], blocked: [],
+    settledAt: "2026-09-11T00:00:00.000Z",
+  }] });
+  const { body } = await read();
+  expect(mocks.decisions).toHaveBeenCalledWith("pilot-acme01", compiled.collectionId, REVIEW_DECISION_READ_LIMIT);
+  expect(REVIEW_DECISION_READ_LIMIT).toBe(200);
+  expect(body.documentBreakdown.missing).toEqual([]);
+});
+
+it("reports a truncated decision read rather than presenting a later decision as the first", async () => {
+  mocks.jobs.mockResolvedValue({ ok: true, value: [{
+    collectionId: compiled.collectionId, documentIds: ["breakdown-read"], blocked: [],
+    settledAt: "2026-09-11T00:00:00.000Z",
+  }] });
+  mocks.decisions.mockResolvedValue({
+    ok: true,
+    decisions: Array.from({ length: REVIEW_DECISION_READ_LIMIT }, (_unused, index) => ({
+      evidenceId: `ev-${index}`, recordedAt: "2026-09-11T00:20:00.000Z",
+    })),
+  });
+  const { body } = await read();
+  expect(body.documentBreakdown.missing).toEqual(["review_decisions"]);
 });
 
 it("does not attach a breakdown to a denied read", async () => {

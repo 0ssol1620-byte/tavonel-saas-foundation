@@ -9,7 +9,7 @@ import { checkConnectorSourceAccess } from "@/lib/connector-source-access";
 import { listWorkspaceCompileJobs } from "@/lib/compile-job-store";
 import { listFoundationReviewDecisions } from "@/lib/review-store";
 import { buildWorldReadModel } from "@/lib/world-read-model";
-import { buildReviewQueue } from "@/lib/review-queue";
+import { REVIEW_DECISION_READ_LIMIT, buildReviewQueue } from "@/lib/review-queue";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -59,7 +59,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const model = buildWorldReadModel(loaded.value.artifact, id);
   const [jobs, decisions] = await Promise.all([
     listWorkspaceCompileJobs(auth.principal.workspaceKey),
-    listFoundationReviewDecisions(auth.principal.workspaceKey, id),
+    listFoundationReviewDecisions(auth.principal.workspaceKey, id, REVIEW_DECISION_READ_LIMIT),
   ]);
   const job = jobs.ok ? jobs.value.find((entry) => entry.collectionId === id) : undefined;
   const documentBreakdown = buildReviewQueue({
@@ -69,6 +69,12 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     reviewReasons: artifact.reviewReasons ?? artifact.validation.reviewReasons ?? [],
     evidence: (model?.evidence ?? []).map((item) => ({ id: item.id, sourceId: item.sourceId })),
     decisions: decisions.ok ? decisions.decisions.map((entry) => ({ evidenceId: entry.evidenceId, recordedAt: entry.recordedAt })) : [],
+    /*
+      The decision read is newest-first and bounded. A full window means older decisions exist
+      that this response cannot see, so `documentBreakdown.missing` carries `review_decisions`
+      and the first-review times stop claiming to be the first.
+    */
+    decisionsTruncated: decisions.ok && decisions.decisions.length >= REVIEW_DECISION_READ_LIMIT,
   });
   return NextResponse.json({
     code: "OK",

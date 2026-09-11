@@ -17,6 +17,17 @@
     recorded" -- never zero, never "now".
 */
 
+/**
+ * How many review decisions a caller must ask for before building a queue.
+ *
+ * `listFoundationReviewDecisions` orders `created_at.desc` and caps at 200, so a World with
+ * more decisions than the window hands back rows that do not contain the *first* decision on
+ * an older document -- and a later decision presented as the first one is a wrong number, not
+ * a rounded one. A caller that filled its window says so (`decisionsTruncated`) and the
+ * breakdown reports `review_decisions` under `missing` instead of reading as a measurement.
+ */
+export const REVIEW_DECISION_READ_LIMIT = 200;
+
 /** Four states, in the order a reviewer should meet them. */
 export const REVIEW_QUEUE_STATUSES = ["excluded", "under_review", "unprocessed", "read"] as const;
 
@@ -48,9 +59,11 @@ export type ReviewQueueBreakdown = {
    *
    * An empty array means every input was present. `compile_job` means no compile-job row was
    * available, so excluded and unprocessed documents cannot be listed at all and the reader is
-   * told so instead of being shown a reassuring zero.
+   * told so instead of being shown a reassuring zero. `review_decisions` means the decision
+   * read was truncated, so a document decided outside that window reads as undecided (and
+   * sorts as one), and an elapsed time shown may belong to a later decision than the first.
    */
-  missing: Array<"compile_job" | "compile_settled_at">;
+  missing: Array<"compile_job" | "compile_settled_at" | "review_decisions">;
 };
 
 export type ReviewQueueInput = {
@@ -67,6 +80,12 @@ export type ReviewQueueInput = {
   evidence: Array<{ id: string; sourceId: string }>;
   /** Recorded review decisions, newest or oldest order irrelevant. */
   decisions: Array<{ evidenceId: string; recordedAt: string }>;
+  /**
+   * True when `decisions` is a truncated window -- the read returned as many rows as it asked
+   * for, so older decisions exist that it cannot see. The queue then names the gap instead of
+   * calling the earliest row it happens to hold the first decision.
+   */
+  decisionsTruncated?: boolean;
   names?: Record<string, string>;
 };
 
@@ -93,6 +112,7 @@ export function buildReviewQueue(input: ReviewQueueInput): ReviewQueueBreakdown 
   const missing: ReviewQueueBreakdown["missing"] = [];
   if (input.documentIds === null) missing.push("compile_job");
   if (!input.compileSettledAt || Number.isNaN(Date.parse(input.compileSettledAt))) missing.push("compile_settled_at");
+  if (input.decisionsTruncated === true) missing.push("review_decisions");
 
   const blockedById = new Map(input.blocked.map((entry) => [entry.documentId, entry]));
   const documentById = new Map((input.documents ?? []).map((entry) => [entry.documentId, entry]));
@@ -138,6 +158,11 @@ export function buildReviewQueue(input: ReviewQueueInput): ReviewQueueBreakdown 
       evidence id compiled from it. Anything else stays a World-level reason and is not pinned
       to a row it cannot be shown to belong to.
     */
+    // ponytail: substring match. Ceiling: one document id contained in another id, or in an
+    // evidence id, attributes the reason to both rows. Production ids are UUID-shaped
+    // (lib/compile-job-store.ts), so this does not arise today; an anchored match needs the
+    // reason string itself to delimit the id it names, which is lib/collection-compiler.ts's
+    // format to change, not this module's.
     for (const reason of input.reviewReasons) {
       if (reason.includes(documentId) || evidenceIds.some((id) => reason.includes(id))) reasons.push(reason);
     }

@@ -6,6 +6,7 @@ import {
   buildReviewQueue,
   filterReviewQueue,
   formatElapsed,
+  REVIEW_DECISION_READ_LIMIT,
   reviewQueueReasons,
   type ReviewQueueInput,
 } from "./review-queue";
@@ -172,6 +173,35 @@ describe("a missing compile-job row", () => {
     }));
     expect(markup).toContain("cannot be listed here");
     expect(markup).toContain("time-to-first-review is not measured");
+  });
+});
+
+describe("a truncated review-decision read", () => {
+  /*
+    The decision read is newest-first and bounded, so a World with more decisions than the
+    window hands back rows that may not contain the first decision on a document. The queue
+    must not present the earliest row it happens to hold as "the first review".
+  */
+  it("names the gap rather than calling a later decision the first one", () => {
+    const queue = buildReviewQueue({ ...base, decisionsTruncated: true });
+    expect(queue.missing).toEqual(["review_decisions"]);
+    // The rows still render: a truncated window is incomplete, not useless.
+    expect(queue.total).toBe(5);
+  });
+
+  it("claims nothing of the sort when the window was not full", () => {
+    expect(buildReviewQueue({ ...base, decisionsTruncated: false }).missing).toEqual([]);
+    expect(buildReviewQueue(base).missing).toEqual([]);
+  });
+
+  it("says so on screen, with the window size it actually read", () => {
+    const markup = renderToStaticMarkup(createElement(ReviewQueue, {
+      input: { ...base, decisionsTruncated: true },
+    }));
+    expect(markup).toContain(`More than ${REVIEW_DECISION_READ_LIMIT} review decisions`);
+    expect(markup).toContain("ordered as if it were still undecided");
+    expect(renderToStaticMarkup(createElement(ReviewQueue, { input: base })))
+      .not.toContain("review decisions are recorded for this World");
   });
 });
 
