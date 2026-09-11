@@ -734,6 +734,21 @@ describe("the revision-compile request", () => {
       { revisionCompile: { ...snapshot, artifactHashes: { "canonical/model": "not-a-digest" } } },
       active,
     )).toBeNull();
+    // `PreviousUnit` declares both of these as tuples of strings, so the elements are checked.
+    expect(readRevisionCompileSnapshot(
+      { revisionCompile: { ...snapshot, units: [{ ...snapshot.units[0], documentPath: ["Sources", 7] }] } },
+      active,
+    )).toBeNull();
+    expect(readRevisionCompileSnapshot(
+      { revisionCompile: { ...snapshot, units: [{ ...snapshot.units[0], neighbourAnchors: [null] }] } },
+      active,
+    )).toBeNull();
+    // Absent is legal: the contract gives `neighbourAnchors` a default.
+    const { neighbourAnchors: _dropped, ...withoutAnchors } = snapshot.units[0];
+    expect(readRevisionCompileSnapshot(
+      { revisionCompile: { ...snapshot, units: [withoutAnchors] } },
+      active,
+    )).toEqual({ ...snapshot, units: [withoutAnchors] });
   });
 
   it("persists the Core's units only when the flag asked it to", async () => {
@@ -769,15 +784,10 @@ describe("the revision-compile request", () => {
   });
 
   it("is off unless the flag is exactly 1", () => {
-    // NODE_ENV is required on ProcessEnv (next/types/global), so each literal carries it.
-    const env = (value?: string) => ({
-      NODE_ENV: "test" as const,
-      ...(value === undefined ? {} : { [CORE_V2_REVISION_COMPILE_FLAG]: value }),
-    });
-    expect(revisionCompileEnabled(env())).toBe(false);
-    expect(revisionCompileEnabled(env("0"))).toBe(false);
-    expect(revisionCompileEnabled(env("true"))).toBe(false);
-    expect(revisionCompileEnabled(env("1"))).toBe(true);
+    expect(revisionCompileEnabled({ NODE_ENV: "test" })).toBe(false);
+    expect(revisionCompileEnabled({ NODE_ENV: "test", [CORE_V2_REVISION_COMPILE_FLAG]: "0" })).toBe(false);
+    expect(revisionCompileEnabled({ NODE_ENV: "test", [CORE_V2_REVISION_COMPILE_FLAG]: "true" })).toBe(false);
+    expect(revisionCompileEnabled({ NODE_ENV: "test", [CORE_V2_REVISION_COMPILE_FLAG]: "1" })).toBe(true);
   });
 });
 
