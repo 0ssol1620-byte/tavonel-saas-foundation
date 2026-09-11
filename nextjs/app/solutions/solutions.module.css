@@ -1,10 +1,18 @@
 /*
-  Two lines the global `.tile` treatment has no rule for: who the page is for, and the problem
-  it answers. Both sit under the title and both have to read as supporting text rather than as
-  the card's own claim, which is the whole of what these rules do.
+  What the global `.tile` treatment has no rule for on this hub: who the page is for, the problem
+  it answers, and the fact that a card is the only thing a reader chooses between here and
+  therefore has to look and behave like one.
 
   Selectors are compounded through `.card` rather than carrying `!important`: `.tile p` in
-  `app/tavonel.css` is a class plus an element and outranks a bare class on its own.
+  `app/tavonel.css` is a class plus an element and outranks a bare class on its own. The title
+  rule reaches for `:global(.tiles)` to get a third class, because the rule it has to beat is
+  `.tiles .tile h2` -- two classes and an element -- and a tie would be settled by whichever
+  stylesheet the bundler happened to emit second. The card's own eyebrow needs no rule at all:
+  `.tile .n` is already the 9.5px BA-051 asks for.
+
+  `app/tavonel.css` is design-assets' file this week, so nothing here reaches for it. Every rule
+  below is scoped to this hub's own cards and cannot affect another page; the two that override a
+  global rule say which one.
 */
 
 .card .audience {
@@ -14,10 +22,63 @@
   color: var(--text-mid);
 }
 
+/*
+  BA-040 and BA-055. This paragraph carried `border-top` and closed the card, so the hub read as
+  five complaints under five rule lines -- and because the rule was on the paragraph rather than
+  on the card's content box, it stopped about 15% short of the card's right edge on a phone,
+  which reads as a rendering fault. It is a sentence in the middle of the card now: no rule left
+  to draw short, and the card ends on what the workflow gives you.
+*/
 .card .problem {
-  margin-top: 2px;
-  padding-top: 9px;
-  border-top: 1px solid var(--hairline);
+  margin: 0;
   font-size: 11.5px;
   color: var(--text-xlo);
+}
+
+/*
+  BA-051. The card headline is the only thing a reader on this page chooses between, and at the
+  global 17px it was optically the same size as the paragraph under it and carried less visual
+  weight than its own uppercase eyebrow -- five cards read as five paragraphs with a bold first
+  line. The hierarchy is now eyebrow, title, audience, body.
+*/
+:global(.tiles) .card .cardTitle {
+  font-size: clamp(19px, 1.7vw, 22px);
+  letter-spacing: -0.018em;
+  font-variation-settings: "wght" 560;
+  line-height: 1.18;
+}
+
+.card .cardTitle a { color: inherit; }
+
+/*
+  BA-052. The whole card is the target. One link per card, expanded over the article by a
+  pseudo-element rather than by wrapping a second anchor around markup that already contains one:
+  a nested link is not reachable by keyboard in a sane order and is announced twice.
+
+  `:focus-within`, not `:focus`, because the element that takes focus is the anchor inside the
+  card while the surface that has to show it is the card.
+*/
+.card {
+  position: relative;
+  transition: background-color 120ms ease, box-shadow 120ms ease;
+}
+
+.card .cardTitle a::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.card:hover {
+  background: var(--g2);
+  box-shadow: inset 0 0 0 1px var(--hairline-hi);
+}
+
+.card:focus-within {
+  background: var(--g2);
+  box-shadow: inset 0 0 0 2px var(--verified);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card { transition: none; }
 }
