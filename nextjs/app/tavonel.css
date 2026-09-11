@@ -272,6 +272,18 @@ a { color: inherit; text-decoration: none; }
   view-transition-name: world-canvas;
 }
 
+/*
+  BA-005 -- no live canvas under 900px, and none on a coarse pointer up to 1023px.
+
+  `components/world-field.tsx` already refuses to mount below this boundary, so the frame loop
+  never starts there. This is the belt to that braces: if the canvas ever reaches a phone by some
+  other path -- a stale render, a re-used shell -- it stays out of the way rather than animating
+  the whole viewport behind a stacked mobile flow.
+*/
+@media (max-width: 899px), (pointer: coarse) and (max-width: 1023px) {
+  .world-field { display: none; }
+}
+
 .shell {
   /* width:100% is load-bearing. .scene is a column flexbox and `margin:0 auto` on a flex item
      cancels the default stretch -- without an explicit width the shell shrink-wraps to its
