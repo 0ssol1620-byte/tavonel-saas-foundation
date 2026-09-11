@@ -3,6 +3,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { IBM_Plex_Mono } from "next/font/google";
 import RouteBoot from "@/components/route-boot";
 import MarketingConsent from "@/components/marketing-consent";
+import { jsonLdHtml } from "@/lib/structured-data";
 import "./globals.css";
 
 /**
@@ -77,7 +78,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
+            __html: jsonLdHtml({
               "@context": "https://schema.org",
               "@graph": [
                 {
