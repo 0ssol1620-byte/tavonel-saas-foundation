@@ -27,4 +27,15 @@ describe("sanitizeDocumentText", () => {
     const prose = "Pages 1 < 2 are read first, and the figure stays with the paragraph it was printed in.";
     expect(sanitizeDocumentText(prose)).toBe(prose);
   });
+
+  /*
+    The regression this file was repaired for: a comparison written without a space -- `value<max`
+    in a financial-report excerpt, a code fragment in a manual -- is a `<` followed by a letter and
+    never closed. It must not be read as a tag that runs to the end of the string, because that
+    deletes the rest of the excerpt and says nothing about it.
+  */
+  it("keeps every sentence after an unclosed less-than that never meets a greater-than", () => {
+    const prose = "The rule holds when value<max is true, and every later sentence stays visible.";
+    expect(sanitizeDocumentText(prose)).toBe(prose);
+  });
 });

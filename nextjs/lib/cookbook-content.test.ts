@@ -180,12 +180,21 @@ describe("the limits are read from the product, and sit above the calls to actio
     }
   });
 
-  it("quotes the World Build scope as DRAFT and prices none of it", () => {
+  it("summarises the World Build scope as DRAFT, prices none of it, and invents no deal term", () => {
     const next = findCookbook("documents-to-grounded-work")!.sections.find((section) => section.key === "next")!;
-    // The offer's own structure line, quoted rather than paraphrased into a promise.
+    // The offer's own step names, flattened into a sentence rather than softened into a promise.
     expect(next.body).toContain("customer provides representative corpus, TAVONEL compiles");
     expect(next.body).toContain("one update/change test");
     expect(next.body, "the commercial terms are a founder decision and must read as DRAFT").toContain("DRAFT");
+    /*
+      The repair. `WORLD_BUILD_OFFER.md` marks exactly three commercial terms FOUNDER DECISION --
+      the fee, whether the fee credits against a plan, and the minimum corpus and engagement. A
+      page naming a fourth attributes a deal term to a file that does not contain it, which is the
+      same act as writing a price, so the ones that were invented once are pinned here.
+    */
+    for (const invented of ["support hours", "revision count", "refund"]) {
+      expect(next.body.toLowerCase(), `${invented}: not a term the offer file carries`).not.toContain(invented);
+    }
   });
 
   it("orders the template so prerequisites and limits precede the next action", () => {

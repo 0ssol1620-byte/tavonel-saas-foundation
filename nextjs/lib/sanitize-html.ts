@@ -21,8 +21,18 @@
 /** `<script>` and `<style>` take their contents with them. An unterminated one takes the rest. */
 const ELEMENT_WITH_BODY = /<(script|style)\b[^>]*>[\s\S]*?(?:<\/\1\s*>|$)/gi;
 
-/** Every other tag, and HTML comments, lose themselves and keep their text. */
-const ANY_TAG = /<\/?[a-z][^>]*>?|<!--[\s\S]*?(?:-->|$)/gi;
+/*
+  Every other tag, and HTML comments, lose themselves and keep their text.
+
+  The closing `>` is required here, and that is the whole difference between this rule and the one
+  above it. `<script` takes the rest of the text with it because a script body has no visible end;
+  an ordinary `<` followed by a letter and never closed is not a tag at all -- it is `value<max` in
+  an excerpt -- and matching that to the end of the string would delete every sentence after it
+  without saying so. Silent truncation of document text is the failure this file exists to prevent,
+  not a safety margin: left unmatched, `value<max` renders as the text it always was, in a text
+  node React escapes.
+*/
+const ANY_TAG = /<\/?[a-z][^>]*>|<!--[\s\S]*?(?:-->|$)/gi;
 
 export function sanitizeDocumentText(raw: string): string {
   return raw

@@ -74,7 +74,15 @@ function SectionBlock({ section }: { section: CookbookSection }) {
         */
         <p className="docs-note">This section has not been run. {sanitizeDocumentText(section.lockedReason)}</p>
       ) : (
-        section.body.split("\n\n").map((paragraph) => <p key={paragraph}>{sanitizeDocumentText(paragraph)}</p>)
+        /*
+          Keyed by position, not by the paragraph text: two identical sentences in one section are
+          a duplicate key, and React's answer to a duplicate key is to render one of them. A
+          repeated sentence is an editing mistake worth seeing on the page, not one worth hiding.
+          The list is static content and never reorders, so position is the stable key here.
+        */
+        section.body
+          .split("\n\n")
+          .map((paragraph, index) => <p key={`${section.key}-${index}`}>{sanitizeDocumentText(paragraph)}</p>)
       )}
       {section.status === "ready" && section.docsSlug ? (
         <p className="fine">
