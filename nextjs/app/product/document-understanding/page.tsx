@@ -68,7 +68,15 @@ const OFFICE = CAPABILITY_MANIFEST.entries
     && ["document", "spreadsheet", "presentation"].includes(entry.sourceFamily)
     && (entry.knownLimitations as readonly string[]).includes("converted_to_pdf_before_reading"))
   .flatMap((entry) => entry.extensions.map((extension) => extension.toUpperCase()));
-const OFFICE_SENTENCE = `${OFFICE.slice(0, -1).join(", ")} and ${OFFICE.at(-1)}`;
+if (OFFICE.length === 0) {
+  // Fail closed like the missing-phrase branch above: a manifest that accepts no
+  // convert-to-PDF format makes this clause a claim about formats the deployment does not take,
+  // and an empty join would print " and undefined are converted ..." on a public page.
+  throw new Error("capability manifest accepts no converted Office/ODF format; this sentence cannot be derived");
+}
+const OFFICE_CLAUSE = OFFICE.length > 1
+  ? `${OFFICE.slice(0, -1).join(", ")} and ${OFFICE.at(-1)} are converted to PDF before anything reads them.`
+  : `${OFFICE[0]} is converted to PDF before anything reads it.`;
 
 const READ_BODY = [
   "Native text layers are read, and a scan is read as an image rather than skipped.",
@@ -76,7 +84,7 @@ const READ_BODY = [
   NO_TABLE_EXTRACTION
     ? "Structured tables and formulas are not extracted yet: a price table arrives as the paragraphs it was printed as, each with the box it sat in, so the figures are readable and the grid that arranged them is not."
     : "Structured tables and formulas are extracted, and the manifest names the fields that survive.",
-  `${OFFICE_SENTENCE} are converted to PDF before anything reads them.`,
+  OFFICE_CLAUSE,
 ].join(" ");
 
 const LAYOUT_BODY = [

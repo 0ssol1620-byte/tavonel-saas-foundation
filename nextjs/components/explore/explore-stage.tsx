@@ -395,8 +395,8 @@ export default function ExploreStage({ model, layout, change, answers, technical
               evidence and what a new filing changed. It is not a claim about a mixed internal
               corpus, several permission levels, non-English text or a degraded scan; what the read
               does and does not recover is published as the{" "}
-              <a href="/sources">capability manifest</a>. The same inputs are downloadable as a{" "}
-              <a href="/reproducibility">reproducibility manifest</a>, so this World can be
+              <Link href="/sources">capability manifest</Link>. The same inputs are downloadable as a{" "}
+              <Link href="/reproducibility">reproducibility manifest</Link>, so this World can be
               re-derived rather than taken on trust.
             </p>
           </div>
