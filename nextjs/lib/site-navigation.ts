@@ -345,15 +345,15 @@ export const NAV_GROUPS: readonly NavGroup[] = [
 export const NAV_PRICING: SiteLink = { href: "/pricing", label: "Pricing" };
 
 /**
- * Declared in the menu before the route exists on this branch.
+ * Declared in the menu before the route exists. Empty, and meant to stay empty.
  *
- * `/solutions` is the hub the `ia-hubs` lane is building on a sibling branch, and the menu needs
- * its "All solutions" link on the day the two merge. Keeping the exception in one named constant
- * is what makes it temporary: `lib/site-nav-model.test.ts` fails if anything else joins this
- * list, and fails again once the page lands and the entry is stale. It is deliberately absent
- * from `app/sitemap.ts` -- a sitemap entry is a request to index a page that does not answer yet.
+ * It held `/solutions` while the `ia-hubs` lane was building the hub on a sibling branch. Both
+ * branches are merged, the page answers and it is in `app/sitemap.ts`, so the exception is spent
+ * and the list is `[]`. The constant stays because it is the only place such an exception may
+ * live: `lib/site-nav-model.test.ts` pins it empty, and an entry added for a page that already
+ * exists fails there rather than hiding a stale excuse for a link that works.
  */
-export const NAV_PENDING_HREFS: readonly string[] = ["/solutions"] as const;
+export const NAV_PENDING_HREFS: readonly string[] = [] as const;
 
 /*
   Which bar item owns the page being read.

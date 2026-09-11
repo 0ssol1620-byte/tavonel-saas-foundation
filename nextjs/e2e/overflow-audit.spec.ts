@@ -35,8 +35,9 @@ const WIDTHS = [360, 390, 412, 768, 1024, 1280, 1440] as const;
    `navHrefs()` is the 2026-09-11 menu, which reaches pages no flat list mentioned:
    `/product/compiled-world`, the four docs sections in the Developers panel, and the four
    solution slugs the bar's single "Solutions" link never named. `NAV_PENDING_HREFS` is
-   subtracted because a route another lane is still building has nothing to measure; the one
-   entry in it is pinned by `lib/site-nav-model.test.ts`, which fails once the page lands. */
+   subtracted because a route another lane is still building has nothing to measure; it is empty
+   since stage-B integration landed the /solutions hub, and `lib/site-nav-model.test.ts` pins it
+   empty, so today this filter removes nothing and every menu destination is measured. */
 const ROUTES = [
   ...new Set([
     "/",

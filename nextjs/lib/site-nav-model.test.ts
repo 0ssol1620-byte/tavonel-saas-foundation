@@ -47,20 +47,26 @@ describe("the global menu's destinations", () => {
   });
 
   /*
-    The pending list is an exception with an expiry, not a permanent escape hatch.
+    The pending list is an exception with an expiry, and the expiry has passed.
 
-    `/solutions` is a sibling lane's page. The first assertion stops the list from growing into a
-    place where a broken link can hide; the second fails the moment the page lands, so the entry
-    is removed by whoever merges rather than left behind as a lie about the route.
+    It held `/solutions` while the hub lived on a sibling branch. Stage-B integration merged both,
+    so the list is empty and the previous test above -- every menu destination is a sitemap route
+    -- now carries the whole menu with no exception to hide behind. That is the tighter rule, and
+    it is why emptying the list is not a loosening: the escape hatch is pinned shut, and the loop
+    still fails if someone re-opens it for a page that already answers.
   */
-  it("declares exactly one pending destination, and it is still pending", () => {
-    expect(NAV_PENDING_HREFS).toEqual(["/solutions"]);
+  it("declares no pending destination, because the hub it was waiting for landed", () => {
+    expect(NAV_PENDING_HREFS).toEqual([]);
     for (const href of NAV_PENDING_HREFS) {
       expect(
         () => read(`../app${href}/page.tsx`),
         `${href} exists now -- drop it from NAV_PENDING_HREFS and add it to app/sitemap.ts`,
       ).toThrow();
     }
+    // The counterpart of the emptied entry: the hub answers and is advertised, both directions.
+    expect(() => read("../app/solutions/page.tsx")).not.toThrow();
+    expect(SITEMAP_PATHS.has("/solutions"), "/solutions is in app/sitemap.ts ROUTES").toBe(true);
+    expect(navHrefs().filter((href) => href === "/solutions"), "one All solutions link").toHaveLength(1);
   });
 
   it("lists /explore twice and nothing else twice", () => {
