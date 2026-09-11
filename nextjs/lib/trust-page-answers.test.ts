@@ -173,6 +173,9 @@ describe("/security answers the §17.1 questions", () => {
     );
     expect(absent).toContain("An external penetration test is planned after the first paying customer");
     expect(absent).toContain("SOC 2 timing is not set");
+    expect(absent, "the sequencing sentence carries its provenance label on this page too").toContain(
+      "That sequencing is a delegated decision pending the founder's confirmation (decision log, FD-12)",
+    );
     for (const schedule of ["q1", "q2", "q3", "q4", "under way", "underway", "by the end of", "this year", "next year", "in progress", "scheduled for"]) {
       expect(absent.toLowerCase(), `"${schedule}" turns a sequence into a date`).not.toContain(schedule);
     }
@@ -290,6 +293,12 @@ describe("/trust indexes the six published surfaces", () => {
     );
     const tile = page.slice(page.indexOf("href={DPA_URL}"));
     expect(tile.slice(0, 600), "the label has to travel with the link").toContain("{DPA_LABEL}");
+    expect(page, "the incident row restates the 72-hour number and must carry the same label").toContain(
+      "The 72-hour window is a delegated decision pending the founder's confirmation (decision log, FD-06/07)",
+    );
+    expect(page, "the certification row restates the FD-12 sequencing and must carry the same label").toContain(
+      "That sequencing is a delegated decision pending the founder's confirmation (decision log, FD-12)",
+    );
     for (const commitment of [
       "within 72 hours",
       "30 days in advance",
