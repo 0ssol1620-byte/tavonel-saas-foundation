@@ -18,15 +18,22 @@ export const dynamic = "force-dynamic";
   what the page prints. Editing the disclosure means editing the policy.
 */
 const PURCHASE_GATES: PurchaseGate[] = [
+  /*
+    The two leads are different sentences because the two gates are different kinds of thing.
+    Customer-data processing is closed until a receipt exists, which will change. The promotion
+    gate is closed on purpose and is not waiting for anything -- `lib/capabilities.ts` says so in
+    those words -- and calling it "gated today" would promise an automation nobody intends to
+    build.
+  */
   {
     id: "customerData",
-    label: "Compiling your own customer data",
+    lead: "Compiling your own files is gated before you buy.",
     enabled: activationPolicy.customerData.enabled,
     reason: activationPolicy.customerData.reason,
   },
   {
     id: "candidatePromotion",
-    label: "Promoting a candidate to the active World",
+    lead: "Nothing reaches an active World without a person.",
     enabled: activationPolicy.candidatePromotion.enabled,
     reason: activationPolicy.candidatePromotion.reason,
   },

@@ -164,7 +164,8 @@ const SCENARIOS = SCENARIO_PAGES.map((pages) => ({
 
 export type PurchaseGate = {
   id: "customerData" | "candidatePromotion";
-  label: string;
+  /** The sentence this gate leads with; each gate is a different kind of closed. */
+  lead: string;
   enabled: boolean;
   reason: string;
 };
@@ -361,7 +362,7 @@ export default function PricingPageClient({
             */}
             {gates.filter((gate) => !gate.enabled).map((gate) => (
               <p className="notice static" role="status" key={gate.id} data-purchase-gate={gate.id}>
-                <strong>{gate.label} is gated today.</strong>
+                <strong>{gate.lead}</strong>
                 {gate.reason}{" "}
                 <Link href={"/status" as Route}>Current deployment state</Link>
               </p>
