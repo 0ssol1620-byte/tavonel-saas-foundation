@@ -13,14 +13,25 @@ const { expect, test } = "test" in playwrightModule ? playwrightModule : playwri
   So the assertions below read the API first and then require the page to match it row for row.
 */
 
-const TIERS = [
-  "VERIFIED_NATIVE",
-  "VERIFIED_HYBRID",
-  "BEST_EFFORT",
-  "METADATA_ONLY",
-  "REVIEW_REQUIRED",
-  "UNSUPPORTED",
-];
+/*
+  BA-062: the six frozen tiers, and the label each one prints.
+
+  The enum is still the enum -- it is what `/api/v1/capabilities` serves and what the server
+  compares -- but a `SCREAMING_SNAKE_CASE` identifier rendered as a UI badge on a
+  primary-navigation page is a machine word shown to a buyer. The pairing is what this file
+  asserts, in both directions: every chip is a written label, no chip is an identifier, and the
+  label on a row is the label of the tier the API sent for that row's MIME type.
+*/
+const TIER_LABEL: Record<string, string> = {
+  VERIFIED_NATIVE: "Verified, native reader",
+  VERIFIED_HYBRID: "Verified, native and checked",
+  BEST_EFFORT: "Best effort",
+  METADATA_ONLY: "Metadata only",
+  REVIEW_REQUIRED: "Needs review",
+  UNSUPPORTED: "Not read",
+};
+
+const TIERS = Object.values(TIER_LABEL);
 
 type ManifestEntry = { mime: string; status: string; qualificationReceipt: string | null };
 
@@ -36,7 +47,8 @@ test("prints the same capability manifest the API serves", async ({ page }) => {
   expect(served.contentSha256).toMatch(/^sha256:[0-9a-f]{64}$/);
 
   await page.goto("/sources");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("can actually read");
+  // BA-063: the headline names the product and leads with what the read produces.
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("what survives the read");
 
   const rows = page.locator("table.src-matrix tbody tr");
   await expect(rows).toHaveCount(served.entries.length);
@@ -48,11 +60,16 @@ test("prints the same capability manifest the API serves", async ({ page }) => {
     ).toHaveCount(1);
   }
 
-  // Every chip is one of the six frozen tiers, and every chip on the page is one the API sent.
+  // Every chip is a written label for one of the six frozen tiers, in the API's own row order.
   const chips = await page.locator("table.src-matrix .src-tier").allInnerTexts();
   expect(chips).toHaveLength(served.entries.length);
-  for (const chip of chips) expect(TIERS).toContain(chip.trim());
-  expect(chips.map((chip) => chip.trim())).toEqual(served.entries.map((entry) => entry.status));
+  for (const chip of chips) {
+    expect(TIERS).toContain(chip.trim());
+    expect(chip.trim(), "a manifest identifier is being printed as a badge").not.toMatch(/[A-Z]_[A-Z]/);
+  }
+  expect(chips.map((chip) => chip.trim())).toEqual(
+    served.entries.map((entry) => TIER_LABEL[entry.status]),
+  );
 });
 
 test("shows no verified tier while no format carries a qualification receipt", async ({ page }) => {
@@ -65,17 +82,44 @@ test("shows no verified tier while no format carries a qualification receipt", a
   await page.goto("/sources");
   const table = page.locator("table.src-matrix");
   await expect(table.locator(".src-tier[data-token='verified']")).toHaveCount(0);
-  await expect(table).not.toContainText("VERIFIED_NATIVE");
-  await expect(table).not.toContainText("VERIFIED_HYBRID");
+  await expect(table).not.toContainText(TIER_LABEL.VERIFIED_NATIVE!);
+  await expect(table).not.toContainText(TIER_LABEL.VERIFIED_HYBRID!);
 
-  // The legend still explains the tiers nothing has reached; the state line says why.
-  await expect(page.locator(".src-legend")).toContainText("VERIFIED_NATIVE");
-  await expect(page.locator("main")).toContainText("No format on this deployment carries a qualification receipt.");
+  // The legend still explains the tiers nothing has reached.
+  await expect(page.locator(".src-legend")).toContainText(TIER_LABEL.VERIFIED_NATIVE!);
+
+  /*
+    BA-058. The bordered callout under the lede said nothing on this page is verified, which is
+    what the table already says row by row, and it said it before a reader had read a row.
+
+    What replaces it is the rule written forwards, in the fold that explains how a row is filled
+    in -- so this pins two things the deleted sentence did not: that the page still states what
+    earns a tier, and that it no longer announces the count of formats that have not earned one.
+    A count sentence coming back fails here.
+  */
+  await page.evaluate(() => {
+    for (const fold of document.querySelectorAll("details")) fold.open = true;
+  });
+  const main = page.locator("main");
+  await expect(main).toContainText("A tier is earned by a measurement.");
+  await expect(main).toContainText("a qualification run produces a receipt");
+  await expect(main).not.toContainText("No format on this deployment");
+  await expect(main).not.toContainText("carries a qualification receipt.");
 });
 
 test("states the refusal rule once and claims nothing it cannot support", async ({ page }) => {
   await page.goto("/sources");
-  await expect(page.locator(".src-refusal")).toHaveText("Formats not listed are refused at upload.");
+  /*
+    BA-068. The refusal rule is a clause of the lede now, not a tracked-uppercase line floating
+    between two folds where it read as a system error. Still stated exactly once: the assertion
+    is on the count as well as the wording, and the old standalone element is asserted gone.
+  */
+  await expect(page.locator(".src-refusal")).toHaveCount(0);
+  await expect(page.locator("p.lede")).toContainText("refused at upload rather than accepted");
+  expect(
+    (await page.locator("main").innerText()).match(/refused at upload/g)?.length ?? 0,
+    "the refusal rule is stated once",
+  ).toBe(1);
 
   /*
     Open every fold before reading the page.

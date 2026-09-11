@@ -518,14 +518,41 @@ const CASE_SURFACES = [
   "app/reproducibility/page.tsx",
 ] as const;
 
+/*
+  BA-072, 2026-09-11. The label stays. Where it is said, and how many times, changes.
+
+  B07 was right that an absence nothing names reads as an oversight. What it produced was the
+  identical sentence -- ending on "no customer has given it" -- printed on all three surfaces
+  above, so three pages volunteered to a reader who had not asked, and to no legal requirement,
+  that we have no customers. /reproducibility ended its *hero paragraph* on it.
+
+  The consent policy is a policy, so it is stated once, on /trust, as one: customer names,
+  figures and logos appear on this site only with that customer's written sign-off on the exact
+  wording. No sentence anywhere states the current count.
+
+  The failure path is the half that matters and it is unchanged in force: the day a customer
+  result does appear it must not appear as a logo wall with no consent behind it. That check
+  still runs on all three surfaces, and a new one holds the policy to its single home -- so
+  deleting it from /trust fails here, and restoring it to the other three fails here too.
+*/
 describe("CA B07 customer cases are labelled absent, not implied", () => {
-  it.each(CASE_SURFACES)("%s says customer results need written consent and there are none", (surface) => {
-    const source = read(surface);
-    expect(source).toContain("only with written consent");
+  it("states the consent policy once, on /trust, with no count of customers", () => {
+    const trust = read("app/trust/page.tsx");
+    expect(trust).toContain("only with");
+    expect(trust.toLowerCase()).toContain("written sign-off");
+    // Stripped: the paragraph's own comment quotes the sentence it replaced, on purpose.
     expect(
-      source.toLowerCase(),
-      'a page that names consent has to say whether it has any',
-    ).toMatch(/no customer has given it|none has been given/);
+      withoutComments(trust).toLowerCase(),
+      "the policy says what the rule is, not how many have met it",
+    ).not.toMatch(/no customer has given it|none has been given/);
+  });
+
+  it.each(CASE_SURFACES)("%s neither repeats the consent policy nor counts our customers", (surface) => {
+    const copy = withoutComments(read(surface)).toLowerCase();
+    expect(copy, "the consent policy has one home, and it is /trust")
+      .not.toContain("only with written consent");
+    expect(copy, "a public page does not publish the number of customers we have")
+      .not.toMatch(/no customer has given it|none has been given/);
   });
 
   it.each(CASE_SURFACES)("%s invents no customer, logo or before-and-after figure", (surface) => {
@@ -587,11 +614,49 @@ describe("CA E02/E05 the measured entries carry their figures and their receipts
     A named receipt a reader cannot reach is half an answer, so the page that renders these
     entries has to say where the files are and how to ask for one.
   */
-  it("says on the page where the named receipts live", () => {
-    const notes = read("app/research/notes/page.tsx");
-    expect(notes).toContain("docs/evidence/artifacts/");
-    expect(notes).toContain("not published at a public URL");
-    expect(notes).toContain("check the hash yourself");
+  /*
+    BA-073 / BA-074, 2026-09-11. The same requirement, pinned to a sentence a buyer can read.
+
+    The paragraph this used to check published an internal repository path, the internal words
+    "campaign" and "claims pack", the admission that our own evidence is not reachable at a URL,
+    and then asked the reader to email for an attachment. Two of its facts were worth keeping --
+    a receipt is bound by sha256, and we will send one -- and those are the two a reader can act
+    on.
+
+    So the check is stricter in both directions than the three substrings it replaces: the
+    actionable facts are still required, and the internal vocabulary is asserted absent.
+    `withoutComments` matters, because the page explains in a comment which words it stopped
+    printing.
+  */
+  it("says on the page that a receipt is hash-bound and how to get one", () => {
+    const notes = withoutComments(read("app/research/notes/page.tsx"));
+    expect(notes).toContain("bound by sha256");
+    expect(notes).toContain("Request any receipt named here");
+    expect(notes).toContain("check the hash");
+    expect(notes).toContain("hello@tavonel.com");
+    // BA-089: the missing space that rendered as "Askhello@tavonel.com".
+    expect(notes, "a JSX element after a word needs its space").not.toMatch(/[a-z]\s*\n?\s*<a href="mailto/);
+    for (const internal of ["docs/evidence/artifacts/", "claims pack", "campaign", "not published at a public URL"]) {
+      expect(notes, `"${internal}" is internal vocabulary on a public page`).not.toContain(internal);
+    }
+  });
+
+  /*
+    BA-073 / BA-092. The receipt is a field now, and the page renders its public half.
+
+    The filename stays in `lib/evidence-record.ts` -- the two assertions above describe why, and
+    renaming an artifact would break the reproducibility its hash exists for -- but the retired
+    internal campaign name may not reach the page, and a 64-character digest may not be typeset
+    as body prose. Both are asserted on the page rather than on the record.
+  */
+  it("renders a receipt identifier and a shortened digest, not an internal filename", () => {
+    const notes = withoutComments(read("app/research/notes/page.tsx"));
+    expect(notes).toContain("Receipt {entry.receipt.id}");
+    expect(notes).toContain("shortDigest(entry.receipt.digest)");
+    // The whole value stays one hover or one copy away, so nothing is withheld.
+    expect(notes).toContain("title={`sha256 ${entry.receipt.digest}`}");
+    expect(notes.toLowerCase(), "the internal campaign name may not be rendered").not.toContain("folynta");
+    expect(notes, "a receipt file name may not be rendered").not.toContain(".json");
   });
 });
 

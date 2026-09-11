@@ -97,14 +97,42 @@ export default function ResourcesPage() {
                             Representative case — a real compiled result, published read-only.
                           </p>
                         ) : null}
-                        <p className={styles.tileTags}>
-                          {tags.map((tag) => RESOURCE_TAG_LABELS[tag].toUpperCase()).join(" · ")}
+                        {/*
+                          BA-083 / BA-084. The tag line was the loudest thing in each tile and
+                          the least informative: tracked 9.5px uppercase mono, longer than the
+                          card's own description, wrapping to two lines on four of nine tiles,
+                          and repeating the filter the reader had just used. It was also the same
+                          seven labels the filter above prints in sentence case, so one page
+                          showed one vocabulary in two casings and the filter's words did not
+                          look like the tiles' words.
+
+                          The filter already encodes what these said, so they are gone rather
+                          than restyled, and the space goes to the card's action link -- the card
+                          anatomy /product already uses.
+                        */}
+                        <p className={styles.tileAction}>
+                          <Link href={link.href as Route}>Open →</Link>
                         </p>
                       </article>
                     );
                   })}
                 </div>
               </div>
+
+              {/*
+                BA-082. The hub ended at the closing div of the tile grid: no action, no next
+                step, no closing line, and 200px of dead space before the footer. It was the one
+                page in this lens that simply stopped, having handed a reader nine descriptions
+                and nothing to do with them. The action row is the one its sibling pages carry.
+              */}
+              <div className="actions">
+                <Link className="btn" href="/explore">Explore a compiled world</Link>
+                <Link className="btn ghost" href={"/docs/quickstart" as Route}>Read the quickstart</Link>
+              </div>
+              <p className="fine">
+                Building something specific? The exact contract is in the{" "}
+                <Link href="/docs">documentation</Link>.
+              </p>
             </div>
           </div>
         </div>

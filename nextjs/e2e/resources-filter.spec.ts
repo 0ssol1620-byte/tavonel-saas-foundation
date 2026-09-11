@@ -32,7 +32,50 @@ test("the resources hub narrows by a fragment and keeps every entry in the HTML"
 
   // Every title stays in the served document at a filtered state, which is what WG-074 asks for:
   // the page is one document to a crawler and to Ctrl+F whatever the filter is showing.
+  // BA-083 gave each card an "Open" action beside its heading link, so the count is per element.
   for (const link of RESOURCE_LINKS) {
-    await expect(page.locator(`[data-tags] a[href="${link.href}"]`)).toHaveCount(1);
+    await expect(page.locator(`[data-tags] h3 a[href="${link.href}"]`)).toHaveCount(1);
+    await expect(page.locator(`[data-tags] p a[href="${link.href}"]`)).toHaveCount(1);
   }
+});
+
+/*
+  BA-085. The control row, measured rather than described.
+
+  Three failures met in one row: no chip showed the state a reader arrives in, the chips were
+  29px tall on a phone against a 44px floor, and the group labels sat inline on a different
+  baseline so three groups read as one jumble. The first two are what a browser can answer, so
+  they are asserted here; the label line break is a layout fact the screenshots carry.
+
+  The failure path is the half worth having: exactly one control may look selected at a time. A
+  default-active rule with no override would show two the moment a reader picked a purpose.
+*/
+const FILTER_LINKS = "nav[aria-label^='Narrow the resources'] a";
+
+test("shows exactly one selected filter, and no chip under the tap-target floor", async ({ page }) => {
+  // A chip reads as selected when its border takes the same high-contrast colour as its text,
+  // which is what both the default rule and the `:target` rule do and the resting state does not.
+  const selected = async () =>
+    await page.locator(FILTER_LINKS).evaluateAll((links) =>
+      links
+        .filter((link) => {
+          const style = getComputedStyle(link);
+          return style.borderTopColor === style.color;
+        })
+        .map((link) => (link.textContent ?? "").trim()),
+    );
+
+  await page.goto("/resources");
+  expect(await selected(), "'Everything' is the state on arrival and nothing said so")
+    .toEqual(["Everything"]);
+
+  await page.goto("/resources#find-build");
+  const afterFilter = await selected();
+  expect(afterFilter, "two chips look selected at once").toHaveLength(1);
+  expect(afterFilter[0]).not.toBe("Everything");
+
+  const short = await page.locator(FILTER_LINKS).evaluateAll((links) =>
+    links.map((link) => link.getBoundingClientRect().height).filter((height) => height < 44),
+  );
+  expect(short, "a filter chip is under the 44px tap-target floor").toEqual([]);
 });
