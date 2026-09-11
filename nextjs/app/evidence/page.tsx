@@ -120,13 +120,14 @@ export default function EvidencePage() {
                 the security and compliance status is on <Link href={"/trust" as Route}>Trust</Link>.
               </p>
               {/*
-                B07. The audit's point is that the trust case is made of architecture rather than
-                of customer outcomes, and it is right. The honest fix is not a case study; it is
-                saying why there is none, in the place a reader looks for one. There are no
-                consented customer cases, so there is no section — and an absence with no label
-                reads as an oversight rather than as a state.
+                BA-072. B07's label was right that an absence nothing names reads as an oversight.
+
+                The sentence that was here, ending on "no customer has given it", was
+                printed identically on /benchmarks and /reproducibility too -- three pages
+                volunteering to a reader who had not asked, and to no legal requirement, that we
+                have no customers. The consent policy is a policy, so it is stated once, on
+                /trust, as one. What is gone is the count.
               */}
-              <p className="fine">Customer results are published only with written consent, and no customer has given it, so there is no customer case on this site and no operating figure taken from one. A named customer, a before-and-after time or a logo appears here when a customer has signed off on the wording, and not before.</p>
 
               <p className="slate"><span />WHAT AN EXACT SOURCE LOCATION IS</p>
               <p className="fine">

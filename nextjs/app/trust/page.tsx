@@ -189,6 +189,25 @@ export default function TrustCenterPage() {
               </p>
 
               {/*
+                BA-072, from the copy-sources-trustcase lane. CROSS-LANE -> copy-commerce-legal:
+                this paragraph is the one edit that lane's /trust needs, and it is two lines.
+
+                The same sentence -- ending on "no customer has given it" -- was printed on
+                /benchmarks, /evidence and /reproducibility, so three pages volunteered to a
+                reader who had not asked, and to no legal requirement, that we have no customers;
+                /reproducibility ended its hero paragraph on it. Removing it from three pages and
+                adding it nowhere would lose a policy worth publishing, so it lives here once,
+                written as the policy it is, with no count of who has met it.
+
+                `trust-page-answers.test.ts` holds it to this one home in both directions: it
+                fails if this paragraph goes, and it fails if any of the three gets it back.
+              */}
+              <p className="fine">
+                Customer names, figures and logos appear on this site only with that
+                customer&rsquo;s written sign-off on the exact wording.
+              </p>
+
+              {/*
                 The whole tile is the link, not the heading inside it.
 
                 `a { color: inherit; text-decoration: none }` is global here, so a link wrapped

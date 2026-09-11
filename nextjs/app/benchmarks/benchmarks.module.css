@@ -39,10 +39,24 @@
   color: var(--text-mid);
 }
 
-/* A section heading that reads as an instrument label. Pairs with the global .slate. */
+/*
+  A section heading, in the page's own typeface. Pairs with the global .slate's rule.
+
+  BA-112: the page was 4,303px at 1280 and 7,361px at 390 with exactly one sans element below
+  the h1, so a reader's eye had nowhere to rest across four screens and the whole thing read as
+  an internal spec document with a headline on it. Folding the receipt schema (BA-093) and
+  writing the metric chips as prose (BA-094) took most of the length out. What was still missing
+  is a step between the 48px h1 and the 10px tracked mono labels, so a section title is a
+  readable size here with the label rule under it rather than instead of it.
+*/
 .sectionTitle {
-  font-variation-settings: "wght" 500;
+  font-family: var(--f-sans);
+  font-size: 16px;
+  letter-spacing: -0.008em;
+  text-transform: none;
+  font-variation-settings: "wght" 560;
   text-wrap: initial;
+  color: var(--text-hi);
 }
 
 /*

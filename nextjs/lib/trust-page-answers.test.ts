@@ -518,14 +518,41 @@ const CASE_SURFACES = [
   "app/reproducibility/page.tsx",
 ] as const;
 
+/*
+  BA-072, 2026-09-11. The label stays. Where it is said, and how many times, changes.
+
+  B07 was right that an absence nothing names reads as an oversight. What it produced was the
+  identical sentence -- ending on "no customer has given it" -- printed on all three surfaces
+  above, so three pages volunteered to a reader who had not asked, and to no legal requirement,
+  that we have no customers. /reproducibility ended its *hero paragraph* on it.
+
+  The consent policy is a policy, so it is stated once, on /trust, as one: customer names,
+  figures and logos appear on this site only with that customer's written sign-off on the exact
+  wording. No sentence anywhere states the current count.
+
+  The failure path is the half that matters and it is unchanged in force: the day a customer
+  result does appear it must not appear as a logo wall with no consent behind it. That check
+  still runs on all three surfaces, and a new one holds the policy to its single home -- so
+  deleting it from /trust fails here, and restoring it to the other three fails here too.
+*/
 describe("CA B07 customer cases are labelled absent, not implied", () => {
-  it.each(CASE_SURFACES)("%s says customer results need written consent and there are none", (surface) => {
-    const source = read(surface);
-    expect(source).toContain("only with written consent");
+  it("states the consent policy once, on /trust, with no count of customers", () => {
+    const trust = read("app/trust/page.tsx");
+    expect(trust).toContain("only with");
+    expect(trust.toLowerCase()).toContain("written sign-off");
+    // Stripped: the paragraph's own comment quotes the sentence it replaced, on purpose.
     expect(
-      source.toLowerCase(),
-      'a page that names consent has to say whether it has any',
-    ).toMatch(/no customer has given it|none has been given/);
+      withoutComments(trust).toLowerCase(),
+      "the policy says what the rule is, not how many have met it",
+    ).not.toMatch(/no customer has given it|none has been given/);
+  });
+
+  it.each(CASE_SURFACES)("%s neither repeats the consent policy nor counts our customers", (surface) => {
+    const copy = withoutComments(read(surface)).toLowerCase();
+    expect(copy, "the consent policy has one home, and it is /trust")
+      .not.toContain("only with written consent");
+    expect(copy, "a public page does not publish the number of customers we have")
+      .not.toMatch(/no customer has given it|none has been given/);
   });
 
   it.each(CASE_SURFACES)("%s invents no customer, logo or before-and-after figure", (surface) => {
