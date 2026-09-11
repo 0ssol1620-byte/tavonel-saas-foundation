@@ -25,7 +25,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Search, X } from "lucide-react";
+import { Search } from "lucide-react";
 import Logomark from "@/components/logomark";
 import { trackFunnel } from "@/lib/funnel-events";
 import { chooseExploreEntryProof, excerptPreview } from "@/lib/explore-entry-proof";
@@ -261,6 +261,12 @@ export default function ExploreStage({ model, layout, change, answers, technical
           <span>WORLD</span>
           <span className={styles.badge}>{EXPLORE_COPY.badge}</span>
         </p>
+        {/*
+          BA-029. Two bordered boxes of the same weight are not a hierarchy, and an unlabelled X
+          on a page a visitor arrives at from a marketing CTA is a dead end: the logomark was the
+          only way back and nothing said so. So the drawer opener is a quiet text button and the
+          exit names its destination rather than drawing a glyph.
+        */}
         <div className={styles.headerActions}>
           <button
             type="button"
@@ -270,8 +276,8 @@ export default function ExploreStage({ model, layout, change, answers, technical
           >
             {EXPLORE_COPY.technical}
           </button>
-          <Link href="/" className={styles.close} aria-label={EXPLORE_COPY.closeLabel}>
-            <X size={15} aria-hidden="true" />
+          <Link href="/" className={styles.close}>
+            <span aria-hidden="true">←</span> {EXPLORE_COPY.closeLabel}
           </Link>
         </div>
       </header>
@@ -392,27 +398,32 @@ export default function ExploreStage({ model, layout, change, answers, technical
               filings · Follow the evidence back to its source
             </p>
             {/*
-              Audit E04 and G06, at the demo rather than two pages away.
+              Audit E04 and G06, at the sample rather than two pages away, rewritten by BA-037.
 
-              E04: this sample is Apple's own public SEC filings -- one issuer, English, clean,
-              well-scanned, one permission level. It is a good way to show the mechanism and it is
-              not a claim about a mixed internal corpus, several permission levels, non-English
-              text or a degraded scan. That caveat lived implicitly in /reproducibility's
-              fixture-versus-quality framing and nowhere near the thing it describes.
+              Six scoping clauses in 11px type sat directly under the page's central promise --
+              one issuer, in English, cleanly scanned, one permission level, not a mixed internal
+              corpus, not a degraded scan -- and half of them were the page auditing itself in
+              front of a buyer. Both facts survive, in two sentences at a readable size, because
+              both are still load-bearing: the corpus is public so the result is re-derivable, and
+              what the read recovers is published in full rather than summarised here. The
+              capability manifest is the one document that carries the whole of the second half,
+              which is why one link can replace four clauses without losing anything.
 
-              G06: the reproducibility manifest and the sample World were downloadable from
-              /reproducibility only. They are the one asset a visitor can take away and re-run, so
-              the entry act links them from here.
+              The representativeness limit keeps one sentence rather than none. The audit's
+              replacement dropped it entirely, and nothing else on the site states it: /sources
+              publishes what the *read* recovers and /reproducibility publishes what the manifest
+              establishes, and neither says that this particular corpus is one clean English
+              issuer. A limitation is moved to where it belongs or compressed, never deleted -- so
+              the four clauses become one sentence that leads with what the corpus shows.
             */}
             <p className={styles.entryNote}>
-              These are Apple&apos;s own public SEC filings: one issuer, in English, cleanly
-              scanned, at one permission level. What this shows is the mechanism — a compile, its
-              evidence and what a new filing changed. It is not a claim about a mixed internal
-              corpus, several permission levels, non-English text or a degraded scan; what the read
-              does and does not recover is published as the{" "}
-              <Link href="/sources">capability manifest</Link>. The same inputs are downloadable as a{" "}
-              <Link href="/reproducibility">reproducibility manifest</Link>, so this World can be
-              re-derived rather than taken on trust.
+              This World is compiled from Apple’s public SEC filings, so you can re-derive every
+              result: the same inputs are downloadable as a{" "}
+              <Link href="/reproducibility">reproducibility manifest</Link>. One issuer’s clean,
+              English-language filings at a single permission level show the mechanism; they are
+              not a claim about a mixed internal corpus or a degraded scan. What this read
+              recovers, and what it does not, is published in full in the{" "}
+              <Link href="/sources">capability manifest</Link>.
             </p>
           </div>
         ) : null}
@@ -449,9 +460,32 @@ export default function ExploreStage({ model, layout, change, answers, technical
       <section className={styles.next}>
         <p>YOUR SOURCES</p>
         <h2>{EXPLORE_COPY.endHeading}</h2>
+        {/*
+          BA-029. The closing section was a two-column grid with the whole left column empty below
+          the heading, which reads as a layout failure rather than as restraint. What belongs there
+          is the thing a reader who has just walked the sample wants named: the filings it was
+          compiled from. Every line is read off `technical.documents`, which is the acquisition
+          record -- form, filing date and the bytes the compiler read -- so this cannot drift from
+          the World above it.
+        */}
+        <ul className={styles.nextSources} aria-label="The filings this sample is compiled from">
+          {technical.documents.map((document) => (
+            <li key={document.documentId}>
+              <b>{document.form}</b> filed {document.filingDate} ·{" "}
+              {document.compiledPageCount === document.pageCount
+                ? `${document.pageCount} pages`
+                : `${document.compiledPageCount} of ${document.pageCount} pages`}
+            </li>
+          ))}
+        </ul>
+        {/*
+          BA-036. Three buttons in one row is the rule 3.4 bars, and the third was the one nobody
+          needed as a button: a reader who has finished the sample either brings their own files or
+          connects a system. The guide stays one click away as a sentence. Only the sign-in exit is
+          the signup step -- counting the other action as a conversion would inflate the last
+          funnel row.
+        */}
         <div>
-          {/* Only the sign-in exit is the signup step. The other two end actions stay on the
-              public site and counting them as conversions would inflate the last funnel row. */}
           {EXPLORE_COPY.endActions.map((action) => (
             <Link
               key={action.href}
@@ -463,6 +497,10 @@ export default function ExploreStage({ model, layout, change, answers, technical
             </Link>
           ))}
         </div>
+        <p className={styles.nextNote}>
+          Or read how a compile reaches a World first, in the{" "}
+          <Link href="/knowledge-compiler">Knowledge Compiler guide</Link>.
+        </p>
       </section>
     </main>
   );

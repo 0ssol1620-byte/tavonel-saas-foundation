@@ -52,28 +52,31 @@
   gap: 12px;
 }
 
-.technicalButton {
+/*
+  BA-029. Both header actions used to be bordered boxes of the same weight, which is not a
+  hierarchy -- and the second of them was an unlabelled 44px X. Now both are quiet 12px text:
+  the drawer opener stays a button, the exit is a link that says where it goes, and the only
+  thing drawing a box in this header is nothing.
+*/
+.technicalButton,
+.close {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   min-height: 44px;
-  padding: 7px 10px;
+  padding: 7px 0;
   color: var(--text-lo);
   background: none;
-  border: 1px solid var(--hairline-hi);
-  font: inherit;
-  letter-spacing: 0.12em;
+  border: 0;
+  font: 12px/1.35 var(--f-sans);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
-.technicalButton:hover { color: var(--text-hi); }
+.technicalButton:hover,
+.close:hover { color: var(--text-hi); }
 .technicalButton:focus-visible,
 .close:focus-visible { outline: 2px solid var(--verified); outline-offset: 2px; }
-
-.close {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  color: var(--text-lo);
-  border: 1px solid var(--hairline-hi);
-}
 
 /* ------------------------------------------------------------------ stage */
 
@@ -768,11 +771,23 @@
   is inherited rather than declared, for the reason `.entryScope` already relies on -- this stage
   is painted light and a themed foreground token here can invert.
 */
-.entryNote { margin: 12px 0 0; max-width: 86ch; color: var(--text-lo); font-size: 12px; line-height: 2; }
+/*
+  BA-037 raised this from 12px to 15px when it went from six clauses to two. The line height
+  stays generous for the reason the old rule gives -- it is what makes the inline links a 24px
+  pointer target -- and 1.7 at 15px clears WCAG 2.5.8 with room.
+*/
+.entryNote { margin: 12px 0 0; max-width: 62ch; color: var(--text-lo); font-size: 15px; line-height: 1.7; }
 .entryNote a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
 
 @media (max-width: 900px) {
-  .entry { align-content: start; padding: 36px 24px; }
+  /*
+    BA-030. The entry sat on a 0.74 scrim, so the World act behind it showed through and its node
+    labels -- "DOCUMENT · 502 regions", "10-Q · filed 2026-05-01" -- were legible straight through
+    the headline and the lede. Two layers of readable text in one optical plane is the defect; at
+    phone width, where the entry copy fills the frame anyway, the scrim is opaque. The composition
+    is still behind it (and still the reader's on the next tap); it is no longer competing.
+  */
+  .entry { align-content: start; padding: 36px 24px; background: var(--ground); }
   .entryLayout { grid-template-columns: minmax(0, 1fr); gap: 36px; }
   .entryCopy { gap: 18px; }
   .entryCopy h1 { max-width: 15ch; font-size: clamp(44px, 8vw, 64px); }
@@ -976,6 +991,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
   gap: 22px;
+  align-items: start;
   width: 100%;
   max-width: var(--shell);
   margin: 0 auto;
@@ -989,6 +1005,36 @@
   font: 9px var(--f-mono);
   letter-spacing: 0.14em;
 }
+
+/*
+  BA-029. The left column of this section was empty below its eyebrow -- half a section of
+  nothing, which reads as a broken layout and not as restraint. It now holds what a reader who
+  has just walked the sample would ask for by name: the filings it was compiled from, read off
+  the acquisition record rather than written here.
+*/
+.nextSources {
+  grid-column: 1;
+  display: grid;
+  gap: 9px;
+  align-content: start;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nextSources li { color: var(--text-lo); font-size: 12px; line-height: 1.55; }
+.nextSources b { color: var(--text-hi); font-weight: 550; }
+
+/* BA-036: the third action, as the sentence it always was. */
+.next .nextNote {
+  grid-column: 2;
+  max-width: 54ch;
+  color: var(--text-lo);
+  font: 13px/1.6 var(--f-sans);
+  letter-spacing: 0;
+}
+
+.next .nextNote a { color: var(--text-hi); text-decoration: underline; text-underline-offset: 3px; }
 
 .next h2 {
   margin: 0;
@@ -1005,15 +1051,16 @@
   gap: 10px;
 }
 
-.next a {
+/* BA-036: a CTA label is typeset in the text face, like every other button on the site. */
+.next > div a {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
-  padding: 12px 15px;
+  padding: 12px 16px;
   color: var(--text-lo);
   border: 1px solid var(--hairline-hi);
-  font: 9px var(--f-mono);
-  letter-spacing: 0.12em;
+  font: 550 13px/1.35 var(--f-sans);
+  letter-spacing: 0.01em;
 }
 
 .next a[data-primary="1"] { color: var(--ground); background: var(--verified); border-color: var(--verified); }
@@ -1068,7 +1115,9 @@
   .revision > header span { flex-basis: 100%; }
 
   .next { grid-template-columns: 1fr; }
-  .next > div { grid-column: 1; }
+  .next > div,
+  .next .nextNote,
+  .nextSources { grid-column: 1; }
 
   /* Five figures do not fit a phone column; they wrap rather than shrink to unreadable. */
   .timelineCounts { grid-template-columns: repeat(2, minmax(0, 1fr)); }

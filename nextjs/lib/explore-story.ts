@@ -153,12 +153,21 @@ export const EXPLORE_COPY = {
   */
   entityDisclaimer:
     "Entity labels in this fixed sample come from a simple capitalised-token heuristic, not by a resolver. In the recorded evaluation, 3 of 16 baseline labels were true positives. Unreviewed entities are shown only as sample structure; Claims and page-bound evidence are the parts to judge here.",
-  closeLabel: "Leave the sample",
+  /* BA-029: the exit names where it goes. It was an unlabelled X with this only as an aria-label. */
+  closeLabel: "Back to TAVONEL",
   endHeading: "Try the same path with your own knowledge.",
+  /*
+    BA-036: two, not three. "How compilation works" was a third sibling button in one row -- the
+    arrangement 3.4 bars -- and it is the one of the three that is reading rather than doing, so
+    it moved into the sentence under the row and takes the global label for its destination.
+
+    Both labels that remain are the site's own: "Start with your files" is what
+    `lib/commercial-state.ts` calls the primary action and what /pricing and /trust render, and
+    "Connect a source" is /integrations' own button. Neither is /explore vocabulary.
+  */
   endActions: [
     { label: "Start with your files", href: "/login", primary: true },
     { label: "Connect a source", href: "/integrations", primary: false },
-    { label: "How compilation works", href: "/knowledge-compiler", primary: false },
   ],
 } as const;
 

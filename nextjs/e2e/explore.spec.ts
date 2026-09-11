@@ -565,5 +565,18 @@ test("the closing action offers the reader their own sources", async ({ page }) 
   await expect(page.getByRole("heading", { name: "Try the same path with your own knowledge." })).toBeVisible();
   await expect(page.getByRole("link", { name: "Start with your files" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Connect a source" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "How compilation works" })).toBeVisible();
+  /*
+    BA-036. Three sibling buttons in one row is the arrangement 3.4 bars, so the reading action
+    became the sentence it always was. This is the same case, tightened: the row is exactly two,
+    and the guide has to still be reachable from here -- a dropped third action must not become a
+    dropped destination.
+  */
+  const actions = page.locator("section", { has: page.getByRole("link", { name: "Connect a source" }) })
+    .last().locator("div > a");
+  await expect(actions).toHaveCount(2);
+  await expect(page.getByRole("link", { name: "Knowledge Compiler guide" })).toBeVisible();
+  // BA-029: the closing column names the filings the sample was compiled from, not nothing.
+  const sources = page.getByRole("list", { name: /filings this sample is compiled from/i });
+  await expect(sources.locator("li")).toHaveCount(5);
+  await expect(sources.locator("li").first()).toContainText(/filed \d{4}-\d{2}-\d{2} · /);
 });
