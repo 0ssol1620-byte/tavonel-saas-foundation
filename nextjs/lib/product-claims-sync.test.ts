@@ -157,6 +157,17 @@ describe("product claims sync", () => {
     expect(pdf.preserved).toEqual(["page", "paragraph_text", "bbox1000"]);
     expect(pdf.knownLimitations as readonly string[]).toContain("no_table_or_formula_extraction");
     expect(pdf.knownLimitations as readonly string[]).toContain("no_native_structure_reader_yet");
+    /*
+      Both derived sentences degrade loudly, not into malformed copy. A manifest that narrowed to
+      one accepted Office/ODF format would make `slice(0, -1).join(", ")` print
+      " and DOCX are converted ...", and an empty one " and undefined ...", on a public page.
+      Asserted at source because the page throws at module scope: the same reason the M05 case
+      reads the initialiser rather than rendering the component.
+    */
+    expect(page, "an empty Office list must throw rather than print ' and undefined'")
+      .toContain("if (OFFICE.length === 0)");
+    expect(page, "the conversion sentence must agree with the count the manifest gives it")
+      .toContain("OFFICE.length > 1");
   });
 
   it("derives the compiled-world identity and relation claims from the compiler contract", () => {
