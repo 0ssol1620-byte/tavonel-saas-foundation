@@ -155,6 +155,14 @@ const COPY_SURFACES = [
   "components/trust-next.tsx",
   // `/trust` stopped being a redirect and became a page, which makes it a copy surface.
   "app/trust/page.tsx",
+  /*
+    The §12.4 Korean entry page. A barred phrase does not stop being barred in translation, and
+    the list below is matched against source text, so the row is here for the English words this
+    page does carry -- the plan label it reads from `billing-catalog.ts`, the page names it links
+    to, and its own comments. What it cannot check is a Korean sentence that means one of these
+    things; that is a review, and it is why this page states no claim it does not link to.
+  */
+  "app/ko/page.tsx",
 ];
 
 const BARRED = [
