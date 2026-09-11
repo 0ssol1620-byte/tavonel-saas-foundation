@@ -16,7 +16,7 @@ import { RESOURCE_TAG_LABELS, resourceFilterHref, type ResourceTag } from "@/lib
   sanitize-to-PDF reading path literally does today and generalizing them would make them less
   true. `brand-copy.test.ts` now guards this file and /api against the retired wording.
 */
-const SOLUTIONS = {
+export const SOLUTIONS = {
   "ai-ready-knowledge": {
     resources: "build",
     audience: "AI and platform engineers",
@@ -96,7 +96,7 @@ const SOLUTIONS = {
   },
 } as const;
 
-type SolutionSlug = keyof typeof SOLUTIONS;
+export type SolutionSlug = keyof typeof SOLUTIONS;
 
 /*
   WG-048: every solution page ends at the hub and at the documentation, not at a dead end.

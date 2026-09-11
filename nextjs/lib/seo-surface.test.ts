@@ -146,6 +146,20 @@ describe("public surface: robots, sitemap and llms.txt agree", () => {
     regex that silently stopped matching would turn this whole class green by exempting
     everything. Both directions are named.
   */
+  /*
+    The one route this campaign adds, and the two ways it could be added wrongly.
+
+    A hub that is not in the sitemap is reachable only through the five detail pages that link
+    back to it, and a hub that declares itself noindex while sitting in the sitemap is the exact
+    contradiction the exemption above exists to allow for /reproducibility and to refuse
+    everywhere else.
+  */
+  it("advertises the solutions hub as an indexable route", () => {
+    expect(sitemapPaths, "/solutions is the entry to the five solution pages").toContain("/solutions");
+    expect(isRealRoute("/solutions")).toBe(true);
+    expect(isNoindex("/solutions"), "the hub is advertised, so it may not opt out of search").toBe(false);
+  });
+
   it("reads noindex from the page rather than assuming it", () => {
     expect(isNoindex("/reproducibility"), "the one deliberate llms-only URL no longer reads as noindex").toBe(true);
     expect(isNoindex("/benchmarks"), "an indexable page reads as noindex, so the exemption admits anything").toBe(false);
