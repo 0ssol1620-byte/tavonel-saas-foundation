@@ -14,6 +14,7 @@ import {
   orderedSections,
   referencedDocsSlugs,
 } from "./cookbook-content";
+import { COOKBOOK_WORKFLOW_IDS } from "./keyword-map";
 import { CAPABILITY_MANIFEST } from "../../shared/capabilityManifest";
 
 /*
@@ -259,5 +260,78 @@ describe("the copy guards cover the new surfaces", () => {
 
   it("registers the content as a claim surface", () => {
     expect(read("lib/product-claims-sync.test.ts")).toContain('"lib/cookbook-content.ts"');
+  });
+});
+
+/*
+  B4. What a `claims` entry has to be able to resolve to.
+
+  The assertion above says a draft with no run carries no claim id. This says what a claim id will
+  have to satisfy the day one is added, because the registry moved into this repository during this
+  campaign (`docs/gtm/CLAIMS_REGISTRY.yaml`, keyword-claims-data lane) and until now nothing in CI
+  read it. An id that resolves to no row, or to a row whose `artifact` is `none`, is a citation that
+  looks like a receipt and is not one -- which is the failure mode a registry exists to prevent.
+
+  Three conditions, all of them on the record's side except the first:
+
+    the id exists in the registry,
+    the row names an artifact an auditor can open rather than `none`,
+    and the record itself records the run -- `lastVerifiedAt` and `verifiedBuild` both set.
+
+  The third is the one that is easy to skip. A registry row can be true of the build while the
+  cookbook citing it has never been run, and a cookbook's claims are claims about its own workflow.
+
+  The registry is read as text rather than parsed: this repository has no YAML parser in `lib/`,
+  the two facts needed are one field each, and adding a dependency to read two lines is the trade
+  this file would lose.
+*/
+describe("a claim id on a record resolves to a receipt", () => {
+  const registry = read("../docs/gtm/CLAIMS_REGISTRY.yaml");
+  const rows = new Map(
+    [...registry.matchAll(/^ {2}- claimId: (CLM-\d{3})\r?$([\s\S]*?)(?=^ {2}- claimId:|\Z)/gm)].map(
+      ([, id, body]) => [id!, body!],
+    ),
+  );
+  const resolvesToAnArtifact = (id: string) => {
+    const body = rows.get(id);
+    if (body === undefined) return false;
+    const artifact = /^ {4}artifact: "?([^"\r\n]+)"?\r?$/m.exec(body)?.[1]?.trim();
+    return artifact !== undefined && !artifact.startsWith("none");
+  };
+
+  it("reads the registry it is asserting against", () => {
+    // If the shape of the file changes, this test must fail loudly rather than pass over an empty
+    // map -- a lookup that resolves nothing would accept every id, which is the inverse of its job.
+    expect(rows.size).toBeGreaterThanOrEqual(44);
+    expect(resolvesToAnArtifact("CLM-001"), "CLM-001 names an artifact and must resolve").toBe(true);
+    expect(resolvesToAnArtifact("CLM-999"), "an id that is in no row must not resolve").toBe(false);
+  });
+
+  it("holds every record's claim ids to it", () => {
+    for (const record of COOKBOOKS) {
+      for (const id of record.claims) {
+        expect(resolvesToAnArtifact(id), `${record.slug} cites ${id}, which resolves to no artifact`).toBe(true);
+        expect(record.lastVerifiedAt, `${record.slug} cites ${id} with no run of its own recorded`).not.toBeNull();
+        expect(record.verifiedBuild, `${record.slug} cites ${id} with no build recorded`).not.toBeNull();
+      }
+    }
+  });
+
+  /*
+    And the two things spelled "workflow" that must not merge. A keyword row's `workflow_id` is the
+    work package -- one of the six slugs -- and that is the join from `lib/keyword-map.ts` to a
+    cookbook. A record's own `workflowId` is which of the blueprint's three journeys it
+    demonstrates. Same word, different vocabulary, and a reader who joins on the wrong one gets an
+    empty result rather than an error.
+  */
+  it("keeps the keyword join key and the journey id apart", () => {
+    for (const record of COOKBOOKS) {
+      expect(COOKBOOK_WORKFLOW_IDS, `${record.slug} is the keyword join key`).toContain(record.slug);
+      expect(
+        [...COOKBOOK_WORKFLOW_IDS] as string[],
+        `${record.slug}: the journey id is not a keyword workflow id`,
+      ).not.toContain(record.workflowId);
+      expect(record.workflowId).toMatch(/^j[123]-/);
+    }
   });
 });
