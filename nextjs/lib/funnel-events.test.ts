@@ -244,3 +244,53 @@ describe("server funnel events", () => {
     expect(body.slice(0, body.indexOf("\n}"))).not.toContain("track(");
   });
 });
+
+/*
+  B5. What the recipe hop is actually measured by, on the merged tree.
+
+  Three lanes met here and each left the same three §15.2 names unbuilt -- `recipe_start_clicked`,
+  `recipe_resumed`, `preflight_confirmed` -- for the same reason: this file's rule is that a name
+  needs its control in the same commit, and the control belonged to a different lane each time.
+  Both lanes solved their half with an existing event and an allow-listed detail key instead, which
+  is the right answer and is also the answer nothing asserted. So it is asserted here: the two real
+  call sites, the keys the values travel under, and the fact that the three names are still absent.
+
+  The last of those matters most. A declared-but-unfired name is caught by the per-name test above;
+  a name nobody declared is caught by nothing, and the failure it causes is a reader of the funnel
+  looking for a recipe-start column, finding none, and concluding the hop is not measured when what
+  it has is a different label.
+
+  And the cookbook route: it stays a server component with no client JavaScript. A `content_view`
+  or a click event there would mean a client component on a page whose whole body is server-rendered
+  text, and it would be the first client JS on that route. That is a trade worth making
+  deliberately, not one worth arriving at by adding an event.
+*/
+describe("the recipe hop is measured by the events that exist", () => {
+  const read = (path: string) => readFileSync(resolve(import.meta.dirname, path), "utf8");
+  const loginPage = read("../app/login/page.tsx");
+  const callbackPage = read("../app/auth/callback/page.tsx");
+  const cookbookPage = read("../app/cookbooks/[slug]/page.tsx");
+
+  it("records reaching the sign-in with a recipe, and resuming into one", () => {
+    expect(loginPage).toContain('trackFunnel("login_reached_with_intent", { kind: "recipe" })');
+    expect(callbackPage).toContain('trackFunnel("signed_in"');
+    expect(callbackPage).toContain('"resume-recipe"');
+    // Both values travel under keys that were already on the allowlist. No key was added for this.
+    expect(FUNNEL_DETAIL_KEYS as readonly string[]).toContain("kind");
+    expect(FUNNEL_DETAIL_KEYS as readonly string[]).toContain("mode");
+  });
+
+  it("declares none of the three §15.2 names no lane had a control for", () => {
+    for (const absent of ["recipe_start_clicked", "recipe_resumed", "preflight_confirmed"]) {
+      expect(declaredEvents, `${absent} is declared: it needs its call site in this commit`).not.toContain(absent);
+      expect(callSites.includes(`"${absent}"`), `${absent} is fired but not declared`).toBe(false);
+    }
+  });
+
+  it("keeps the cookbook route free of client JavaScript", () => {
+    for (const pattern of ['"use client"', "trackFunnel", "onClick", "useEffect", "useState", "next/dynamic"]) {
+      expect(cookbookPage, `${pattern}: the cookbook route is server-rendered text and stays that way`)
+        .not.toContain(pattern);
+    }
+  });
+});
