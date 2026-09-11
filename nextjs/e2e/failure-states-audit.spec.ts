@@ -104,15 +104,10 @@ test.describe("a compile that cannot start", () => {
 
   test("says so when the request never lands", async ({ page }) => {
     /*
-      Known defect, kept visible on purpose.
-
-      `startDurableCompile` (app/workspace/page.tsx:1050) calls `fetch` with no `catch`, so a
-      dropped request rejects the promise: `compileSelectedDocuments`'s `finally` clears the busy
-      flag and the button comes back, but nothing is ever said. The visitor is left with a
-      selection, an enabled button and no idea whether a compile they may be billed for started.
-      One `try/catch` fixes it; the patch is in CROSS-LANE REQUESTS in CA_LANE_REPORT_qa.md.
+      Fixed at integration (stage 2 C8): the POST and the reply that follows it are both caught,
+      and the notice says a run may already have started and to refresh -- it does not claim
+      nothing happened, because from the browser this is indistinguishable from a lost reply.
     */
-    test.fail(true, "the compile start has no catch, so a dropped request says nothing");
     await page.route("**/api/compile-jobs", route => route.request().method() === "POST"
       ? route.abort("failed")
       : route.fulfill({ json: { code: "OK", jobs: [] } }));

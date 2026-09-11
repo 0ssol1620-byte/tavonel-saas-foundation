@@ -1126,23 +1126,41 @@ export default function WorkspacePage() {
       setNotice("Sign in with Google first.");
       return;
     }
-    const response = await fetch("/api/compile-jobs", {
+    /*
+      A request that never lands rejects, and nothing caught it: compileSelectedDocuments's
+      `finally` cleared the busy flag, the button came back enabled, and not one word was said.
+      The visitor was left with a selection, a button that looks ready, and no way to know whether
+      a compile they may be billed for had started.
+
+      Both halves are caught, because from here they are the same event: a POST that never arrived
+      and a POST that arrived and whose reply was lost are indistinguishable to this browser, and
+      the run may exist either way. So the sentence does not say nothing happened -- it says
+      refresh, which is the only way to find out.
+    */
+    const sent = await fetch("/api/compile-jobs", {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
       body: JSON.stringify({ documentIds }),
-    });
-    const json = await response.json() as {
-      jobId?: string;
-      state?: string;
-      code?: string;
-      message?: string;
-      corpusId?: string;
-      batchCount?: number;
-      partsEnqueued?: number;
-      /* Set when the server wrote some parts and not the rest. Reading it is the whole point. */
-      incompleteReason?: string | null;
-      parts?: Array<{ jobId: string; batchIndex: number }>;
-    };
+    }).then(async (reply) => ({
+      response: reply,
+      json: await reply.json() as {
+        jobId?: string;
+        state?: string;
+        code?: string;
+        message?: string;
+        corpusId?: string;
+        batchCount?: number;
+        partsEnqueued?: number;
+        /* Set when the server wrote some parts and not the rest. Reading it is the whole point. */
+        incompleteReason?: string | null;
+        parts?: Array<{ jobId: string; batchIndex: number }>;
+      },
+    })).catch(() => null);
+    if (!sent) {
+      setNotice("The compile request did not reach our servers, or its reply was lost. A run may already have started — refresh before trying again.");
+      return;
+    }
+    const { response, json } = sent;
     /*
       Over the per-compile ceiling the server partitions the selection and answers with a
       corpus instead of a job. The browser does not decide that -- it asks for the whole
