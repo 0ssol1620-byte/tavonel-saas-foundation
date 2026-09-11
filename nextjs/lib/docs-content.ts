@@ -97,7 +97,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
           "PUT the file to that URL with the same content type you declared.",
           "Start a compile with the document ids you want in the World. It answers 202 with a job id, not a World.",
           "Poll GET /api/compile-jobs/{jobId} until state is ready, review_required, failed or cancelled. A settled job carries the collectionId the candidate was written to.",
-          "A PERSON ACTIVATES THE WORLD. This step is not in the script and not in the API: promotion is a browser-session action by a human in the workspace, and the published contract has no promote and no rollback path for any key to call.",
+          "A person activates the World. This step is not in the script and not in the API: promotion is a browser-session action by a human in the workspace, and the published contract has no promote and no rollback path for any key to call.",
           "Ask the active World a question, and read which retrieval runtime answered it.",
           "Download the signed package and verify it offline with the published verifiers.",
         ],
@@ -106,7 +106,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
       // a delegated decision, 2026-09-11, read off `planReachesLevel` rather than typed here.
       {
         kind: "note",
-        text: "Step 5 is the one that stops a script, and it stops for two separate reasons. Promotion is human-only by design — a candidate is not organizational truth until a person says so, and no API key of any plan has a promote or rollback path to call. Separately, the activation surface is plan-gated: it takes the **Developer** plan held by the workspace **owner**, or the **Team** plan under its usual workspace roles. `authorizeFoundationProduct(..., \"activation\", role)` refuses anything else with `STUDIO_SUBSCRIPTION_REQUIRED`, and an evaluation trial with `SUBSCRIPTION_REQUIRED`. So a self-serve Developer workspace can reach an active World on its own; Team remains sold through a conversation rather than self-serve checkout.",
+        text: "Step 5 is the one that stops a script, and it stops for two separate reasons. Promotion is human-only by design — a candidate is not organizational truth until a person says so, and no API key of any plan has a promote or rollback path to call. Separately, the activation surface is plan-gated: it runs on the **Developer** plan held by the workspace **owner**, or on the **Team** plan under its usual workspace roles, so steps 1-4 and 6-7 work on Developer today and step 5 does too when you own the workspace. Any other caller is refused with `STUDIO_SUBSCRIPTION_REQUIRED`, and an evaluation trial with `SUBSCRIPTION_REQUIRED`; branch on those two codes. Team is arranged with us rather than bought at a checkout.",
       },
       {
         kind: "code",
@@ -294,7 +294,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
           `// Then run the two published verifiers; see the CLI page.`,
         ].join("\n"),
       },
-      { kind: "note", text: "What this quickstart does not do is answer from a World nobody approved. A `review_required` candidate is readable and exportable and is not authoritative, and `/ask` reads the active World only — there is no parameter that points it at a candidate." },
+      { kind: "note", text: "`/ask` answers only from the World a person has approved. A `review_required` candidate stays readable and exportable until then, and it is never treated as authoritative: there is no parameter that points `/ask` at a candidate." },
     ],
   },
   {
@@ -487,7 +487,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
           entry.preserved.length > 0 ? entry.preserved.join(", ") : "nothing — not compiled",
         ]),
       },
-      { kind: "note", text: "A verified tier requires a qualification receipt and the date it was produced. No format carries one on this deployment, so no format claims more than best effort. /sources prints the same manifest with every limitation attached." },
+      { kind: "note", text: "Every format above is read through the same sanitize-to-PDF and OCR path, and the table states exactly what each one preserves. A format is promoted above its tier only with a published qualification result and the date it was produced. The Sources page prints the same manifest with every limitation attached." },
       {
         kind: "table",
         head: ["Limit", "Value", "Why it is that number"],
@@ -603,7 +603,6 @@ export const DOCS_SECTIONS: DocsSection[] = [
     blocks: [
       { kind: "prose", text: "Search runs against the active version. A workspace with no promoted World returns nothing rather than falling back to a candidate — an answer from a version nobody accepted is not a smaller answer, it is a different one." },
       { kind: "prose", text: "Three retrieval sources run concurrently over the World's compiled index: lexical full-text, dense vectors, and structure (claim and entity overlap with what the query already matched). Their ranks are fused with reciprocal rank fusion — ranks only, so native scores from different scoring spaces never mix — then reranked, then filtered by the World Gate, which admits a region only if it belongs to your tenant, to the active world version, and is bound to evidence." },
-      { kind: "prose", text: "This page used to describe Search as lexical retrieval. The pipeline has been hybrid since it shipped; the summary was stale. It is corrected here rather than quietly, because a reader who chose Search over Ask on the old description made that choice on the wrong information." },
       {
         kind: "table",
         head: ["Field", "What it tells you"],
@@ -640,7 +639,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
       },
       { kind: "prose", text: "The fallback is not a rare edge. A World promoted before its index was compiled, a compile that failed on an unreachable embedder, and a run still in flight all land here, and the response distinguishes them: `retrievalIndex.status` is `missing`, `compiled` or `failed`, `retrievalIndex.errorClass` names the failure class, and `retrievalNotice` says the same thing in a sentence. An index that exists but has not finished is reported as `missing` — an incomplete index is not queryable, and half an index is not a smaller index." },
       { kind: "prose", text: "Both paths return `answer`, `reason`, `citations`, `receipt`, `activeWorld`, `freshness`, `answerMode` and `retrievalPath`. What differs is the per-citation scoring, and it is not normalized across the two: the fallback reports `relevance` with its lexical, graph, temporal and authority breakdown, while the compiled path reports each source's rank and the reranker score. Presenting one as the other would mean inventing a number neither path measured." },
-      { kind: "prose", text: "Which path served an answer is a retrieval-quality difference, so a workspace comparing answers across Worlds should read `retrievalPath` before concluding anything about the Worlds themselves. There is no published measurement yet of how much the two differ on real corpora — that comparison is an open evidence item, and no number is claimed here in its place." },
+      { kind: "prose", text: "The two paths differ in retrieval quality, so read `retrievalPath` before comparing answers across Worlds: a difference between two answers can be a difference between two runtimes rather than between two corpora." },
       {
         kind: "table",
         head: ["freshness", "Which clock it is"],
@@ -694,7 +693,6 @@ export const DOCS_SECTIONS: DocsSection[] = [
         kind: "table",
         head: ["Artifact", "Signature state", "What happens"],
         rows: [
-          ["Candidate, inside the compiler", "`external_signer_required`", "Every compiled candidate carries this until it is signed. It is an internal state, not something you receive: it says the bytes exist and no signature has been made over them yet."],
           ["Customer download", "Signed, or refused", "`GET /v1/collections/{id}/download` signs the manifest with Ed25519 or refuses with `EXPORT_SIGNER_NOT_CONFIGURED` (503). There is no third outcome: you never receive an archive still in the candidate state."],
           ["Public sample World", "Deliberately unsigned", "The sample on the Reproducibility page is a fixture, labelled unsigned, and is not a promoted customer World. Do not use it to test the signature path."],
         ],
@@ -725,7 +723,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
         ],
       },
       { kind: "note", text: "There is no write tool and there is no promotion tool. Promotion is the moment a candidate becomes the World an organisation answers from, and it stays with a person in a browser; the server refuses to start if a tool that writes is ever added to it." },
-      { kind: "note", text: "list_worlds lists only active Worlds. This page said for three releases that there was no list_worlds tool, because the API had no endpoint that listed a workspace's collections and a tool guessing at ids would have been wrong silently. GET /v1/collections is that endpoint now, so the tool exists — and it still refuses to list candidates nobody promoted, because a discovery list mixing accepted and unaccepted output would present both as organizational truth." },
+      { kind: "note", text: "list_worlds lists only active Worlds, over `GET /v1/collections`. Candidates are excluded: a discovery list mixing accepted and unaccepted output would present both as organizational truth." },
       { kind: "note", text: "download_package returns a descriptor rather than the archive: the URL, the size, the signed manifest digest and the signing key id. The bytes are fetched over HTTP with the same key and checked with the verifier on the CLI page." },
     ],
   },
@@ -868,7 +866,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
         label: "What this deployment can read, publish and sign",
         language: "bash",
         body: [
-          `# Every readable format, with its tier and qualification receipt. No key.`,
+          `# Every readable format, with its tier and its stated limitations. No key.`,
           `curl -fsS https://tavonel.com/api/v1/capabilities | jq '{schemaVersion, entries: (.entries | length), contentSha256}'`,
           ``,
           `# The pin a caller keeps: drop contentSha256 -- it is the last key -- and re-serialize.`,
@@ -891,7 +889,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
     slug: "billing-and-limits",
     title: "Billing and limits",
     group: "Operations and errors",
-    summary: "What is counted, what is not decided, and the ceilings that apply.",
+    summary: "What is counted, how a page is quoted, and the ceilings that apply.",
     blocks: [
       { kind: "prose", text: "Processing is quoted in pages before a compile starts, with the maximum charge shown alongside the estimate. A page count read from the document itself is labelled verified; a count the document only declares — the number Word saved — is labelled declared. A file whose format states no count at all is quoted at nothing: it is named in the preflight with the reason and left out of the total, because a page count derived from file size is an invented number." },
       /*
@@ -987,7 +985,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
     group: "Operations and errors",
     summary: "What changed in the product and the public interfaces.",
     blocks: [
-      { kind: "prose", text: "Product changes are listed on the Changelog page. The API contract carries its own version, shown at the top of every page here, and the machine-readable document is the authority for what a version contains." },
+      { kind: "prose", text: "Product changes are listed on the Changelog page, linked from the footer of every page on this site. The API contract carries its own version, shown in the footer of each documentation section, and the machine-readable contract is the authority for what a version contains." },
     ],
   },
 ];
@@ -1016,6 +1014,25 @@ export const DOCS_VERSION = API_VERSION;
  * one nobody gave. This moves when a person moves it.
  */
 export const DOCS_REVIEWED = "2026-09-11";
+
+/**
+ * A date a reader reads as a date (BA-220).
+ *
+ * `2026-09-11` sat next to `API 2026-09-02.1` in the same 10px monospace line, so the two read
+ * as the same kind of number and the documentation looked eight days behind a version it has
+ * nothing to do with. Spelling the month out separates them, and it is one function rather than
+ * a format per surface.
+ */
+export function formatReviewDate(iso: string): string {
+  const [year, month, day] = iso.split("-");
+  const months = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+  ];
+  const name = months[Number(month) - 1];
+  if (!year || !name || !day) throw new Error(`not an ISO date: ${iso}`);
+  return `${Number(day)} ${name} ${year}`;
+}
 
 export function findDocsSection(slug: string) {
   return DOCS_SECTIONS.find((section) => section.slug === slug) ?? null;

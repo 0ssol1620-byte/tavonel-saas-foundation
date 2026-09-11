@@ -11,6 +11,7 @@ import {
   DOCS_SECTIONS,
   DOCS_VERSION,
   findDocsSection,
+  formatReviewDate,
   type DocsBlock,
 } from "@/lib/docs-content";
 import { readDocsEndpoints, snippetFor, SNIPPET_LANGUAGES, type DocsEndpoint } from "@/lib/docs-endpoints";
@@ -71,7 +72,11 @@ function Endpoint({ endpoint, id }: { endpoint: DocsEndpoint; id?: string }) {
       <header>
         <b data-method={endpoint.method}>{endpoint.method}</b>
         <code>{endpoint.path}</code>
-        {endpoint.scope ? <em>{endpoint.scope}</em> : null}
+        {/*
+          BA-216. The scope used to render as a bare em after the path -- `collections:read`
+          with nothing saying what it was, which a reader either already knew or could not guess.
+        */}
+        {endpoint.scope ? <em>Scope <code>{endpoint.scope}</code></em> : null}
       </header>
       {endpoint.description ? <p>{endpoint.description}</p> : null}
       <DocsSnippet
@@ -115,7 +120,12 @@ function Block({ block, endpoints, id }: { block: DocsBlock; endpoints: Map<stri
     case "prose":
       return <p>{withEmphasis(block.text)}</p>;
     case "note":
-      return <p className="docs-note">{withEmphasis(block.text)}</p>;
+      /*
+        BA-217. The accent bar was doing two opposite jobs across the site -- real guidance here,
+        and "this section has not been run" on every cookbook. The cookbook use is gone
+        (BA-178); the label is what keeps this one legible without relying on the colour.
+      */
+      return <p className="docs-note"><strong>Note</strong> {withEmphasis(block.text)}</p>;
     case "steps":
       return <ol className="docs-steps">{block.items.map((item) => <li key={item}>{item}</li>)}</ol>;
     case "code":
@@ -190,13 +200,16 @@ export default async function DocsSectionPage({ params }: { params: Promise<{ se
               {next ? <Link href={`/docs/${next.slug}` as Route}>{next.title} →</Link> : <span />}
             </nav>
             <p className="fine">
-              API version {DOCS_VERSION} · reviewed {DOCS_REVIEWED} ·{" "}
+              API version {DOCS_VERSION} · reviewed {formatReviewDate(DOCS_REVIEWED)} ·{" "}
               {/*
                 Feedback goes to an address that exists and is read. A form posting to an endpoint
                 nobody had built would look like feedback and be a hole in the floor.
+
+                BA-221: the label asked "Something wrong on this page?", which opens by assuming
+                the page is wrong. It is the same mailto, phrased as an action.
               */}
               <a href={`mailto:support@tavonel.com?subject=${encodeURIComponent(`Docs feedback: ${entry.title}`)}`}>
-                Something wrong on this page?
+                Report an issue with this page →
               </a>
             </p>
           </div>

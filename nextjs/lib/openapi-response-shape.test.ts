@@ -496,7 +496,13 @@ describe("the quickstart names only endpoints the contract publishes", () => {
     const prose = quickstart.blocks
       .flatMap((block) => block.kind === "steps" ? block.items : block.kind === "prose" || block.kind === "note" ? [block.text] : [])
       .join("\n");
-    expect(prose).toContain("A PERSON ACTIVATES THE WORLD");
+    /*
+      BA-190. This pinned the step in capitals, which is how it was written -- a shouted line
+      inside a numbered list. The fact the guard exists for is that the step is there and says a
+      person takes it; the case-insensitive match is the same protection without the shouting.
+    */
+    expect(prose).toMatch(/a person activates the World/i);
+    expect(prose, "the step is a sentence in the list, not a shouted one").not.toContain("A PERSON ACTIVATES THE WORLD");
     expect(prose, "the quickstart no longer says promotion is a browser-session action by a human")
       .toMatch(/browser-session action by a human/);
     expect(prose, "the quickstart no longer names the plan activation actually requires")

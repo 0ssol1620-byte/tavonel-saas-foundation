@@ -14,6 +14,7 @@ import {
   orderedSections,
   type CookbookSection,
 } from "@/lib/cookbook-content";
+import { formatReviewDate } from "@/lib/docs-content";
 import { loginUrlForRecipe } from "@/lib/recipe-intent";
 import { sanitizeDocumentText } from "@/lib/sanitize-html";
 import { PageToc, tocEntries } from "@/components/docs/page-toc";
@@ -169,7 +170,7 @@ export default async function CookbookPage({ params }: { params: Promise<{ slug:
           */}
           <p className="fine">
             This guide is published ahead of a recorded run; the run-dependent sections appear when
-            one exists. Guide revision {record.recipeVersion}.
+            one exists. Guide revision {formatReviewDate(record.recipeVersion)}.
           </p>
 
           {/*

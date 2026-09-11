@@ -325,7 +325,7 @@ describe("the route publishes a draft as a draft", () => {
       expect(WORKFLOW_LABEL[record.workflowId]).not.toMatch(/DRAFT|NOT YET|NOT RUN/);
     }
     expect(PAGE).toContain("This guide is published ahead of a recorded run");
-    expect(PAGE).toContain("Guide revision {record.recipeVersion}");
+    expect(PAGE).toContain("Guide revision {formatReviewDate(record.recipeVersion)}");
     /*
       The five internal fields, checked against what the component renders rather than the whole
       file: `publication` is still read in `generateMetadata` and must be, because it is what

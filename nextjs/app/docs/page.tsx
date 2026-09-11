@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { PublicPageShell } from "@/components/public-page-shell";
 import { DocsSearch } from "@/components/docs-search";
-import { DOCS_GROUPS, DOCS_REVIEWED, DOCS_SECTIONS, DOCS_VERSION, docsSearchIndex } from "@/lib/docs-content";
+import { DOCS_GROUPS, DOCS_REVIEWED, DOCS_SECTIONS, DOCS_VERSION, docsSearchIndex, formatReviewDate } from "@/lib/docs-content";
 
 export const metadata: Metadata = {
   title: "Documentation — TAVONEL",
@@ -51,7 +51,7 @@ export default function DocsPage() {
             ))}
           </div>
           <p className="fine">
-            API version {DOCS_VERSION} · documentation reviewed {DOCS_REVIEWED} ·{" "}
+            API version {DOCS_VERSION} · documentation reviewed {formatReviewDate(DOCS_REVIEWED)} ·{" "}
             <a href="/api/openapi">machine-readable contract</a> ·{" "}
             <a href="/llms.txt">llms.txt</a>
           </p>
