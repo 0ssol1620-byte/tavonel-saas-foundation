@@ -169,6 +169,24 @@ const COPY_SURFACES = [
   */
   "lib/cookbook-content.ts",
   "app/cookbooks/[slug]/page.tsx",
+  /*
+    The §12.4 Korean entry page. A barred phrase does not stop being barred in translation, and
+    the list below is matched against source text, so the row is here for the English words this
+    page does carry -- the plan label it reads from `billing-catalog.ts`, the page names it links
+    to, and its own comments. What it cannot check is a Korean sentence that means one of these
+    things; that is a review, and it is why this page states no claim it does not link to.
+  */
+  "app/ko/page.tsx",
+  /*
+    `llms.txt` is public copy that no guard read.
+
+    It is prose, it is served verbatim to crawlers and AI tools, and it was the one public surface
+    here checked by nothing -- which is how it came to carry a dated, attributed claim about how
+    Google treats AI discovery files, with no receipt behind it. The claim is gone; the reason it
+    survived was the missing row, so the row is here. A barred phrase or a readiness overclaim in
+    it now fails the same way it does on a page.
+  */
+  "public/llms.txt",
 ];
 
 const BARRED = [

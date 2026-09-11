@@ -62,6 +62,14 @@ const SALES_SURFACES = [
     reasons to defend itself is the page that most needs the rule.
   */
   "cookbooks/[slug]",
+  /*
+    `ko` is the §12.4 Korean entry page: indexable, in the sitemap, in llms.txt, and the first
+    TAVONEL page a Korean-language searcher lands on. That makes it a sales surface. It is on
+    this list for its metadata as much as its markup -- the title and description are the whole
+    of what a search result shows, and they are Korean, so nothing else on the site would have
+    read them.
+  */
+  "ko",
 ] as const;
 
 /*

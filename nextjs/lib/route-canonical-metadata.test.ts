@@ -74,6 +74,19 @@ describe("per-route canonical metadata", () => {
   const exemptFromCanonical = (route: string) =>
     route === "/" || route.startsWith("/dev/") || route.startsWith("/workspace/");
 
+  /*
+    A second correct spelling, not an exemption.
+
+    `pageMetadata` in `lib/page-seo.ts` takes one `canonical` field and builds both
+    `alternates.canonical` and `openGraph.url` from it, refusing at build time anything that is
+    not a single same-origin path. So a page that calls it declares its address once instead of
+    three times, and the `canonical:` literal is still in the file -- which is what the two
+    assertions below actually compare against the route. What they cannot find on such a page is
+    the surrounding `alternates: {` and `openGraph: {` spelling, and reading their absence as a
+    missing canonical would report a defect that is not there.
+  */
+  const declaresThroughHelper = (source: string) => /pageMetadata\(\s*\{/.test(source);
+
   it("declares a canonical on every route other than the root itself", () => {
     const missing: string[] = [];
     for (const page of pages) {
@@ -86,7 +99,7 @@ describe("per-route canonical metadata", () => {
         .filter((path) => path !== join(appDirectory, "layout.tsx"))
         .map((path) => readFileSync(path, "utf8"))
         .join("\n");
-      if (!/alternates:\s*\{[^}]*canonical/.test(own)) missing.push(route);
+      if (!/alternates:\s*\{[^}]*canonical/.test(own) && !declaresThroughHelper(own)) missing.push(route);
     }
     expect(missing).toEqual([]);
   });
@@ -169,7 +182,11 @@ describe("per-route canonical metadata", () => {
         );
         continue;
       }
-      const ogUrl = /openGraph:\s*\{[^}]*url:\s*"([^"]+)"/.exec(own)?.[1];
+      // Built from the canonical by `pageMetadata`, which is one address rather than two that
+      // can disagree. The equality is asserted on the helper itself in `lib/page-seo.test.ts`.
+      const ogUrl = declaresThroughHelper(own)
+        ? /canonical:\s*"([^"]+)"/.exec(own)?.[1]
+        : /openGraph:\s*\{[^}]*url:\s*"([^"]+)"/.exec(own)?.[1];
       if (ogUrl !== route) mismatched.push(`${route} -> ${ogUrl ?? "(none)"}`);
     }
     expect(mismatched).toEqual([]);

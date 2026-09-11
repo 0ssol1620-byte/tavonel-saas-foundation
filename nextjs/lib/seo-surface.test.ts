@@ -1,8 +1,10 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
+import type { Metadata } from "next";
 import { describe, expect, it } from "vitest";
 import robots from "@/app/robots";
 import sitemap from "@/app/sitemap";
+import { pageMetadata } from "./page-seo";
 
 /*
   robots.txt, sitemap.xml and llms.txt describe the same public surface, and nothing kept them
@@ -39,20 +41,32 @@ function segmentsOf(filePath: string, filename: string): string[] {
   return relative(appDirectory, filePath).split(sep).filter((segment) => segment && segment !== filename);
 }
 
-function routeMatcherOf(pagePath: string): RegExp {
+/*
+  The parameter names come out with the pattern, so a dynamic route's own `generateMetadata` can
+  be called for a concrete advertised URL instead of being skipped. That is what lets the noindex
+  reader below read `/docs/exports` and a future `/cookbooks/<slug>` as the head each one renders.
+*/
+type RouteParam = { name: string; catchAll: boolean };
+
+function routeMatcherOf(pagePath: string): { matcher: RegExp; params: RouteParam[] } {
+  const params: RouteParam[] = [];
   const pattern = segmentsOf(pagePath, "page.tsx")
     // `[...slug]` swallows the rest of the path, `[section]` one segment, everything else is a
     // literal. Route directories are lowercase words and hyphens, so nothing here needs escaping.
-    .map((segment) => (/^\[\.\.\..+\]$/.test(segment) ? ".+" : /^\[.+\]$/.test(segment) ? "[^/]+" : segment))
+    .map((segment) => {
+      const dynamic = /^\[(\.\.\.)?(.+)\]$/.exec(segment);
+      if (!dynamic) return segment;
+      params.push({ name: dynamic[2], catchAll: dynamic[1] !== undefined });
+      return dynamic[1] ? "(.+)" : "([^/]+)";
+    })
     .join("/");
-  return new RegExp(`^/${pattern}$`);
+  return { matcher: new RegExp(`^/${pattern}$`), params };
 }
 
 /*
-  Each page read once, with the two facts every assertion below needs: the pattern it answers to,
-  and whether it opts itself out of search. Reading the metadata rather than keeping a second list
-  of noindex routes is the same choice the sitemap makes about `DOCS_SECTIONS` -- a hand-kept list
-  is the thing that goes stale silently.
+  Each page read once, for the two facts a file can answer: the pattern it responds to, and whether
+  it is a retired-URL stub. Whether it opts itself out of search is a value in its head, not a word
+  in the file, and is read further down by evaluating that head.
 */
 /*
   The retired-URL stub, matched on its shape rather than on the words in it.
@@ -70,9 +84,9 @@ const pages = findFiles(appDirectory, "page.tsx").map((path) => {
   const source = readFileSync(path, "utf8");
   const alwaysNotFound = RETIRED_STUB_BODY.test(source);
   return {
+    file: path,
     route: `/${segmentsOf(path, "page.tsx").join("/")}`,
-    matcher: routeMatcherOf(path),
-    noindex: /robots:\s*\{[^}]*index:\s*false/.test(source),
+    ...routeMatcherOf(path),
     alwaysNotFound,
     // Both halves: it must actually 404 for everyone, and it must say why.
     retiredStub: alwaysNotFound && source.includes(RETIRED_STUB_REASON),
@@ -81,7 +95,6 @@ const pages = findFiles(appDirectory, "page.tsx").map((path) => {
 
 const routeMatchers = pages.map((page) => page.matcher);
 const isRealRoute = (path: string) => path === "/" ? routeMatchers.some((m) => m.test("/")) : routeMatchers.some((m) => m.test(path));
-const isNoindex = (path: string) => pages.some((page) => page.matcher.test(path) && page.noindex);
 
 /*
   robots.txt path semantics: a Disallow value is a prefix match on the path. None of ours use the
@@ -106,6 +119,72 @@ const withheldBy = (token: string) => allRoutes.filter((route) => route === toke
 
 const sitemapPaths = sitemap().map((entry) => new URL(entry.url).pathname);
 const llmsPaths = [...readFileSync(resolve(import.meta.dirname, "../public/llms.txt"), "utf8").matchAll(/https:\/\/tavonel\.com(\/[^)\s]*)?/g)].map((match) => (match[1] ?? "/").replace(/\/$/, "") || "/");
+
+/*
+  Whether a page opts itself out of search is a value in its head, so it is read as one.
+
+  This was a regex over the page source -- `/robots:\s*\{[^}]*index:\s*false/` -- which is true
+  for a metadata literal and false for every other way of writing the same fact. It went blind on
+  the helper added in this same campaign: `pageMetadata({ index: false })` composes the `robots`
+  object inside `lib/page-seo.ts`, so the page source carries no `robots:` text at all, the reader
+  answered "indexable", and the guard whose whole job is to fail on a noindex page in the sitemap
+  would have passed a draft in silence. The computed spelling a per-record page needs
+  (`index: record.publication === "approved"`) is not readable from source in any form.
+
+  So the page module is imported and its head evaluated: `metadata` where it is a static export,
+  `generateMetadata` called with the params of this very path where it is not. Every page.tsx in
+  the tree imports under vitest, a dynamic route's head is read for the slug the sitemap actually
+  advertises, and a computed `index` is read as the boolean it evaluates to. The reads happen at
+  module scope rather than inside a test so that no test's timeout is a cap on how many pages the
+  suite may read.
+*/
+type PageModule = {
+  metadata?: Metadata;
+  generateMetadata?: (props: { params: Promise<Record<string, string | string[]>>; searchParams: Promise<Record<string, string>> }) => Metadata | Promise<Metadata>;
+};
+
+async function headOf(page: (typeof pages)[number], path: string): Promise<Metadata> {
+  const pageModule = (await import(page.file)) as PageModule;
+  if (pageModule.metadata) return pageModule.metadata;
+  // A page that exports neither inherits the layout's head, which indexes.
+  if (!pageModule.generateMetadata) return {};
+  const values = (page.matcher.exec(path) ?? []).slice(1);
+  const params = Object.fromEntries(page.params.map((param, index) => {
+    const value = values[index] ?? "";
+    return [param.name, param.catchAll ? value.split("/") : value];
+  }));
+  return await pageModule.generateMetadata({ params: Promise.resolve(params), searchParams: Promise.resolve({}) });
+}
+
+/*
+  `/film` is noindex and advertised in neither file, so it is only readable here if this list
+  names it -- and it is the positive control that keeps the reader honest without depending on
+  what happens to be in llms.txt.
+*/
+const READER_CONTROLS = ["/film", "/benchmarks", "/reproducibility"];
+
+const heads = new Map<string, Metadata>();
+for (const path of new Set([...sitemapPaths, ...llmsPaths, ...READER_CONTROLS])) {
+  const page = pages.find((candidate) => candidate.matcher.test(path));
+  // An advertised path that resolves to no page is its own failure, asserted below. It must not
+  // take the whole file down at collect time.
+  if (page) heads.set(path, await headOf(page, path));
+}
+
+/* Next accepts `robots` as an object or as the raw string, and absent means indexable. */
+function declaresNoindex(head: Metadata): boolean {
+  const robots = head.robots;
+  if (typeof robots === "string") return /\bnoindex\b/.test(robots);
+  return robots?.index === false;
+}
+
+const isNoindex = (path: string) => {
+  const head = heads.get(path);
+  // No silent `false`. A reader that answers "indexable" for a path whose head it never read is
+  // precisely the failure this replaced.
+  if (!head) throw new Error(`${path} resolves to no page.tsx, so no head was read for it`);
+  return declaresNoindex(head);
+};
 
 describe("public surface: robots, sitemap and llms.txt agree", () => {
   it("has paths to check in all three files", () => {
@@ -149,7 +228,21 @@ describe("public surface: robots, sitemap and llms.txt agree", () => {
   it("reads noindex from the page rather than assuming it", () => {
     expect(isNoindex("/reproducibility"), "the one deliberate llms-only URL no longer reads as noindex").toBe(true);
     expect(isNoindex("/benchmarks"), "an indexable page reads as noindex, so the exemption admits anything").toBe(false);
-    expect(pages.filter((page) => page.noindex).length).toBeGreaterThan(0);
+    expect(isNoindex("/film"), "a noindex page nothing advertises reads as indexable, so heads are not being read").toBe(true);
+  });
+
+  /*
+    The integration the old source regex broke on, asserted on the two halves directly.
+
+    The reader's input is whatever a page's head evaluates to, so `pageMetadata`'s spelling and a
+    metadata literal are the same fact to it. Read from source they were not: the helper composes
+    `robots` in `lib/page-seo.ts` and the calling page contains no `robots:` text, which made every
+    helper-built draft read as indexable.
+  */
+  it("reads a head built by pageMetadata the same as a metadata literal", () => {
+    const draft = { title: "Draft cookbook — TAVONEL", description: "A cookbook record that is not approved yet, described in a sentence long enough for a search result to print.", canonical: "/cookbooks/draft" };
+    expect(declaresNoindex(pageMetadata({ ...draft, index: false })), "pageMetadata({ index: false }) does not read as noindex").toBe(true);
+    expect(declaresNoindex(pageMetadata(draft)), "an approved record reads as noindex, so the reader refuses everything").toBe(false);
   });
 
   /*
@@ -209,5 +302,94 @@ describe("public surface: every disallowed path is deliberate", () => {
   it("recognises the retired-URL stubs it is guarding, and nothing else", () => {
     expect(pages.filter((page) => page.retiredStub).map((page) => page.route).sort()).toEqual(["/customers", "/film-2", "/film-3", "/film-4", "/research/experiments"]);
     expect(pages.find((page) => page.route === "/product/continuous-knowledge")?.alwaysNotFound, "a live page that describes the stub pattern is being read as a stub").toBe(false);
+  });
+});
+
+/*
+  §12.1: only an approved page goes in the sitemap -- checked as the contradiction it produces
+  rather than as a list of drafts.
+
+  There is no publication flag in the content layer, and this campaign deliberately does not add
+  one: a page that is not approved yet declares `robots: { index: false }` and stays out of
+  `sitemap.ts`, and both change in the commit that approves it. What was missing is the direction
+  nothing read. The guards above ask whether an advertised path exists and whether robots.txt
+  withholds it; none of them asked whether the page itself says no. So a draft added to `ROUTES`
+  by a hand that forgot the other half rendered a sitemap asking a crawler to index a page whose
+  own head refuses, and every assertion in this file was green.
+
+  That is the entire draft gate for `/cookbooks/[slug]`, whose records carry
+  `publication: 'draft'`. It needs no new classification file -- `route-classification.json` is
+  the CSRF credential matrix for API routes and has nothing to do with page publication -- and no
+  new list here.
+*/
+describe("public surface: the sitemap advertises only approved pages", () => {
+  it("lists no page that declares itself noindex", () => {
+    const contradictions = sitemapPaths.filter((path) => isNoindex(path));
+    expect(contradictions, "in the sitemap and noindex: the site asks a crawler to index a page whose own head refuses").toEqual([]);
+  });
+
+  /* The reader, both ways. A noindex test that stopped recognising noindex would pass everything. */
+  it("still knows a noindex page when it reads one", () => {
+    expect(isNoindex("/reproducibility"), "the standing noindex example no longer reads as noindex").toBe(true);
+    expect(sitemapPaths).not.toContain("/reproducibility");
+    expect(sitemapPaths).toContain("/ko");
+  });
+
+  /*
+    The one place the llms.txt exemption must not reach.
+
+    A noindex page is allowed in `llms.txt` -- `/reproducibility` is there on purpose, and the
+    guard above admits exactly that case. A draft is different in kind: it is unapproved copy,
+    not approved copy withheld from search, so advertising it to models is publishing it. The
+    set below is empty until the cookbooks lane lands its six draft records, which makes this a
+    gate rather than a measurement, and it is written as a gate on purpose.
+  */
+  it("offers a /cookbooks URL to models only once it is approved", () => {
+    for (const path of [...new Set(llmsPaths)].filter((path) => path.startsWith("/cookbooks"))) {
+      expect(isRealRoute(path), `${ORIGIN}${path} is in llms.txt but no page resolves it`).toBe(true);
+      expect(sitemapPaths, `${ORIGIN}${path} is offered to models while it is still a draft`).toContain(path);
+    }
+  });
+});
+
+/*
+  §12.4 -- the Korean subtree, and the three ways an hreflang scaffold is wrong.
+
+  It can annotate a language the document does not declare, it can omit the page carrying it
+  from its own alternate set, and it can be enforced by a redirect that hides the other language
+  from the reader who wanted it. `lib/page-seo.ts` refuses the second at build time; the first
+  and the third are facts about files, so they are read here.
+*/
+describe("public surface: the Korean subtree", () => {
+  const koreanPages = pages.filter((page) => page.route === "/ko" || page.route.startsWith("/ko/"));
+
+  it("is the one Korean URL this campaign ships, and it is approved", () => {
+    expect(koreanPages.map((page) => page.route)).toEqual(["/ko"]);
+    expect(sitemapPaths).toContain("/ko");
+    expect(isNoindex("/ko")).toBe(false);
+  });
+
+  it("declares Korean on the subtree it renders", () => {
+    expect(readFileSync(join(appDirectory, "ko", "layout.tsx"), "utf8"), 'the /ko layout must carry lang="ko" -- the root layout says lang="en"').toMatch(/lang="ko"/);
+  });
+
+  it("names itself and the English entry in its own hreflang set", () => {
+    const source = readFileSync(join(appDirectory, "ko", "page.tsx"), "utf8");
+    expect(source).toMatch(/canonical:\s*"\/ko"/);
+    expect(source).toMatch(/ko:\s*"\/ko"/);
+    expect(source).toMatch(/en:\s*"\/"/);
+    expect(source).toMatch(/"x-default":\s*"\/"/);
+  });
+
+  /*
+    No forced geo redirect. `middleware.ts` mints a CSP nonce and routes nothing, and the build
+    uses no Next `i18n` block -- which is the feature that would prefix and redirect every URL.
+    A general 301 is not forbidden here; §12.1 asks for accurate ones. Sending a reader to a
+    language because of where they connected from is what is forbidden.
+  */
+  it("sends nobody to a language they did not ask for", () => {
+    const middleware = readFileSync(resolve(import.meta.dirname, "../middleware.ts"), "utf8");
+    expect(middleware).not.toMatch(/NextResponse\.redirect|accept-language|acceptLanguage|locale/i);
+    expect(readFileSync(resolve(import.meta.dirname, "../next.config.mjs"), "utf8")).not.toMatch(/\bi18n\b/);
   });
 });
