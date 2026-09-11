@@ -673,27 +673,39 @@ describe("CA I04 /integrations states how the customer-run agent actually behave
 });
 
 /*
-  The one number about /trust that is typed on another page.
+  What /trust and /pricing both say about the security review, held to each other.
 
-  `/pricing`'s purchase-friction row for "Can an enterprise security review approve it?" quotes a
-  count of what the trust index publishes. It said ten of thirteen with three absences, which was
-  already wrong when it was written and became wronger when the 2026-09-11 lanes answered the DPA
-  and residency questions. A count on a buyer surface that no test reads is a count that drifts,
-  so both sentences are held to the same number here -- and to the arrays they describe, which are
-  what a reader who counts the rows will find.
+  This used to reconcile a *count*. `/pricing` said "ten of the thirteen things such a review
+  asks", then "twelve of the thirteen", and /trust's lede did the same arithmetic -- and the count
+  drifted every time the index gained an answer, because it was ours: §45's internal list of
+  thirteen, quoted on two public pages as though it were a standard a reviewer would recognise.
+
+  BA-164 removed the number from both pages, so the thing to reconcile is what is actually
+  checkable: the two answers the index says are not published, which are the two rows a reader
+  counts in `NOT_PUBLISHED`. That is a tighter pin than the number was -- the number could be
+  right while the rows were wrong -- and the ban below stops either page from reaching for the
+  thirteen again.
 */
-describe("the security-review count reconciles across the two pages that state it", () => {
+describe("the security-review answer reconciles across the two pages that state it", () => {
   const trust = withoutComments(read("app/trust/page.tsx"));
   const pricing = withoutComments(read("components/pricing-page-client.tsx"));
   const rows = (source: string, start: string, end: string) =>
     (source.slice(source.indexOf(start), end ? source.indexOf(end) : undefined).match(/^ {2}\[/gm) ?? []).length;
 
-  it("says twelve answered and one unanswered on both pages", () => {
-    expect(trust, "/trust's lede").toContain("Twelve of them are");
-    expect(trust, "/trust names the one absence").toContain("One is not answered");
-    expect(pricing, "/pricing quotes the same count").toContain("Twelve of the thirteen things such a review asks are published");
-    expect(pricing, "/pricing quotes the same absence").toContain("this deployment sets no recovery objective");
-    expect(pricing, "the superseded count must not come back").not.toContain("Ten of the thirteen");
+  it("names the same two unpublished answers on both pages", () => {
+    expect(trust, "/trust's lede leads with what is published").toContain("Those answers are");
+    expect(trust, "/trust names both absences").toContain("this deployment sets no recovery objective, and nobody outside this");
+    expect(pricing, "/pricing names the same two").toContain("no recovery objective, and no outside audit");
+    expect(pricing, "/pricing leads with the index rather than with a gap").toContain("the Trust Center publishes the data path");
+  });
+
+  it("quotes no checklist total on either page", () => {
+    for (const [name, copy] of [["/trust", trust], ["/pricing", pricing]] as const) {
+      expect(copy, `${name} may not quote an internal checklist size as a public fact`)
+        .not.toMatch(/\b(?:ten|twelve|thirteen) of (?:them|the thirteen)\b/i);
+      expect(copy, `${name} may not assert a universal thirteen-question review`)
+        .not.toMatch(/same thirteen things/i);
+    }
   });
 
   it("matches the rows a reader would count on the page", () => {

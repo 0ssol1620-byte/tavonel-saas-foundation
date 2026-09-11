@@ -17,23 +17,27 @@ export const dynamic = "force-dynamic";
   same object /api/status serves is read here, on the server, and its own `reason` strings are
   what the page prints. Editing the disclosure means editing the policy.
 */
+/*
+  BA-119. Both gates stay disclosed here, in the policy's own words. What changed is that they
+  stopped being two identical grey warnings directly above the plan grid.
+
+  They were never the same kind of thing, and rendering them alike made the stronger of the two
+  read as a defect. The promotion gate is closed on purpose, it is not waiting for anything --
+  `lib/capabilities.ts` says so in those words -- and it is one of the properties this product is
+  sold on, so its lead is now a feature heading and the client renders it inside the "How your plan
+  works" grid. The intake gate is a fact about this deployment and belongs in fine print under the
+  plans, which is where the client puts it.
+*/
 const PURCHASE_GATES: PurchaseGate[] = [
-  /*
-    The two leads are different sentences because the two gates are different kinds of thing.
-    Customer-data processing is closed until a receipt exists, which will change. The promotion
-    gate is closed on purpose and is not waiting for anything -- `lib/capabilities.ts` says so in
-    those words -- and calling it "gated today" would promise an automation nobody intends to
-    build.
-  */
   {
     id: "customerData",
-    lead: "Compiling your own files is gated before you buy.",
+    lead: "What you can compile today",
     enabled: activationPolicy.customerData.enabled,
     reason: activationPolicy.customerData.reason,
   },
   {
     id: "candidatePromotion",
-    lead: "Nothing reaches an active World without a person.",
+    lead: "Human promotion",
     enabled: activationPolicy.candidatePromotion.enabled,
     reason: activationPolicy.candidatePromotion.reason,
   },
