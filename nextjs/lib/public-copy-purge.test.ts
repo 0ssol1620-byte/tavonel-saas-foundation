@@ -55,6 +55,13 @@ const SALES_SURFACES = [
   // `trust` answers buyer questions and is linked from the footer, so it is a sales surface and
   // is held to the same purge as the rest of them (trust lane CROSS-LANE 3).
   "trust",
+  /*
+    The cookbooks are drafts and carry `noindex`, which would have qualified them for the exempt
+    list. They are held to the purge instead: the register this test guards is exactly the one a
+    page reaches for when it has to say a section has not been run, and a page that has eleven
+    reasons to defend itself is the page that most needs the rule.
+  */
+  "cookbooks/[slug]",
 ] as const;
 
 /*
