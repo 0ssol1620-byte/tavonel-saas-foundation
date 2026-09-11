@@ -138,6 +138,12 @@ jobs:
           node-version: 22
           cache: pnpm
           cache-dependency-path: nextjs/pnpm-lock.yaml
+      # The clean-install harness syntax-checks the published source agent and runs the Python
+      # verifier, and this job had no Python. Without it the harness FAILS (it required Python
+      # for the source agent before the verifiers existed) rather than reporting a skip.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - run: pnpm install --frozen-lockfile
       - name: Install Chromium runtime
         run: pnpm exec playwright install --with-deps chromium
@@ -146,6 +152,22 @@ jobs:
         run: pnpm start --hostname 127.0.0.1 --port 3117 > /tmp/tavonel-next.log 2>&1 &
       - name: Wait for health
         run: node scripts/launch-qa/wait-for-health.mjs
+      # X08: catch recipe and distribution drift against the current release.
+      #
+      # In THIS job and not in product-qa, which is where they were proposed: product-qa's server
+      # is playwright.config.ts's webServer, so it exists only for the duration of the
+      # `playwright test` invocation and a step after it would find nothing listening. This job
+      # starts its own server and keeps it up for the steps that follow, which is what
+      # smoke.mjs needs -- it makes three unauthenticated GETs.
+      #
+      # Port 3117, not 3000: that is the port this job starts, and the proposed 127.0.0.1:3000
+      # would have pointed the smoke at nothing.
+      - name: Developer distribution — clean install, public downloads only
+        run: node scripts/verify-developer-clean-install.mjs
+      - name: Integration recipes — smoke
+        env:
+          TAVONEL_RECIPE_BASE_URL: http://127.0.0.1:3117
+        run: node scripts/developer-recipes/smoke.mjs
       - name: Enforce Lighthouse budgets
         run: CHROME_PATH=$(node -e "const { chromium } = require('@playwright/test'); process.stdout.write(chromium.executablePath())") pnpm qa:lighthouse
       - name: Show server log on failure

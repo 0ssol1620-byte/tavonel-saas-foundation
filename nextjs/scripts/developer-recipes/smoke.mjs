@@ -90,7 +90,10 @@ async function mcp() {
   assert(initialize?.result?.serverInfo?.name === "tavonel-readonly", "the server did not identify as read-only");
   const names = (tools?.result?.tools ?? []).map((tool) => tool.name).sort();
   assert(
-    names.join(",") === "ask_world,download_package,get_evidence,get_object,get_relation,get_world,list_sources,search_world",
+    // list_worlds arrived with GET /v1/collections (retrieval lane). Pinned as an exact set on
+    // purpose: the recipe is what a customer pastes, so a tool appearing or disappearing has to
+    // break this rather than be absorbed.
+    names.join(",") === "ask_world,download_package,get_evidence,get_object,get_relation,get_world,list_sources,list_worlds,search_world",
     `the tool list has drifted from the recipe: ${names.join(", ")}`,
   );
   for (const forbidden of ["promote", "rollback", "upload", "compile"]) {
