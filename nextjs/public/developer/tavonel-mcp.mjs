@@ -49,7 +49,7 @@ export const DEFAULT_BASE_URL = "https://tavonel.com";
  * Separate from `SERVER_VERSION`, which is the API contract this speaks. A rebuild that changes
  * these bytes changes this; a change to what the API answers changes that.
  */
-export const DISTRIBUTION_VERSION = "2026.9.3.1";
+export const DISTRIBUTION_VERSION = "2026.9.11.1";
 export const API_VERSION_HEADER = "1";
 
 const COLLECTION_ID = /^collection-[a-f0-9]{32}$/;

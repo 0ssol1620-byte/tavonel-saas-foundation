@@ -75,8 +75,8 @@ try {
   const exportUsage = runExpecting(1, process.execPath, ["tavonel-verify-export.mjs"]);
   const packageUsage = runExpecting(2, process.execPath, ["tavonel-verify-package.mjs"]);
   const roundtripUsage = runExpecting(2, python, ["-I", "tavonel-verify-roundtrip.py"]);
-  if (!cliVersion.includes("2026.9.3.1") || !cliHelp.includes("update-check")) throw new Error("CLI distribution contract failed");
-  if (mcp?.result?.serverInfo?.version !== "2026.9.3.1") throw new Error("MCP distribution contract failed");
+  if (!cliVersion.includes("2026.9.11.1") || !cliHelp.includes("update-check")) throw new Error("CLI distribution contract failed");
+  if (mcp?.result?.serverInfo?.version !== "2026.9.11.1") throw new Error("MCP distribution contract failed");
   if (!exportUsage.includes("--trusted-fingerprint")) throw new Error("the export verifier did not print its usage");
   if (!packageUsage.includes("--package")) throw new Error("the package validator did not print its usage");
   if (!roundtripUsage.includes("--package")) throw new Error("the round-trip checker did not print its usage");

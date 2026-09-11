@@ -1,18 +1,18 @@
 {
   "schemaVersion": "tavonel.developer-distribution.v1",
-  "version": "2026.9.3.1",
+  "version": "2026.9.11.1",
   "apiVersion": 1,
   "minimumNode": 20,
   "minimumPython": "3.12",
-  "releasedAt": "2026-09-03T00:00:00Z",
+  "releasedAt": "2026-09-11T00:00:00Z",
   "assets": {
     "cli": {
       "url": "https://tavonel.com/developer/tavonel-cli.mjs",
-      "sha256": "sha256:d49a0305bdad92104fdae24100881810cfda2f11069bf18f9d9a6335496a1f96"
+      "sha256": "sha256:803b18a80548e626f6d26e417c47f468583e64379e6b011d59f985d49cc5ede2"
     },
     "mcp": {
       "url": "https://tavonel.com/developer/tavonel-mcp.mjs",
-      "sha256": "sha256:64489f0c0fc06ee6041a773515a4f3322cbccca10aac58cff07298dff8d18eae"
+      "sha256": "sha256:1d9e8279b008fdd29b89a7eb9329f97ca825811901a5d131ad294344a0570285"
     },
     "sourceAgent": {
       "url": "https://tavonel.com/developer/tavonel-source-agent.py",

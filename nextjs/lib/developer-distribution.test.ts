@@ -30,11 +30,22 @@ describe("developer distribution", () => {
     const channel = JSON.parse(readFileSync(developerAsset("channel.json"), "utf8")) as { version: string; apiVersion: number; assets: Record<string, { sha256: string }> };
     const cli = readFileSync(developerAsset("tavonel-cli.mjs"), "utf8");
     const mcp = readFileSync(developerAsset("tavonel-mcp.mjs"), "utf8");
-    expect(channel.version).toBe("2026.9.3.1");
+    expect(channel.version).toBe("2026.9.11.1");
     expect(channel.apiVersion).toBe(1);
     expect(cli).toContain(`DISTRIBUTION_VERSION = "${channel.version}"`);
     expect(mcp).toContain(`DISTRIBUTION_VERSION = "${channel.version}"`);
-    const assetFiles = { cli: "tavonel-cli.mjs", mcp: "tavonel-mcp.mjs", sourceAgent: "tavonel-source-agent.py" } as const;
+    // Every asset the channel publishes, not a subset: an unchecked row is a digest that can
+    // go stale silently, and a stale digest turns "verify before you run it" into a failure the
+    // customer hits instead of the build.
+    const assetFiles = {
+      cli: "tavonel-cli.mjs",
+      mcp: "tavonel-mcp.mjs",
+      sourceAgent: "tavonel-source-agent.py",
+      verifyExport: "tavonel-verify-export.mjs",
+      verifyPackage: "tavonel-verify-package.mjs",
+      verifyRoundtrip: "tavonel-verify-roundtrip.py",
+    } as const;
+    expect(Object.keys(assetFiles).sort()).toEqual(Object.keys(channel.assets).sort());
     for (const [key, filename] of Object.entries(assetFiles)) {
       const digest = `sha256:${createHash("sha256").update(readFileSync(developerAsset(filename))).digest("hex")}`;
       expect(channel.assets[key].sha256).toBe(digest);
