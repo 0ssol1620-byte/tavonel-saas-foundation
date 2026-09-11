@@ -376,6 +376,29 @@ export default function ExploreStage({ model, layout, change, answers, technical
               ) : null}
             </div>
             <p className={styles.entryScope}>{technical.documents.length} public filings · Follow the evidence back to its source</p>
+            {/*
+              Audit E04 and G06, at the demo rather than two pages away.
+
+              E04: this sample is Apple's own public SEC filings -- one issuer, English, clean,
+              well-scanned, one permission level. It is a good way to show the mechanism and it is
+              not a claim about a mixed internal corpus, several permission levels, non-English
+              text or a degraded scan. That caveat lived implicitly in /reproducibility's
+              fixture-versus-quality framing and nowhere near the thing it describes.
+
+              G06: the reproducibility manifest and the sample World were downloadable from
+              /reproducibility only. They are the one asset a visitor can take away and re-run, so
+              the entry act links them from here.
+            */}
+            <p className={styles.entryNote}>
+              These are Apple&apos;s own public SEC filings: one issuer, in English, cleanly
+              scanned, at one permission level. What this shows is the mechanism — a compile, its
+              evidence and what a new filing changed. It is not a claim about a mixed internal
+              corpus, several permission levels, non-English text or a degraded scan; what the read
+              does and does not recover is published as the{" "}
+              <a href="/sources">capability manifest</a>. The same inputs are downloadable as a{" "}
+              <a href="/reproducibility">reproducibility manifest</a>, so this World can be
+              re-derived rather than taken on trust.
+            </p>
           </div>
         ) : null}
 

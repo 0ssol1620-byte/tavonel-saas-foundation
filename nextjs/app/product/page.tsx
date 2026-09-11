@@ -12,16 +12,40 @@ export const metadata: Metadata = {
 
 const SURFACES = [
   ["/knowledge-compiler", "CATEGORY", "Knowledge Compiler", "Read sources, reconstruct structure, resolve identities, map relationships, keep evidence attached, and compile the result."],
-  ["/product/document-understanding", "READING", "Document understanding", "Recover text, layout and structure from documents and scans before anything is compiled."],
+  // Audit M01: /product/document-understanding now derives what the read recovers from the
+  // capability manifest, and typed structure is not in it. This card stops promising it.
+  ["/product/document-understanding", "READING", "Document understanding", "Recover text, reading order and coordinates from documents and scans before anything is compiled."],
   ["/product/compiled-world", "OUTPUT", "Compiled World", "Structured knowledge with provenance and reusable retrieval artifacts — not a pile of searchable files."],
   ["/product/continuous-knowledge", "CONTRACT", "Continuous recompilation", "What a compile promises when a source changes: eight clauses, each carrying the state it holds in this deployment."],
 ] as const;
 
 const PRODUCT_FLOW = [
   ["SOURCE", "Files, folders, ZIP and connected systems"],
-  ["READ", "Pages, tables, regions and coordinates"],
+  // "Pages, tables, regions and coordinates" said a table is read as a table. Audit M01: what
+  // survives the read is the paragraph, the page and the box it sat in, and
+  // /product/document-understanding now derives that sentence from the capability manifest. This
+  // row stops contradicting it.
+  ["READ", "Pages, paragraphs, regions and coordinates"],
   ["STRUCTURE", "Entities, claims, relations and review"],
   ["WORLD", "Evidence, graph, retrieval and portable export"],
+] as const;
+
+/*
+  Audit ST03. Which layer this replaces and which it plugs into, said once, with no competitor
+  named and no competitor's number quoted.
+
+  The boundary already existed in exactly one place -- /solutions/knowledge-graph's "Exports are
+  Turtle, JSON-LD and CSV. There is no live connector into a graph database yet." -- where a buyer
+  comparing platforms would never look for it. A read-only source-grounded knowledge supplier is a
+  position, not a shortfall, and a page that states the position does not have to answer for every
+  write workflow it never offered.
+*/
+const LAYERS = [
+  ["Document parsing and OCR", "Replaced", "Reading is a compile step here: sanitize, read, keep the location and the uncertainty, and carry both into review."],
+  ["Ingestion and cleanup scripts", "Replaced", "One compile over a collection, versioned, producing a candidate a person promotes — not a pipeline that overwrites what was there."],
+  ["Enterprise search", "Connected to", "The package carries a retrieval corpus, and the API and MCP are read-only. An existing search product keeps its index; what changes is that a result can name the source version behind it."],
+  ["Ontology and knowledge platforms", "Connected to", "Turtle, JSON-LD and CSV leave in a signed package. There is no live connector into a graph database, and no modelling or business-rule editor here."],
+  ["Agent and workflow orchestration", "Connected to", "Eight read-only MCP tools and an HTTP API. There is no write tool and no operational action: an agent reads a World, it does not act through one."],
 ] as const;
 
 export default function ProductPage() {
@@ -59,6 +83,29 @@ export default function ProductPage() {
               </Link>
             ))}
           </div>
+
+          <section aria-labelledby="product-layers-title">
+            <p className="slate"><b>BOUNDARY</b><span />WHAT THIS REPLACES, WHAT IT CONNECTS TO</p>
+            <h2 id="product-layers-title">Two of these layers are ours. Three of them are yours.</h2>
+            <table className="docs-table">
+              <thead>
+                <tr>
+                  <th scope="col">Layer</th>
+                  <th scope="col">Position</th>
+                  <th scope="col">What that means here</th>
+                </tr>
+              </thead>
+              <tbody>
+                {LAYERS.map(([layer, position, meaning]) => (
+                  <tr key={layer}>
+                    <th scope="row">{layer}</th>
+                    <td>{position}</td>
+                    <td>{meaning}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
         </div>
       </section>
     </PublicPageShell>

@@ -26,7 +26,16 @@ export default function LoginPage() {
   const [authState, setAuthState] = useState<AuthState>("checking");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [commercialMode, setCommercialMode] = useState<"pilot" | "live">("pilot");
+  /*
+    Audit M05. This was initialised to "pilot", and the PRIVATE PILOT badge renders on
+    `commercialMode === "pilot"` from the first paint -- so a commercially live deployment served
+    the literal words PRIVATE PILOT in its own /login HTML and then took them away a moment later
+    when the fetch resolved. A badge is a statement about the deployment; until /api/status has
+    answered, this page has no such statement to make, and `null` renders nothing. The catch
+    branch leaves it null for the same reason: an unreachable status endpoint is not evidence of
+    a pilot.
+  */
+  const [commercialMode, setCommercialMode] = useState<"pilot" | "live" | null>(null);
   const [selfService, setSelfService] = useState(false);
   const [customerProcessingEnabled, setCustomerProcessingEnabled] = useState(false);
   /**
@@ -67,7 +76,11 @@ export default function LoginPage() {
           activationPolicy?: { customerData?: { enabled?: boolean } };
         };
         if (cancelled) return;
-        setCommercialMode(body.commercialMode === "live" ? "live" : "pilot");
+        // Only the two values this deployment can actually be in set the badge. A malformed
+        // status body leaves it unset rather than defaulting to the wrong label.
+        setCommercialMode(body.commercialMode === "live" || body.commercialMode === "pilot"
+          ? body.commercialMode
+          : null);
         setSelfService(body.selfService === true);
         setCustomerProcessingEnabled(body.activationPolicy?.customerData?.enabled === true);
         setAuthState(body.auth === "google_oauth_configured" ? "ready" : "unconfigured");
