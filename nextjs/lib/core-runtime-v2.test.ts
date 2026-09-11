@@ -624,6 +624,17 @@ describe("Core-computed relations and contradictions survive the projection", ()
     expect(projected!.blueprint.ontologyRelations, "the live engine has no Topic object at all")
       .not.toContain("discusses_topic");
     expect(projected!.blueprint.id).toBe(GENERIC_MIXED_CORPUS_BLUEPRINT.id);
+
+    /*
+      And the other half of the same inconsistency, which the blueprint fix leaves standing on its
+      own: `counts.topics` is a hard-coded 0. That is the true count today -- the projection emits
+      no Topic node and drops the Core ontology terms -- but a literal cannot notice the day it
+      stops being true, and the pair (blueprint implies topics / count says none) is exactly what
+      the evidence lane flagged. Tied to the projection here, so either half moving fails.
+    */
+    expect(projected!.validation.counts.topics, "counts.topics is a literal; keep it honest").toBe(0);
+    expect(projected!.ontology.nodes.some((node) => node.kind === "Topic"))
+      .toBe(projected!.validation.counts.topics > 0);
   });
 
   it("refuses an object kind it has never been taught instead of dropping it", async () => {
