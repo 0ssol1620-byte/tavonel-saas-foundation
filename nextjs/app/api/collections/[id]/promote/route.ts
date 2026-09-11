@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { authorizeFoundationProduct } from "@/lib/billing-product-access";
 import { validatePromotableCollectionArtifact } from "@/lib/collection-download";
 import { checkConnectorSourceAccess } from "@/lib/connector-source-access";
+import { assertEquivalenceGate } from "@/lib/equivalence-gate";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
 import {
   checkCurrentSourceVersions,
@@ -159,6 +160,28 @@ export async function POST(
     );
   }
 
+  /*
+    The full-rebuild equivalence gate (audit TM02), on the receipt as it was stored.
+
+    It runs before the pointer moves, because a World nobody compared is not a World to hand to
+    consumers. What it adds over the candidate check above is the part nothing re-checks at
+    promote time: that the receipt is *readable*. `validatePromotableCollectionArtifact` refuses
+    an `equivalence: "failed"` verdict, and `dispatchProductCoreV2` refuses a receipt whose
+    artifact counts do not add up -- but the object promoted here is read back out of immutable
+    storage, and it may have been written by a build that predates either check. An unreadable
+    verdict or an unaccounted artifact is therefore refused here rather than promoted on trust.
+
+    `not_run` passes with its reason attached: every compile on this deployment reports it while
+    TM01's revision-compile flag is off, and refusing it would refuse every promotion. It is
+    never reported as equivalence.
+  */
+  const equivalence = assertEquivalenceGate(stored.coreExecution.receipt);
+  if (!equivalence.ok) {
+    return NextResponse.json(
+      { code: "WORLD_EQUIVALENCE_REFUSED", equivalence: { status: equivalence.status, detail: equivalence.detail } },
+      { status: 409, headers: NO_STORE }
+    );
+  }
 
   const sourceDocuments = stored.sourceDocuments;
   if (

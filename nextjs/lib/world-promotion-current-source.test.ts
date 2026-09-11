@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { compileCollectionCandidate, type CollectionOcrInput } from "./collection-compiler";
 
-const { getUser, pilotAccess, productAccess, getCandidate, listObjects, promote, sourceAccess } = vi.hoisted(() => ({
+const { getUser, pilotAccess, productAccess, getCandidate, listObjects, promote, sourceAccess, ensureIndex } = vi.hoisted(() => ({
   getUser: vi.fn(),
   pilotAccess: vi.fn(),
   productAccess: vi.fn(),
@@ -9,6 +9,7 @@ const { getUser, pilotAccess, productAccess, getCandidate, listObjects, promote,
   listObjects: vi.fn(),
   promote: vi.fn(),
   sourceAccess: vi.fn(),
+  ensureIndex: vi.fn(),
 }));
 
 vi.mock("@/lib/foundation-pilot", () => ({ getRequestUser: getUser, foundationPilotAccess: pilotAccess }));
@@ -23,6 +24,7 @@ vi.mock("@/lib/r2-synthetic-canary", () => ({
 }));
 vi.mock("@/lib/world-store", () => ({ promoteFoundationCandidate: promote }));
 vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: sourceAccess }));
+vi.mock("@/lib/retrieval-index-status", () => ({ ensureRetrievalIndexForActiveWorld: ensureIndex }));
 
 import { POST } from "../app/api/collections/[id]/promote/route";
 
@@ -51,15 +53,33 @@ function input(documentId: string, versionKey: string, text: string): Collection
 const compiled = compileCollectionCandidate([
   input("doc-one", "a".repeat(64), "Quarterly revenue increased after the reviewed policy change."),
 ]);
+/*
+  The receipt carries the artifact counts and the equivalence verdict the wire actually stores
+  (`dispatchProductCoreV2` refuses a receipt without them), because the promote route now reads
+  them: audit TM02's gate.
+*/
+const receipt = {
+  requestId: "core-proof",
+  outputSha256: compiled.manifestDigest,
+  candidatePromotion: false,
+  equivalence: "not_run",
+  totalArtifacts: 8,
+  rebuiltArtifacts: 8,
+  workAvoidedArtifacts: 0,
+};
 const artifact = {
   ...compiled,
   coreExecution: {
     status: "completed",
     runtime: "tavonel-python-core-v2",
     worldStateId: "world-state-1",
-    receipt: { requestId: "core-proof", outputSha256: compiled.manifestDigest, candidatePromotion: false },
+    receipt,
   },
 };
+const withReceipt = (patch: Record<string, unknown>) => ({
+  ...artifact,
+  coreExecution: { ...artifact.coreExecution, receipt: { ...receipt, ...patch } },
+});
 
 function request() {
   return new Request(`https://tavonel.com/api/collections/${artifact.collectionId}/promote`, {
@@ -83,6 +103,7 @@ beforeEach(() => {
   });
   promote.mockReset().mockResolvedValue({ ok: true, result: { status: "active" } });
   sourceAccess.mockReset().mockResolvedValue({ ok: true });
+  ensureIndex.mockReset().mockResolvedValue({ status: "compiled", runId: "rrun-1", retrievalProfileId: "rprof-1" });
 });
 
 describe("World promotion source-version gate", () => {
@@ -129,5 +150,73 @@ describe("World promotion source-version gate", () => {
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ code: "AUTHORIZATION_CHANGED_RETRY" });
     expect(promote).not.toHaveBeenCalled();
+  });
+});
+
+/*
+  Audit TM02 at the point it decides something.
+
+  The gate reads the Core's own verdict off the stored receipt; it does not re-derive one. What
+  is asserted here is the ordering the integration owes both lanes: the refusal happens before
+  the pointer moves, and the retrieval index is compiled after it (R4-01), so a refused
+  promotion neither activates a World nor spends an embedder on one.
+*/
+describe("the full-rebuild equivalence gate in front of promotion", () => {
+  async function promoteWith(json: unknown) {
+    getCandidate.mockResolvedValue({ ok: true, json });
+    const response = await POST(request(), { params: Promise.resolve({ id: artifact.collectionId }) });
+    return { response, body: await response.json() as Record<string, unknown> };
+  }
+
+  it("promotes and then compiles the index when the Core reported no divergence", async () => {
+    const { response, body } = await promoteWith(withReceipt({ equivalence: "passed", rebuiltArtifacts: 3, workAvoidedArtifacts: 5 }));
+    expect(response.status).toBe(200);
+    expect(body.code).toBe("WORLD_ACTIVE");
+    expect(promote).toHaveBeenCalledOnce();
+    expect(ensureIndex).toHaveBeenCalledOnce();
+    // The gate refuses before promotion; the index is compiled after it. Both, in that order.
+    expect(promote.mock.invocationCallOrder[0]!).toBeLessThan(ensureIndex.mock.invocationCallOrder[0]!);
+  });
+
+  it("promotes an uncompared full rebuild, which is every compile on this deployment", async () => {
+    const { response, body } = await promoteWith(artifact);
+    expect(response.status).toBe(200);
+    expect(body.code).toBe("WORLD_ACTIVE");
+    expect(promote).toHaveBeenCalledOnce();
+  });
+
+  it("refuses a receipt whose artifacts are not all accounted for", async () => {
+    const { response, body } = await promoteWith(withReceipt({ equivalence: "passed", rebuiltArtifacts: 3, workAvoidedArtifacts: 4 }));
+    expect(response.status).toBe(409);
+    expect(body.code).toBe("WORLD_EQUIVALENCE_REFUSED");
+    expect((body.equivalence as { status: string }).status).toBe("mismatch");
+    expect(promote).not.toHaveBeenCalled();
+    expect(ensureIndex).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["a verdict nothing recognises", { equivalence: "probably" }],
+    ["counts that cannot be read", { totalArtifacts: "eight" }],
+    ["no verdict at all", { equivalence: undefined }],
+  ])("refuses %s rather than promoting on trust", async (_label, patch) => {
+    const { response, body } = await promoteWith(withReceipt(patch));
+    expect(response.status).toBe(409);
+    expect(body.code).toBe("WORLD_EQUIVALENCE_REFUSED");
+    expect((body.equivalence as { status: string }).status).toBe("unknown");
+    expect(promote).not.toHaveBeenCalled();
+    expect(ensureIndex).not.toHaveBeenCalled();
+  });
+
+  it("refuses a selective rebuild the Core said diverges, and says which check caught it", async () => {
+    /*
+      A `failed` verdict never reaches the gate: validatePromotableCollectionArtifact already
+      refuses it, so the promoter sees WORLD_CANDIDATE_NOT_PROMOTABLE. Asserted here so the two
+      refusals cannot both drift away at once and leave a divergent rebuild promotable.
+    */
+    const { response, body } = await promoteWith(withReceipt({ equivalence: "failed" }));
+    expect(response.status).toBe(422);
+    expect(body.code).toBe("WORLD_CANDIDATE_NOT_PROMOTABLE");
+    expect(promote).not.toHaveBeenCalled();
+    expect(ensureIndex).not.toHaveBeenCalled();
   });
 });

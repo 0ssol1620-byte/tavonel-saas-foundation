@@ -106,7 +106,20 @@ const ARTIFACT = {
     status: "completed",
     runtime: "tavonel-python-core-v2",
     worldStateId: "world-state-wiring",
-    receipt: { requestId: "core-proof", outputSha256: compiled.manifestDigest, candidatePromotion: false },
+    /*
+      The artifact counts and the verdict are what `dispatchProductCoreV2` stores and what the
+      promote route's equivalence gate now reads (audit TM02). `not_run` is what every compile
+      on this deployment reports, and it promotes.
+    */
+    receipt: {
+      requestId: "core-proof",
+      outputSha256: compiled.manifestDigest,
+      candidatePromotion: false,
+      equivalence: "not_run",
+      totalArtifacts: 8,
+      rebuiltArtifacts: 8,
+      workAvoidedArtifacts: 0,
+    },
   },
 };
 const COLLECTION = ARTIFACT.collectionId;
