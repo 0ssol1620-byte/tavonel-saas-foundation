@@ -2,7 +2,11 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { applyCandidatePatch } from "./collection-patch";
-import { compileCollectionCandidate, type CollectionOcrInput } from "./collection-compiler";
+import {
+  advertisedOntologyRelations,
+  compileCollectionCandidate,
+  type CollectionOcrInput,
+} from "./collection-compiler";
 import { validateReviewableCollectionArtifact } from "./collection-download";
 
 /*
@@ -247,5 +251,76 @@ describe("the ledger the correction is written to", () => {
     expect(migration).toContain("foundation_review_decisions_patch_is_whole");
     expect(migration).toContain("action = 'edit'");
     expect(migration).toContain("patch_before is distinct from patch_after");
+  });
+});
+
+/*
+  A correction to a Core V2 candidate must not rewrite its blueprint into the fallback's.
+
+  `materializeLabelDerivedFiles` defaults `blueprint` to `GENERIC_MIXED_CORPUS_BLUEPRINT`,
+  whose `ontologyRelations` is the fallback's three predicates. `scripts/compiled-world/
+  validate.mjs` reads that list out of `canonical/model.json` as the allowlist an edge predicate
+  must be inside (PREDICATE_UNDECLARED) -- so re-materialising a Core V2 candidate with the
+  default wrote a canonical model declaring predicates the artifact does not contain and
+  omitting the two it does. A reviewer fixing a spelling would have invalidated the package.
+
+  The fixture reshapes the fallback candidate into a V2-shaped one -- the artifact's own
+  blueprint, and the live engine's edge vocabulary -- because what is under test here is the
+  pass-through. The projection that produces such an artifact is covered in
+  `core-runtime-v2.test.ts`, and reading one back in `world-read-model-core-v2.test.ts`.
+*/
+describe("correcting a label on a Core V2 candidate", () => {
+  function coreShaped() {
+    const base = stored();
+    const claims = base.ontology.nodes.filter((node) => node.kind === "Claim");
+    const entity = entityNode(base);
+    const evidence = base.ontology.nodes.filter((node) => node.kind === "Evidence");
+    if (claims.length < 2 || evidence.length < 2) throw new Error("fixture needs two claims and two evidence nodes");
+    const edges = [
+      { id: "relation-core-supported", type: "supported_by" as const, from: claims[0].id, to: evidence[0].id, evidenceIds: [...evidence[0].evidenceIds] },
+      { id: "relation-core-mentions", type: "mentions" as const, from: claims[0].id, to: entity.id, evidenceIds: [...evidence[0].evidenceIds] },
+      {
+        id: "relation-core-contradicts",
+        type: "contradicts" as const,
+        from: claims[0].id,
+        to: claims[1].id,
+        evidenceIds: [...evidence[0].evidenceIds, ...evidence[1].evidenceIds],
+        reason: "numeric_disagreement" as const,
+      },
+    ];
+    return {
+      ...base,
+      blueprint: { ...base.blueprint, ontologyRelations: advertisedOntologyRelations(edges) },
+      ontology: { nodes: base.ontology.nodes, edges },
+    };
+  }
+
+  it("declares its own predicate set, not the fallback's", () => {
+    const artifact = coreShaped();
+    const target = entityNode(artifact);
+    const result = applyCandidatePatch(artifact, { objectId: target.id, before: target.label, after: "ACME Corporation" }, context);
+    if (!result.ok) throw new Error(result.code);
+
+    const canonical = JSON.parse(
+      result.artifact.package.files.find((file) => file.path === "canonical/model.json")!.content,
+    ) as { blueprint: { ontologyRelations: string[] }; nodes: Array<{ id: string; label: string }>; edges: Array<{ type: string }> };
+
+    expect(canonical.blueprint.ontologyRelations).toEqual(["contradicts", "mentions", "supported_by"]);
+    expect(canonical.blueprint.ontologyRelations).toEqual(artifact.blueprint.ontologyRelations);
+    // Every predicate the regenerated model contains is one the same file declares. That is the
+    // property `validate.mjs` checks, and the reason the default was wrong here.
+    for (const edge of canonical.edges) expect(canonical.blueprint.ontologyRelations).toContain(edge.type);
+    expect(canonical.blueprint.ontologyRelations, "the live engine has no Topic object at all")
+      .not.toContain("discusses_topic");
+    // And the correction itself still happened.
+    expect(canonical.nodes.find((node) => node.id === target.id)?.label).toBe("ACME Corporation");
+  });
+
+  it("still validates as a reviewable candidate", () => {
+    const artifact = coreShaped();
+    const target = entityNode(artifact);
+    const result = applyCandidatePatch(artifact, { objectId: target.id, before: target.label, after: "ACME Corporation" }, context);
+    if (!result.ok) throw new Error(result.code);
+    expect(validateReviewableCollectionArtifact(result.artifact, artifact.collectionId)).not.toBeNull();
   });
 });
