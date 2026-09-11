@@ -740,8 +740,21 @@ describe("public copy", () => {
   it("says the compile film is a recreation and points at the working interface", () => {
     const landing = read("components/home-page-client.tsx");
     expect(landing).toContain("directed recreation of a compile, not a screen recording");
+    /*
+      The pointer without its label, which is the only part of this that changed at integration.
+
+      It pinned `label="See the working interface"`, and that collided with the other rule about
+      this page: landing.spec.ts requires every unqualified /explore link to read "Explore a
+      Compiled World", and a link carrying its own wording has to be a named proof (?act=...).
+      Two merged lanes disagreeing about one element, and the label lost -- it pointed at the
+      working interface in general, which is what the door already is.
+
+      What this test is for is untouched. `btn ghost` is the 44px control, and the failure it was
+      written against is a link inside the 14px `.fine` caption, which is about 18px tall under a
+      coarse pointer. That is still exactly what it asserts.
+    */
     expect(landing, "and the pointer is a 44px control, not a link in fine print")
-      .toContain('<ExploreLink className="btn ghost" label="See the working interface" />');
+      .toContain(String.raw`<ExploreLink className="btn ghost" />`);
   });
 
   /*
