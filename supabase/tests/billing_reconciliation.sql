@@ -16,7 +16,7 @@
 -- `20260911120000_compute_settlement_expired_terminal.sql` fixed it and they now state the
 -- fixed behaviour, so the file is green throughout and no deliberate-red marker is left here.
 begin;
-select plan(27);
+select plan(31);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -270,6 +270,58 @@ select is(
         where workspace_key = 'pilot-recon00000000' and state = 'reserved'),
   2000,
   'balance plus outstanding holds is exactly the 2000 ever granted -- the expired hold was returned once'
+);
+
+-- ---------------------------------------------------------------------------
+-- The other half of O04-1's fix, measured rather than described: a free source
+-- is refused too, and the run it refuses is countable on its own.
+--
+-- The guard sits above the `billing_source in ('owner', 'trial')` branch, so a
+-- trial compile that finished after its 10-minute capability lapsed is refused
+-- like a paid one. That is the conservative placement -- a lapsed capability is a
+-- lapsed capability -- and it has a cost the migrations lane named: the run's
+-- observed units never reach `foundation_trial_daily_budget`, so trial accounting
+-- loses that run. The assertions below are that cost, stated as arithmetic.
+--
+-- `billing_source` is set on the already-expired row rather than bootstrapped
+-- through `bootstrap_foundation_self_service_trial`, because what is under test is
+-- the order of two branches inside the settlement function, not how a trial is
+-- created. The sweep has already run and returned the hold at this point.
+--
+-- What this also shows is that counting the refused runs separately needs no new
+-- column: `state = 'expired'` plus `reason_code = 'CAPABILITY_EXPIRED'` is the
+-- filter, and it is written by the sweep. What has no home yet is a durable
+-- *total* -- see the stage-B report's open items.
+-- ---------------------------------------------------------------------------
+
+update public.foundation_compute_reservations
+   set billing_source = 'trial'
+ where document_id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+
+select throws_ok(
+  $$select public.settle_foundation_compute_v3(
+    'pilot-recon00000000', 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'settled', 9, 'CDR_LATE_SETTLE'
+  )$$,
+  'foundation_compute_settlement_expired',
+  'a free source is refused by the same guard: the expired check is above the billing-source branch'
+);
+select is(
+  (select reason_code from public.foundation_compute_reservations
+    where document_id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'),
+  'CAPABILITY_EXPIRED',
+  'the refused run keeps the sweep''s reason code, so it is separable from a settled one'
+);
+select is(
+  (select count(*)::integer from public.foundation_compute_reservations
+    where workspace_key = 'pilot-recon00000000' and billing_source = 'trial'
+      and state = 'expired' and reason_code = 'CAPABILITY_EXPIRED'),
+  1,
+  'refused-expired trial runs are counted by a reason-code filter over existing rows, with no new column'
+);
+select is(
+  (select count(*)::integer from public.foundation_trial_daily_budget),
+  0,
+  'and none of it reaches the trial budget -- the observed units of a refused run are recorded nowhere'
 );
 
 select * from finish();
