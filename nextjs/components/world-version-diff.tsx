@@ -51,6 +51,19 @@ export default function WorldVersionDiffPanel({ model, onRollback, rollbackBusy 
   const [other, setOther] = useState<WorldReadModel | null>(null);
   const [decisions, setDecisions] = useState<ReviewDecision[] | null>(null);
   const [state, setState] = useState<"idle" | "loading" | "unavailable">("idle");
+  /*
+    Changed only, on by default (audit U03).
+
+    The comparison was already change-only in substance -- it lists added, removed and changed
+    records and never the identical ones -- but it still printed a heading and a "No objects
+    differ." line for every section that had nothing in it, so a one-field change arrived
+    surrounded by five paragraphs saying nothing happened. This hides those empty sections.
+
+    It is a display filter over a comparison that has already been made, and the control stays
+    on screen while it is on: a reader who wants the whole shape of the comparison, including
+    what did not move, turns it off. Nothing is hidden that the toggle cannot bring back.
+  */
+  const [changedOnly, setChangedOnly] = useState(true);
 
   // Default to the version immediately before the one on screen, which is the comparison
   // someone almost always wants and the one a rollback would actually perform.
@@ -152,10 +165,16 @@ export default function WorldVersionDiffPanel({ model, onRollback, rollbackBusy 
             {diff.identical ? "identical" : `${countChanges(diff)} change${countChanges(diff) === 1 ? "" : "s"}`}
           </p>
 
-          <Section title="Objects" group={diff.objects} render={(item) => `${item.type} · ${item.label}`} />
-          <Section title="Relations" group={diff.relations} render={(item) => `${item.subject} ${item.predicate} ${item.object}`} />
-          <Section title="Evidence" group={diff.evidence} render={(item) => `${item.sourceId} p.${item.page}`} />
+          <label className={styles.note}>
+            <input type="checkbox" checked={changedOnly} onChange={(event) => setChangedOnly(event.target.checked)} />
+            {" "}Changed only — hide the sections with no difference
+          </label>
 
+          <DiffSection title="Objects" group={diff.objects} render={(item) => `${item.type} · ${item.label}`} changedOnly={changedOnly} />
+          <DiffSection title="Relations" group={diff.relations} render={(item) => `${item.subject} ${item.predicate} ${item.object}`} changedOnly={changedOnly} />
+          <DiffSection title="Evidence" group={diff.evidence} render={(item) => `${item.sourceId} p.${item.page}`} changedOnly={changedOnly} />
+
+          {changedOnly && diff.files.added.length + diff.files.removed.length + diff.files.changed.length === 0 ? null : (
           <section>
             <h4>Package files</h4>
             {diff.files.added.length + diff.files.removed.length + diff.files.changed.length === 0 ? (
@@ -168,7 +187,9 @@ export default function WorldVersionDiffPanel({ model, onRollback, rollbackBusy 
               </ul>
             )}
           </section>
+          )}
 
+          {changedOnly && diff.sourceRevisions.added.length + diff.sourceRevisions.removed.length === 0 ? null : (
           <section>
             <h4>Source revisions</h4>
             <p className={styles.note}>
@@ -177,6 +198,7 @@ export default function WorldVersionDiffPanel({ model, onRollback, rollbackBusy 
               {diff.sourceRevisions.removed.length > 0 ? ` · ${diff.sourceRevisions.removed.length} removed` : ""}
             </p>
           </section>
+          )}
 
           <section>
             <h4>Review decisions</h4>
@@ -222,12 +244,14 @@ export default function WorldVersionDiffPanel({ model, onRollback, rollbackBusy 
   );
 }
 
-function Section<T extends { id: string; changes: FieldChange[] }>({ title, group, render }: {
+export function DiffSection<T extends { id: string; changes: FieldChange[] }>({ title, group, render, changedOnly }: {
   title: string;
   group: { added: T[]; removed: T[]; changed: T[] };
   render: (item: T) => string;
+  changedOnly?: boolean;
 }) {
   const total = group.added.length + group.removed.length + group.changed.length;
+  if (changedOnly && total === 0) return null;
   return (
     <section>
       <h4>{title}</h4>
