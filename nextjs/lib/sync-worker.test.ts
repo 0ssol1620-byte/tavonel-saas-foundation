@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const completeJobBatch = vi.fn<(...args: any[]) => Promise<any>>(async () => ({ ok: true as const, value: { state: "leased" as const } }));
 const getOAuthConnectionSecretReference = vi.fn<(...args: any[]) => any>();
+const markOAuthConnectionReauthorizationRequired = vi.fn<(...args: any[]) => any>();
 const listOAuthSourcePage = vi.fn<(...args: any[]) => any>();
 const importSourceObject = vi.fn<(...args: any[]) => any>();
 const suspendConnectorSource = vi.fn<(...args: any[]) => any>();
@@ -25,7 +26,7 @@ const readOAuthSecret = vi.fn(async () => "secret");
 const readR2SignerEnv = vi.fn<(...args: any[]) => any>(() => ({ accountId: "a", bucket: "b", accessKeyId: "k", secretAccessKey: "s" }));
 
 vi.mock("./job-store", () => ({ completeJobBatch }));
-vi.mock("./connector-oauth-store", () => ({ getOAuthConnectionSecretReference }));
+vi.mock("./connector-oauth-store", () => ({ getOAuthConnectionSecretReference, markOAuthConnectionReauthorizationRequired }));
 vi.mock("./connector-oauth-adapters", () => ({ listOAuthSourcePage, OAUTH_SOURCE_PAGE_SIZE: 25 }));
 vi.mock("./source-import", () => ({ importSourceObject }));
 vi.mock("./connector-oauth", () => ({ refreshOAuthAccessToken, readOAuthProviderRuntime }));
@@ -58,6 +59,7 @@ beforeEach(() => {
   suspendConnectorSource.mockResolvedValue({ ok: true });
   completeJobBatch.mockResolvedValue({ ok: true as const, value: { state: "leased" as const } });
   getOAuthConnectionSecretReference.mockResolvedValue({ ok: true, provider: "google_drive", refreshTokenReference: "vault://refresh" });
+  markOAuthConnectionReauthorizationRequired.mockResolvedValue({ ok: true });
   refreshOAuthAccessToken.mockResolvedValue({ accessToken: "at-1" });
   readOAuthProviderRuntime.mockReturnValue({ clientSecretReference: "vault://client" });
   readOAuthSecretBrokerConfig.mockReturnValue({ kind: "vault" });
@@ -323,6 +325,44 @@ describe("failure classification", () => {
     refreshOAuthAccessToken.mockRejectedValue(new Error("revoked"));
     await runSourceImportBatch(JOB, "worker-1");
     expect(completeJobBatch.mock.calls[0][3]).toMatchObject({ outcome: "retry", errorCode: "OAUTH_TOKEN_REFRESH_FAILED" });
+  });
+
+  it("leaves the connection alone while a token refresh failure still has retries left", async () => {
+    // A broker blip must not send the owner to a re-authorization screen. Anything short of
+    // the ceiling is still "we do not know yet", and the UI state says a person must act.
+    refreshOAuthAccessToken.mockRejectedValue(new Error("broker timeout"));
+    completeJobBatch.mockResolvedValue({ ok: true as const, value: { state: "queued" as const } });
+    expect(await runSourceImportBatch(JOB, "worker-1")).toEqual({ ok: false, code: "OAUTH_TOKEN_REFRESH_FAILED" });
+    expect(markOAuthConnectionReauthorizationRequired).not.toHaveBeenCalled();
+  });
+
+  it("flags the connection for re-authorization once the refusal outlives the attempt ceiling", async () => {
+    refreshOAuthAccessToken.mockRejectedValue(new Error("invalid_grant"));
+    completeJobBatch.mockResolvedValue({ ok: true as const, value: { state: "dead" as const } });
+    expect(await runSourceImportBatch(JOB, "worker-1")).toEqual({ ok: false, code: "OAUTH_TOKEN_REFRESH_FAILED" });
+    expect(markOAuthConnectionReauthorizationRequired).toHaveBeenCalledWith({
+      workspaceKey: JOB.workspaceKey,
+      userId: JOB.payload.userId,
+      oauthConnectionId: JOB.oauthConnectionId,
+      errorCode: "OAUTH_TOKEN_REFRESH_FAILED",
+    });
+  });
+
+  it("does not flag re-authorization for a terminal failure that is not about the grant", async () => {
+    // A dead job from an unreadable provider page says nothing about the credential.
+    listOAuthSourcePage.mockRejectedValue(new Error("429"));
+    completeJobBatch.mockResolvedValue({ ok: true as const, value: { state: "dead" as const } });
+    await runSourceImportBatch(JOB, "worker-1");
+    expect(markOAuthConnectionReauthorizationRequired).not.toHaveBeenCalled();
+  });
+
+  it("reports a refused re-authorization flag instead of leaving it silent", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    refreshOAuthAccessToken.mockRejectedValue(new Error("invalid_grant"));
+    completeJobBatch.mockResolvedValue({ ok: true as const, value: { state: "dead" as const } });
+    markOAuthConnectionReauthorizationRequired.mockResolvedValue({ ok: false, code: "OAUTH_CONNECTION_NOT_FOUND" });
+    expect(await runSourceImportBatch(JOB, "worker-1")).toEqual({ ok: false, code: "OAUTH_TOKEN_REFRESH_FAILED" });
+    expect(logged).toHaveBeenCalledWith("OAuth reauthorization flag failed", { jobId: JOB.jobId, code: "OAUTH_CONNECTION_NOT_FOUND" });
   });
 
   it.each(["OAUTH_SOURCE_PAGE_INVALID", "OAUTH_SOURCE_CURSOR_INVALID"])("retains the checkpoint and imports nothing after %s", async code => {

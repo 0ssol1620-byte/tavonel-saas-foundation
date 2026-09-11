@@ -273,3 +273,42 @@ export async function recordOAuthConnectionSync(input: {
     return { ok: false as const, code: "OAUTH_CONNECTION_SYNC_WRITE_FAILED" };
   }
 }
+
+// A withdrawn grant is not a retryable error. Say so on the connection, once, terminally, so
+// the workspace can ask for re-authorization instead of showing a job that retries forever.
+//
+// No audit event: `foundation_developer_audit_events.action` is a closed check constraint
+// (0019) with no value for this transition, and no lane writes a migration this campaign.
+// The transition is still traceable -- the terminal job row and `foundation_job_events` carry
+// the same error code -- but a proper `oauth_connection_reauthorization_required` action is
+// owed. ponytail: add it with the migration, and fail closed on the audit write like the
+// neighbours here do.
+export async function markOAuthConnectionReauthorizationRequired(input: {
+  workspaceKey: string;
+  userId: string;
+  oauthConnectionId: string;
+  errorCode: string;
+}) {
+  const config = readSupabaseAdminConfig();
+  if (!config) return { ok: false as const, code: "OAUTH_STORE_NOT_CONFIGURED" };
+  try {
+    const response = await supabaseAdminRequest(config, `/rest/v1/foundation_oauth_connections?oauth_connection_id=eq.${input.oauthConnectionId}&workspace_key=eq.${input.workspaceKey}&status=neq.revoked`, {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({
+        status: "reauthorization_required",
+        last_error_code: input.errorCode,
+        updated_by: input.userId,
+        updated_at: new Date().toISOString(),
+      }),
+    });
+    const rows = await response.json().catch(() => []) as Array<Record<string, unknown>>;
+    if (!response.ok) return { ok: false as const, code: "OAUTH_CONNECTION_STATUS_WRITE_FAILED" };
+    // A revoked connection is excluded by the filter above, so zero rows means there is
+    // nothing to flag -- never a silent success.
+    if (rows.length !== 1) return { ok: false as const, code: rows.length === 0 ? "OAUTH_CONNECTION_NOT_FOUND" : "OAUTH_CONNECTION_STATUS_WRITE_FAILED" };
+    return { ok: true as const };
+  } catch {
+    return { ok: false as const, code: "OAUTH_CONNECTION_STATUS_WRITE_FAILED" };
+  }
+}
