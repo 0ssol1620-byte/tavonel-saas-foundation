@@ -71,7 +71,9 @@ const OFFICE = CAPABILITY_MANIFEST.entries
 const OFFICE_SENTENCE = `${OFFICE.slice(0, -1).join(", ")} and ${OFFICE.at(-1)}`;
 
 const READ_BODY = [
-  "Native text layers are read, and a scan is read as an image rather than skipped.",
+  // There is no native text read on any path: the CDR rasterizes every accepted source, and
+  // test_office_conversion.py asserts the sanitized output has no extractable text at all.
+  "Every accepted source is sanitized to an image-only PDF and read by OCR, so a scan is read the same way a born-digital file is.",
   `What survives that read into the compile is ${PRESERVED_SENTENCE} — after the file has been sanitized to PDF and passed through OCR.`,
   NO_TABLE_EXTRACTION
     ? "Structured tables and formulas are not extracted yet: a price table arrives as the paragraphs it was printed as, each with the box it sat in, so the figures are readable and the grid that arranged them is not."
@@ -101,7 +103,9 @@ const PARTS = [
   ["READ", "Text, scans, and what survives them", READ_BODY],
   ["LOCATION", "The place, kept", "Every region keeps the address of where it was read — in a PDF, the page and the box on it. This is what later lets every compiled fact stay traceable to its exact source location."],
   ["LAYOUT", "Reading order, not recovered structure", LAYOUT_BODY],
-  ["UNCERTAINTY", "Doubt is carried forward", "Low-confidence regions stay marked and arrive in review instead of being quietly resolved. A reader that never reports doubt cannot be believed later."],
+  // "arrive in review" was not supported: ocr-review.json is written only when the read fails,
+  // and no threshold on confidence routes anything. The confidence is recorded, and that is all.
+  ["UNCERTAINTY", "Doubt is carried forward", "Per-region confidence is recorded in the OCR output; it does not route anything, and review is opened only when a read fails. A reader that never reports doubt cannot be believed later."],
 ] as const;
 
 export default function DocumentUnderstandingPage() {

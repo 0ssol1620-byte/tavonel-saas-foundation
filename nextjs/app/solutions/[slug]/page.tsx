@@ -40,7 +40,9 @@ const SOLUTIONS = {
     outcomes: ["Provenance to the exact source location", "Visible confidence and review reasons", "Immutable OCR output", "Structure ready for compilation"],
     limitations: [
       "Where a format does not state a page count, the quote is an estimate and is labelled one. Spreadsheets have no decided billable unit at all.",
-      "Handwriting, stamps and heavily degraded scans are routed to review rather than guessed at, and review is a person's time.",
+      // Nothing detects handwriting, a stamp or scan degradation: review is opened on an OCR
+      // failure, and this deployment has no quality score and deliberately does not route on one.
+      "A page the reader cannot read fails visibly and is opened for review; nothing guesses at handwriting, stamps or degraded scans, and review is a person's time.",
       "No accuracy figure is published without a same-condition benchmark.",
     ],
   },
