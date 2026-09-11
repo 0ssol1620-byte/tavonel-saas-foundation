@@ -53,7 +53,10 @@ import { observeCompileJob } from "@/lib/compile-job-client";
 import { measureSelection, type PageCountResult } from "@/lib/page-count";
 import { type ArchiveExpander, createArchiveExpander } from "@/lib/archive-client";
 import { ARCHIVE_LIMITS } from "@/lib/archive-expand";
-import type { BlockerResolution } from "@/lib/compile-job-store";
+import type { BlockerResolution, CompileBlocker } from "@/lib/compile-job-store";
+import ReviewQueue from "@/components/review-queue";
+import WorldFreshness from "@/components/world-freshness";
+import type { ReviewQueueInput } from "@/lib/review-queue";
 
 /** What this panel prints when it has no value. Not "0", and not a spinner that never resolves. */
 const UNKNOWN = "not read yet";
@@ -357,6 +360,57 @@ export default function WorkspacePage() {
       .catch((error: unknown) => {
         if (!(error instanceof DOMException && error.name === "AbortError")) setWorldReadModel(null);
       });
+    return () => controller.abort();
+  }, [collectionResult?.collectionId]);
+  /*
+    The two server facts the review queue needs and the candidate artifact does not carry.
+
+    The compile-job row knows the document set it was asked to read, which of those were
+    blocked and when the run settled; the decision ledger knows when somebody first decided on
+    a piece of evidence. Neither is in the artifact, and without them a per-document breakdown
+    could only ever list what compiled -- which is the half that went right.
+
+    Both reads are best-effort and both fail to `null`, never to an empty list: "no compile-job
+    row" and "no documents were excluded" are different answers, and the queue prints the
+    difference rather than smoothing it over.
+  */
+  const [compileRecord, setCompileRecord] = useState<
+    { documentIds: string[]; blocked: CompileBlocker[]; settledAt: string | null } | null
+  >(null);
+  const [reviewDecisions, setReviewDecisions] = useState<Array<{ evidenceId: string; recordedAt: string }>>([]);
+  useEffect(() => {
+    const collectionId = collectionResult?.collectionId;
+    if (!collectionId) {
+      setCompileRecord(null);
+      setReviewDecisions([]);
+      return;
+    }
+    const controller = new AbortController();
+    void (async () => {
+      const client = getSupabaseBrowserClient();
+      const { data } = client ? await client.auth.getSession() : { data: { session: null } };
+      const token = data.session?.access_token;
+      if (!token) return;
+      const headers = { authorization: `Bearer ${token}` };
+      const [jobs, reviews] = await Promise.allSettled([
+        fetch("/api/compile-jobs", { cache: "no-store", headers, signal: controller.signal })
+          .then((response) => response.ok
+            ? response.json() as Promise<{ jobs?: Array<{ collectionId: string | null; documentIds?: string[]; blocked?: CompileBlocker[]; settledAt?: string | null }> }>
+            : null),
+        fetch(`/api/v1/reviews?collectionId=${encodeURIComponent(collectionId)}`, { cache: "no-store", headers, signal: controller.signal })
+          .then((response) => response.ok
+            ? response.json() as Promise<{ decisions?: Array<{ evidenceId: string; recordedAt: string }> }>
+            : null),
+      ]);
+      if (controller.signal.aborted) return;
+      const row = jobs.status === "fulfilled"
+        ? jobs.value?.jobs?.find((job) => job.collectionId === collectionId)
+        : undefined;
+      setCompileRecord(row && Array.isArray(row.documentIds)
+        ? { documentIds: row.documentIds, blocked: Array.isArray(row.blocked) ? row.blocked : [], settledAt: row.settledAt ?? null }
+        : null);
+      setReviewDecisions(reviews.status === "fulfilled" ? reviews.value?.decisions ?? [] : []);
+    })();
     return () => controller.abort();
   }, [collectionResult?.collectionId]);
   const [downloading, setDownloading] = useState(false);
@@ -1813,6 +1867,27 @@ export default function WorkspacePage() {
     reviewCount > 0,
   );
   /*
+    Everything the per-document breakdown is derived from, gathered in one place.
+
+    `compileRecord === null` is passed through as a null document set rather than as an empty
+    array: the queue treats the two differently and says which one it got.
+  */
+  const reviewQueueInput: ReviewQueueInput = {
+    documentIds: compileRecord?.documentIds ?? null,
+    blocked: compileRecord?.blocked ?? [],
+    compileSettledAt: compileRecord?.settledAt ?? null,
+    documents: (documents ?? []).map((document) => ({
+      documentId: document.documentId,
+      hasOcrJson: document.hasOcrJson,
+      processingState: document.processingState,
+      ocrReviewReasonCode: document.ocrReviewReasonCode,
+    })),
+    reviewReasons: collectionResult?.reviewReasons ?? [],
+    evidence: (worldReadModel?.evidence ?? []).map((item) => ({ id: item.id, sourceId: item.sourceId })),
+    decisions: reviewDecisions,
+    names,
+  };
+  /*
     One derivation, in `lib/workspace-onboarding.ts`, for what state this workspace is in.
 
     Everything below reads from it: the state hero, the next action, the needs-attention queue,
@@ -2240,6 +2315,22 @@ export default function WorkspacePage() {
               }}
             />
           ) : null}
+          {/*
+            Which documents, by name, with the denominator (audit U05).
+
+            The panel above reports counts -- "9 of 12 read", "3 could not be read" -- which is
+            the right summary and the wrong thing to act on: "partial" is not a defect a reader
+            can do anything with until they know *which* source is missing and why. The same
+            list, from the same derivation, is what the review tab orders by risk and what the
+            candidate API returns, so the three surfaces cannot drift.
+          */}
+          {compileJob || collectionResult ? (
+            <section className="card" aria-labelledby="workspace-corpus-breakdown-title">
+              <p className="eyebrow">WHAT IS IN THIS COMPILE</p>
+              <h2 id="workspace-corpus-breakdown-title">Every source this compile was asked to read.</h2>
+              <ReviewQueue input={reviewQueueInput} compact />
+            </section>
+          ) : null}
           {surface === "sources" ? <>
           {/*
             The compile, drawn.
@@ -2378,6 +2469,14 @@ export default function WorkspacePage() {
               {surface === "world" ? (
               <div id="workspace-world">
                 {/*
+                  The four times "current" can mean, and the warning that matters (audit TM04).
+
+                  Read from the World read model's freshness block, which is produced server-side.
+                  The component renders nothing at all when the block is absent, so this line is
+                  safe before that field ships and never invents a timestamp to fill the space.
+                */}
+                <WorldFreshness freshness={(worldReadModel as { freshness?: unknown } | null)?.freshness} />
+                {/*
                   Rollback is offered from the Versions lens, where the diff sits directly
                   above the button. A rollback control with only a version number beside it
                   asks somebody to approve a change they cannot see; the reason box below is
@@ -2409,6 +2508,32 @@ export default function WorkspacePage() {
                 architecture above is built from.
               */}
               {surface === "review" ? <>
+              {/*
+                The order the work should be done in (audit U03).
+
+                Review already had the two things that make a decision possible -- the source
+                page beside the extracted claim, and a changed-only comparison before a rollback
+                -- and none of the things that make it a job rather than a scavenger hunt. This
+                is the queue: safety stops first, then documents waiting on a decision, then the
+                rest, filtered by the reasons the compiler actually recorded, with the elapsed
+                time from the compile settling to the first decision on each document.
+
+                There is no severity score here on purpose. Ordering is categorical, from
+                reasons that already exist; a synthesised number would be an uncalibrated
+                threshold dressed up as a measurement.
+              */}
+              <section className="card" aria-labelledby="review-queue-title">
+                <p className="eyebrow">REVIEW QUEUE</p>
+                <h2 id="review-queue-title">Worst first, by the reasons already on the record.</h2>
+                <ReviewQueue
+                  input={reviewQueueInput}
+                  selectedDocumentId={worldReadModel?.evidence.find((item) => item.id === reviewEvidenceId)?.sourceId ?? null}
+                  onSelectDocument={(documentId) => {
+                    const first = worldReadModel?.evidence.find((item) => item.sourceId === documentId);
+                    if (first) setReviewEvidenceId(first.id);
+                  }}
+                />
+              </section>
               <section className="card review-comparison" aria-labelledby="review-comparison-title">
                 <p className="eyebrow">REVIEW</p>
                 <h2 id="review-comparison-title">Compare the compiled result with its source.</h2>
