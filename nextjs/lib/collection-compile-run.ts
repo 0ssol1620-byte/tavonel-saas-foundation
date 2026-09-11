@@ -2,10 +2,19 @@ import { OCR_REGIONS_REQUIRED, documentsWithoutRegions } from "../../shared/comp
 import { type CollectionCandidateArtifact, validateCollectionOcrInput } from "./collection-compiler";
 import { checkConnectorSourceAccess } from "./connector-source-access";
 import { dispatchCoreCompile, readCoreRuntimeEnv } from "./core-runtime";
-import { dispatchProductCoreV2, projectProductCoreV2Candidate, readProductCoreV2Env } from "./core-runtime-v2";
+import {
+  dispatchProductCoreV2,
+  productCoreV2CollectionId,
+  projectProductCoreV2Candidate,
+  readProductCoreV2Env,
+  readRevisionCompileSnapshot,
+  revisionCompileEnabled,
+  type ProductCoreV2CompileRequest,
+} from "./core-runtime-v2";
 import { checkCurrentSourceVersions, collectionCandidateKey, groupImmutableDocuments, selectCurrentDocumentVersions } from "./immutable-keys";
-import { getWorkspaceOcrJson, listImmutableWorkspaceObjects, putWorkspaceCollectionCandidate } from "./r2-objects";
+import { getWorkspaceCollectionCandidate, getWorkspaceOcrJson, listImmutableWorkspaceObjects, putWorkspaceCollectionCandidate } from "./r2-objects";
 import { readR2SignerEnv } from "./r2-synthetic-canary";
+import { getFoundationActiveWorld } from "./world-store";
 
 /*
   One compile, with no opinion about who asked for it.
@@ -159,10 +168,54 @@ export async function runCollectionCompile(
   const preDispatchVersionFailure = await revalidate();
   if (preDispatchVersionFailure) return preDispatchVersionFailure;
 
+  /*
+    TM01. The prior active World, when this compile is a revision of one and the flag is on.
+
+    `operationClass` was the literal `"initial_compile"` on every call and `previousActiveWorld`
+    was never populated, so the selective-recompile machinery that exists on both sides of the
+    wire -- `plan_recompilation` and `verify_equivalence` in `akc_cir`, branched on in
+    `compiler.py` -- was never once executed in production, and `receipt.equivalence` was always
+    `not_run`. This fills in the data the Core needs to take that branch.
+
+    Three things it does not do, said here because each would be worse than not shipping:
+    it does not compile as if it were the first time when the prior World cannot be read (that
+    would report every unit as new and call it a diff), it does not send a units-less snapshot
+    (same defect, with a receipt attached), and it is off unless an operator turns it on --
+    nothing here verifies that the deployed Core accepts `incremental_recompile`.
+
+    The lookup is exact: the collection id is a hash of the document/version binding, so this
+    finds a prior World only for a re-compile of an identical binding. That is enough to
+    exercise the equivalence path and not enough for the economic claim; the missing piece is a
+    collection identity that survives a source revision, written up in the lane report.
+  */
+  let previousActiveWorld: ProductCoreV2CompileRequest["previousActiveWorld"] | null = null;
+  if (coreV2 && revisionCompileEnabled()) {
+    const active = await getFoundationActiveWorld(
+      workspaceId,
+      productCoreV2CollectionId(workspaceId, verifiedInputs),
+    );
+    if (!active.ok && active.code !== "ACTIVE_WORLD_NOT_FOUND") {
+      return { ok: false, status: 503, code: active.code, payload: {} };
+    }
+    if (active.ok) {
+      const stored = await getWorkspaceCollectionCandidate(signer, workspaceId, active.world.candidateObjectKey);
+      if (!stored.ok) return { ok: false, status: 503, code: stored.code, payload: {} };
+      previousActiveWorld = readRevisionCompileSnapshot(stored.json, active.world);
+      if (!previousActiveWorld) {
+        return {
+          ok: false,
+          status: 409,
+          code: "REVISION_COMPILE_PRIOR_WORLD_UNREADABLE",
+          payload: { manifestDigest: active.world.manifestDigest },
+        };
+      }
+    }
+  }
+
   let artifact: CollectionCandidateArtifact;
   let coreExecution: CollectionCompileSuccess["coreExecution"];
   if (coreV2) {
-    const compiled = await dispatchProductCoreV2(coreV2, workspaceId, verifiedInputs);
+    const compiled = await dispatchProductCoreV2(coreV2, workspaceId, verifiedInputs, new Date(), previousActiveWorld);
     if (!compiled.ok) return { ok: false, status: 503, code: compiled.code, payload: {} };
     if (compiled.result.status === "rejected") {
       return {
@@ -176,7 +229,7 @@ export async function runCollectionCompile(
         },
       };
     }
-    const projected = projectProductCoreV2Candidate(compiled.result, verifiedInputs);
+    const projected = projectProductCoreV2Candidate(compiled.result, verifiedInputs, revisionCompileEnabled());
     if (!projected) return { ok: false, status: 502, code: "CORE_V2_PROJECTION_INVALID", payload: {} };
     artifact = projected;
     coreExecution = {
