@@ -15,6 +15,8 @@ import {
 } from "@/lib/cookbook-content";
 import { loginUrlForRecipe } from "@/lib/recipe-intent";
 import { sanitizeDocumentText } from "@/lib/sanitize-html";
+import { PageToc, tocEntries } from "@/components/docs/page-toc";
+import anchor from "@/components/docs/page-toc.module.css";
 
 /*
   One route for the six cookbooks, arranged the way `/docs/[section]` arranges the documentation:
@@ -62,11 +64,17 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   };
 }
 
-function SectionBlock({ section }: { section: CookbookSection }) {
-  const id = `cookbook-${section.key}`;
+function SectionBlock({ section, id }: { section: CookbookSection; id: string }) {
   return (
     <Fragment>
-      <h2 id={id}>{SECTION_LABEL[section.key]}</h2>
+      {/*
+        The id comes from the page's own `tocEntries` call, so the anchor and the jump link that
+        names it are one derivation rather than two strings that have to agree. `anchor.anchor`
+        is the `scroll-margin-top` that keeps the heading out from under the fixed header -- the
+        reason the docs template puts the class on the element carrying the id and not on
+        `:target`.
+      */}
+      <h2 id={id} className={anchor.anchor}>{SECTION_LABEL[section.key]}</h2>
       {section.status === "locked" ? (
         /*
           The whole of what a locked section renders. No placeholder figure, no sample answer and
@@ -102,6 +110,13 @@ export default async function CookbookPage({ params }: { params: Promise<{ slug:
   if (!record) notFound();
 
   const sections = orderedSections(record);
+  /*
+    One jump list for the twelve sections, from the documentation template's own component rather
+    than a second one written here. `tocEntries` owns the slug, the duplicate suffix and the
+    empty-label fallback; the ids it returns are joined back to the sections by order, which is
+    safe because `orderedSections` is the order this page renders.
+  */
+  const toc = tocEntries(sections.map((section) => SECTION_LABEL[section.key]));
 
   return (
     <PublicPageShell>
@@ -113,18 +128,12 @@ export default async function CookbookPage({ params }: { params: Promise<{ slug:
         </div>
 
         <div className="stack">
-          <nav aria-label="Sections on this page">
-            <ol className="docs-steps">
-              {sections.map((section) => (
-                <li key={section.key}>
-                  <a href={`#cookbook-${section.key}`}>{SECTION_LABEL[section.key]}</a>
-                </li>
-              ))}
-            </ol>
-          </nav>
+          <PageToc entries={toc} />
 
           <div className="stack docs-body">
-            {sections.map((section) => <SectionBlock key={section.key} section={section} />)}
+            {sections.map((section, order) => (
+              <SectionBlock key={section.key} section={section} id={toc[order]!.id} />
+            ))}
           </div>
 
           {/* The record's own state, printed from its fields rather than written into the copy. */}

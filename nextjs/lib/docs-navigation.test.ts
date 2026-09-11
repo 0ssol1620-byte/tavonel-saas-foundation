@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { slugify, tocEntries } from "@/components/docs/page-toc";
+import { SECTION_LABEL } from "./cookbook-content";
 import { DOCS_GROUPS, DOCS_SECTIONS } from "./docs-content";
 
 /*
@@ -75,6 +76,33 @@ describe("in-page table of contents", () => {
     const source = read("../components/docs/page-toc.tsx");
     expect(source).toContain("export function PageToc(");
     expect(source).toContain("export function tocEntries(");
+  });
+
+  /*
+    The cookbook route reuses it, which is the reason the export exists.
+
+    That route shipped its own `<nav aria-label="Sections on this page">` with ids typed as
+    `#cookbook-${section.key}` -- a second jump list with a second set of slug rules, and two
+    strings that had to agree for a link to land. It now derives both halves from one
+    `tocEntries` call, so the anchor and the link that names it cannot disagree, and the
+    `scroll-margin-top` that keeps a heading out from under the fixed header comes with it
+    instead of being rediscovered. The last assertion is the one that stops the old list
+    growing back beside the new one.
+  */
+  it("is reused by the cookbook route rather than copied", () => {
+    const cookbook = read("../app/cookbooks/[slug]/page.tsx");
+    expect(cookbook).toContain('import { PageToc, tocEntries } from "@/components/docs/page-toc";');
+    expect(cookbook).toContain("<PageToc entries={toc} />");
+    expect(cookbook).toContain("const toc = tocEntries(sections.map((section) => SECTION_LABEL[section.key]));");
+    // The id and the anchor class sit on the element the link points at.
+    expect(cookbook).toContain('<h2 id={id} className={anchor.anchor}>');
+    expect(cookbook).toContain("id={toc[order]!.id}");
+    expect(cookbook).not.toContain("#cookbook-");
+    expect(cookbook).not.toContain('aria-label="Sections on this page"');
+    // Twelve sections, so the component's three-entry threshold cannot silence this page.
+    expect(Object.keys(SECTION_LABEL).length).toBeGreaterThanOrEqual(3);
+    expect(tocEntries(Object.values(SECTION_LABEL)).map((entry) => entry.id))
+      .toHaveLength(Object.keys(SECTION_LABEL).length);
   });
 });
 
