@@ -40,6 +40,21 @@ const readPaths = (collectionId: string) => [
   `/api/v1/collections/${collectionId}/world`,
   `/api/v1/world/${collectionId}`,
   `/api/v1/world/${collectionId}/evidence`,
+  /*
+    The retrieval lane's surfaces, requested at integration (stage 2 C18). Added to THIS list
+    rather than given a spec of their own so they inherit every assertion the file already
+    makes: anonymous is 401, a forged key is 401 and never 200, a foreign id and an id
+    belonging to nobody are indistinguishable, no refusal leaks a URL or a digest, and every
+    refusal is uncacheable.
+
+    The paginated reads are listed WITH their parameters because authorization is checked
+    before limit and cursor are parsed. That order is the assertion: supplying them must not
+    reorder the two and turn a validation 400 into a probe of whether a workspace exists.
+  */
+  "/api/v1/collections",
+  "/api/v1/collections?limit=2&cursor=collection-" + "a".repeat(32),
+  `/api/v1/world/${collectionId}/objects?limit=2`,
+  `/api/v1/world/${collectionId}/relations?limit=2&cursor=relation-1`,
   "/api/v1/documents",
   "/api/v1/connections",
   "/api/v1/reviews",
@@ -52,6 +67,10 @@ const writePaths = (collectionId: string) => [
   { path: `/api/v1/collections/${collectionId}/ask`, data: { question: "what changed" } },
   { path: `/api/v1/collections/${collectionId}/search`, data: { query: "revenue" } },
   { path: `/api/v1/world/${collectionId}/ask`, data: { question: "what changed" } },
+  // Builds a retrieval index. The owner-or-admin gate behind it needs a real member
+  // credential and is covered in lib/retrieval-compile-wiring.test.ts; what belongs here is
+  // that an uncredentialed caller never reaches that gate at all.
+  { path: `/api/v1/collections/${collectionId}/retrieval-index`, data: {} },
 ];
 
 /** A refusal may carry a code. It may not carry a URL, an object key, a digest or a credential. */
