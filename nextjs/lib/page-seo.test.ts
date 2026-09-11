@@ -93,6 +93,13 @@ describe("pageMetadata refuses a verification date that verifies nothing", () =>
     const metadata = pageMetadata({ ...VALID, verified }, TODAY);
     expect(metadata.authors).toEqual([{ name: "R. Kim" }]);
     expect(metadata.openGraph).toMatchObject({ type: "article", modifiedTime: "2026-09-10" });
+    /*
+      The author's name goes out once, in the field that takes a name. `og:article:author` takes
+      a profile URL, so a name there renders `<meta property="article:author" content="R. Kim">`
+      -- a duplicate in the wrong format, and nothing else in this file would have seen it,
+      because the assertions above read whether a field exists and not whether its value fits.
+    */
+    expect(metadata.openGraph, "og article:author takes a profile URL, not a reviewer's name").not.toHaveProperty("authors");
   });
 
   it("refuses a date in the future", () => {

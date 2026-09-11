@@ -24,7 +24,7 @@ Measured 2026-09-11 against the live site (`curl -s https://tavonel.com/robots.t
 | No training-crawler token appears at all (`Google-Extended`, `GPTBot`, `CCBot`, `ClaudeBot`, `anthropic-ai`, `Applebot-Extended`) | `lib/seo-surface.test.ts` — "takes no position on training crawlers" |
 | A customer document, a workspace and every API route are unreachable to any crawler **by authorization**, not by `robots.txt` | Session/tenant checks on `/workspace` and `/api/*`; `robots.txt` only spares a crawler the walk |
 | Only approved pages are advertised; a draft page declares `robots: { index: false }` and is absent from `sitemap.ts` | `lib/seo-surface.test.ts` — "the sitemap advertises only approved pages" |
-| `llms.txt` is a reading map, not a ranking signal, and says so in its own header | `nextjs/public/llms.txt` |
+| `llms.txt` requests nothing of a search engine and makes no claim about how one treats it; it says so in its own header | `nextjs/public/llms.txt` |
 
 **The consequence that must not be lost in the decision below:** blocking a crawler is not access
 control, and allowing one is not exposure of anything private. Customer documents are behind

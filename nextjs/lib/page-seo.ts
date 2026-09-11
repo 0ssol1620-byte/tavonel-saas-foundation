@@ -117,8 +117,11 @@ export function pageMetadata(record: PageSeoRecord, today: Date = new Date()): M
     alternates: languages ? { canonical, languages } : { canonical },
     // og:url is the canonical, always. A share card that claims another address is a wrong
     // canonical wearing a different hat.
+    // No `authors` inside openGraph. og's `article:author` takes a profile URL, and a reviewer's
+    // name is not one -- the name goes out as the top-level `authors` below, which is the field
+    // that takes a name. If og ever needs the author, `PageVerification` gains a `reviewerUrl`.
     openGraph: verified
-      ? { title, description, url: canonical, type: "article", modifiedTime: verified.at, authors: [verified.reviewer] }
+      ? { title, description, url: canonical, type: "article", modifiedTime: verified.at }
       : { title, description, url: canonical, type: "website" },
     ...(verified ? { authors: [{ name: verified.reviewer }] } : {}),
     ...(record.index === false ? { robots: { index: false, follow: true } } : {}),

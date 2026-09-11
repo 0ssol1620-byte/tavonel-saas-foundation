@@ -4,7 +4,7 @@
 
 This file is a curated map of public TAVONEL pages for language models. It does not request preferential indexing.
 
-Role of this file: a reading map for tools, and not a ranking signal. Google's 2026-07-10 guidance states that AI-specific files of this kind are not used as a Google ranking signal, and nothing here is written as if they were: every page listed below is reachable from the sitemap and the site navigation, and deleting this file would change what a tool has to crawl to find them, not whether they can be found. Search-crawler and training-crawler access are separate questions and neither is decided here — robots.txt names the search crawlers it addresses, and the training-crawler policy is unresolved.
+Role of this file: a reading map for tools. It asks no search engine for anything and no claim is made here about how any search engine treats it — every page listed below is reachable from the sitemap and the site navigation, so deleting this file would change what a tool has to crawl to find them, not whether they can be found. Search-crawler and training-crawler access are separate questions and neither is decided here — robots.txt names the search crawlers it addresses, and the training-crawler policy is unresolved.
 
 TAVONEL offers self-service evaluation and paid Developer access. Product and research claims should be read from the public pages below; measured evidence and methodology are published separately from product descriptions.
 
