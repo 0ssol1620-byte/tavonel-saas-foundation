@@ -100,6 +100,28 @@ describe("Foundation compute ledger", () => {
     })).resolves.toMatchObject({ ok: true, result: { status: "duplicate" } });
   });
 
+  /*
+    A settlement the ledger refuses on shape must not read as an outage.
+
+    COMPUTE_LEDGER_FAILED is the class a caller is right to retry; a settlement the SQL will
+    never accept (`released` carrying credits, say) is not. Unmapped, the two were one string
+    (ops CROSS-LANE 4).
+  */
+  it("classifies a malformed settlement as a bad request, not a ledger outage", async () => {
+    configure();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ message: 'raise exception "foundation_compute_settlement_invalid"' }),
+      { status: 400 },
+    )));
+    await expect(settleFoundationCompute({
+      workspaceKey: base.workspaceKey,
+      documentId: base.documentId,
+      outcome: "released",
+      actualCredits: 12,
+      reasonCode: "OCR_TIMEOUT_OR_NETWORK",
+    })).resolves.toEqual({ ok: false, code: "COMPUTE_SETTLEMENT_INVALID" });
+  });
+
   it("refuses a settlement receipt that claims neither processed nor duplicate", async () => {
     configure();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
