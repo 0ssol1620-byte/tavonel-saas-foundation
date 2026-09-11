@@ -2,7 +2,11 @@ import { validateReviewableCollectionArtifact } from "./collection-download";
 import { loadPreferredCollectionCandidate } from "./collection-storage";
 import { COLLECTION_ID_PATTERN } from "./immutable-keys";
 import { readR2SignerEnv } from "./r2-synthetic-canary";
-import { collectionSourceDocumentIds } from "./collection-source-access";
+import {
+  coreCollectionSourceBinding,
+  collectionSourceDocumentIds,
+  type CollectionSourceBinding,
+} from "./collection-source-access";
 import { checkConnectorSourceAccess } from "./connector-source-access";
 import {
   getFoundationActiveWorld,
@@ -11,6 +15,16 @@ import {
 } from "./world-store";
 
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
+/*
+  Both engines' identifiers pass this, and that is worth stating rather than discovering.
+
+  `akc_cir.identity` writes `<prefix>_<sha256 hex>` -- `src_`, `dv_`, `ev_`, `ku_`, and
+  `akc_product_core`'s `ko_evidence_`, `claim_`, `entity_`, `relation_`, `chunk_` -- while the
+  TypeScript fallback compiler writes `<prefix>-<hex>`. The character class admits both, so a
+  shape check here never distinguishes the two namespaces: what separates them is which field
+  an id is *resolved* against, which is what the source binding and the evidence namespace
+  below are for.
+*/
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/;
 const NODE_KINDS = new Set(["Document", "Topic", "Entity", "Claim", "Evidence"]);
 
@@ -224,17 +238,33 @@ type CanonicalEdge = {
   evidenceIds: string[];
 };
 
-type SourceBinding = {
-  documentId: string;
-  versionKey: string;
-  inputSha256: string;
-};
+/*
+  One compiled source, in both namespaces. Defined in `collection-source-access.ts` because the
+  permission check and this read model have to agree on which documents a World was compiled
+  from, and a second copy of the translation is a second answer to that question.
+
+  `documentId`/`versionKey` are the ids the package's own rows cite; `productDocumentId`/
+  `productVersionKey` are the same source as the document store, `/api/documents/<id>/source` and
+  the connector ACL know it. The pairs are the same strings for a fallback-compiled package and
+  are not for a Core one, where the join between them is the immutable content digest.
+*/
+type SourceBinding = CollectionSourceBinding;
 
 type CanonicalModel = {
   collectionId: string;
   nodes: CanonicalNode[];
   edges: CanonicalEdge[];
   inputBinding: SourceBinding[];
+  /*
+    The evidence-id namespace an edge, a node and a chunk row may cite.
+
+    The fallback compiler gives an Evidence node the same string for its id and its evidence
+    ref, so one set served both. The Core does not: an Evidence object's `stableId` is
+    `ko_evidence_<hex>` while its `payload.evidenceId` -- the string `rag/chunks.jsonl`,
+    `retrieval-units.ts` and every edge use -- is `ev_<hex>`. So the namespace is stated once
+    here instead of being re-derived from node ids at each use.
+  */
+  evidenceIds: Set<string>;
 };
 
 function notYet<T>(reason: string): ReadValue<T> {
@@ -304,11 +334,105 @@ function parseCanonicalModel(content: string, collectionId: string): CanonicalMo
       binding.inputSha256 !== `sha256:${binding.versionKey}`
     ) return null;
     sourceIds.add(binding.documentId);
-    inputBinding.push({ documentId: binding.documentId, versionKey: binding.versionKey, inputSha256: binding.inputSha256 });
+    inputBinding.push({
+      documentId: binding.documentId,
+      versionKey: binding.versionKey,
+      inputSha256: binding.inputSha256,
+      // This package's rows are already in the product's namespace; the two are one string.
+      productDocumentId: binding.documentId,
+      productVersionKey: binding.versionKey,
+    });
   }
 
   if (nodes.some((node) => node.evidenceIds.some((id) => !evidenceNodeIds.has(id)))) return null;
-  return { collectionId, nodes, edges, inputBinding };
+  return { collectionId, nodes, edges, inputBinding, evidenceIds: evidenceNodeIds };
+}
+
+/**
+ * Read the compiled graph off the artifact when `canonical/model.json` is not the fallback's.
+ *
+ * Audit R3-K09's second half. Core V2 writes the canonical *knowledge model* at that path --
+ * `{schemaVersion: "canonical-knowledge-1.0.0", tenantId, collectionId, objects}` -- so
+ * `parseCanonicalModel` refuses it, `buildWorldReadModel` returns null and
+ * `/api/collections/[id]/world` answers WORLD_READ_MODEL_INVALID for every World the live engine
+ * compiled. The nodes and edges exist: `projectProductCoreV2Candidate` already computed them and
+ * they are on the artifact as `ontology`, which is also what the graph CSVs, the download package
+ * and `collection-patch.ts` read. So this reads the same field, with the same checks the
+ * canonical-model parser applies, and refuses on anything that does not resolve.
+ *
+ * It is a second reader rather than a relaxation of the first, because the first is what keeps a
+ * fallback-compiled package honest: its canonical model is a signed package file, and accepting
+ * an artifact whose package file disagrees with its own `ontology` would make the file
+ * decorative. Here the package file is a different document, not a disagreeing one.
+ */
+function parseProjectedKnowledgeModel(value: unknown, collectionId: string): CanonicalModel | null {
+  if (!value || typeof value !== "object") return null;
+  const artifact = value as Record<string, unknown>;
+  const ontology = artifact.ontology && typeof artifact.ontology === "object"
+    ? artifact.ontology as Record<string, unknown>
+    : null;
+  if (!ontology || !Array.isArray(ontology.nodes) || !Array.isArray(ontology.edges)) return null;
+  /*
+    The source binding comes from the one place a Core package names its sources, and it is
+    read by the module the permission check already reads it with.
+
+    `source/collection-files.json` names them in the Core's identity scheme; the chunk rows cite
+    the same ids; the product's document store does not know them. So the binding carries both
+    namespaces, joined on the content digest -- and it is `collection-source-access.ts` that owns
+    that join, because the ACL list has to be the same translation or the two disagree about
+    which documents this World was compiled from.
+  */
+  const inputBinding = coreCollectionSourceBinding(artifact);
+  if (!inputBinding) return null;
+
+  const nodes: CanonicalNode[] = [];
+  const nodeIds = new Set<string>();
+  for (const raw of ontology.nodes) {
+    if (!raw || typeof raw !== "object") return null;
+    const node = raw as Record<string, unknown>;
+    if (
+      typeof node.id !== "string" || !SAFE_ID.test(node.id) || nodeIds.has(node.id) ||
+      typeof node.kind !== "string" || !NODE_KINDS.has(node.kind) ||
+      typeof node.label !== "string" || node.label.trim().length === 0 || node.label.length > 2_000 ||
+      !isStringArray(node.evidenceIds)
+    ) return null;
+    nodeIds.add(node.id);
+    nodes.push({ id: node.id, kind: node.kind as WorldObjectType, label: node.label, evidenceIds: [...node.evidenceIds] });
+  }
+
+  /*
+    An Evidence node resolves under either of its two names, and nothing else resolves at all.
+
+    The Core's convention is that an Evidence object's `stableId` is the node id and its
+    `payload.evidenceId` is the string the edges, the retrieval units and `rag/chunks.jsonl`
+    cite. Accepting both is the whole relaxation; an id that is neither still refuses the read,
+    which is what keeps a dangling evidence reference a refusal rather than an empty citation.
+    Rewriting the Core's edge evidence to node ids instead was the alternative and is wrong:
+    `retrieval-units.ts` and the chunk file are in the `payload.evidenceId` namespace, so the
+    rewrite would disconnect an answer's citation from the World's.
+  */
+  const evidenceIds = new Set(
+    nodes.filter((node) => node.kind === "Evidence").flatMap((node) => [node.id, ...node.evidenceIds]),
+  );
+  if (nodes.some((node) => node.evidenceIds.some((id) => !evidenceIds.has(id)))) return null;
+
+  const edges: CanonicalEdge[] = [];
+  const edgeIds = new Set<string>();
+  for (const raw of ontology.edges) {
+    if (!raw || typeof raw !== "object") return null;
+    const edge = raw as Record<string, unknown>;
+    if (
+      typeof edge.id !== "string" || !SAFE_ID.test(edge.id) || edgeIds.has(edge.id) ||
+      typeof edge.type !== "string" || !SAFE_ID.test(edge.type) ||
+      typeof edge.from !== "string" || !nodeIds.has(edge.from) ||
+      typeof edge.to !== "string" || !nodeIds.has(edge.to) ||
+      !isStringArray(edge.evidenceIds) || edge.evidenceIds.some((id) => !evidenceIds.has(id))
+    ) return null;
+    edgeIds.add(edge.id);
+    edges.push({ id: edge.id, type: edge.type, from: edge.from, to: edge.to, evidenceIds: [...edge.evidenceIds] });
+  }
+
+  return { collectionId, nodes, edges, inputBinding, evidenceIds };
 }
 
 function validBbox(value: unknown): value is [number, number, number, number] {
@@ -317,7 +441,7 @@ function validBbox(value: unknown): value is [number, number, number, number] {
 
 function parseEvidence(content: string, model: CanonicalModel): WorldEvidence[] | null {
   const sourceById = new Map(model.inputBinding.map((binding) => [binding.documentId, binding]));
-  const evidenceIds = new Set(model.nodes.filter((node) => node.kind === "Evidence").map((node) => node.id));
+  const evidenceIds = model.evidenceIds;
   const result: WorldEvidence[] = [];
   const ids = new Set<string>();
   for (const line of content.split(/\r?\n/).filter(Boolean)) {
@@ -341,8 +465,16 @@ function parseEvidence(content: string, model: CanonicalModel): WorldEvidence[] 
     ids.add(chunk.chunkId);
     result.push({
       id: `${chunk.evidenceId}:${chunk.chunkId}`,
-      sourceId: chunk.sourceId as string,
-      sourceVersionId: chunk.sourceVersionId as string,
+      /*
+        The product's ids, not the row's.
+
+        The two are the same string for a fallback-compiled package. For a Core one the row
+        carries `src_`/`dv_`, and `world-studio-ultimate.tsx` opens the cited page with
+        `/api/documents/<sourceId>/source?version=<sourceVersionId>` -- so publishing the Core's
+        ids here would render a World whose every citation silently fails to open.
+      */
+      sourceId: source.productDocumentId,
+      sourceVersionId: source.productVersionKey,
       page: chunk.pageNumber1 as number,
       bbox: chunk.bbox1000,
       blockId: chunk.chunkId,
@@ -472,7 +604,16 @@ export function buildWorldReadModel(value: unknown, collectionId: string, contex
   const canonicalFile = artifact.package.files.find((file) => file.path === "canonical/model.json");
   const chunksFile = artifact.package.files.find((file) => file.path === "rag/chunks.jsonl");
   if (!canonicalFile || !chunksFile) return null;
-  const canonical = parseCanonicalModel(canonicalFile.content, collectionId);
+  /*
+    Two readers, in the order that keeps the signed package file authoritative where it is one.
+
+    A fallback-compiled package's `canonical/model.json` *is* the graph, so it is read first and
+    a malformed one still refuses. A Core V2 package's is a different document -- the canonical
+    knowledge model -- so the graph is read from the artifact's own `ontology`, which is what
+    produced that package's graph CSVs in the first place.
+  */
+  const canonical = parseCanonicalModel(canonicalFile.content, collectionId)
+    ?? parseProjectedKnowledgeModel(value, collectionId);
   if (!canonical) return null;
   const evidence = parseEvidence(chunksFile.content, canonical);
   if (!evidence) return null;
