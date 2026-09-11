@@ -164,8 +164,10 @@
 .solution-actions { margin-left: 0; }
 
 /* --------------------------------------------------------------------------
-   Landing compilation film: autoplay-first. The motion control remains for WCAG but it is
-   deliberately secondary and never blocks the frame with a play button.
+   Landing compilation film. Autoplay-first where autoplay is wanted -- and where it is not,
+   the same control is the way in rather than being absent (film-01, film-02): under reduced
+   motion or Save-Data it reads Play and is drawn at full contrast, because it is the only
+   thing on the frame that will start it.
    -------------------------------------------------------------------------- */
 .compile-film-viewport { position: relative; }
 .compile-film-motion-control {
@@ -189,8 +191,14 @@
   transition: opacity 160ms ease, border-color 160ms ease;
 }
 .compile-film-viewport:hover .compile-film-motion-control,
+.compile-film-motion-control[data-control="play"],
 .compile-film-motion-control:focus-visible { opacity: 1; }
-.compile-film-motion-control span { font: 10px/1 var(--f-mono); transform: translateY(-.5px); }
+.compile-film-motion-control[data-control="play"] {
+  border-color: var(--hairline-hi);
+  background: color-mix(in srgb, var(--ground) 92%, transparent);
+  color: var(--text-hi);
+}
+.compile-film-motion-control span { font: 12px/1 var(--f-mono); transform: translateY(-.5px); }
 .compile-film-caption { align-items: center; }
 .compile-film-caption p { margin-right: auto; }
 .compile-film-progress { color: var(--text-xlo); font: 9px var(--f-mono); letter-spacing: .12em; white-space: nowrap; }
@@ -401,9 +409,13 @@
   .compile-stage { aspect-ratio: 1 / 1; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .compile-film-motion-control { display: none; }
-}
+/*
+  film-01 -- this block used to be `.compile-film-motion-control { display: none }`.
+
+  Under reduced motion the frame is a still, and hiding the control left a poster of a film
+  with no way to watch it. The control stays; it reads Play there, and a click is the visitor's
+  own request, which is what WCAG 2.2.2 permits.
+*/
 
 /*
   /sources quick navigator — §14.3.
