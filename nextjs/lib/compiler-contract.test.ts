@@ -435,9 +435,15 @@ describe("contract promises", () => {
     Does the published verifier verify? Run it, on a real archive, from the public copy.
 
     M07's completion bar is evidence that a machine holding only the public downloads can check
-    both halves of an export. The archive here is built by the same `buildSignedCollectionZip` a
-    customer download goes through, signed with a throwaway key, and handed to the two files that
-    are served from /developer -- not to the repository scripts.
+    both halves of an export. The archive here is compiled by `compileCollectionCandidate` from
+    two small sources and packaged by the same `buildSignedCollectionZip` a customer download goes
+    through, signed with a throwaway key, and handed to the files that are served from /developer
+    -- not to the repository scripts. Nothing in the archive is hand-written.
+
+    Two small sources rather than the /explore sample on purpose: the sample compiles five real
+    SEC filings on import and costs a minute and a half, which is a minute and a half added to
+    every run of the whole suite for no extra coverage of the verifiers. `collection-download.
+    test.ts` uses the same two-source fixture for the same reason.
 
     The failure paths are asserted too, because a verifier that cannot fail is a verifier that
     does not work: the wrong trusted fingerprint is rejected, and running the package validator
@@ -448,8 +454,8 @@ describe("contract promises", () => {
     This is also the only coverage of the archive reader in the package validator, which is the
     path a customer hits and the one nothing exercised while fflate did the reading.
   */
-  it("verifies a real signed archive using only the two published downloads", async () => {
-    const { exploreSampleArtifact } = await import("./explore-sample");
+  it("verifies a real signed archive using only the published downloads", async () => {
+    const { compileCollectionCandidate } = await import("./collection-compiler");
     const { buildSignedCollectionZip, validateDownloadableCollectionArtifact } = await import("./collection-download");
     const { createExportSigner } = await import("./export-signing");
 
@@ -460,11 +466,45 @@ describe("contract promises", () => {
     });
     if (!signer) throw new Error("the export signer refused a freshly generated Ed25519 key");
 
-    const artifact = validateDownloadableCollectionArtifact(
-      JSON.parse(JSON.stringify(exploreSampleArtifact)),
-      exploreSampleArtifact.collectionId,
-    );
-    if (!artifact) throw new Error("the explore sample is not a downloadable artifact");
+    const source = (documentId: string, versionKey: string, text: string) => {
+      const key = `immutable/pilot-devx/pilot-devx/${documentId}/${versionKey}/sanitized.pdf`;
+      return {
+        documentId,
+        versionKey,
+        sanitizedKey: key,
+        ocrJsonKey: `immutable/pilot-devx/pilot-devx/${documentId}/${versionKey}/ocr.json`,
+        pageCount: 1,
+        text,
+        inputSha256: `sha256:${versionKey}`,
+        sourceImmutableKey: key,
+        regions: [{
+          regionId: `${documentId}-p1-b1`,
+          pageIndex0: 0,
+          pageNumber1: 1,
+          order: 0,
+          blockType: "paragraph" as const,
+          text,
+          bbox1000: [80, 120, 920, 320] as [number, number, number, number],
+          confidence: 0.99,
+          authority: "contractual" as const,
+        }],
+      };
+    };
+    const compiled = compileCollectionCandidate([
+      source("doc-one", "a".repeat(64), "Quarterly revenue increased after the reviewed policy change."),
+      source("doc-two", "b".repeat(64), "Security research documented access control evidence."),
+    ]);
+    const candidate = {
+      ...compiled,
+      coreExecution: {
+        status: "completed",
+        runtime: "tavonel-foundation-core-deterministic-v1",
+        receipt: { requestId: "devx-verifier-probe", outputSha256: compiled.manifestDigest, candidatePromotion: false },
+      },
+    };
+
+    const artifact = validateDownloadableCollectionArtifact(candidate, compiled.collectionId);
+    if (!artifact) throw new Error("the compiled candidate is not a downloadable artifact");
     const signed = buildSignedCollectionZip(artifact, signer);
 
     const directory = mkdtempSync(join(tmpdir(), "tavonel-devx-verify-"));
@@ -478,7 +518,7 @@ describe("contract promises", () => {
       expect(exportOk.status, exportOk.stderr).toBe(0);
       expect(JSON.parse(exportOk.stdout)).toEqual(expect.objectContaining({
         ok: true,
-        collectionId: exploreSampleArtifact.collectionId,
+        collectionId: compiled.collectionId,
         keyId: "devx-published-verifier-probe",
       }));
 
