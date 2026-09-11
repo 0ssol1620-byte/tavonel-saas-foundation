@@ -11,9 +11,10 @@
 -- once and nothing else grants anything, so any balance that is not explained by a hold, a
 -- release or a charge is a reconciliation break.
 --
--- The last two assertions are FINDING O04-1 and are deliberately written to the behaviour that
--- exists today rather than the behaviour that is correct -- the same device
--- `tenant_rls_deliberate_red.sql` uses. See the comment above them.
+-- The last two assertions were FINDING O04-1, written to the behaviour that existed rather
+-- than the behaviour that is correct -- the same device `tenant_rls_deliberate_red.sql` uses.
+-- `20260911120000_compute_settlement_expired_terminal.sql` fixed it and they now state the
+-- fixed behaviour, so the file is green throughout and no deliberate-red marker is left here.
 begin;
 select plan(27);
 
@@ -201,24 +202,23 @@ select is(
 );
 
 -- ---------------------------------------------------------------------------
--- FINDING O04-1 — settlement after the expiry sweep.
+-- FINDING O04-1, CLOSED — settlement after the expiry sweep.
 --
 -- `reserve_foundation_compute_v3` sweeps every reservation whose capability has
 -- lapsed and returns its hold to `credit_balance`. `settle_foundation_compute_v3`
--- treats only `settled`, `released` and `operator_review` as terminal, so a
--- settlement that arrives after the sweep runs the paid branch a second time and
--- returns the same hold again.
+-- treated only `settled`, `released` and `operator_review` as terminal, so a
+-- settlement arriving after the sweep ran the paid branch a second time and
+-- returned the same hold again -- 2012 in an account that was ever granted 2000.
 --
--- Direction matters: this over-credits the account, it does not double-charge the
--- customer, so it is not the failure the audit asked about -- and the audit's
--- question is answered in the negative by the assertions above. It is still a
--- reconciliation break. The fix is one word in a SQL function ('expired' added to
--- that terminal list, with its own reason code) and therefore a migration, which
--- no lane in this campaign is allowed to write; it is in the lane report and the
--- founder queue instead.
+-- Direction mattered: it over-credited the account rather than double-charging the
+-- customer, so it was not the failure the audit asked about -- and that question is
+-- answered in the negative by the assertions above. It was still a reconciliation
+-- break, and `20260911120000_compute_settlement_expired_terminal.sql` closed it by
+-- adding `expired` to that terminal list under its own error name.
 --
--- The two assertions below state what happens today. When the guard is added they
--- both go red, which is the point: they are the marker that the finding is open.
+-- The two assertions below are therefore the fixed behaviour, not the broken one:
+-- the late settlement is refused, and the ledger adds up to exactly what was
+-- granted. They are what stops the regression coming back.
 -- ---------------------------------------------------------------------------
 
 select is(
@@ -257,19 +257,19 @@ select is(
   'the balance is the 2000 granted, less only the 4 still held'
 );
 
-select is(
-  public.settle_foundation_compute_v3(
+select throws_ok(
+  $$select public.settle_foundation_compute_v3(
     'pilot-recon00000000', 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'released', 0, 'CDR_LATE_RELEASE'
-  )->>'status',
-  'processed',
-  'FINDING O04-1: a settlement for an already-expired reservation is processed rather than refused'
+  )$$,
+  'foundation_compute_settlement_expired',
+  'a settlement for an already-expired reservation is refused, under its own error name rather than as a conflict'
 );
 select is(
   (select credit_balance from public.foundation_billing_accounts where workspace_key = 'pilot-recon00000000')
     + (select coalesce(sum(reserved_credits), 0)::integer from public.foundation_compute_reservations
         where workspace_key = 'pilot-recon00000000' and state = 'reserved'),
-  2012,
-  'FINDING O04-1: balance plus outstanding holds is 2012 against 2000 ever granted -- the expired hold was returned twice'
+  2000,
+  'balance plus outstanding holds is exactly the 2000 ever granted -- the expired hold was returned once'
 );
 
 select * from finish();
