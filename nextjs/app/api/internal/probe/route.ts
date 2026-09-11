@@ -5,6 +5,18 @@ import { authorizeSyntheticCanary, readR2SignerEnv } from "@/lib/r2-synthetic-ca
 import { runSyntheticProbe } from "@/lib/synthetic-probe";
 import { nextProbeHistory, readProbeHistory, writeProbeHistory } from "@/lib/synthetic-probe-store";
 
+/*
+  CROSS-LANE, deliberate red. This route exports POST, so `lib/route-classification.test.ts`
+  requires an entry in `lib/security/route-classification.json` -- a file outside lane L10's
+  ownership row (CA_LANE_CONTRACT_2026-09-11 §2), and rule 2 says a fix in a file this lane does
+  not own is requested as a patch and not applied here. Until the orchestrator applies CROSS-LANE
+  REQUEST 0 from `reports/CA_LANE_REPORT_ops.md` (the entry is quoted verbatim there), exactly one
+  assertion is red on this branch:
+    lib/route-classification.test.ts > classifies every route that exports a state-changing method
+      expected [ 'app/api/internal/probe/route.ts' ] to deeply equal []
+  Dropping POST would silence that test instead of classifying the route: the GET path writes the
+  history object too, so this surface is state-changing whichever method reaches it.
+*/
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 /*
