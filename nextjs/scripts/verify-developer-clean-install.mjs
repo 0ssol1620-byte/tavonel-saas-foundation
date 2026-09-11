@@ -32,6 +32,24 @@ function run(command, args, input) {
   return result.stdout.trim();
 }
 
+/*
+  A verifier's refusal is part of its contract, so the refusal runs here too.
+
+  Audit 2026-09-11 M07: /docs/cli told every reader to run two verifiers that were not published
+  at all. They are now, and this harness is where "a clean machine with only the public downloads"
+  stops being an assertion about them. Exit codes rather than output, because both are checked
+  against a real signed archive in lib/compiler-contract.test.ts -- what is new here is that they
+  execute at all with no node_modules, no inherited environment and an isolated home.
+*/
+function runExpecting(expected, command, args) {
+  const result = spawnSync(command, args, { cwd: install, env: cleanEnv, encoding: "utf8", timeout: 15_000 });
+  if (result.error) throw new Error(`${command} ${args.join(" ")} did not run: ${result.error.message}`);
+  if (result.status !== expected) {
+    throw new Error(`${command} ${args.join(" ")} exited ${result.status}, expected ${expected}: ${result.stderr}`);
+  }
+  return `${result.stdout}${result.stderr}`.trim();
+}
+
 function pythonRuntime() {
   if (process.env.TAVONEL_VERIFY_PYTHON && existsSync(process.env.TAVONEL_VERIFY_PYTHON)) return process.env.TAVONEL_VERIFY_PYTHON;
   if (process.platform === "win32" && process.env.USERPROFILE) {
@@ -42,7 +60,10 @@ function pythonRuntime() {
 }
 
 try {
-  for (const name of ["tavonel-cli.mjs", "tavonel-mcp.mjs", "tavonel-source-agent.py", "channel.json", "README.md"]) cpSync(join(source, name), join(install, name));
+  for (const name of [
+    "tavonel-cli.mjs", "tavonel-mcp.mjs", "tavonel-source-agent.py", "channel.json", "README.md",
+    "tavonel-verify-export.mjs", "tavonel-verify-package.mjs", "tavonel-verify-roundtrip.py",
+  ]) cpSync(join(source, name), join(install, name));
   const cliVersion = run(process.execPath, ["tavonel-cli.mjs", "--version"]);
   const cliHelp = run(process.execPath, ["tavonel-cli.mjs", "help"]);
   const initialize = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "clean-harness", version: "1" } } });
@@ -50,9 +71,26 @@ try {
   const python = pythonRuntime();
   const pythonVersion = run(python, ["--version"]);
   run(python, ["-I", "-m", "py_compile", "tavonel-source-agent.py"]);
+  run(python, ["-I", "-m", "py_compile", "tavonel-verify-roundtrip.py"]);
+  const exportUsage = runExpecting(1, process.execPath, ["tavonel-verify-export.mjs"]);
+  const packageUsage = runExpecting(2, process.execPath, ["tavonel-verify-package.mjs"]);
+  const roundtripUsage = runExpecting(2, python, ["-I", "tavonel-verify-roundtrip.py"]);
   if (!cliVersion.includes("2026.9.3.1") || !cliHelp.includes("update-check")) throw new Error("CLI distribution contract failed");
   if (mcp?.result?.serverInfo?.version !== "2026.9.3.1") throw new Error("MCP distribution contract failed");
-  process.stdout.write(`${JSON.stringify({ status: "passed", isolatedHome: true, providerSecretsInherited: false, cliVersion, mcpVersion: mcp.result.serverInfo.version, pythonVersion, sourceAgentSyntax: "passed" }, null, 2)}\n`);
+  if (!exportUsage.includes("--trusted-fingerprint")) throw new Error("the export verifier did not print its usage");
+  if (!packageUsage.includes("--package")) throw new Error("the package validator did not print its usage");
+  if (!roundtripUsage.includes("--package")) throw new Error("the round-trip checker did not print its usage");
+  process.stdout.write(`${JSON.stringify({
+    status: "passed",
+    isolatedHome: true,
+    providerSecretsInherited: false,
+    cliVersion,
+    mcpVersion: mcp.result.serverInfo.version,
+    pythonVersion,
+    sourceAgentSyntax: "passed",
+    // The three verifiers a customer is told to run, executed from the public downloads alone.
+    verifiersRunnable: ["tavonel-verify-export.mjs", "tavonel-verify-package.mjs", "tavonel-verify-roundtrip.py"],
+  }, null, 2)}\n`);
 } finally {
   rmSync(sandbox, { recursive: true, force: true });
 }
