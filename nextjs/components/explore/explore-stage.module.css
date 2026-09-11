@@ -640,10 +640,15 @@
   margin: 0;
 }
 
+/*
+  BA-033. These are the labels on the five figures a reader is meant to compare, and at 8px mono
+  they were smaller than the caption under the table. The type floor for rendered text on a public
+  route is 12px, so they read at 12px in the text face; the figures keep their own scale.
+*/
 .timelineCounts dt {
-  color: var(--text-xlo);
-  font: 8px var(--f-mono);
-  letter-spacing: 0.12em;
+  color: var(--text-lo);
+  font: 12px/1.35 var(--f-sans);
+  letter-spacing: 0;
 }
 
 .timelineCounts dd {
@@ -656,18 +661,19 @@
 
 .timelineCounts dd[data-tone="changed"] { color: var(--changed); }
 
-.equivalence {
-  display: grid;
-  gap: 8px;
-  padding: 16px 0 0;
-  border-top: 1px solid var(--hairline);
-}
+/*
+  BA-033's lead: the sentence that says what four filings did, in front of the figures rather
+  than after them. Larger than `.changeCaption` because it is the reading, not the footnote.
 
-.equivalenceState {
+  `.equivalence` and `.equivalenceState` were removed with BA-028 -- the section they styled is
+  gone, and a rule kept for markup that no longer exists is the next author's trap.
+*/
+.changeLead {
   margin: 0;
+  max-width: 62ch;
   color: var(--text-hi);
-  font: 11px var(--f-mono);
-  letter-spacing: 0.16em;
+  font-size: clamp(15px, 1.2vw, 18px);
+  line-height: 1.55;
 }
 
 /* ------------------------------------------------------------------ entry */

@@ -205,7 +205,7 @@ export const exploreChangeStory: ExploreChangeStory = {
   affectedNodeIds,
   untouchedNodeIds,
   /*
-    No equivalence claim on this deployment.
+    No equivalence claim here.
 
     `EquivalenceReport` lives in the Core (`akc_cir.recompilation`), not in this repository, and
     nothing here has run it over this corpus. The Act says what the comparison is instead of
@@ -214,12 +214,15 @@ export const exploreChangeStory: ExploreChangeStory = {
   equivalence: {
     state: "not_yet",
     /*
-      Read on the page directly after `EXPLORE_COPY.equivalenceLead`, which already says both
-      snapshots were fully compiled. Saying it again here ran the two into one paragraph that
-      repeated itself, so this states only what the lead does not.
+      BA-028 took this sentence off the public act, where it was the last thing read before the
+      sign-up action, and left it in the technical drawer -- which is the surface a reader opens
+      to see machinery. Two words went with the move: "receipt" and "this deployment" are how we
+      describe our own wiring, not what the sentence is about. What it is about is that the
+      comparison on screen is between two whole compiles, so a selective-rebuild check has
+      nothing here to check.
     */
     reason:
-      "Full-rebuild equivalence is a separate check, run by the compiler core over a selective rebuild; no receipt from it is wired into this deployment.",
+      "Full-rebuild equivalence is a separate check the compiler core runs over a selective rebuild. Both sides of this comparison are complete compiles, so there is no selective result for it to compare.",
   },
 };
 

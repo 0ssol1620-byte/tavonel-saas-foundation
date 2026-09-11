@@ -354,9 +354,21 @@ test("Act 3 reports the arriving filings with derived counts and claims no equiv
   await expect(steps.first().getByText("Recompiled", { exact: true })).toBeVisible();
   await expect(timeline).toContainText("every object in the World is rebuilt at every step");
 
-  await expect(page.getByText("FULL-REBUILD EQUIVALENCE", { exact: true })).toBeVisible();
-  await expect(page.getByText("NOT ESTABLISHED IN THIS DEPLOYMENT", { exact: true })).toBeVisible();
-  await expect(page.getByText(/the comparison is between two complete compiles/)).toBeVisible();
+  /*
+    BA-028. The act used to close on a FULL-REBUILD EQUIVALENCE heading whose state read NOT
+    ESTABLISHED IN THIS DEPLOYMENT, so the last sentence before the sign-up action was a named
+    absence and an internal wiring state. The section is gone; the fact it protected is in the
+    caption, positively, once. These assertions are the inverse of the ones they replace and are
+    strictly narrower: the positive sentence must be on the page and neither the absence nor the
+    equivalence vocabulary may be anywhere in the rendered body.
+  */
+  await expect(page.getByText(/Both snapshots are complete compiles of the corpus as it stood/))
+    .toBeVisible();
+  await expect(page.locator("body")).not.toContainText(/equivalen/i);
+  await expect(page.locator("body")).not.toContainText(/NOT ESTABLISHED/i);
+  await expect(page.locator("body")).not.toContainText(/this deployment/i);
+  // BA-033: the reading leads on the figures, and one filing never reads as "1 filings".
+  await expect(page.getByText(/^\d[\d,]* filings arrived\./)).toBeVisible();
   // No badge for a check that did not run.
   await expect(page.getByText("PASS", { exact: true })).toHaveCount(0);
   await expect(page.locator("body")).not.toContainText(/not_yet/i);
@@ -484,7 +496,8 @@ test("reduced motion removes the transitions and none of the content", async ({ 
 
   await page.goto("/explore?act=change");
   await expect(page.locator(STAGE)).toHaveAttribute("data-world-act", "change_compare");
-  await expect(page.getByText("FULL-REBUILD EQUIVALENCE", { exact: true })).toBeVisible();
+  // BA-028 removed the equivalence section; the act's own timeline is the marker that it rendered.
+  await expect(page.locator("[data-change-timeline]")).toBeVisible();
   await expect(page.locator(`${NODE}[data-node-state="affected"]`).first()).toBeVisible();
   const pulses = await page.$$eval('[data-node-state="affected"]', (elements) =>
     elements.map((element) => getComputedStyle(element).animationName));
