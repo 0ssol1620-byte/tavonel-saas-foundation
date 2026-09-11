@@ -24,7 +24,7 @@ calibrates a threshold.
 | | |
 |---|---|
 | corpus | `nextjs/lib/explore-sample.w4.inputs.json` — five Apple SEC filings (2025 10-K + four 2026 filings), 290 pages, 1,281 OCR regions |
-| corpus digest | `sha256:328d3ef3a6ee0153b14e9a782cdb4e9f499a6443b1f5dbf2898ace1cb4915b7f` (W4 manifest digest, frozen in `explore-sample.ts`) |
+| corpus digest | `sha256:328d3ef3a6ee0153b14e9a782cdb4e9f499a6443b1f5dbf2898ace1cb4915b7f` — the W4 manifest digest **as it stood when this ran**. It moved to `sha256:aff67d5c6d0e3e119433446ed003545a942ad5638de8e7b51c93c6ca1a847091` at integration (stage 1 B14): `manifestDigest` covers `package.files`, so adding the per-document validation list to the compiler moved all five frozen digests. Recorded, not rewritten — the run measured the artifact whose digest was `328d3ef3`, and the counts below are counts of that artifact. The object bytes did not change. |
 | engine A | `tavonel-collection-compiler-ts-v1` — the TypeScript fallback engine, and the engine that builds `/explore` at build time |
 | engine B | `tavonel-python-core-v2` — the engine the product dispatches a real compile to, run from an unmodified checkout at `D:\CodexProjects\ai-knowledge-compiler-p0p2-productization`, in process, 14.4 s |
 | request digest (B) | `sha256:b5076ba8cd9fd5c303a6af8b818a9b09ee7bbf4841b7ea6adc0b8c5965d9c9d4` — the request exactly as `buildProductCoreV2Request` builds it |
