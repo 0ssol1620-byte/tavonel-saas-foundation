@@ -9,8 +9,11 @@ import {
 } from "./collection-source-access";
 import { checkConnectorSourceAccess } from "./connector-source-access";
 import {
+  EMPTY_WORLD_FRESHNESS,
   getFoundationActiveWorld,
+  getWorldFreshness,
   listFoundationWorldVersions,
+  type WorldFreshness,
   type WorldVersionRow,
 } from "./world-store";
 
@@ -187,6 +190,17 @@ export type WorldReadModel = {
     status: Exclude<WorldFactStatus, "research">;
     revision: ReadValue<number>;
   };
+  /*
+    Four clocks, kept apart (audit TM04).
+
+    "Current" is four different instants -- when the bytes were observed, when the compile
+    settled, when a person answered a blocker, when a person activated the result -- and a
+    consumer reading the previous active World while a newer version waits has no way to know
+    it unless they are told. `candidateAwaitingActivation` is that signal. Every field is read
+    from an existing column; a null is a value that is not recorded, never a substitute drawn
+    from a neighbouring clock. See getWorldFreshness in world-store.ts.
+  */
+  freshness: WorldFreshness;
   objects: WorldObject[];
   relations: WorldRelation[];
   evidence: WorldEvidence[];
@@ -221,6 +235,7 @@ type BuildContext = {
   activeRevision?: number | null;
   versions?: WorldVersionRow[];
   origin?: "compiled_artifact" | "deterministic_sample";
+  freshness?: WorldFreshness;
 };
 
 type CanonicalNode = {
@@ -703,6 +718,9 @@ export function buildWorldReadModel(value: unknown, collectionId: string, contex
       status,
       revision: status === "active" && context.activeRevision && context.activeRevision > 0 ? read(context.activeRevision) : notYet("No active revision is bound to this artifact."),
     },
+    // Absent context means nobody read the clocks, which is reported as four nulls rather
+    // than as a fresh World. buildWorldReadModel is pure; loadWorldReadModel does the read.
+    freshness: context.freshness ?? { ...EMPTY_WORLD_FRESHNESS },
     objects,
     relations,
     evidence,
@@ -746,10 +764,20 @@ export async function loadWorldReadModel(
   const sourceAccess = await checkConnectorSourceAccess(workspaceKey, documentIds);
   if (!sourceAccess.ok) return { ok: false, code: sourceAccess.code,
     status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503 };
+  /*
+    The candidate digest is handed to the freshness read rather than rediscovered there: this
+    function has already loaded the preferred candidate, and the database cannot see a
+    candidate that was never promoted. Passing it is what makes "you are reading the previous
+    active World, and a newer candidate is waiting" answerable at all (audit TM04).
+  */
+  const freshness = await getWorldFreshness(workspaceKey, collectionId, {
+    candidateManifestDigest: artifact?.manifestDigest ?? null,
+  });
   const model = buildWorldReadModel(loaded.value.artifact, collectionId, {
     activeManifestDigest: active.ok ? active.world.manifestDigest : null,
     activeRevision: active.ok ? active.world.revision : null,
     versions: versions.versions,
+    freshness,
   });
   return model ? { ok: true, model } : { ok: false, code: "WORLD_READ_MODEL_INVALID", status: 422 };
 }

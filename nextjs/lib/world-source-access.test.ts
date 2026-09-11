@@ -1,12 +1,21 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { compileCollectionCandidate } from "./collection-compiler";
-const mocks = vi.hoisted(() => ({ load: vi.fn(), access: vi.fn(), active: vi.fn() }));
+const mocks = vi.hoisted(() => ({ load: vi.fn(), access: vi.fn(), active: vi.fn(), freshness: vi.fn() }));
 vi.mock("./collection-storage", () => ({ loadPreferredCollectionCandidate: mocks.load }));
 vi.mock("./connector-source-access", () => ({ checkConnectorSourceAccess: mocks.access }));
-vi.mock("./world-store", () => ({ getFoundationActiveWorld: mocks.active, listFoundationWorldVersions: vi.fn() }));
+vi.mock("./world-store", async (importOriginal) => ({
+  // Partial, so the freshness block's own constants stay real. The World read model gained a
+  // getWorldFreshness call (audit TM04); stubbing it keeps this file about source access, and
+  // keeps it from reaching for a database it has no business touching.
+  ...(await importOriginal<typeof import("./world-store")>()),
+  getFoundationActiveWorld: mocks.active,
+  listFoundationWorldVersions: vi.fn(),
+  getWorldFreshness: mocks.freshness,
+}));
 vi.mock("./r2-synthetic-canary", () => ({ readR2SignerEnv: () => ({ bucket: "fixture" }) }));
 vi.mock("./developer-auth", () => ({ authorizeFoundationRequest: async () => ({ ok: true, principal: { workspaceKey: "pilot-acme01" } }) }));
 import { loadWorldReadModel } from "./world-read-model";
+import { EMPTY_WORLD_FRESHNESS } from "./world-store";
 import { GET as collectionGet } from "../app/api/collections/[id]/route";
 const compiled = compileCollectionCandidate([{
   documentId: "source-access-fixture", versionKey: "a".repeat(64),
@@ -24,6 +33,7 @@ beforeEach(() => {
   mocks.load.mockResolvedValue({ ok: true, value: { artifact } });
   mocks.active.mockResolvedValue({ ok: false, code: "ACTIVE_WORLD_NOT_FOUND" });
   mocks.access.mockResolvedValue({ ok: true });
+  mocks.freshness.mockResolvedValue({ ...EMPTY_WORLD_FRESHNESS });
 });
 it("checks actual source inventory before returning a World model", async () => {
   expect((await loadWorldReadModel("pilot-acme01", compiled.collectionId)).ok).toBe(true);

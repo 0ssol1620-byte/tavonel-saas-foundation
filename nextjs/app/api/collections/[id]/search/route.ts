@@ -8,7 +8,8 @@ import {
   createProductionRerankerAdapter,
   readRetrievalRuntimeEnv,
 } from "@/lib/retrieval-runtime-config";
-import { getFoundationActiveWorld } from "@/lib/world-store";
+import { readRetrievalIndexState, retrievalIndexNotice } from "@/lib/retrieval-index-status";
+import { getFoundationActiveWorld, getWorldFreshness } from "@/lib/world-store";
 
 // POST /v1/collections/{id}/search -- evidence-rich candidates, no generated prose.
 //
@@ -88,20 +89,54 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   });
 
   if (!result.ok) {
+    /*
+      A 409 here has exactly one cause worth explaining -- there is no compiled index for this
+      active world -- and until now the response was the bare code. Search has no fallback, so
+      this is the whole answer the caller gets, and it has to carry what to do about it: which
+      state the index is in, and why it is in that state (audit R4-01, Q02).
+    */
+    const conflict = CONFLICT_CODES.has(result.code);
+    const indexState = conflict
+      ? await readRetrievalIndexState({
+          workspaceKey: auth.principal.workspaceKey,
+          collectionId: id,
+          worldManifestDigest: active.world.manifestDigest,
+        })
+      : null;
     return NextResponse.json(
-      { code: result.code },
-      { status: CONFLICT_CODES.has(result.code) ? 409 : result.code === "RETRIEVAL_QUESTION_INVALID" ? 400 : 503, headers: NO_STORE },
+      {
+        code: result.code,
+        ...(indexState
+          ? {
+              retrievalPath: "compiled-retrieval-v1",
+              retrievalIndex: indexState,
+              retrievalNotice: retrievalIndexNotice(indexState),
+            }
+          : {}),
+      },
+      { status: conflict ? 409 : result.code === "RETRIEVAL_QUESTION_INVALID" ? 400 : 503, headers: NO_STORE },
     );
   }
 
   return NextResponse.json(
     {
       code: result.packet.items.length > 0 ? "SEARCH_RESULTS" : "SEARCH_EMPTY",
+      /*
+        Search only ever runs the compiled pipeline -- there is no excerpt fallback here, which
+        is why a missing index is a 409 rather than a weaker answer. The field is stated anyway,
+        so /search and /ask can be read side by side without inferring which runtime answered
+        from which endpoint you happened to call (audit Q02, M06).
+      */
+      retrievalPath: "compiled-retrieval-v1",
+      // What did not run. A missing embedder degrades this to lexical + structure, and a
+      // reranker outage degrades it to the fused order; both are named rather than silent.
+      degradations: result.diagnostics.degradations,
       activeWorld: {
         manifestDigest: active.world.manifestDigest,
         revision: active.world.revision,
         worldStateId: active.world.worldStateId,
       },
+      freshness: await getWorldFreshness(auth.principal.workspaceKey, id),
       // The packet itself is the contract every surface shares (§20). It is returned whole
       // rather than reshaped per endpoint, so /search, /ask, MCP and the CLI cannot drift
       // into four subtly different evidence formats.

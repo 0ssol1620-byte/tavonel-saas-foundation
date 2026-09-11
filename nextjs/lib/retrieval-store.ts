@@ -526,3 +526,65 @@ export async function ensureRetrievalProfile(
   if (!response.ok) return fail("RETRIEVAL_STORE_WRITE_FAILED");
   return { ok: true as const, value: profile.id };
 }
+
+// The latest run for the triple, whatever state it reached -- the observability counterpart to
+// findLatestCompletedRun, which deliberately sees only runs a query may read.
+//
+// A promotion that could not compile its retrieval index leaves a `failed` row here, and this
+// is what lets /ask and the World read model say so instead of silently serving the fallback
+// forever (audit R4-01). `error_reason` is a machine class written by finishCompileRun, never a
+// sentence and never a provider payload.
+export type LatestRunRecord = {
+  runId: string;
+  status: "pending" | "running" | "completed" | "failed";
+  errorReason: string | null;
+};
+
+export async function findLatestRun(params: {
+  workspaceKey: string;
+  collectionId: string;
+  worldManifestDigest: string;
+  retrievalProfileId: string;
+}): Promise<StoreResult<LatestRunRecord>> {
+  if (!validScope(params.workspaceKey, params.collectionId) || !SHA256.test(params.worldManifestDigest)) {
+    return fail("RETRIEVAL_SCOPE_INVALID");
+  }
+  const config = readSupabaseAdminConfig();
+  if (!config) return fail("RETRIEVAL_STORE_NOT_CONFIGURED");
+
+  const query = new URLSearchParams({
+    select: "run_id,status,error_reason",
+    workspace_key: `eq.${params.workspaceKey}`,
+    collection_id: `eq.${params.collectionId}`,
+    world_manifest_digest: `eq.${params.worldManifestDigest}`,
+    retrieval_profile_id: `eq.${params.retrievalProfileId}`,
+    // A completed run outranks a later failed retry of the same world version: once an index is
+    // queryable, a subsequent failed attempt does not make it un-queryable.
+    order: "status.asc,started_at.desc",
+    limit: "1",
+  });
+
+  let response: Response;
+  try {
+    response = await supabaseAdminRequest(config, `/rest/v1/foundation_retrieval_compile_runs?${query}`);
+  } catch {
+    return fail("RETRIEVAL_STORE_READ_FAILED");
+  }
+  if (!response.ok) return fail("RETRIEVAL_STORE_READ_FAILED");
+  const rows = (await response.json().catch(() => null)) as Array<Record<string, unknown>> | null;
+  const row = rows?.[0];
+  if (!row) return fail("RETRIEVAL_RUN_NOT_FOUND");
+  const runId = String(row.run_id ?? "");
+  const status = String(row.status ?? "");
+  if (!RUN_ID.test(runId) || !["pending", "running", "completed", "failed"].includes(status)) {
+    return fail("RETRIEVAL_RUN_NOT_FOUND");
+  }
+  return {
+    ok: true as const,
+    value: {
+      runId,
+      status: status as LatestRunRecord["status"],
+      errorReason: typeof row.error_reason === "string" && row.error_reason.length > 0 ? row.error_reason : null,
+    },
+  };
+}

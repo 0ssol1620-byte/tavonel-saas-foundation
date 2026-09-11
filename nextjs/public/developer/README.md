@@ -41,17 +41,18 @@ the MCP client's environment or secret facility, not in the command arguments.
 }
 ```
 
-The MCP surface is permanently read-only. Eight tools:
+The MCP surface is permanently read-only. Nine tools:
 
 | Tool | Returns |
 | --- | --- |
 | `list_sources` | The workspace's documents, with processing state and version key. |
-| `get_world` | One Compiled World: status, contract, objects, relations, evidence, history. |
+| `list_worlds` | The workspace's active Compiled Worlds, with manifest digest and revision. Pass `limit` (1-50) and `cursor` to page. |
+| `get_world` | One Compiled World: status, contract, freshness, objects, relations, evidence, history. |
 | `search_world` | Retrieved regions with provenance and ranks. No generated prose. |
 | `ask_world` | A grounded answer with citations, or an abstention. |
-| `get_object` | The objects lens, or one object by stable id. |
-| `get_relation` | The relations lens, or one relation by stable id. |
-| `get_evidence` | Every region with its source version, page and bbox in the 0-1000 page frame. |
+| `get_object` | The objects lens, or one object by stable id. Pass `limit` and `cursor` to page a large World. |
+| `get_relation` | The relations lens, or one relation by stable id. Pages the same way. |
+| `get_evidence` | Every region with its source version, page and bbox in the 0-1000 page frame. Pages the same way. |
 | `download_package` | Where the signed package is, its size, its manifest digest and signing key. |
 
 There is no upload, compile, connector mutation, promotion, rollback, billing or
@@ -59,12 +60,34 @@ key-management tool, and the server refuses to start if one is ever added to it:
 promotion is the moment a candidate becomes the World an organisation answers
 from, and it stays with a person in a browser.
 
-Two tools are deliberately absent. There is no `list_worlds`, because the API has
-no endpoint that lists a workspace's collections and a tool that guessed at ids
-would be wrong silently. And `download_package` returns a descriptor rather than
-the archive: the bytes are fetched over HTTPS with the same key and checked with
-the offline verifier, which is better than base64ing tens of megabytes through a
-pipe to deliver something the caller must verify anyway.
+`list_worlds` lists only **active** Worlds. A candidate nobody promoted is not
+what this workspace answers from, and a discovery list mixing the two would hand
+an agent a set in which some entries are organizational truth and some are not.
+The tool was absent until this release because the API had no endpoint that
+listed a workspace's collections; `GET /api/v1/collections` is that endpoint.
+
+On the lens tools, omitting `limit` still returns the whole lens, so nothing that
+worked before pages differently now. An id and a page cannot be combined: the id
+is selected from the response, so a paged request plus an id would report
+`NOT_FOUND` for an item sitting on a later page. Ask for the id, or walk the
+pages.
+
+`download_package` returns a descriptor rather than the archive: the bytes are
+fetched over HTTPS with the same key and checked with the offline verifier, which
+is better than base64ing tens of megabytes through a pipe to deliver something
+the caller must verify anyway.
+
+Before registering it, run the built-in check:
+
+```bash
+TAVONEL_API_KEY=tvnl_live_... node tavonel-mcp.mjs --doctor
+```
+
+It verifies the key with one authenticated read, compares this file's build
+against the published channel, lists your active Worlds, and prints `PASS`/`FAIL`
+per check with what to do about the first failure. It exits non-zero when a check
+fails, and it performs reads only -- through the same tool table and the same
+read-only gate the server starts behind.
 
 Tool names changed in release 2026.9.3.1. `list_documents`, `get_collection`,
 `get_active_world` and `ask_active_world` are now `list_sources`, `get_world` and
