@@ -23,8 +23,10 @@ export const metadata: Metadata = {
   §45 lists thirteen elements a Trust Center carries. Twelve are published somewhere on this site
   today and one is not, so the page has two sections rather than one list with a hopeful tone: a
   reader who stops at a missing element should see that it is missing, not scroll looking for it.
-  An absence §45 does not name joined the second list in the 2026-09-11 audit remediation:
-  third-party certification and audit, which every procurement reader asks first.
+  Two questions §45 does not name are on the page anyway, one in each section, because a buyer asks
+  both: third-party certification and audit, which is an absence and joined the second list in the
+  2026-09-11 audit remediation, and data residency, which has an answer and joined the first list.
+  Fifteen rows in total, and the lede below counts them that way.
 
   What is still absent is absent because the work behind it has not been done -- no recovery
   objective, no external audit -- and a Trust Center that phrases those as "coming soon" is worth
@@ -34,16 +36,23 @@ export const metadata: Metadata = {
   opposite directions from the usual one. The backup row asserted three absences at once, including
   "no tested restore", and a restore was performed and verified on 2026-09-10, so the row narrowed
   to the objectives rather than being deleted. Then the DPA and the incident procedure stopped
-  being absent: the founder decided the three numbers that were blocking the agreement -- 72 hours,
-  30 days, 30 days -- and the DPA is now a labelled draft anyone can read, while the incident
-  procedure has a customer-facing summary in the published list. A stated absence that is no longer
-  absent is the same failure as a claim with no receipt, pointing the other way, and it is corrected
-  the same way -- by making the sentence match what happened.
+  being absent: the three numbers that were blocking the agreement -- 72 hours, 30 days, 30 days --
+  were settled, and the DPA is now a labelled draft anyone can read, while the incident procedure
+  has a customer-facing summary in the published list. A stated absence that is no longer absent is
+  the same failure as a claim with no receipt, pointing the other way, and it is corrected the same
+  way -- by making the sentence match what happened.
 
-  Neither new row claims more than happened. The DPA is a draft pending legal review and says so
-  everywhere it appears, and the incident row leads with the fact that nobody is on call rather
-  than with the window, because that is the fact a buyer would otherwise find out during an
-  incident.
+  Who settled them, because the label depends on it. Not the founder: delegated decision,
+  2026-09-11 (orchestrator, under the founder's delegation) -- see
+  `docs/policy/DECISION_LOG_2026-09-11.md`, FD-06/07. The founder may confirm, change or reverse
+  any of the three, which is why the published label reads "delegated decision pending the
+  founder's confirmation and legal review" and not "pending legal review" alone. No copy on this
+  page attributes any of it to the founder, because no record of a founder statement exists.
+
+  Neither new row claims more than happened. The DPA is a draft pending both that confirmation and
+  a legal review, and says so everywhere it appears; the incident row leads with the fact that
+  nobody is on call rather than with the window, because that is the fact a buyer would otherwise
+  find out during an incident.
 */
 
 /*
@@ -53,9 +62,14 @@ export const metadata: Metadata = {
   route, because the document is the deliverable and rendering it as a page would invite it to
   drift from the text a reviewer downloads. The version and date are in the filename so that a
   copy someone saved can be identified later; a new version is a new file, not an edit to this one.
+
+  The label names two separate things the document is still waiting on, and neither may be dropped:
+  the founder's confirmation of a delegated decision, and a legal review that has not been
+  commissioned. `docs/policy/DECISION_LOG_2026-09-11.md` is the provenance.
 */
 const DPA_URL = "/policy/TAVONEL_DPA_v1_2026-09-11.md";
-const DPA_LABEL = "v1 draft (2026-09-11) — pending legal review; not a signed agreement";
+const DPA_LABEL =
+  "v1 draft (2026-09-11) — delegated decision pending the founder's confirmation and legal review; not a signed agreement";
 
 const DESTINATIONS: Array<[string, string, Route]> = [
   ["Security", "The path a document takes, what holds its bytes, what never sees them, and which controls are enforced in this deployment right now.", "/security" as Route],
@@ -74,17 +88,19 @@ const DESTINATIONS: Array<[string, string, Route]> = [
 const PUBLISHED: Array<[string, string, string]> = [
   ["Architecture and data flow", "Security", "The enforced boundary in order, and which component holds a document body at each step."],
   /*
-    Two rows moved here from the not-published list on 2026-09-11, when the founder decided the
-    three numbers that were blocking them. Neither is finished work and neither says it is: the DPA
-    is labelled a draft pending legal review wherever it appears, and the incident row leads with
-    the absence of an on-call rotation rather than with the window.
+    Two rows moved here from the not-published list on 2026-09-11, when the three numbers that were
+    blocking them were settled as a delegated decision (orchestrator, under the founder's
+    delegation -- `docs/policy/DECISION_LOG_2026-09-11.md`, FD-06/07), not by the founder. Neither
+    is finished work and neither says it is: the DPA is labelled a draft pending the founder's
+    confirmation and a legal review wherever it appears, and the incident row leads with the absence
+    of an on-call rotation rather than with the window.
 
     The incident answer is the customer-facing half of `docs/policy/INCIDENT_RESPONSE_RUNBOOK.md`.
     The runbook stays internal -- severity tiers, evidence preservation and the record format are
     an operating procedure, not a statement to a buyer -- and the two sentences a buyer is actually
     choosing between are here: who is reachable, and by when they will be told.
   */
-  ["Data processing agreement", "DPA v1 draft", "Published for reading at a URL: the notification, sub-processor and deletion commitments are written down rather than described. It is a draft pending legal review and not a signed agreement, and the clauses still open -- governing law, transfer mechanism, liability -- say so in place."],
+  ["Data processing agreement", "DPA v1 draft", "Published for reading at a URL: the notification, sub-processor and deletion commitments are written down rather than described. It is a draft pending the founder's confirmation and a legal review, it is not a signed agreement, and the clauses still open -- governing law, transfer mechanism, liability -- say so in place."],
   ["Incident response", "This page", "There is no on-call rotation: one person operates the service, and security@tavonel.com is an inbox that person reads. The commitment that follows from that is notification of an affected customer without undue delay and no later than 72 hours after becoming aware of a breach of their personal data. No tabletop exercise has been run yet."],
   ["Data residency", "Privacy notice", "The database is configured in Seoul, and no data residency is guaranteed. Several providers may process limited data through infrastructure outside Korea, and the object-storage location hint is best-effort rather than a promise. The subprocessors page names which provider handles which data class."],
   ["Data handling", "Privacy notice", "Categories collected, purposes, storage locations, international processing, and the optional website analytics you can decline or withdraw."],
@@ -134,13 +150,22 @@ export default function TrustCenterPage() {
               <h1 className="document-title">Everything we publish<br />about handling your documents.</h1>
             </div>
             <div className="stack">
+              {/*
+                The count in this sentence has to reconcile with the two arrays above, because a
+                reader who counts the rows is exactly the reader this page is for. Fifteen rows:
+                twelve of §45's thirteen answered, one of them not, and two questions the checklist
+                never names -- where the data sits, which is answered, and whether anyone outside
+                this company has audited it, which is not. The residency row was added on
+                2026-09-11 and was for one commit uncounted here.
+              */}
               <p className="lede">
                 A security review asks the same thirteen things every time. Twelve of them are
                 answered on the pages below, including a data processing agreement you can read
                 now — as a draft, labelled as one.<b> One is not answered: this deployment sets no
-                recovery objective. Neither is a fourteenth the checklist never names — whether
-                anyone outside this company has audited it. Both are listed</b> — a review that
-                finds them here is faster than one that finds them after a pilot.
+                recovery objective. Two more rows answer what the checklist never asks — where your
+                data sits, which is answered, and whether anyone outside this company has audited
+                it, which is not. Both absences are listed</b> — a review that finds them here is
+                faster than one that finds them after a pilot.
               </p>
               {/*
                 B04. Five hubs -- this one, Evidence, Benchmarks, Reproducibility, Research --

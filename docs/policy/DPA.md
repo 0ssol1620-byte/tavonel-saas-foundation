@@ -2,7 +2,8 @@
 
 **The document itself is `nextjs/public/policy/TAVONEL_DPA_v1_2026-09-11.md`**, served at
 `https://tavonel.com/policy/TAVONEL_DPA_v1_2026-09-11.md` and linked from `/trust` as
-*v1 draft (2026-09-11) — pending legal review; not a signed agreement*.
+*v1 draft (2026-09-11) — delegated decision pending the founder's confirmation and legal review;
+not a signed agreement*.
 
 This file used to be the draft. It is a pointer now, because a DPA written in two places is a DPA
 that will disagree with itself, and the copy in `docs/` would be the one a customer never reads.
@@ -10,11 +11,19 @@ Edit the served file; this one records only what an agent must not decide again.
 
 - Was: `docs/policy/DPA_DRAFT.md`, status `PROPOSED`, drafted 2026-09-11 KST (competitive-audit
   remediation, lane L9), with every contractual number left as `[FOUNDER]`.
-- Now: v1 draft published for reading, with three of those numbers decided by the founder and
-  recorded below. Superseded `[FOUNDER]` markers are gone from the served text; the clauses still
-  open say *not drafted — pending legal review* in place.
+- Now: v1 draft published for reading, with three of those numbers set as a **delegated decision,
+  2026-09-11 (orchestrator, under the founder's delegation) — see
+  `docs/policy/DECISION_LOG_2026-09-11.md`** (FD-06/07) and recorded below. Superseded
+  `[FOUNDER]` markers are gone from the served text; the clauses still open say *not drafted —
+  pending legal review* in place.
 
-## Decided 2026-09-11, by the founder, and not re-openable by an agent
+## Delegated decision, 2026-09-11, and not re-opened by an agent on its own
+
+**Who decided this.** Not the founder. The three numbers below were chosen by the orchestrating
+agent under the delegation the founder gave in the 2026-09-11 working session, recorded in
+`docs/policy/DECISION_LOG_2026-09-11.md` (FD-06/07). The founder may confirm, change or reverse
+any of them, and a reversal is a new entry in that log. Nothing here is the founder's own
+statement, and no copy anywhere may present it as one.
 
 | Clause | Commitment | Why the number is meetable |
 |---|---|---|
@@ -24,8 +33,9 @@ Edit the served file; this one records only what an agent must not decide again.
 
 The earlier draft's reasoning for leaving all three blank is preserved here on purpose, because it
 is the argument a reviewer will re-make: an unmeasured number in a signed contract is a promise
-nobody has tested. What changed is not the argument but the authority -- the founder decided, and
-these are version-1 commitments that move only with a new version of the served document.
+nobody has tested. What changed is not the argument but who was entitled to settle it -- a
+delegated decision was taken, and these are version-1 commitments that move only with a new
+version of the served document or a reversal in the decision log.
 
 ## Still open, and still not an agent's call
 

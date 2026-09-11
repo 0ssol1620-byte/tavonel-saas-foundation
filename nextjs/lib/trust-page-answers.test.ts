@@ -159,7 +159,9 @@ describe("/security answers the §17.1 questions", () => {
   /*
     The roadmap sentence, and its failure path.
 
-    The founder authorised one sentence of sequencing on this page and on `/trust`: an external
+    One sentence of sequencing is authorised on this page and on `/trust` -- a delegated decision,
+    2026-09-11 (orchestrator, under the founder's delegation), FD-12 in
+    `docs/policy/DECISION_LOG_2026-09-11.md`, and reversible by the founder: an external
     penetration test after the first paying customer, and no SOC 2 timing. It is publishable
     because it contains no date and nothing scheduled. The edit this guards against is the one
     that adds a quarter, a month or an "under way" and turns an order of events into a commitment
@@ -271,11 +273,21 @@ describe("/trust indexes the six published surfaces", () => {
     The failure path is the edit that keeps the link and loses the label. A reader who sees the URL
     without "draft ... not a signed agreement" has been handed a contract, so the label is asserted
     inside the anchor rather than merely somewhere on the page.
+
+    The label names two things the document waits on, and the second one is the repair of a defect
+    this test used to hold in place. The three commitments were not the founder's statement -- they
+    were a delegated decision (`docs/policy/DECISION_LOG_2026-09-11.md`, FD-06/07) -- so "pending
+    legal review" alone read as though the only missing signature was a lawyer's. Both halves are
+    asserted, because dropping either one overstates who has agreed to the document.
   */
   it("links the DPA with its draft label in the same tile", () => {
     expect(page).toContain('const DPA_URL = "/policy/TAVONEL_DPA_v1_2026-09-11.md"');
     expect(page).toContain("v1 draft (2026-09-11)");
-    expect(page).toContain("pending legal review; not a signed agreement");
+    expect(page).toContain("delegated decision pending the founder's confirmation and legal review");
+    expect(page).toContain("not a signed agreement");
+    expect(page, "no copy here may present a delegated decision as the founder's own").not.toMatch(
+      /founder decided|decided by the founder/,
+    );
     const tile = page.slice(page.indexOf("href={DPA_URL}"));
     expect(tile.slice(0, 600), "the label has to travel with the link").toContain("{DPA_LABEL}");
     for (const commitment of [
@@ -290,7 +302,12 @@ describe("/trust indexes the six published surfaces", () => {
 
   it("serves a DPA whose commitments match the ones the page advertises", () => {
     const document = read("public/policy/TAVONEL_DPA_v1_2026-09-11.md");
-    expect(document).toContain("**v1 draft (2026-09-11) — pending legal review; not a signed agreement.**");
+    expect(document).toContain(
+      "**v1 draft (2026-09-11) — delegated decision pending the founder's confirmation and legal review; not a signed agreement.**",
+    );
+    expect(document, "the served text has to point at the provenance it relies on").toContain(
+      "docs/policy/DECISION_LOG_2026-09-11.md",
+    );
     expect(document).toContain("without undue delay and no later than 72 hours after becoming aware");
     expect(document).toContain("30 days in advance of that sub-processor beginning to process");
     expect(document).toContain("right to object");

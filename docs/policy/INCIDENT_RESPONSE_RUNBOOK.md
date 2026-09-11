@@ -13,7 +13,10 @@ fact rather than the sentence.
 The customer-facing summary of this document is on `/trust`; the procedure itself stays here.
 
 - Drafted: 2026-09-11 KST, competitive-audit remediation campaign, lane L9.
-- Status: notification window `DECIDED`; procedure `WRITTEN_NOT_EXERCISED`.
+- Window set by: **delegated decision, 2026-09-11 (orchestrator, under the founder's delegation) —
+  see `docs/policy/DECISION_LOG_2026-09-11.md`** (FD-06/07). Not the founder's own statement; the
+  founder may reverse it, and a reversal is a new entry in that log and a new version of the DPA.
+- Status: notification window `DECIDED_UNDER_DELEGATION`; procedure `WRITTEN_NOT_EXERCISED`.
 - Feeds: the served DPA (`nextjs/public/policy/TAVONEL_DPA_v1_2026-09-11.md`) §8, which carries
   the same 72-hour window, and the `/trust` incident-response row.
 
@@ -131,7 +134,7 @@ Remediation destroys evidence. This step comes first, and a SEV1 that skipped it
 6. **Hash what was captured**, and record the hash in the timeline, so the record can later be
    shown to be the record.
 
-## 5. Customer notification — 72 hours, decided 2026-09-11
+## 5. Customer notification — 72 hours, delegated decision 2026-09-11
 
 **TAVONEL notifies an affected customer without undue delay and no later than 72 hours after
 becoming aware of a personal data breach affecting their personal data.** That is the commitment,

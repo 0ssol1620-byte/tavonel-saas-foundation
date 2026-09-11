@@ -1,15 +1,24 @@
 # TAVONEL Data Processing Agreement
 
-**v1 draft (2026-09-11) — pending legal review; not a signed agreement.**
+<!-- One line on purpose: `lib/trust-page-answers.test.ts` pins this label as a single string, so a
+     wrap would split the label from the document it labels. -->
+
+**v1 draft (2026-09-11) — delegated decision pending the founder's confirmation and legal review; not a signed agreement.**
 
 This text is published so that a security or procurement reviewer can read the terms before
 asking for them. It has not been reviewed by a lawyer, it is not executed, and it binds nobody
 until it is signed. Clauses that are not drafted say so, in place, rather than being left out.
 
-Three commitments in it are decided and will not move without a new version: the breach
-notification window (§8), the sub-processor change notice and objection right (§6), and the
-deletion completion time (§7). The clauses marked **Not drafted — pending legal review** are the
-ones still open.
+Three commitments in it are written down and will not move without a new version of this document:
+the breach notification window (§8), the sub-processor change notice and objection right (§6), and
+the deletion completion time (§7). The clauses marked **Not drafted — pending legal review** are
+the ones still open.
+
+**Who set those three, stated plainly because a reviewer is entitled to know.** They are a
+delegated decision, 2026-09-11 (orchestrator, under the founder's delegation), recorded in
+`docs/policy/DECISION_LOG_2026-09-11.md` (FD-06/07). They are not the founder's own statements and
+this draft does not present them as agreed by the operating entity: the founder may confirm, change
+or reverse any of them, and a reversal is a new version of this document.
 
 Where this document and a published page disagree, the published page — `/privacy`,
 `/subprocessors`, `/security`, `/terms` — is the statement in force and this document is the
@@ -221,6 +230,7 @@ and the service terms, signature blocks and the annexes (the `/security` version
 
 ## What has to happen before this is a signable document
 
+- The founder's confirmation of the three delegated commitments below
 - Lawyer reviewed, jurisdiction chosen, and the review recorded
 - Operating entity, registration number and address filled in (§1)
 - Transfer mechanism decided; Standard Contractual Clauses annexed if any customer is in the EEA
@@ -228,5 +238,8 @@ and the service terms, signature blocks and the annexes (the `/security` version
 - Recovery objectives either committed or explicitly excluded (§9)
 - Liability, precedence and signature blocks drafted (§13)
 
-Decided, and not open: the 72-hour breach notice (§8), the 30-day sub-processor change notice with
-a right to object (§6), and deletion completed within 30 days of a verified request (§7).
+Written down, and not re-opened by an agent on its own: the 72-hour breach notice (§8), the 30-day
+sub-processor change notice with a right to object (§6), and deletion completed within 30 days of a
+verified request (§7). All three are a delegated decision, 2026-09-11 (orchestrator, under the
+founder's delegation) — `docs/policy/DECISION_LOG_2026-09-11.md`, FD-06/07 — awaiting the founder's
+confirmation.

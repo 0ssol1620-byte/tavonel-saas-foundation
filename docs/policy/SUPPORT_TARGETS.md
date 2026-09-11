@@ -17,7 +17,10 @@ one person can commit to, and resolution depends on the bug.
 
 - Drafted: 2026-09-11 KST, competitive-audit remediation campaign, lane L9.
 - Published: 2026-09-11, website-growth campaign, lane trust-policy.
-- Status: §2 `PUBLISHED`. §3–§6 `NOT PUBLISHED` and each says why.
+- Set by: **delegated decision, 2026-09-11 (orchestrator, under the founder's delegation) — see
+  `docs/policy/DECISION_LOG_2026-09-11.md`** (FD-09). Not the founder's own statement; the founder
+  may lower, raise or withdraw the target, and a reversal is a new entry in that log.
+- Status: §2 `PUBLISHED_UNDER_DELEGATION`. §3–§6 `NOT PUBLISHED` and each says why.
 ---
 
 ## 1. The constraint, stated first

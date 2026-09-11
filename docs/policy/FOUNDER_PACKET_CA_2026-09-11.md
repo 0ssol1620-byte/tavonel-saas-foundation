@@ -2,34 +2,46 @@
 
 **Founder packet — competitive-audit remediation campaign, 2026-09-11 KST.**
 
-Every item below is a decision an agent must not make. Nothing here has been acted on; each entry
-says what is true today, what the decision is, and what the evidence is. Nothing in this packet is
-published or linked from the site.
+Every item below is a decision an agent must not make on its own. Each entry says what was true
+when the packet was compiled, what the decision is, and what the evidence is. Nothing in this
+packet is published or linked from the site.
+
+Six of the items were subsequently acted on under a delegation rather than left open — see
+**Delegated on 2026-09-11** below before reading any entry as untouched. None of the six is a
+founder statement, and the founder may reverse any of them.
 
 Ordered by what blocks the most other work, not by size.
 
 - Compiled: 2026-09-11 KST, lane L9 (trust).
 - Campaign: `TAVONEL-COMPETITIVE-AUDIT-20260911-V1`, executing
   `D:\TAVONEL_COMPETITIVE_AUDIT_2026-09-11_KO.md`.
-- Cross-references: `DPA.md` (a pointer to the served text), `INCIDENT_RESPONSE_RUNBOOK.md`,
-  `SUPPORT_TARGETS.md`, `REFUND_THRESHOLD_DRAFT.md`. The first three were renamed out of `_DRAFT`
-  when the decisions below landed.
+- Cross-references: `DECISION_LOG_2026-09-11.md` (what was delegated, and by what authority),
+  `DPA.md` (a pointer to the served text), `INCIDENT_RESPONSE_RUNBOOK.md`, `SUPPORT_TARGETS.md`,
+  `REFUND_THRESHOLD_DRAFT.md`. The middle three were renamed out of `_DRAFT` when the delegated
+  decisions below landed.
 
-**Decided 2026-09-11 by the founder, after this packet was compiled** (website-growth campaign,
-lane trust-policy). The entries below still describe the state at compile time; these six are no
-longer open, and the rest are:
+## Delegated on 2026-09-11
 
-- Breach notification window: without undue delay and no later than **72 hours** after becoming
-  aware. Served DPA §8 and runbook §5 carry the same sentence.
-- Sub-processor change notice: **30 days** in advance, with a right to object. Served DPA §6.
-- Deletion completion: **within 30 days** of a verified request, on the systems TAVONEL operates.
-  Served DPA §7. A provider's backup expiry still carries no day count.
-- Support acknowledgement: **within 1 business day (KST)**, no resolution-time commitment, from
-  one constant in `nextjs/lib/support-targets.ts`.
-- Repository licence: a proprietary `LICENSE` at the repository root, and
-  `"license": "SEE LICENSE IN LICENSE"` in both `package.json` files (the root one said `MIT`).
-- External audit sequencing: an external penetration test after the first paying customer; SOC 2
-  timing not set. Published on `/trust` and `/security` with no date.
+**Delegated decision, 2026-09-11 (orchestrator, under the founder's delegation) — see
+`docs/policy/DECISION_LOG_2026-09-11.md`.** Six of the items in this packet were settled that way
+after it was compiled (website-growth campaign, lane trust-policy). They are **not** the founder's
+own statements and this packet does not present them as settled by the founder: the founder may
+confirm, change or reverse any of them, and a reversal is a new entry in the decision log. Every
+entry below still describes the state at compile time.
+
+| Item | Delegated decision | Log |
+|---|---|---|
+| 5 · incident notification window | Without undue delay and no later than **72 hours** after becoming aware. Served DPA §8 and runbook §5 carry the same sentence. | FD-06/07 |
+| 6 · DPA | Published as a **v1 draft** pending the founder's confirmation and legal review, not a signed agreement. The legal review itself is still uncommissioned and still the founder's to authorize. | FD-06/07 |
+| 6 · sub-processor change notice | **30 days** in advance, with a right to object. Served DPA §6. | FD-06/07 |
+| 7 · deletion completion | **Within 30 days** of a verified request, on the systems TAVONEL operates. Served DPA §7. A provider's backup expiry still carries no day count. | FD-06/07 |
+| 8 · support acknowledgement | **Within 1 business day (KST)**, no resolution-time commitment, from one constant in `nextjs/lib/support-targets.ts`. | FD-09 |
+| 10 · repository licence | Proprietary `LICENSE` at the repository root, and `"license": "SEE LICENSE IN LICENSE"` in both `package.json` files (the root one said `MIT`). Option (a), a real MIT grant, was **not** taken. | FD-10 |
+| 4 · external audit sequencing | An external penetration test after the first paying customer; SOC 2 timing not set. Published on `/trust` and `/security` with no date. The recovery objectives in that item stay unset and undelegated. | FD-12 |
+
+The rest of this packet is open, and the items the decision log lists under **Not decided here** —
+payment credentials, secrets, third-party account access, customer-data consent, corpus rights and
+spend beyond trial scale — were explicitly outside the delegation.
 
 ---
 
@@ -210,6 +222,10 @@ disclosure. Four `[FOUNDER + LEGAL]` clauses are unwritten on purpose:
 
 Until the review is recorded, `/trust`'s "no DPA is published" row is correct and stays.
 
+*Superseded by the delegated decision above: the DPA is now served as a labelled v1 draft and the
+`/trust` row says so. The legal review is still uncommissioned, which the label states. Do not
+restore the "no DPA is published" row without reversing FD-06/07 in the decision log.*
+
 ---
 
 ## 7. Deletion completion time · audit S04
@@ -279,7 +295,11 @@ or a downstream consumer reading `package.json` today concludes MIT and may fork
 that belief, while GitHub's UI and default copyright law say all rights reserved.
 
 The repository's own README documents the conflict and instructs contributors not to resolve it
-unilaterally, which is why no agent has touched either file and none should.
+unilaterally, which is why no agent had touched either file at compile time.
+
+*Superseded by the delegated decision above: option (b) was taken — a proprietary `LICENSE` and
+`"license": "SEE LICENSE IN LICENSE"` in both manifests — and the README section was replaced by
+the resolution. The founder may replace the licence; doing so is a new entry in the decision log.*
 
 - **(a) Add a real MIT LICENSE**, accepting that the code becomes genuinely reusable under MIT terms
   — and noting that this settles copyright only and **never patent freedom to operate**.
