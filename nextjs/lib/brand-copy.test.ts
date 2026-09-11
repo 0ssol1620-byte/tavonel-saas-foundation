@@ -845,10 +845,23 @@ describe("public copy", () => {
   */
   it("states what the Apple sample does not represent, next to the sample", () => {
     const stage = read("components/explore/explore-stage.tsx");
-    expect(stage).toContain("Apple&apos;s own public SEC filings");
-    expect(stage, "the limit names the four things it does not represent")
+    /*
+      BA-037 rewrote the note this guards: six scoping clauses at 11px sitting under the page's
+      central promise became three sentences at 15px, and "Apple&apos;s" became U+2019. The fact
+      is unchanged and the case is tighter rather than looser -- the limit is still required
+      here, the corpus is still named, both documents are still reachable, and the note may no
+      longer be typeset below the 12px floor it was under.
+    */
+    expect(stage).toContain("compiled from Apple’s public SEC filings");
+    expect(stage, "no straight apostrophe between letters in this note")
+      .not.toContain("Apple&apos;s own public SEC filings");
+    expect(stage, "the limit still names what the corpus does not represent")
       .toContain("not a claim about a mixed internal corpus");
-    expect(stage, "and the reproducible asset is reachable from the demo")
+    expect(stage, "and the reproducible asset is reachable from the sample")
       .toContain('href="/reproducibility"');
+    expect(stage, "and what the read does not recover is still one link away")
+      .toContain('href="/sources"');
+    expect(read("components/explore/explore-stage.module.css"))
+      .toMatch(/\.entryNote \{[^}]*font-size: 1[5-9]px/);
   });
 });

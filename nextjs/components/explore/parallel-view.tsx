@@ -21,10 +21,20 @@
 import styles from "./explore-stage.module.css";
 import type { VisualLayout, VisualState, VisualWorldModel } from "@/lib/visual-world-model";
 
-/** The same vocabulary the Evidence act prints, so one object never has two state words. */
+/*
+  The same vocabulary the Evidence act prints, so one object never has two state words.
+
+  BA-032: `candidate` does not print as CANDIDATE here. Our own published glossary
+  (/knowledge-compiler) defines a CANDIDATE as "a compiled result that has not been promoted ...
+  nothing answers from it", and every object in this fixture is one -- so labelling the showcase
+  World CANDIDATE told a reader, in our own words, that the act beside it answers from a World
+  that answers nothing. The lifecycle is unchanged: the artifact is still `candidate`, the
+  technical drawer still prints the World's real status, and `explore-sample.test.ts` still
+  asserts it. What changes is the word a visitor reads, which now says what this World is to them.
+*/
 export const STATE_WORD: Record<VisualState, string> = {
   current: "CURRENT",
-  candidate: "CANDIDATE",
+  candidate: "PUBLISHED SAMPLE",
   changed: "CHANGED",
   affected: "AFFECTED",
   unresolved: "UNRESOLVED",

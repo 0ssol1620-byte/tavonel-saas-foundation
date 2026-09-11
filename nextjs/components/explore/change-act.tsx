@@ -4,16 +4,18 @@
   Act 3 -- CHANGE.
 
   Four 2026 filings landed on top of Apple's 2025 Form 10-K, and this act shows how the two
-  complete compiled Worlds differ and -- the part that is easiest to get wrong and most tempting
-  to fake -- what has *not* been established.
+  complete compiled Worlds differ.
 
   Every figure below arrives as a prop from `lib/explore-change.ts`, which read it out of two
-  complete compiles. None of them is written here, and the module that produces them refuses to
-  load if either compile's digest moves.
+  complete compiles. None of them is written here -- including the lead sentence, whose three
+  numbers are read off the same props the tiles under it print -- and the module that produces
+  them refuses to load if either compile's digest moves.
 
-  There is no PASS. Full-rebuild equivalence is a check the compiler core runs over a selective
-  rebuild; both sides of this comparison are full compiles, so the act states the comparison it
-  actually made and names the one it did not.
+  There is no PASS, and after BA-028 there is no named absence either. Full-rebuild equivalence is
+  a check the compiler core runs over a selective rebuild; both sides of this comparison are full
+  compiles, so the act states the comparison it actually made -- once, in `changeCaption` -- and
+  stops there. The equivalence check stays published where a reader looking for it already goes:
+  /product/continuous-knowledge, and the receipt inside a downloaded package.
 */
 
 import Link from "next/link";
@@ -24,6 +26,10 @@ import ParallelView from "./parallel-view";
 import styles from "./explore-stage.module.css";
 import { EXPLORE_COPY, type ExploreChangeArrivalView, type ExploreChangeView } from "@/lib/explore-story";
 import type { VisualLayout, VisualState, VisualWorldModel } from "@/lib/visual-world-model";
+
+/** "4 filings", "1 filing" -- a measured count read out loud, never a hand-typed one. */
+const count = (value: number, noun: string) =>
+  `${value.toLocaleString("en-US")} ${noun}${value === 1 ? "" : "s"}`;
 
 /*
   One arriving filing, opened on a region of itself.
@@ -201,6 +207,19 @@ export default function ChangeAct({
           onOpen={onOpen}
           open={reduced}
         />
+        {/*
+          BA-033. The act used to open on two bare figures and close on a paragraph whose first
+          clause denied a capability, so the sentence a reader took away was about what is not
+          wired rather than about what four filings did. This is the same three measurements the
+          tiles below print, in a sentence, in front of them -- `count()` exists only so that one
+          filing does not read as "1 filings".
+        */}
+        <p className={styles.changeLead}>
+          {count(change.arrivals.length, "filing")} arrived.{" "}
+          {count(change.counts.rebuilt, "object")} the World already carried{" "}
+          {change.counts.rebuilt === 1 ? "was" : "were"} rebuilt because of them;{" "}
+          {change.counts.untouched.toLocaleString("en-US")} kept their identity untouched.
+        </p>
         <p className={styles.changeCaption}>{EXPLORE_COPY.changeCaption}</p>
 
         {/*
@@ -238,28 +257,13 @@ export default function ChangeAct({
         </p>
         <p className={styles.changeNote}>{EXPLORE_COPY.changeCountsNote}</p>
         <p className={styles.changeNote}>
-          In the composition above, {shownAffected} of the {inFocus.size} objects on screen are
-          named by the diff and {shownUntouched} retain the same compiled identity across both Worlds.
+          In the composition above, {shownAffected} of the {inFocus.size} objects on screen{" "}
+          {shownAffected === 1 ? "is" : "are"} named by the diff and {shownUntouched}{" "}
+          {shownUntouched === 1 ? "retains" : "retain"} the same compiled identity across both
+          Worlds.
         </p>
 
         <Timeline steps={change.timeline} />
-
-        <section className={styles.equivalence}>
-          <p className={styles.paneLabel}>{EXPLORE_COPY.equivalenceHeading}</p>
-          <p className={styles.equivalenceState}>
-            {change.equivalence.state === "receipt"
-              ? change.equivalence.equivalent
-                ? "EQUIVALENT"
-                : "NOT EQUIVALENT"
-              : "NOT ESTABLISHED IN THIS DEPLOYMENT"}
-          </p>
-          <p className={styles.changeNote}>
-            {EXPLORE_COPY.equivalenceLead}{" "}
-            {change.equivalence.state === "receipt"
-              ? `Receipt ${change.equivalence.source}, ${change.equivalence.compared} objects compared.`
-              : change.equivalence.reason}
-          </p>
-        </section>
       </div>
     </div>
   );

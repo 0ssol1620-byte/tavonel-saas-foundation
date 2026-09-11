@@ -121,6 +121,16 @@ export const EXPLORE_SAMPLE_W3_DIGEST = "sha256:76eda2ed020039cef776c89b5d2e4f39
 
 export const EXPLORE_SAMPLE_SOURCE_DIRECTORY = "public/explore-sample";
 
+/*
+  BA-034. The engine gap recorded three notes above -- 6,300 objects here against 4,402 from the
+  Core a customer's compile is dispatched to, on the same bytes -- is now labelled at every point
+  the figure is published, not only explained in this comment. The label itself lives in
+  `EXPLORE_COPY.countsQualifier` (`lib/explore-story.ts`) rather than here, because two of its
+  three points of use are reached from a client bundle and this module drags the compiler and
+  `node:crypto` with it. Recompiling the sample on the customer engine is a run, not a copy edit,
+  and is not this change.
+*/
+
 function sha256(value: string) {
   return createHash("sha256").update(value, "utf8").digest("hex");
 }

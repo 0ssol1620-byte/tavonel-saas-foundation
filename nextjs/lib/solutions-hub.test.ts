@@ -64,7 +64,54 @@ describe("the solutions hub", () => {
   });
 
   it("says what a solution page is before a reader opens one", () => {
-    expect(hub).toContain("A described use is not a completed");
+    /*
+      BA-040 moved this sentence rather than deleting it, and the case moves with it and gets
+      tighter. The hub's lede used to end on "A described use is not a completed customer case",
+      so a page whose job is to answer "who is this for" opened by disqualifying its own five
+      entries. The sentence is still published, at the foot of the page. What this now refuses is
+      the old lede, in both directions: the disclaimer may not return to the top, and it may not
+      quietly disappear from the bottom either.
+    */
+    expect(shipped).toContain("A described use is not a completed customer");
+    const lede = shipped.match(/<p className="lede">([\s\S]*?)<\/p>/)?.[1] ?? "";
+    expect(lede, "the hub has a lede").not.toBe("");
+    expect(lede).toContain("Five ways teams put the compiler to work");
+    expect(lede, "the lede does not disqualify its own five entries")
+      .not.toContain("not a completed customer");
+    const fine = shipped.match(/<p className="fine">([\s\S]*?)<\/p>/)?.[1] ?? "";
+    expect(fine, "and it is the page's closing line instead")
+      .toContain("A described use is not a completed customer");
+  });
+
+  /*
+    BA-040 in the cards, BA-052 on the surface, BA-054 in the eyebrow: three halves of the same
+    first impression -- five cards that end on a complaint under a rule line, that look clickable
+    and are not, under a heading whose descriptor slot is filled with our own brand name.
+  */
+  it("ends each card on the product rather than on the difficulty", () => {
+    const card = shipped.match(/<article className=\{`tile \$\{styles\.card\}`\}[\s\S]*?<\/article>/)?.[0] ?? "";
+    expect(card, "the card markup is still where this can read it").not.toBe("");
+    expect(card.indexOf("styles.problem"), "the problem comes before what the workflow gives you")
+      .toBeLessThan(card.indexOf("{solution.lede}"));
+    // The hairline that closed each card, and stopped 15% short of its edge at 390 (BA-055).
+    expect(read("../app/solutions/solutions.module.css")).not.toMatch(/\.problem \{[^}]*border-top/);
+  });
+
+  it("makes the whole card the target it looks like", () => {
+    const css = read("../app/solutions/solutions.module.css");
+    expect(shipped, "one link per card, not a second anchor wrapped round the first")
+      .toContain("className={styles.cardTitle}");
+    expect(css).toMatch(/\.card \{[^}]*position: relative/);
+    expect(css, "the title anchor is expanded over the article")
+      .toMatch(/\.card \.cardTitle a::after \{[^}]*inset: 0/);
+    expect(css, "and the surface answers a pointer").toMatch(/\.card:hover/);
+    expect(css, "and a keyboard").toMatch(/\.card:focus-within/);
+  });
+
+  it("fills the eyebrow's descriptor slot with what the section holds", () => {
+    expect(shipped).toContain("<b>SOLUTIONS</b><span />FIVE DOCUMENTED USES");
+    expect(shipped, "the brand name is not a descriptor")
+      .not.toContain("<b>SOLUTIONS</b><span />TAVONEL");
   });
 
   it("ends at the resources hub and the documentation", () => {
