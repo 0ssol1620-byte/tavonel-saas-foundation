@@ -291,8 +291,18 @@ export const COOKBOOKS: readonly CookbookRecord[] = [
       docsSlug: "quickstart",
       limitsExtra:
         "The result is a draft for a person to check. This workflow is not used to settle a medical, legal or investment question, and a document set is only as current as its last compile.",
-      next:
+      next: [
         "Open the read-only sample to see a compiled World and its evidence without an account, read the quickstart if you are starting from a key, or talk to us about activating a World on your own corpus. Nothing on this page sits behind an email form.",
+        /*
+          The World Build, quoted from `WORLD_BUILD_OFFER.md` rather than restated: the structure
+          and the deliverables are the offer's own words, and the commercial terms are the fields
+          that file leaves as a founder decision. DRAFT is the label, not a softener -- a price
+          written here would be this lane deciding one.
+        */
+        "If you would rather not run it yourself, the World Build is a fixed-scope engagement and its commercial terms are DRAFT: the scope below is decided, and the fee, the support hours, the revision count and whether the fee credits against a subscription are not.",
+        "The structure: customer provides representative corpus, TAVONEL compiles, evidence / gaps / review states shown, current World, one update/change test, grounded Ask, architecture + economics review. What it leaves behind: the compiled World itself as a reviewable candidate, a source and evidence report, a report of what could not be compiled and why, one update demonstration, a latency and cost snapshot for that corpus on this deployment, and an implementation plan for going beyond the pilot.",
+        "Two things are settled before any document moves: every format in the corpus has to be one this deployment accepts, and the corpus may not need the customer-data gate that is off by default. No fee appears here, because none has been approved.",
+      ].join(PARAGRAPH),
     }),
   },
   {

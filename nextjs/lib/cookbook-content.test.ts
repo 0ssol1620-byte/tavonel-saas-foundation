@@ -164,6 +164,14 @@ describe("the limits are read from the product, and sit above the calls to actio
     }
   });
 
+  it("quotes the World Build scope as DRAFT and prices none of it", () => {
+    const next = findCookbook("documents-to-grounded-work")!.sections.find((section) => section.key === "next")!;
+    // The offer's own structure line, quoted rather than paraphrased into a promise.
+    expect(next.body).toContain("customer provides representative corpus, TAVONEL compiles");
+    expect(next.body).toContain("one update/change test");
+    expect(next.body, "the commercial terms are a founder decision and must read as DRAFT").toContain("DRAFT");
+  });
+
   it("orders the template so prerequisites and limits precede the next action", () => {
     const index = (key: string) => SECTION_ORDER.indexOf(key as (typeof SECTION_ORDER)[number]);
     expect(index("prerequisites")).toBeLessThan(index("next"));
