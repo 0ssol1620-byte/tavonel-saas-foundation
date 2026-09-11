@@ -213,20 +213,27 @@ describe("what the documentation does not claim", () => {
     }
   });
 
-  it("documents the MCP server that exists, tool by tool, and the two tools it does not have", () => {
+  it("documents the MCP server that exists, tool by tool, and the tool it still does not have", () => {
     /*
       This used to assert the sentence "no published MCP server yet", which was the honest thing
       to say while there was none. There is one now, so the check moves to the two claims that
       can go wrong in the other direction: that the tool list on the page is the tool list the
       server exposes, and that the absences are still named rather than quietly filled in.
+
+      One of those absences stopped being true. The page said there was no list_worlds tool
+      because the API had no endpoint listing a workspace's collections; audit X01 built
+      GET /v1/collections and the tool shipped with it. So the assertion that it is absent is
+      gone, and the claim that can now go wrong takes its place: discovery must stay scoped to
+      ACTIVE Worlds, never listing candidates nobody promoted. The no-write-tool absence is
+      unchanged and still asserted.
     */
     const mcp = findDocsSection("mcp")!;
     const table = mcp.blocks.find((block) => block.kind === "table");
     const documented = table && table.kind === "table" ? table.rows.map((row) => row[0]) : [];
     expect(documented).toEqual(MCP_TOOLS.map((tool: { name: string }) => tool.name));
-    expect(documented).not.toContain("list_worlds");
+    expect(documented).toContain("list_worlds");
     const text = JSON.stringify(mcp);
-    expect(text).toContain("no list_worlds tool");
+    expect(text).toContain("list_worlds lists only active Worlds");
     expect(text).toContain("no write tool");
   });
 });

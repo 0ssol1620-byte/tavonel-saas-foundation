@@ -146,8 +146,42 @@ export function GET(request: Request) {
           responses: { "200": { description: "The cancelled job" }, "404": errorResponse, "409": errorResponse },
         },
       },
+      /*
+        Discovery. The MCP server documented the absence of this endpoint for three releases --
+        an agent holding only an API key could not find out which collection ids existed
+        without a person pasting one in. Only ACTIVE Worlds are listed: a candidate nobody
+        promoted is not what the workspace answers from, and a list mixing the two would
+        present unaccepted output as organizational truth.
+      */
+      "/collections": {
+        get: {
+          operationId: "listActiveWorlds",
+          "x-tavonel-scope": "collections:read",
+          description: "The calling workspace's active Compiled Worlds, keyset-paginated on collection id. `page.nextCursor` is the last collection id on this page, or null on the last page. The workspace comes from the credential; there is no workspace parameter.",
+          parameters: [
+            { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 50, default: 25 } },
+            { name: "cursor", in: "query", required: false, schema: { type: "string", pattern: "^collection-[a-f0-9]{32}$" } },
+          ],
+          responses: { "200": { description: "{ code: COLLECTIONS_LISTED, collections: [{ collectionId, manifestDigest, revision, updatedAt }], page: { limit, cursor, nextCursor } }" }, "400": errorResponse, "401": errorResponse, "403": errorResponse, "503": errorResponse },
+        },
+      },
       "/collections/{id}": {
         get: { operationId: "getCollection", "x-tavonel-scope": "collections:read", parameters: [{ $ref: "#/components/parameters/CollectionId" }], responses: { "200": { description: "Reviewable candidate artifact" }, "404": errorResponse } },
+      },
+      /*
+        Rebuilding a derived cache, not promoting knowledge. Promotion compiles the retrieval
+        index itself and never fails because of it; this is the recovery path for the state that
+        can leave behind -- active World, index missing or failed -- so /ask can stop serving
+        the excerpt fallback without anyone re-promoting a candidate.
+      */
+      "/collections/{id}/retrieval-index": {
+        post: {
+          operationId: "recompileRetrievalIndex",
+          "x-tavonel-scope": "collections:compile",
+          parameters: [{ $ref: "#/components/parameters/CollectionId" }],
+          description: "Compiles the retrieval index for the collection's ACTIVE world, and is a no-op returning alreadyCompiled: true when a completed run for that world version already exists. The manifest comes from the active pointer, so this cannot index an unpromoted candidate. Requires the workspace owner or admin role in addition to the scope. A rebuild that does not reach a queryable index answers 503 with RETRIEVAL_INDEX_NOT_COMPILED and the failure class in retrievalIndex.errorClass -- never 200.",
+          responses: { "200": { description: "{ code: RETRIEVAL_INDEX_COMPILED, alreadyCompiled, activeWorld, retrievalIndex }" }, "400": errorResponse, "401": errorResponse, "403": errorResponse, "404": errorResponse, "409": { ...errorResponse, description: "ACTIVE_WORLD_NOT_FOUND: nothing has been promoted for this collection, so there is no world to index." }, "503": errorResponse },
+        },
       },
       "/collections/{id}/download": {
         get: { operationId: "downloadCollection", "x-tavonel-scope": "collections:download", parameters: [{ $ref: "#/components/parameters/CollectionId" }], responses: { "200": { description: "Signed, hash-verifiable ZIP", content: { "application/zip": { schema: { type: "string", contentEncoding: "binary" } } } }, "404": errorResponse } },
@@ -161,7 +195,7 @@ export function GET(request: Request) {
           "x-tavonel-scope": "ask:read",
           parameters: [{ $ref: "#/components/parameters/CollectionId" }],
           requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["question"], properties: { question: { type: "string", minLength: 3, maxLength: 500 } } } } } },
-          responses: { "200": { description: "Grounded answer with exact page and bbox citations, or an explicit abstention. `retrievalPath` names which runtime answered: `compiled-retrieval-v1` (lexical + dense + structure, RRF-fused, reranked and World Gate filtered) or `excerpt-concatenation-fallback` when no compiled retrieval index exists for the active world yet" }, "409": errorResponse },
+          responses: { "200": { description: "Grounded answer with exact page and bbox citations, or an explicit abstention. Both retrieval paths return the same fields: `answer`, `reason`, `citations`, `receipt`, `activeWorld`, `freshness`, `answerMode` and `retrievalPath`. `answerMode` is `evidence_excerpts` on both -- the answer is the cited excerpts, concatenated in rank order, and no language model writes any part of it. `retrievalPath` names which runtime answered: `compiled-retrieval-v1` (lexical + dense + structure, RRF-fused, reranked and World Gate filtered; also returns `contextPacket` and `retrieval` diagnostics) or `excerpt-concatenation-fallback` when the active world has no queryable compiled index, which also returns `retrievalIndex` ({ status: missing | compiled | failed, errorClass, runId, retrievalProfileId }) and a human-readable `retrievalNotice`. Per-citation scoring differs by path and is not normalized across them: the fallback carries `relevance` with its lexical/graph/temporal/authority breakdown, the compiled path carries per-source ranks and the reranker score." }, "409": errorResponse },
         },
       },
       "/runs/{runId}/events": {
@@ -193,10 +227,64 @@ export function GET(request: Request) {
         post: {
           operationId: "searchActiveWorld",
           "x-tavonel-scope": "ask:read",
-          description: "Retrieval-only search over the active world's compiled retrieval index. Returns the ContextPacket (the same runtime contract /ask, MCP and the CLI share) plus per-source retrieval telemetry, without generating an answer.",
+          description: "Retrieval-only search over the active world's compiled retrieval index: hybrid lexical + dense + structure retrieval, RRF-fused, reranked, then World Gate filtered. Returns the ContextPacket (the same runtime contract /ask, MCP and the CLI share) plus per-source retrieval telemetry, without generating an answer. There is no excerpt fallback here -- a world with no queryable compiled index is a 409, not a weaker answer.",
           parameters: [{ $ref: "#/components/parameters/CollectionId" }],
           requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["query"], properties: { query: { type: "string", minLength: 3, maxLength: 500 }, limit: { type: "integer", minimum: 1, maximum: 25, default: 10 } } } } } },
-          responses: { "200": { description: "ContextPacket of evidence-bound retrieval units with lexical/dense/structure ranks, reranker score and World Gate decisions" }, "400": errorResponse, "409": errorResponse, "503": errorResponse },
+          responses: { "200": { description: "ContextPacket of evidence-bound retrieval units with lexical/dense/structure ranks, reranker score and World Gate decisions, plus `retrievalPath` (always `compiled-retrieval-v1`), `degradations` (a named list of what did not run, e.g. dense retrieval skipped with no embedder configured, or the reranker degrading to the fused order), `activeWorld` and `freshness`" }, "400": errorResponse, "409": { ...errorResponse, description: "RETRIEVAL_RUN_NOT_FOUND or RETRIEVAL_PROFILE_NOT_FOUND: this active world has no queryable compiled retrieval index. The body carries `retrievalIndex` and `retrievalNotice` saying which state it is in, and POST /collections/{id}/retrieval-index rebuilds it." }, "503": errorResponse },
+        },
+      },
+      /*
+        The World lenses, documented here for the first time -- they shipped before this
+        document covered them, which is how a reader ended up with no written bound on a read
+        that returned an entire graph.
+
+        Paging is opt-in and stays that way: a default page would truncate every existing
+        consumer, including the MCP tools' by-id lookups, into a NOT_FOUND for anything past
+        page one. `page.limit: null` in the response is how a client tells a whole-lens answer
+        from page one of a paged one.
+      */
+      "/world/{id}": {
+        get: {
+          operationId: "getWorldReadModel",
+          "x-tavonel-scope": "worlds:read",
+          description: "The whole World read model: contract, freshness, objects, relations, evidence, directory, ontology, history, files and review state. `manifest` reads a specific version, which is what a two-version diff needs.",
+          parameters: [
+            { $ref: "#/components/parameters/CollectionId" },
+            { name: "manifest", in: "query", required: false, schema: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" } },
+          ],
+          responses: { "200": { description: "{ code: OK, model }" }, "400": errorResponse, "404": errorResponse, "503": errorResponse },
+        },
+      },
+      "/world/{id}/{lens}": {
+        get: {
+          operationId: "getWorldLens",
+          "x-tavonel-scope": "worlds:read",
+          description: "One lens of the World read model. `objects`, `relations` and `evidence` accept `limit` and `cursor`; `history`, `files` and `review` do not and answer WORLD_LENS_NOT_PAGEABLE if asked. Omitting `limit` returns the whole lens and `page.limit: null`. The cursor is the last item id from the previous page -- keyset, not an offset -- and a cursor naming an id the lens does not contain is a 400 rather than an empty page.",
+          parameters: [
+            { $ref: "#/components/parameters/CollectionId" },
+            { name: "lens", in: "path", required: true, schema: { type: "string", enum: ["objects", "relations", "evidence", "history", "files", "review"] } },
+            { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 50 } },
+            { name: "cursor", in: "query", required: false, schema: { type: "string" } },
+          ],
+          responses: { "200": { description: "{ code: OK, world, contract, freshness, <lens>, page: { limit, cursor, nextCursor, total } }" }, "400": errorResponse, "404": errorResponse, "503": errorResponse },
+        },
+      },
+      /*
+        Staleness, answerable online. Rollback restores a prior revision; it does not undo
+        downstream use of an older answer, and a signed package already downloaded verifies
+        offline and cannot be recalled remotely. This does not change either fact -- it lets a
+        holder check, live, whether the copy they hold is still the current one.
+      */
+      "/world/{id}/manifest-status": {
+        get: {
+          operationId: "getManifestStatus",
+          "x-tavonel-scope": "worlds:read",
+          description: "Whether a manifest digest is the one this workspace currently answers from. `active: false` means a different version is active now; it does not mean the held copy was withdrawn or deleted, and this endpoint deletes nothing. `knownToWorkspace: false` means this workspace has no record of ever promoting that digest, which is a different answer from 'it was superseded'.",
+          parameters: [
+            { $ref: "#/components/parameters/CollectionId" },
+            { name: "digest", in: "query", required: true, schema: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" } },
+          ],
+          responses: { "200": { description: "{ code: MANIFEST_STATUS, manifestStatus: { collectionId, manifestDigest, active, activeManifestDigest, knownToWorkspace, lifecycleStatus, activatedAt } }" }, "400": errorResponse, "401": errorResponse, "409": errorResponse, "503": errorResponse },
         },
       },
       "/connections": {

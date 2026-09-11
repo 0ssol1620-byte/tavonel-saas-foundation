@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
   There was briefly a second MCP server in `scripts/`, which is how two servers with different
   tool names end up in one repository. The file under test is the one people download.
 */
-import { assertReadOnly, createClient, createServer, DISTRIBUTION_VERSION, SERVER_VERSION, TOOLS, validateInput } from "../public/developer/tavonel-mcp.mjs";
+import { assertReadOnly, createClient, createServer, DISTRIBUTION_VERSION, formatDoctor, runDoctor, SERVER_VERSION, TOOLS, validateInput } from "../public/developer/tavonel-mcp.mjs";
 import { API_VERSION } from "./api-version";
 
 /*
@@ -104,6 +104,7 @@ describe("the tool surface", () => {
   it("names the tools 22.2 asks for that the API can answer", () => {
     expect(TOOLS.map((tool: { name: string }) => tool.name)).toEqual([
       "list_sources",
+      "list_worlds",
       "get_world",
       "search_world",
       "ask_world",
@@ -114,17 +115,47 @@ describe("the tool surface", () => {
     ]);
   });
 
-  it("does not offer list_worlds, and says why where a developer will look", () => {
+  it("offers list_worlds as a read of the endpoint that now exists", () => {
     /*
-      22.2 names `list_worlds`; the API has no endpoint that lists a workspace's collections. A
-      tool that returned an empty array, or that guessed, would be a tool that is wrong silently.
-      Its absence is only honest if it is explained, so the explanation is asserted too.
+      This assertion used to say the opposite, and it was right when it was written: 22.2 names
+      `list_worlds`, the API had no endpoint that listed a workspace's collections, and a tool
+      that guessed at ids or returned an empty array would have been wrong silently. Audit X01
+      built the endpoint (GET /api/v1/collections), so the honest answer changed and this test
+      changed with it. What it now pins: the tool exists, it is a GET, it pages, it says it
+      lists only active Worlds, and adding it did not make the surface writable.
     */
-    expect(TOOLS.map((tool: { name: string }) => tool.name)).not.toContain("list_worlds");
-    const world = TOOLS.find((tool: { name: string }) => tool.name === "get_world")!;
-    expect(world.description).toContain("no tool that lists worlds");
+    const tool = TOOLS.find((entry: { name: string }) => entry.name === "list_worlds")!;
+    expect(tool.request({})).toEqual({ method: "GET", path: "/api/v1/collections" });
+    expect(tool.request({ limit: 5 }).path).toBe("/api/v1/collections?limit=5");
+    // Discovery must not present unpromoted candidates as the workspace's knowledge.
+    expect(tool.description).toContain("active");
+    expect(assertReadOnly()).toBe(true);
     const source = readFileSync(resolve(import.meta.dirname, "../public/developer/tavonel-mcp.mjs"), "utf8");
-    expect(source).toContain("list_worlds --");
+    expect(source).toContain("It lists only ACTIVE Worlds");
+  });
+
+  it("bounds and pages the lens tools without breaking an unpaged read", () => {
+    /*
+      Audit X06: get_object/get_relation/get_evidence fetched an entire lens and filtered
+      client-side. The page parameters are opt-in precisely so this first assertion keeps
+      holding -- a default page would silently truncate every existing consumer.
+    */
+    for (const name of ["get_object", "get_relation", "get_evidence"]) {
+      const tool = TOOLS.find((entry: { name: string }) => entry.name === name)!;
+      const lens = name === "get_object" ? "objects" : name === "get_relation" ? "relations" : "evidence";
+      expect(tool.request({ collectionId: COLLECTION }).path).toBe(`/api/v1/world/${COLLECTION}/${lens}`);
+      expect(tool.request({ collectionId: COLLECTION, limit: 10 }).path).toBe(
+        `/api/v1/world/${COLLECTION}/${lens}?limit=10`,
+      );
+      expect(() => validateInput(tool, { collectionId: COLLECTION, limit: 51 })).toThrow("1 to 50");
+      expect(() => validateInput(tool, { collectionId: COLLECTION, cursor: "claim-1" })).toThrow("requires limit");
+    }
+    const objects = TOOLS.find((entry: { name: string }) => entry.name === "get_object")!;
+    // An id is selected from the response, so a page plus an id would report NOT_FOUND for an
+    // object on a later page. Refused rather than answered wrongly.
+    expect(() => validateInput(objects, { collectionId: COLLECTION, objectId: OBJECT, limit: 5 })).toThrow(
+      "cannot be combined",
+    );
   });
 
   it("speaks the same contract version the API publishes", () => {
@@ -283,5 +314,101 @@ describe("failure reaches the agent intact", () => {
     const result = await callTool(handle, "list_sources", {});
     expect(result.isError).toBe(true);
     expect(result.text).toContain("API_RESPONSE_UNREADABLE_502");
+  });
+});
+
+describe("the doctor path", () => {
+  /*
+    Audit U07: the gap between "I downloaded the file" and "an agent is reading my knowledge".
+    What is asserted is that each failure is reported as the actionable one it is -- a missing
+    key, a stale build, a rejected key, an empty workspace -- because a diagnostic that says
+    "failed" has told the operator nothing.
+  */
+  const channel = { version: DISTRIBUTION_VERSION };
+
+  function doctorFetcher(overrides: {
+    channelVersion?: string | null;
+    collections?: Array<{ collectionId: string }>;
+    status?: number;
+    code?: string;
+  } = {}) {
+    return (async (url: string) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/developer/channel.json") {
+        return overrides.channelVersion === null
+          ? new Response("nope", { status: 404 })
+          : new Response(JSON.stringify({ ...channel, version: overrides.channelVersion ?? DISTRIBUTION_VERSION }), { status: 200 });
+      }
+      if (overrides.status && overrides.status >= 400) {
+        return new Response(JSON.stringify({ code: overrides.code ?? "API_KEY_REVOKED" }), {
+          status: overrides.status,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ code: "COLLECTIONS_LISTED", collections: overrides.collections ?? [] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }) as unknown as typeof fetch;
+  }
+
+  it("passes when the key reads, the build matches and a World is active", async () => {
+    const report = await runDoctor({
+      baseUrl: "https://tavonel.test",
+      apiKey: "tvnl_live_probe",
+      fetcher: doctorFetcher({ collections: [{ collectionId: COLLECTION }] }),
+    });
+    expect(report.ok).toBe(true);
+    expect(report.checks.map((check: { name: string }) => check.name)).toEqual([
+      "api_key",
+      "distribution_version",
+      "authenticated_read",
+      "active_world",
+    ]);
+    expect(formatDoctor(report)).toContain("All checks passed");
+  });
+
+  it("stops at the missing key rather than reporting four failures", async () => {
+    const report = await runDoctor({ baseUrl: "https://tavonel.test", apiKey: "", fetcher: doctorFetcher() });
+    expect(report.ok).toBe(false);
+    expect(report.checks).toHaveLength(1);
+    expect(report.checks[0].detail).toContain("TAVONEL_API_KEY");
+  });
+
+  it("names a stale build and refuses to update itself", async () => {
+    const report = await runDoctor({
+      baseUrl: "https://tavonel.test",
+      apiKey: "tvnl_live_probe",
+      fetcher: doctorFetcher({ channelVersion: "9999.1.1.1", collections: [{ collectionId: COLLECTION }] }),
+    });
+    expect(report.ok).toBe(false);
+    const version = report.checks.find((check: { name: string }) => check.name === "distribution_version")!;
+    expect(version.ok).toBe(false);
+    expect(version.detail).toContain("9999.1.1.1");
+    expect(version.detail).toContain("nothing updates itself");
+  });
+
+  it("reports a rejected key as a scope or revocation problem, not as an empty workspace", async () => {
+    const report = await runDoctor({
+      baseUrl: "https://tavonel.test",
+      apiKey: "tvnl_live_probe",
+      fetcher: doctorFetcher({ status: 403, code: "API_SCOPE_REQUIRED" }),
+    });
+    expect(report.ok).toBe(false);
+    const read = report.checks.find((check: { name: string }) => check.name === "authenticated_read")!;
+    expect(read.detail).toContain("collections:read");
+    const world = report.checks.find((check: { name: string }) => check.name === "active_world")!;
+    expect(world.detail).toContain("not checked");
+  });
+
+  it("says a workspace with no promoted World needs a person, not a retry", async () => {
+    const report = await runDoctor({
+      baseUrl: "https://tavonel.test",
+      apiKey: "tvnl_live_probe",
+      fetcher: doctorFetcher({ collections: [] }),
+    });
+    expect(report.ok).toBe(false);
+    const world = report.checks.find((check: { name: string }) => check.name === "active_world")!;
+    expect(world.detail).toContain("an API key cannot promote");
   });
 });

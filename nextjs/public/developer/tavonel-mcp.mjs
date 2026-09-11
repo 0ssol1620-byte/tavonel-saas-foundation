@@ -10,17 +10,20 @@
  *   TAVONEL_API_KEY=tvnl_live_... node tavonel-mcp.mjs
  *   TAVONEL_BASE_URL=https://tavonel.com           (default)
  *   node tavonel-mcp.mjs --version                 (record the exact build before registering it)
+ *   node tavonel-mcp.mjs --doctor                  (check the key, the channel and one real read)
  *
  * Transport is stdio with newline-delimited JSON-RPC 2.0, which is what the MCP stdio transport
  * specifies, so this needs no dependency and no build step. It is a file you can read before
  * pointing an agent at your own knowledge.
  *
- * What it deliberately does not offer:
+ * `list_worlds` arrived in this release. It was absent for a real reason -- the API had no
+ * endpoint that listed a workspace's collections, and a tool that guessed at ids would be a tool
+ * that lies when it is wrong -- and it is present now because that endpoint exists
+ * (GET /api/v1/collections). It lists only ACTIVE Worlds: a candidate nobody promoted is not
+ * organizational truth, and a discovery list that mixed the two would hand an agent a set in
+ * which some entries are authoritative and some are not.
  *
- *   list_worlds -- 22.2 names it, and the API has no endpoint that lists a workspace's
- *   collections. A tool that answered by guessing at ids, or by returning an empty array, would
- *   be a tool that lies when it is wrong. It is absent, and `tools/list` says why in the same
- *   place a developer looks for it.
+ * What it deliberately does not offer:
  *
  *   download_package returns a descriptor -- url, size, manifest digest, signing key id -- and
  *   not the archive. Base64ing up to 64 MiB through a pipe to hand back bytes the caller must
@@ -60,6 +63,32 @@ const collectionProperty = {
 };
 
 /**
+ * One pagination idiom for the whole surface.
+ *
+ * `search_world` already bounded its `limit` at 1 to 50, and the lens tools had no bound at all:
+ * they fetched an entire World's objects, relations or evidence in one response and filtered
+ * client-side. Reusing these two properties -- rather than inventing a second convention for the
+ * lenses -- is what keeps "how do I page this" a question with one answer (audit X06).
+ *
+ * Omitting `limit` still returns the whole lens, because defaulting to a page would silently
+ * truncate a by-id lookup into NOT_FOUND for anything past the first page.
+ */
+const limitProperty = { type: "integer", minimum: 1, maximum: 50 };
+const cursorProperty = {
+  type: "string",
+  description: "The last id from the previous page. Requires limit. Keyset, not an offset.",
+};
+
+/** Adds the page parameters to a lens GET only when the caller actually asked for a page. */
+function lensPath(collectionId, lens, input) {
+  const query = new URLSearchParams();
+  if (input.limit !== undefined) query.set("limit", String(input.limit));
+  if (input.cursor !== undefined) query.set("cursor", input.cursor);
+  const suffix = query.size > 0 ? `?${query}` : "";
+  return `/api/v1/world/${collectionId}/${lens}${suffix}`;
+}
+
+/**
  * Every tool, and the exact request it makes.
  *
  * The request lives in the table rather than inside each handler so that "does this server
@@ -74,10 +103,28 @@ export const TOOLS = [
     request: () => ({ method: "GET", path: "/api/v1/documents" }),
   },
   {
+    name: "list_worlds",
+    description:
+      "The workspace's active Compiled Worlds, newest promotions included, with each one's " +
+      "manifest digest and revision. Start here when you do not already hold a collection id. " +
+      "Candidates nobody promoted are not listed: they are not what this workspace answers from.",
+    inputSchema: {
+      type: "object",
+      properties: { limit: limitProperty, cursor: cursorProperty },
+      additionalProperties: false,
+    },
+    request: (input) => {
+      const query = new URLSearchParams();
+      if (input.limit !== undefined) query.set("limit", String(input.limit));
+      if (input.cursor !== undefined) query.set("cursor", input.cursor);
+      return { method: "GET", path: `/api/v1/collections${query.size > 0 ? `?${query}` : ""}` };
+    },
+  },
+  {
     name: "get_world",
     description:
-      "One Compiled World: its status, contract, objects, relations, evidence and history. " +
-      "There is no tool that lists worlds -- the API has no endpoint that does.",
+      "One Compiled World: its status, contract, freshness, objects, relations, evidence and " +
+      "history. Use list_worlds first if you do not have a collection id.",
     inputSchema: {
       type: "object",
       properties: { collectionId: collectionProperty },
@@ -129,40 +176,59 @@ export const TOOLS = [
   },
   {
     name: "get_object",
-    description: "The objects lens. Pass objectId to return one object instead of all of them.",
+    description:
+      "The objects lens. Pass objectId to return one object, or limit and cursor to walk a " +
+      "large World a page at a time instead of fetching every object at once.",
     inputSchema: {
       type: "object",
-      properties: { collectionId: collectionProperty, objectId: { type: "string", pattern: STABLE_ID.source } },
+      properties: {
+        collectionId: collectionProperty,
+        objectId: { type: "string", pattern: STABLE_ID.source },
+        limit: limitProperty,
+        cursor: cursorProperty,
+      },
       required: ["collectionId"],
       additionalProperties: false,
     },
-    request: (input) => ({ method: "GET", path: `/api/v1/world/${input.collectionId}/objects` }),
+    request: (input) => ({ method: "GET", path: lensPath(input.collectionId, "objects", input) }),
     select: (payload, input) => selectById(payload, "objects", input.objectId),
   },
   {
     name: "get_relation",
-    description: "The relations lens. Pass relationId to return one relation instead of all of them.",
+    description:
+      "The relations lens. Pass relationId to return one relation, or limit and cursor to walk " +
+      "the graph a page at a time.",
     inputSchema: {
       type: "object",
-      properties: { collectionId: collectionProperty, relationId: { type: "string", pattern: STABLE_ID.source } },
+      properties: {
+        collectionId: collectionProperty,
+        relationId: { type: "string", pattern: STABLE_ID.source },
+        limit: limitProperty,
+        cursor: cursorProperty,
+      },
       required: ["collectionId"],
       additionalProperties: false,
     },
-    request: (input) => ({ method: "GET", path: `/api/v1/world/${input.collectionId}/relations` }),
+    request: (input) => ({ method: "GET", path: lensPath(input.collectionId, "relations", input) }),
     select: (payload, input) => selectById(payload, "relations", input.relationId),
   },
   {
     name: "get_evidence",
     description:
       "The evidence lens: every region with its source version, page and bbox in the 0-1000 " +
-      "page frame. Pass evidenceId to return one region.",
+      "page frame. Pass evidenceId to return one region, or limit and cursor to page.",
     inputSchema: {
       type: "object",
-      properties: { collectionId: collectionProperty, evidenceId: { type: "string", pattern: STABLE_ID.source } },
+      properties: {
+        collectionId: collectionProperty,
+        evidenceId: { type: "string", pattern: STABLE_ID.source },
+        limit: limitProperty,
+        cursor: cursorProperty,
+      },
       required: ["collectionId"],
       additionalProperties: false,
     },
-    request: (input) => ({ method: "GET", path: `/api/v1/world/${input.collectionId}/evidence` }),
+    request: (input) => ({ method: "GET", path: lensPath(input.collectionId, "evidence", input) }),
     select: (payload, input) => selectById(payload, "evidence", input.evidenceId),
   },
   {
@@ -242,6 +308,23 @@ export function validateInput(tool, input) {
   }
   if (value.limit !== undefined && (!Number.isInteger(value.limit) || value.limit < 1 || value.limit > 50)) {
     throw new Error("INPUT_INVALID: limit must be an integer from 1 to 50");
+  }
+  if (value.cursor !== undefined) {
+    // A cursor is an id the previous page handed back, and it goes into a query string. The
+    // pattern is what an id can be -- an evidence cursor is `<evidenceId>:<blockId>` -- and
+    // nothing that could carry another parameter or a path segment into the request.
+    if (typeof value.cursor !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/.test(value.cursor)) {
+      throw new Error("INPUT_INVALID: cursor is not a page cursor");
+    }
+    if (value.limit === undefined) throw new Error("INPUT_INVALID: cursor requires limit");
+  }
+  for (const key of ["objectId", "relationId", "evidenceId"]) {
+    // Selecting one item happens after the response arrives, so a paged request plus an id
+    // would report NOT_FOUND for an item sitting on a later page. Refused rather than answered
+    // wrongly: ask for the id, or walk the pages, not both.
+    if (value[key] !== undefined && (value.limit !== undefined || value.cursor !== undefined)) {
+      throw new Error(`INPUT_INVALID: ${key} cannot be combined with limit or cursor`);
+    }
   }
   return value;
 }
@@ -361,6 +444,79 @@ export function createServer({ call }) {
   };
 }
 
+/* -------------------------------------------------------------------- doctor */
+
+/**
+ * `--doctor`: from "I downloaded the file" to "it reads my knowledge", checked (audit U07).
+ *
+ * Four checks, in the order they fail in real life: is a key set, does this build match the
+ * published channel, does the key authenticate against a real read, and does the workspace
+ * actually have an active World to read. Each line is pass or fail plus what to do about it --
+ * a diagnostic that prints a stack trace has told the operator nothing.
+ *
+ * It performs reads only, through the same `TOOLS` table and the same `assertReadOnly` gate the
+ * server starts behind, so the doctor cannot reach an endpoint the server itself may not.
+ */
+export async function runDoctor({ baseUrl = DEFAULT_BASE_URL, apiKey = "", fetcher = fetch, now = () => new Date() } = {}) {
+  assertReadOnly();
+  const base = (baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
+  const checks = [];
+  const record = (name, ok, detail) => { checks.push({ name, ok, detail }); return ok; };
+
+  if (!record("api_key", Boolean(apiKey), apiKey
+    ? "TAVONEL_API_KEY is set"
+    : "set TAVONEL_API_KEY to a key from Workspace > Developers")) {
+    return { ok: false, checkedAt: now().toISOString(), baseUrl: base, distribution: DISTRIBUTION_VERSION, checks };
+  }
+
+  try {
+    const response = await fetcher(`${base}/developer/channel.json`, { method: "GET" });
+    const channel = response.ok ? await response.json() : null;
+    const published = channel?.version ?? null;
+    record("distribution_version", published === DISTRIBUTION_VERSION, published === null
+      ? `could not read ${base}/developer/channel.json; this build is ${DISTRIBUTION_VERSION}`
+      : published === DISTRIBUTION_VERSION
+        ? `this build ${DISTRIBUTION_VERSION} matches the published channel`
+        : `this build is ${DISTRIBUTION_VERSION}; the channel publishes ${published}. Download the new file and verify its sha256 before replacing this one -- nothing updates itself.`);
+  } catch {
+    record("distribution_version", false, `could not reach ${base}/developer/channel.json`);
+  }
+
+  const call = createClient({ baseUrl: base, apiKey, fetcher });
+  const listWorlds = TOOLS.find((tool) => tool.name === "list_worlds");
+  try {
+    const payload = await call(listWorlds.request({ limit: 5 }));
+    const collections = Array.isArray(payload?.collections) ? payload.collections : [];
+    record("authenticated_read", true, "the key authenticated against GET /api/v1/collections");
+    record("active_world", collections.length > 0, collections.length > 0
+      ? `${collections.length} active World(s); first is ${collections[0].collectionId}`
+      : "no active World in this workspace yet. Compile a collection and have a person promote it -- an API key cannot promote.");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "UNKNOWN";
+    record("authenticated_read", false, message.includes("API_ERROR_401") || message.includes("API_ERROR_403")
+      ? `${message} -- the key was rejected. Check it is not revoked and that it holds the collections:read scope.`
+      : message);
+    record("active_world", false, "not checked: the authenticated read did not succeed");
+  }
+
+  return {
+    ok: checks.every((check) => check.ok),
+    checkedAt: now().toISOString(),
+    baseUrl: base,
+    distribution: DISTRIBUTION_VERSION,
+    checks,
+  };
+}
+
+export function formatDoctor(report) {
+  const lines = report.checks.map((check) => `${check.ok ? "PASS" : "FAIL"}  ${check.name}: ${check.detail}`);
+  return [
+    `tavonel-mcp ${report.distribution} doctor  ->  ${report.baseUrl}`,
+    ...lines,
+    report.ok ? "All checks passed. Register this file as a stdio MCP server." : "At least one check failed. Fix the first FAIL above and run --doctor again.",
+  ].join("\n");
+}
+
 /* ------------------------------------------------------------------- process */
 
 async function main() {
@@ -395,6 +551,12 @@ async function main() {
 if (process.argv.includes("--version")) {
   // Recorded before registration, so a support conversation can start from the exact build.
   process.stdout.write(`tavonel-mcp ${DISTRIBUTION_VERSION} (api v${API_VERSION_HEADER}, contract ${SERVER_VERSION})\n`);
+} else if (process.argv.includes("--doctor")) {
+  const report = await runDoctor({ baseUrl: process.env.TAVONEL_BASE_URL, apiKey: process.env.TAVONEL_API_KEY });
+  process.stdout.write(`${formatDoctor(report)}\n`);
+  // A non-zero exit so a setup script, a CI job or a support runbook can branch on it instead
+  // of grepping the text.
+  process.exitCode = report.ok ? 0 : 1;
 } else if (process.argv[1] && process.argv[1].split(/[\\/]/).pop() === "tavonel-mcp.mjs") {
   await main();
 }
