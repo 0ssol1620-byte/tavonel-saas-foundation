@@ -16,8 +16,16 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import Logomark from "@/components/logomark";
+import { RecipePreflight } from "@/components/recipe-preflight";
 import { readOfferParam, rememberCheckoutIntent, takeCheckoutIntent } from "@/lib/checkout-intent";
 import { trackFunnel } from "@/lib/funnel-events";
+import {
+  readRecipeParams,
+  rememberFirstTouch,
+  rememberRecipeIntent,
+  takeRecipeIntent,
+  type RecipeIntent,
+} from "@/lib/recipe-intent";
 import { BILLING_OFFERS, type BillingOfferCode } from "@/lib/billing-catalog";
 
 type AuthState = "checking" | "ready" | "unconfigured";
@@ -46,14 +54,37 @@ export default function LoginPage() {
    * callback path that cannot carry a query string of ours.
    */
   const [intent, setIntent] = useState<BillingOfferCode | null>(null);
+  /**
+   * WG-082/084. The same hop for a reader who came from a cookbook rather than from a price.
+   *
+   * `next=recipe` is a different arrival from `next=checkout` and the two never mix: one of them
+   * is at most present, the checkout path is untouched, and the recipe is validated against the
+   * closed slug list before it is stored or rendered. A recipe carries no plan and no price, so
+   * what this page can say about cost comes from `usage-pricing.ts` and the plan catalog, never
+   * from the URL.
+   */
+  const [recipe, setRecipe] = useState<RecipeIntent | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    /*
+      WG-085. First touch is recorded before any internal id is written, and `rememberFirstTouch`
+      never overwrites a record that already exists -- so a reader who arrived from a campaign and
+      then clicked through three internal pages keeps the campaign. The recipe intent is a
+      separate key and nothing below writes an internal id into the attribution record.
+    */
+    rememberFirstTouch(window.location.search);
     const offer = readOfferParam(window.location.search);
     if (offer) {
       setIntent(offer);
       rememberCheckoutIntent(offer);
       trackFunnel("login_reached_with_intent", { offer });
+    }
+    const startedRecipe = readRecipeParams(window.location.search);
+    if (startedRecipe) {
+      setRecipe(startedRecipe);
+      rememberRecipeIntent(startedRecipe);
+      trackFunnel("login_reached_with_intent", { kind: "recipe" });
     }
     void (async () => {
       // Already signed in? Do not make someone sign in twice.
@@ -63,6 +94,13 @@ export default function LoginPage() {
         const { data } = await client.auth.getSession();
         if (data.session && !cancelled) {
           const resume = takeCheckoutIntent();
+          /*
+            Consumed and discarded on purpose. Somebody already signed in who lands here from a
+            cookbook CTA has not been interrupted by a sign-in, so there is nothing to resume --
+            and sending them back to the page they just clicked from is a loop, not a resume. The
+            intent is still taken so it cannot surface on a later, unrelated hop.
+          */
+          takeRecipeIntent();
           window.location.replace(resume ? `/workspace?checkout=${resume}` : "/workspace");
           return;
         }
@@ -124,8 +162,12 @@ export default function LoginPage() {
 
       <div className="auth-body">
         <div className="auth-card">
-          <p className="eyebrow">{intent ? "SIGN IN TO CONTINUE" : "SIGN IN"}</p>
-          <h1>{intent ? "One step before checkout." : "Open your workspace."}</h1>
+          <p className="eyebrow">{intent || recipe ? "SIGN IN TO CONTINUE" : "SIGN IN"}</p>
+          <h1>
+            {intent ? "One step before checkout."
+              : recipe ? "One step before you run this."
+                : "Open your workspace."}
+          </h1>
           <p className="lead">
             TAVONEL turns your documents and connected sources into a structured, source-grounded
             World. Your workspace is tenant-scoped and source data is processed under the published
@@ -138,6 +180,14 @@ export default function LoginPage() {
               itself once you are in. Nothing is charged by signing in, and access changes only
               after a signed webhook is persisted.
             </p>
+          ) : recipe ? (
+            <>
+              <p className="notice static" role="status">
+                <strong>Your recipe is kept for you.</strong> Signing in brings you back to the same
+                page and the same recipe, with nothing running until you ask for it.
+              </p>
+              <RecipePreflight intent={recipe} />
+            </>
           ) : selfService && customerProcessingEnabled ? (
             <p className="notice static" role="status">
               <strong>Start with a free evaluation.</strong> Use up to 3 files and 50 standard

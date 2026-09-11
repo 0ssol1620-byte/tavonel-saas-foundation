@@ -41,6 +41,13 @@ const COPY_SURFACES = [
   "app/error.tsx",
   "lib/capabilities.ts",
   "lib/checkout-intent.ts",
+  /*
+    The recipe hop, registered with the checkout hop it copies. `read` takes a literal path and
+    never follows an import, so the preflight the sign-in page renders is unguarded until its own
+    row is here -- and the preflight is where a cost sentence and an entitlement sentence live.
+  */
+  "lib/recipe-intent.ts",
+  "components/recipe-preflight.tsx",
   "lib/funnel-events.ts",
   "lib/demo-world.ts",
   "lib/film-script.ts",
