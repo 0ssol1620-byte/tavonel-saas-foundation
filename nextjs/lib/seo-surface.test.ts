@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { describe, expect, it } from "vitest";
 import robots from "@/app/robots";
 import sitemap from "@/app/sitemap";
+import { COOKBOOKS, COOKBOOK_SLUGS } from "./cookbook-content";
 import { pageMetadata } from "./page-seo";
 
 /*
@@ -161,7 +162,17 @@ async function headOf(page: (typeof pages)[number], path: string): Promise<Metad
   names it -- and it is the positive control that keeps the reader honest without depending on
   what happens to be in llms.txt.
 */
-const READER_CONTROLS = ["/film", "/benchmarks", "/reproducibility"];
+/*
+  The six draft cookbooks are advertised in none of the three files, so without this line no head
+  is read for them and `isNoindex` throws rather than answering -- which is the right failure, and
+  not one any assertion would reach. A draft is the case this reader exists for, so it is read.
+*/
+const READER_CONTROLS = [
+  "/film",
+  "/benchmarks",
+  "/reproducibility",
+  ...COOKBOOK_SLUGS.map((slug) => `/cookbooks/${slug}`),
+];
 
 const heads = new Map<string, Metadata>();
 for (const path of new Set([...sitemapPaths, ...llmsPaths, ...READER_CONTROLS])) {
@@ -392,4 +403,48 @@ describe("public surface: the Korean subtree", () => {
     expect(middleware).not.toMatch(/NextResponse\.redirect|accept-language|acceptLanguage|locale/i);
     expect(readFileSync(resolve(import.meta.dirname, "../next.config.mjs"), "utf8")).not.toMatch(/\bi18n\b/);
   });
+});
+
+/*
+  The six drafts, read the same way every other page is read.
+
+  This is where the two lanes had to meet and where nothing would have caught them missing each
+  other. The cookbooks lane asserts `noindex` with a regex over its own page source; that regex is
+  true today and says nothing about the value Next actually puts in the head, which is the exact
+  blindness the reader above was repaired for. The seo-i18n lane's guard reads evaluated heads, but
+  only for paths one of the three public files advertises -- and a draft is advertised nowhere, so
+  the six routes it was written to protect were the six it never looked at.
+
+  So the cookbook paths join READER_CONTROLS and are asserted from the head: noindex per slug,
+  absent from the sitemap, absent from llms.txt. The reader needed no extension for the dynamic
+  route -- `headOf` already calls `generateMetadata` with the params of the path it was handed --
+  and the canonical assertion below is what proves that rather than assuming it: a reader that
+  evaluated the file once, for one slug, would return the same canonical six times.
+*/
+describe("public surface: the draft cookbooks", () => {
+  const cookbookPaths = COOKBOOK_SLUGS.map((slug) => `/cookbooks/${slug}`);
+
+  it("has one route and six records, and reads a head for each", () => {
+    expect(pages.filter((page) => page.route.startsWith("/cookbooks")).map((page) => page.route)).toEqual([
+      "/cookbooks/[slug]",
+    ]);
+    expect(cookbookPaths).toHaveLength(6);
+    for (const path of cookbookPaths) expect(isRealRoute(path), path).toBe(true);
+  });
+
+  it.each(COOKBOOK_SLUGS)("/cookbooks/%s declares noindex in the head it renders", (slug) => {
+    const path = `/cookbooks/${slug}`;
+    expect(isNoindex(path), `${ORIGIN}${path} is a draft whose own head does not refuse indexing`).toBe(true);
+    // Per URL, not per file: a reader that resolved the dynamic route once would answer the same
+    // canonical for all six, and the guard would be reading one page's head six times.
+    expect(heads.get(path)?.alternates?.canonical).toBe(path);
+  });
+
+  it("advertises none of them while every record is a draft", () => {
+    const drafts = COOKBOOKS.filter((record) => record.publication === "draft").map((record) => `/cookbooks/${record.slug}`);
+    expect(drafts).toEqual(cookbookPaths);
+    expect(sitemapPaths.filter((path) => path.startsWith("/cookbooks"))).toEqual([]);
+    expect(llmsPaths.filter((path) => path.startsWith("/cookbooks"))).toEqual([]);
+  });
+
 });
