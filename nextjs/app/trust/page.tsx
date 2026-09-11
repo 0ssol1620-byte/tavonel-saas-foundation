@@ -56,14 +56,25 @@ const PUBLISHED: Array<[string, string, string]> = [
 ];
 
 /*
-  §45 asks for thirteen. Three have no answer, and each of the three is a question a reassuring
-  sentence would answer badly -- "stored durably" is not a tested restore, and a reader who wanted
-  one would have to find that out later.
+  §45 asks for thirteen, and this list is the ones with no answer. Two things changed in it.
+
+  "Backup and recovery" was one row asserting three absences, and one of the three stopped being
+  true on 2026-09-10, when a database restore was performed and checked. Deleting the row would
+  have been wrong in the other direction: the recovery objectives are still unset, and that is the
+  half a buyer is really asking about. So the row narrowed to the objectives and points at the
+  security page for the drill, rather than keeping a sentence that is now half false.
+
+  The fourth row is new, and it answers a question §45 does not list. A procurement reader looks
+  for SOC 2, ISO 27001 or a penetration-test report before anything else, and this page's own
+  inventory named that question in neither section -- so a reader could read all thirteen rows and
+  still not learn that the answer is no. It is written as a plain absence: no badge, and no
+  sentence about a review being under way, because none has been commissioned.
 */
-const NOT_PUBLISHED: Array<[string, string]> = [
-  ["Backup and recovery", "Not yet published. This deployment states no recovery objective, no backup retention period and no tested restore. The absence of a number here is the state of it; ask before you depend on one."],
-  ["Data processing agreement", "Not yet published. There is no DPA at a public URL to download. A processing review is arranged through privacy@tavonel.com, and what that review can commit to is not settled by this page."],
-  ["Incident response process", "Not yet published. The reporting addresses are on the status page and in security.txt, and they are read. What is not written down is the procedure after that: no severity definitions, no notification window, no post-incident record format."],
+const NOT_PUBLISHED: Array<[string, string, Route | null]> = [
+  ["Recovery objectives", "Not yet published. This deployment states no recovery point objective, no recovery time objective and no backup retention period. One restore has been performed and checked, and the security page carries its date, its scope and what it does not commit to. The absence of a target is the state of it; ask before you depend on one.", "/security" as Route],
+  ["Data processing agreement", "Not yet published. There is no DPA at a public URL to download. A processing review is arranged through privacy@tavonel.com, and what that review can commit to is not settled by this page.", null],
+  ["Incident response process", "Not yet published. The reporting addresses are on the status page and in security.txt, and they are read. What is not written down is the procedure after that: no severity definitions, no notification window, no post-incident record format.", null],
+  ["Third-party certification and audit", "Not published, because there is nothing to publish. No SOC 2 report, no ISO 27001 certificate and no independent penetration-test report exists for this deployment, and no such review has been commissioned. That is why no badge appears anywhere on this site. What does exist is on the security page: the controls this deployment enforces, checked by us.", "/security" as Route],
 ];
 
 export default function TrustCenterPage() {
@@ -79,9 +90,25 @@ export default function TrustCenterPage() {
             <div className="stack">
               <p className="lede">
                 A security review asks the same thirteen things every time. Ten of them are
-                answered on the pages below.<b> Three are not answered anywhere, and they are
-                listed too</b> — a review that finds them here is faster than one that finds them
-                after a pilot.
+                answered on the pages below.<b> Three are not answered anywhere, and a fourteenth
+                the checklist never names — whether anyone outside this company has audited
+                it — has no answer either. All four are listed</b> — a review that finds
+                them here is faster than one that finds them after a pilot.
+              </p>
+              {/*
+                B04. Five hubs -- this one, Evidence, Benchmarks, Reproducibility, Research --
+                answer five different questions, and were reachable from one another with nothing
+                saying which was which, so a reader looking for one of the five read parts of
+                three. Each now opens with the same shaped line: what this page answers, and which
+                page answers the next thing.
+              */}
+              <p className="fine">
+                <b>This page answers one question:</b> what is published about security and
+                compliance, and what has no answer yet. How a citation stays bound to its source is
+                on <Link href={"/evidence" as Route}>Evidence</Link>; what a result has to carry
+                before it is published as a number is on <Link href={"/benchmarks" as Route}>Benchmarks</Link>;
+                the frozen fixtures you can rerun are on <Link href={"/reproducibility" as Route}>Reproducibility</Link>;
+                the open problems and the experiments that failed are on <Link href={"/research" as Route}>Research</Link>.
               </p>
 
               {/*
@@ -119,10 +146,11 @@ export default function TrustCenterPage() {
 
               <p className="slate"><span />NOT ANSWERED ANYWHERE YET</p>
               <div className="tiles">
-                {NOT_PUBLISHED.map(([title, body]) => (
+                {NOT_PUBLISHED.map(([title, body, href]) => (
                   <article className="tile" key={title}>
                     <h3>{title}</h3>
                     <p>{body}</p>
+                    {href ? <p className="fine"><Link href={href}>What is on record instead</Link></p> : null}
                   </article>
                 ))}
               </div>
