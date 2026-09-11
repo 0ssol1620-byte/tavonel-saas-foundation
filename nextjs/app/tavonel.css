@@ -2061,6 +2061,15 @@ footer.site .shell { display: flex; flex-direction: column; gap: 14px; }
 .workspace-preflight dl div { display: grid; gap: 4px; padding: 12px; background: var(--g1); }
 .workspace-preflight dt { color: var(--text-xlo); font: 9px var(--f-mono); letter-spacing: .1em; text-transform: uppercase; }
 .workspace-preflight dd { margin: 0; color: var(--text-hi); font: 15px var(--f-mono); }
+/* Per-file preservation (audit D10). One column at every width on purpose: the omitted list is
+   the longest string on the panel and a second column would either clip it or push the page
+   sideways at 360px. No fixed widths anywhere here -- `min-width: 0` is what lets a long
+   filename wrap inside the grid track instead of setting the row's floor. */
+.workspace-preflight-files { list-style: none; display: grid; gap: 1px; margin: 0 0 15px; padding: 0; background: var(--hairline); }
+.workspace-preflight-files li { display: grid; gap: 4px; min-width: 0; padding: 12px; background: var(--g1); }
+.workspace-preflight-files strong { color: var(--text-hi); font-size: 13px; overflow-wrap: anywhere; }
+.workspace-preflight-files span { color: var(--text-lo); font: 11px/1.5 var(--f-mono); overflow-wrap: anywhere; }
+.workspace-preflight-files li[data-status="refused"] strong { color: var(--changed); }
 
 /*
   The durable compile panel.

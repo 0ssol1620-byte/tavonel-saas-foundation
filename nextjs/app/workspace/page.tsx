@@ -51,6 +51,12 @@ import { describeCorpusStart, judgeCorpusSet, type CorpusProgress } from "@/lib/
 import { CompileJobPanel, type CompileJobView } from "@/components/compile-job-panel";
 import { observeCompileJob } from "@/lib/compile-job-client";
 import { measureSelection, type PageCountResult } from "@/lib/page-count";
+import {
+  buildPreflightSummary,
+  describePreflightFile,
+  describePreflightSummary,
+  words,
+} from "@/lib/preflight-report";
 import { type ArchiveExpander, createArchiveExpander } from "@/lib/archive-client";
 import { ARCHIVE_LIMITS } from "@/lib/archive-expand";
 import type { BlockerResolution, CompileBlocker } from "@/lib/compile-job-store";
@@ -1414,6 +1420,24 @@ export default function WorkspacePage() {
   const stagedPages = stagedEstimates.reduce((sum, estimate) => sum + (estimate?.pages ?? 0), 0);
   const stagedQuote = quoteCompilePages(stagedPages);
   /*
+    Audit D10. The counts above say how many files there are; this says what each one loses.
+
+    Accepting a file and preserving what is inside it are different claims, and this panel only
+    ever made the first -- so someone who staged a spreadsheet, read "1 file staged" and an
+    estimate had been told something true that reads as something false. Every field is a lookup
+    in the same `shared/capabilityManifest.ts` row that /sources prints, so the two surfaces
+    cannot drift. Nothing here opens the file and it must not start: the report is worth having
+    precisely because it arrives before the upload is spent. The MIME and the size are the
+    browser's own, so every staged file is reported on rather than a subset.
+  */
+  const stagedPreflight = buildPreflightSummary(
+    stagedSelection?.files.map((entry) => ({
+      fileName: entry.file.name,
+      mime: entry.file.type || null,
+      bytes: entry.file.size,
+    })) ?? [],
+  );
+  /*
     The set is as strong as its weakest file. One PDF without a page count drags the preflight
     back to an estimate; one Word file drags it to "declared", because the total the customer
     authorises against is then partly a number Word wrote rather than one anything counted.
@@ -2270,6 +2294,21 @@ export default function WorkspacePage() {
                       file size. A spreadsheet has no page count, and what it is billed in is not settled — so this part
                       of the estimate is an upper bound and nothing more.
                     </p>
+                  ) : null}
+                  {stagedPreflight.files.length > 0 ? (
+                    <>
+                      <p className="fine" role="status">{describePreflightSummary(stagedPreflight)}.</p>
+                      <ul className="workspace-preflight-files" aria-label="What each staged file will carry">
+                        {stagedPreflight.files.map((file, index) => (
+                          <li key={`${file.fileName}-${index}`} data-status={file.status}>
+                            <strong>{file.fileName}</strong>
+                            <span>{describePreflightFile(file)}</span>
+                            {file.reasons.length > 0 ? <span>{file.reasons.map(words).join(" · ")}</span> : null}
+                            <span>{file.mime ?? "MIME UNRESOLVED"}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
                   ) : null}
                   <p className="fine">{compileLimits}</p>
                   {stagedVerdict.ok ? null : (

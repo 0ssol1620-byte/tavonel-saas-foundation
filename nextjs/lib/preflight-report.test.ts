@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -236,5 +238,51 @@ describe("the workspace preflight section", () => {
     const html = render([]);
     expect(html).not.toContain("accepted as BEST_EFFORT");
     expect(html).toContain("No source run has been observed");
+  });
+});
+
+/*
+  D10's other half: the report has to be on the panel where the upload is authorised.
+
+  The operations surface above reports on sources that already exist. The staged-selection block
+  is the last moment a customer can still change their mind, and it was the surface making the
+  "1 file staged" claim with nothing beside it. The page is a client component with live effects
+  and a Supabase browser client, so this reads the mount rather than rendering it: the rendering
+  is covered by the cases above, and what could silently disappear here is the call.
+*/
+describe("the staged-selection block in the workspace", () => {
+  const read = (path: string) => readFileSync(resolve(import.meta.dirname, "..", path), "utf8");
+
+  it("reports per staged file before the upload is spent", () => {
+    const page = read("app/workspace/page.tsx");
+    expect(page).toContain('from "@/lib/preflight-report"');
+    // Built from the staged files themselves, with the browser's own MIME and size, so every
+    // staged file is reported on rather than the subset whose filename is known.
+    expect(page).toContain("const stagedPreflight = buildPreflightSummary(");
+    expect(page).toContain("mime: entry.file.type || null");
+    expect(page).toContain("bytes: entry.file.size");
+    for (const rendered of [
+      "describePreflightSummary(stagedPreflight)",
+      "describePreflightFile(file)",
+      "file.reasons.map(words)",
+      "<strong>{file.fileName}</strong>",
+    ]) {
+      expect(page, rendered).toContain(rendered);
+    }
+  });
+
+  it("stacks the rows at phone width instead of scrolling the page sideways", () => {
+    const css = read("app/tavonel.css");
+    const list = css.slice(css.indexOf(".workspace-preflight-files {"));
+    const outer = list.slice(0, list.indexOf(".workspace-preflight-files li"));
+    expect(outer).toContain("display: grid");
+    /*
+      One column at every width, and nothing that sets a floor wider than a 360px screen. A
+      `min-width: 0` is the opposite of that problem -- it is what lets a long filename wrap
+      inside its track instead of widening the row -- so only a non-zero one fails here.
+    */
+    expect(outer).not.toMatch(/grid-template-columns|\bwidth:\s|min-width:\s(?!0)/);
+    expect(list).toContain("min-width: 0");
+    expect(list).toContain("overflow-wrap: anywhere");
   });
 });
