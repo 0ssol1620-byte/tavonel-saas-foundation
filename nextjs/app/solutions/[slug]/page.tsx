@@ -1,9 +1,10 @@
-import type { Metadata } from "next";
+import type { Metadata, Route } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PublicPageShell } from "@/components/public-page-shell";
 import PublicPrimaryCta from "@/components/public-primary-cta";
 import SolutionProofSample from "@/components/solution-proof-sample";
+import { RESOURCE_TAG_LABELS, resourceFilterHref, type ResourceTag } from "@/lib/site-navigation";
 
 /*
   RESOLVED A-1 (2026-09-06), applied here in the repair pass rather than in the pass that
@@ -17,6 +18,7 @@ import SolutionProofSample from "@/components/solution-proof-sample";
 */
 const SOLUTIONS = {
   "ai-ready-knowledge": {
+    resources: "build",
     audience: "AI and platform engineers",
     eyebrow: "AI-READY KNOWLEDGE",
     title: "Give every AI project the same grounded knowledge asset.",
@@ -31,6 +33,7 @@ const SOLUTIONS = {
     ],
   },
   "document-intelligence": {
+    resources: "evaluate",
     audience: "Document and operations teams",
     eyebrow: "DOCUMENT INTELLIGENCE",
     title: "Read the source before asking AI to reason over it.",
@@ -47,6 +50,7 @@ const SOLUTIONS = {
     ],
   },
   "knowledge-graph": {
+    resources: "build",
     audience: "Data and knowledge architects",
     eyebrow: "KNOWLEDGE GRAPH",
     title: "Compile a graph people can inspect and machines can reuse.",
@@ -61,6 +65,7 @@ const SOLUTIONS = {
     ],
   },
   "source-grounded-assistants": {
+    resources: "use-elsewhere",
     audience: "Application and agent developers",
     eyebrow: "GROUNDED ASSISTANTS",
     title: "Let an answer travel all the way back to the source.",
@@ -75,6 +80,7 @@ const SOLUTIONS = {
     ],
   },
   "knowledge-operations": {
+    resources: "verify",
     audience: "Knowledge owners and security reviewers",
     eyebrow: "KNOWLEDGE OPERATIONS",
     title: "Review, promote and govern knowledge as an operational asset.",
@@ -91,6 +97,15 @@ const SOLUTIONS = {
 } as const;
 
 type SolutionSlug = keyof typeof SOLUTIONS;
+
+/*
+  WG-048: every solution page ends at the hub and at the documentation, not at a dead end.
+
+  `resources` above is one of the hub's own tags, so this link lands on a filter that exists
+  and is labelled with the hub's own words. Nothing here links to `/cookbooks/*`: that route is
+  a proposal, and a draft page is not offered to a reader as the next step.
+*/
+const resourceTagOf = (solution: (typeof SOLUTIONS)[SolutionSlug]): ResourceTag => solution.resources;
 
 export function generateStaticParams() {
   return Object.keys(SOLUTIONS).map((slug) => ({ slug }));
@@ -173,6 +188,15 @@ export default async function SolutionPage({ params }: { params: Promise<{ slug:
           <PublicPrimaryCta className="btn" />
           <Link className="btn ghost" href="/explore">Explore a World</Link>
         </div>
+
+        <p className="fine">
+          Next:{" "}
+          <Link href={resourceFilterHref(resourceTagOf(solution)) as Route}>
+            {RESOURCE_TAG_LABELS[resourceTagOf(solution)].toLowerCase()}
+          </Link>{" "}
+          in the resources hub, or the exact product contract in the{" "}
+          <Link href="/docs">documentation</Link>.
+        </p>
       </div></section>
     </PublicPageShell>
   );
