@@ -1,0 +1,975 @@
+# CLAIMS_REGISTRY.yaml — Public claim governance (blueprint §72; program §44)
+#
+# MOVED 2026-09-11. This file lived in `D:\CodexProjects\uskc-lanes\gtm\CLAIMS_REGISTRY.yaml`,
+# outside the site repository, where nothing that ships could read it and nothing in CI could
+# fail when it went stale. It now lives beside the code it governs; `MOVED_TO.md` in the old
+# directory points here, and the old copy must not be edited again. There is one registry.
+#
+# Every quantitative or capability claim live in the site copy read for the 2026-09-08 lane:
+# /, /knowledge-compiler, /pricing, /security, /sources, /developers, /benchmarks, /evidence,
+# /research, /research/notes, /trust — plus the five 2026-09-11 rows listed under RE-ALIGNMENT.
+#
+# Site repo: `0ssol1620-byte/tavonel-saas-foundation`. Paths in `artifact` are relative to that
+# repository's root unless they name a drive.
+#
+# ---------------------------------------------------------------------------------------------
+# Fields (2026-09-08: program §44 names ten; the first revision of this file carried six)
+#
+#   claimId                The stable id a page, a cookbook record or a report cites. Assigned
+#                          2026-09-11 in file order, CLM-001..CLM-049, and never reused: a
+#                          retired claim keeps its id so a citation to it can still be resolved.
+#   claim                  The sentence as a reader meets it, quoted or closely paraphrased.
+#   surface                Where it is said.
+#   evidence               What makes it true — the code, constant or decision behind it.
+#   artifact               The file an auditor opens to check it, or `none` with the reason.
+#                          `none` is not a defect on a copy claim; it is a defect on a number.
+#   runtime                Which running thing the claim describes. A claim derived from a
+#                          constant is true of any deployment; a claim about an activation gate
+#                          is true of this one and stops being true when the gate moves.
+#   scope                  What the claim covers.
+#   limitations            What it does not say. The half a reader supplies for themselves if
+#                          nobody writes it down.
+#   status                 §72's five: DRAFT / SUPPORTED / QUALIFIED / RESTRICTED / RETIRED.
+#   public_private         PUBLIC — may be said on a public page.
+#                          RESTRICTED_MECHANISM — describes a technology on the disclosure
+#                          registry's publication freeze; needs IP review before it is said.
+#                          INTERNAL — not for a public surface in any form.
+#   ip_disclosure_review_required   Present and `true` only where a founder/IP review gates it.
+#   owner                  Who keeps this row true day to day. Per CLAUDE.md, what a public claim
+#                          says and whether evidence supports it is always the founder's call;
+#                          `engineering` here means the row is derived from a constant and pinned
+#                          by a named test, so drift fails a build rather than waiting for a read.
+#   expiry_or_revalidation The event that invalidates it, not only a date. A date alone expires
+#                          on a calendar; a claim expires when the thing under it moves.
+#   supportedBuild         The commit this row was last checked against. `38d957d` means a lane
+#                          opened the artifact at that HEAD; `3157ee5` means the row was written
+#                          on 2026-09-08 and has not been re-read since. It is a record of the
+#                          last check, never an assertion that the row is still true.
+#   lastVerifiedAt         The day of that check. Moved by a person or a lane that actually read
+#                          the artifact — never by a rebase, a reformat or a copy.
+#   review_date            Standing cadence. K-03: every row still carries the same placeholder,
+#                          because no cadence has been set. That is a founder item, and a uniform
+#                          date is recorded here as the absence of a cadence rather than as one.
+#
+# Blueprint §16.3 asks for eight fields per claim. Seven are the columns above under different
+# names — text=claim, evidenceRef=evidence+artifact, reviewer=owner, publicationPermission=
+# public_private, recheckTrigger=expiry_or_revalidation, plus scope and lastVerifiedAt. The
+# eighth, supportedBuild, is new above. No second schema was created: a parallel registry would
+# drift from this one within a week, and this file is already the thing CI can be pointed at.
+# ---------------------------------------------------------------------------------------------
+#
+# No claim below was invented by a lane — every row quotes or paraphrases text or a constant
+# already in the repository. Rows with no receipt are DRAFT (asserted, unverified by an artifact)
+# or RESTRICTED (should not be said publicly without a receipt or a founder-approved qualifier).
+#
+# Two rows describe copy that is no longer live: the `/research` category text the 2026-09-08 IP
+# gate found describing frozen technologies. They are recorded as RESTRICTED rather than deleted,
+# because a registry that only lists what is live cannot stop a sentence from coming back.
+#
+# ---------------------------------------------------------------------------------------------
+# RE-ALIGNMENT to HEAD 38d957d, 2026-09-11 (website-growth lane keyword-claims-data, WG-105)
+#
+# Fourteen rows were re-read against the current build and carry `lastVerifiedAt: 2026-09-11`:
+# CLM-003, 004, 005, 008, 009, 011 (the capability-manifest rows), CLM-016 (promote), CLM-022,
+# 023, 024 (billing and pricing constants), CLM-027, 028 (the empty benchmark registry),
+# CLM-029 (one locator) and CLM-037 (/knowledge-compiler). The other thirty keep 2026-09-08 and
+# `supportedBuild: 3157ee5`, which says only that nobody has re-read them.
+#
+# Two rows had their `limitations` extended rather than their claim changed:
+#
+#   CLM-016  Promotion is closed by design — now also records that promote requires plan
+#            `studio` (Team, $99, `saleChannel: "contact"`) and that an Evaluation trial or a
+#            self-serve Developer subscription is refused with 402. The claim was true and
+#            incomplete, and the missing half is the one a growth page would trip over.
+#   CLM-037  /knowledge-compiler — now records the 2026-09-11 abstention correction (see
+#            CLM-047), because the page's own "where the category stops" row was one of the four
+#            sentences that moved.
+#
+# Five rows are new, for five things the 2026-09-08 registry could not have known:
+#
+#   CLM-045  TXT/CSV/HTML declared and withheld behind `TEXT_INPUTS_LIVE = false`.
+#   CLM-046  The live engine's relation set (supported_by, mentions, contradicts).
+#   CLM-047  Ask/retrieval declines only when nothing matched — eligibility, not relevance.
+#   CLM-048  Two identical uploads are two documents. Nothing dedupes.
+#   CLM-049  WG-012: the native-structure/table/formula sentences are computed from the manifest.
+#
+# WG-012 cross-check (source manifest vs the Native / table / formula descriptions), done at
+# 38d957d and recorded as CLM-049 rather than as a separate document:
+#
+#   agrees, structurally — /product/document-understanding selects its table sentence and its
+#     structure sentence by reading `knownLimitations` for `no_table_or_formula_extraction` and
+#     `no_native_structure_reader_yet`; /sources prints the preserved list and names cells and
+#     formulas as absent from it. A page cannot drift from the manifest it reads.
+#   agrees — LIVE_PRESERVED is [page, paragraph_text, bbox1000] on all eleven live rows, every
+#     row carries qualifiedAt: null and qualificationReceipt: null, and ZIP is UNSUPPORTED.
+#   gap — the three withheld text rows carry `converted_from_text_before_reading`,
+#     `cells_are_read_back_as_rendered_text`, `comma_delimiter_and_utf8_encoding_assumed` and
+#     `laid_out_by_libreoffice_not_by_a_browser`, none of which any public sentence covers. That
+#     is correct while the gate is closed and becomes a copy defect the day it opens.
+#   gap — `product-claims-sync.test.ts` guards a hand-listed set of surfaces, so a new page that
+#     writes a reading limit in its own words is unguarded until its row is added there.
+#
+# Not re-aligned, and deliberately: no price, no plan name, no threshold and no measured figure
+# in any row was changed. A claim whose number moved would need its own receipt, and this lane
+# ran nothing.
+# ---------------------------------------------------------------------------------------------
+#
+# 49 claims: 32 SUPPORTED · 9 QUALIFIED · 4 RESTRICTED · 3 DRAFT · 1 RETIRED.
+# 3 carry `public_private: RESTRICTED_MECHANISM` and `ip_disclosure_review_required: true`;
+# 2 carry `public_private: INTERNAL`.
+claims:
+
+  - claimId: CLM-001
+    claim: "Your AI needs more than searchable files. It needs a current, traceable world."
+    surface: "/"
+    evidence: "docs/north-star (founder-locked hero, RESOLVED A-2 2026-09-06); components/home-page-client.tsx h1"
+    artifact: "nextjs/components/home-page-client.tsx"
+    runtime: "Site copy, any deployment."
+    scope: "Brand hero line, not a measured claim."
+    limitations: "Says nothing about how current, or how much is traceable. Neither is quantified anywhere."
+    status: SUPPORTED
+    public_private: PUBLIC
+    owner: founder
+    expiry_or_revalidation: "On any change to the founder-locked hero (RESOLVED A-2)."
+    supportedBuild: "3157ee5"
+    lastVerifiedAt: "2026-09-08"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-002
+    claim: "TAVONEL compiles your own sources into that world: current, because it is recompiled when those sources change, and traceable, because every compiled fact stays traceable to its exact source location."
+    surface: "/"
+    evidence: "components/home-page-client.tsx lede; mechanism described in app/evidence/page.tsx (Source identity, Source-location binding, Version binding)"
+    artifact: "nextjs/app/evidence/page.tsx"
+    runtime: "Site copy; the mechanism it describes is the PDF-path reading path in this deployment."
+    scope: "Describes the mechanism as built for PDF-path documents; not a claim of coverage across every source family."
+    limitations: "Recompilation is described as a behaviour, never with a cost or a proportion. No published measurement supports any statement about how much of a world a change rebuilds."
+    status: QUALIFIED
+    public_private: PUBLIC
+    owner: founder
+    expiry_or_revalidation: "On the first published recompilation measurement, or a change to the evidence-binding path."
+    supportedBuild: "3157ee5"
+    lastVerifiedAt: "2026-09-08"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-003
+    claim: '"Documents, scans, spreadsheets, decks" (accepted as sources, hero proof strip)'
+    surface: "/"
+    evidence: "shared/capabilityManifest.ts CAPABILITY_MANIFEST.entries (pdf, docx, xlsx, pptx, odt, ods, odp, jpg, png, tiff, gif, all status BEST_EFFORT)"
+    artifact: "shared/capabilityManifest.ts"
+    runtime: "Any deployment — derived from the manifest at build time."
+    scope: "Format is accepted at upload; every accepted format is sanitized to PDF and OCR-read, preserving only page/paragraph-text/bbox. No native XLSX cell/formula, no native DOCX/PPTX structure survives today."
+    limitations: "Acceptance is not fidelity. A deck is read as pages, not as slides with shapes."
+    status: QUALIFIED
+    public_private: PUBLIC
+    owner: engineering
+    expiry_or_revalidation: "On any change to CAPABILITY_MANIFEST entries or their status tier."
+    supportedBuild: "38d957d"
+    lastVerifiedAt: "2026-09-11"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-004
+    claim: '"Formats this deployment reads" — chip list derived from `sourceFamilyChips` (PDF/DOCX/ODT, XLSX/ODS, PPTX/ODP, JPG/PNG/TIFF/GIF)'
+    surface: "/"
+    evidence: "shared/capabilityManifest.ts deriveSourceFamilyChips(); /sources page prints the same manifest"
+    artifact: "shared/capabilityManifest.ts"
+    runtime: "Any deployment — the chips are computed from the manifest, not retyped."
+    scope: "Upload-accepted formats only; single source of truth is the manifest by construction."
+    limitations: "Reads means accepts and OCR-reads. It does not mean any format-specific structure is preserved."
+    status: SUPPORTED
+    public_private: PUBLIC
+    owner: engineering
+    expiry_or_revalidation: "On any manifest change; the derivation makes drift impossible without one."
+    supportedBuild: "38d957d"
+    lastVerifiedAt: "2026-09-11"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-005
+    claim: '"A ZIP is expanded in your browser and every file inside it is checked the same way — the archive itself is never compiled" / ZIP is UNSUPPORTED'
+    surface: "/, /sources"
+    evidence: "shared/capabilityManifest.ts ZIP entry (status UNSUPPORTED); lib/archive-expand.ts (128 files / 500MB / no encrypted or nested archives)"
+    artifact: "nextjs/lib/archive-expand.ts"
+    runtime: "This deployment's intake path."
+    scope: "Applies to the current intake code path."
+    limitations: "The stated limits (128 files, 500MB, no encrypted or nested archives) are part of the claim; quoting the sentence without them overstates it."
+    status: SUPPORTED
+    public_private: PUBLIC
+    owner: engineering
+    expiry_or_revalidation: "On any change to the archive-expansion limits."
+    supportedBuild: "38d957d"
+    lastVerifiedAt: "2026-09-11"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-006
+    claim: "Google Drive · Dropbox · OneDrive / SharePoint — Beta. Read-only discovery and import, built and contract-tested. Not qualified: deletion and permission semantics are still being settled."
+    surface: "/, /integrations, /developers"
+    evidence: "connector-oauth-adapters.ts (three providers); founder decision B-7 — Google Drive trashed=false deletion gap blocks qualification"
+    artifact: "nextjs/lib/connector-oauth-adapters.ts; D:\\CodexProjects\\uskc-lanes\\USKC_FOUNDER_DECISIONS_RESOLVED_2026-09-06.md"
+    runtime: "This deployment. No connector is VERIFIED on any deployment (B-7)."
+    scope: "Beta tier explicitly, not qualified or verified."
+    limitations: "Beta covers discovery and import only. Deletion, permission change, tombstone and ACL propagation are not qualified for any connector."
+    status: QUALIFIED
+    public_private: PUBLIC
+    owner: founder
+    expiry_or_revalidation: "When a connector passes full-lifecycle qualification, or when B-7 is revisited."
+    supportedBuild: "3157ee5"
+    lastVerifiedAt: "2026-09-08"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-007
+    claim: "Object storage and mounted shares — Enterprise-assisted. S3-compatible buckets and SMB, NFS or SFTP paths are imported by an agent you run inside your own network — not a connector you switch on here."
+    surface: "/, /developers, /integrations"
+    evidence: "public/developer/tavonel-source-agent.py (customer-run agent); founder decision A-4"
+    artifact: "nextjs/public/developer/tavonel-source-agent.py"
+    runtime: "Customer-run agent against this deployment's upload and sync routes."
+    scope: "Assisted import route, not a self-serve connector; explicitly not called generally supported per A-4."
+    limitations: "The agent runs in the customer's network and is set up with them. Nothing here is switched on from the product."
+    status: SUPPORTED
+    public_private: PUBLIC
+    owner: founder
+    expiry_or_revalidation: "If the agent ever becomes self-serve, this row is wrong the same day."
+    supportedBuild: "3157ee5"
+    lastVerifiedAt: "2026-09-08"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-008
+    claim: '"0 of X accepted formats carry a qualification receipt" / "No format on this deployment carries a qualification receipt."'
+    surface: "/sources"
+    evidence: "shared/capabilityManifest.ts — every entry has qualifiedAt: null, qualificationReceipt: null"
+    artifact: "shared/capabilityManifest.ts"
+    runtime: "Computed at build time from the manifest; true of any deployment built from this tree."
+    scope: "Whole-deployment statement (the qualified.length === 0 branch)."
+    limitations: "It states an absence. It is the strongest claim on the site precisely because it claims nothing."
+    status: SUPPORTED
+    public_private: PUBLIC
+    owner: engineering
+    expiry_or_revalidation: "The first non-null qualificationReceipt changes the sentence automatically; the receipt itself then needs a row here."
+    supportedBuild: "38d957d"
+    lastVerifiedAt: "2026-09-11"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-009
+    claim: "Every accepted source is sanitized to PDF and read by OCR; every row preserves page, paragraph text and bounding box; a spreadsheet's cells and formulas are not preserved."
+    surface: "/sources"
+    evidence: "shared/capabilityManifest.ts LIVE_PRESERVED = [page, paragraph_text, bbox1000]; LIVE_READER_PLAN = [cdr_sanitizer_v1, foundation_ocr_gpu_v1]"
+    artifact: "shared/capabilityManifest.ts"
+    runtime: "This deployment's reading path."
+    scope: "Applies to all listed formats identically; no per-format native fidelity today."
+    limitations: "Says what is preserved, not how accurately it is read. No OCR accuracy figure exists on this deployment."
+    status: SUPPORTED
+    public_private: PUBLIC
+    owner: engineering
+    expiry_or_revalidation: "On any change to LIVE_PRESERVED or LIVE_READER_PLAN."
+    supportedBuild: "38d957d"
+    lastVerifiedAt: "2026-09-11"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-010
+    claim: "No connector on this deployment has been qualified for the full lifecycle (create/update/rename/move/delete/permission change/tombstone/source-version propagation/world update/ACL enforcement)."
+    surface: "/sources"
+    evidence: "founder decision B-7; shared/capabilityManifest.ts connector lifecycle comment"
+    artifact: "D:\\CodexProjects\\uskc-lanes\\USKC_FOUNDER_DECISIONS_RESOLVED_2026-09-06.md"
+    runtime: "All connectors, all deployments, as of 2026-09-08."
+    scope: "An absence disclosure covering every connector."
+    limitations: "None — the claim is the disclosure of a gap."
+    status: SUPPORTED
+    public_private: PUBLIC
+    owner: founder
+    expiry_or_revalidation: "On the first connector lifecycle qualification."
+    supportedBuild: "3157ee5"
+    lastVerifiedAt: "2026-09-08"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-011
+    claim: "Legacy binary HWP (.hwp) has no reader here; the upload route refuses it before any file is stored."
+    surface: "/sources"
+    evidence: "founder decision C-3 (HWP v5 excluded, manifest status REVIEW_REQUIRED, pyhwp not used); shared/capabilityManifest.ts has no HWP entry"
+    artifact: "shared/capabilityManifest.ts"
+    runtime: "This deployment's upload route."
+    scope: "Legacy binary .hwp only, not HWPX."
+    limitations: "Says nothing about HWPX, which is a different decision."
+    status: SUPPORTED
+    public_private: PUBLIC
+    owner: founder
+    expiry_or_revalidation: "If C-3 is revisited, or an HWP entry appears in the manifest."
+    supportedBuild: "38d957d"
+    lastVerifiedAt: "2026-09-11"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-012
+    claim: "Your documents are not used to train shared models. Models read your sources to compile your world, and for nothing else."
+    surface: "/security, /privacy"
+    evidence: "lib/activation-policy.ts (customerData.enabled = false — customer-data processing is gated); no training pipeline in the repository"
+    artifact: "nextjs/lib/activation-policy.ts"
+    runtime: "This deployment, with customer-data processing gated off."
+    scope: "True in the strong sense today because customer-data processing is not enabled at all."
+    limitations: "Its strength today comes partly from a gate being closed. The sentence must still be true under real traffic, not only by default-off — re-verify the moment customerData flips."
+    status: QUALIFIED
+    public_private: PUBLIC
+    owner: founder
+    expiry_or_revalidation: "The moment activationPolicy.customerData.enabled becomes true."
+    supportedBuild: "3157ee5"
+    lastVerifiedAt: "2026-09-08"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-013
+    claim: "Transport is TLS throughout, and stored objects are encrypted at rest by the storage provider."
+    surface: "/security, /trust"
+    evidence: "HSTS and upgrade-insecure-requests in nextjs/next.config.mjs, pinned by lib/security-headers.test.ts. At-rest is the storage provider's platform default."
+    artifact: "none — no qualification receipt exists for this deployment's at-rest configuration."
+    runtime: "Transport: verifiable on any response from tavonel.com. At rest: the provider's default, not configured or verified here."
+    scope: "Provider-default encryption at rest, not customer-managed keys and not a FIPS-validated claim."
+    limitations: "No key management statement, no key rotation statement, no customer-managed key. The at-rest half is inherited, not operated."
+    status: DRAFT
+    public_private: PUBLIC
+    owner: founder
+    expiry_or_revalidation: "On a storage-provider change, or when an at-rest configuration is actually asserted rather than inherited."
+    supportedBuild: "3157ee5"
+    lastVerifiedAt: "2026-09-08"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-014
+    claim: "Access is a workspace membership checked server-side on every request; there are no roles, no SSO and no seat model in this deployment."
+    surface: "/security, /trust"
+    evidence: "lib/foundation-pilot.ts / lib/developer-auth.ts read the credential from the Authorization header on every route; the pricing page sells Team through /contact because seat accounting does not exist"
+    artifact: "nextjs/lib/security/route-classification.json"
+    runtime: "This deployment."
+    scope: "Current-state absence disclosure, not a roadmap promise."
+    limitations: "S-54 records that the database half of tenant isolation is untested. The route half is asserted; the row-level half is not."
+    status: SUPPORTED
+    public_private: PUBLIC
+    owner: engineering
+    expiry_or_revalidation: "The day a role, an invitation or an SSO path ships."
+    supportedBuild: "3157ee5"
+    lastVerifiedAt: "2026-09-08"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-015
+    claim: "Creating, rotating and revoking a developer key writes an append-only audit row naming the workspace, the action, the target and whether a person or a key acted."
+    surface: "/security"
+    evidence: "lib/developer-store.ts posts to foundation_developer_audit_events; founder decision B-6"
+    artifact: "nextjs/lib/developer-store.ts"
+    runtime: "This deployment, developer-key events only."
+    scope: "Developer, API and configuration events."
+    limitations: "Not a customer-facing audit export, and not the enterprise_audit_events table for source or data security events. A reader who wants an audit trail over their documents does not have one."
+    status: SUPPORTED
+    public_private: PUBLIC
+    owner: engineering
+    expiry_or_revalidation: "If the audit table or its columns change."
+    supportedBuild: "3157ee5"
+    lastVerifiedAt: "2026-09-08"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-016
+    claim: "Promotion is closed by design: a candidate world becomes active only after an authenticated person approves it."
+    surface: "/security, /knowledge-compiler, /pricing"
+    evidence: "lib/activation-policy.ts activationPolicy.candidatePromotion.enabled = false"
+    artifact: "nextjs/lib/activation-policy.ts"
+    runtime: "This deployment. Served verbatim from /api/status."
+    scope: "All worlds on this deployment; no auto-promote path exists."
+    limitations: >-
+      It is a gate, not a review tool. Nothing here claims the person promoting has been given
+      enough to decide well. Re-aligned 2026-09-11: the person also has to be on the Team plan.
+      `app/api/collections/[id]/promote/route.ts:100,237` calls
+      `authorizeFoundationProduct(..., "studio")`, and `lib/billing-catalog.ts:32-49` sells
+      `studio_access` at $99 with `saleChannel: "contact"`, so an Evaluation trial and a
+      self-serve Developer subscription are both refused with
+      `402 STUDIO_SUBSCRIPTION_REQUIRED`. Copy that pairs this sentence with a self-serve
+      first-success story describes a path that does not exist today. FD-02/FD-14.
+    status: SUPPORTED
+    public_private: PUBLIC
+    owner: engineering
+    expiry_or_revalidation: "The moment candidatePromotion.enabled becomes true, or the plan promote requires moves (FD-02/FD-14)."
+    supportedBuild: "38d957d"
+    lastVerifiedAt: "2026-09-11"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-017
+    claim: "A control opens only after the one before it is qualified, so a partial failure stops the pipeline rather than emitting an incomplete world."
+    surface: "/security"
+    evidence: "BOUNDARY chain in lib/evidence-record.ts (Quarantine → Sanitize → Understand → Review); CLAUDE.md fail-closed invariant"
+    artifact: "nextjs/lib/evidence-record.ts"
+    runtime: "This deployment's pipeline order."
+    scope: "Architectural description of the enforced order."
+    limitations: "Not an incident-rate claim, and not a statement that no partial failure has ever occurred."
+    status: SUPPORTED
+    public_private: PUBLIC
+    owner: engineering
+    expiry_or_revalidation: "On a change to the BOUNDARY chain."
+    supportedBuild: "3157ee5"
+    lastVerifiedAt: "2026-09-08"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-018
+    claim: "Quarantine source objects are sanitized before anything downstream reads them. The sanitizer running today is the synthetic build, tavonel-cdr-synthetic; the pypdfium2 sanitizer service is not deployed, so this row describes the interim path and not the renderer it will become."
+    surface: "/security, /api/status, /trust"
+    evidence: "Live Cloud Run revision `tavonel-cdr-synthetic-00002-6sz`, image sha256:00faa4cf… (synthetic, PyMuPDF era); `tavonel-pdf-raster-cdr` does not exist as a service; quarantine-sidecar/cdr-cloudrun pins pypdfium2==5.13.0 and its licensing and fail-closed tests pass on that tree"
+    artifact: "D:\\CodexProjects\\uskc-lanes\\reports\\gtm\\O1_LIVE_PROOF.md; quarantine-sidecar/cdr-cloudrun/tests/test_disarm_malware.py"
+    runtime: "Cloud Run, live revision tavonel-cdr-synthetic-00002-6sz. NOT the tested pypdfium2 build."
+    scope: "Names the deployed build rather than the intended one. Replaces the previous sentence, 'The CDR worker sanitizes quarantine source objects and writes immutable PDFs before downstream reading', which was true of the code and silent about the deployment (matrix C-13)."
+    limitations: "The malware fail-closed and renderer-licensing tests have never run against the live service. C-06's EICAR qualification is unrun in production. Nothing here may be read as a statement that the PDFium renderer is serving traffic."
+    status: QUALIFIED
+    public_private: PUBLIC
+    owner: founder
+    expiry_or_revalidation: "When C-11 lands — a deployed image digest that matches the tested build. `nextjs/lib/trust-page-answers.test.ts` fails if the string claims PDFium before then."
+    supportedBuild: "3157ee5"
+    lastVerifiedAt: "2026-09-08"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-019
+    claim: '"8 tools over sources, World, search, Ask, objects, relations, evidence and package" (MCP server) / "No write tool, and the server refuses to start if one is added."'
+    surface: "/developers, /pricing"
+    evidence: "public/developer/tavonel-mcp.mjs; lib/mcp-server.test.ts assertReadOnly contract"
+    artifact: "nextjs/public/developer/tavonel-mcp.mjs"
+    runtime: "The published MCP server, pinned by sha256 in the channel manifest."
+    scope: "The shipped MCP server contract."
+    limitations: "Read-only is a property of the server, not of the API key it carries."
+    status: SUPPORTED
+    public_private: PUBLIC
+    owner: engineering
+    expiry_or_revalidation: "On any change to the tool list or the read-only assertion."
+    supportedBuild: "3157ee5"
+    lastVerifiedAt: "2026-09-08"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-020
+    claim: "A signed package: JSON-LD and Turtle semantic projections, graph nodes and relationships, a retrieval corpus, provenance activities and a validation report, under a signed manifest with a digest for every file."
+    surface: "/developers, /evidence, /pricing, /docs/exports"
+    evidence: "lib/collection-download.ts REQUIRED_PACKAGE_PATHS + PACKAGE_EXTRAS; public key published at /api/export/trust"
+    artifact: "nextjs/lib/collection-download.ts"
+    runtime: "Any deployment; the file list is printed from the exporter, not retyped."
+    scope: "The package contract as implemented by buildSignedCollectionArchive."
+    limitations: "A package whose signature status reads `external_signer_required` has not been signed. The claim is about the format, not about every emitted package being signed."
+    status: SUPPORTED
+    public_private: PUBLIC
+    owner: engineering
+    expiry_or_revalidation: "On any change to REQUIRED_PACKAGE_PATHS."
+    supportedBuild: "3157ee5"
+    lastVerifiedAt: "2026-09-08"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-021
+    claim: "Free Evaluation: Up to 3 files and 50 standard pages, 1 Compiled World with Evidence and Ask, Signed export, 7 days, no card required."
+    surface: "/pricing"
+    evidence: "components/pricing-page-client.tsx EVALUATION constant"
+    artifact: "nextjs/components/pricing-page-client.tsx"
+    runtime: "This deployment, when self-service access is open."
+    scope: "As-coded plan limits."
+    limitations: "The limits are copy, not enforced by the same constant the trial code reads. A drift between the two would not fail a build today."
+    status: SUPPORTED
+    public_private: PUBLIC
+    owner: founder
+    expiry_or_revalidation: "On any change to the evaluation limits in lib/self-service-trial.ts."
+    supportedBuild: "3157ee5"
+    lastVerifiedAt: "2026-09-08"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-022
+    claim: "Developer: $29/month, 500 standard verified pages, compile your own worlds, evidence/Ask/signed export, API and MCP access."
+    surface: "/pricing"
+    evidence: "lib/billing-catalog.ts BILLING_OFFERS.observer_access (priceUsd 29, includedPages 500)"
+    artifact: "nextjs/lib/billing-catalog.ts"
+    runtime: "Any deployment — the plan grid is derived from the catalog."
+    scope: "self_serve saleChannel — purchasable when liveCheckout is true."
+    limitations: "The price is the catalog's, not a quote. What a page costs past the included ones is a separate claim."
+    status: SUPPORTED
+    public_private: PUBLIC
+    owner: founder
+    expiry_or_revalidation: "On any change to BILLING_OFFERS."
+    supportedBuild: "38d957d"
+    lastVerifiedAt: "2026-09-11"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-023
+    claim: "Team: $99/month, 2,500 standard verified pages, review queue and version history, guided corpus onboarding."
+    surface: "/pricing"
+    evidence: "lib/billing-catalog.ts BILLING_OFFERS.studio_access (priceUsd 99, includedPages 2500)"
+    artifact: "nextjs/lib/billing-catalog.ts"
+    runtime: "Any deployment; sold through /contact, not checkout."
+    scope: "saleChannel is 'contact' because seat, invitation and role accounting do not exist."
+    limitations: "The plan name says Team and the product has no seats. Any copy implying self-serve Team checkout is RESTRICTED until saleChannel flips. Founder item G-14 owns the wording."
+    status: QUALIFIED
+    public_private: PUBLIC
+    owner: founder
+    expiry_or_revalidation: "When saleChannel flips to self_serve, or when seat accounting ships."
+    supportedBuild: "38d957d"
+    lastVerifiedAt: "2026-09-11"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-024
+    claim: "Standard processing rate: $0.04 per standard page ($0.01 × 4 units); complex pages escalate but never exceed $0.06 per page ($0.01 × 6 units) without new confirmation."
+    surface: "/pricing"
+    evidence: "lib/usage-pricing.ts PROCESSING_UNIT_USD=0.01, STANDARD_UNITS_PER_PAGE=4, MAX_UNITS_PER_PAGE=6"
+    artifact: "nextjs/lib/usage-pricing.ts"
+    runtime: "The same constants the reservation and checkout code charge against."
+    scope: "Arithmetic identity with the charging constants — not a marketing number."
+    limitations: "Says what a page costs, not what a corpus costs: the page count itself is estimated before a run and confirmed after."
+    status: SUPPORTED
+    public_private: PUBLIC
+    owner: engineering
+    expiry_or_revalidation: "On any change to the three pricing constants."
+    supportedBuild: "38d957d"
+    lastVerifiedAt: "2026-09-11"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-025
+    claim: "Each renewal adds its included pages to your balance, and nothing in the billing code expires an unused balance today. That is the current behaviour of this deployment, not yet a published rollover term."
+    surface: "/pricing"
+    evidence: "apply_foundation_billing_event_v4 (migration 0035) grants each renewal's allowance into credit_balance; no job, trigger or route resets it"
+    artifact: "supabase/migrations/0035_subscription_allowance_ledger.sql"
+    runtime: "Production Supabase, migration 0035 onward."
+    scope: "A statement of current behaviour, explicitly not a contractual term."
+    limitations: "Whether unused capacity is contractually carried is undecided (F-7 / G-14). A reader who treats this as a term is reading more than the sentence says, which is why the sentence says so."
+    status: DRAFT
+    public_private: PUBLIC
+    owner: founder
+    expiry_or_revalidation: "When the founder sets a rollover term, or when any code expires a balance."
+    supportedBuild: "3157ee5"
+    lastVerifiedAt: "2026-09-08"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-026
+    claim: '"A PDF page is a page, one image is one page, a slide is a page-equivalent." / preflight page-count estimate methodology (verified / declared / estimated tiers)'
+    surface: "/pricing"
+    evidence: "lib/usage-pricing.ts pageEstimateConfidence, pageCountLabel, canAuthorizeCharge, canReserveAgainst"
+    artifact: "nextjs/lib/usage-pricing.ts"
+    runtime: "Any deployment."
+    scope: "Byte-derived counts are estimate-labelled; only verified counts (pdf_page_tree, image, pptx_slides) may authorize a final charge."
+    limitations: "An estimate is an upper bound, and the page says so. It is not a promise about the final number, only about its ceiling."
+    status: SUPPORTED
+    public_private: PUBLIC
+    owner: engineering
+    expiry_or_revalidation: "On any change to the confidence tiers."
+    supportedBuild: "3157ee5"
+    lastVerifiedAt: "2026-09-08"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-027
+    claim: '"No competitor score, no arena figure and no vendor leaderboard row appears here" / "No run on this deployment carries every field of the receipt below. So this page publishes the protocol and no table."'
+    surface: "/benchmarks"
+    evidence: "lib/benchmark-registry.ts — benchmark-registry.records.json holds an empty array; validateBenchmarkReceipt enforces six digest fields plus denominator, failures and comparisonBasis"
+    artifact: "nextjs/lib/benchmark-registry.records.json"
+    runtime: "Any deployment built from this tree."
+    scope: "Accurate as of 2026-09-08: zero published benchmark records."
+    limitations: "The protocol is published; nothing has been measured through it. §71 and §73 both apply the moment a record is added."
+    status: SUPPORTED
+    public_private: PUBLIC
+    owner: founder
+    expiry_or_revalidation: "The first record added to benchmark-registry.records.json needs its own row here before it is published."
+    supportedBuild: "38d957d"
+    lastVerifiedAt: "2026-09-11"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-028
+    claim: '"Verified Fresh Knowledge Coverage" (North Star metric) — "no value published on this deployment"'
+    surface: "/benchmarks"
+    evidence: "lib/benchmark-registry.ts NORTH_STAR constant, captioned 'DEFINITION · NO VALUE PUBLISHED ON THIS DEPLOYMENT'"
+    artifact: "nextjs/lib/benchmark-registry.ts"
+    runtime: "Any deployment."
+    scope: "A definition, not a measured number."
+    limitations: "Any future value needs the full BenchmarkReceipt — denominator, digests, comparisonBasis — before it may be shown beside the definition."
+    status: DRAFT
+    public_private: PUBLIC
+    owner: founder
+    expiry_or_revalidation: "The first published value."
+    supportedBuild: "38d957d"
+    lastVerifiedAt: "2026-09-11"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-029
+    claim: "This deployment reads one [locator] today — PDF page and region, through the sanitize-to-PDF reading path — and every other format it accepts is read through that same path."
+    surface: "/evidence"
+    evidence: "shared/capabilityManifest.ts (all entries use pdf evidenceLocatorKinds); explicit disclaimer in app/evidence/page.tsx"
+    artifact: "shared/capabilityManifest.ts"
+    runtime: "This deployment's reading path."
+    scope: "The other seven locator shapes listed are model and vocabulary only — none is implemented."
+    limitations: "Do not read the list of eight as eight supported locators. The page says one; the list is the model it would grow into."
+    status: QUALIFIED
+    public_private: PUBLIC
+    owner: engineering
+    expiry_or_revalidation: "When a second locator kind is implemented."
+    supportedBuild: "38d957d"
+    lastVerifiedAt: "2026-09-11"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-030
+    claim: "An export carries a manifest with a digest for every file, signed on the way out. The public key is published at /api/export/trust so a recipient can verify a package without asking us."
+    surface: "/evidence, /pricing"
+    evidence: "lib/collection-download.ts signed manifest construction; /api/export/trust route publishes the public key"
+    artifact: "nextjs/lib/collection-download.ts"
+    runtime: "Any deployment with a signer configured."
+    scope: "The signature mechanism as implemented."
+    limitations: "Where no external signer is configured, a package reports `external_signer_required` rather than presenting itself as verified. The claim is about the mechanism, not about every package."
+    status: SUPPORTED
+    public_private: PUBLIC
+    owner: engineering
+    expiry_or_revalidation: "On a change to the signing path or the published key route."
+    supportedBuild: "3157ee5"
+    lastVerifiedAt: "2026-09-08"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-031
+    claim: "A world with an unresolved link is not emitted. Broken knowledge fails visibly instead of arriving looking complete."
+    surface: "/evidence"
+    evidence: "CLAUDE.md fail-closed invariant; lib/evidence-record.ts EVIDENCE — 404 of 1,000 refused in one campaign, published with its denominator"
+    artifact: "nextjs/lib/evidence-record.ts"
+    runtime: "The compiler behaviour, evidenced by one named campaign."
+    scope: "Architectural behaviour supported by the published 404/1,000 measurement."
+    limitations: "One campaign, one corpus. Not a universal guarantee for every corpus shape, and the refusal rate is not a general rate."
+    status: SUPPORTED
+    public_private: PUBLIC
+    owner: founder
+    expiry_or_revalidation: "If the 404/1,000 figure is ever restated without its denominator, this row is the reason it may not be."
+    supportedBuild: "3157ee5"
+    lastVerifiedAt: "2026-09-08"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-032
+    claim: "Recovery changes the outcome — on a public benchmark with an unmodified scoring path, the recovery runtime moved a document extraction score substantially. Our own measurement, published with its confidence interval, never placed beside a competitor's number as if reproduced."
+    surface: "/research/notes"
+    evidence: "lib/evidence-record.ts EVIDENCE row 1, state=measured"
+    artifact: "nextjs/lib/evidence-record.ts"
+    runtime: "A research measurement, not a production claim."
+    scope: "MEASURED in the site's own vocabulary — a number produced with a scoring path the team did not touch."
+    limitations: "'Substantially' is not quantified on the public page. The confidence interval lives with the underlying receipt and is not printed inline. Never place it beside a vendor leaderboard row."
+    status: SUPPORTED
+    public_private: PUBLIC
+    owner: founder
+    expiry_or_revalidation: "If any number is ever added to this sentence, it needs the receipt with it."
+    supportedBuild: "3157ee5"
+    lastVerifiedAt: "2026-09-08"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-033
+    claim: "Of a thousand documents offered in one campaign, four hundred and four were refused, every one for a link the compiler could not resolve."
+    surface: "/research/notes"
+    evidence: "lib/evidence-record.ts EVIDENCE row 2, state=measured (404/1,000)"
+    artifact: "nextjs/lib/evidence-record.ts"
+    runtime: "One named campaign."
+    scope: "One denominator (1,000), not a general refusal rate."
+    limitations: "Quoting the 404 without the 1,000 turns a published denominator into a bare number, which is the failure §73 exists to prevent."
+    status: SUPPORTED
+    public_private: PUBLIC
+    owner: founder
+    expiry_or_revalidation: "Never restate without the denominator."
+    supportedBuild: "3157ee5"
+    lastVerifiedAt: "2026-09-08"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-034
+    claim: "Blind quality detection failed — prediction-only signals could not beat ranking by length alone. Published as unsupported, and not shipped as a feature."
+    surface: "/research/notes"
+    evidence: "lib/evidence-record.ts EVIDENCE row 3, state=unsupported"
+    artifact: "nextjs/lib/evidence-record.ts"
+    runtime: "A research finding; nothing in production routes on a blind quality score."
+    scope: "A negative result, explicitly not a shipped capability."
+    limitations: "CLAUDE.md's invariant — never route on a scalar blind quality score — is the operational half of this row and outlives the page."
+    status: RETIRED
+    public_private: PUBLIC
+    owner: founder
+    expiry_or_revalidation: "Only a new experiment reopens it, and it would need its own row."
+    supportedBuild: "3157ee5"
+    lastVerifiedAt: "2026-09-08"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-035
+    claim: "Most thresholds are uncalibrated — tests show the code does what its author intended, they do not show a threshold is right."
+    surface: "/research/notes"
+    evidence: "lib/evidence-record.ts EVIDENCE row 4, state=unproven; CLAUDE.md: CalibrationTable.calibrated is False"
+    artifact: "nextjs/lib/evidence-record.ts"
+    runtime: "Standing caveat over the whole codebase."
+    scope: "Applies to essentially every threshold; a standing caveat, not a per-feature exception."
+    limitations: "No threshold value may be published. Identity thresholds in particular are trade-secret register items (TS-01–TS-26)."
+    status: RESTRICTED
+    public_private: PUBLIC
+    owner: founder
+    expiry_or_revalidation: "When a calibration corpus is named and CalibrationTable.calibrated can be set true."
+    supportedBuild: "3157ee5"
+    lastVerifiedAt: "2026-09-08"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-036
+    claim: "Selective recompilation — the landing demonstration follows a dependency path on declared fixture data. Not a measurement of production impact precision, and not a shipped capability."
+    surface: "/research/notes (demonstrated at /explore)"
+    evidence: "lib/evidence-record.ts EVIDENCE row 5, state=unproven"
+    artifact: "nextjs/lib/evidence-record.ts"
+    runtime: "A fixture demonstration, not production traffic."
+    scope: "Explore's dependency-path demo runs on a fixture."
+    limitations: "Any marketing copy implying live selective-recompile precision is RESTRICTED. The only measurement that exists for the underlying implementation (EXP-0101, rebuild fraction 1.0000) points the other way and is internal."
+    status: RESTRICTED
+    public_private: RESTRICTED_MECHANISM
+    ip_disclosure_review_required: true
+    owner: founder
+    expiry_or_revalidation: "Blocked behind IP review; see IP_GATE_2026-09-08.md §1 effect 7 and §3."
+    supportedBuild: "3157ee5"
+    lastVerifiedAt: "2026-09-08"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-037
+    claim: "What Is a Knowledge Compiler? — category definitions and comparisons to RAG, knowledge graph, enterprise search"
+    surface: "/knowledge-compiler"
+    evidence: "Editorial and positioning content; every comparison row is a scope statement, not a superiority claim"
+    artifact: "nextjs/app/knowledge-compiler/page.tsx"
+    runtime: "Site copy."
+    scope: "Category-definition prose."
+    limitations: >-
+      No comparison on the page is measured, and none names a vendor. §71 forbids naming one;
+      lib/prohibited-phrases.test.ts enforces it over the whole route tree. Re-aligned
+      2026-09-11: the row that says where the category stops no longer says the World
+      "abstains". It says retrieval declines only when nothing matched at all
+      (`app/knowledge-compiler/page.tsx:56`), because abstention here is an eligibility test and
+      not a judgement about whether what matched answers the question. See CLM-047.
+    status: SUPPORTED
+    public_private: PUBLIC
+    owner: founder
+    expiry_or_revalidation: "If any comparison acquires a number or a vendor name, or the abstention wording moves again."
+    supportedBuild: "38d957d"
+    lastVerifiedAt: "2026-09-11"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-038
+    claim: "One of these families [document reading, evidence, identity, knowledge, temporal, recompilation, ask, operations] is what a knowledge-compilation result is measured in — eight families, one receipt, four rules."
+    surface: "/benchmarks"
+    evidence: "lib/benchmark-registry.ts BENCHMARK_FAMILIES (8) + QUALIFICATION (4 rules)"
+    artifact: "nextjs/lib/benchmark-registry.ts"
+    runtime: "Any deployment."
+    scope: "A taxonomy and protocol claim, not a scored result."
+    limitations: "Publishing the families is not evidence that any of them has been measured."
+    status: SUPPORTED
+    public_private: PUBLIC
+    owner: founder
+    expiry_or_revalidation: "On any change to the family list or the four rules."
+    supportedBuild: "3157ee5"
+    lastVerifiedAt: "2026-09-08"
+    review_date: "2026-12-07"
+
+  # -------------------------------------------------------------------------------------------
+  # Added 2026-09-08 (lane G). The two /research category descriptions the IP gate found: live
+  # HIGH_LEVEL descriptions of two technologies on the publication freeze, tracked nowhere.
+  # Both are recorded as withdrawn copy so that the exact sentence cannot return without a
+  # review. `nextjs/lib/prohibited-phrases.test.ts` fails the build if either name reappears.
+  # -------------------------------------------------------------------------------------------
+
+  - claimId: CLM-039
+    claim: "Selective recompilation — 'Working out which parts of a world a source change actually invalidates, so a corpus update does not mean recompiling everything.' WITHDRAWN from /research on 2026-09-08."
+    surface: "/research (removed 2026-09-08; replaced by 'Cost of staying current')"
+    evidence: "IP_GATE_2026-09-08.md §1 effect 7 and §3: a HIGH_LEVEL description of 'Document-Semantic Lineage and Incremental Recompilation', which V4_DISCLOSURE_REGISTRY.yaml places on the publication freeze with filing_status NOT_FILED. Family B is the family approved to file first."
+    artifact: "D:\\CodexProjects\\uskc-lanes\\reports\\master\\IP_GATE_2026-09-08.md"
+    runtime: "Was live site copy at main 3157ee5; not live at the head that carries this row."
+    scope: "The exact category title and description, and any close paraphrase of it."
+    limitations: "The measured rebuild fraction for the current implementation is 1.0000 — it rebuilds everything today — so the withdrawn phrasing implied a capability the only measurement contradicts. That figure is internal and may not be published either."
+    status: RESTRICTED
+    public_private: RESTRICTED_MECHANISM
+    ip_disclosure_review_required: true
+    owner: founder
+    expiry_or_revalidation: "Blocked until a founder/IP review, and at the earliest until Family B has a filing receipt."
+    supportedBuild: "3157ee5"
+    lastVerifiedAt: "2026-09-08"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-040
+    claim: "Multi-model verification — 'Treating models as replaceable workers and checking their output against the source, so the world contract survives swapping any one of them.' WITHDRAWN from /research on 2026-09-08."
+    surface: "/research (removed 2026-09-08; replaced by 'Model independence')"
+    evidence: "IP_GATE_2026-09-08.md §1 effects 1 and 5: overlaps 'Cross-Page Document Reconciliation' (publication freeze) and Family A element A9, the source-grounded acceptance gate, drafted as A-Claim 1 in the examiner-hardened set."
+    artifact: "D:\\CodexProjects\\uskc-lanes\\reports\\master\\IP_GATE_2026-09-08.md"
+    runtime: "Was live site copy at main 3157ee5; not live at the head that carries this row."
+    scope: "The category title and the source-checking description, plus any 'verified merge' or 'consensus' phrasing of the same idea."
+    limitations: "The only measured result for a naive verified-merge mechanism is negative — worse than the best fixed single model on every surface tested — and is internal. The reconciler must not be described publicly as a working verified-merge mechanism."
+    status: RESTRICTED
+    public_private: RESTRICTED_MECHANISM
+    ip_disclosure_review_required: true
+    owner: founder
+    expiry_or_revalidation: "Blocked until a founder/IP review; Family A is unfiled."
+    supportedBuild: "3157ee5"
+    lastVerifiedAt: "2026-09-08"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-041
+    claim: "Cost of staying current — 'Sources keep arriving, and a world nobody can afford to update stops being worth having. What it should cost to keep a compiled world faithful to changing sources is an open question here, not a settled one.'"
+    surface: "/research"
+    evidence: "The replacement copy for the withdrawn row above. States a problem and claims no capability, no proportion and no number."
+    artifact: "nextjs/app/research/page.tsx"
+    runtime: "Site copy."
+    scope: "A research-area statement at VALUE_ONLY depth."
+    limitations: "Deliberately says nothing about how invalidation is decided or how much of a world an update rebuilds. Adding either turns it back into the withdrawn claim."
+    status: SUPPORTED
+    public_private: PUBLIC
+    owner: founder
+    expiry_or_revalidation: "If any mechanism or proportion is added, this row becomes the withdrawn one."
+    supportedBuild: "3157ee5"
+    lastVerifiedAt: "2026-09-08"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-042
+    claim: "Model independence — 'The worth of a compiled world should not rest on which model happened to produce it. Keeping what the product guarantees stable while the models underneath it change is a problem we work on rather than a property we assume.'"
+    surface: "/research"
+    evidence: "The replacement copy for the withdrawn row above. Names no verification mechanism and asserts no capability — 'a problem we work on rather than a property we assume' is the whole of the claim."
+    artifact: "nextjs/app/research/page.tsx"
+    runtime: "Site copy."
+    scope: "A research-area statement at VALUE_ONLY depth."
+    limitations: "Says nothing about checking output against a source, about agreement between models, or about a merge. Each of those is the withdrawn claim."
+    status: SUPPORTED
+    public_private: PUBLIC
+    owner: founder
+    expiry_or_revalidation: "If a verification mechanism is described, this row becomes the withdrawn one."
+    supportedBuild: "3157ee5"
+    lastVerifiedAt: "2026-09-08"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-043
+    claim: "With your permission, Google Analytics uses first-party cookies to measure visits and selected interactions on public marketing pages... We do not send document contents, filenames, questions, account identifiers or workspace events to Google Analytics. Advertising personalization and Google signals are disabled."
+    surface: "/privacy, /subprocessors, and the consent panel on public pages"
+    evidence: "Arrived on main as be17e00 (PR #36) while this lane was open. The exclusion is enforced in code, not only stated: `lib/marketing-analytics.ts` sends a pseudonymous browser id, device information, a query-stripped public page address and the referring origin, and the panel disables analytics unless consent is true and the hostname is tavonel.com."
+    artifact: "nextjs/lib/marketing-analytics.ts; nextjs/components/marketing-consent.tsx; nextjs/lib/marketing-analytics.test.ts"
+    runtime: "Public marketing pages on tavonel.com only, and only for a visitor who has said yes."
+    scope: "Opt-in analytics on public pages. Registered here because this lane owns the claims registry and the copy is live; the code and its tests belong to the lane that shipped PR #36."
+    limitations: "Choice and analytics cookies expire after 180 days. Google may process the data outside Korea. This says nothing about the separate Vercel analytics, which the same paragraph states uses no analytics cookies. N-12's gap -- a signed-in surface instrumented with no notice -- is closed for the public pages by this paragraph; whether the workspace funnel events need their own sentence is a question for the analytics lane."
+    status: SUPPORTED
+    public_private: PUBLIC
+    owner: founder
+    expiry_or_revalidation: "On any change to what marketing-analytics.ts sends, or to the consent gate."
+    supportedBuild: "3157ee5"
+    lastVerifiedAt: "2026-09-08"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-044
+    claim: "Ten of the thirteen things a security review asks are published; three — backup and recovery, a data processing agreement, and a written incident response process — are not published anywhere."
+    surface: "/trust, /pricing"
+    evidence: "Built by counting the §45 element list against the live pages: architecture, data handling, retention, encryption, access, tenant isolation, subprocessors, vulnerability disclosure, CDR/malware and security contact are published; backup/recovery (F-10), DPA (T-10) and incident process (T-09) are not."
+    artifact: "nextjs/app/trust/page.tsx; D:\\CodexProjects\\uskc-lanes\\program\\matrix\\MATRIX_SECURITY_GTM_2026-09-08.md table 15"
+    runtime: "This deployment, 2026-09-08."
+    scope: "A count of what is published, not a statement that what is published is sufficient."
+    limitations: "Publishing an answer is not the same as the answer being good. T-04 in particular notes the description of tenant isolation outruns its proof: the database half is untested (S-54)."
+    status: QUALIFIED
+    public_private: PUBLIC
+    owner: founder
+    expiry_or_revalidation: "The moment any of the three is published, or any of the ten is withdrawn. `lib/trust-page-answers.test.ts` fails if the three stop being named."
+    supportedBuild: "3157ee5"
+    lastVerifiedAt: "2026-09-08"
+    review_date: "2026-12-07"
+
+  # ------------------------------------------------------------------------------------------
+  # Added 2026-09-11 by the website-growth campaign's keyword-claims-data lane (WG-105/WG-012).
+  # Five rows for the five things this build does that the 2026-09-08 registry could not have
+  # known about. Every artifact path is relative to the site repository and was opened at
+  # HEAD 38d957d before the row was written.
+  # ------------------------------------------------------------------------------------------
+
+  - claimId: CLM-045
+    claim: "TXT, CSV and HTML are declared in the input manifest and withheld from the running site; the picker, the upload whitelist and /sources are the live eleven formats plus ZIP."
+    surface: "none — internal. No public page mentions TXT, CSV or HTML, and none may until the gate flips."
+    evidence: "shared/capabilityManifest.ts TEXT_ENTRIES (three BEST_EFFORT rows) behind `export const TEXT_INPUTS_LIVE = false`; CAPABILITY_MANIFEST serves LIVE_ENTRIES while the flag is false, DECLARED_INPUT_MANIFEST holds both sets and is what the CDR source tree is tested against."
+    artifact: "shared/capabilityManifest.ts:296-415"
+    runtime: "This deployment. The deployed CDR revision refuses any MIME its own ALLOWED_INPUTS does not carry, so the flag is what stops the picker offering a format the service answers 422 for after the upload is paid for."
+    scope: "The declared-but-withheld state of three formats. Not a roadmap date and not a capability."
+    limitations: >-
+      The three rows carry limitations no public sentence covers, which is a second reason not to
+      mention them early: `converted_from_text_before_reading` on all three, plus
+      `cells_are_read_back_as_rendered_text` and `comma_delimiter_and_utf8_encoding_assumed` on
+      CSV, and `laid_out_by_libreoffice_not_by_a_browser` on HTML. A CSV is rendered as a
+      spreadsheet page and read back as text, so its cells are gone before anything reads it.
+      The gate flips only after the CDR image is rebuilt, malware-scan-qualification passes for
+      that exact SHA, the founder applies service.yaml, and a TXT/CSV/HTML fixture round-trips.
+    status: SUPPORTED
+    public_private: INTERNAL
+    owner: founder
+    expiry_or_revalidation: "The moment TEXT_INPUTS_LIVE becomes true. At that point /sources, the format chips (CLM-003, CLM-004) and the receipt count (CLM-008) all change in the same commit."
+    supportedBuild: "38d957d"
+    lastVerifiedAt: "2026-09-11"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-046
+    claim: "Core V2 — the engine this deployment runs — emits three edge types: a claim supported_by its evidence, a claim mentions an entity, and one claim contradicts another. Each edge carries the evidence ids that justify it."
+    surface: "/docs (concepts, ontology-output), /product/compiled-world, the compiler-contract diagram"
+    evidence: "lib/compiler-contract.ts `typed-dependencies` clause, state `demonstrated`; lib/core-runtime-v2.ts projectProductCoreV2Candidate projects the Core's relation and contradiction objects and computes advertisedOntologyRelations from the edges the artifact actually contains; lib/collection-compiler.ts holds the fallback compiler's separate three (discusses_topic, mentions_entity, supported_by)."
+    artifact: "nextjs/lib/compiler-contract.ts:115-121; nextjs/lib/core-runtime-v2.ts"
+    runtime: "This deployment, since 2026-09-11 — the projection stopped discarding the Core's RELATION and VALIDATION_RECORD objects, so two computed predicates now reach the package that previously did not."
+    scope: "The predicate set of the live engine. The fallback compiler's three are different and are named separately on the same surfaces."
+    limitations: >-
+      A `contradicts` edge is a candidate, not a verdict: the detector flags a pair whose numbers
+      or whose polarity disagree inside one topic and one temporal reference, sends it to review
+      rather than resolving it, and knows nothing about jurisdiction, units or exception clauses.
+      Two claims phrased with different dates are never compared. `mentions` is a case-folded
+      regular-expression scan, not read semantics. The predicate list an artifact advertises is
+      computed from that artifact's own edges, so quoting three predicates as a product feature
+      overstates any single package.
+    status: QUALIFIED
+    public_private: PUBLIC
+    owner: engineering
+    expiry_or_revalidation: "Any change to the emitted predicate set, or to the contradiction detector's scope. `lib/compiler-contract.test.ts` and `lib/core-runtime-v2.test.ts` fail if the edge types move."
+    supportedBuild: "38d957d"
+    lastVerifiedAt: "2026-09-11"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-047
+    claim: "Retrieval declines only when nothing matched at all. It is an eligibility test, not a judgement about whether what matched answers the question."
+    surface: "/knowledge-compiler, /solutions/<slug>, /docs"
+    evidence: "Corrected on 2026-09-11 (integration C14) after the evidence lane measured both the grounded-ask and compiled paths answering deliberately unanswerable questions with the nearest matching regions. Four public sentences implying it declines because the sources do not support an answer were replaced."
+    artifact: "nextjs/app/knowledge-compiler/page.tsx:56; nextjs/app/solutions/[slug]/page.tsx:69; nextjs/lib/product-claims-sync.test.ts"
+    runtime: "This deployment."
+    scope: "What the product does when the sources do not support an answer: it returns the nearest matching regions with their locators, and deciding they do not answer the question is the reader's work."
+    limitations: >-
+      This is the opposite of a feature sentence and must not be softened back into one. What is
+      barred is any phrasing that asserts a relevance or entailment judgement -- that the World
+      declines *because* the sources do not support the answer, or that it knows when it does not
+      know. "Abstains" and "abstention" are not themselves barred words: grounded-ask really does
+      abstain when no chunk matched any token, and the compiled path when no source returned a
+      candidate or the World Gate rejected every one, so both words are in live copy today
+      (`lib/docs-content.ts` /concepts and /ask, `app/api/page.tsx`, `app/api/openapi/route.ts`,
+      and "Explicit abstention" in `app/solutions/[slug]/page.tsx:70`) and pass the guard.
+      `lib/product-claims-sync.test.ts` matches only the literal fragments in its
+      OVERCLAIM_PHRASES list -- "abstains where the sources do not support", "abstains rather than
+      composing", "support is insufficient", "declines when the world cannot answer", "cannot
+      answer, it abstains" -- so a fresh wording of the same judgement passes the guard and still
+      breaks this claim: the judgement is what is banned, the list is only the tripwire. The guard
+      also fails only on the sales-page surfaces it enumerates and cannot see a surface that is
+      not on that list, so a new page carries both risks until it is registered there.
+    status: SUPPORTED
+    public_private: PUBLIC
+    owner: founder
+    expiry_or_revalidation: "The first time an entailment or relevance test ships in front of an answer."
+    supportedBuild: "38d957d"
+    lastVerifiedAt: "2026-09-11"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-048
+    claim: "Uploading the same file twice produces two documents with two source records that share one content digest; nothing merges them, and each citation names one of the documents carrying those bytes."
+    surface: "/docs/concepts"
+    evidence: "Corrected on 2026-09-11 (integration, R2 follow-up) from 'one source with one digest'. `public.documents` puts no uniqueness on source_sha256 — a format check only, a fresh uuid and its own object keys per upload — and the Core derives its source id from the product's own document id, so two uploads are two Core sources and two source versions."
+    artifact: "nextjs/lib/docs-content.ts:422; supabase/migrations/0001_tavonel_tenant_foundation.sql:64-77"
+    runtime: "This deployment."
+    scope: "What two identical uploads produce. Not a statement that deduplication is planned or unplanned."
+    limitations: >-
+      The pairing of a Core source to one of several byte-identical documents is deterministic
+      but not knowable from the exported package, which is why the sentence says a citation names
+      one of the documents rather than naming which. The Core-side half of the evidence
+      (`_compile_document` deriving the source id from `native_id`) lives in the product-core
+      repository, not this one, so an auditor checking that half is reading a different tree. No
+      dedupe promise survives anywhere in the copy; it was removed rather than weakened.
+    status: SUPPORTED
+    public_private: PUBLIC
+    owner: engineering
+    expiry_or_revalidation: "The first commit that adds a uniqueness constraint on a content digest, or any merge of two byte-identical documents."
+    supportedBuild: "38d957d"
+    lastVerifiedAt: "2026-09-11"
+    review_date: "2026-12-07"
+
+  - claimId: CLM-049
+    claim: "Every public sentence about native structure, tables and formulas is computed from the capability manifest's knownLimitations rather than written beside them."
+    surface: "none — internal governance property of /sources and /product/document-understanding."
+    evidence: "WG-012 cross-check, 2026-09-11. app/product/document-understanding/page.tsx:61 reads READING.knownLimitations.includes('no_table_or_formula_extraction') and picks the sentence from it (:87-88); the structure sentence (:95) is selected the same way from no_native_structure_reader_yet. /sources:93 states that a spreadsheet's cells and formulas are in the file and not in the preserved list. The manifest's LIVE_PRESERVED is [page, paragraph_text, bbox1000] and LIVE_LIMITS carries no_native_structure_reader_yet, no_table_or_formula_extraction and no_visual_native_reconciliation on all eleven live rows."
+    artifact: "shared/capabilityManifest.ts:77-93; nextjs/app/product/document-understanding/page.tsx:61,87-95; nextjs/app/sources/page.tsx:93; nextjs/lib/product-claims-sync.test.ts"
+    runtime: "This deployment."
+    scope: "The three descriptions blueprint 1.3 asks to be checked against the source manifest — native structure, tables, formulas — on the two pages that make them. Agreement is structural: the page reads the manifest, so the two cannot disagree."
+    limitations: >-
+      Two gaps the cross-check found rather than closed. First, the three withheld text formats
+      (CLM-045) carry four limitations no public sentence covers, so the structural guarantee
+      above stops at the live eleven. Second, `product-claims-sync.test.ts` reads a hand-listed
+      set of surfaces: a new page that writes "tables keep their structure" in its own words is
+      unguarded until its row is added there, which is exactly how audit M01 happened once.
+    status: SUPPORTED
+    public_private: INTERNAL
+    owner: engineering
+    expiry_or_revalidation: "Any change to LIVE_PRESERVED or LIVE_LIMITS, or a page that states a reading limit in its own words instead of reading the manifest."
+    supportedBuild: "38d957d"
+    lastVerifiedAt: "2026-09-11"
+    review_date: "2026-12-07"
