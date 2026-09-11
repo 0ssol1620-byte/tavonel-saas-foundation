@@ -93,13 +93,22 @@ describe("in-page table of contents", () => {
     const cookbook = read("../app/cookbooks/[slug]/page.tsx");
     expect(cookbook).toContain('import { PageToc, tocEntries } from "@/components/docs/page-toc";');
     expect(cookbook).toContain("<PageToc entries={toc} />");
-    expect(cookbook).toContain("const toc = tocEntries(sections.map((section) => SECTION_LABEL[section.key]));");
+    /*
+      BA-178 moved the six run-dependent sections out of the body and into one closing block, so
+      the jump list is the ready sections plus that block rather than all twelve labels. Still one
+      `tocEntries` call and still one derivation: the ids are joined back by the same order the
+      page renders, which is what this pins.
+    */
+    expect(cookbook).toContain("const toc = tocEntries([...ready.map((section) => SECTION_LABEL[section.key]), PENDING_HEADING]);");
+    expect(cookbook).toContain("id={toc[ready.length]!.id}");
     // The id and the anchor class sit on the element the link points at.
     expect(cookbook).toContain('<h2 id={id} className={anchor.anchor}>');
     expect(cookbook).toContain("id={toc[order]!.id}");
     expect(cookbook).not.toContain("#cookbook-");
     expect(cookbook).not.toContain('aria-label="Sections on this page"');
-    // Twelve sections, so the component's three-entry threshold cannot silence this page.
+    // Six ready sections and the closing block, so the component's three-entry threshold cannot
+    // silence this page. The label set is still checked for collisions across all twelve, because
+    // a run opening a locked section brings its label back into the same list.
     expect(Object.keys(SECTION_LABEL).length).toBeGreaterThanOrEqual(3);
     expect(tocEntries(Object.values(SECTION_LABEL)).map((entry) => entry.id))
       .toHaveLength(Object.keys(SECTION_LABEL).length);

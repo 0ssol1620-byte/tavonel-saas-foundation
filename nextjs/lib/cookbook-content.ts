@@ -49,6 +49,19 @@ import { RECIPE_VERSION, type CookbookSlug } from "./cookbook-slugs";
 */
 export type CookbookWorkflowId = "j1-grounded-work" | "j2-external-consumption" | "j3-revision-reuse";
 
+/**
+ * The kicker above the title, per workflow family (BA-177).
+ *
+ * It used to read "DRAFT · NOT YET RUN", so the first three words a buyer read were that this
+ * guide had never been run. The family is a property of the record rather than a state of the
+ * evidence, and the absent run is now stated once, at the foot of the page.
+ */
+export const WORKFLOW_LABEL: Record<CookbookWorkflowId, string> = {
+  "j1-grounded-work": "GROUNDED WORK",
+  "j2-external-consumption": "EXTERNAL CONSUMPTION",
+  "j3-revision-reuse": "SOURCE REVISION",
+};
+
 export const SECTION_ORDER = [
   "outcome",
   "input",
@@ -101,7 +114,15 @@ export type CookbookSection =
   | {
       readonly key: SectionKey;
       readonly status: "locked";
-      readonly lockedReason: string;
+      /**
+       * What a recorded run will add here, in the customer's words (BA-178/179).
+       *
+       * This was `lockedReason`, and the renderer printed each one as its own section under a
+       * 32px heading -- six "this has not been run" boxes per page, half of every page, and one
+       * of them naming a founder decision. The honest fact is unchanged; the shape is one
+       * closing list of what a run adds, stated once, at the end.
+       */
+      readonly whenRun: string;
       readonly body: "";
     };
 
@@ -206,31 +227,48 @@ function prerequisites(extra: string): string {
   ].join(PARAGRAPH);
 }
 
+/*
+  BA-209/181. This opened with the whole reading limit and closed by announcing the absence of
+  figures. The limit is already the second paragraph of the prerequisites, three sections up, and
+  printing it twice per page teaches a reader to skip it; the measurement policy belongs to
+  /benchmarks and /reproducibility, which carry it once for the whole site.
+
+  What survives is the recipe's own ceiling and a back-reference, so the shared limit is not
+  silently dropped -- `cookbook-content.test.ts` pins both halves.
+*/
 function limits(extra: string): string {
   return [
-    READING_LIMIT_SENTENCE,
     extra,
-    "No time, cost, quality or effort figure appears anywhere on this page: this workflow has not been run on this build, and a figure without a run behind it is an invention.",
+    `The reading limits under "${SECTION_LABEL.prerequisites}" apply to this recipe too.`,
   ].join(PARAGRAPH);
 }
 
-const LOCKED_REASON = {
+/*
+  The six forward items, one per run-dependent section.
+
+  Each names what a recorded run adds, and none of them is a claim: a noun phrase describing an
+  artifact that does not exist yet cannot be read as one that does, which is the property the old
+  wording lacked and paid for with six apologies per page. The input item keeps the only
+  substantive fact the old reason carried -- that a published example comes from a corpus cleared
+  for redistribution -- and drops the governance vocabulary with the rest of it (BA-179).
+*/
+const WHEN_RUN = {
   input:
-    "No source has been cleared for publication yet. Which documents, at which version, under which redistribution rights, is a founder decision, and a plausible example input would be a fabricated source.",
+    "The document set the run used, published from a corpus cleared for redistribution.",
   ui:
-    "Only a real capture of a real run belongs here. No run of this workflow has been recorded on this build, and a staged or generated screen is not a capture.",
+    "A capture of the workspace screens as the run passed through them, recorded rather than staged.",
   output:
-    "The output is whatever a run produced. There has been no run on this build, so there is no file, no table and no draft to show.",
+    "The files, tables and drafts the run produced, as it produced them.",
   provenance:
-    "Which source location a value came from is a property of a run. There is no run to trace.",
+    "The source location behind each value, opened at the page and the region it came from.",
   external:
-    "An external consumer's result is its own run, verified on its own. Neither the run nor the consumption has happened on this build.",
+    "The result an external consumer read back from the same World, verified on its own run.",
   effect:
-    "Quality, time, cost and human effort are published from a same-condition measurement or not at all. No measurement of this workflow exists.",
+    "Quality, time, cost and human effort, from a same-condition measurement of that run.",
 } as const;
 
-function locked(key: SectionKey, reason: string): CookbookSection {
-  return { key, status: "locked", lockedReason: reason, body: "" };
+function locked(key: SectionKey, whenRun: string): CookbookSection {
+  return { key, status: "locked", whenRun, body: "" };
 }
 
 function ready(key: SectionKey, body: string, docsSlug?: string): CookbookSection {
@@ -256,19 +294,19 @@ function sectionsFor(parts: {
 }): readonly CookbookSection[] {
   return [
     ready("outcome", parts.outcome),
-    locked("input", LOCKED_REASON.input),
+    locked("input", WHEN_RUN.input),
     ready("prerequisites", prerequisites(parts.prerequisitesExtra)),
-    locked("ui", LOCKED_REASON.ui),
+    locked("ui", WHEN_RUN.ui),
     ready("code", parts.code, parts.docsSlug),
-    locked("output", LOCKED_REASON.output),
-    locked("provenance", LOCKED_REASON.provenance),
-    locked("external", LOCKED_REASON.external),
-    locked("effect", LOCKED_REASON.effect),
+    locked("output", WHEN_RUN.output),
+    locked("provenance", WHEN_RUN.provenance),
+    locked("external", WHEN_RUN.external),
+    locked("effect", WHEN_RUN.effect),
     ready("limits", limits(parts.limitsExtra)),
     ready("next", parts.next),
     ready(
       "meta",
-      "This is a draft: it describes the workflow the product supports and carries no result. The record's verified build, verified date and source-rights state are printed below, and they move when a person records a run, never on an edit to this page.",
+      "Every section above describes what the product does today, and the revision of this guide is printed at the foot of the page. A verified run date appears there only once a person has recorded a run, never on an edit to this page.",
     ),
   ];
 }
@@ -301,15 +339,18 @@ export const COOKBOOKS: readonly CookbookRecord[] = [
           The World Build, summarised from `WORLD_BUILD_OFFER.md`. Read "summarised" literally: the
           structure keeps that file's step names with its arrows flattened into a sentence, and the
           deliverables are shortened to read as prose, so this is a paraphrase and not a quotation.
-          What is exact is the list of undecided terms -- the three the file marks FOUNDER DECISION
-          (the fee, whether the fee credits against a plan, and the minimum corpus and engagement)
-          and nothing else. A deal term named here that the offer file does not carry would be this
-          lane inventing one, which is the same act as writing a price. DRAFT is the label, not a
-          softener.
+
+          BA-182. The three terms that file marks undecided -- the fee, whether the fee credits
+          against a plan, and the minimum corpus and engagement -- are the three this page used to
+          list as undecided, under a DRAFT label, followed by "No fee appears here, because none has
+          been approved". That is a buyer reading our internal state instead of our offer. The scope
+          and the deliverables are decided and stay; the price is set in the conversation the
+          sentence routes to. Nothing here names a deal term the offer file does not carry, which
+          would be this lane inventing one, and no figure appears at all.
         */
-        "If you would rather not run it yourself, the World Build is a fixed-scope engagement and its commercial terms are DRAFT: the scope below is decided, and the fee, whether that fee credits against a subscription, and the smallest corpus and engagement worth running are not.",
+        "If you would rather not run it yourself, the World Build is a fixed-scope engagement on your own corpus. The scope and what it leaves behind are below; pricing is set with you — talk to us.",
         "The structure: customer provides representative corpus, TAVONEL compiles, evidence / gaps / review states shown, current World, one update/change test, grounded Ask, architecture + economics review. What it leaves behind: the compiled World itself as a reviewable candidate, a source and evidence report, a report of what could not be compiled and why, one update demonstration, a latency and cost snapshot for that corpus on this deployment, and an implementation plan for going beyond the pilot.",
-        "Two things are settled before any document moves: every format in the corpus has to be one this deployment accepts, and the corpus may not need the customer-data gate that is off by default. No fee appears here, because none has been approved.",
+        "Two things are settled before any document moves: every format in the corpus has to be one this deployment accepts, and the corpus may not need the customer-data gate that is off by default.",
       ].join(PARAGRAPH),
     }),
   },
