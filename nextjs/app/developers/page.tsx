@@ -148,6 +148,18 @@ export default function DevelopersPage() {
                     has none.
                   */}
                   <article className="tile"><h3>Source agent</h3><p>Runs inside your network and pushes to TAVONEL, which reaches into nothing. Reads a mounted directory — an SMB, NFS or SFTP mount included — or an S3-compatible bucket. An assisted import route, not a self-serve connector.</p><a href="/developer/tavonel-source-agent.py" download>Download source agent</a></article>
+                  {/*
+                    The two reference verifiers, added when channel.json went from four assets to
+                    six (devx CROSS-LANE 1). A customer who could not find them here could still
+                    reach them by URL, which is a worse contract than not shipping them: the whole
+                    claim of an offline-verifiable export is that the holder has the checker.
+
+                    Hard-coded, like the three above it, and that is the remaining defect (devx M07):
+                    a seventh asset can go unlisted the same way these two did. Generating the tiles
+                    from channel.json is the root fix and a larger change than this campaign.
+                  */}
+                  <article className="tile"><h3>Export verifier</h3><p>Checks a downloaded archive offline: the Ed25519 signature against a fingerprint you fetch separately, every file against the digest we signed, and nothing added. Node.js 20+, no dependency.</p><a href="/developer/tavonel-verify-export.mjs" download>Download export verifier</a></article>
+                  <article className="tile"><h3>Package verifier</h3><p>Checks what is inside the archive: relations resolve, every region sits inside its page in the 0-1000 frame, and the Turtle, JSON-LD and CSV describe the same graph. Add <code>tavonel-verify-roundtrip.py</code> to load it into SQLite and query the ids back.</p><a href="/developer/tavonel-verify-package.mjs" download>Download package verifier</a></article>
                 </div>
                 <p className="fine">Verify versions and SHA-256 values against <a href="/developer/channel.json">the public distribution channel</a>. The <a href="/developer/README.md">setup and safety contract</a> documents scopes, secret handling and fail-closed behavior.</p>
               </div>
