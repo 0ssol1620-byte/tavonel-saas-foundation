@@ -108,7 +108,17 @@ describe("every solution page says where it stops too", () => {
   });
 
   it("names real limits rather than solved problems", () => {
-    for (const phrase of ["abstains", "not calibrated", "Membership is not available", "is an estimate", "human decision"]) {
+    /*
+      The abstention sentinel is the CORRECTED wording, not the old one (stage 2 C14).
+
+      It read "abstains", which the page satisfied with "The World abstains where the sources do
+      not support an answer." -- a sentence the evidence lane measured as false: abstention is an
+      eligibility test, and both retrieval paths answered every deliberately unanswerable question.
+      So the sentinel is now the narrower claim the page actually keeps, which also means the
+      overclaim cannot come back by rewording: this test needs the limit named, and
+      product-claims-sync.test.ts bans the four assertive forms of the old one.
+    */
+    for (const phrase of ["declines when no evidence matched", "not calibrated", "Membership is not available", "is an estimate", "human decision"]) {
       expect(solutions, phrase).toContain(phrase);
     }
   });
