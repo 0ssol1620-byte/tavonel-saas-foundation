@@ -1,0 +1,184 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TAVONEL full-journey proof receipt",
+  "description": "Two artifacts prove.mjs writes. journeyReceipt is one run over one input; unauthenticatedProbe is the no-key surface check, which is not a journey and has no journey table. Validated by scripts/journey/acceptance-checker.mjs, which supports type, required, enum, properties and items only -- do not add oneOf, $ref or conditionals without replacing that walker.",
+  "$defs": {
+    "journeyReceipt": {
+      "type": "object",
+      "required": [
+        "origin",
+        "format",
+        "fileName",
+        "sha256",
+        "bytes",
+        "declaredMimeType",
+        "uniqueToken",
+        "question",
+        "startedAt",
+        "finishedAt",
+        "capabilityLookup",
+        "calls",
+        "documentId",
+        "documentProcessingState",
+        "compileJobId",
+        "compileJobState",
+        "collectionId",
+        "readerRouteLabel",
+        "evidenceLocators",
+        "tokenFoundInEvidence",
+        "blockedBy",
+        "reachedStep",
+        "stepChain",
+        "verdict"
+      ],
+      "properties": {
+        "origin": { "type": "string" },
+        "format": { "type": "string" },
+        "fileName": { "type": "string" },
+        "sha256": { "type": "string" },
+        "bytes": { "type": "integer" },
+        "declaredMimeType": { "type": "string" },
+        "uniqueToken": { "type": "string" },
+        "question": { "type": "string" },
+        "startedAt": { "type": "string" },
+        "finishedAt": { "type": "string" },
+        "capability": { "type": ["object", "null"] },
+        "capabilityManifestSha256": { "type": ["string", "null"] },
+        "capabilityLookup": { "type": "string" },
+        "calls": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["step", "method", "path", "status", "code", "latencyMs"],
+            "properties": {
+              "step": { "type": "string" },
+              "method": { "type": "string" },
+              "path": { "type": "string" },
+              "status": { "type": ["integer", "null"] },
+              "code": { "type": ["string", "null"] },
+              "latencyMs": { "type": "integer" },
+              "transportError": { "type": "string" }
+            }
+          }
+        },
+        "documentId": { "type": ["string", "null"] },
+        "documentProcessingState": { "type": ["string", "null"] },
+        "documentInventoryRow": { "type": ["object", "null"] },
+        "compileJobId": { "type": ["string", "null"] },
+        "compileJobState": { "type": ["string", "null"] },
+        "compileJob": { "type": ["object", "null"] },
+        "collectionId": { "type": ["string", "null"] },
+        "collection": { "type": ["object", "null"] },
+        "readerRouteLabel": { "type": ["string", "null"] },
+        "activeWorld": { "type": ["object", "null"] },
+        "askResponse": { "type": ["object", "string", "null"] },
+        "evidenceLocators": { "type": ["object", "array", "null"] },
+        "tokenFoundInEvidence": { "type": ["boolean", "null"] },
+        "externalConsumer": {
+          "description": "Step 12. A read of the same active World from outside the browser, with the same API key.",
+          "type": ["object", "null"],
+          "required": ["via", "status"],
+          "properties": {
+            "via": { "type": "string" },
+            "status": { "type": ["integer", "null"] },
+            "code": { "type": ["string", "null"] },
+            "tokenFoundInResults": { "type": ["boolean", "null"] }
+          }
+        },
+        "filePackage": {
+          "description": "Step 13. The signed package as downloaded, and what the existing package verifier said about it. `verified` is null when the verifier was not run -- never assumed true.",
+          "type": ["object", "null"],
+          "required": ["via", "status"],
+          "properties": {
+            "via": { "type": "string" },
+            "status": { "type": ["integer", "null"] },
+            "bytes": { "type": ["integer", "null"] },
+            "sha256": { "type": ["string", "null"] },
+            "savedTo": { "type": ["string", "null"] },
+            "verifier": { "type": ["string", "null"] },
+            "verified": { "type": ["boolean", "null"] },
+            "missingContractPaths": { "type": ["array", "null"], "items": { "type": "string" } },
+            "verifyCommand": { "type": ["string", "null"] }
+          }
+        },
+        "costAccounting": {
+          "description": "Step 18. Cost is not instrumented anywhere in this pipeline, so `measured` is false and no number is written. A cost figure may only appear here once something measures one.",
+          "type": "object",
+          "required": ["measured", "reason"],
+          "properties": {
+            "measured": { "type": "boolean" },
+            "reason": { "type": "string" },
+            "currency": { "type": ["string", "null"] },
+            "amount": { "type": ["number", "null"] }
+          }
+        },
+        "notApplicable": {
+          "description": "step id -> why the input made that step inapplicable. Only steps in NOT_APPLICABLE_ALLOWED may appear; an unimplemented step is NOT_RUN (blueprint §5).",
+          "type": "object"
+        },
+        "journey": {
+          "description": "The 18-step table as this run saw it. Written by prove.mjs from the same function the checker uses, so a receipt and a re-check cannot disagree.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["n", "step", "status", "execution", "semantic", "task", "evidence"],
+            "properties": {
+              "n": { "type": "integer" },
+              "step": {
+                "type": "string",
+                "enum": [
+                  "login_permission",
+                  "full_input",
+                  "security_processing",
+                  "real_read",
+                  "uncertainty",
+                  "structuring",
+                  "candidate_validation",
+                  "human_approval",
+                  "active_world",
+                  "ask",
+                  "source_locator",
+                  "live_external_consumption",
+                  "file_consumption",
+                  "revision_input",
+                  "change_approval",
+                  "post_change_use",
+                  "previous_result_preserved",
+                  "accounting"
+                ]
+              },
+              "status": { "type": "string", "enum": ["PASS", "FAIL", "NOT_RUN", "NOT_APPLICABLE", "HELD", "PARTIAL"] },
+              "execution": { "type": "string", "enum": ["PASS", "FAIL", "NOT_RUN", "NOT_APPLICABLE", "HELD", "PARTIAL"] },
+              "semantic": { "type": "string", "enum": ["PASS", "FAIL", "NOT_RUN", "NOT_APPLICABLE", "HELD", "PARTIAL"] },
+              "task": { "type": "string", "enum": ["PASS", "FAIL", "NOT_RUN", "NOT_APPLICABLE", "HELD", "PARTIAL"] },
+              "evidence": { "type": "string" }
+            }
+          }
+        },
+        "blockedBy": { "type": ["string", "null"] },
+        "reachedStep": { "type": "string" },
+        "stepChain": { "type": "array", "items": { "type": "string" } },
+        "verdict": { "type": "string" },
+        "mode": { "type": "string", "enum": ["resume"] },
+        "resumedFrom": { "type": ["string", "null"] },
+        "priorVerdict": { "type": ["string", "null"] },
+        "harnessError": { "type": "string" }
+      }
+    },
+    "unauthenticatedProbe": {
+      "type": "object",
+      "required": ["origin", "ranAt", "calls", "capabilitiesStatus", "allGuardedRoutesRefused", "verdict"],
+      "properties": {
+        "origin": { "type": "string" },
+        "ranAt": { "type": "string" },
+        "note": { "type": "string" },
+        "calls": { "type": "array" },
+        "capabilitiesStatus": { "type": ["integer", "null"] },
+        "capabilitiesPublic": { "type": "boolean" },
+        "allGuardedRoutesRefused": { "type": "boolean" },
+        "guardedStatuses": { "type": "object" },
+        "verdict": { "type": "string", "enum": ["UNAUTHENTICATED_SURFACE_REFUSES", "UNAUTHENTICATED_SURFACE_UNEXPECTED"] }
+      }
+    }
+  }
+}
