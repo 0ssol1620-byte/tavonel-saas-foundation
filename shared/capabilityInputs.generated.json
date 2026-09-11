@@ -1,0 +1,89 @@
+{
+  "schemaVersion": "tavonel.capability_inputs.v1",
+  "generatedFrom": "shared/capabilityManifest.ts",
+  "textInputsLive": false,
+  "cdrAllowedInputs": {
+    "application/pdf": [
+      ".pdf"
+    ],
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [
+      ".docx"
+    ],
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [
+      ".xlsx"
+    ],
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation": [
+      ".pptx"
+    ],
+    "application/vnd.oasis.opendocument.text": [
+      ".odt"
+    ],
+    "application/vnd.oasis.opendocument.spreadsheet": [
+      ".ods"
+    ],
+    "application/vnd.oasis.opendocument.presentation": [
+      ".odp"
+    ],
+    "image/jpeg": [
+      ".jpg",
+      ".jpeg"
+    ],
+    "image/png": [
+      ".png"
+    ],
+    "image/tiff": [
+      ".tif",
+      ".tiff"
+    ],
+    "image/gif": [
+      ".gif"
+    ],
+    "text/plain": [
+      ".txt"
+    ],
+    "text/csv": [
+      ".csv"
+    ],
+    "text/html": [
+      ".html",
+      ".htm"
+    ]
+  },
+  "siteUploadWhitelist": {
+    "application/pdf": [
+      ".pdf"
+    ],
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [
+      ".docx"
+    ],
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [
+      ".xlsx"
+    ],
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation": [
+      ".pptx"
+    ],
+    "application/vnd.oasis.opendocument.text": [
+      ".odt"
+    ],
+    "application/vnd.oasis.opendocument.spreadsheet": [
+      ".ods"
+    ],
+    "application/vnd.oasis.opendocument.presentation": [
+      ".odp"
+    ],
+    "image/jpeg": [
+      ".jpg",
+      ".jpeg"
+    ],
+    "image/png": [
+      ".png"
+    ],
+    "image/tiff": [
+      ".tif",
+      ".tiff"
+    ],
+    "image/gif": [
+      ".gif"
+    ]
+  }
+}

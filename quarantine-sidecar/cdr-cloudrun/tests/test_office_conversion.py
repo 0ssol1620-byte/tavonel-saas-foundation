@@ -59,6 +59,28 @@ class OfficeConversionQualificationTest(unittest.TestCase):
                 "application/vnd.openxmlformats-officedocument.presentationml.presentation",
                 cls._make_pptx(),
             ),
+            # D06. These three are the whole qualification of the text formats: nothing outside
+            # this image can prove that `soffice` opens a .txt/.csv/.html with the import filter
+            # `app.py` pins and produces a page. The filter strings are the part that fails
+            # loudly if they are wrong -- a bad --infilter is a non-zero exit and a 422 here.
+            "fixture-text.txt": (
+                "text/plain",
+                "TAVONEL harmless plain-text conversion fixture\nsecond line\n".encode("utf-8"),
+            ),
+            "fixture-text.csv": (
+                "text/csv",
+                "field,value\nfixture,123\nTAVONEL,456\n".encode("utf-8"),
+            ),
+            # Self-contained on purpose: `reject_active_html` refuses any external reference
+            # before LibreOffice sees the file, so a fixture with an <img src> would 422 rather
+            # than qualify the conversion.
+            "fixture-text.html": (
+                "text/html",
+                (
+                    "<html><head><title>TAVONEL</title></head><body><h1>Harmless</h1>"
+                    "<table><tr><td>1</td><td>2</td></tr></table></body></html>"
+                ).encode("utf-8"),
+            ),
         }
 
     @classmethod

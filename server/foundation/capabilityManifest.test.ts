@@ -9,12 +9,14 @@ import {
   CAPABILITY_MANIFEST,
   CAPABILITY_MANIFEST_SCHEMA,
   type CapabilityManifest,
+  DECLARED_INPUT_MANIFEST,
   type CapabilityManifestEntry,
   describeAcceptedFormats,
   deriveSourceFamilyChips,
   deriveUploadAccept,
   deriveUploadWhitelist,
   isAcceptedAtUpload,
+  TEXT_INPUTS_LIVE,
 } from "../../shared/capabilityManifest";
 import { qualifiedDocumentInputs, validateQualifiedDocumentInput } from "../../shared/qualifiedDocumentInputs";
 import {
@@ -94,6 +96,29 @@ const WHITELIST_AT_4C18E86 = {
 /** The file picker's `accept` attribute as it was written by hand at 4c18e86. */
 const ACCEPT_AT_4C18E86 =
   ".pdf,.docx,.pptx,.xlsx,.odt,.ods,.odp,.jpg,.jpeg,.png,.tif,.tiff,.gif,.zip";
+
+/*
+  The three surfaces below are pinned literals, and TXT/CSV/HTML change all three the day
+  `TEXT_INPUTS_LIVE` flips. Both states are written out rather than derived: a derived
+  expectation would pass whatever the manifest said, which is the whole point of pinning them.
+  D06 -- the rows exist in `DECLARED_INPUT_MANIFEST` today and reach these surfaces only after
+  the CDR image that accepts them is released.
+*/
+const WHITELIST_WITH_TEXT_INPUTS = {
+  ...WHITELIST_AT_4C18E86,
+  "text/plain": [".txt"],
+  "text/csv": [".csv"],
+  "text/html": [".html", ".htm"],
+};
+const ACCEPT_WITH_TEXT_INPUTS = `${ACCEPT_AT_4C18E86},.txt,.csv,.html,.htm`;
+const EXPECTED_WHITELIST = TEXT_INPUTS_LIVE ? WHITELIST_WITH_TEXT_INPUTS : WHITELIST_AT_4C18E86;
+const EXPECTED_ACCEPT = TEXT_INPUTS_LIVE ? ACCEPT_WITH_TEXT_INPUTS : ACCEPT_AT_4C18E86;
+const EXPECTED_SENTENCE = TEXT_INPUTS_LIVE
+  ? "PDF, DOCX, XLSX, PPTX, ODT, ODS, ODP, JPG, PNG, TIF, GIF, TXT, CSV or HTML"
+  : "PDF, DOCX, XLSX, PPTX, ODT, ODS, ODP, JPG, PNG, TIF or GIF";
+const EXPECTED_CHIPS = TEXT_INPUTS_LIVE
+  ? ["PDF / DOCX / ODT / TXT", "XLSX / ODS / CSV", "PPTX / ODP", "JPG / PNG / TIF / GIF", "ZIP", "HTML"]
+  : ["PDF / DOCX / ODT", "XLSX / ODS", "PPTX / ODP", "JPG / PNG / TIF / GIF", "ZIP"];
 
 type JsonObject = Record<string, unknown>;
 
@@ -234,10 +259,13 @@ describe("frozen contract artifacts", () => {
 describe("the capability manifest", () => {
   it("validates against the frozen schema", () => {
     expect(violations(CAPABILITY_MANIFEST)).toEqual([]);
+    // The withheld rows are held to the same schema as the shipped ones, or the gate flip is a
+    // schema break discovered at release time.
+    expect(violations(DECLARED_INPUT_MANIFEST)).toEqual([]);
   });
 
   it("claims no verified tier, because no qualification receipt exists", () => {
-    for (const item of CAPABILITY_MANIFEST.entries) {
+    for (const item of DECLARED_INPUT_MANIFEST.entries) {
       expect(item.qualificationReceipt, `${item.mime} carries a receipt`).toBeNull();
       expect(item.qualifiedAt, `${item.mime} carries a qualification date`).toBeNull();
       expect(["VERIFIED_NATIVE", "VERIFIED_HYBRID"]).not.toContain(item.status);
@@ -245,7 +273,7 @@ describe("the capability manifest", () => {
   });
 
   it("names a live reader and an evidence locator for every accepted format", () => {
-    for (const item of CAPABILITY_MANIFEST.entries.filter((candidate) => isAcceptedAtUpload(candidate.status))) {
+    for (const item of DECLARED_INPUT_MANIFEST.entries.filter((candidate) => isAcceptedAtUpload(candidate.status))) {
       expect(item.readerPlan).toEqual(["cdr_sanitizer_v1", "foundation_ocr_gpu_v1"]);
       expect(item.preserved).toEqual(["page", "paragraph_text", "bbox1000"]);
       expect(item.evidenceLocatorKinds).toEqual(["pdf"]);
@@ -255,7 +283,7 @@ describe("the capability manifest", () => {
   });
 
   it("says that every non-PDF source is converted before it is read", () => {
-    for (const item of CAPABILITY_MANIFEST.entries) {
+    for (const item of DECLARED_INPUT_MANIFEST.entries) {
       if (item.mime === "application/pdf" || item.status === "UNSUPPORTED") continue;
       expect(item.knownLimitations, `${item.mime} hides the CDR conversion`)
         .toContain("converted_to_pdf_before_reading");
@@ -278,24 +306,25 @@ describe("the capability manifest", () => {
 
 describe("the derivations that replaced the hard-coded lists", () => {
   it("reproduces the intake whitelist exactly as it was written at 4c18e86", () => {
-    expect(deriveUploadWhitelist(CAPABILITY_MANIFEST)).toEqual(WHITELIST_AT_4C18E86);
-    expect(qualifiedDocumentInputs).toEqual(WHITELIST_AT_4C18E86);
+    expect(deriveUploadWhitelist(CAPABILITY_MANIFEST)).toEqual(EXPECTED_WHITELIST);
+    expect(qualifiedDocumentInputs).toEqual(EXPECTED_WHITELIST);
+    expect(deriveUploadWhitelist(DECLARED_INPUT_MANIFEST)).toEqual(WHITELIST_WITH_TEXT_INPUTS);
   });
 
   it("offers the same set of extensions in the file picker as the hand-written attribute did", () => {
     // The order changed with the manifest's ordering; `accept` is an unordered hint, so the set
     // is the contract and the string is not.
-    expect([...deriveUploadAccept(CAPABILITY_MANIFEST)].sort()).toEqual(ACCEPT_AT_4C18E86.split(",").sort());
+    expect([...deriveUploadAccept(CAPABILITY_MANIFEST)].sort()).toEqual(EXPECTED_ACCEPT.split(",").sort());
   });
 
   it("names the accepted formats in the rejection sentence", () => {
-    expect(describeAcceptedFormats(CAPABILITY_MANIFEST))
-      .toBe("PDF, DOCX, XLSX, PPTX, ODT, ODS, ODP, JPG, PNG, TIF or GIF");
+    expect(describeAcceptedFormats(CAPABILITY_MANIFEST)).toBe(EXPECTED_SENTENCE);
+    expect(describeAcceptedFormats(DECLARED_INPUT_MANIFEST))
+      .toBe("PDF, DOCX, XLSX, PPTX, ODT, ODS, ODP, JPG, PNG, TIF, GIF, TXT, CSV or HTML");
   });
 
   it("groups the landing page chips by source family, primary extension only", () => {
-    expect(deriveSourceFamilyChips(CAPABILITY_MANIFEST))
-      .toEqual(["PDF / DOCX / ODT", "XLSX / ODS", "PPTX / ODP", "JPG / PNG / TIF / GIF", "ZIP"]);
+    expect(deriveSourceFamilyChips(CAPABILITY_MANIFEST)).toEqual(EXPECTED_CHIPS);
   });
 
   it("still accepts and refuses exactly what the intake contract accepted and refused", () => {
@@ -416,6 +445,7 @@ describe("a manifest that breaks the contract is refused", () => {
 
   it("ships a manifest whose MIME types are already distinct", () => {
     expect(() => assertDistinctMimes(CAPABILITY_MANIFEST)).not.toThrow();
+    expect(() => assertDistinctMimes(DECLARED_INPUT_MANIFEST)).not.toThrow();
   });
 });
 
@@ -441,7 +471,8 @@ describe("no surface restates the format list", () => {
     "nextjs/components/source-capability-table.tsx",
   ];
   const names = [
-    ...new Set(CAPABILITY_MANIFEST.entries.flatMap((item) => item.extensions).map((ext) => ext.toUpperCase())),
+    // Declared, not shipped: the scan has to keep working the day the text rows go live.
+    ...new Set(DECLARED_INPUT_MANIFEST.entries.flatMap((item) => item.extensions).map((ext) => ext.toUpperCase())),
     "ODF", // the label the drop-zone hint invented; no MIME row uses it.
   ];
   const restated = new RegExp(`\\b(${names.join("|")})\\b\\s*[·/,]\\s*\\b(${names.join("|")})\\b`);

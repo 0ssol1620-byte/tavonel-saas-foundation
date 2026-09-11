@@ -71,8 +71,20 @@ ALLOWED_INPUTS: Final = {
     "image/png": {".png"},
     "image/tiff": {".tif", ".tiff"},
     "image/gif": {".gif"},
+    # The cheap text formats. They need no new converter: LibreOffice already carries DOCX and
+    # XLSX through the same `soffice` call, and `.txt`/`.csv`/`.html` are three of its oldest
+    # import filters. `shared/capabilityManifest.ts` keeps them off the *site* whitelist until a
+    # released image carrying this dict is deployed (TEXT_INPUTS_LIVE); this service learns them
+    # first on purpose, because the order the other way round is the 422-after-payment failure.
+    # Markdown is not here: LibreOffice has a Markdown export filter and no import filter, so a
+    # `.md` would be refused or silently imported as untyped text. `.eml` is not here either --
+    # an email is a MIME part tree and nothing in this service parses one.
+    "text/plain": {".txt"},
+    "text/csv": {".csv"},
+    "text/html": {".html", ".htm"},
 }
 LIBREOFFICE_MIMES: Final = set(ALLOWED_INPUTS) - {"application/pdf", "image/jpeg", "image/png", "image/tiff", "image/gif"}
+TEXT_MIMES: Final = {"text/plain", "text/csv", "text/html"}
 IMAGE_MIMES: Final = {"image/jpeg", "image/png", "image/tiff", "image/gif"}
 OOXML_MIMES: Final = {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -84,6 +96,43 @@ ODF_MIMES: Final = {
     "application/vnd.oasis.opendocument.spreadsheet",
     "application/vnd.oasis.opendocument.presentation",
 }
+
+# Which LibreOffice module opens a text source, and with which options.
+#
+# An Office package names its own type, so `soffice` needs no help with DOCX. A text file does
+# not: the module and the parsing options come from the extension and then from the *locale*,
+# which is not a property this service controls. Left implicit, a CSV would be split on whatever
+# separator the container's locale suggests and decoded with a guessed charset -- a sanitized PDF
+# that is quietly wrong rather than a refusal. So each one is pinned:
+#
+#   text/plain  Writer's encoded-text import, forced to UTF-8.
+#   text/csv    Calc's CSV import: comma (44), double quote (34), charset 76 = UTF-8, from row 1.
+#   text/html   Writer/Web's HTML import, rather than letting an .htm land in some other module.
+#
+# The *export* filter stays `pdf:writer_pdf_Export` for every source, which is what the deployed
+# image already does for XLSX and ODS and what `test_office_conversion.py` qualifies.
+OFFICE_IMPORT_FILTERS: Final = {
+    "text/plain": "Text (encoded):UTF8",
+    "text/csv": "Text - txt - csv (StarCalc):44,34,76,1",
+    "text/html": "HTML (StarWriter)",
+}
+
+# HTML that would make LibreOffice fetch or run something, refused before it is converted.
+#
+# Writer/Web import resolves linked resources -- `<img src=...>`, a stylesheet `<link>`, a CSS
+# `url(...)` -- while it loads the document. On a revision whose egress is pinned to the no-NAT
+# VPC that fetch fails harmlessly, but `service.yaml`'s own README says the two network
+# annotations must be removed if the network does not exist yet, and a document is hostile data
+# on every revision. So the reference is refused here rather than trusted to fail elsewhere: the
+# qualified shape is self-contained markup and text. `<a href>` is left alone; it is not fetched
+# at import, and refusing every link would refuse ordinary saved pages.
+HTML_ACTIVE_OR_EXTERNAL: Final = re.compile(
+    r"<\s*(?:script|iframe|frame|frameset|object|embed|applet|link|base)\b"
+    r"|<\s*meta[^>]*http-equiv"
+    r"|\b(?:src|srcset|background|formaction|xlink:href)\s*="
+    r"|url\s*\(|@import",
+    re.IGNORECASE,
+)
 
 
 class RequestReplayGuard:
@@ -212,6 +261,23 @@ def reject_risky_office_package(source: Path, source_mime: str) -> None:
         )
     if risky:
         raise HTTPException(422, "CDR Office package contains unqualified active or embedded content")
+
+
+def reject_active_html(source: Path, source_mime: str) -> None:
+    """Refuse HTML that references or carries active content, before LibreOffice opens it.
+
+    Bounded by `MAX_INPUT_BYTES`, so the whole source is already on disk and under 5 MiB. The
+    decode is lossy on purpose: this is a refusal scan, not a parse, and a byte sequence that is
+    not UTF-8 must still be searched rather than raising.
+    """
+    if source_mime != "text/html":
+        return
+    try:
+        markup = source.read_bytes().decode("utf-8", errors="replace")
+    except OSError as exc:
+        raise HTTPException(422, "CDR HTML source could not be read") from exc
+    if HTML_ACTIVE_OR_EXTERNAL.search(markup):
+        raise HTTPException(422, "CDR HTML source contains unqualified active or external content")
 
 
 def copy_and_digest(upload: UploadFile, target: Path) -> tuple[str, int]:
@@ -390,6 +456,7 @@ def convert_to_pdf(source: Path, source_mime: str, work_dir: Path) -> Path:
     output_dir = work_dir / "converted"
     profile.mkdir(mode=0o700)
     output_dir.mkdir(mode=0o700)
+    import_filter = OFFICE_IMPORT_FILTERS.get(source_mime)
     command = [
         "soffice",
         "--headless",
@@ -398,6 +465,7 @@ def convert_to_pdf(source: Path, source_mime: str, work_dir: Path) -> Path:
         "--nodefault",
         "--nolockcheck",
         f"-env:UserInstallation={profile.resolve().as_uri()}",
+        *(["--infilter", import_filter] if import_filter else []),
         "--convert-to",
         "pdf:writer_pdf_Export",
         "--outdir",
@@ -577,6 +645,7 @@ def disarm(
         # LibreOffice and the renderer all run after a verdict exists.
         malware_scan = scan_or_refuse(input_path, actual_digest)
         reject_risky_office_package(input_path, mime_type)
+        reject_active_html(input_path, mime_type)
         pdf_source = convert_to_pdf(input_path, mime_type, work_dir)
         output_path = work_dir / "sanitized.pdf"
         byte_size = rasterize_to_pdf(pdf_source, output_path)
