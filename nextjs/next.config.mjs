@@ -43,10 +43,26 @@ const contentSecurityPolicy = [
   "frame-src 'self' https://*.paddle.com https://*.r2.cloudflarestorage.com",
   "worker-src 'self' blob:",
   "manifest-src 'self'",
-  // Production and HTTPS Preview must upgrade insecure subresources. The built-in Playwright
-  // server is intentionally plain HTTP, though, and WebKit applies this directive to localhost
-  // itself, turning same-origin CSS/JS requests into HTTPS requests for a port with no TLS
-  // listener. Omit only in that explicit local test-server process; production never sets it.
+  /*
+    Production and HTTPS Preview must upgrade insecure subresources. The built-in Playwright
+    server is intentionally plain HTTP, though, and WebKit applies this directive to localhost
+    itself, turning same-origin CSS/JS requests into HTTPS requests for a port with no TLS
+    listener. Omit only in that explicit local test-server process; production never sets it.
+
+    BA-258 is that escape hatch going unused on the other path into the suite.
+    `playwright.config.ts` sets `PLAYWRIGHT_LOCAL_HTTP=1` for the server it starts itself, but a
+    lane running with `PLAYWRIGHT_EXTERNAL_SERVER=1` starts `pnpm start` by hand -- and started
+    without this variable, WebKit renders every route completely unstyled (Times New Roman, blue
+    underlined links) and reports horizontal overflow at widths that have none. The first audit
+    pass measured exactly that, and it was not a site defect. The procedure, for the record:
+
+        PLAYWRIGHT_LOCAL_HTTP=1 pnpm start --hostname 127.0.0.1 --port <port>
+
+    The directive is deliberately not made conditional on the request's own scheme instead.
+    `headers()` can branch on `x-forwarded-proto`, which a client is free to send, so the CSP of a
+    production response would become something a visitor could ask to have weakened. A local
+    variable that no deployment sets is the safer half of that trade.
+  */
   localHttpPlaywright ? null : "upgrade-insecure-requests",
 ].filter(Boolean).join("; ");
 

@@ -2,7 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { CONSENT_KEY, GA_ID, MARKETING_EVENTS, consentCopy, publicPageLocation, readConsent, referralOrigin } from "@/lib/marketing-analytics";
+import {
+  CONSENT_KEY,
+  GA_ID,
+  MARKETING_EVENTS,
+  NAV_OPEN_EVENT,
+  consentCopy,
+  consentSurface,
+  publicPageLocation,
+  readConsent,
+  referralOrigin,
+} from "@/lib/marketing-analytics";
 import styles from "./marketing-consent.module.css";
 
 type AnalyticsWindow = Window & {
@@ -26,6 +36,8 @@ export default function MarketingConsent() {
   const [consent, setConsent] = useState<boolean | null>(null);
   const [ready, setReady] = useState(false);
   const [editing, setEditing] = useState(false);
+  // BA-245: the phone menu is modal while it is open, and this banner is not drawn over it.
+  const [navOpen, setNavOpen] = useState(false);
 
   useEffect(() => {
     try { setConsent(readConsent(window.localStorage)); } catch { /* storage denied: ask, do not collect */ }
@@ -34,7 +46,12 @@ export default function MarketingConsent() {
       try { setConsent(readConsent(window.localStorage)); } catch { setConsent(null); }
     };
     window.addEventListener("storage", sync);
-    return () => window.removeEventListener("storage", sync);
+    const onNav = (event: Event) => setNavOpen(Boolean((event as CustomEvent).detail?.open));
+    window.addEventListener(NAV_OPEN_EVENT, onNav);
+    return () => {
+      window.removeEventListener("storage", sync);
+      window.removeEventListener(NAV_OPEN_EVENT, onNav);
+    };
   }, []);
 
   useEffect(() => {
@@ -92,8 +109,9 @@ export default function MarketingConsent() {
     if (!allowed && document.getElementById("tavonel-google-tag")) window.location.reload();
   }
 
-  if (!ready || !location) return null;
-  if (consent !== null && !editing) return <button className={styles.settings} onClick={() => setEditing(true)}>{copy.settings}</button>;
+  const surface = consentSurface({ measured: Boolean(location), ready, consent, editing, navOpen });
+  if (surface === "nothing") return null;
+  if (surface === "settings") return <button className={styles.settings} onClick={() => setEditing(true)}>{copy.settings}</button>;
   return <section className={styles.panel} aria-label={copy.region}>
     <p>{copy.prompt} <a href="/privacy">{copy.privacy}</a></p>
     <div className={styles.actions}>
