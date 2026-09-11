@@ -56,7 +56,14 @@ export const EVIDENCE = [
   ["measured", "Compilation refuses more than it emits, sometimes", "Of a thousand documents offered, 596 compiled and 404 were refused, every one for a link the compiler could not resolve — most often a referenced figure asset that had not been supplied alongside the markdown. A vault with a broken link is not emitted, by design. Measured 2026-08-08, on that corpus and that build: a historical research measurement, not this service's live refusal rate, which is not published. Receipt: folynta-knowledge-compilation-properties-2026-08-08.json, sha256 936b859c484fb54a8bdff3175d89d2fd47d695d48ec93b99fcfd93ac53ee2e25."],
   ["unsupported", "Blind quality detection failed", "We tested whether prediction-only signals could pick the worst documents without ground truth. They could not beat ranking by length alone. Published as unsupported, and not shipped as a feature."],
   ["unproven", "Most thresholds are uncalibrated", "Tests show the code does what its author intended. They do not show a threshold is right. Nothing here presents an uncalibrated threshold as a measured result."],
-  ["unproven", "Selective recompilation", "The landing demonstration follows a dependency path on declared fixture data. That is not a measurement of production impact precision, and it is not a shipped capability."],
+  /*
+    BA-075. This card was titled with a frozen mechanism name -- one of the technologies on the
+    disclosure registry's publication freeze -- and it reached a public page through the one
+    directory `prohibited-phrases.test.ts` was not walking. The entry itself stays, because it
+    is a real published limit on what the landing demonstration establishes. What changes is the
+    title: the behaviour, not the name of the mechanism.
+  */
+  ["unproven", "Rebuilding only what changed", "The landing demonstration follows a dependency path on declared fixture data. That is not a measurement of production impact precision, and it is not a shipped capability."],
 ] as const;
 
 export const EVIDENCE_STATE: Record<string, string> = {
