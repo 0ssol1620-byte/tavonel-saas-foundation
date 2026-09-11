@@ -9,6 +9,9 @@ export const runtime = "nodejs";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const HEADERS = { "Cache-Control": "no-store", "X-TAVONEL-API-Version": "1" };
+/** How many rows the backlog is counted over. The listed jobs stay at the previous ten. */
+const BACKLOG_WINDOW = 50;
+const LISTED_JOBS = 10;
 
 // Start a bulk import of a connected source.
 //
@@ -91,11 +94,29 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const { id } = await context.params;
   if (!UUID.test(id)) return NextResponse.json({ code: "OAUTH_CONNECTION_ID_INVALID" }, { status: 400, headers: HEADERS });
 
-  const jobs = await listConnectionJobs(auth.principal.workspaceKey, id);
+  const jobs = await listConnectionJobs(auth.principal.workspaceKey, id, BACKLOG_WINDOW);
   if (!jobs.ok) {
     const status = jobs.code === "JOB_SCOPE_INVALID" ? 400 : 503;
     return NextResponse.json({ code: jobs.code }, { status, headers: HEADERS });
   }
 
-  return NextResponse.json({ code: "OK", jobs: jobs.value }, { headers: HEADERS });
+  /*
+    The backlog, not just the newest job (audit I06).
+    A connection whose latest job says "finished" can still have four imports waiting behind
+    it, and the panel that showed only `jobs[0]` reported that connection as up to date. These
+    are counts of rows this read returned, nothing derived: `queued` is waiting for a worker,
+    `leased` is being worked on right now.
+  */
+  const backlog = {
+    queued: jobs.value.filter((job) => job.state === "queued").length,
+    leased: jobs.value.filter((job) => job.state === "leased").length,
+    /*
+      ponytail: counted over the most recent BACKLOG_WINDOW jobs, which is every unfinished one
+      unless a connection has more than fifty jobs newer than its oldest queued job. Say so
+      here rather than in the UI; an exact count needs a separate count query in job-store.
+    */
+    window: BACKLOG_WINDOW,
+  };
+
+  return NextResponse.json({ code: "OK", jobs: jobs.value.slice(0, LISTED_JOBS), backlog }, { headers: HEADERS });
 }
