@@ -90,6 +90,17 @@ const isNoindex = (path: string) => pages.some((page) => page.matcher.test(path)
 */
 const genericRule = robots().rules;
 const genericDisallow = (Array.isArray(genericRule) ? genericRule : [genericRule]).filter((rule) => rule.userAgent === "*").flatMap((rule) => (Array.isArray(rule.disallow) ? rule.disallow : rule.disallow ? [rule.disallow] : []));
+
+/*
+  robots.txt now carries two kinds of rule, and they are split here by shape rather than by a
+  second copy of the token lists: a search rule allows the public surface and withholds the private
+  paths, a training rule allows nothing. The tests below assert the membership of each group, so a
+  token that moves between them fails rather than being silently re-classified by this split.
+*/
+const allRules = Array.isArray(genericRule) ? genericRule : [genericRule];
+const TRAINING_RULES = allRules.filter((rule) => rule.allow === undefined);
+const SEARCH_RULES = allRules.filter((rule) => rule.allow !== undefined);
+const crawlerPolicy = readFileSync(resolve(import.meta.dirname, "../../docs/policy/CRAWLER_POLICY.md"), "utf8");
 const disallowedFor = (path: string) => genericDisallow.filter((token) => path === token || path.startsWith(token));
 
 /*
@@ -157,22 +168,54 @@ describe("public surface: robots, sitemap and llms.txt agree", () => {
     list. A rule that allowed one of them past a path `*` is withheld from would be a leak written
     as an optimisation.
   */
-  it("gives every named crawler the same private list as *", () => {
-    const rules = Array.isArray(genericRule) ? genericRule : [genericRule];
-    expect(rules.map((rule) => rule.userAgent)).toEqual(["OAI-SearchBot", "PerplexityBot", "Googlebot", "*"]);
-    for (const rule of rules) expect(rule.disallow, `${String(rule.userAgent)} disagrees with *`).toEqual(genericDisallow);
+  it("gives every named search crawler the same private list as *", () => {
+    expect(SEARCH_RULES.map((rule) => rule.userAgent)).toEqual(["OAI-SearchBot", "PerplexityBot", "Googlebot", "*"]);
+    for (const rule of SEARCH_RULES) expect(rule.disallow, `${String(rule.userAgent)} disagrees with *`).toEqual(genericDisallow);
   });
 
   /*
-    Training-crawler policy is a founder and legal decision (§8.4). This test does not decide it;
-    it only refuses to let it be decided here by a copy-paste.
+    Training-crawler policy was a founder decision and it has been made: the five tokens below are
+    disallowed everywhere, and the reasoning is in `docs/policy/CRAWLER_POLICY.md`. This test no
+    longer refuses the position -- it pins it, in both directions.
+
+    Both directions, because the two ways this drifts are opposite and each is silent. A training
+    token that loses its Disallow gives away a licence position in a commit about SEO; a search
+    crawler that arrives in the training list by copy-paste removes the site from search, and every
+    other assertion in this file would still pass.
   */
-  it("takes no position on training crawlers", () => {
-    const rules = Array.isArray(genericRule) ? genericRule : [genericRule];
-    const agents = rules.map((rule) => String(rule.userAgent));
-    for (const training of ["Google-Extended", "GPTBot", "CCBot", "ClaudeBot", "anthropic-ai", "Applebot-Extended"]) {
-      expect(agents, `${training} is a training-crawler policy, not an SEO change`).not.toContain(training);
+  const TRAINING_TOKENS = ["GPTBot", "CCBot", "anthropic-ai", "Google-Extended", "Applebot-Extended"];
+
+  it("disallows every training crawler everywhere", () => {
+    expect(TRAINING_RULES.map((rule) => rule.userAgent)).toEqual(TRAINING_TOKENS);
+    for (const rule of TRAINING_RULES) {
+      expect(rule.disallow, `${String(rule.userAgent)} must be disallowed at the root`).toBe("/");
+      expect(rule.allow, `${String(rule.userAgent)} must not carry an allow rule`).toBeUndefined();
     }
+  });
+
+  it("keeps the two groups apart, so neither can become the other", () => {
+    for (const search of ["OAI-SearchBot", "PerplexityBot", "Googlebot", "*"]) {
+      expect(TRAINING_TOKENS, `${search} in the training block would remove this site from search`)
+        .not.toContain(search);
+    }
+    for (const training of TRAINING_TOKENS) {
+      expect(SEARCH_RULES.map((rule) => String(rule.userAgent)), `${training} is not a search crawler`)
+        .not.toContain(training);
+    }
+    // Search discovery is the point of the site: no public page is withheld from a search crawler.
+    for (const rule of SEARCH_RULES) expect(rule.allow).toBe("/");
+  });
+
+  /*
+    ClaudeBot is the token Anthropic's current crawler sends; `anthropic-ai` is the older one, and
+    only the older one is on the founder's list. That gap is recorded as open in the crawler policy,
+    so the document has to keep naming it -- an open decision that stops being written down is an
+    open decision nobody makes.
+  */
+  it("records the tokens it does not list, rather than letting them look decided", () => {
+    expect(TRAINING_TOKENS, "ClaudeBot is an open founder decision, not a default").not.toContain("ClaudeBot");
+    expect(crawlerPolicy, "the policy must name the token it leaves out").toContain("ClaudeBot");
+    expect(crawlerPolicy, "robots.txt is a request, not a technical measure").toContain("not access control");
   });
 });
 

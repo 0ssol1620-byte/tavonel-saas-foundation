@@ -1,0 +1,61 @@
+TAVONEL — PROPRIETARY SOURCE LICENCE
+Copyright (c) 2026 TAVONEL. All rights reserved.
+
+This repository is published so that it can be read and evaluated. It is not
+open source, and publication is not a grant.
+
+1. WHAT YOU MAY DO
+
+   You may view, read, and evaluate the source code in this repository,
+   including reading it to assess the product, its security posture, or its
+   suitability for your organisation.
+
+2. WHAT YOU MAY NOT DO WITHOUT PRIOR WRITTEN PERMISSION
+
+   You may not copy, reproduce, fork, mirror, modify, adapt, translate, port,
+   merge, publish, redistribute, sublicense, sell, or use this source code —
+   in whole or in part — for any commercial purpose, nor incorporate it into
+   another work, nor use it to train or fine-tune a machine-learning model.
+
+   Permission means a signed writing from the copyright holder. Nothing else
+   grants it: not the repository being public, not a fork button, not an
+   absence of technical enforcement, not a package manifest, and not a reply
+   in an issue thread.
+
+3. THIRD-PARTY COMPONENTS
+
+   This repository depends on, and in places vendors, third-party components.
+   Each of those stays under its own licence, held by its own copyright
+   holder, and this licence neither restricts nor extends it. Where a
+   third-party file carries its own licence header or LICENSE file, that file
+   governs that component. This licence applies only to the parts of this
+   repository authored by the copyright holder.
+
+   A permissive licence on a dependency is copyright permission from that
+   contributor and settles nothing about any third party's patents.
+
+4. NO OTHER RIGHTS
+
+   No trademark, patent, or other right is granted by this licence or by
+   implication. The TAVONEL name and marks are not licensed here.
+
+5. NO WARRANTY
+
+   This source is provided "as is", without warranty of any kind, express or
+   implied, including but not limited to the warranties of merchantability,
+   fitness for a particular purpose, and non-infringement. In no event shall
+   the copyright holder be liable for any claim, damages, or other liability,
+   whether in an action of contract, tort, or otherwise, arising from, out of,
+   or in connection with this source or its use.
+
+6. ASKING
+
+   Requests for permission, including evaluation licences and commercial
+   terms, go to hello@tavonel.com.
+
+NOTE ON THE COPYRIGHT HOLDER: the operating entity's registered legal name,
+registration number and address are not published in this repository (the
+site's operator disclosure is environment-driven and is not published in the
+pilot deployment). "TAVONEL" above identifies the holder as the project is
+publicly known; the registered details are supplied on request and are filled
+in here when the entity disclosure is published.

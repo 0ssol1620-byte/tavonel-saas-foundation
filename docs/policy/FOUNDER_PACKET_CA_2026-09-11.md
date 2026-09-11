@@ -11,8 +11,25 @@ Ordered by what blocks the most other work, not by size.
 - Compiled: 2026-09-11 KST, lane L9 (trust).
 - Campaign: `TAVONEL-COMPETITIVE-AUDIT-20260911-V1`, executing
   `D:\TAVONEL_COMPETITIVE_AUDIT_2026-09-11_KO.md`.
-- Cross-references: `DPA_DRAFT.md`, `INCIDENT_RESPONSE_RUNBOOK_DRAFT.md`,
-  `SUPPORT_TARGETS_DRAFT.md`, `REFUND_THRESHOLD_DRAFT.md`.
+- Cross-references: `DPA.md` (a pointer to the served text), `INCIDENT_RESPONSE_RUNBOOK.md`,
+  `SUPPORT_TARGETS.md`, `REFUND_THRESHOLD_DRAFT.md`. The first three were renamed out of `_DRAFT`
+  when the decisions below landed.
+
+**Decided 2026-09-11 by the founder, after this packet was compiled** (website-growth campaign,
+lane trust-policy). The entries below still describe the state at compile time; these six are no
+longer open, and the rest are:
+
+- Breach notification window: without undue delay and no later than **72 hours** after becoming
+  aware. Served DPA §8 and runbook §5 carry the same sentence.
+- Sub-processor change notice: **30 days** in advance, with a right to object. Served DPA §6.
+- Deletion completion: **within 30 days** of a verified request, on the systems TAVONEL operates.
+  Served DPA §7. A provider's backup expiry still carries no day count.
+- Support acknowledgement: **within 1 business day (KST)**, no resolution-time commitment, from
+  one constant in `nextjs/lib/support-targets.ts`.
+- Repository licence: a proprietary `LICENSE` at the repository root, and
+  `"license": "SEE LICENSE IN LICENSE"` in both `package.json` files (the root one said `MIT`).
+- External audit sequencing: an external penetration test after the first paying customer; SOC 2
+  timing not set. Published on `/trust` and `/security` with no date.
 
 ---
 

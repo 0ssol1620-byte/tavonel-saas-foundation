@@ -3,6 +3,7 @@ import PolicyLayout from "@/components/policy-layout";
 import { readPublicOperations } from "@/lib/operations";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
 import { NOT_RUN, buildProbeSection } from "@/lib/status-probe";
+import { SUPPORT_ACKNOWLEDGEMENT } from "@/lib/support-targets";
 import { readProbeHistory } from "@/lib/synthetic-probe-store";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -79,5 +80,7 @@ export default async function StatusPage() {
     <p>End-to-end fixture run: {probe.fixtureE2E}</p>
 
     <h3>Incident contact</h3><p>Report service impact to support@tavonel.com and security issues to security@tavonel.com. Do not include document contents in email.</p>
+    {/* The support target, imported rather than written: /contact prints the same constant. */}
+    <p>{SUPPORT_ACKNOWLEDGEMENT}</p>
   </PolicyLayout>;
 }

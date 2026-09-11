@@ -155,6 +155,14 @@ const COPY_SURFACES = [
   "components/trust-next.tsx",
   // `/trust` stopped being a redirect and became a page, which makes it a copy surface.
   "app/trust/page.tsx",
+  /*
+    The published support target. It is one exported string rendered on `/status` and `/contact`,
+    and neither page's own source contains the words -- so without a row here the only support
+    commitment on the site would be guarded by nothing in this file.
+  */
+  "lib/support-targets.ts",
+  // `/contact` carries three addresses and the support target, and had no row.
+  "app/contact/page.tsx",
 ];
 
 const BARRED = [
