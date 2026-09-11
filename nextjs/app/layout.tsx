@@ -49,13 +49,22 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "/",
     /*
-      §12.4 -- the reverse half of the pair `/ko` declares (seo-i18n CROSS-LANE 1; this file is in
-      no lane's row, which is why it arrives at integration). A search engine may ignore a one-way
-      annotation, and `/` and `/ko` are each the site's entry point in their own language, so each
-      names the other. `lib/page-seo.ts` holds the /ko side and refuses an alternate set that omits
-      the page carrying it.
+      §12.4's hreflang pair is **not** here, and that is the point of this comment.
+
+      It was, for one commit: the reverse half of the pair `/ko` declares (seo-i18n CROSS-LANE 1)
+      was added to this layout, and metadata declared on a layout is inherited by every page that
+      declares no `alternates` of its own. In the built output that was `/ko` plus `_not-found`,
+      `/customers`, `/film-2`, `/film-3`, `/film-4`, `/product/knowledge-compiler` and
+      `/research/experiments` -- seven 404 stubs and a permanent redirect, each telling a crawler
+      it had a Korean counterpart. Harmless while they 404, and exactly the kind of annotation
+      that stops being harmless the day one of those paths becomes a real page.
+
+      So the pair lives on the two pages that have a counterpart: `app/page.tsx` and
+      `app/ko/page.tsx`, each naming the other. `canonical` stays here as the safety net it has
+      always been -- every advertised page declares its own, which
+      `lib/route-canonical-metadata.test.ts` enforces -- and `lib/seo-surface.test.ts` now fails
+      if `languages` returns to this file or appears on a noindex page.
     */
-    languages: { en: "/", ko: "/ko", "x-default": "/" },
   },
   openGraph: {
     title: "Your knowledge already exists. Compile it.",

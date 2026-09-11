@@ -469,19 +469,24 @@ describe("public surface: the Korean subtree", () => {
 
 /*
     B10 / seo-i18n CROSS-LANE 1 and 2, both of which land here because neither file is in a lane's
-    row: `app/layout.tsx` carries the English half of the hreflang pair, and
+    row: the English half of the hreflang pair is declared on the English entry page, and
     `lib/marketing-analytics.ts` is what decides where a consented page view is even possible.
 
     The pair is the point. `/ko` naming `/` as its English alternate is a claim a search engine may
     ignore when only one side annotates it, and a one-way annotation is not wrong -- it is
     incomplete in a way nothing on either side could see.
+
+    B13 moved the English half off `app/layout.tsx`, where seven pages with no Korean counterpart
+    were inheriting it. The pair is unchanged, so this reads `app/page.tsx` instead.
   */
   it("is named as the Korean alternate by the English entry page too", () => {
-    const layout = readFileSync(join(appDirectory, "layout.tsx"), "utf8");
-    expect(layout).toMatch(/languages:\s*\{[^}]*ko:\s*"\/ko"/);
-    expect(layout).toMatch(/languages:\s*\{[^}]*en:\s*"\/"/);
-    expect(layout).toMatch(/languages:\s*\{[^}]*"x-default":\s*"\/"/);
-    expect(layout).toMatch(/canonical:\s*"\/"/);
+    const entry = readFileSync(join(appDirectory, "page.tsx"), "utf8");
+    expect(entry).toMatch(/languages:\s*\{[^}]*ko:\s*"\/ko"/);
+    expect(entry).toMatch(/languages:\s*\{[^}]*en:\s*"\/"/);
+    expect(entry).toMatch(/languages:\s*\{[^}]*"x-default":\s*"\/"/);
+    expect(entry).toMatch(/canonical:\s*"\/"/);
+    // The layout keeps the canonical safety net for every page that declares none of its own.
+    expect(readFileSync(join(appDirectory, "layout.tsx"), "utf8")).toMatch(/canonical:\s*"\/"/);
   });
 
   it("can be measured at all, which needs its path on the consented set", () => {
@@ -558,4 +563,63 @@ describe("public surface: the draft cookbooks", () => {
     expect(llmsPaths.filter((path) => path.startsWith("/cookbooks"))).toEqual([]);
   });
 
+});
+
+/*
+  hreflang, and the seven pages that were claiming a Korean counterpart they do not have.
+
+  Stage-A open risk 2. The reverse half of `/ko`'s pair was declared on the root layout, and
+  layout metadata is inherited by every page that declares no `alternates` of its own -- which in
+  the built output was `_not-found`, five retired-URL stubs and one permanent redirect, each
+  annotated as having a Korean alternate. Harmless while they 404; a wrong annotation on a real
+  page the day one of those paths becomes one.
+
+  Three assertions, because the defect can come back three ways: the pair returning to the layout,
+  a third page declaring a pair for a counterpart that does not exist, and a page that opts out of
+  search carrying one anyway. The last is evaluated from the head rather than read from the file,
+  which is what makes it true of the six draft cookbooks as well.
+*/
+describe("hreflang is declared only where a counterpart exists", () => {
+  const PAIRED = ["app/ko/page.tsx", "app/page.tsx"]; // sorted, to compare against a sorted scan
+  const relativeFile = (file: string) => relative(resolve(import.meta.dirname, ".."), file).split(sep).join("/");
+
+  it("is not on the root layout, where every page would inherit it", () => {
+    const layout = readFileSync(resolve(import.meta.dirname, "../app/layout.tsx"), "utf8");
+    expect(layout, "the layout still declares the canonical safety net").toContain('canonical: "/"');
+    expect(layout, "a pair here is inherited by every page that declares no alternates of its own")
+      .not.toMatch(/^\s*languages:/m);
+  });
+
+  it("is declared by exactly the two entry pages, each naming the other", () => {
+    const declaring = pages
+      .filter((page) => /languages:/.test(readFileSync(page.file, "utf8")))
+      .map((page) => relativeFile(page.file))
+      .sort();
+    expect(declaring).toEqual(PAIRED);
+    for (const file of PAIRED) {
+      const source = readFileSync(resolve(import.meta.dirname, "..", file), "utf8");
+      expect(source, `${file} must name both halves and the default`).toMatch(/ko: "\/ko"/);
+      expect(source, `${file} must name both halves and the default`).toMatch(/en: "\/"/);
+      expect(source, `${file} must name a default`).toMatch(/"x-default": "\/"/);
+    }
+  });
+
+  it("is on no page that asks not to be indexed", () => {
+    const noindex = [...heads].filter(([, head]) => declaresNoindex(head));
+    // Not vacuous: the drafts and /film are noindex, and they are in the map.
+    expect(noindex.length).toBeGreaterThanOrEqual(COOKBOOK_SLUGS.length);
+    for (const [path, head] of noindex) {
+      expect(head.alternates?.languages, `${path} is noindex and must claim no alternate`).toBeUndefined();
+    }
+  });
+
+  it("is on no retired-URL stub, which declares no head of its own at all", () => {
+    const stubs = pages.filter((page) => page.retiredStub);
+    expect(stubs.length, "the retired stubs are the pages this risk was about").toBeGreaterThanOrEqual(5);
+    for (const stub of stubs) {
+      const source = readFileSync(stub.file, "utf8");
+      expect(source, `${stub.route} must not declare metadata`).not.toContain("export const metadata");
+      expect(source, `${stub.route} must not declare metadata`).not.toContain("generateMetadata");
+    }
+  });
 });
