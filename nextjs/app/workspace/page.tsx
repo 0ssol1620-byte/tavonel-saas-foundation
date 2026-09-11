@@ -2387,7 +2387,24 @@ export default function WorkspacePage() {
                   )}
                   {stagedSelection.warnings.map((warning) => <p className="fine" key={warning}>{warning}</p>)}
                   <div className="workspace-intake-actions">
-                    <button type="button" disabled={busy || !stagedQuote || !stagedVerdict.ok} onClick={() => void startStagedCompile()}>{busy ? "Uploading & compiling…" : "Upload & compile"}</button>
+                    {/*
+                      The gate is "we have finished trying to count", not "we got a number".
+
+                      It was `!stagedQuote`, which was the same thing while every file had a page
+                      count: anything a format did not state was quoted from its size. Nothing is
+                      quoted from size any more, so a staged set of spreadsheets -- or of PDFs
+                      whose page tree does not parse -- produces no quote at all, and this button
+                      stayed disabled forever while the paragraph above it said the pages are
+                      counted while the documents are processed. The panel promised the upload and
+                      the button refused it.
+
+                      The quote is information, not authorisation: `startStagedCompile` never
+                      reads it, the server reserves `reservationPageCeiling` for a source it
+                      cannot count, and settlement bills the pages actually produced. What still
+                      blocks is a corpus the compile step would refuse and a count still in
+                      flight, both of which are answers rather than the absence of one.
+                    */}
+                    <button type="button" disabled={busy || !stagedPageCounts || !stagedVerdict.ok} onClick={() => void startStagedCompile()}>{busy ? "Uploading & compiling…" : "Upload & compile"}</button>
                     <button type="button" onClick={() => setStagedSelection(null)}>Clear</button>
                   </div>
                 </div>
