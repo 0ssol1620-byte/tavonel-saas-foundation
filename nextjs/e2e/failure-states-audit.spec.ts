@@ -71,17 +71,9 @@ test("a refused intake ends in a sentence and a usable control, not a spinner", 
 
 test("a refused intake says why", async ({ page }) => {
   /*
-    Known defect, kept visible on purpose.
-
-    `uploadDocument` does set the reason -- "Upload was not issued (INTAKE_FILE_TOO_LARGE)." --
-    but `uploadDocuments` overwrites the same single notice slot with its batch summary
-    milliseconds later (app/workspace/page.tsx:1294-1301), so the only sentence that survives is
-    a count. A visitor who is over the file ceiling is told that one file did not upload and
-    never told that it was too large, which is the one fact that tells them what to do next.
-    The patch (carry the reasons into the summary) is in CROSS-LANE REQUESTS in
-    CA_LANE_REPORT_qa.md.
+    Fixed at integration (stage 2 C7): the batch summary carries the per-file reasons, deduped,
+    so the sentence that survives says why and not only how many.
   */
-  test.fail(true, "the batch summary overwrites the per-file refusal reason");
   await refuseIntake(page, "INTAKE_FILE_TOO_LARGE");
   await expect(page.locator("p.notice")).toContainText("INTAKE_FILE_TOO_LARGE", { timeout: 10_000 });
 });

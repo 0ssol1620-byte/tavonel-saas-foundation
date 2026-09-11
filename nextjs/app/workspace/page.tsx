@@ -829,12 +829,24 @@ export default function WorkspacePage() {
   const patchUpload = (localId: string, patch: Partial<LocalUpload>) =>
     setUploads((current) => current.map((item) => (item.localId === localId ? { ...item, ...patch } : item)));
 
-  const uploadDocument = async (file: File, manageBusy = true): Promise<string | null> => {
+  const uploadDocument = async (file: File, manageBusy = true, onRefusal?: (reason: string) => void): Promise<string | null> => {
     const sourceLabel = (file as WorkspaceUploadFile).tavonelRelativePath || file.name;
     if (manageBusy) setBusy(true);
     // The id is local until the capability call returns one. The board needs a row immediately,
     // because issuing the capability is itself a wait the visitor should be able to see.
     const localId = `local-${file.name}-${file.size}-${uploadSeq.current++}`;
+    /*
+      Every refusal path below already wrote its reason onto the upload row; `refuse` is that same
+      write with a second reader. The reason existed and was reachable -- it was on the board and in
+      a notice this function set -- and then the batch summary overwrote the one notice slot
+      milliseconds later, so the sentence that survived was a count. A visitor over the file ceiling
+      was told one file did not upload and never told it was too large, which is the only fact that
+      says what to do next.
+    */
+    const refuse = (reason: string) => {
+      patchUpload(localId, { phase: "failed", reason });
+      onRefusal?.(reason);
+    };
     setUploads((current) => [
       ...current,
       { localId, filename: sourceLabel, bytes: file.size, documentId: null, phase: "issuing", loaded: 0 },
@@ -842,14 +854,14 @@ export default function WorkspacePage() {
     try {
       const client = getSupabaseBrowserClient();
       if (!client) {
-        patchUpload(localId, { phase: "failed", reason: "not signed in" });
+        refuse("not signed in");
         setNotice("Sign in with Google first.");
         return null;
       }
       const { data } = await client.auth.getSession();
       const token = data.session?.access_token;
       if (!token) {
-        patchUpload(localId, { phase: "failed", reason: "not signed in" });
+        refuse("not signed in");
         setNotice("Sign in with Google first.");
         return null;
       }
@@ -868,7 +880,7 @@ export default function WorkspacePage() {
       });
       const json = await capability.json() as { code?: string; documentId?: string; uploadUrl?: string; declaredMimeType?: string };
       if (!capability.ok || !json.uploadUrl) {
-        patchUpload(localId, { phase: "failed", reason: `capability not issued (${json.code ?? capability.status})` });
+        refuse(`capability not issued (${json.code ?? capability.status})`);
         setNotice(json.code === "AUTH_REQUIRED" ? "Sign in with Google first." : `Upload was not issued (${json.code ?? capability.status}).`);
         return null;
       }
@@ -906,7 +918,7 @@ export default function WorkspacePage() {
             }).catch(() => undefined);
           }
         }
-        patchUpload(localId, { phase: "failed", reason });
+        refuse(reason);
         setNotice(`${reason}. The file never entered the app server.`);
         return null;
       }
@@ -936,7 +948,7 @@ export default function WorkspacePage() {
           // code, and say that the source stops here until it succeeds.
           const failure = await confirmed.json().catch(() => null) as { code?: string } | null;
           const code = failure?.code ?? `HTTP ${confirmed.status}`;
-          patchUpload(localId, { phase: "failed", reason: `source confirmation refused (${code})` });
+          refuse(`source confirmation refused (${code})`);
           setNotice(`${file.name} reached storage but was not confirmed (${code}). It is not queued for processing.`);
           await loadDocuments();
           return json.documentId;
@@ -1359,11 +1371,15 @@ export default function WorkspacePage() {
     clearWorldState();
     try {
       setNotice(`Uploading ${files.length} file(s) securely, ${UPLOAD_CEILING} at a time.`);
-      const settled = await runBounded(files, UPLOAD_CEILING, (file) => uploadDocument(file, false));
+      const refusals: string[] = [];
+      const settled = await runBounded(files, UPLOAD_CEILING, (file) =>
+        uploadDocument(file, false, (reason) => { refusals.push(reason); }));
       const ids = settled.flatMap((result) => (result.ok && result.value ? [result.value] : []));
       const lost = files.length - ids.length;
       if (lost > 0) {
-        setNotice(`${ids.length} of ${files.length} files uploaded. ${lost} did not, and nothing was retried automatically.`);
+        // Deduplicated: twenty files over the same ceiling is one fact, not twenty sentences.
+        const why = [...new Set(refusals)].join("; ");
+        setNotice(`${ids.length} of ${files.length} files uploaded. ${lost} did not, and nothing was retried automatically.${why ? ` Why: ${why}.` : ""}`);
       }
       /*
         One uploaded file is a compile.
