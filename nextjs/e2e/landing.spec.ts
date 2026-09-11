@@ -24,11 +24,17 @@ type Page = {
 
 /*
   Every link into the compiled world: the hero door, the evidence scene's two named proofs
-  (`?act=evidence` and `?act=change`) and the closing scene's door. Four since 2026-09-08, when
-  the evidence scene stopped sending a reader to the entry act to hunt for the trace it had
-  just described.
+  (`?act=evidence` and `?act=change`), the closing scene's door -- four since
+  2026-09-08, when the evidence scene stopped sending a reader to the entry act to hunt for the
+  trace it had just described -- and, since the 2026-09-11 truth lane, the film caption's door in
+  the actions row.
+
+  That fifth one sits in the actions row rather than inside the caption paragraph for a measured
+  reason the component records: `mobile-landing.spec.ts` holds every a/button/summary on / to a
+  44px floor under a coarse pointer, and a link inside a 14px `.fine` paragraph is about 18px.
+  It is a door, not a named proof, so it carries the one label like the other three.
 */
-const EXPLORE_CTA_COUNT = 4;
+const EXPLORE_CTA_COUNT = 5;
 
 /** Every grid on the page whose tracks are equal and therefore can be widened by one child. */
 const CONTAINERS = [".plans", ".packs", ".caps", ".checks", ".stops", ".legend", ".chain", ".tiles", ".twoworlds", ".sources"];

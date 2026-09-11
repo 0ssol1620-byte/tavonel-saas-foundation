@@ -397,7 +397,15 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
             filings by the same compiler.
           </p>
           <div className="actions rv">
-            <ExploreLink className="btn ghost" label="See the working interface" />
+            {/*
+              No label override. An unqualified /explore link is "the door" and always reads
+              "Explore a Compiled World" -- landing.spec.ts states that rule and this link broke
+              it, which is the drift the one-component refactor existed to prevent. A link with
+              its own wording has to be a named proof (/explore?act=...), and this one is not:
+              it points at the working interface in general, which is the door. The caption
+              above it already says what is on the other side.
+            */}
+            <ExploreLink className="btn ghost" />
           </div>
         </Scene>
 
