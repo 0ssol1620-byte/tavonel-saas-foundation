@@ -1,6 +1,12 @@
 import type { Metadata } from "next";
 import PolicyLayout from "@/components/policy-layout";
 import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
+import {
+  BILLING_OFFERS,
+  REFUND_MAX_CONSUMED_FRACTION,
+  REFUND_WINDOW_DAYS,
+  refundablePageAllowance,
+} from "@/lib/billing-catalog";
 import { readCommercialState } from "@/lib/commercial-state";
 import { LEGAL_EFFECTIVE_DATE } from "@/lib/operations";
 
@@ -78,23 +84,47 @@ export default function RefundsPage() {
       <h3>Access cancellation</h3>
       <p>You may request cancellation of access at any time through support@tavonel.com.</p>
 
-      <h3>14-day refund window</h3>
+      <h3>{REFUND_WINDOW_DAYS}-day refund window</h3>
       <p>
-        You may request a full refund within 14 calendar days of a one-time purchase or within 14
-        calendar days of the latest subscription renewal. Submit the request through
+        You may request a full refund within {REFUND_WINDOW_DAYS} calendar days of a one-time
+        purchase or within {REFUND_WINDOW_DAYS} calendar days of the latest subscription renewal.
+        Submit the request through
         support@tavonel.com or Paddle buyer support with the transaction email and order
         reference. Paddle, as merchant of record, processes approved refunds to the original
         payment method.
       </p>
 
+      {/*
+        FD-04's bright line, derived rather than described.
+
+        This paragraph said refund eligibility "may be limited after substantial processing has
+        been consumed", which names no line at all -- a reader could not tell before asking
+        whether they were inside it, and neither could support. The numbers below are
+        `REFUND_WINDOW_DAYS`, `REFUND_MAX_CONSUMED_FRACTION` and
+        `Math.round(includedPages * fraction)` from the billing catalog, so the page cannot drift
+        from the terms the catalog holds, and `/pricing` and `/docs/billing-and-limits` state the
+        same rule from the same constants.
+
+        FD-04 is a delegated decision, 2026-09-11 (orchestrator, under the founder's delegation)
+        -- `docs/policy/DECISION_LOG_2026-09-11.md` -- and §5 of
+        `docs/policy/REFUND_THRESHOLD_DRAFT.md` is unanswered legal work. This template renders
+        only when `liveChargesEnabled` is true, which is the gate that keeps an unreviewed clause
+        off a page that can take money.
+      */}
       <h3>Use and statutory rights</h3>
       <p>
-        Refund eligibility may be limited after substantial processing has been consumed, custom
-        services begin with your consent, or immediately supplied digital content is fully
-        delivered, but mandatory consumer rights always prevail. Defective, misdescribed or
-        unavailable service claims are reviewed independently of the 14-day voluntary window.
-        Approved card refunds typically appear within 3-5 working days; payment-provider timing
-        can vary.
+        Within {REFUND_WINDOW_DAYS} calendar days of a payment you may request a full refund,
+        provided fewer than {Math.round(REFUND_MAX_CONSUMED_FRACTION * 100)}% of your
+        plan&apos;s included pages have been consumed when you ask —{" "}
+        {refundablePageAllowance(BILLING_OFFERS.observer_access)} pages on{" "}
+        {BILLING_OFFERS.observer_access.label},{" "}
+        {refundablePageAllowance(BILLING_OFFERS.studio_access)} on{" "}
+        {BILLING_OFFERS.studio_access.label}. Past that line the payment is not refunded, and
+        unused pages are not refunded on cancellation. Subject to the terms as updated. Mandatory
+        consumer rights always prevail: a service that is defective, was not as described, or was
+        unavailable is refunded regardless of how much of it you processed, and is assessed
+        separately from this window. Approved card refunds typically appear within 3-5 working
+        days; payment-provider timing can vary.
       </p>
 
       <h3>Cancellation</h3>

@@ -396,6 +396,41 @@ describe("product claims sync", () => {
     enforcement not existing. Failure path: publish the term with no migration and this fails;
     land the migration and the copy becomes sayable without touching this file.
   */
+  /*
+    FD-04's line on `/refunds`, which was the one buyer surface that did not draw it.
+
+    The live template said eligibility "may be limited after substantial processing has been
+    consumed" -- a sentence a reader cannot apply to themselves and support cannot apply either.
+    The entitlements lane published the derived line on `/pricing` and in the billing docs and
+    could not reach this file; it also recorded that nothing pinned the rendered threshold. This
+    is that pin, and it is on the derivation rather than on the numbers: a typed "14 days" or
+    "10%" here would be a second source for a money term the catalog already holds.
+
+    The template renders only when `liveChargesEnabled` is true. That is the gate, not this
+    test -- §5 of `docs/policy/REFUND_THRESHOLD_DRAFT.md` is unanswered legal work, and the lane
+    report makes answering it a precondition for opening checkout.
+  */
+  it("draws the refund line on /refunds from the catalog, not from a typed number", () => {
+    const refunds = read("app/refunds/page.tsx");
+    expect(refunds, "the window is the catalog's").toContain("{REFUND_WINDOW_DAYS}");
+    expect(refunds, "the share is the catalog's").toContain("Math.round(REFUND_MAX_CONSUMED_FRACTION * 100)");
+    for (const offer of ["observer_access", "studio_access"] as const) {
+      expect(refunds, `${offer}'s page allowance is derived`).toContain(`refundablePageAllowance(BILLING_OFFERS.${offer})`);
+    }
+    const copy = strip(refunds);
+    expect(copy, "the sentence that drew no line at all is gone").not.toContain("substantial processing");
+    expect(copy, "statutory rights are assessed separately from the voluntary window")
+      .toContain("regardless of how much of it you processed");
+    /*
+      The heading and the window paragraph above it typed "14" three times, which is the same
+      term from a second source -- and the one that would have been missed when the window moved,
+      because nothing rendered the two side by side. They are derived now, so the only literal
+      day count left on the page is the payment provider's 3-5 working days, which is not ours.
+    */
+    expect(copy, "no day count typed beside the derived one").not.toMatch(/\b14[- ](calendar )?days?\b/);
+    expect(copy, "no percentage typed beside the derived one").not.toMatch(/\b\d{1,3}%/);
+  });
+
   it("does not publish the page-expiry term until a migration enforces it", () => {
     const migrations = new URL("../supabase/migrations/", root);
     const enforced = readdirSync(migrations)

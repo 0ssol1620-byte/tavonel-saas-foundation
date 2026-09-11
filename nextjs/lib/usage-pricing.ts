@@ -1,3 +1,5 @@
+import { PROCESSING_CEILING } from "../../shared/intakeCeiling";
+
 export const PROCESSING_UNIT_USD = 0.01;
 export const STANDARD_UNITS_PER_PAGE = 4;
 export const MAX_UNITS_PER_PAGE = 6;
@@ -153,3 +155,25 @@ export function estimateBillablePages(value: {
   return null;
 }
 
+
+/**
+ * The pages to *reserve* for a source nobody has counted yet -- never a page count to show.
+ *
+ * `estimateBillablePages` returns `null` for a file whose format states no page count, which is
+ * the correct answer to "how many pages is this" and a dangerous one to reserve against. Both
+ * server call sites used to write `?? 1`: before the byte-derived fallback was removed they
+ * reserved a byte-derived ceiling, and afterwards they reserved **one page** for a spreadsheet
+ * that can settle at up to `PROCESSING_CEILING.maxSourcePages`. Bounded, because nothing in the
+ * chain reads more than that ceiling and settlement bills the pages actually produced -- but the
+ * gap between the hold and the settlement is credit an untruthful client can spend twice.
+ *
+ * So the fallback is the deployment's own documented page ceiling: the most a rasterizer will
+ * ever render for one source, which is the most a settlement for one source can ever charge.
+ * It over-reserves, deliberately and in the customer's favour on refusal, and it is never
+ * rendered: `pageCountLabel("provisional")` is what a reader sees for an uncounted file, and it
+ * says the pages are not counted yet. A number chosen to hold credit is not a fact about a
+ * document, and this function returns the first and never the second.
+ */
+export function reservationPageCeiling(value: Parameters<typeof estimateBillablePages>[0]): number {
+  return estimateBillablePages(value)?.pages ?? PROCESSING_CEILING.maxSourcePages;
+}
