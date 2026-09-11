@@ -80,6 +80,17 @@ const OVERCLAIM_PHRASES = [
   "merged into one object",
   "automatically merg",
   /*
+    The same claim in the vocabulary the Core lane is building it in (core-identity CROSS-LANE
+    to L1). Neither engine resolves an alias today: clause 02 is still `direction`, and the one
+    surface that stages it says in its own first line that it is a staged example rather than a
+    compiler run. `/docs` still needs to be able to *name* identity resolution to say it is what
+    joining two corpora would require, so the banned forms are the ones that assert it happens.
+  */
+  "resolves aliases",
+  "alias matching",
+  "aliases are matched",
+  "entity resolution is",
+  /*
     M03. Four predicates the compiler has never emitted, banned as the tuple a sales page writes
     when it is claiming them. The prose form is what is banned, not the predicate names: /docs
     has to be able to name `supports` and `depends_on` in order to say a query for them comes
