@@ -15,7 +15,12 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("./collection-storage", () => ({ loadPreferredCollectionCandidate: mocks.load }));
 vi.mock("./connector-source-access", () => ({ checkConnectorSourceAccess: mocks.access }));
-vi.mock("./world-store", () => ({ getFoundationActiveWorld: mocks.active, listFoundationWorldVersions: vi.fn() }));
+// Partial: world-read-model imports EMPTY_WORLD_FRESHNESS from here, and only the two reads need stubbing.
+vi.mock("./world-store", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./world-store")>()),
+  getFoundationActiveWorld: mocks.active,
+  listFoundationWorldVersions: vi.fn(),
+}));
 vi.mock("./r2-synthetic-canary", () => ({ readR2SignerEnv: () => ({ bucket: "fixture" }) }));
 vi.mock("./developer-auth", () => ({ authorizeFoundationRequest: async () => ({ ok: true, principal: { workspaceKey: "pilot-acme01" } }) }));
 vi.mock("./compile-job-store", () => ({ listWorkspaceCompileJobs: mocks.jobs }));
