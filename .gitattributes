@@ -48,3 +48,14 @@ shared/*.schema.json text eol=lf
 
 # Imported executable script: keep its hashbang compatible with module transforms.
 nextjs/scripts/secret-scan.mjs text eol=lf
+
+# The two reference verifiers are copied verbatim to nextjs/public/developer/ as
+# tavonel-verify-export.mjs and tavonel-verify-package.mjs, pinned by sha256 in
+# channel.json, and lib/compiler-contract.test.ts asserts the published copy is
+# byte-identical to its source. The published copies are already eol=lf above;
+# without the same pin here their sources are checked out CRLF on Windows, the
+# byte comparison fails on one platform or the other, and whichever digest was
+# computed from the wrong checkout is served to customers. Same rule as the rest
+# of this file: content that is hashed or served verbatim gets an explicit eol.
+nextjs/scripts/verify-signed-export.mjs text eol=lf
+nextjs/scripts/compiled-world/validate.mjs text eol=lf

@@ -20,7 +20,7 @@
     },
     "verifyExport": {
       "url": "https://tavonel.com/developer/tavonel-verify-export.mjs",
-      "sha256": "sha256:50d69a351a9766f0b899f71db8ed305cfd478ca35c78ec2f0e8e2f4444f97ba0"
+      "sha256": "sha256:cc01a2cbaa8f15968507dd80b653f4e632e88ac6a858f0a02d2ade9bccd0bcb8"
     },
     "verifyPackage": {
       "url": "https://tavonel.com/developer/tavonel-verify-package.mjs",
