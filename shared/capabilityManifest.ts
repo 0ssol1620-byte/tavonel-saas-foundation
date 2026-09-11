@@ -565,45 +565,91 @@ export function serializeCanonicalInputs(): string {
   they label are generated from the same constant -- a hand-typed "5 MB" would drift the day the
   deployed processors change.
 */
+/**
+ * A row as a reader receives it: written strings and nothing else.
+ *
+ * The projection resolves the labels rather than passing the keys through, so the payload a
+ * visitor downloads carries no manifest identifier at all -- no `BEST_EFFORT`, no `bbox1000`, no
+ * `no_table_or_formula_extraction`. Those are the server's vocabulary for comparing things, and
+ * the client's only job here is to print words and pick one of four status colours.
+ *
+ * `mime` stays, because a reader looks up their own file by it and `/sources` is the page that
+ * answers "will you take this". `tierToken` stays because it selects a colour: `tavonel.css` has
+ * exactly four status tokens and which tier maps to which is a published rule of the design
+ * system, not a presentation detail a page gets to re-decide.
+ */
 export type PublicCapabilityRow = {
   readonly sourceFamily: SourceFamily;
   readonly mime: string;
   readonly extensions: readonly string[];
-  readonly status: CapabilityStatus;
+  /** The tier, written. */
+  readonly tier: string;
+  readonly tierToken: CapabilityTierToken;
+  /** Written labels. */
   readonly preserved: readonly string[];
-  readonly knownLimitations: readonly string[];
+  /** Written labels, minus the ones every accepted format carries. */
+  readonly specific: readonly string[];
+};
+
+export type CapabilityTierToken = "verified" | "unresolved" | "changed" | "reused";
+
+/**
+ * Which of the four status colours a tier takes, and why those four.
+ *
+ * The rule is what the deployment owes the reader, not how good the format is: a receipt exists,
+ * it reads and nobody has qualified how well, a person has to decide first, or nothing is
+ * compiled at all. A fifth hue would have to mean something, and the thing it would mean is
+ * already said by the tier's name.
+ */
+export const CAPABILITY_TIER_TOKEN: Record<CapabilityStatus, CapabilityTierToken> = {
+  VERIFIED_NATIVE: "verified",
+  VERIFIED_HYBRID: "verified",
+  BEST_EFFORT: "unresolved",
+  METADATA_ONLY: "unresolved",
+  REVIEW_REQUIRED: "changed",
+  UNSUPPORTED: "reused",
 };
 
 export function publicCapabilityRows(
   manifest: CapabilityManifest = CAPABILITY_MANIFEST,
 ): readonly PublicCapabilityRow[] {
+  const shared = sharedAcceptedLimitationKeys(manifest);
   return manifest.entries.map((entry) => ({
     sourceFamily: entry.sourceFamily,
     mime: entry.mime,
     extensions: entry.extensions,
-    status: entry.status,
-    preserved: entry.preserved,
-    knownLimitations: entry.knownLimitations,
+    tier: CAPABILITY_TIER_LABEL[entry.status],
+    tierToken: CAPABILITY_TIER_TOKEN[entry.status],
+    preserved: entry.preserved.map(capabilityTokenLabel),
+    // What is true of this format and not of every accepted one; the rest is one sentence above.
+    specific: entry.knownLimitations
+      .filter((limitation) => !shared.includes(limitation))
+      .map(capabilityTokenLabel),
   }));
 }
 
 /**
- * The limitations every accepted format carries, so the table states them once instead of
- * twelve times.
+ * The limitations every accepted format carries, written, so the table states them once instead
+ * of twelve times.
  *
  * Measured over the rows accepted at upload rather than over every row: the archive row shares
  * none of them, because nothing about an archive is read. A sentence above the table can only
  * say "every accepted format", so that is the population this is computed over.
  */
-export function sharedAcceptedLimitations(
-  manifest: CapabilityManifest = CAPABILITY_MANIFEST,
-): readonly string[] {
+function sharedAcceptedLimitationKeys(manifest: CapabilityManifest): readonly string[] {
   const accepted = manifest.entries.filter((entry) => isAcceptedAtUpload(entry.status));
   const first = accepted[0];
   if (!first) return [];
   return first.knownLimitations.filter((limitation) =>
     accepted.every((entry) => entry.knownLimitations.includes(limitation)),
   );
+}
+
+/** The same set, written, for the sentence above the table. */
+export function sharedAcceptedLimitationLabels(
+  manifest: CapabilityManifest = CAPABILITY_MANIFEST,
+): readonly string[] {
+  return sharedAcceptedLimitationKeys(manifest).map(capabilityTokenLabel);
 }
 
 /** A tier, as a reader reads it. The frozen enum stays the enum; this is its label. */

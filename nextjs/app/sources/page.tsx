@@ -4,9 +4,8 @@ import type { Route } from "next";
 import { PublicSitePage } from "@/components/public-site-chrome";
 import SourceCapabilityTable from "@/components/source-capability-table";
 import {
-  capabilityTokenLabel,
   publicCapabilityRows,
-  sharedAcceptedLimitations,
+  sharedAcceptedLimitationLabels,
 } from "../../../shared/capabilityManifest";
 
 /*
@@ -55,10 +54,15 @@ export default function SourcesPage() {
     `SourceCapabilityTable` is a client component, so whatever it is handed is serialized into
     the page every visitor downloads. It was handed the manifest, which carries the reader
     plan's internal component ids and revisions, a per-format receipt state and the default
-    status -- none of it rendered, all of it shipped. `publicCapabilityRows` is what may cross.
+    status -- none of it rendered, all of it shipped.
+
+    `publicCapabilityRows` is what may cross, and it resolves the labels here rather than passing
+    the keys through, so the payload holds no manifest identifier at all -- no `BEST_EFFORT`, no
+    `bbox1000`, no `no_table_or_formula_extraction`. Those are the server's words for comparing
+    things. §6.1's DTO sweep asks for exactly this.
   */
   const rows = publicCapabilityRows();
-  const shared = sharedAcceptedLimitations();
+  const shared = sharedAcceptedLimitationLabels();
 
   return (
     <PublicSitePage>
@@ -91,10 +95,10 @@ export default function SourcesPage() {
                 <b>Every accepted format is read the same way.</b> It is sanitized to PDF and read
                 by the OCR reader, so every row below preserves the page, the paragraph text and
                 the exact region that binds a result back to its source. What that path does not
-                do, it does not do for any of them: {shared.map(capabilityTokenLabel).join(" · ")}.
+                do, it does not do for any of them: {shared.join(" · ")}.
               </p>
 
-              <SourceCapabilityTable rows={rows} shared={shared} />
+              <SourceCapabilityTable rows={rows} />
 
               {/*
                 The four paragraphs explaining the table are technical detail, and §14.3 asks for

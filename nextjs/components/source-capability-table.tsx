@@ -4,7 +4,7 @@ import { useState } from "react";
 import { trackFunnel } from "@/lib/funnel-events";
 import {
   CAPABILITY_TIER_LABEL,
-  capabilityTokenLabel,
+  CAPABILITY_TIER_TOKEN,
   type PublicCapabilityRow,
 } from "../../shared/capabilityManifest";
 import { capabilityStatuses, type CapabilityStatus, type SourceFamily } from "../../shared/uskcEnums";
@@ -24,58 +24,38 @@ import { capabilityStatuses, type CapabilityStatus, type SourceFamily } from "..
 
   BA-060 / BA-062 / BA-064 changed three things about how it prints.
 
-  It takes `PublicCapabilityRow[]`, not the manifest: the internal fields -- the reader plan's
+  It takes `PublicCapabilityRow[]`, not the manifest. The internal fields -- the reader plan's
   component ids and revisions, the per-format receipt state, the default status -- were crossing
-  to the client in the RSC payload of a page that rendered none of them.
+  to the client in the RSC payload of a page that rendered none of them, and the projection also
+  resolves every label on the server, so what a visitor downloads carries no manifest identifier
+  at all. This component prints strings and picks one of four colours; it holds no vocabulary.
 
-  Each row shows one status, and it shows a written label. Two badges per row printed the tier
-  enum and then a claim-state word for the same fact, which on the archive row said "Not read"
-  twice in two vocabularies; and `SCREAMING_SNAKE_CASE` is an identifier, not a label.
+  Each row shows one status. Two badges per row printed the tier enum and then a claim-state word
+  for the same fact, which on the archive row said "not read" twice in two vocabularies.
 
-  The limitations shared by every accepted format are hoisted into one sentence above the table
-  by the page, so a row carries only what is true of *it*. The column used to print the same six
-  negations twelve times, which on a phone was the greater part of an 8,000px page.
+  And the limitations shared by every accepted format are hoisted into one sentence above the
+  table, so a row carries only what is true of *it*. That column used to print the same six
+  negations twelve times, which on a phone was the greater part of an 8,101px page.
 */
-const TIERS: Record<CapabilityStatus, { meaning: string; token: "verified" | "unresolved" | "changed" | "reused" }> = {
-  VERIFIED_NATIVE: {
-    meaning: "Read by a native reader for the format, with a qualification receipt behind it.",
-    token: "verified",
-  },
-  VERIFIED_HYBRID: {
-    meaning: "Read natively and cross-checked against a render or OCR pass, with a qualification receipt behind it.",
-    token: "verified",
-  },
-  BEST_EFFORT: {
-    meaning: "Extracted by a general-purpose path. Useful, and not a guarantee that every structure in the source survived.",
-    token: "unresolved",
-  },
-  METADATA_ONLY: {
-    meaning: "Handled at the type, metadata or container level only. No content is read.",
-    token: "unresolved",
-  },
-  REVIEW_REQUIRED: {
-    meaning: "Encrypted, damaged or proprietary in a way that needs a person before anything is compiled.",
-    token: "changed",
-  },
-  UNSUPPORTED: {
-    meaning: "Refused. Nothing about the source is compiled.",
-    token: "reused",
-  },
+const TIER_MEANING: Record<CapabilityStatus, string> = {
+  VERIFIED_NATIVE: "Read by a native reader for the format, with a qualification receipt behind it.",
+  VERIFIED_HYBRID: "Read natively and cross-checked against a render or OCR pass, with a qualification receipt behind it.",
+  BEST_EFFORT: "Extracted by a general-purpose path. Useful, and not a guarantee that every structure in the source survived.",
+  METADATA_ONLY: "Handled at the type, metadata or container level only. No content is read.",
+  REVIEW_REQUIRED: "Encrypted, damaged or proprietary in a way that needs a person before anything is compiled.",
+  UNSUPPORTED: "Refused. Nothing about the source is compiled.",
 };
 
-function TokenList({ values }: { values: readonly string[] }) {
+function Written({ values }: { values: readonly string[] }) {
   if (values.length === 0) return <span className="src-none">nothing beyond the shared read</span>;
   return (
     <ul className="src-tokens">
-      {values.map((value) => <li key={value}>{capabilityTokenLabel(value)}</li>)}
+      {values.map((value) => <li key={value}>{value}</li>)}
     </ul>
   );
 }
 
-function Row({ row, shared }: { row: PublicCapabilityRow; shared: readonly string[] }) {
-  const tier = TIERS[row.status];
-  // What is true of this format and not of every accepted one. The rest is the sentence above.
-  const specific = row.knownLimitations.filter((limitation) => !shared.includes(limitation));
+function Row({ row }: { row: PublicCapabilityRow }) {
   return (
     <tr>
       <th scope="row" data-label="Source">
@@ -83,10 +63,10 @@ function Row({ row, shared }: { row: PublicCapabilityRow; shared: readonly strin
         <i>{row.mime}</i>
       </th>
       <td data-label="Support tier">
-        <span className="src-tier" data-token={tier.token}>{CAPABILITY_TIER_LABEL[row.status]}</span>
+        <span className="src-tier" data-token={row.tierToken}>{row.tier}</span>
       </td>
-      <td data-label="What is preserved"><TokenList values={row.preserved} /></td>
-      <td data-label="Specific to this format"><TokenList values={specific} /></td>
+      <td data-label="What is preserved"><Written values={row.preserved} /></td>
+      <td data-label="Specific to this format"><Written values={row.specific} /></td>
     </tr>
   );
 }
@@ -119,13 +99,7 @@ function familyRank(family: SourceFamily) {
   return at === -1 ? FAMILY_ORDER.length : at;
 }
 
-export default function SourceCapabilityTable({
-  rows: all,
-  shared,
-}: {
-  rows: readonly PublicCapabilityRow[];
-  shared: readonly string[];
-}) {
+export default function SourceCapabilityTable({ rows: all }: { rows: readonly PublicCapabilityRow[] }) {
   const [family, setFamily] = useState<SourceFamily | "all">("all");
   const ordered = [...all].sort((a, b) => familyRank(a.sourceFamily) - familyRank(b.sourceFamily));
   const families = FAMILY_ORDER.filter((name) => ordered.some((entry) => entry.sourceFamily === name));
@@ -184,7 +158,7 @@ export default function SourceCapabilityTable({
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => <Row key={row.mime} row={row} shared={shared} />)}
+            {rows.map((row) => <Row key={row.mime} row={row} />)}
           </tbody>
         </table>
       </div>
@@ -204,9 +178,11 @@ export default function SourceCapabilityTable({
           {capabilityStatuses.map((status) => (
             <div key={status}>
               <dt>
-                <span className="src-tier" data-token={TIERS[status].token}>{CAPABILITY_TIER_LABEL[status]}</span>
+                <span className="src-tier" data-token={CAPABILITY_TIER_TOKEN[status]}>
+                  {CAPABILITY_TIER_LABEL[status]}
+                </span>
               </dt>
-              <dd>{TIERS[status].meaning}</dd>
+              <dd>{TIER_MEANING[status]}</dd>
             </div>
           ))}
         </dl>
