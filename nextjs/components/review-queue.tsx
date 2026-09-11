@@ -5,6 +5,7 @@ import {
   buildReviewQueue,
   filterReviewQueue,
   formatElapsed,
+  REVIEW_DECISION_READ_LIMIT,
   REVIEW_QUEUE_STATUS_COPY,
   reviewQueueReasons,
   type ReviewQueueInput,
@@ -75,6 +76,14 @@ export default function ReviewQueue({
       {queue.missing.includes("compile_settled_at") ? (
         <p className="fine" role="status">
           This compile has no settled time recorded, so time-to-first-review is not measured.
+        </p>
+      ) : null}
+      {queue.missing.includes("review_decisions") ? (
+        <p className="fine" role="status">
+          More than {REVIEW_DECISION_READ_LIMIT} review decisions are recorded for this World and
+          only the newest {REVIEW_DECISION_READ_LIMIT} were read. A document whose first decision
+          falls outside that window shows no decision, or a later one, and is ordered as if it
+          were still undecided.
         </p>
       ) : null}
 

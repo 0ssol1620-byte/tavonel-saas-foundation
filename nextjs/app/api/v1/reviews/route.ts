@@ -6,6 +6,7 @@ import { collectionCandidateKey, COLLECTION_ID_PATTERN } from "@/lib/immutable-k
 import { putWorkspaceCollectionCandidate } from "@/lib/r2-objects";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
 import { listFoundationReviewDecisions, recordFoundationReviewDecision } from "@/lib/review-store";
+import { REVIEW_DECISION_READ_LIMIT } from "@/lib/review-queue";
 import { loadWorldReadModel } from "@/lib/world-read-model";
 
 export const dynamic = "force-dynamic";
@@ -157,7 +158,17 @@ export async function GET(request: Request) {
   if (!COLLECTION_ID_PATTERN.test(collectionId)) {
     return NextResponse.json({ code: "REVIEW_REQUEST_INVALID" }, { status: 400 });
   }
-  const listed = await listFoundationReviewDecisions(auth.principal.workspaceKey, collectionId);
+  const listed = await listFoundationReviewDecisions(auth.principal.workspaceKey, collectionId, REVIEW_DECISION_READ_LIMIT);
   if (!listed.ok) return NextResponse.json({ code: listed.code }, { status: 503 });
-  return NextResponse.json({ code: "OK", decisions: listed.decisions }, { headers: { "Cache-Control": "no-store" } });
+  /*
+    `truncated` is not decoration. The read is `created_at.desc` and bounded, so a World with
+    more decisions than the window returns rows that do not include the first decision on an
+    older document -- and a caller computing time-to-first-review from them would print a later
+    decision as the first one. Saying the window was full is what lets it say so instead.
+  */
+  return NextResponse.json({
+    code: "OK",
+    decisions: listed.decisions,
+    truncated: listed.decisions.length >= REVIEW_DECISION_READ_LIMIT,
+  }, { headers: { "Cache-Control": "no-store" } });
 }

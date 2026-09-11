@@ -383,12 +383,12 @@ export default function WorkspacePage() {
   const [compileRecord, setCompileRecord] = useState<
     { documentIds: string[]; blocked: CompileBlocker[]; settledAt: string | null } | null
   >(null);
-  const [reviewDecisions, setReviewDecisions] = useState<Array<{ evidenceId: string; recordedAt: string }>>([]);
+  const [reviewDecisions, setReviewDecisions] = useState<{ decisions: Array<{ evidenceId: string; recordedAt: string }>; truncated: boolean }>({ decisions: [], truncated: false });
   useEffect(() => {
     const collectionId = collectionResult?.collectionId;
     if (!collectionId) {
       setCompileRecord(null);
-      setReviewDecisions([]);
+      setReviewDecisions({ decisions: [], truncated: false });
       return;
     }
     const controller = new AbortController();
@@ -405,7 +405,7 @@ export default function WorkspacePage() {
             : null),
         fetch(`/api/v1/reviews?collectionId=${encodeURIComponent(collectionId)}`, { cache: "no-store", headers, signal: controller.signal })
           .then((response) => response.ok
-            ? response.json() as Promise<{ decisions?: Array<{ evidenceId: string; recordedAt: string }> }>
+            ? response.json() as Promise<{ decisions?: Array<{ evidenceId: string; recordedAt: string }>; truncated?: boolean }>
             : null),
       ]);
       if (controller.signal.aborted) return;
@@ -415,7 +415,15 @@ export default function WorkspacePage() {
       setCompileRecord(row && Array.isArray(row.documentIds)
         ? { documentIds: row.documentIds, blocked: Array.isArray(row.blocked) ? row.blocked : [], settledAt: row.settledAt ?? null }
         : null);
-      setReviewDecisions(reviews.status === "fulfilled" ? reviews.value?.decisions ?? [] : []);
+      /*
+        `truncated` comes from the route, not from counting rows here: the window size is the
+        route's, and a queue that assumed one would go wrong the day it changes. A truncated
+        read is passed through as such so the queue says the first-review times may not be
+        first, instead of showing them as measured.
+      */
+      setReviewDecisions(reviews.status === "fulfilled"
+        ? { decisions: reviews.value?.decisions ?? [], truncated: reviews.value?.truncated === true }
+        : { decisions: [], truncated: false });
     })();
     return () => controller.abort();
   }, [collectionResult?.collectionId]);
@@ -1908,7 +1916,8 @@ export default function WorkspacePage() {
     })),
     reviewReasons: collectionResult?.reviewReasons ?? [],
     evidence: (worldReadModel?.evidence ?? []).map((item) => ({ id: item.id, sourceId: item.sourceId })),
-    decisions: reviewDecisions,
+    decisions: reviewDecisions.decisions,
+    decisionsTruncated: reviewDecisions.truncated,
     names,
   };
   /*
