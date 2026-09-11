@@ -266,6 +266,30 @@ describe("retrieval pipeline orchestration", () => {
     expect(first?.retrieval.rerankerScore).not.toBeNull();
   });
 
+  it("records the cut line, and nothing when there is nothing in the packet", async () => {
+    const result = await runRetrievalPipeline(baseInput());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    // The cut IS the last packet item, so the two may never disagree -- that is the whole reason
+    // it is read off `ranked` instead of recomputed from the fused list.
+    const last = result.packet.items[result.packet.items.length - 1]!;
+    expect(result.diagnostics.contextCutoff?.unitId).toBe(last.unitId);
+    expect(result.diagnostics.contextCutoff?.lexicalRank).toBe(last.retrieval.lexicalRank);
+    expect(result.diagnostics.contextCutoff?.rerankerScore).toBe(last.retrieval.rerankerScore);
+    // Nothing was held back by the context limit in this scenario, which is itself the fact that
+    // separates "not retrieved" from "retrieved and trimmed".
+    expect(result.diagnostics.contextCutoff?.eligibleBeyondLimit).toBe(0);
+
+    scenario.lexicalIds = [];
+    scenario.denseIds = [];
+    const empty = await runRetrievalPipeline(baseInput());
+    expect(empty.ok).toBe(true);
+    if (!empty.ok) return;
+    expect(empty.packet.items).toHaveLength(0);
+    expect(empty.diagnostics.contextCutoff, "an empty packet has no cut line to report").toBeNull();
+  });
+
   it("binds every packet item to real evidence and page/bbox provenance", async () => {
     const result = await runRetrievalPipeline(baseInput());
     expect(result.ok).toBe(true);

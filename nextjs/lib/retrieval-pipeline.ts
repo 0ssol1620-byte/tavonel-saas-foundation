@@ -75,6 +75,27 @@ export type RetrievalDiagnostics = {
   fusedCandidateCount: number;
   rerankerApplied: boolean;
   gateRejections: WorldGateRejection[];
+  /*
+    The cut line: the last unit that made it into the packet, with the ranks and score it got
+    there on (evidence lane cross-lane 1, stage 2 C20).
+
+    It is the one fact about a near miss that cannot be recovered from what the packet carries.
+    Reading an eval result, "the answer was not in the context" and "the answer was one rank
+    below the cut" are different problems -- the first is a retrieval failure, the second is a
+    context-limit decision -- and nothing distinguished them.
+
+    INTERNAL. `app/api/collections/[id]/search/route.ts` copies diagnostics field by field into
+    its response, and this one is deliberately not on that list: a fused score in a customer DTO
+    is the disclosure the constitution forbids. Keep it off the allow-list.
+  */
+  contextCutoff: {
+    unitId: string;
+    lexicalRank: number | null;
+    denseRank: number | null;
+    structureRank: number | null;
+    rerankerScore: number | null;
+    eligibleBeyondLimit: number;
+  } | null;
   degradations: string[];
 };
 
@@ -230,6 +251,7 @@ export async function runRetrievalPipeline(input: RetrievalPipelineInput): Promi
         fusedCandidateCount: 0,
         rerankerApplied: false,
         gateRejections: [],
+        contextCutoff: null,
         degradations,
       },
     };
@@ -324,6 +346,23 @@ export async function runRetrievalPipeline(input: RetrievalPipelineInput): Promi
     };
   });
 
+  /*
+    Read off `ranked`, not recomputed: the last element IS the cut, so the two cannot disagree.
+    `eligibleBeyondLimit` is how many the gate would have allowed that the context limit did not,
+    which is what says whether raising the limit is even the lever.
+  */
+  const lastRanked = ranked[ranked.length - 1];
+  const contextCutoff = lastRanked
+    ? {
+        unitId: lastRanked.unitId,
+        lexicalRank: lastRanked.lexicalRank ?? null,
+        denseRank: lastRanked.denseRank ?? null,
+        structureRank: lastRanked.structureRank ?? null,
+        rerankerScore: lastRanked.rerankerScore ?? null,
+        eligibleBeyondLimit: Math.max(0, gated.eligible.length - ranked.length),
+      }
+    : null;
+
   const abstentionReasons: string[] = [];
   if (ranked.length === 0) {
     abstentionReasons.push(
@@ -357,6 +396,7 @@ export async function runRetrievalPipeline(input: RetrievalPipelineInput): Promi
       fusedCandidateCount: fused.length,
       rerankerApplied,
       gateRejections: gated.rejected,
+      contextCutoff,
       degradations,
     },
   };
