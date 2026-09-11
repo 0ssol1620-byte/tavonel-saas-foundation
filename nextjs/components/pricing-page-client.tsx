@@ -580,6 +580,7 @@ export default function PricingPageClient({
               each row is read from the route that enforces it.
             */}
             <h3 id="plan-capability-title">What each plan can do</h3>
+            <div className="table-scroll">
             <table className="docs-table" aria-labelledby="plan-capability-title">
               <thead>
                 <tr>
@@ -611,6 +612,7 @@ export default function PricingPageClient({
                 ))}
               </tbody>
             </table>
+            </div>
             <p className="fine">
               Every Enterprise engagement is scoped with you, so this table compares the three
               plans you can start from; an Enterprise scope is agreed in the conversation. The free
@@ -632,6 +634,7 @@ export default function PricingPageClient({
               two constants the reservation code charges against. No figure below is typed.
             */}
             <h3 id="pricing-scenarios-title">What four volumes cost</h3>
+            <div className="table-scroll">
             <table className="docs-table" aria-labelledby="pricing-scenarios-title">
               <thead>
                 <tr>
@@ -650,6 +653,7 @@ export default function PricingPageClient({
                 ))}
               </tbody>
             </table>
+            </div>
             <p className="fine">
               Subscription plus {formatUsd(STANDARD_PAGE_USD)} for every standard page past the
               plan&apos;s included pages. A page is counted when a source is admitted for reading,
