@@ -265,3 +265,70 @@ describe("search", () => {
     expect(index).toHaveLength(DOCS_SECTIONS.length);
   });
 });
+
+/*
+  The founder-locked phrase lists, applied to the docs.
+
+  `lib/brand-copy.test.ts` holds the binding lists and walks a `COPY_SURFACES` array; neither
+  `lib/docs-content.ts` nor the page that renders it is on that array, so every word on
+  /docs/* was unguarded -- including the quickstart, cli and exports blocks this campaign
+  rewrote. Adding the two paths to `COPY_SURFACES` is the root fix and touches a file another
+  lane owns, so it is a cross-lane request; this is the same check, run where the docs live.
+
+  Two differences from the brand-copy version, both deliberate. It scans the rendered body of
+  every section through `docsSearchIndex()` as well as the two source files, because a phrase
+  assembled from an imported constant is not in either file's text. And `scan` is exercised on
+  a planted phrase, because an `it.each` over a list that stopped being populated passes in
+  silence -- a guard that cannot fail is not a guard.
+
+  The known limit: these lists are a copy. The assertion below fails if a phrase is renamed or
+  removed from `brand-copy.test.ts`, so the copy cannot drift out of the original -- but a
+  phrase *added* there will not appear here until someone adds it, which is the reason the
+  cross-lane request exists.
+*/
+const BARRED = [
+  "unlock your data",
+  "second brain",
+  "100% accurate",
+  "never hallucinates",
+  "better than rag",
+  "ai brain",
+  "supports every file",
+  "all files",
+  "perfect parsing",
+  "best ocr",
+  "never stale",
+  "always current",
+  "industry-leading",
+  "every file supported",
+  "lossless for every format",
+  "fully autonomous truth",
+];
+const OVERCLAIMS = ["generally available", "production-ready", "fully automated ontology"];
+
+const scan = (text: string) => [...BARRED, ...OVERCLAIMS].filter((phrase) => text.toLowerCase().includes(phrase));
+
+describe("founder-locked copy on the docs surfaces", () => {
+  const surfaces = ["lib/docs-content.ts", "app/docs/[section]/page.tsx", "app/docs/page.tsx"];
+
+  it.each(surfaces)("keeps every barred phrase and readiness overclaim out of %s", (surface) => {
+    const source = readFileSync(resolve(import.meta.dirname, "..", surface), "utf8");
+    expect(scan(source), `${surface} contains founder-locked copy`).toEqual([]);
+  });
+
+  it("keeps them out of the rendered body of every section, not only the source text", () => {
+    const offenders = docsSearchIndex()
+      .map((entry) => ({ slug: entry.slug, hits: scan(entry.text) }))
+      .filter((entry) => entry.hits.length > 0);
+    expect(offenders).toEqual([]);
+  });
+
+  it("fires on a planted phrase, and stays pinned to the list brand-copy.test.ts locks", () => {
+    expect(scan("This release is production-ready and 100% accurate.")).toEqual(["100% accurate", "production-ready"]);
+    const locked = readFileSync(resolve(import.meta.dirname, "brand-copy.test.ts"), "utf8");
+    for (const phrase of [...BARRED, ...OVERCLAIMS]) {
+      expect(locked, `"${phrase}" is no longer in the founder-locked list this copy tracks`)
+        .toContain(`"${phrase}"`);
+    }
+  });
+});
