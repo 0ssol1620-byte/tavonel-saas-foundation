@@ -495,6 +495,32 @@ describe("public surface: the Korean subtree", () => {
     expect(publicPageLocation("/ko")).toBe("https://tavonel.com/ko");
     expect(publicPageLocation("/workspace"), "the set still refuses a private path").toBeNull();
   });
+});
+
+/*
+  Every page the site asks to have indexed can also be measured.
+
+  /ko was found by hand, and `/solutions` and `/trust` were then found the same way at stage-B
+  integration -- a new hub and the trust index, both advertised in the sitemap and neither on the
+  consented set, so a visitor who arrived on them counted nowhere. Three by hand is the point:
+  the set is maintained beside the sitemap and nothing compared the two, so the next page added
+  would have been missed as well. This derives the expectation from the sitemap instead.
+
+  It is deliberately one-directional. A path on the consented set that is not in the sitemap is
+  normal -- `/` is generated, the docs sections are generated, and a page may be measured
+  without being advertised. The reverse is the defect.
+*/
+describe("public surface: what is advertised is what is measured", () => {
+  it("has every sitemap path on the consented analytics set", () => {
+    const unmeasured = sitemapPaths.filter((path) => publicPageLocation(path) === null);
+    expect(unmeasured, "advertised in the sitemap and measured nowhere").toEqual([]);
+  });
+
+  it("still refuses the private paths, so this is not a blanket allow", () => {
+    for (const path of ["/workspace", "/workspace/sources", "/login", "/auth/callback", "/api/contact", "/dev/tokens"]) {
+      expect(publicPageLocation(path), `${path} must not be measured`).toBeNull();
+    }
+  });
 
   it("declares Korean on the subtree it renders", () => {
     expect(readFileSync(join(appDirectory, "ko", "layout.tsx"), "utf8"), 'the /ko layout must carry lang="ko" -- the root layout says lang="en"').toMatch(/lang="ko"/);
