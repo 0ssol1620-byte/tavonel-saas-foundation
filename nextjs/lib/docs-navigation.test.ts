@@ -121,6 +121,44 @@ describe("in-page table of contents", () => {
   });
 });
 
+/*
+  BA-202. The eyebrow above every title on these five pages was `<b>LABEL</b><span />TEXT`, with
+  the empty span styled as a 34px rule. A rule is not a character: the accessible name and every
+  text extraction read the two clauses as one word -- "DEVELOPERSONE WORLD",
+  "DOCUMENTATIONAPI 2026-09-02.1", "DOCUMENTATIONAll sections".
+
+  The fix is the audit's second option: mark the rule decorative, and put a real separator in the
+  text. So the pattern this pins is the absence of a bare `<span />` between two clauses.
+*/
+describe("eyebrow labels read as two clauses", () => {
+  const SURFACES = [
+    "../app/developers/page.tsx",
+    "../app/docs/page.tsx",
+    "../app/docs/[section]/page.tsx",
+    "../app/cookbooks/[slug]/page.tsx",
+    "../app/ko/page.tsx",
+  ];
+
+  it.each(SURFACES)("%s separates the label from the text it sits beside", (surface) => {
+    const source = read(surface);
+    /*
+      Every `.slate` eyebrow on the page, and what follows the rule inside it. A two-clause
+      eyebrow (one with a <b>) has to carry a separator; a one-clause eyebrow, where the rule
+      leads and there is nothing before it, needs none -- but the rule is decorative either way.
+    */
+    const eyebrows = [...source.matchAll(/<p className="slate">([\s\S]*?)<\/p>/g)].map((match) => match[1]!);
+    expect(eyebrows.length, surface + " renders no eyebrow -- the pattern has moved").toBeGreaterThan(0);
+    for (const eyebrow of eyebrows) {
+      expect(eyebrow, "the rule is decorative and says so: " + eyebrow).not.toContain("<span />");
+      // A separator is owed only where there are two clauses: a label, the rule, and text after
+      // it. A one-clause eyebrow -- a bare label, or a rule that leads -- has nothing to separate.
+      const after = eyebrow.split('<span aria-hidden="true" />')[1] ?? "";
+      if (!eyebrow.includes("<b>") || after.trim() === "") continue;
+      expect(eyebrow, "two clauses fused into one accessible name: " + eyebrow).toMatch(/\/>·/);
+    }
+  });
+});
+
 describe("documentation section index", () => {
   it("lists every group and every section, from the documentation data", () => {
     expect(docsToc).toContain("DOCS_GROUPS.map");

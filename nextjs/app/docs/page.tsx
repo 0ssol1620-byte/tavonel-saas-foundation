@@ -24,7 +24,7 @@ export default function DocsPage() {
     <PublicPageShell>
       <section className="scene doc"><div className="shell"><div className="body">
         <div className="stack">
-          <p className="slate"><b>DOCUMENTATION</b><span />API {DOCS_VERSION}</p>
+          <p className="slate"><b>DOCUMENTATION</b><span aria-hidden="true" />· API {DOCS_VERSION}</p>
           <h1 className="document-title">From sources to a Compiled World.</h1>
         </div>
         <div className="stack">

@@ -135,7 +135,7 @@ export default async function CookbookPage({ params }: { params: Promise<{ slug:
       <BreadcrumbJsonLd trail={[{ name: record.title, path: `/cookbooks/${record.slug}` }]} />
       <section className="scene doc"><div className="shell"><div className="body">
         <div className="stack">
-          <p className="slate"><b>COOKBOOK</b><span />{WORKFLOW_LABEL[record.workflowId]}</p>
+          <p className="slate"><b>COOKBOOK</b><span aria-hidden="true" />· {WORKFLOW_LABEL[record.workflowId]}</p>
           <h1 className="document-title">{record.title}</h1>
         </div>
 

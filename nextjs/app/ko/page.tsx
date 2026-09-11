@@ -61,7 +61,7 @@ export default function KoreanEntryPage() {
         <div className="shell">
           <div className="body">
             <div className="stack">
-              <p className="slate"><b>한국어</b><span />TAVONEL</p>
+              <p className="slate"><b>한국어</b><span aria-hidden="true" />· TAVONEL</p>
               <h1 className="document-title">문서는 이미 있습니다.<br />AI가 쓸 수 있게 컴파일하십시오.</h1>
             </div>
             <div className="stack">
@@ -135,7 +135,7 @@ export default function KoreanEntryPage() {
                 one broken eight-cell grid with a wide row through the middle. One eyebrow marks
                 the language for the whole group, and one line under it says where the links go.
               */}
-              <p className="slate"><b>ENGLISH</b><span aria-hidden="true" />기준 문서</p>
+              <p className="slate"><b>ENGLISH</b><span aria-hidden="true" />· 기준 문서</p>
               <div className="tiles">
                 {ENGLISH_PAGES.map((page) => (
                   <article className="tile" key={page.href}>

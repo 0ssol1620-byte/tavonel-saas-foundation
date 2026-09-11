@@ -187,7 +187,7 @@ export default async function DocsSectionPage({ params }: { params: Promise<{ se
         <div className="body">
           <div className="stack">
             <p className="slate">
-              <b>DOCUMENTATION</b><span /><Link href="/docs">All sections</Link>
+              <b>DOCUMENTATION</b><span aria-hidden="true" />· <Link href="/docs">All sections</Link>
             </p>
             <h1 className="document-title">{entry.title}</h1>
           </div>
