@@ -587,11 +587,49 @@ describe("CA E02/E05 the measured entries carry their figures and their receipts
     A named receipt a reader cannot reach is half an answer, so the page that renders these
     entries has to say where the files are and how to ask for one.
   */
-  it("says on the page where the named receipts live", () => {
-    const notes = read("app/research/notes/page.tsx");
-    expect(notes).toContain("docs/evidence/artifacts/");
-    expect(notes).toContain("not published at a public URL");
-    expect(notes).toContain("check the hash yourself");
+  /*
+    BA-073 / BA-074, 2026-09-11. The same requirement, pinned to a sentence a buyer can read.
+
+    The paragraph this used to check published an internal repository path, the internal words
+    "campaign" and "claims pack", the admission that our own evidence is not reachable at a URL,
+    and then asked the reader to email for an attachment. Two of its facts were worth keeping --
+    a receipt is bound by sha256, and we will send one -- and those are the two a reader can act
+    on.
+
+    So the check is stricter in both directions than the three substrings it replaces: the
+    actionable facts are still required, and the internal vocabulary is asserted absent.
+    `withoutComments` matters, because the page explains in a comment which words it stopped
+    printing.
+  */
+  it("says on the page that a receipt is hash-bound and how to get one", () => {
+    const notes = withoutComments(read("app/research/notes/page.tsx"));
+    expect(notes).toContain("bound by sha256");
+    expect(notes).toContain("Request any receipt named here");
+    expect(notes).toContain("check the hash");
+    expect(notes).toContain("hello@tavonel.com");
+    // BA-089: the missing space that rendered as "Askhello@tavonel.com".
+    expect(notes, "a JSX element after a word needs its space").not.toMatch(/[a-z]\s*\n?\s*<a href="mailto/);
+    for (const internal of ["docs/evidence/artifacts/", "claims pack", "campaign", "not published at a public URL"]) {
+      expect(notes, `"${internal}" is internal vocabulary on a public page`).not.toContain(internal);
+    }
+  });
+
+  /*
+    BA-073 / BA-092. The receipt is a field now, and the page renders its public half.
+
+    The filename stays in `lib/evidence-record.ts` -- the two assertions above describe why, and
+    renaming an artifact would break the reproducibility its hash exists for -- but the retired
+    internal campaign name may not reach the page, and a 64-character digest may not be typeset
+    as body prose. Both are asserted on the page rather than on the record.
+  */
+  it("renders a receipt identifier and a shortened digest, not an internal filename", () => {
+    const notes = withoutComments(read("app/research/notes/page.tsx"));
+    expect(notes).toContain("Receipt {entry.receipt.id}");
+    expect(notes).toContain("shortDigest(entry.receipt.digest)");
+    // The whole value stays one hover or one copy away, so nothing is withheld.
+    expect(notes).toContain("title={`sha256 ${entry.receipt.digest}`}");
+    expect(notes.toLowerCase(), "the internal campaign name may not be rendered").not.toContain("folynta");
+    expect(notes, "a receipt file name may not be rendered").not.toContain(".json");
   });
 });
 

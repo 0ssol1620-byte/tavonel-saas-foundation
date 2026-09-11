@@ -48,14 +48,73 @@ export const BOUNDARY = [
  * a named corpus and a named build, and the entries say so, because a research refusal count
  * read as a production failure rate is the exact misreading the campaign record warns about.
  *
- * The receipts are named rather than linked, because they are not published at a URL. Where
- * they live is written on /research/notes, next to the address that will send one.
+ * BA-073 / BA-092: the receipt is a field, not a sentence.
+ *
+ * Both halves of the old shape were wrong for a public page. The filename ends in the internal
+ * campaign name, which is not the public brand -- a reader who searched it found a company that
+ * had renamed itself and left the old name in its evidence. And a 64-character digest typeset as
+ * body prose wrapped mid-string inside the card, which read like console output pasted into a
+ * paragraph.
+ *
+ * The filename and the digest stay here in full, because they are what makes a request for a
+ * receipt answerable and because renaming an artifact breaks reproducibility -- the constitution
+ * is explicit that artifact filenames and hashes keep their campaign names. What changes is what
+ * is *rendered*: `/research/notes` prints the public identifier, the human description, the date
+ * and a shortened digest, and the file is named only in the reply to someone who asks for it.
  */
-export const EVIDENCE = [
-  ["measured", "Recovery changes the outcome", "On olmOCR-Bench, scored by the benchmark's own evaluator at revision cfa88c1e, the same pipeline scored 80.6 with the recovery lane and 53.7 with only that lane switched off — a gap of 26.9 points, 95% confidence intervals 79.62–81.57 and 52.62–54.93, which do not overlap. Model, evaluator revision, corpus, source manifest, test set and settings were identical; the only difference was whether the documents recovery delivered carried their content. Measured 2026-08-08 over 1,403 documents and 8,413 checks. One category, headers and footers, scores higher without recovery, because a check that a phrase is absent passes trivially on an empty page — the no-recovery figure is generous rather than harsh. Ours, and never placed beside a competitor's number as if reproduced. Receipt: folynta-recovery-accuracy-counterfactual-olmocr-2026-08-08.json, sha256 1f5b6220c1fa569e8e33530d933a16eb7ad6b856c56e22f1744f8fa96efe33e0."],
-  ["measured", "Compilation refuses more than it emits, sometimes", "Of a thousand documents offered, 596 compiled and 404 were refused, every one for a link the compiler could not resolve — most often a referenced figure asset that had not been supplied alongside the markdown. A vault with a broken link is not emitted, by design. Measured 2026-08-08, on that corpus and that build: a historical research measurement, not this service's live refusal rate, which is not published. Receipt: folynta-knowledge-compilation-properties-2026-08-08.json, sha256 936b859c484fb54a8bdff3175d89d2fd47d695d48ec93b99fcfd93ac53ee2e25."],
-  ["unsupported", "Blind quality detection failed", "We tested whether prediction-only signals could pick the worst documents without ground truth. They could not beat ranking by length alone. Published as unsupported, and not shipped as a feature."],
-  ["unproven", "Most thresholds are uncalibrated", "Tests show the code does what its author intended. They do not show a threshold is right. Nothing here presents an uncalibrated threshold as a measured result."],
+export type EvidenceReceipt = {
+  /** The identifier a reader can quote back to us. */
+  readonly id: string;
+  /** What the receipt is of, in words. */
+  readonly of: string;
+  readonly date: string;
+  readonly digest: string;
+  /** The artifact under `docs/evidence/artifacts/`. Not rendered; quoted when one is sent. */
+  readonly file: string;
+};
+
+export type EvidenceEntry = {
+  readonly state: "measured" | "unsupported" | "unproven";
+  readonly title: string;
+  readonly body: string;
+  readonly receipt?: EvidenceReceipt;
+};
+
+export const EVIDENCE: readonly EvidenceEntry[] = [
+  {
+    state: "measured",
+    title: "Recovery changes the outcome",
+    body: "On olmOCR-Bench, scored by the benchmark's own evaluator at revision cfa88c1e, the same pipeline scored 80.6 with the recovery lane and 53.7 with only that lane switched off — a gap of 26.9 points, 95% confidence intervals 79.62–81.57 and 52.62–54.93, which do not overlap. Model, evaluator revision, corpus, source manifest, test set and settings were identical; the only difference was whether the documents recovery delivered carried their content. Measured 2026-08-08 over 1,403 documents and 8,413 checks. One category, headers and footers, scores higher without recovery, because a check that a phrase is absent passes trivially on an empty page — the no-recovery figure is generous rather than harsh. Ours, and never placed beside a competitor's number as if reproduced.",
+    receipt: {
+      id: "R-01",
+      of: "recovery counterfactual on olmOCR-Bench",
+      date: "2026-08-08",
+      digest: "1f5b6220c1fa569e8e33530d933a16eb7ad6b856c56e22f1744f8fa96efe33e0",
+      file: "folynta-recovery-accuracy-counterfactual-olmocr-2026-08-08.json",
+    },
+  },
+  {
+    state: "measured",
+    title: "Compilation refuses more than it emits, sometimes",
+    body: "Of a thousand documents offered, 596 compiled and 404 were refused, every one for a link the compiler could not resolve — most often a referenced figure asset that had not been supplied alongside the markdown. A vault with a broken link is not emitted, by design. Measured 2026-08-08, on that corpus and that build: a historical research measurement, not this service's live refusal rate, which is not published.",
+    receipt: {
+      id: "R-02",
+      of: "knowledge-compilation properties on a thousand-document corpus",
+      date: "2026-08-08",
+      digest: "936b859c484fb54a8bdff3175d89d2fd47d695d48ec93b99fcfd93ac53ee2e25",
+      file: "folynta-knowledge-compilation-properties-2026-08-08.json",
+    },
+  },
+  {
+    state: "unsupported",
+    title: "Blind quality detection failed",
+    body: "We tested whether prediction-only signals could pick the worst documents without ground truth. They could not beat ranking by length alone. Published as unsupported, and not shipped as a feature.",
+  },
+  {
+    state: "unproven",
+    title: "Most thresholds are uncalibrated",
+    body: "Tests show the code does what its author intended. They do not show a threshold is right. Nothing here presents an uncalibrated threshold as a measured result.",
+  },
   /*
     BA-075. This card was titled with a frozen mechanism name -- one of the technologies on the
     disclosure registry's publication freeze -- and it reached a public page through the one
@@ -63,12 +122,32 @@ export const EVIDENCE = [
     is a real published limit on what the landing demonstration establishes. What changes is the
     title: the behaviour, not the name of the mechanism.
   */
-  ["unproven", "Rebuilding only what changed", "The landing demonstration follows a dependency path on declared fixture data. That is not a measurement of production impact precision, and it is not a shipped capability."],
-] as const;
+  {
+    state: "unproven",
+    title: "Rebuilding only what changed",
+    body: "The landing demonstration follows a dependency path on declared fixture data. That is not a measurement of production impact precision, and it is not a shipped capability.",
+  },
+];
 
+/**
+ * The badge each state prints.
+ *
+ * BA-091: `unproven` used to print "BUILT, NOT PROVEN", which is the public rendering of the
+ * internal status word `IMPLEMENTED_NOT_PROVEN`. A badge brands a card rather than describing a
+ * finding, so two of five entries were stamped with a negative state word by a page whose
+ * subject is findings. "OPEN" is the finding those two actually support, and the card bodies keep
+ * saying exactly what is and is not established -- which is where that belongs.
+ *
+ * MEASURED and NOT SUPPORTED stay: they are real result states a researcher expects to read.
+ */
 export const EVIDENCE_STATE: Record<string, string> = {
   measured: "MEASURED",
   unsupported: "NOT SUPPORTED",
-  unproven: "BUILT, NOT PROVEN",
+  unproven: "OPEN",
   direction: "IN PROGRESS",
 };
+
+/** "1f5b6220…efe33e0" -- enough to recognise, with the whole value one copy away. */
+export function shortDigest(digest: string) {
+  return `${digest.slice(0, 8)}…${digest.slice(-7)}`;
+}
