@@ -552,39 +552,59 @@ export async function findLatestRun(params: {
   const config = readSupabaseAdminConfig();
   if (!config) return fail("RETRIEVAL_STORE_NOT_CONFIGURED");
 
-  const query = new URLSearchParams({
+  // Precedence is written here, not inferred from how the status strings happen to sort.
+  //
+  // The rule has two rungs and only two: a `completed` run wins outright, because once an index
+  // is queryable a later failed retry does not make it un-queryable; with no completed run, the
+  // most recent attempt is the one that describes the current state. An earlier version of this
+  // function got the same answer from `order=status.asc`, which worked only because the four
+  // values in 0020's CHECK constraint (`pending`, `running`, `completed`, `failed`) happen to
+  // sort `completed` first. A fifth value -- `aborted`, `canceled`, `blocked` -- would have
+  // silently outranked a queryable index. Two explicit reads cost one extra round trip, and
+  // only on the path where no completed run exists.
+  const filters = {
     select: "run_id,status,error_reason",
     workspace_key: `eq.${params.workspaceKey}`,
     collection_id: `eq.${params.collectionId}`,
     world_manifest_digest: `eq.${params.worldManifestDigest}`,
     retrieval_profile_id: `eq.${params.retrievalProfileId}`,
-    // A completed run outranks a later failed retry of the same world version: once an index is
-    // queryable, a subsequent failed attempt does not make it un-queryable.
-    order: "status.asc,started_at.desc",
+    order: "started_at.desc",
     limit: "1",
-  });
-
-  let response: Response;
-  try {
-    response = await supabaseAdminRequest(config, `/rest/v1/foundation_retrieval_compile_runs?${query}`);
-  } catch {
-    return fail("RETRIEVAL_STORE_READ_FAILED");
-  }
-  if (!response.ok) return fail("RETRIEVAL_STORE_READ_FAILED");
-  const rows = (await response.json().catch(() => null)) as Array<Record<string, unknown>> | null;
-  const row = rows?.[0];
-  if (!row) return fail("RETRIEVAL_RUN_NOT_FOUND");
-  const runId = String(row.run_id ?? "");
-  const status = String(row.status ?? "");
-  if (!RUN_ID.test(runId) || !["pending", "running", "completed", "failed"].includes(status)) {
-    return fail("RETRIEVAL_RUN_NOT_FOUND");
-  }
-  return {
-    ok: true as const,
-    value: {
-      runId,
-      status: status as LatestRunRecord["status"],
-      errorReason: typeof row.error_reason === "string" && row.error_reason.length > 0 ? row.error_reason : null,
-    },
   };
+
+  const read = async (status: string | null): Promise<StoreResult<LatestRunRecord>> => {
+    const query = new URLSearchParams(status ? { ...filters, status: `eq.${status}` } : filters);
+    let response: Response;
+    try {
+      response = await supabaseAdminRequest(config, `/rest/v1/foundation_retrieval_compile_runs?${query}`);
+    } catch {
+      return fail("RETRIEVAL_STORE_READ_FAILED");
+    }
+    if (!response.ok) return fail("RETRIEVAL_STORE_READ_FAILED");
+    const rows = (await response.json().catch(() => null)) as Array<Record<string, unknown>> | null;
+    const row = rows?.[0];
+    if (!row) return fail("RETRIEVAL_RUN_NOT_FOUND");
+    const runId = String(row.run_id ?? "");
+    const runStatus = String(row.status ?? "");
+    if (!RUN_ID.test(runId) || !["pending", "running", "completed", "failed"].includes(runStatus)) {
+      return fail("RETRIEVAL_RUN_NOT_FOUND");
+    }
+    return {
+      ok: true as const,
+      value: {
+        runId,
+        status: runStatus as LatestRunRecord["status"],
+        errorReason: typeof row.error_reason === "string" && row.error_reason.length > 0 ? row.error_reason : null,
+      },
+    };
+  };
+
+  const completed = await read("completed");
+  if (completed.ok) return completed;
+  // A read that failed is not "no completed run": it is a state we could not determine, and
+  // answering with the newest attempt instead would hide a store outage behind a plausible
+  // status. Fail closed -- readRetrievalIndexState turns anything but RUN_NOT_FOUND into
+  // `failed`, never `compiled`.
+  if (completed.code !== "RETRIEVAL_RUN_NOT_FOUND") return completed;
+  return read(null);
 }

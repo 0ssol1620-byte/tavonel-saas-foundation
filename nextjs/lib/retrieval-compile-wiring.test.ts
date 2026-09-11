@@ -121,6 +121,7 @@ let units: Row[];
 let refuseRunInsert: boolean;
 let refuseUnitInsert: boolean;
 let failRunReads: boolean;
+let failCompletedRunReads: boolean;
 let requests: string[];
 
 function jsonResponse(payload: unknown, ok = true) {
@@ -142,6 +143,7 @@ beforeEach(() => {
   refuseRunInsert = false;
   refuseUnitInsert = false;
   failRunReads = false;
+  failCompletedRunReads = false;
   requests = [];
   resetWorkspaceCostGuard();
 
@@ -205,12 +207,21 @@ beforeEach(() => {
         return jsonResponse(null);
       }
       if (failRunReads) return jsonResponse({ message: "down" }, false);
+      if (failCompletedRunReads && /(?:^|&)status=eq\.completed/.test(href)) {
+        return jsonResponse({ message: "down" }, false);
+      }
       const selected = runs.filter((row) =>
         matchesFilters(href, row, ["workspace_key", "collection_id", "world_manifest_digest", "retrieval_profile_id", "status"]),
       );
-      // findLatestCompletedRun filters status=eq.completed; findLatestRun does not and orders
-      // completed first. Both are satisfied by sorting completed to the front.
-      return jsonResponse([...selected].sort((left, right) => String(left.status).localeCompare(String(right.status))));
+      // Both readers ask for `order=started_at.desc` with `limit=1`, and both narrow with
+      // `status=eq.…` when they mean one status. The mock honours exactly that -- newest
+      // first, nothing else -- so a reader that leaned on how the status strings happen to
+      // sort would fail here instead of passing by accident.
+      const ordered = [...selected].sort((left, right) =>
+        String(right.started_at ?? "").localeCompare(String(left.started_at ?? "")),
+      );
+      const limit = /(?:^|&)limit=(\d+)/.exec(href);
+      return jsonResponse(limit ? ordered.slice(0, Number(limit[1])) : ordered);
     }
     if (href.includes("foundation_retrieval_units")) {
       if (method === "POST") {
@@ -390,5 +401,64 @@ describe("a retrieval compile that fails does not fail the promotion", () => {
     const asked = await askRoute(queryRequest("ask", "termination notice period"), { params });
     expect(asked.status).toBe(503);
     expect((await asked.json()).code).toBe("RETRIEVAL_STORE_READ_FAILED");
+  });
+});
+
+describe("which run describes the index, when several exist for one world version", () => {
+  /*
+    The precedence between runs used to be an artifact of the status strings.
+
+    `findLatestRun` asked PostgREST for `order=status.asc` and took the first row, which put a
+    `completed` run first only because "completed" sorts before "failed", "pending" and
+    "running". Nothing in the code said so, and a fifth status in 0020's CHECK constraint --
+    "aborted", "blocked", "canceled" -- would have outranked a queryable index silently. The
+    precedence is now two explicit reads, and these are the two cases that tell the difference.
+  */
+
+  function run(id: string, status: string, startedAt: string, errorReason: string | null = null) {
+    runs.push({
+      run_id: `retrieval-run-${id.repeat(32).slice(0, 32)}`,
+      workspace_key: WORKSPACE,
+      collection_id: COLLECTION,
+      world_manifest_digest: MANIFEST,
+      retrieval_profile_id: PROFILE.id,
+      status,
+      started_at: startedAt,
+      error_reason: errorReason,
+    });
+  }
+
+  const scope = { workspaceKey: WORKSPACE, collectionId: COLLECTION, worldManifestDigest: MANIFEST };
+
+  it("keeps a completed run authoritative over a newer failed retry", async () => {
+    run("a", "completed", "2026-09-11T00:00:00.000Z");
+    run("b", "failed", "2026-09-11T01:00:00.000Z", "RETRIEVAL_COMPILE_EMBED_FAILED");
+
+    const state = await readRetrievalIndexState(scope);
+    // The index is still queryable: a later attempt that failed did not delete the units.
+    expect(state.status).toBe("compiled");
+    expect(state.errorClass).toBeNull();
+  });
+
+  it("reports the newest attempt when none completed, rather than the alphabetically first", async () => {
+    run("c", "failed", "2026-09-11T00:00:00.000Z", "RETRIEVAL_COMPILE_EMBED_FAILED");
+    run("d", "running", "2026-09-11T01:00:00.000Z");
+
+    const state = await readRetrievalIndexState(scope);
+    // The old ordering answered `failed` here, because "failed" < "running" -- reporting a
+    // stale failure while a rebuild was in flight. The current state is the rebuild.
+    expect(state.status).toBe("missing");
+    expect(state.errorClass).toBe("RETRIEVAL_COMPILE_RUN_INCOMPLETE");
+  });
+
+  it("fails closed when the completed-run read fails, instead of answering from the second read", async () => {
+    // Fail closed on the two-read path: the first read decides whether a queryable index
+    // exists, so a read that did not complete must not be treated as "no completed run".
+    run("e", "completed", "2026-09-11T00:00:00.000Z");
+    failCompletedRunReads = true;
+
+    const state = await readRetrievalIndexState(scope);
+    expect(state.status).toBe("failed");
+    expect(state.errorClass).toBe("RETRIEVAL_STORE_READ_FAILED");
   });
 });
