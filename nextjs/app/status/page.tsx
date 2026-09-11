@@ -69,12 +69,13 @@ export default async function StatusPage() {
     <p>Unlike the rows above, each row here is the outcome of a request this deployment sent through the dependency on a schedule, carrying no customer data. A row marked &ldquo;not probed&rdquo; is neither a pass nor a failure: nothing was sent, and the reason is given.</p>
     {/*
       The word in the badge is the state; `data-state` only picks a colour, and it is picked from
-      the vocabulary `tavonel.css` already styles. A failure borrows `closed` (attention) and an
-      absence borrows `not_configured` (muted), because an unstyled value would inherit the
-      green of `operational` -- a failed probe rendered green is worse than no probe at all. A
-      real `failed` style is a cross-lane request in the lane report.
+      the vocabulary `tavonel.css` already styles. `failed` now has its own rule there, so it is
+      passed through rather than borrowing `closed` -- a request that came back wrong and a
+      capability deliberately switched off are different facts and no longer look identical. An
+      absence still borrows `not_configured` (muted), because an unstyled value would inherit
+      the green of `operational`, and a failed probe rendered green is worse than no probe.
     */}
-    <div className="status-list">{probe.rows.map((row) => <article key={row.name} data-state={row.state === "operational" ? "operational" : row.state === "failed" ? "closed" : "not_configured"}><span>{row.state}</span><h3>{row.label}</h3><p>{row.detail}</p></article>)}</div>
+    <div className="status-list">{probe.rows.map((row) => <article key={row.name} data-state={row.state === "operational" ? "operational" : row.state === "failed" ? "failed" : "not_configured"}><span>{row.state}</span><h3>{row.label}</h3><p>{row.detail}</p></article>)}</div>
     <p>End-to-end fixture run: {probe.fixtureE2E}</p>
 
     <h3>Incident contact</h3><p>Report service impact to support@tavonel.com and security issues to security@tavonel.com. Do not include document contents in email.</p>

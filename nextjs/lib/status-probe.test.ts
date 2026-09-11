@@ -5,6 +5,8 @@
   sentence: a missing result rendering as blank, a failed read rendering as "has not run", and a
   rate quoted without the denominator it was measured over.
 */
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { NOT_RUN, buildProbeSection } from "./status-probe";
 import { PROBE_RUN_SCHEMA, type ProbeCheck, type ProbeRun } from "./synthetic-probe";
@@ -101,5 +103,22 @@ describe("the /status synthetic probe section", () => {
 
   it("says plainly that nothing here proves sanitization or OCR read a document", () => {
     expect(buildProbeSection(stored([run()])).fixtureE2E).toContain("nothing here proves sanitization");
+  });
+
+  /*
+    The colour a failure lands on (ops CROSS-LANE 3).
+
+    `.status-list article > span` is green by default, so a `data-state` value with no rule in
+    tavonel.css renders a failed probe in the colour of a passing one. A failure used to borrow
+    `closed`, which made a request that came back wrong look exactly like a capability
+    deliberately switched off. Both files are read here because either half alone is useless.
+  */
+  it("gives a failed probe its own style instead of borrowing a configuration state", () => {
+    const read = (path: string) => readFileSync(resolve(import.meta.dirname, "..", path), "utf8");
+    const page = read("app/status/page.tsx");
+    expect(page, "the page passes the state through").toContain('row.state === "failed" ? "failed"');
+    expect(page, "a failure no longer renders as closed").not.toContain('row.state === "failed" ? "closed"');
+    expect(read("app/tavonel.css"), "and the stylesheet has a rule for it")
+      .toContain('.status-list article[data-state="failed"] > span');
   });
 });

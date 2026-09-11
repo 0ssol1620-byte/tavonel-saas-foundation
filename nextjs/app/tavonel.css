@@ -1187,6 +1187,17 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 .status-list article[data-state="disabled"] > span { color: var(--changed); }
 .status-list article[data-state="not_configured"] > span,
 .status-list article[data-state="not_qualified"] > span { color: var(--text-xlo); }
+/* A failed probe is a result, not a configuration state, and it was borrowing `closed` -- so a
+   request that came back wrong looked exactly like a capability deliberately switched off. The
+   colour stays --changed, because `failed` is --changed everywhere else in this stylesheet and
+   this design has four state colours on purpose; what separates it is the boxed treatment the
+   blocked-run notice already uses, so the failure carries weight without a fifth hue. */
+.status-list article[data-state="failed"] > span {
+  color: var(--changed);
+  padding: 4px 7px;
+  border: 1px solid var(--changed-dim);
+  background: var(--changed-deep);
+}
 .offlist { margin: 0; padding: 0; list-style: none; display: grid; gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 4px; overflow: hidden; }
 .offlist li {
   background: var(--g1);
