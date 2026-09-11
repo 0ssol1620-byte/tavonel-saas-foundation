@@ -1,7 +1,7 @@
 import { listOAuthSourcePage, OAUTH_SOURCE_PAGE_SIZE, type OAuthSourceItem, type OAuthSourceTarget } from "./connector-oauth-adapters";
 import { readOAuthProviderRuntime, refreshOAuthAccessToken } from "./connector-oauth";
 import { readOAuthSecret, readOAuthSecretBrokerConfig } from "./connector-oauth-secrets";
-import { getOAuthConnectionSecretReference } from "./connector-oauth-store";
+import { getOAuthConnectionSecretReference, markOAuthConnectionReauthorizationRequired } from "./connector-oauth-store";
 import { completeJobBatch, type ClaimedJob } from "./job-store";
 import { readR2SignerEnv } from "./r2-synthetic-canary";
 import { importSourceObject } from "./source-import";
@@ -139,10 +139,29 @@ export async function runSourceImportBatch(
   } catch {
     // Could be a transient broker failure or a revoked grant. Retry with backoff; the
     // attempt ceiling turns a genuinely revoked grant into a dead job rather than a loop.
-    await completeJobBatch(job.workspaceKey, job.jobId, workerId, {
+    const reported = await completeJobBatch(job.workspaceKey, job.jobId, workerId, {
       outcome: "retry",
       errorCode: "OAUTH_TOKEN_REFRESH_FAILED",
     });
+    // This catch cannot tell a withdrawn grant from a broker blip, so only the terminal
+    // attempt speaks for the connection: sending an owner to a re-authorization screen
+    // because the secret broker was briefly unreachable would be a worse lie than silence.
+    // The queue owns the ceiling, so this reads its answer instead of re-deriving it.
+    // ponytail: the terminal attempt is a heuristic for "the grant is gone" -- a broker that
+    // is down for the whole backoff window flips a valid connection. Upgrade path is reading
+    // `error=invalid_grant` out of the token response in connector-oauth.ts and classifying
+    // it apart from every transport failure; then this can flag on the first refusal.
+    if (reported.ok && reported.value.state === "dead") {
+      const marked = await markOAuthConnectionReauthorizationRequired({
+        workspaceKey: job.workspaceKey,
+        userId: String(job.payload.userId ?? ""),
+        oauthConnectionId: job.oauthConnectionId,
+        errorCode: "OAUTH_TOKEN_REFRESH_FAILED",
+      });
+      // The job is already durably dead; a failed flag leaves the connection reading
+      // "active" with a dead job beside it, which is visible but wrong. Say so out loud.
+      if (!marked.ok) console.error("OAuth reauthorization flag failed", { jobId: job.jobId, code: marked.code });
+    }
     return { ok: false, code: "OAUTH_TOKEN_REFRESH_FAILED" };
   }
 

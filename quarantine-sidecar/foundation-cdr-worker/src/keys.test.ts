@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, it } from "node:test";
 import { PermanentReject } from "./errors";
 import {
+  MIME_FALLBACK_EXTENSION,
   assertProcessableSourceKey,
   cdrReceiptSiblingKey,
   extractObjectKey,
@@ -97,6 +101,55 @@ describe("R2 event notification key extraction", () => {
   });
 });
 
+/*
+  R2-input-01. The format list crosses two language and deployment boundaries.
+
+  `shared/capabilityManifest.ts` in the site repository is the single source for the five
+  TypeScript surfaces that live beside it. This Worker is not one of them: it ships as its own
+  bundle and carries its own map. So the manifest emits `shared/capabilityInputs.generated.json`
+  and this suite holds the map to it. Read at test time only -- a Worker that fetched a file from
+  the site repository on the request path would be a deployment dependency bought to solve a
+  review problem.
+*/
+describe("the accepted MIME list matches the capability manifest", () => {
+  const repositoryRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+  const artifact = join(repositoryRoot, "shared", "capabilityInputs.generated.json");
+
+  const read = (): { cdrAllowedInputs: Record<string, string[]> } => {
+    // Fail closed: a missing artifact means nothing was compared, and a skip would report that
+    // as a pass.
+    const raw = readFileSync(artifact, "utf8");
+    return JSON.parse(raw) as { cdrAllowedInputs: Record<string, string[]> };
+  };
+
+  it("has one fallback extension for every MIME the CDR accepts, and no others", () => {
+    const { cdrAllowedInputs } = read();
+    assert.deepEqual(
+      Object.keys(MIME_FALLBACK_EXTENSION).sort(),
+      Object.keys(cdrAllowedInputs).sort(),
+    );
+  });
+
+  it("uses an extension the manifest actually declares for that MIME", () => {
+    const { cdrAllowedInputs } = read();
+    for (const [mime, extension] of Object.entries(MIME_FALLBACK_EXTENSION)) {
+      // Not "the first one": image/tiff declares .tif and .tiff and this map has always
+      // answered .tiff. What must hold is that the name it invents is one the CDR would accept
+      // for that MIME, because the CDR validates filename and MIME together.
+      assert.ok(
+        cdrAllowedInputs[mime]?.includes(extension),
+        `${mime} falls back to ${extension}, which the manifest does not declare for it`,
+      );
+    }
+  });
+
+  it("names the text formats the CDR service learned", () => {
+    for (const mime of ["text/plain", "text/csv", "text/html"]) {
+      assert.ok(MIME_FALLBACK_EXTENSION[mime], `${mime} has no fallback extension`);
+    }
+  });
+});
+
 describe("R2 source filename recovery", () => {
   it("derives a safe extension from MIME when older objects have no filename metadata", () => {
     assert.deepEqual(sourcePartFromR2Object({
@@ -104,6 +157,26 @@ describe("R2 source filename recovery", () => {
     }), {
       filename: "source.xlsx",
       contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+  });
+
+  it("names a text source by its own extension rather than calling it a PDF", () => {
+    // The old `.bin` fallback made a CSV arrive as `source.bin`, which the CDR refuses on the
+    // filename/MIME pair -- a successful intake turned into a permanent reject.
+    assert.deepEqual(sourcePartFromR2Object({ httpMetadata: { contentType: "text/csv" } }), {
+      filename: "source.csv",
+      contentType: "text/csv",
+    });
+    assert.deepEqual(sourcePartFromR2Object({ httpMetadata: { contentType: "text/html; charset=utf-8" } }), {
+      filename: "source.html",
+      contentType: "text/html",
+    });
+  });
+
+  it("still refuses to guess an extension for a MIME the manifest does not carry", () => {
+    assert.deepEqual(sourcePartFromR2Object({ httpMetadata: { contentType: "text/markdown" } }), {
+      filename: "source.bin",
+      contentType: "text/markdown",
     });
   });
 

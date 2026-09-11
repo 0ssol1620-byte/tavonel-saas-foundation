@@ -35,11 +35,18 @@ export default function AskOverlay({
 }) {
   const firstRef = useRef<HTMLButtonElement | null>(null);
   const panelRef = useRef<HTMLElement | null>(null);
+  // Tab stays inside while it is open and returns to the Ask bar when it closes (§20).
+  //
+  // Declared BEFORE the self-focus effect below, and the order is the whole fix: effects run in
+  // declaration order, so with the two the other way round the hook recorded
+  // document.activeElement after this panel had already taken focus -- it saved a button inside
+  // itself as the opener and, on close, restored focus to an element that no longer existed.
+  // Focus moved in and Tab was trapped, so it looked like a working dialog; only the return was
+  // broken, which is the half a mouse never notices.
+  useDialogFocus(panelRef);
   useEffect(() => {
     firstRef.current?.focus();
   }, []);
-  // Tab stays inside while it is open and returns to the Ask bar when it closes (§20).
-  useDialogFocus(panelRef);
 
   const answer = answers[index] ?? answers[0];
 

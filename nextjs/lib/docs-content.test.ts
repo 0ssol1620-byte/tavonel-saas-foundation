@@ -213,20 +213,27 @@ describe("what the documentation does not claim", () => {
     }
   });
 
-  it("documents the MCP server that exists, tool by tool, and the two tools it does not have", () => {
+  it("documents the MCP server that exists, tool by tool, and the tool it still does not have", () => {
     /*
       This used to assert the sentence "no published MCP server yet", which was the honest thing
       to say while there was none. There is one now, so the check moves to the two claims that
       can go wrong in the other direction: that the tool list on the page is the tool list the
       server exposes, and that the absences are still named rather than quietly filled in.
+
+      One of those absences stopped being true. The page said there was no list_worlds tool
+      because the API had no endpoint listing a workspace's collections; audit X01 built
+      GET /v1/collections and the tool shipped with it. So the assertion that it is absent is
+      gone, and the claim that can now go wrong takes its place: discovery must stay scoped to
+      ACTIVE Worlds, never listing candidates nobody promoted. The no-write-tool absence is
+      unchanged and still asserted.
     */
     const mcp = findDocsSection("mcp")!;
     const table = mcp.blocks.find((block) => block.kind === "table");
     const documented = table && table.kind === "table" ? table.rows.map((row) => row[0]) : [];
     expect(documented).toEqual(MCP_TOOLS.map((tool: { name: string }) => tool.name));
-    expect(documented).not.toContain("list_worlds");
+    expect(documented).toContain("list_worlds");
     const text = JSON.stringify(mcp);
-    expect(text).toContain("no list_worlds tool");
+    expect(text).toContain("list_worlds lists only active Worlds");
     expect(text).toContain("no write tool");
   });
 });
@@ -263,5 +270,79 @@ describe("search", () => {
     // Somebody searching for this is looking for the paragraph that mentions it.
     expect(runEvents.text).toContain("last-event-id");
     expect(index).toHaveLength(DOCS_SECTIONS.length);
+  });
+});
+
+/*
+  The founder-locked phrase lists, applied to the docs.
+
+  `lib/brand-copy.test.ts` holds the binding lists and walks a `COPY_SURFACES` array; neither
+  `lib/docs-content.ts` nor the page that renders it is on that array, so every word on
+  /docs/* was unguarded -- including the quickstart, cli and exports blocks this campaign
+  rewrote. Adding the two paths to `COPY_SURFACES` is the root fix and touches a file another
+  lane owns, so it is a cross-lane request; this is the same check, run where the docs live.
+
+  Two differences from the brand-copy version, both deliberate. It scans the rendered body of
+  every section through `docsSearchIndex()` as well as the two source files, because a phrase
+  assembled from an imported constant is not in either file's text. And `scan` is exercised on
+  a planted phrase, because an `it.each` over a list that stopped being populated passes in
+  silence -- a guard that cannot fail is not a guard.
+
+  The known limit: these lists are a copy. The assertion below fails if a phrase is renamed or
+  removed from `brand-copy.test.ts`, so the copy cannot drift out of the original -- but a
+  phrase *added* there will not appear here until someone adds it, which is the reason the
+  cross-lane request exists.
+*/
+/*
+  Kept after brand-copy.test.ts took on all three /docs surfaces (stage 2 C23c), because it is not
+  redundant: brand-copy scans SOURCE text, and the second test below scans every section as it
+  RENDERS. A phrase assembled at render time out of pieces no grep finds in the source is exactly
+  what that reaches and a source scan cannot. The third test pins this list to brand-copy.test.ts,
+  so the two cannot drift even though both exist.
+*/
+const BARRED = [
+  "unlock your data",
+  "second brain",
+  "100% accurate",
+  "never hallucinates",
+  "better than rag",
+  "ai brain",
+  "supports every file",
+  "all files",
+  "perfect parsing",
+  "best ocr",
+  "never stale",
+  "always current",
+  "industry-leading",
+  "every file supported",
+  "lossless for every format",
+  "fully autonomous truth",
+];
+const OVERCLAIMS = ["generally available", "production-ready", "fully automated ontology"];
+
+const scan = (text: string) => [...BARRED, ...OVERCLAIMS].filter((phrase) => text.toLowerCase().includes(phrase));
+
+describe("founder-locked copy on the docs surfaces", () => {
+  const surfaces = ["lib/docs-content.ts", "app/docs/[section]/page.tsx", "app/docs/page.tsx"];
+
+  it.each(surfaces)("keeps every barred phrase and readiness overclaim out of %s", (surface) => {
+    const source = readFileSync(resolve(import.meta.dirname, "..", surface), "utf8");
+    expect(scan(source), `${surface} contains founder-locked copy`).toEqual([]);
+  });
+
+  it("keeps them out of the rendered body of every section, not only the source text", () => {
+    const offenders = docsSearchIndex()
+      .map((entry) => ({ slug: entry.slug, hits: scan(entry.text) }))
+      .filter((entry) => entry.hits.length > 0);
+    expect(offenders).toEqual([]);
+  });
+
+  it("fires on a planted phrase, and stays pinned to the list brand-copy.test.ts locks", () => {
+    expect(scan("This release is production-ready and 100% accurate.")).toEqual(["100% accurate", "production-ready"]);
+    const locked = readFileSync(resolve(import.meta.dirname, "brand-copy.test.ts"), "utf8");
+    for (const phrase of [...BARRED, ...OVERCLAIMS]) {
+      expect(locked, `"${phrase}" is no longer in the founder-locked list this copy tracks`)
+        .toContain(`"${phrase}"`);
+    }
   });
 });

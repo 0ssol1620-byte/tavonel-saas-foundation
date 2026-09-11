@@ -7,6 +7,15 @@ import { activationPolicy } from "@/lib/activation-policy";
 const read = (path: string) => readFileSync(resolve(import.meta.dirname, "..", path), "utf8");
 
 /*
+  The comments in these files say what a sentence used to claim and why it stopped. That makes
+  them full of the exact strings these checks forbid -- a comment reading "RPO and RTO are not
+  set" contains "RPO" -- so anything asserting what the page does not say reads the stripped
+  source. Anything asserting what the page does say may read either.
+*/
+const withoutComments = (source: string) =>
+  source.replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, " ").replace(/\/\*[\s\S]*?\*\//g, " ");
+
+/*
   UX §17.1 lists the thirteen questions a customer asks a security page. `brand-copy.test.ts`
   already holds that the five trust pages form one chain; this holds that the first page in that
   chain answers the questions, because a funnel whose first step is silent about half of them
@@ -29,7 +38,13 @@ const SECURITY_ANSWERS: Array<[string, string]> = [
   ["provider isolation", "no tools, no broad credentials, no outbound network"],
   ["model data policy", "No third-party model API receives your documents"],
   ["training on customer data", "not used to train shared models"],
-  ["backup / recovery", "Not yet answered"],
+  ["recovery objectives", "Not yet answered"],
+  // CA O01. The drill is a separate question from the objective, and both have to be here.
+  ["tested restore", "One restore has been performed and checked"],
+  // CA S08. Malware scanning and instruction injection are two questions; this is the second.
+  ["instructions inside a document", "No model writes prose from your documents"],
+  // CA I03. Source-level enforcement exists; its grain is the workspace, and that is the claim.
+  ["source-level access", "The grain of that decision is the workspace, not the person"],
 ];
 
 describe("/security answers the §17.1 questions", () => {
@@ -40,23 +55,73 @@ describe("/security answers the §17.1 questions", () => {
   });
 
   /*
-    The one question that must stay unanswered until founder item F-10 lands.
+    CA O01. The unanswered row narrowed, and this is the test that had to change with it.
 
-    An unanswered question is only honest while it stays unanswered. The failure this guards is
-    the small edit that turns "not yet answered" into a sentence that sounds like an answer --
-    durable storage, provider replication, daily snapshots -- none of which is a tested restore
-    and all of which a buyer would read as one.
+    It used to require the title "Backup and recovery", which asserted three absences at once:
+    no objective, no retention period, no tested restore. The third stopped being true on
+    2026-09-10, so the row is now about the objectives alone. Keeping the old title would have
+    kept a claim the deployment can no longer make honestly, in the opposite direction from the
+    usual failure: a stated absence that is no longer absent.
+
+    The comfort-word ban stays exactly as it was, and matters more now than before. One drill
+    gives the page something friendly to say, which is precisely when a small edit turns
+    "not yet answered" into durable storage, provider replication and daily snapshots -- none of
+    which is a recovery objective, and all of which a buyer would read as one.
   */
-  it("leaves backup and recovery unanswered without reassuring anyone", () => {
+  it("leaves the recovery objectives unanswered without reassuring anyone", () => {
     const unanswered = page.match(/const UNANSWERED = \[[\s\S]*?\] as const;/)?.[0] ?? "";
-    expect(unanswered).toContain("Backup and recovery");
+    expect(unanswered).toContain("Recovery objectives");
     expect(unanswered).toContain("Not yet answered");
+    expect(unanswered).toContain("no recovery point objective");
+    expect(unanswered).toContain("no recovery time objective");
     for (const comfort of ["replicated", "redundant", "daily", "point-in-time", "durable", "snapshot"]) {
       expect(unanswered.toLowerCase(), `"${comfort}" answers a different question than the one asked`)
         .not.toContain(comfort);
     }
     // And it has to be rendered, not just declared.
     expect(read("app/security/page.tsx")).toContain("UNANSWERED.map");
+  });
+
+  /*
+    CA O01's other half, and its failure path.
+
+    A drill is only evidence while it carries what it did not cover. The failure this guards is
+    the edit that keeps the reassuring clause -- a restore was performed -- and drops the scope,
+    leaving a reader to assume their documents were part of it. They were not: the bytes live in
+    object storage and the drill was a database restore.
+  */
+  it("states the restore drill with its date, its parity count and its scope", () => {
+    const controls = page.match(/const CONTROLS = \[[\s\S]*?\] as const;/)?.[0] ?? "";
+    expect(controls).toContain("2026-09-10");
+    expect(controls).toContain("2026-09-08 16:33:31 UTC");
+    expect(controls).toContain("all 431 matched");
+    expect(
+      controls,
+      'a drill that does not name what it left out reads as a recovery programme',
+    ).toContain("It did not cover the document bytes in object storage");
+    // And it must not become a commitment: the objective words belong in UNANSWERED only.
+    const copy = withoutComments(controls);
+    for (const commitment of ["recovery point objective", "recovery time objective", "RPO", "RTO"]) {
+      expect(
+        copy,
+        `"${commitment}" in a control row turns one drill into a promise`,
+      ).not.toContain(commitment);
+    }
+  });
+
+  /*
+    CA S08's failure path. The statement is only true while no generator is wired, so the page
+    has to carry the gate as well as the fact -- otherwise the day an adapter lands, the page
+    keeps asserting a safety property that stopped holding and nobody has to notice.
+  */
+  it("names the gate that has to run before a generator answers a request", () => {
+    const controls = page.match(/const CONTROLS = \[[\s\S]*?\] as const;/)?.[0] ?? "";
+    expect(controls).toContain("No model writes prose from your documents");
+    expect(controls).toContain("the injection classes are re-run against a real generator");
+    expect(
+      controls,
+      'the claim has to be dated to this deployment, not to the product',
+    ).toContain("what is wired today");
   });
 
   it("claims no certification, audit or attestation", () => {
@@ -109,9 +174,23 @@ describe("/trust indexes the six published surfaces", () => {
     expect(page).toContain(href);
   });
 
-  it("says which §45 elements are not published, without promising them", () => {
-    // The three §45 elements no page answers. Each has to stay named and stay a "no".
-    for (const missing of ["Backup and recovery", "Data processing agreement", "Incident response process"]) {
+  /*
+    CA S09 / O01. This used to require the row "Backup and recovery", and that row was renamed
+    to "Recovery objectives" because one of the three things it asserted was absent -- a tested
+    restore -- stopped being absent on 2026-09-10. Requiring the old title would have required
+    the old, now half-false claim. The objectives are the part still missing, so that is what
+    the row has to name.
+
+    The fourth entry is new: certification and third-party audit, which §45 does not list and
+    every procurement reader asks first.
+  */
+  it("says which elements are not published, without promising them", () => {
+    for (const missing of [
+      "Recovery objectives",
+      "Data processing agreement",
+      "Incident response process",
+      "Third-party certification and audit",
+    ]) {
       expect(page).toContain(missing);
     }
     const absent = page.match(/const NOT_PUBLISHED[\s\S]*?\];/)?.[0] ?? "";
@@ -121,11 +200,46 @@ describe("/trust indexes the six published surfaces", () => {
     }
   });
 
+  /*
+    S09's failure path, and the reason this is not simply a substring ban any more.
+
+    The previous check forbade "soc 2", "iso 27001" and "penetration test" anywhere on the
+    page, which is a rule that cannot tell a claim from its denial: the honest sentence the
+    audit asks for -- that none of the three exists -- is unwriteable under it, and an absence
+    nobody is allowed to name is an absence the reader has to discover later.
+
+    So the three artefact names are now allowed only inside the not-published list, which is
+    the only place on the page where naming one is a "no". The words that assert the claim --
+    certified, compliant, attestation, audited by -- stay banned outright, and the row has to
+    keep saying that nothing has been commissioned, because "none exists yet" and "one is
+    under way" are the two different answers a buyer is choosing between.
+  */
+  it("names SOC 2, ISO 27001 and a penetration test only as things that do not exist", () => {
+    const absent = page.match(/const NOT_PUBLISHED[\s\S]*?\];/)?.[0] ?? "";
+    const elsewhere = withoutComments(page.replace(absent, " ")).toLowerCase();
+    for (const artefact of ["soc 2", "soc2", "iso 27001", "iso27001", "pen test", "penetration test"]) {
+      expect(
+        elsewhere,
+        `"${artefact}" outside the not-published list reads as a claim`,
+      ).not.toContain(artefact);
+    }
+    const row = absent.slice(absent.indexOf("Third-party certification"));
+    expect(row).toContain("No SOC 2 report");
+    expect(row).toContain("no ISO 27001 certificate");
+    expect(row).toContain("no independent penetration-test report exists");
+    expect(row, "a badge is the marketing decoration this row exists to refuse").toContain("no badge");
+    expect(
+      row,
+      'none commissioned and one under way are the two answers a buyer is choosing between',
+    ).toContain("no such review has been commissioned");
+  });
+
   it("claims no certification, audit or attestation", () => {
-    for (const claim of ["soc 2", "soc2", "iso 27001", "iso27001", "pen test", "penetration test", "attestation", "certified", "compliant"]) {
+    for (const claim of ["attestation", "certified", "compliant", "audited by", "independently audited"]) {
       expect(page.toLowerCase(), `"${claim}" is a claim this deployment cannot make`).not.toContain(claim);
     }
   });
+
 });
 
 /* C-13 / K-07. This string is public runtime copy, so it names the controls on the active path. */
@@ -157,5 +271,217 @@ describe("§77 /status scope", () => {
   it("never claims all systems are operational", () => {
     // The one sentence §77 names. It is a summary nothing on this page is entitled to compute.
     expect(page.toLowerCase()).not.toContain("all systems");
+  });
+});
+
+/*
+  CA B04 / B07. Five hub pages, five different questions, and until this campaign nothing on any
+  of them said which question it answered -- so a reader who wanted one of the five read parts of
+  three and left with a worse answer than any single page gave.
+
+  Held as data rather than as five hand-written assertions, because the failure mode is one page
+  quietly losing its line in an unrelated edit, and a list is the only version of this check that
+  notices. The role line has to name the other pages too: a page that says what it is for and
+  nothing about its neighbours still leaves the reader to guess where the next question goes.
+*/
+const HUBS: Array<[string, string]> = [
+  ["app/trust/page.tsx", "what is published about security and"],
+  ["app/evidence/page.tsx", "how a compiled result stays bound to the"],
+  ["app/benchmarks/page.tsx", "what a knowledge-compilation result has to"],
+  ["app/research/page.tsx", "which problems are still open"],
+  ["app/research/notes/page.tsx", "what has actually been measured"],
+];
+
+describe("CA B04 the five hubs each say which question they answer", () => {
+  it.each(HUBS)("%s states its own role", (surface, role) => {
+    expect(read(surface)).toContain(role);
+  });
+
+  it.each(HUBS)("%s points at the neighbouring hubs by name", (surface) => {
+    const source = read(surface);
+    const named = ["/evidence", "/benchmarks", "/reproducibility", "/research", "/trust"]
+      .filter((href) => !surface.includes(href.slice(1) + "/page"))
+      .filter((href) => source.includes(href));
+    expect(named.length, `${surface} names none of its siblings`).toBeGreaterThanOrEqual(3);
+  });
+
+  /*
+    /reproducibility renders through the shared registry component, so its only prose slot is the
+    summary prop. Checked separately rather than bent into the list above.
+  */
+  it("reproducibility states its role in the summary the registry renders", () => {
+    const source = read("app/reproducibility/page.tsx");
+    expect(source).toContain("can you rerun the same input and get the same bytes");
+    expect(source).toContain("/research/notes");
+  });
+});
+
+/*
+  CA B07. The audit is right that the trust case is architecture rather than customer outcomes,
+  and the fix is not a case study -- there are no consented customers, so writing one would be the
+  fabrication the constitution forbids. The fix is a label where a reader looks for the case, so
+  the absence reads as a state rather than as an oversight.
+
+  The failure path is the more important half: the day a customer result does appear, it must not
+  appear as a logo wall with no consent behind it. So the same test that requires the label also
+  requires that no page has quietly grown a fabricated one.
+*/
+const CASE_SURFACES = [
+  "app/evidence/page.tsx",
+  "app/benchmarks/page.tsx",
+  "app/reproducibility/page.tsx",
+] as const;
+
+describe("CA B07 customer cases are labelled absent, not implied", () => {
+  it.each(CASE_SURFACES)("%s says customer results need written consent and there are none", (surface) => {
+    const source = read(surface);
+    expect(source).toContain("only with written consent");
+    expect(
+      source.toLowerCase(),
+      'a page that names consent has to say whether it has any',
+    ).toMatch(/no customer has given it|none has been given/);
+  });
+
+  it.each(CASE_SURFACES)("%s invents no customer, logo or before-and-after figure", (surface) => {
+    const copy = withoutComments(read(surface)).toLowerCase();
+    for (const invention of ["case study", "testimonial", "trusted by", "customers like", "hours saved", "logo wall"]) {
+      expect(copy, `"${invention}" needs a consented customer behind it`).not.toContain(invention);
+    }
+  });
+});
+
+/*
+  CA E02 / E05. The two measured entries described their own numbers instead of stating them, so
+  a reader could not check either one: "moved a document extraction score substantially" is not a
+  figure, and "in one campaign" is not a date.
+
+  Every string below was copied from the campaign receipt named in the same entry, and the point
+  of the test is that they stay copied. The failure path is the edit that rounds 80.6 to 81, drops
+  the confidence interval, or -- the one the audit actually warns about -- lets the 404 refusals
+  read as this service's current failure rate by removing the word that dates them.
+*/
+describe("CA E02/E05 the measured entries carry their figures and their receipts", () => {
+  const record = read("lib/evidence-record.ts");
+
+  it("states the recovery delta with both confidence intervals", () => {
+    expect(record).toContain("80.6 with the recovery lane and 53.7");
+    expect(record).toContain("26.9 points");
+    expect(record).toContain("79.62\u201381.57");
+    expect(record).toContain("52.62\u201354.93");
+    expect(record, "a delta without its denominator is not a measurement").toContain("1,403 documents and 8,413 checks");
+    expect(record).toContain("folynta-recovery-accuracy-counterfactual-olmocr-2026-08-08.json");
+    expect(record).toContain("1f5b6220c1fa569e8e33530d933a16eb7ad6b856c56e22f1744f8fa96efe33e0");
+  });
+
+  it("dates the refusal count and says it is not a live rate", () => {
+    expect(record).toContain("596 compiled and 404 were refused");
+    expect(record).toContain("Measured 2026-08-08");
+    expect(
+      record,
+      'the audit warns specifically against reading 404 of 1,000 as a current failure rate',
+    ).toContain("not this service's live refusal rate");
+    expect(record).toContain("folynta-knowledge-compilation-properties-2026-08-08.json");
+    expect(record).toContain("936b859c484fb54a8bdff3175d89d2fd47d695d48ec93b99fcfd93ac53ee2e25");
+  });
+
+  it("keeps the vague wording from coming back", () => {
+    // The comment above the list quotes the old wording in order to explain it, so the check
+    // reads the copy rather than the explanation of the copy.
+    const copy = withoutComments(record);
+    for (const vague of [
+      "moved a document extraction score substantially",
+      "published with its confidence interval",
+      "in one campaign",
+    ]) {
+      expect(copy, `"${vague}" describes a number instead of stating it`).not.toContain(vague);
+    }
+  });
+
+  /*
+    A named receipt a reader cannot reach is half an answer, so the page that renders these
+    entries has to say where the files are and how to ask for one.
+  */
+  it("says on the page where the named receipts live", () => {
+    const notes = read("app/research/notes/page.tsx");
+    expect(notes).toContain("docs/evidence/artifacts/");
+    expect(notes).toContain("not published at a public URL");
+    expect(notes).toContain("check the hash yourself");
+  });
+});
+
+/*
+  CA S04. The privacy notice said data remains until deletion and that backup remnants expire on
+  the provider schedule, which is true and answers none of what a buyer asks: which parts happen
+  when you act, which parts a person does, and where no number exists.
+
+  Each assertion here corresponds to something read out of the code -- the token delete that runs
+  before the revoke, the suspension that lands on the next request, the absence of any object or
+  workspace delete route, and the deletion-receipt gate nothing calls. The failure path is the
+  edit that supplies a comfortable day count: a published retention period that no run has ever
+  measured is the unsupported claim this repository stops the line for.
+*/
+describe("CA S04 the privacy notice states deletion mechanics and no invented number", () => {
+  const page = read("app/privacy/page.tsx");
+
+  it("names what happens immediately, and that it fails rather than reporting success", () => {
+    expect(page).toContain("deletes the stored provider refresh token immediately");
+    expect(page).toContain("the disconnect returns an error rather than reporting success");
+    expect(page).toContain("with no wait for a background reindex");
+  });
+
+  it("says a person carries out the rest, because no self-service path exists", () => {
+    expect(page).toContain("There is no self-service action that deletes a workspace");
+    expect(page).toContain("privacy@tavonel.com");
+  });
+
+  it("says where a number is missing instead of supplying one", () => {
+    expect(page).toContain("We publish no completion time for that");
+    expect(page).toContain("we publish no day count for it");
+    expect(page).toContain("have no published retention period");
+  });
+
+  it("promises no deletion receipt, because no route issues one", () => {
+    expect(page).toContain("no part of the running service issues one today");
+  });
+
+  it("invents no retention period in days", () => {
+    const copy = withoutComments(page);
+    const numbers = copy.match(/\b\d+\s*(?:calendar )?(?:days?|weeks?|months?|years?)\b/gi) ?? [];
+    const invented = numbers.filter((match) => !/180 days/.test(match));
+    expect(
+      invented,
+      `a retention period in days has to come from a measured run: ${invented.join(", ")}`,
+    ).toEqual([]);
+  });
+});
+
+/*
+  CA I04. Both private-source rows were labelled Customer-run, which is the honest label and not
+  yet an answer. The two facts a customer is most likely to be surprised by are that one run is
+  one sync, and that the agent never retries -- so those are the two this test refuses to let a
+  later edit soften into something that sounds managed.
+*/
+describe("CA I04 /integrations states how the customer-run agent actually behaves", () => {
+  const page = read("app/integrations/page.tsx");
+
+  it.each([
+    ["one run is one sync", "One invocation performs one sync and exits"],
+    ["no internal schedule", "has no internal timer"],
+    ["no retry", "There is no retry inside the agent"],
+    ["cursor written last", "written only after we have committed the batch"],
+    ["update channel", "/developer/channel.json"],
+    ["who is responsible", "are yours, because the agent runs inside your network"],
+    ["read-only", "the agent never writes to your source"],
+  ])("states %s", (_question, phrase) => {
+    expect(page).toContain(phrase);
+  });
+
+  it("does not describe the agent as managed, monitored or self-updating", () => {
+    const copy = withoutComments(page).toLowerCase();
+    // "There is no self-update" is the page stating the absence, so the banned form is the
+    // positive one: a sentence claiming the agent keeps itself current, retries, or is watched.
+    for (const overclaim of ["updates itself", "automatically retries", "always in sync", "we monitor"]) {
+      expect(copy, `"${overclaim}" is not what the script does`).not.toContain(overclaim);
+    }
   });
 });

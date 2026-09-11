@@ -136,7 +136,25 @@ export function applyCandidatePatch(
     inputSha256: document.inputSha256,
     sourceImmutableKey: document.sanitizedKey,
   }));
-  const derived = materializeLabelDerivedFiles({ collectionId: artifact.collectionId, nodes, edges, inputBinding });
+  /*
+    The artifact's own blueprint, not the fallback's constant.
+
+    `scripts/compiled-world/validate.mjs` reads `canonical/model.json`'s
+    `blueprint.ontologyRelations` as the allowlist an edge predicate must be inside
+    (PREDICATE_UNDECLARED). A Core V2 candidate's edges include `mentions` and `contradicts`,
+    which the constant does not declare, so re-materialising one with the default wrote a
+    canonical model its own validator refuses: a reviewer correcting a spelling would have
+    invalidated the package. `artifact.blueprint.ontologyRelations` is that compile's emitted set
+    (`advertisedOntologyRelations`), so the regenerated file keeps declaring what the artifact
+    actually contains.
+  */
+  const derived = materializeLabelDerivedFiles({
+    collectionId: artifact.collectionId,
+    nodes,
+    edges,
+    inputBinding,
+    blueprint: artifact.blueprint,
+  });
   const replacements = new Map([
     [derived.canonicalModel.path, derived.canonicalModel],
     [derived.turtle.path, derived.turtle],

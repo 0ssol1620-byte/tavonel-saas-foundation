@@ -86,11 +86,33 @@ export default function BenchmarksPage() {
                 for measuring all of it</b> — eight families, one receipt, four rules.
               </p>
 
+              {/*
+                B04. Five hubs answered five different questions with nothing saying which was
+                which, so a reader looking for one of them read parts of three. One line, the
+                same shape on each: what this page answers, and where the next question goes.
+              */}
+              <p className="fine">
+                <b>This page answers one question:</b> what a knowledge-compilation result has to
+                carry before it may be published as a number. The numbers we already have, with
+                their denominators and their receipts, are on <Link href={"/research/notes" as Route}>Research notes</Link>;
+                how a citation stays bound to its source is on <Link href={"/evidence" as Route}>Evidence</Link>;
+                the frozen fixtures you can rerun are on <Link href={"/reproducibility" as Route}>Reproducibility</Link>;
+                the security and compliance status is on <Link href={"/trust" as Route}>Trust</Link>.
+              </p>
+
               <p className={styles.state}>
                 <b>No run on this deployment carries every field of the receipt below.</b> So this
                 page publishes the protocol and no table. A row arrives here when there is a
                 receipt behind it: the digests, the denominator, and the failures the run produced.
               </p>
+              {/*
+                B07. The audit's point is that the trust case is made of architecture rather than
+                of customer outcomes, and it is right. The honest fix is not a case study; it is
+                saying why there is none, in the place a reader looks for one. There are no
+                consented customer cases, so there is no section — and an absence with no label
+                reads as an oversight rather than as a state.
+              */}
+              <p className="fine">Customer results are published only with written consent, and no customer has given it, so there is no customer case on this site and no operating figure taken from one. A named customer, a before-and-after time or a logo appears here when a customer has signed off on the wording, and not before.</p>
 
               <h2 className={`slate ${styles.sectionTitle}`}><span />THE EIGHT METRIC FAMILIES</h2>
               <div className="tiles">

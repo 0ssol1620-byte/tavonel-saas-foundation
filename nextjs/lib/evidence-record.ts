@@ -37,10 +37,23 @@ export const BOUNDARY = [
  * scoring path we did not touch, "unsupported" is a hypothesis that failed and was not shipped
  * anyway, and "unproven" is code that passes its tests without that proving the threshold in it
  * is right. A page that only carried the first state would be a page of marketing.
+ *
+ * The two measured entries used to describe their own numbers instead of stating them --
+ * "moved a document extraction score substantially", "of a thousand documents offered in one
+ * campaign" -- which is the shape a reader can neither check nor date. Both now carry the
+ * figure, the denominator, the date, and the filename and sha256 of the receipt the figure came
+ * from, copied from the benchmark campaign record rather than restated from memory.
+ *
+ * Neither is a statement about how this service behaves now. They are research measurements on
+ * a named corpus and a named build, and the entries say so, because a research refusal count
+ * read as a production failure rate is the exact misreading the campaign record warns about.
+ *
+ * The receipts are named rather than linked, because they are not published at a URL. Where
+ * they live is written on /research/notes, next to the address that will send one.
  */
 export const EVIDENCE = [
-  ["measured", "Recovery changes the outcome", "On a public benchmark with an unmodified scoring path, the recovery runtime moved a document extraction score substantially. Our own measurement, published with its confidence interval, and never placed beside a competitor's number as if reproduced."],
-  ["measured", "Compilation refuses more than it emits, sometimes", "Of a thousand documents offered in one campaign, four hundred and four were refused, every one for a link the compiler could not resolve. A vault with a broken link is not emitted, by design."],
+  ["measured", "Recovery changes the outcome", "On olmOCR-Bench, scored by the benchmark's own evaluator at revision cfa88c1e, the same pipeline scored 80.6 with the recovery lane and 53.7 with only that lane switched off — a gap of 26.9 points, 95% confidence intervals 79.62–81.57 and 52.62–54.93, which do not overlap. Model, evaluator revision, corpus, source manifest, test set and settings were identical; the only difference was whether the documents recovery delivered carried their content. Measured 2026-08-08 over 1,403 documents and 8,413 checks. One category, headers and footers, scores higher without recovery, because a check that a phrase is absent passes trivially on an empty page — the no-recovery figure is generous rather than harsh. Ours, and never placed beside a competitor's number as if reproduced. Receipt: folynta-recovery-accuracy-counterfactual-olmocr-2026-08-08.json, sha256 1f5b6220c1fa569e8e33530d933a16eb7ad6b856c56e22f1744f8fa96efe33e0."],
+  ["measured", "Compilation refuses more than it emits, sometimes", "Of a thousand documents offered, 596 compiled and 404 were refused, every one for a link the compiler could not resolve — most often a referenced figure asset that had not been supplied alongside the markdown. A vault with a broken link is not emitted, by design. Measured 2026-08-08, on that corpus and that build: a historical research measurement, not this service's live refusal rate, which is not published. Receipt: folynta-knowledge-compilation-properties-2026-08-08.json, sha256 936b859c484fb54a8bdff3175d89d2fd47d695d48ec93b99fcfd93ac53ee2e25."],
   ["unsupported", "Blind quality detection failed", "We tested whether prediction-only signals could pick the worst documents without ground truth. They could not beat ranking by length alone. Published as unsupported, and not shipped as a feature."],
   ["unproven", "Most thresholds are uncalibrated", "Tests show the code does what its author intended. They do not show a threshold is right. Nothing here presents an uncalibrated threshold as a measured result."],
   ["unproven", "Selective recompilation", "The landing demonstration follows a dependency path on declared fixture data. That is not a measurement of production impact precision, and it is not a shipped capability."],

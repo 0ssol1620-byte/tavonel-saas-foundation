@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { authorizeFoundationRequest, revalidateFoundationAuthorization } from "@/lib/developer-auth";
 import { readBoundedJson } from "@/lib/enterprise-http";
 import { validatePromotableCollectionArtifact } from "@/lib/collection-download";
-import { answerGroundedQuestion } from "@/lib/grounded-ask";
+import { answerFromContextPacket, answerGroundedQuestion } from "@/lib/grounded-ask";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
 import { getWorkspaceCollectionCandidate } from "@/lib/r2-objects";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
+import { readRetrievalIndexState, retrievalIndexNotice } from "@/lib/retrieval-index-status";
 import { runRetrievalPipeline } from "@/lib/retrieval-pipeline";
 import {
   buildProductionRetrievalProfile,
@@ -13,7 +14,7 @@ import {
   createProductionRerankerAdapter,
   readRetrievalRuntimeEnv,
 } from "@/lib/retrieval-runtime-config";
-import { getFoundationActiveWorld, type ActiveWorld } from "@/lib/world-store";
+import { getFoundationActiveWorld, getWorldFreshness, type ActiveWorld } from "@/lib/world-store";
 import { WORKSPACE_ASK_CONCURRENCY } from "@/lib/workspace-cost-guard";
 import { acquireWorkspaceOperation } from "@/lib/workspace-operation-guard";
 import { loadActiveWorldSourceIds } from "@/lib/active-world-source-access";
@@ -51,6 +52,20 @@ const NO_STORE = { "Cache-Control": "no-store" };
 // the real one is broken would hide exactly the failure an operator needs to see.
 const FALLBACK_CODES = new Set(["RETRIEVAL_RUN_NOT_FOUND", "RETRIEVAL_PROFILE_NOT_FOUND"]);
 
+/*
+ * One answer shape, both paths (audit R4-02).
+ *
+ * The compiled branch used to return a packet, diagnostics and the code GROUNDED_ANSWER with no
+ * `answer` field at all -- only the fallback produced prose. That was survivable only because
+ * the compiled branch was unreachable; wiring it (R4-01) without this would have shipped a
+ * "successful" answer with no answer in it.
+ *
+ * `answerMode` is on both paths and has one value today. Ask is retriever-only: the answer is
+ * the cited excerpts, and no model writes a word of it. The field exists so the day that
+ * changes, a consumer can tell the difference from the response instead of from a changelog.
+ */
+const ANSWER_MODE = "evidence_excerpts";
+
 type Answered = { status: number; body: Record<string, unknown> };
 
 /**
@@ -68,6 +83,9 @@ async function answerQuestion(workspaceKey: string, id: string, question: string
     revision: active.world.revision,
     worldStateId: active.world.worldStateId,
   };
+  // Four clocks, and whether a newer version is waiting for a person (audit TM04). Read once
+  // here so both paths carry the identical block.
+  const freshness = await getWorldFreshness(workspaceKey, id);
 
   // --- Preferred path: the compiled retrieval pipeline ----------------------------------
   const runtimeEnv = readRetrievalRuntimeEnv();
@@ -83,12 +101,22 @@ async function answerQuestion(workspaceKey: string, id: string, question: string
   });
 
   if (pipeline.ok) {
+    const answer = answerFromContextPacket(pipeline.packet, {
+      collectionId: id,
+      manifestDigest: active.world.manifestDigest,
+    });
     return {
       status: 200,
       body: {
-        code: pipeline.packet.items.length > 0 ? "GROUNDED_ANSWER" : "ANSWER_ABSTAINED",
+        // The code follows the ANSWER, not the packet's item count: a packet whose every item
+        // lost its evidence binding is an abstention, and calling it GROUNDED_ANSWER because
+        // units came back would be the exact claim the World Gate exists to prevent.
+        code: answer.status === "grounded" ? "GROUNDED_ANSWER" : "ANSWER_ABSTAINED",
         retrievalPath: "compiled-retrieval-v1",
+        answerMode: ANSWER_MODE,
         activeWorld,
+        freshness,
+        ...answer,
         contextPacket: pipeline.packet,
         retrieval: {
           compileRunId: pipeline.diagnostics.compileRunId,
@@ -108,6 +136,16 @@ async function answerQuestion(workspaceKey: string, id: string, question: string
   }
 
   // --- Fallback: excerpt concatenation over the promoted artifact ------------------------
+  //
+  // Why the index is not there is part of the answer (audit R4-01). A world promoted before the
+  // compile step existed, a compile that failed on an unreachable embedder and a run still in
+  // flight are three different operator problems, and "no compiled retrieval index exists yet"
+  // described all three identically. The run table already knows which one it is.
+  const indexState = await readRetrievalIndexState({
+    workspaceKey,
+    collectionId: id,
+    worldManifestDigest: active.world.manifestDigest,
+  });
   const signer = readR2SignerEnv();
   if (!signer) return { status: 503, body: { code: "SIGNER_NOT_CONFIGURED" } };
   const loaded = await getWorkspaceCollectionCandidate(signer, workspaceKey, active.world.candidateObjectKey);
@@ -125,10 +163,15 @@ async function answerQuestion(workspaceKey: string, id: string, question: string
     body: {
       code: answer.status === "grounded" ? "GROUNDED_ANSWER" : "ANSWER_ABSTAINED",
       // Named explicitly so a caller can never mistake a fallback answer for a full-pipeline
-      // one; `retrievalNotice` says why this path was taken.
+      // one; `retrievalNotice` says why this path was taken and `retrievalIndex` says which
+      // state it is in, so a failed compile is visible rather than looking like a world that
+      // was simply never indexed.
       retrievalPath: "excerpt-concatenation-fallback",
-      retrievalNotice: "no compiled retrieval index exists for this active world yet",
+      retrievalNotice: retrievalIndexNotice(indexState),
+      retrievalIndex: indexState,
+      answerMode: ANSWER_MODE,
       activeWorld,
+      freshness,
       ...answer,
     },
   };

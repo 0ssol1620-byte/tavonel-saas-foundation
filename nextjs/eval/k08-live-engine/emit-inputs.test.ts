@@ -1,0 +1,81 @@
+/**
+ * K08 step 1: emit the Core V2 compile request for the Explore corpus, and count what the TS
+ * fallback engine produced from the same inputs.
+ *
+ * Audit K08 says the public "6,300 objects" figure describes the TypeScript fallback engine's
+ * candidate emission, not what Core V2 -- the actually-configured live engine -- produces and shows
+ * a customer. Re-measuring needs the same bytes through both engines. This file produces the two
+ * things the Python side cannot: the request exactly as `buildProductCoreV2Request` builds it in
+ * production, and the TS engine's own node-kind breakdown.
+ *
+ *   npx vitest run --config eval/vitest.config.ts eval/k08-live-engine/emit-inputs.test.ts
+ *   <p0p2 venv python> eval/k08-live-engine/run_core_v2.py
+ *
+ * `core-v2-request.json` is a few megabytes of the corpus's own text and is git-ignored (see the
+ * .gitignore beside it). `ts-fallback-counts.json` is small and committed, because it is the number
+ * the comparison is against.
+ */
+
+import { mkdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
+import { describe, expect, it } from "vitest";
+import { buildProductCoreV2Request } from "../../lib/core-runtime-v2";
+import { exploreSampleArtifact, exploreSampleInputs, EXPLORE_SAMPLE_DIGEST } from "../../lib/explore-sample";
+import { duplicateLabelRate } from "./metrics";
+
+const OUT_DIR = path.resolve(import.meta.dirname, "results");
+const WORKSPACE_ID = "pilot-k08";
+
+type OntologyNode = { id: string; kind: string; label?: string };
+type OntologyEdge = { id: string; type: string };
+
+function countBy<T>(items: T[], key: (item: T) => string): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const item of items) {
+    const bucket = key(item);
+    counts[bucket] = (counts[bucket] ?? 0) + 1;
+  }
+  return Object.fromEntries(Object.entries(counts).sort(([left], [right]) => left.localeCompare(right)));
+}
+
+describe("K08 inputs", () => {
+  it("emits the Core V2 request and the TS fallback engine's counts for the same corpus", () => {
+    const request = buildProductCoreV2Request(
+      WORKSPACE_ID,
+      [...exploreSampleInputs],
+      new Date("2026-09-11T00:00:00.000Z"),
+      "core-k08-explore-w4",
+    );
+
+    const nodes = exploreSampleArtifact.ontology.nodes as OntologyNode[];
+    const edges = exploreSampleArtifact.ontology.edges as OntologyEdge[];
+    const tsCounts = {
+      schema: "tavonel.k08.ts-fallback-counts.v1",
+      engine: "tavonel-collection-compiler-ts-v1 (the fallback engine and the Explore build-time engine)",
+      corpus: "explore-sample-w4",
+      corpusManifestDigest: EXPLORE_SAMPLE_DIGEST,
+      documents: exploreSampleInputs.length,
+      pages: exploreSampleInputs.reduce((sum, document) => sum + document.pageCount, 0),
+      regions: exploreSampleInputs.reduce((sum, document) => sum + (document.regions?.length ?? 0), 0),
+      reportedCounts: exploreSampleArtifact.validation.counts,
+      nodeKinds: countBy(nodes, (node) => node.kind),
+      nodeTotal: nodes.length,
+      edgeTypes: countBy(edges, (edge) => edge.type),
+      edgeTotal: edges.length,
+      duplicateLabels: duplicateLabelRate(nodes),
+      candidatesConsidered: exploreSampleArtifact.validation.counts.candidatesConsidered ?? null,
+      lifecycle: exploreSampleArtifact.lifecycle,
+    };
+
+    mkdirSync(OUT_DIR, { recursive: true });
+    writeFileSync(path.join(OUT_DIR, "core-v2-request.json"), JSON.stringify(request), "utf8");
+    writeFileSync(path.join(OUT_DIR, "ts-fallback-counts.json"), `${JSON.stringify(tsCounts, null, 2)}\n`, "utf8");
+
+    // Fail closed: an empty request or an ontology with no nodes would produce a comparison of
+    // nothing against nothing, and the Python side has no way to tell that apart from a real run.
+    expect(request.documents.length).toBe(exploreSampleInputs.length);
+    expect(request.documents.every((document) => document.regions.length > 0)).toBe(true);
+    expect(nodes.length).toBeGreaterThan(0);
+    expect(edges.length).toBeGreaterThan(0);
+  });
+});

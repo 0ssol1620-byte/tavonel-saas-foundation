@@ -15,6 +15,9 @@ export default defineConfig({
     // Deployment flags must not turn isolated route tests into live database calls.
     // Durable boundary suites explicitly stub production/opt-in mode and the RPC.
     env: { VERCEL_ENV: "preview", TAVONEL_DURABLE_WORKSPACE_GUARDS: "0" },
-    include: ["lib/**/*.test.ts", "lib/**/*.spec.ts"],
+    // The eval metric tests only: pure functions over committed result files, fast enough for
+    // every run. eval/ask-eval/run.harness.test.ts and eval/k08-live-engine/emit-inputs.test.ts
+    // stay out -- they write report files and take minutes, and live in eval/vitest.config.ts.
+    include: ["lib/**/*.test.ts", "lib/**/*.spec.ts", "eval/**/metrics.test.ts"],
   },
 });

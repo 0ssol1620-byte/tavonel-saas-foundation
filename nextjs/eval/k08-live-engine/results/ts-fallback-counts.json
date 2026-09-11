@@ -1,0 +1,42 @@
+{
+  "schema": "tavonel.k08.ts-fallback-counts.v1",
+  "engine": "tavonel-collection-compiler-ts-v1 (the fallback engine and the Explore build-time engine)",
+  "corpus": "explore-sample-w4",
+  "corpusManifestDigest": "sha256:328d3ef3a6ee0153b14e9a782cdb4e9f499a6443b1f5dbf2898ace1cb4915b7f",
+  "documents": 5,
+  "pages": 290,
+  "regions": 1281,
+  "reportedCounts": {
+    "documents": 5,
+    "topics": 5,
+    "entities": 2365,
+    "claims": 3930,
+    "evidence": 5,
+    "relations": 7794,
+    "packageFiles": 16,
+    "candidatesConsidered": 6300
+  },
+  "nodeKinds": {
+    "Claim": 3930,
+    "Document": 5,
+    "Entity": 2365,
+    "Evidence": 5,
+    "Topic": 5
+  },
+  "nodeTotal": 6310,
+  "edgeTypes": {
+    "discusses_topic": 23,
+    "mentions_entity": 3841,
+    "supported_by": 3930
+  },
+  "edgeTotal": 7794,
+  "duplicateLabels": {
+    "labelledNodes": 6310,
+    "distinctLabels": 5749,
+    "nodesSharingALabel": 846,
+    "rate": 0.13407290015847861,
+    "population": "nodes carrying a non-empty label"
+  },
+  "candidatesConsidered": 6300,
+  "lifecycle": "candidate"
+}

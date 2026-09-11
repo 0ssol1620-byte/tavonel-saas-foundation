@@ -47,6 +47,96 @@ describe("Foundation compute ledger", () => {
     }));
   });
 
+  /*
+    Audit U06: a reload, a second tab and a dropped network must not charge twice.
+
+    The reservation RPC is keyed on (workspace, document), so a second attempt is a replay of
+    the first rather than a second reservation -- and the receipt says which it was. These hold
+    the three outcomes a duplicated request can have: a replay passed through as a replay, a
+    conflict refused rather than silently re-reserved, and a settlement that arrives twice
+    because delivery is at-least-once.
+  */
+  it("passes an idempotent replay through as a replay rather than a second reservation", async () => {
+    configure();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      reservationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      documentId: base.documentId,
+      state: "reserved",
+      expiresAt: "2026-08-29T12:10:00Z",
+      reservedCredits: 12,
+      maximumCredits: 18,
+      billingSource: "paid",
+      idempotentReplay: true,
+    }), { status: 200 })));
+    await expect(reserveFoundationCompute(base)).resolves.toMatchObject({
+      ok: true,
+      result: { reservationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", idempotentReplay: true },
+    });
+  });
+
+  it("refuses an idempotency conflict with its own code instead of reserving again", async () => {
+    configure();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ message: "foundation_compute_idempotency_conflict" }), { status: 409 },
+    )));
+    await expect(reserveFoundationCompute(base)).resolves.toEqual({ ok: false, code: "COMPUTE_IDEMPOTENCY_CONFLICT" });
+  });
+
+  it("accepts a duplicate settlement, which is what at-least-once delivery produces", async () => {
+    configure();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      status: "duplicate",
+      reservationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      state: "settled",
+      settledCredits: 12,
+      billingSource: "paid",
+    }), { status: 200 })));
+    await expect(settleFoundationCompute({
+      workspaceKey: base.workspaceKey,
+      documentId: base.documentId,
+      outcome: "settled",
+      actualCredits: 12,
+      reasonCode: "OCR_COMPLETED",
+    })).resolves.toMatchObject({ ok: true, result: { status: "duplicate" } });
+  });
+
+  /*
+    A settlement the ledger refuses on shape must not read as an outage.
+
+    COMPUTE_LEDGER_FAILED is the class a caller is right to retry; a settlement the SQL will
+    never accept (`released` carrying credits, say) is not. Unmapped, the two were one string
+    (ops CROSS-LANE 4).
+  */
+  it("classifies a malformed settlement as a bad request, not a ledger outage", async () => {
+    configure();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ message: 'raise exception "foundation_compute_settlement_invalid"' }),
+      { status: 400 },
+    )));
+    await expect(settleFoundationCompute({
+      workspaceKey: base.workspaceKey,
+      documentId: base.documentId,
+      outcome: "released",
+      actualCredits: 12,
+      reasonCode: "OCR_TIMEOUT_OR_NETWORK",
+    })).resolves.toEqual({ ok: false, code: "COMPUTE_SETTLEMENT_INVALID" });
+  });
+
+  it("refuses a settlement receipt that claims neither processed nor duplicate", async () => {
+    configure();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      status: "charged_again",
+      reservationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    }), { status: 200 })));
+    await expect(settleFoundationCompute({
+      workspaceKey: base.workspaceKey,
+      documentId: base.documentId,
+      outcome: "settled",
+      actualCredits: 12,
+      reasonCode: "OCR_COMPLETED",
+    })).resolves.toEqual({ ok: false, code: "COMPUTE_SETTLEMENT_RECEIPT_INVALID" });
+  });
+
   it("accepts only an idempotent settlement receipt", async () => {
     configure();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({

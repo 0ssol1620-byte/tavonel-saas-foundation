@@ -257,12 +257,31 @@ export const CDR_DETAIL_FAILURE_CLASS: Record<string, FailureClass> = {
   "CDR Office package is invalid or encrypted": "ENCRYPTED_SOURCE",
   "CDR password-protected PDF is not qualified": "ENCRYPTED_SOURCE",
   "CDR Office package contains unqualified active or embedded content": "MALWARE_QUARANTINED",
+  /*
+    The HTML analogue of the line above, and the same class for the same reason.
+
+    `reject_active_html` refuses script, event-handler and external-reference markup before
+    LibreOffice opens the file (`cdr-cloudrun/app.py:280`). What it found is active content the
+    deployment will not execute, which is the statement `MALWARE_QUARANTINED` makes -- not a
+    judgement that the document is broken.
+  */
+  "CDR HTML source contains unqualified active or external content": "MALWARE_QUARANTINED",
   "CDR source exceeds the controlled-beta size limit": "PARSER_OOM",
   "CDR sanitized output is outside the controlled-beta size limit": "PARSER_OOM",
   "CDR source rendering budget is not qualified": "PARSER_OOM",
   "CDR source page count is not qualified": "PARSER_OOM",
   "CDR source is empty": "CORRUPT_SOURCE",
   "CDR source could not be converted safely": "CORRUPT_SOURCE",
+  /*
+    The refusal scan could not read the bytes it was asked to scan.
+
+    `app.py:278` raises this when reading the source off disk fails, and it is raised as 422
+    rather than 5xx, so it lands here as a statement about the document. `CORRUPT_SOURCE` is the
+    honest reading: the deployment held the file and still could not read it, which is what the
+    neighbouring "could not be converted" and "is empty" lines say. The decode itself never
+    reaches this -- it is lossy on purpose -- so only an unreadable file arrives here.
+  */
+  "CDR HTML source could not be read": "CORRUPT_SOURCE",
   "CDR source renderer rejected this document": "CORRUPT_SOURCE",
   "CDR source could not be rasterized safely": "CORRUPT_SOURCE",
   "CDR sanitized PDF could not be created": "CORRUPT_SOURCE",

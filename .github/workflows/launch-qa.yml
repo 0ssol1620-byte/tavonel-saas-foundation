@@ -54,9 +54,14 @@ jobs:
           retention-days: 14
 
   product-qa:
-    name: Product QA (widths + reduced motion)
+    name: Product QA (widths + reduced motion + audit)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # 45, not 30. The three audit projects added below are 90 tests that walk every public route
+    # at seven widths and measure contrast, 200% zoom, dialog focus, failure states, cross-tenant
+    # refusals and compile resume. Measured at 2m15s with three workers against a warm production
+    # build; the extra headroom is for a two-worker runner and a cold build, not for a job that is
+    # allowed to get slower.
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: nextjs
@@ -88,10 +93,24 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Install Chromium runtime
         run: pnpm exec playwright install --with-deps chromium
-      # One build, four viewports: the webServer in playwright.config.ts builds and starts the
-      # production bundle once for the whole run, so the added cost is the run, not four builds.
-      - name: Run the product width and reduced-motion projects
-        run: pnpm exec playwright test --project=1440 --project=390 --project=360 --project=reduced-motion
+      # One command, seven projects, one build.
+      #
+      # The webServer in playwright.config.ts runs `pnpm build && pnpm start` with
+      # `reuseExistingServer: false`, so every separate `playwright test` invocation pays for
+      # another production build. The projects therefore share one invocation.
+      #
+      # The last three are the 2026-09-11 competitive-audit checks (V01-V05, V08, S07, U06).
+      # Three projects rather than four more width projects: `audit` runs the whole set once at
+      # 1440 because each spec drives the widths, contexts and media it needs from the inside
+      # (overflow-audit walks all seven widths, film-fallback-audit opens 899 and 901,
+      # contrast-zoom-audit builds a 640px/2x context for 200% zoom), while `audit-768` and
+      # `audit-1280` add the tablet edge and the small laptop -- the two viewports this job has
+      # never covered -- for the specs where the viewport is the variable.
+      - name: Run the product width, reduced-motion and competitive-audit projects
+        run: >-
+          pnpm exec playwright test
+          --project=1440 --project=390 --project=360 --project=reduced-motion
+          --project=audit --project=audit-768 --project=audit-1280
       - name: Preserve product failure evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -119,6 +138,12 @@ jobs:
           node-version: 22
           cache: pnpm
           cache-dependency-path: nextjs/pnpm-lock.yaml
+      # The clean-install harness syntax-checks the published source agent and runs the Python
+      # verifier, and this job had no Python. Without it the harness FAILS (it required Python
+      # for the source agent before the verifiers existed) rather than reporting a skip.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - run: pnpm install --frozen-lockfile
       - name: Install Chromium runtime
         run: pnpm exec playwright install --with-deps chromium
@@ -127,6 +152,22 @@ jobs:
         run: pnpm start --hostname 127.0.0.1 --port 3117 > /tmp/tavonel-next.log 2>&1 &
       - name: Wait for health
         run: node scripts/launch-qa/wait-for-health.mjs
+      # X08: catch recipe and distribution drift against the current release.
+      #
+      # In THIS job and not in product-qa, which is where they were proposed: product-qa's server
+      # is playwright.config.ts's webServer, so it exists only for the duration of the
+      # `playwright test` invocation and a step after it would find nothing listening. This job
+      # starts its own server and keeps it up for the steps that follow, which is what
+      # smoke.mjs needs -- it makes three unauthenticated GETs.
+      #
+      # Port 3117, not 3000: that is the port this job starts, and the proposed 127.0.0.1:3000
+      # would have pointed the smoke at nothing.
+      - name: Developer distribution — clean install, public downloads only
+        run: node scripts/verify-developer-clean-install.mjs
+      - name: Integration recipes — smoke
+        env:
+          TAVONEL_RECIPE_BASE_URL: http://127.0.0.1:3117
+        run: node scripts/developer-recipes/smoke.mjs
       - name: Enforce Lighthouse budgets
         run: CHROME_PATH=$(node -e "const { chromium } = require('@playwright/test'); process.stdout.write(chromium.executablePath())") pnpm qa:lighthouse
       - name: Show server log on failure

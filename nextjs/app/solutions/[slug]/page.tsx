@@ -17,6 +17,7 @@ import SolutionProofSample from "@/components/solution-proof-sample";
 */
 const SOLUTIONS = {
   "ai-ready-knowledge": {
+    audience: "AI and platform engineers",
     eyebrow: "AI-READY KNOWLEDGE",
     title: "Give every AI project the same grounded knowledge asset.",
     lede: "Compile document collections into a versioned World before retrieval, assistants or agent workflows consume them.",
@@ -30,6 +31,7 @@ const SOLUTIONS = {
     ],
   },
   "document-intelligence": {
+    audience: "Document and operations teams",
     eyebrow: "DOCUMENT INTELLIGENCE",
     title: "Read the source before asking AI to reason over it.",
     lede: "Move from difficult PDFs and scans to reviewable structure, without losing the page and region each result came from.",
@@ -38,11 +40,14 @@ const SOLUTIONS = {
     outcomes: ["Provenance to the exact source location", "Visible confidence and review reasons", "Immutable OCR output", "Structure ready for compilation"],
     limitations: [
       "Where a format does not state a page count, the quote is an estimate and is labelled one. Spreadsheets have no decided billable unit at all.",
-      "Handwriting, stamps and heavily degraded scans are routed to review rather than guessed at, and review is a person's time.",
+      // Nothing detects handwriting, a stamp or scan degradation: review is opened on an OCR
+      // failure, and this deployment has no quality score and deliberately does not route on one.
+      "A page the reader cannot read fails visibly and is opened for review; nothing guesses at handwriting, stamps or degraded scans, and review is a person's time.",
       "No accuracy figure is published without a same-condition benchmark.",
     ],
   },
   "knowledge-graph": {
+    audience: "Data and knowledge architects",
     eyebrow: "KNOWLEDGE GRAPH",
     title: "Compile a graph people can inspect and machines can reuse.",
     lede: "Turn document facts into stable semantic objects and evidence-bound relations inside a versioned World.",
@@ -56,19 +61,21 @@ const SOLUTIONS = {
     ],
   },
   "source-grounded-assistants": {
+    audience: "Application and agent developers",
     eyebrow: "GROUNDED ASSISTANTS",
     title: "Let an answer travel all the way back to the source.",
     lede: "Ask, API and MCP consume the same current World and return evidence from the same version.",
     problem: "An answer can sound confident while depending on stale, conflicting or untraceable source material.",
-    flow: ["Ask the active World", "Retrieve qualified objects", "Generate with version context", "Attach evidence", "Abstain when support is insufficient"],
+    flow: ["Ask the active World", "Retrieve qualified objects", "Generate with version context", "Attach evidence", "Decline when nothing matched"],
     outcomes: ["Answer and evidence share one World version", "Citation inspection at the exact source location", "Explicit abstention", "Model-independent knowledge"],
     limitations: [
-      "The World abstains where the sources do not support an answer.",
+      "The World declines when no evidence matched the question at all. It does not judge whether what matched answers it, so a question these sources cannot answer returns the nearest matching regions and their locators, not a refusal.",
       "Ask, the API and MCP read the same active revision, so an assistant is as current as the last promotion.",
       "Model choice is yours; the World is the contract.",
     ],
   },
   "knowledge-operations": {
+    audience: "Knowledge owners and security reviewers",
     eyebrow: "KNOWLEDGE OPERATIONS",
     title: "Review, promote and govern knowledge as an operational asset.",
     lede: "Separate candidate compilation from the active World, preserve change history and keep human decisions explicit.",
@@ -115,6 +122,15 @@ export default async function SolutionPage({ params }: { params: Promise<{ slug:
             <h1 className="document-title">{solution.title}</h1>
           </div>
           <div className="stack solution-hero-copy">
+            {/*
+              Audit B02. Five solution pages repeat the same concepts and the same sample figures,
+              and nothing told a reader which of the five answers *their* question -- a developer,
+              an operations owner and a security reviewer were handed the same five doors. The
+              audience is a field on the solution rather than a sentence written into each page, so
+              it cannot drift from the copy under it, and it renders as a wrapping paragraph rather
+              than a mono label because the longest of them is wider than a 360px phone.
+            */}
+            <p className="fine">For: {solution.audience}</p>
             <p className="lede">{solution.lede}</p>
             <p>{solution.problem}</p>
           </div>

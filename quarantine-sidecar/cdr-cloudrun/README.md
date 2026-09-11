@@ -2,7 +2,7 @@
 
 ## Purpose and activation state
 
-This directory contains a **format-changing Content Disarm and Reconstruction (CDR) service** for the isolated TAVONEL SaaS Foundation. It is an alternative to a managed CDR vendor when customer documents must remain in the APAC deployment boundary. The service accepts a source only after the Cloudflare quarantine sidecar supplies an independent HMAC, short-lived timestamp, request ID, and source SHA-256. It converts qualified Office inputs to PDF with LibreOffice, decodes qualified raster images with Pillow under explicit page/pixel ceilings, rasterizes PDF pages with PDFium through pypdfium2, and returns a newly created image-only PDF.
+This directory contains a **format-changing Content Disarm and Reconstruction (CDR) service** for the isolated TAVONEL SaaS Foundation. It is an alternative to a managed CDR vendor when customer documents must remain in the APAC deployment boundary. The service accepts a source only after the Cloudflare quarantine sidecar supplies an independent HMAC, short-lived timestamp, request ID, and source SHA-256. It converts qualified Office and text inputs to PDF with LibreOffice, decodes qualified raster images with Pillow under explicit page/pixel ceilings, rasterizes PDF pages with PDFium through pypdfium2, and returns a newly created image-only PDF.
 
 The service is designed for **Google Cloud Run first generation in `asia-northeast3` (Seoul)**. First generation Cloud Run uses gVisor as its container sandbox, while Cloud Run resource data is stored in the selected region. [1] [2] A source-built Cloud Run revision is deployed but has no runtime HMAC configured, so the CDR service itself returns structured fail-closed `503` responses. The active Cloudflare Worker has no CDR runtime configuration and remains HTTP 503 fail-closed; it cannot accept or process customer bytes.
 
@@ -14,11 +14,19 @@ The service is designed for **Google Cloud Run first generation in `asia-northea
 |---|---:|---|---|
 | PDF | Yes | Image-only PDF | Direct page render and rebuild |
 | DOCX, XLSX, PPTX, ODT/ODS/ODP | Yes, subject to package inspection | Image-only PDF | LibreOffice conversion, then page rebuild |
+| TXT, CSV | Yes | Image-only PDF | LibreOffice conversion with a pinned import filter (UTF-8; CSV comma-separated), then page rebuild |
+| HTML/HTM | Yes, subject to reference inspection | Image-only PDF | Writer/Web conversion, then page rebuild. Markup carrying a script, a frame, a stylesheet link, an `@import`, a CSS `url(...)`, a `meta http-equiv` or any `src`/`srcset`/`background` attribute is refused **before** LibreOffice opens it, because Writer/Web resolves linked resources at import time |
+| Markdown | No | — | LibreOffice ships a Markdown export filter and no import filter; a `.md` would be refused by `soffice` or imported as untyped text, which is not what "Markdown support" would mean |
+| EML / email | No | — | An email is a MIME part tree with headers and attachments; nothing here parses one, and it needs a reader and an `email` locator kind rather than a whitelist entry |
 | Legacy DOC/XLS/PPT | No | — | Binary Office macro/password safety is not empirically qualified in this exact container |
 | JPEG, PNG, TIFF, GIF | Yes | Image-only PDF | Image renderer, then page rebuild |
 | HWP/HWPX | No | — | Not yet empirically qualified in this exact container image |
 | ZIP/archive | No | — | Archive expansion requires a separate bounded, per-entry CDR design |
-| Executables, scripts, HTML, password-protected PDFs, macro/embedded-object Office packages, or unsupported files | No | — | Rejected before renderer invocation or conversion |
+| Executables, scripts, HTML referencing external or active content, password-protected PDFs, macro/embedded-object Office packages, or unsupported files | No | — | Rejected before renderer invocation or conversion |
+
+The whitelist itself is not maintained here. `shared/capabilityManifest.ts` in the site repository emits `shared/capabilityInputs.generated.json`, and `tests/test_text_inputs_and_manifest_parity.py` holds `ALLOWED_INPUTS` to it -- the three lists (this service, the Cloudflare worker, the site manifest) agreed by memory before, which is how a format gets added in one deployable and forgotten in two. Nothing reads that file at runtime; the test is the coupling.
+
+A format reaches this service *before* it reaches the site, never the other way round: `TEXT_INPUTS_LIVE` in the manifest keeps TXT/CSV/HTML off the upload whitelist until an image built from this directory is released, because the reverse order is an upload the customer pays for and a 422 afterwards.
 
 The service accepts at most **5 MiB original input**, **80 pages**, **30 million rendered pixels per page**, **80 million rendered pixels total**, and **18 MiB reconstructed output**. The Cloudflare sidecar enforces the same 5 MiB ceiling and format allowlist before it can mint a browser-to-R2 upload URL for this provider. Any failure leaves the original in quarantine and creates no immutable approval.
 
@@ -76,7 +84,7 @@ sudo docker run --rm --network host \
   python -m unittest discover -v -s /tests
 ```
 
-The container suite verifies structured no-store health and disarm failure with no HMAC, invalid HMAC rejection, duplicate authenticated-request rejection, source digest mismatch rejection, ZIP rejection, macro-bearing OOXML rejection, legacy binary Office rejection, PNG and multi-frame GIF normalization, empirically generated DOCX/XLSX/PPTX conversion through the LibreOffice packages installed by the Dockerfile, and successful creation of text-free image-only PDFs with exact output digests. The sidecar contract suite separately verifies provider HMAC generation, output MIME/digest binding, 5 MiB and archive pre-upload rejection, and legacy generic/Cloudmersive fail-closed behavior.
+The container suite verifies structured no-store health and disarm failure with no HMAC, invalid HMAC rejection, duplicate authenticated-request rejection, source digest mismatch rejection, ZIP rejection, macro-bearing OOXML rejection, legacy binary Office rejection, PNG and multi-frame GIF normalization, empirically generated DOCX/XLSX/PPTX conversion plus TXT/CSV/HTML conversion through the LibreOffice packages installed by the Dockerfile, and successful creation of text-free image-only PDFs with exact output digests. The sidecar contract suite separately verifies provider HMAC generation, output MIME/digest binding, 5 MiB and archive pre-upload rejection, and legacy generic/Cloudmersive fail-closed behavior.
 
 ## Deployment gate for Google Cloud Run
 

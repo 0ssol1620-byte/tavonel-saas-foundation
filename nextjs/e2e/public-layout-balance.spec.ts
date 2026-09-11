@@ -54,7 +54,19 @@ test("integration marketing copy uses access modes instead of beta badges", asyn
   await expect(main.getByText("Customer-run", { exact: true })).toHaveCount(2);
 });
 
+/*
+  The property is about a grid with an odd number of cards: the last one spans the empty cell
+  instead of leaving a hole. Which ROUTES happen to have an odd count is content, and content
+  moves -- the ops lane's probe and error-rate rows took /status from five cards to six, and the
+  loop below used to assert every listed route was odd, so a legitimate content change failed a
+  test about CSS.
+
+  So the geometry is asserted on the routes that exercise the case, and at least one route must
+  still exercise it. Skipping the even ones silently would let this pass by covering nothing,
+  which is the failure mode that matters for a test nobody looks at again.
+*/
 test("odd two-column record grids do not expose an empty placeholder cell", async ({ page }) => {
+  let exercised = 0;
   for (const route of ["/security", "/status", "/subprocessors"] as const) {
     await page.goto(route);
     const grid = page.locator(route === "/subprocessors" ? ".processor-list" : ".status-list").last();
@@ -70,10 +82,13 @@ test("odd two-column record grids do not expose an empty placeholder cell", asyn
       };
     });
 
-    expect(geometry.childCount % 2, `${route} exercises the odd-card case`).toBe(1);
+    if (geometry.childCount % 2 === 0) continue;
+    exercised += 1;
     expect(geometry.leftGap, `${route} final card begins at the grid edge`).toBeLessThanOrEqual(1);
     expect(geometry.rightGap, `${route} final card fills the former empty cell`).toBeLessThanOrEqual(1);
   }
+  expect(exercised, "no listed route has an odd grid any more, so this test proved nothing")
+    .toBeGreaterThan(0);
 });
 
 test("the public footer stays compact and fully painted on narrow screens", async ({ page }) => {

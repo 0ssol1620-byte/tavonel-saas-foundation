@@ -38,6 +38,7 @@ export type RetrievalCompileFailure =
   | "RETRIEVAL_COMPILE_PROFILE_REGISTRATION_FAILED"
   | "RETRIEVAL_COMPILE_RUN_REJECTED"
   | "RETRIEVAL_COMPILE_NO_UNITS"
+  | "RETRIEVAL_COMPILE_SOURCE_BINDING_UNRESOLVED"
   | "RETRIEVAL_COMPILE_UNIT_WRITE_FAILED"
   | "RETRIEVAL_COMPILE_EMBEDDING_INCOMPATIBLE"
   | "RETRIEVAL_COMPILE_EMBEDDING_PROVIDER_FAILED"
@@ -94,6 +95,20 @@ export async function compileRetrievalArtifacts(input: RetrievalCompileInput): P
   // Compile before creating the run: if the artifact yields nothing, there is no reason to
   // leave a failed run row behind.
   const compiled = compileRetrievalUnits(input.artifact, input.profile.views);
+  if (compiled.refusal) {
+    /*
+      A Core V2 package whose sources cannot be named in the product's namespace. Indexing it
+      anyway would publish citations pointing at documents `/api/documents/<id>/source` cannot
+      open, so it refuses under its own code instead of being reported as an empty corpus --
+      an unresolvable binding and a corpus with nothing in it need different answers.
+    */
+    return {
+      ok: false,
+      code: "RETRIEVAL_COMPILE_SOURCE_BINDING_UNRESOLVED",
+      runId: null,
+      reason: "the package's source manifest does not resolve to this workspace's documents",
+    };
+  }
   if (compiled.units.length === 0) {
     return {
       ok: false,

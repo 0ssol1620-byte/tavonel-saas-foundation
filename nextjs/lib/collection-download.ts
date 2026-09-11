@@ -213,12 +213,43 @@ export function validateReviewableCollectionArtifact(
 
   const validationFile = artifact.package.files.find((file) => file.path === "validation/report.json")!;
   try {
-    const report = JSON.parse(validationFile.content) as { status?: unknown; reviewReasons?: unknown };
+    const report = JSON.parse(validationFile.content) as {
+      status?: unknown;
+      reviewReasons?: unknown;
+      documents?: unknown;
+    };
     if (report.status !== artifact.validation.status) return null;
     if (
       artifact.lifecycle === "review_required" &&
       (!Array.isArray(report.reviewReasons) || !sameStrings(reviewReasons, report.reviewReasons))
     ) return null;
+    /*
+      Audit U05: the per-document list has to describe this package's own binding.
+
+      Checked only when it is present, because the live engine writes its own report at that path
+      and this key is the fallback compiler's. When it is present it is cross-checked against
+      `source/collection-files.json` and has to name exactly those documents: a list that names a
+      document the binding does not, or omits one it does, is a package whose own two answers
+      disagree about what was compiled. A `documents` list with no binding to check it against is
+      refused for the same reason -- an unverifiable per-document claim is worse than none,
+      because a customer can quote it back.
+    */
+    if (report.documents !== undefined) {
+      const bindingFile = artifact.package.files.find((file) => file.path === "source/collection-files.json");
+      if (!bindingFile || !Array.isArray(report.documents)) return null;
+      const ids = (rows: unknown[]) => {
+        const read = rows.map((row) => (row && typeof row === "object"
+          ? (row as { documentId?: unknown }).documentId : null));
+        return read.every((id) => typeof id === "string" && id.length > 0)
+          ? (read as string[]).slice().sort()
+          : null;
+      };
+      const binding = JSON.parse(bindingFile.content) as unknown;
+      if (!Array.isArray(binding)) return null;
+      const listed = ids(report.documents);
+      const bound = ids(binding);
+      if (!listed || !bound || !sameStrings(listed, bound)) return null;
+    }
   } catch {
     return null;
   }

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   EXTRACTION_BUDGET_REACHED,
   EXTRACTION_CANDIDATE_BUDGET,
+  advertisedOntologyRelations,
   compileCollectionCandidate,
   validateCollectionOcrInput,
   type CollectionOcrInput,
@@ -362,5 +363,100 @@ describe("the validation record is derived from the package it describes", () =>
       immutableInputsOnly: true,
     });
     expect(report.counts).toEqual(artifact.validation.counts);
+  });
+
+  /*
+    Audit U05 on the export surface. The package said `review_required` and left the customer to
+    work out which document caused it, while the workspace and GET /api/collections/[id] both
+    name it.
+
+    The two per-document facts are the two per-document checks the validator already makes, so
+    the list cannot disagree with the reasons above it. `excluded` and `unprocessed` are absent
+    deliberately: a document the compiler never received leaves no trace in this package, and
+    `documentsNotCompiled` says that rather than letting the absence read as "nothing was".
+  */
+  it("names every document it compiled, and why one of them is in review", () => {
+    const read = (candidate: { package: { files: readonly { path: string; content: string }[] } }) =>
+      JSON.parse(candidate.package.files.find((file) => file.path === "validation/report.json")!.content);
+
+    const report = read(artifact);
+    expect(report.documents).toEqual([
+      { documentId: "doc-a", sourceVersionId: "1".repeat(64), status: "read", reasons: [] },
+      { documentId: "doc-b", sourceVersionId: "2".repeat(64), status: "read", reasons: [] },
+    ]);
+    expect(report.documentsNotCompiled).toContain("not in this package");
+
+    // A document with no regions produces no anchored unit, which is the package's own
+    // EVIDENCE_COVERAGE_INCOMPLETE reason -- here attributed to the document that caused it.
+    const withGap = compileCollectionCandidate([
+      input("doc-a", "1".repeat(64), "The pump was inspected and the reading stayed inside the governance policy limits."),
+      input("doc-b", "2".repeat(64), "Security access control protects the private research evidence of the site.", null),
+    ]);
+    const gapped = read(withGap);
+    expect(gapped.documents).toEqual([
+      { documentId: "doc-a", sourceVersionId: "1".repeat(64), status: "read", reasons: [] },
+      {
+        documentId: "doc-b",
+        sourceVersionId: "2".repeat(64),
+        status: "under_review",
+        reasons: ["EVIDENCE_COVERAGE_INCOMPLETE"],
+      },
+    ]);
+    // Every reason a document carries is one the package already gives for itself.
+    for (const document of gapped.documents as { reasons: string[] }[]) {
+      for (const reason of document.reasons) expect(withGap.validation.reviewReasons).toContain(reason);
+    }
+  });
+
+  /* And the export gate cross-checks it: a list nobody checks is a claim nobody verified. */
+  it("refuses a package whose document list disagrees with the binding it was compiled from", () => {
+    const candidate = stored(artifact);
+    // The baseline, so the refusal below is the list and not something else about the fixture.
+    expect(validateDownloadableCollectionArtifact(candidate, artifact.collectionId)).not.toBeNull();
+
+    const tampered = JSON.parse(JSON.stringify(candidate)) as typeof candidate;
+    const file = tampered.package.files.find((entry) => entry.path === "validation/report.json")!;
+    const report = JSON.parse(file.content) as { documents: { documentId: string }[] };
+    report.documents = report.documents.filter((row) => row.documentId !== "doc-b");
+    file.content = JSON.stringify(report, null, 2) + "\n";
+    expect(validateDownloadableCollectionArtifact(tampered, tampered.collectionId)).toBeNull();
+  });
+});
+
+/*
+  K01, the fallback half. This engine may advertise only the predicates it emits.
+
+  The audit found the Core V2 projection attaching this blueprint's `ontologyRelations` -- which
+  names `discusses_topic` -- to artifacts from an engine that has no topic object at all. That
+  is fixed where it happened, in `core-runtime-v2.ts`, and this is the other direction: the
+  fallback keeps its own literal list, so the list has to stay true of what it emits. The check
+  is written as a subset rather than an equality on purpose: a corpus with no capitalised token
+  in it produces no `mentions_entity` edge, and advertising a predicate the vocabulary permits
+  is different from advertising one the engine cannot produce.
+*/
+describe("the fallback compiler's advertised predicate set", () => {
+  const artifact = compileCollectionCandidate([
+    input("doc-relations-1", "7".repeat(64), "Feedwater Pump 200 was inspected during the fiscal quarter and the reading stayed inside the policy limits."),
+    input("doc-relations-2", "8".repeat(64), "Feedwater Pump 200 governance policy requires a second inspection before the board meeting."),
+  ]);
+
+  it("emits nothing its blueprint does not declare", () => {
+    const emitted = advertisedOntologyRelations(artifact.ontology.edges);
+
+    expect(emitted.length).toBeGreaterThan(0);
+    for (const predicate of emitted) {
+      expect(artifact.blueprint.ontologyRelations, `${predicate} is emitted but not declared`)
+        .toContain(predicate);
+    }
+    // On a corpus with topics, entities and claims, all three of the declared set are real.
+    expect(emitted).toEqual(["discusses_topic", "mentions_entity", "supported_by"]);
+  });
+
+  it("declares none of the Core V2 predicates, which this engine cannot produce", () => {
+    for (const predicate of ["mentions", "contradicts"]) {
+      expect(artifact.blueprint.ontologyRelations).not.toContain(predicate);
+    }
+    expect(artifact.validation.counts.contradictions, "the fallback has no contradiction detector")
+      .toBeUndefined();
   });
 });

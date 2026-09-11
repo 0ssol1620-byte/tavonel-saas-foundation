@@ -53,7 +53,7 @@ export default function KnowledgeCompilerPage() {
       { key: "ONE DOCUMENT", description: "A single file you will read once. Open it. The compile buys nothing you do not already have.", state: "USE A READER" },
       { key: "LIVE RECORDS", description: "Answers that are a query over a database or a ticket queue, not a claim written in a document.", state: "QUERY THE SYSTEM" },
       { key: "NO REVIEWER", description: "Nobody who can decide whether a candidate World is correct. Promotion is a human decision by design, and without one the World never becomes active.", state: "NEEDS A PERSON" },
-      { key: "BEYOND THE SOURCES", description: "Questions whose answer is not in the material. The World abstains rather than composing one, which is the right behaviour and the wrong tool for that job.", state: "OUT OF SCOPE" },
+      { key: "BEYOND THE SOURCES", description: "Questions whose answer is not in the material. Retrieval here is a matching test, not a judgement about whether what matched answers you: it declines only when nothing matched at all, so a question the corpus cannot answer comes back as the nearest matching regions with their locators rather than as a refusal. Deciding they do not answer it is the reader\u2019s work, and buying a compiler to do that work is the wrong purchase.", state: "OUT OF SCOPE" },
     ] },
     { title: "Glossary", body: "The words this product uses in the exact sense it uses them. Where a term has a looser industry meaning, the narrower one here is deliberate.", rows: [
       { key: "COMPILED WORLD", description: "The output of one compile: objects, relations, evidence, retrieval material and a validation report, addressed by a digest.", state: "THE ARTIFACT" },
@@ -80,7 +80,7 @@ export default function KnowledgeCompilerPage() {
       },
       {
         question: "What does it do when it does not know?",
-        answer: "It abstains and says which sources it looked at. A composed answer with no region behind it would be indistinguishable from a correct one, which is the failure this whole contract exists to prevent.",
+        answer: "It declines when nothing in the World matched the question at all, and says which sources it looked at. What it does not do is decide whether what matched actually answers you \u2014 that judgement stays with the reader, which is why every answer carries the page and the region it came from. A composed answer with no region behind it would be indistinguishable from a correct one, and that is the failure this whole contract exists to prevent.",
       },
       {
         question: "What stops the output from being a black box?",

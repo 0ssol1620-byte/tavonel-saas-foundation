@@ -3,7 +3,31 @@
 import { useEffect, useId, useState } from "react";
 
 type SyncJob = { jobId: string; state: string; itemsSeen: number; itemsDone: number; errorCode: string | null };
+/** Counts of unfinished jobs behind the newest one. Absent until the route reports them. */
+type SyncBacklog = { queued: number; leased: number };
 const STATES = new Set(["queued", "leased", "succeeded", "failed", "dead", "canceled"]);
+
+/*
+  Accept the backlog only in the exact shape the route sends (audit I06).
+
+  A malformed or absent field returns null and the panel says nothing about backlog, because
+  printing "0 waiting" for a count nobody read is the difference between a status and a guess.
+*/
+export function readSyncBacklog(value: unknown): SyncBacklog | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  if (!Number.isSafeInteger(raw.queued) || !Number.isSafeInteger(raw.leased)) return null;
+  if ((raw.queued as number) < 0 || (raw.leased as number) < 0) return null;
+  return { queued: raw.queued as number, leased: raw.leased as number };
+}
+
+/** The backlog line, or null when nothing is waiting or nothing was reported. */
+export function describeBacklog(backlog: SyncBacklog | null): string | null {
+  if (!backlog) return null;
+  const total = backlog.queued + backlog.leased;
+  if (total === 0) return null;
+  return `${total} import${total === 1 ? "" : "s"} not finished · ${backlog.queued} waiting for a worker · ${backlog.leased} being read now`;
+}
 
 function recovery(code: string | null) {
   if (code === "SOURCE_LIFECYCLE_REVIEW_REQUIRED" || code?.includes("SUSPENSION") || code?.includes("BINDING_UNRESOLVED"))
@@ -23,6 +47,7 @@ export default function ConnectionSyncStatus({ connectionId, revision, getToken 
 }) {
   const titleId = useId();
   const [jobs, setJobs] = useState<SyncJob[] | null>(null);
+  const [backlog, setBacklog] = useState<SyncBacklog | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refresh, setRefresh] = useState(0);
 
@@ -47,6 +72,7 @@ export default function ConnectionSyncStatus({ connectionId, revision, getToken 
         }
         if (controller.signal.aborted) return;
         setJobs(payload.jobs);
+        setBacklog(readSyncBacklog(payload.backlog));
         setError(null);
         if (payload.jobs.some((job: SyncJob) => job.state === "queued" || job.state === "leased")) {
           timer = setTimeout(() => { void read(); }, 5_000);
@@ -62,6 +88,7 @@ export default function ConnectionSyncStatus({ connectionId, revision, getToken 
 
   const latest = jobs?.[0];
   const advice = recovery(latest?.errorCode ?? null);
+  const backlogLine = describeBacklog(backlog);
   const stateLabel = latest ? ({ queued: "Import queued", leased: "Import in progress", succeeded: "Import finished",
     failed: "Import stopped", dead: "Import needs attention", canceled: "Import canceled" }[latest.state]) : null;
   return <section aria-labelledby={titleId} className="connection-sync-status">
@@ -72,7 +99,12 @@ export default function ConnectionSyncStatus({ connectionId, revision, getToken 
       {jobs?.length === 0 ? <p>No import has been started for this connection.</p> : null}
       {latest ? <>
         <p><strong>{stateLabel}</strong> · {latest.itemsSeen} entries checked · {latest.itemsDone} files accepted</p>
-        {latest.state === "succeeded" ? <p>Import is finished. Check the workspace for processing and review results.</p> : null}
+        {/*
+          Said even when the newest job succeeded: "finished" describes one job, and a
+          connection with work still queued behind it is not up to date.
+        */}
+        {backlogLine ? <p>{backlogLine}</p> : null}
+        {latest.state === "succeeded" && !backlogLine ? <p>Import is finished. Check the workspace for processing and review results.</p> : null}
         {advice ? <p>{advice}</p> : null}
       </> : null}
     </div>

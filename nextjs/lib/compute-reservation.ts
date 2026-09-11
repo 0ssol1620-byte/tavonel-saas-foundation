@@ -20,6 +20,16 @@ function errorCode(message: string) {
     ["foundation_compute_idempotency_conflict", "COMPUTE_IDEMPOTENCY_CONFLICT"],
     ["foundation_compute_reservation_not_found", "COMPUTE_RESERVATION_NOT_FOUND"],
     ["foundation_compute_settlement_conflict", "COMPUTE_SETTLEMENT_CONFLICT"],
+    /*
+      A malformed settlement is a bad request, not an infrastructure fault.
+
+      `settle_foundation_compute_v3` raises this for a settlement whose shape the ledger refuses
+      -- `released` carrying non-zero credits, say. Unmapped, it fell through to
+      COMPUTE_LEDGER_FAILED, which reads as "the ledger is unreachable" and is the one class a
+      caller is right to retry. Retrying a settlement the ledger will never accept is how a
+      compile stays unsettled while looking like a transient outage.
+    */
+    ["foundation_compute_settlement_invalid", "COMPUTE_SETTLEMENT_INVALID"],
     ["foundation_compute_overage_not_enabled", "COMPUTE_OVERAGE_NOT_ENABLED"],
     ["foundation_compute_maximum_charge_exceeded", "COMPUTE_MAXIMUM_CHARGE_EXCEEDED"],
   ] as const;

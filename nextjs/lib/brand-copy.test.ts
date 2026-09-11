@@ -35,7 +35,6 @@ const COPY_SURFACES = [
   "components/compile-pipeline.tsx",
   "components/evidence-tether.tsx",
   "components/identity-resolve.tsx",
-  "components/rebuild-console.tsx",
   "components/world-explorer.tsx",
   "app/login/page.tsx",
   "app/not-found.tsx",
@@ -54,6 +53,17 @@ const COPY_SURFACES = [
   // Most of what /benchmarks says is written in the registry, not in the page that arranges it.
   "lib/benchmark-registry.ts",
   "app/developers/page.tsx",
+  /*
+    /docs, added at integration (stage 2 C23c) as the root fix for devx finding 2.
+
+    The whole of /docs is written in docs-content.ts and arranged by one dynamic route, and
+    neither was on this list -- so the largest body of prose on the site was checked by nothing
+    here, and docs-content.test.ts grew its own copy of the barred-phrase list to compensate.
+    One list, checked once.
+  */
+  "lib/docs-content.ts",
+  "app/docs/[section]/page.tsx",
+  "app/docs/page.tsx",
   "app/pricing/page.tsx",
   "app/product/page.tsx",
   "app/product/knowledge-compiler/page.tsx",
@@ -685,5 +695,92 @@ describe("public copy", () => {
       expect(row, `${row.slice(0, 40)}… answers without offering the page that says it in full`)
         .toMatch(/"\/[a-z/-]+" as Route/);
     }
+  });
+
+  /*
+    Audit B01 / U02, added deliberately with the three job cards under the hero.
+
+    The locked hero stays exactly as it is -- the test above pins all five of its strings -- and
+    the cards go under it because the page went from that hero straight into World, compile,
+    candidate and ontology without ever naming a job. Two things can go wrong with a card like
+    this and both are checked: a link to a solution page that does not exist, and a figure. Every
+    href must resolve to a real `app/solutions/[slug]` key, because a dead link under the hero is
+    the worst place on the site for one, and no card body may carry a digit.
+  */
+  it("puts three job cards under the locked hero, each pointing at a real solution", () => {
+    const landing = read("components/home-page-client.tsx");
+    const jobs = landing.match(/const JOBS = \[([\s\S]*?)\n\] as const;/);
+    expect(jobs, "the job cards are still declared on the landing page").not.toBeNull();
+    const hrefs = [...jobs![1]!.matchAll(/href: "([^"]+)" as Route/g)].map((match) => match[1]!);
+    expect(hrefs, "B01 asks for one card per job, not a single door").toHaveLength(3);
+
+    const solutions = read("app/solutions/[slug]/page.tsx");
+    for (const href of hrefs) {
+      const slug = href.replace("/solutions/", "");
+      expect(solutions, `${href} is linked from the hero and is not a solution slug`)
+        .toContain(`"${slug}": {`);
+    }
+    const bodies = [...jobs![1]!.matchAll(/body: "([^"]*)"/g)].map((match) => match[1]!);
+    expect(bodies).toHaveLength(3);
+    for (const body of bodies) {
+      expect(body, `"${body.slice(0, 40)}…" carries a figure; §35 bars invented metrics`)
+        .not.toMatch(/[0-9]/);
+    }
+  });
+
+  /*
+    Audit B06, added deliberately with the caption under the compile film.
+
+    Four evidence levels share this page and the film is the one a visitor is most likely to read
+    as a screen recording of the product. The rule above keeps the *fixture* disclosure off the
+    landing page, which is a different thing: it bars importing `DISCLOSURE.fixture`, a defensive
+    paragraph about a demo world. This asserts one sentence separating a directed recreation from
+    the working interface, which is the affirmative version of the same job.
+  */
+  it("says the compile film is a recreation and points at the working interface", () => {
+    const landing = read("components/home-page-client.tsx");
+    expect(landing).toContain("directed recreation of a compile, not a screen recording");
+    /*
+      The pointer without its label, which is the only part of this that changed at integration.
+
+      It pinned `label="See the working interface"`, and that collided with the other rule about
+      this page: landing.spec.ts requires every unqualified /explore link to read "Explore a
+      Compiled World", and a link carrying its own wording has to be a named proof (?act=...).
+      Two merged lanes disagreeing about one element, and the label lost -- it pointed at the
+      working interface in general, which is what the door already is.
+
+      What this test is for is untouched. `btn ghost` is the 44px control, and the failure it was
+      written against is a link inside the 14px `.fine` caption, which is about 18px tall under a
+      coarse pointer. That is still exactly what it asserts.
+    */
+    expect(landing, "and the pointer is a 44px control, not a link in fine print")
+      .toContain(String.raw`<ExploreLink className="btn ghost" />`);
+  });
+
+  /*
+    Audit B02. Five solution pages answered the same reader. Each now declares who it is for, as
+    a field, so the label cannot drift from the copy under it and a new solution cannot ship
+    without one.
+  */
+  it("gives every solution page an audience", () => {
+    const solutions = read("app/solutions/[slug]/page.tsx");
+    const slugs = [...solutions.matchAll(/^ {2}"([a-z-]+)": \{\r?$/gm)].map((match) => match[1]!);
+    const audiences = [...solutions.matchAll(/^ {4}audience: "([^"]+)",\r?$/gm)].map((match) => match[1]!);
+    expect(slugs.length).toBeGreaterThanOrEqual(5);
+    expect(audiences, "every solution declares its reader").toHaveLength(slugs.length);
+    expect(solutions, "and the page renders it").toContain("For: {solution.audience}");
+  });
+
+  /*
+    Audit E04 / G06. The Apple sample's representativeness limit, and the take-away asset, both
+    at the demo rather than two pages away from it.
+  */
+  it("states what the Apple sample does not represent, next to the sample", () => {
+    const stage = read("components/explore/explore-stage.tsx");
+    expect(stage).toContain("Apple&apos;s own public SEC filings");
+    expect(stage, "the limit names the four things it does not represent")
+      .toContain("not a claim about a mixed internal corpus");
+    expect(stage, "and the reproducible asset is reachable from the demo")
+      .toContain('href="/reproducibility"');
   });
 });

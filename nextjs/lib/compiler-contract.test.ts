@@ -1,5 +1,9 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { spawnSync } from "node:child_process";
+import { createHash, generateKeyPairSync } from "node:crypto";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import { crc32, deflateRawSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import { readCapabilities } from "./capabilities";
 import { CLAIM_STATE } from "./claim-state";
@@ -184,6 +188,9 @@ describe("compiler contract clauses", () => {
     const compiler = read("./collection-compiler.ts");
     // The entire edge vocabulary. A fourth type means the clause is re-derived, not extended.
     expect(compiler).toContain('type: "discusses_topic" | "mentions_entity" | "supported_by";');
+    // The live engine's own two, which clause 03 also names (knowledge CROSS-LANE 3). Pinned in
+    // the same place as the fallback's, so one vocabulary change fails one test.
+    expect(compiler).toContain('type: "mentions" | "contradicts";');
     // The one claim edge runs claim -> evidence, and that evidence is a whole document version.
     expect(compiler).toContain('type: "supported_by"');
     expect(compiler).toContain("from: claimId");
@@ -337,12 +344,18 @@ describe("contract promises", () => {
     No sentence a visitor reads may name a tool only this repository can run.
 
     The page told a reader to run `pnpm verify:export` against a downloaded archive. That script
-    is `scripts/verify-signed-export.mjs` in the private site repository: it is not in the package,
-    not in `public/developer/`, and not a command in the published CLI. It was the only pnpm script
-    named in the visible copy of any page in this app, so it was not a convention a reader would
-    discount -- it was an instruction that fails. The `evidence` field is exempt on purpose: it is
-    declared as a pointer into this repository, and "WHERE TO CHECK IT" is addressed to someone
-    reading the source, not to someone holding a zip.
+    is `scripts/verify-signed-export.mjs` in the private site repository: it was not in the
+    package, not in `public/developer/`, and not a command in the published CLI. It was the only
+    pnpm script named in the visible copy of any page in this app, so it was not a convention a
+    reader would discount -- it was an instruction that fails. The `evidence` field is exempt on
+    purpose: it is declared as a pointer into this repository, and "WHERE TO CHECK IT" is
+    addressed to someone reading the source, not to someone holding a zip.
+
+    The rule survives; its second half inverted. Audit 2026-09-11 M07/R4-03 found /docs/cli
+    telling every reader to run two scripts that existed only here, which is the same failure on
+    a different page. Both verifiers are now published downloads, so what this asserts is that
+    they are there -- and the pnpm ban stands, because `pnpm verify:export` is still not a
+    command anyone outside this repository has.
   */
   it("names no repository-only script in a sentence addressed to a reader", () => {
     for (const entry of CONTRACT_CLAUSES) {
@@ -352,14 +365,360 @@ describe("contract promises", () => {
     expect(stripComments(read("../app/product/continuous-knowledge/page.tsx")), "the page names a pnpm script")
       .not.toMatch(/\bpnpm\s/);
 
-    // And the verifier is still absent from everything a holder receives.
+    // And the verifier a holder is told to run is now one a holder can actually download.
     const shipped = readdirSync(resolve(import.meta.dirname, "../public/developer"));
-    expect(shipped.filter((file) => file.toLowerCase().includes("verify")), "a verifier now ships to /developer; the portable-world copy can be re-derived")
-      .toEqual([]);
+    expect(shipped.filter((file) => file.toLowerCase().includes("verify")).sort())
+      .toEqual(["tavonel-verify-export.mjs", "tavonel-verify-package.mjs", "tavonel-verify-roundtrip.py"]);
     expect(read("../public/developer/tavonel-cli.mjs")).not.toContain("verify:export");
     expect(read("./collection-download.ts"), "the archive no longer writes the README the clause describes")
       .toContain("Verify manifest/export-manifest.json against signatures/export-manifest.ed25519.json");
   });
+
+  /*
+    The published verifier is the repository's verifier, byte for byte.
+
+    Two copies of a checker is how a checker rots: the repository's runs in CI, the customer's
+    runs on the download, and the day they differ nobody finds out from either one. So the
+    published file is a copy rather than a port, and this asserts the copy. When it fails, the
+    fix is to re-copy and re-pin, never to edit the public file:
+
+      cp scripts/verify-signed-export.mjs public/developer/tavonel-verify-export.mjs
+      cp scripts/compiled-world/validate.mjs public/developer/tavonel-verify-package.mjs
+      # then write the sha256 of each into public/developer/channel.json
+
+    Every import is asserted to be a `node:` built-in, because a verifier whose first step is
+    `pnpm install` is not one a customer on a clean machine can run -- which was the defect.
+  */
+  it("publishes the two verifiers as byte-identical, dependency-free, sha256-pinned downloads", () => {
+    const channel = JSON.parse(read("../public/developer/channel.json")) as {
+      assets: Record<string, { url: string; sha256: string }>;
+    };
+    const published = {
+      verifyExport: ["tavonel-verify-export.mjs", "../scripts/verify-signed-export.mjs"],
+      verifyPackage: ["tavonel-verify-package.mjs", "../scripts/compiled-world/validate.mjs"],
+      verifyRoundtrip: ["tavonel-verify-roundtrip.py", "../scripts/compiled-world/verify-external-roundtrip.py"],
+    } as const;
+
+    for (const [key, [filename, origin]] of Object.entries(published)) {
+      const source = read(`../public/developer/${filename}`);
+      expect(source, `${filename} has drifted from ${origin}`).toBe(read(origin));
+      expect(channel.assets[key]?.url).toBe(`https://tavonel.com/developer/${filename}`);
+      expect(channel.assets[key]?.sha256, `${filename} is not pinned to its own bytes in channel.json`)
+        .toBe(`sha256:${createHash("sha256").update(readFileSync(resolve(import.meta.dirname, `../public/developer/${filename}`))).digest("hex")}`);
+      if (!filename.endsWith(".mjs")) continue;
+      for (const match of source.matchAll(/^import\s[^;]*?from\s+"([^"]+)"/gm)) {
+        expect(match[1], `${filename} imports ${match[1]}, which a downloaded file cannot resolve`)
+          .toMatch(/^node:/);
+      }
+    }
+
+    /*
+      The Python verifier's one third-party import is optional by construction.
+
+      rdflib is a better Turtle parser than the one in that file and is not a dependency a
+      customer should have to install to check a download, so it is imported inside a try and
+      its absence is printed as a check that did not run. Asserted here because the failure
+      mode -- someone hoisting the import to the top during a tidy-up -- turns the verifier into
+      one that refuses to start on a clean machine, which is the defect this whole item is about.
+    */
+    const roundtrip = read("../public/developer/tavonel-verify-roundtrip.py");
+    for (const match of roundtrip.matchAll(/^import\s+(\S+)/gm)) {
+      expect(
+        ["argparse", "csv", "io", "json", "os", "sqlite3", "sys", "zipfile"],
+        `tavonel-verify-roundtrip.py imports ${match[1]} at module scope`,
+      ).toContain(match[1]);
+    }
+    expect(roundtrip, "rdflib must be imported inside a guarded branch, not at module scope")
+      .toMatch(/try:\n {8}import rdflib/);
+    expect(roundtrip).toContain("except ImportError:");
+    expect(roundtrip, "a skipped check must never read as a pass")
+      .toContain("This check did not pass -- it did not run.");
+  });
+
+  /*
+    Does the published verifier verify? Run it, on a real archive, from the public copy.
+
+    M07's completion bar is evidence that a machine holding only the public downloads can check
+    both halves of an export. The archive here is compiled by `compileCollectionCandidate` from
+    two small sources and packaged by the same `buildSignedCollectionZip` a customer download goes
+    through, signed with a throwaway key, and handed to the files that are served from /developer
+    -- not to the repository scripts. Nothing in the archive is hand-written.
+
+    Two small sources rather than the /explore sample on purpose: the sample compiles five real
+    SEC filings on import and costs a minute and a half, which is a minute and a half added to
+    every run of the whole suite for no extra coverage of the verifiers. `collection-download.
+    test.ts` uses the same two-source fixture for the same reason.
+
+    The failure paths are asserted too, because a verifier that cannot fail is a verifier that
+    does not work: the wrong trusted fingerprint is rejected, and running the package validator
+    with no arguments exits non-zero rather than printing nothing and passing. That last one is
+    not hypothetical -- the repository copy detected "am I the CLI" by matching its own path, so
+    the renamed public copy would have loaded, checked nothing and exited 0.
+
+    This is also the only coverage of the archive reader in the package validator, which is the
+    path a customer hits and the one nothing exercised while fflate did the reading.
+  */
+  it("verifies a real signed archive using only the published downloads", async () => {
+    const { compileCollectionCandidate } = await import("./collection-compiler");
+    const { buildSignedCollectionZip, validateDownloadableCollectionArtifact } = await import("./collection-download");
+    const { createExportSigner } = await import("./export-signing");
+
+    const keys = generateKeyPairSync("ed25519");
+    const signer = createExportSigner({
+      keyId: "devx-published-verifier-probe",
+      privateKeyPkcs8DerBase64: keys.privateKey.export({ format: "der", type: "pkcs8" }).toString("base64"),
+    });
+    if (!signer) throw new Error("the export signer refused a freshly generated Ed25519 key");
+
+    const source = (documentId: string, versionKey: string, text: string) => {
+      const key = `immutable/pilot-devx/pilot-devx/${documentId}/${versionKey}/sanitized.pdf`;
+      return {
+        documentId,
+        versionKey,
+        sanitizedKey: key,
+        ocrJsonKey: `immutable/pilot-devx/pilot-devx/${documentId}/${versionKey}/ocr.json`,
+        pageCount: 1,
+        text,
+        inputSha256: `sha256:${versionKey}`,
+        sourceImmutableKey: key,
+        regions: [{
+          regionId: `${documentId}-p1-b1`,
+          pageIndex0: 0,
+          pageNumber1: 1,
+          order: 0,
+          blockType: "paragraph" as const,
+          text,
+          bbox1000: [80, 120, 920, 320] as [number, number, number, number],
+          confidence: 0.99,
+          authority: "contractual" as const,
+        }],
+      };
+    };
+    const compiled = compileCollectionCandidate([
+      source("doc-one", "a".repeat(64), "Quarterly revenue increased after the reviewed policy change."),
+      source("doc-two", "b".repeat(64), "Security research documented access control evidence."),
+    ]);
+    const candidate = {
+      ...compiled,
+      coreExecution: {
+        status: "completed",
+        runtime: "tavonel-foundation-core-deterministic-v1",
+        receipt: { requestId: "devx-verifier-probe", outputSha256: compiled.manifestDigest, candidatePromotion: false },
+      },
+    };
+
+    const artifact = validateDownloadableCollectionArtifact(candidate, compiled.collectionId);
+    if (!artifact) throw new Error("the compiled candidate is not a downloadable artifact");
+    const signed = buildSignedCollectionZip(artifact, signer);
+
+    const directory = mkdtempSync(join(tmpdir(), "tavonel-devx-verify-"));
+    const archivePath = join(directory, "world.zip");
+    writeFileSync(archivePath, signed.archive);
+    const asset = (name: string) => resolve(import.meta.dirname, `../public/developer/${name}`);
+    const run = (args: string[]) => spawnSync(process.execPath, args, { encoding: "utf8", timeout: 120_000 });
+
+    try {
+      const exportOk = run([asset("tavonel-verify-export.mjs"), "--archive", archivePath, "--trusted-fingerprint", signer.publicKeySpkiSha256]);
+      expect(exportOk.status, exportOk.stderr).toBe(0);
+      expect(JSON.parse(exportOk.stdout)).toEqual(expect.objectContaining({
+        ok: true,
+        collectionId: compiled.collectionId,
+        keyId: "devx-published-verifier-probe",
+      }));
+
+      const wrongKey = run([asset("tavonel-verify-export.mjs"), "--archive", archivePath, "--trusted-fingerprint", `sha256:${"0".repeat(64)}`]);
+      expect(wrongKey.status).toBe(1);
+      expect(wrongKey.stderr).toContain("trusted fingerprint");
+
+      const packageOk = run([asset("tavonel-verify-package.mjs"), "--package", archivePath, "--require-signature", "--json"]);
+      expect(packageOk.status, `${packageOk.stdout}${packageOk.stderr}`).toBe(0);
+      const report = JSON.parse(packageOk.stdout) as { ok: boolean; files: number; errors: unknown[] };
+      expect(report).toEqual(expect.objectContaining({ ok: true, errors: [] }));
+      expect(report.files).toBeGreaterThan(10);
+
+      const usage = run([asset("tavonel-verify-package.mjs")]);
+      expect(usage.status, "the published validator ran with no arguments and reported nothing").toBe(2);
+      expect(usage.stderr).toContain("tavonel-verify-package.mjs --package");
+
+      /*
+        The external round trip, when there is a Python to run it with.
+
+        This asserts the claim /docs/cli makes about tavonel-verify-roundtrip.py: the CSV loads
+        into SQLite and the ids come back out, and the three formats agree on the id set. The
+        failure path is asserted on the same archive with one relationship rewritten to point at
+        an id that is not in nodes.csv, because a round-trip check that cannot fail proves
+        nothing about the one that passed.
+
+        No Python on the runner is a loud skip, never a quiet pass: Node is a hard requirement of
+        this repository and Python 3.12 is a documented requirement of two published assets, so a
+        machine without it can still run everything else here.
+      */
+      const interpreter = ["py", "python3", "python"]
+        .find((name) => spawnSync(name, ["--version"], { encoding: "utf8" }).status === 0);
+      if (!interpreter) {
+        console.warn("SKIPPED: no Python interpreter on PATH, so tavonel-verify-roundtrip.py was not run");
+      } else {
+        const roundtrip = (pkg: string) => spawnSync(
+          interpreter,
+          [asset("tavonel-verify-roundtrip.py"), "--package", pkg, "--json"],
+          { encoding: "utf8", timeout: 120_000 },
+        );
+        const ok = roundtrip(archivePath);
+        expect(ok.status, `${ok.stdout}${ok.stderr}`).toBe(0);
+        const receipt = JSON.parse(ok.stdout) as {
+          ok: boolean;
+          sqlite: { nodes: number; relationships: number };
+          jsonld: { subjects: number };
+          turtle: { triples: number };
+        };
+        expect(receipt.ok).toBe(true);
+        expect(receipt.sqlite.nodes).toBeGreaterThan(0);
+        expect(receipt.sqlite.relationships).toBeGreaterThan(0);
+        expect(receipt.jsonld.subjects).toBe(receipt.sqlite.nodes);
+        expect(receipt.turtle.triples).toBeGreaterThan(receipt.sqlite.nodes);
+
+        const brokenPath = join(directory, "broken");
+        for (const file of artifact.package.files) {
+          const target = join(brokenPath, file.path);
+          mkdirSync(dirname(target), { recursive: true });
+          writeFileSync(
+            target,
+            file.path === "graph/relationships.csv"
+              ? file.content.replace(/topic-[a-f0-9]{32}/, `topic-${"0".repeat(32)}`)
+              : file.content,
+          );
+        }
+        const broken = roundtrip(brokenPath);
+        expect(broken.status, "a relationship pointing at a missing id was accepted").toBe(1);
+        expect(broken.stderr).toContain("SQL cannot find in nodes.csv");
+      }
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+    // Compiling the explore sample and running several child processes does not fit the 5 s default.
+  }, 300_000);
+
+  /*
+    A declared size is a claim, and a downloaded archive is hostile until it has been checked.
+
+    Every other ZIP bound in these three verifiers reads the central directory: the entry count,
+    the declared per-entry sizes, their sum, every path. None of that constrains what a deflate
+    stream actually produces -- an entry may declare sixty-four bytes and inflate to gigabytes.
+    So each verifier caps the decompression itself at the size the directory declared, and a
+    stream that keeps going is refused with the same message and the same exit code as any other
+    directory mismatch. The two `.mjs` readers are ours and needed the cap added; the Python one
+    reads through `zipfile`, which caps at the declared size already -- measured below, not
+    assumed, because "the standard library handles it" is exactly the sentence that is wrong half
+    the time.
+
+    What this test shows, and what it cannot. The refusal is exercised for real, on a hand-built
+    archive whose single entry declares 64 bytes and inflates to 128 MiB. It does not
+    *discriminate* the bound from its absence: at 128 MiB an unbounded inflate lands on the same
+    size comparison with the same message, and the size where the two genuinely diverge -- past
+    `buffer.kMaxLength` -- is not a size any unit test should allocate. The bound itself is
+    therefore pinned by reading the published bytes: no inflate call in a published verifier may
+    run without a ceiling. Both halves are needed here; neither is sufficient alone.
+  */
+  it("refuses a ZIP entry that inflates past the size its directory declares", () => {
+    const asset = (name: string) => resolve(import.meta.dirname, `../public/developer/${name}`);
+
+    for (const name of ["tavonel-verify-export.mjs", "tavonel-verify-package.mjs"]) {
+      const source = read(`../public/developer/${name}`);
+      const calls = [...source.matchAll(/inflateRawSync\([^)]*/g)].map((match) => match[0]);
+      expect(calls.length, `${name} does not inflate anything any more`).toBeGreaterThan(0);
+      for (const call of calls) {
+        expect(call, `${name} inflates without a ceiling: ${call}`).toContain("maxOutputLength");
+      }
+    }
+
+    /*
+      One entry, method 8, 128 MiB of zeros, and a central directory that swears it is 64 bytes.
+
+      The CRC is the CRC of the 64 bytes the record claims, not of the 128 MiB the stream holds.
+      Neither .mjs reader checks a CRC at all, but `zipfile` checks one at the point it stops
+      reading -- so a zero CRC here would have the Python verifier refuse the archive for the
+      wrong reason and leave the mismatch under test unexercised. An attacker writes this CRC too.
+    */
+    const payload = deflateRawSync(Buffer.alloc(128 * 1024 * 1024));
+    const truncatedCrc = crc32(Buffer.alloc(64));
+    const name = Buffer.from("manifest/export-manifest.json", "utf8");
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt16LE(8, 8);
+    local.writeUInt32LE(truncatedCrc, 14);
+    local.writeUInt32LE(payload.byteLength, 18);
+    local.writeUInt32LE(64, 22);
+    local.writeUInt16LE(name.byteLength, 26);
+    const central = Buffer.alloc(46);
+    central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt16LE(20, 4);
+    central.writeUInt16LE(20, 6);
+    central.writeUInt16LE(8, 10);
+    central.writeUInt32LE(truncatedCrc, 16);
+    central.writeUInt32LE(payload.byteLength, 20);
+    central.writeUInt32LE(64, 24);
+    central.writeUInt16LE(name.byteLength, 28);
+    const eocd = Buffer.alloc(22);
+    eocd.writeUInt32LE(0x06054b50, 0);
+    eocd.writeUInt16LE(1, 8);
+    eocd.writeUInt16LE(1, 10);
+    eocd.writeUInt32LE(central.byteLength + name.byteLength, 12);
+    eocd.writeUInt32LE(local.byteLength + name.byteLength + payload.byteLength, 16);
+    const archive = Buffer.concat([local, name, payload, central, name, eocd]);
+
+    const directory = mkdtempSync(join(tmpdir(), "tavonel-zip-bomb-"));
+    try {
+      const archivePath = join(directory, "lying.zip");
+      writeFileSync(archivePath, archive);
+      const run = (args: string[]) => spawnSync(process.execPath, args, { encoding: "utf8", timeout: 120_000 });
+
+      const exportRun = run([asset("tavonel-verify-export.mjs"), "--archive", archivePath, "--trusted-fingerprint", `sha256:${"0".repeat(64)}`]);
+      expect(exportRun.status, "a lying directory record was accepted").toBe(1);
+      expect(exportRun.stderr).toContain("size disagrees with its directory record");
+
+      const packageRun = run([asset("tavonel-verify-package.mjs"), "--package", archivePath]);
+      expect(packageRun.status, "a lying directory record was accepted").toBe(1);
+      expect(packageRun.stderr).toContain("size disagrees with its directory record");
+
+      /*
+        The Python verifier needs no cap of its own, and this is the measurement that says so.
+
+        `zipfile` bounds decompression by the directory record already: CPython's
+        `ZipExtFile._read1` decrements `_left` by what it produced and sets `_eof` the moment it
+        reaches zero, so `ZipFile.read` on this entry returns the 64 bytes the record declares
+        and the remaining 128 MiB of the deflate stream is never produced. The first assertion
+        below is that measurement, taken from the interpreter on this machine rather than from
+        the documentation -- 64, not 134217728. The second is the verifier's own behaviour on the
+        same archive: it reads the truncated 64 bytes, finds no package in them, and refuses.
+
+        A `len(raw) != info.file_size` guard was written here first and then deleted: with the
+        bound in `zipfile`, it can never fire, and a check that cannot fail is a claim of
+        protection that is not being provided.
+      */
+      const interpreter = ["py", "python3", "python"]
+        .find((candidate) => spawnSync(candidate, ["--version"], { encoding: "utf8" }).status === 0);
+      if (!interpreter) {
+        console.warn("SKIPPED: no Python interpreter on PATH, so the bounded ZIP read was not measured");
+      } else {
+        const produced = spawnSync(interpreter, [
+          "-c",
+          "import sys, zipfile;"
+          + " a = zipfile.ZipFile(sys.argv[1]);"
+          + " print(len(a.read(a.infolist()[0])))",
+          archivePath,
+        ], { encoding: "utf8", timeout: 120_000 });
+        expect(produced.status, produced.stderr).toBe(0);
+        expect(produced.stdout.trim(), "zipfile produced more than the directory record declared").toBe("64");
+
+        const pythonRun = spawnSync(interpreter, [asset("tavonel-verify-roundtrip.py"), "--package", archivePath], { encoding: "utf8", timeout: 120_000 });
+        expect(pythonRun.status, "a 64-byte fragment was accepted as a package").toBe(1);
+        expect(pythonRun.stderr).toContain("package is missing");
+      }
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  }, 60_000);
 
   /*
     What is left of the portable-world promise once the tool is gone.

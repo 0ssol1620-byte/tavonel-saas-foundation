@@ -526,3 +526,85 @@ export async function ensureRetrievalProfile(
   if (!response.ok) return fail("RETRIEVAL_STORE_WRITE_FAILED");
   return { ok: true as const, value: profile.id };
 }
+
+// The latest run for the triple, whatever state it reached -- the observability counterpart to
+// findLatestCompletedRun, which deliberately sees only runs a query may read.
+//
+// A promotion that could not compile its retrieval index leaves a `failed` row here, and this
+// is what lets /ask and the World read model say so instead of silently serving the fallback
+// forever (audit R4-01). `error_reason` is a machine class written by finishCompileRun, never a
+// sentence and never a provider payload.
+export type LatestRunRecord = {
+  runId: string;
+  status: "pending" | "running" | "completed" | "failed";
+  errorReason: string | null;
+};
+
+export async function findLatestRun(params: {
+  workspaceKey: string;
+  collectionId: string;
+  worldManifestDigest: string;
+  retrievalProfileId: string;
+}): Promise<StoreResult<LatestRunRecord>> {
+  if (!validScope(params.workspaceKey, params.collectionId) || !SHA256.test(params.worldManifestDigest)) {
+    return fail("RETRIEVAL_SCOPE_INVALID");
+  }
+  const config = readSupabaseAdminConfig();
+  if (!config) return fail("RETRIEVAL_STORE_NOT_CONFIGURED");
+
+  // Precedence is written here, not inferred from how the status strings happen to sort.
+  //
+  // The rule has two rungs and only two: a `completed` run wins outright, because once an index
+  // is queryable a later failed retry does not make it un-queryable; with no completed run, the
+  // most recent attempt is the one that describes the current state. An earlier version of this
+  // function got the same answer from `order=status.asc`, which worked only because the four
+  // values in 0020's CHECK constraint (`pending`, `running`, `completed`, `failed`) happen to
+  // sort `completed` first. A fifth value -- `aborted`, `canceled`, `blocked` -- would have
+  // silently outranked a queryable index. Two explicit reads cost one extra round trip, and
+  // only on the path where no completed run exists.
+  const filters = {
+    select: "run_id,status,error_reason",
+    workspace_key: `eq.${params.workspaceKey}`,
+    collection_id: `eq.${params.collectionId}`,
+    world_manifest_digest: `eq.${params.worldManifestDigest}`,
+    retrieval_profile_id: `eq.${params.retrievalProfileId}`,
+    order: "started_at.desc",
+    limit: "1",
+  };
+
+  const read = async (status: string | null): Promise<StoreResult<LatestRunRecord>> => {
+    const query = new URLSearchParams(status ? { ...filters, status: `eq.${status}` } : filters);
+    let response: Response;
+    try {
+      response = await supabaseAdminRequest(config, `/rest/v1/foundation_retrieval_compile_runs?${query}`);
+    } catch {
+      return fail("RETRIEVAL_STORE_READ_FAILED");
+    }
+    if (!response.ok) return fail("RETRIEVAL_STORE_READ_FAILED");
+    const rows = (await response.json().catch(() => null)) as Array<Record<string, unknown>> | null;
+    const row = rows?.[0];
+    if (!row) return fail("RETRIEVAL_RUN_NOT_FOUND");
+    const runId = String(row.run_id ?? "");
+    const runStatus = String(row.status ?? "");
+    if (!RUN_ID.test(runId) || !["pending", "running", "completed", "failed"].includes(runStatus)) {
+      return fail("RETRIEVAL_RUN_NOT_FOUND");
+    }
+    return {
+      ok: true as const,
+      value: {
+        runId,
+        status: runStatus as LatestRunRecord["status"],
+        errorReason: typeof row.error_reason === "string" && row.error_reason.length > 0 ? row.error_reason : null,
+      },
+    };
+  };
+
+  const completed = await read("completed");
+  if (completed.ok) return completed;
+  // A read that failed is not "no completed run": it is a state we could not determine, and
+  // answering with the newest attempt instead would hide a store outage behind a plausible
+  // status. Fail closed -- readRetrievalIndexState turns anything but RUN_NOT_FOUND into
+  // `failed`, never `compiled`.
+  if (completed.code !== "RETRIEVAL_RUN_NOT_FOUND") return completed;
+  return read(null);
+}

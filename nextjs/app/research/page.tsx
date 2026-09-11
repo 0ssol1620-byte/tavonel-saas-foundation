@@ -93,6 +93,20 @@ export default function ResearchPage() {
                 not. These are the problems we work on.
               </p>
 
+              {/*
+                B04. Five hubs answered five different questions with nothing saying which was
+                which, so a reader looking for one of them read parts of three. One line, the
+                same shape on each: what this page answers, and where the next question goes.
+              */}
+              <p className="fine">
+                <b>This page answers one question:</b> which problems are still open, and how we
+                work on them. The results themselves — measured, unproven and the one that failed
+                — are on <Link href={"/research/notes" as Route}>Research notes</Link>; how a
+                citation stays bound to its source is on <Link href={"/evidence" as Route}>Evidence</Link>;
+                the protocol a published number has to satisfy is on <Link href={"/benchmarks" as Route}>Benchmarks</Link>;
+                the security and compliance status is on <Link href={"/trust" as Route}>Trust</Link>.
+              </p>
+
               <p className="slate"><span />RESEARCH AREAS</p>
               <div className="tiles">
                 {AREAS.map(([title, body]) => (

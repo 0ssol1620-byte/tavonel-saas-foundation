@@ -754,6 +754,16 @@
 .proofFoot > span { color: #53595e; font-size: 12px; line-height: 1.6; }
 .proofFoot button { display: flex; justify-content: space-between; align-items: center; gap: 14px; min-height: 44px; width: 100%; padding: 10px 0; color: inherit; background: transparent; border: 0; font-family: inherit; font-size: 14px; font-weight: 600; text-align: left; }
 .entryScope { margin: 26px 0 0; color: var(--text-lo); font-size: 12px; line-height: 1.6; }
+/*
+  The representativeness caveat and the reproducibility link (audit E04, G06).
+
+  `line-height: 2` is not decoration: it gives the two inline links a 24px line box, which is
+  WCAG 2.5.8's floor for a pointer target. At 1.6 they were 19px tall on a phone. The link colour
+  is inherited rather than declared, for the reason `.entryScope` already relies on -- this stage
+  is painted light and a themed foreground token here can invert.
+*/
+.entryNote { margin: 12px 0 0; max-width: 86ch; color: var(--text-lo); font-size: 12px; line-height: 2; }
+.entryNote a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
 
 @media (max-width: 900px) {
   .entry { align-content: start; padding: 36px 24px; }

@@ -29,7 +29,7 @@ function sha256Hex(data: string | Buffer) {
   return createHash("sha256").update(data).digest("hex");
 }
 
-export function readR2SignerEnv(env: NodeJS.ProcessEnv = process.env): R2SignerEnv | null {
+export function readR2SignerEnv(env: Partial<NodeJS.ProcessEnv> = process.env): R2SignerEnv | null {
   const accountId = env.R2_ACCOUNT_ID?.trim() ?? "";
   const bucket = env.R2_BUCKET?.trim() ?? "";
   const accessKeyId = env.R2_ACCESS_KEY_ID?.trim() ?? "";

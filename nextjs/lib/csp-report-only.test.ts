@@ -5,10 +5,14 @@ import { CSP_REPORT_PATH, cspReportOnly, generateCspNonce, summarizeCspReport } 
 
 const NONCE = /script-src 'nonce-([A-Za-z0-9+/=]{24})' 'strict-dynamic'/;
 
+/* The handler reads the pathname, because the S10 nonce flag covers only some routes. */
+const request = (path = "/") =>
+  ({ nextUrl: new URL(`https://tavonel.com${path}`) }) as Request & { nextUrl: URL };
+
 describe("§41 Phase 1 report-only CSP", () => {
   it("mints a fresh nonce on every response", () => {
-    const first = middleware().headers.get("Content-Security-Policy-Report-Only") ?? "";
-    const second = middleware().headers.get("Content-Security-Policy-Report-Only") ?? "";
+    const first = middleware(request()).headers.get("Content-Security-Policy-Report-Only") ?? "";
+    const second = middleware(request()).headers.get("Content-Security-Policy-Report-Only") ?? "";
     const a = first.match(NONCE)?.[1];
     const b = second.match(NONCE)?.[1];
     expect(a, "report-only script-src must carry a nonce").toBeTruthy();
@@ -17,7 +21,7 @@ describe("§41 Phase 1 report-only CSP", () => {
   });
 
   it("names the collector in both the legacy and the current reporting directive", () => {
-    const response = middleware();
+    const response = middleware(request());
     const policy = response.headers.get("Content-Security-Policy-Report-Only") ?? "";
     expect(policy).toContain(`report-uri ${CSP_REPORT_PATH}`);
     expect(policy).toContain("report-to csp-endpoint");
@@ -25,8 +29,10 @@ describe("§41 Phase 1 report-only CSP", () => {
   });
 
   it("never enforces: the report-only policy is only ever on the report-only header", () => {
-    const response = middleware();
-    expect(response.headers.get("Content-Security-Policy")).toBeNull();
+    // Including on the one surface the S10 flag would cover, because that flag is unset.
+    for (const path of ["/", "/workspace/sources"]) {
+      expect(middleware(request(path)).headers.get("Content-Security-Policy"), path).toBeNull();
+    }
   });
 
   it("drops 'unsafe-inline' from script-src while keeping the checkout allowlist", () => {

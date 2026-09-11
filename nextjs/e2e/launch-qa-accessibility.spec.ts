@@ -2,10 +2,48 @@ const playwrightPackage = process.env.PLAYWRIGHT_TEST_PACKAGE ?? "@playwright/te
 const playwrightModule = await import(playwrightPackage);
 const { expect, test } = "test" in playwrightModule ? playwrightModule : playwrightModule.default;
 
-const routes = ["/", "/privacy", "/terms", "/security", "/contact", "/login"] as const;
+/*
+  V03: the six routes this suite launched with were the legal and entry pages. The pages a
+  customer actually evaluates -- pricing, the product index, the solution page, the docs, the
+  developer surface and the compiled-world sample -- were never held to the same baseline.
+  Extending the array is the whole change; every check below is route-agnostic.
+*/
+const routes = [
+  "/",
+  "/privacy",
+  "/terms",
+  "/security",
+  "/contact",
+  "/login",
+  "/pricing",
+  "/product",
+  "/solutions/ai-ready-knowledge",
+  "/docs",
+  "/developers",
+  "/explore",
+] as const;
+
+/*
+  All six routes meet the baseline now, and the list below is empty.
+
+  /pricing rendered its four plan cards as `<h3>` directly under the page `<h1>`, so a
+  screen-reader user moving by heading level dropped from h1 to h3 with nothing between. Fixed
+  at integration (stage 2 C4), together with the CSS selector that carried the card treatment,
+  so the accessibility fix did not become a visual regression.
+
+  A second instance of the same defect was found on `/` by running this spec against the merged
+  branch: the landing page had gained three `<h3>` job cards directly under its hero. Neither
+  lane could have seen that one -- the QA lane audited production main, where the block did not
+  exist. Both are fixed; the list and the `test.fail()` mechanism stay for the next one.
+*/
+const KNOWN_HEADING_DEFECT: readonly string[] = [];
 
 for (const route of routes) {
   test(`${route} meets the launch semantic accessibility baseline`, async ({ page }) => {
+    test.fail(
+      KNOWN_HEADING_DEFECT.includes(route),
+      `${route} jumps h1 -> h3; see CROSS-LANE REQUESTS in CA_LANE_REPORT_qa.md`,
+    );
     await page.goto(route, { waitUntil: "domcontentloaded" });
     const violations = await page.evaluate(() => {
       const issues: string[] = [];

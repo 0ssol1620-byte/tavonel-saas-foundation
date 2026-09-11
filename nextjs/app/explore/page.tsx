@@ -45,8 +45,9 @@ export const metadata: Metadata = {
   The layout is computed here for the same reason it is a pure function -- one composition for
   every device, and a server-rendered first paint that already has the world in it.
 
-  What the stage receives is `boundVisualWorld(...)`, not `world` (§24). The compiled World is
-  6,300 objects and 1,281 regions and every object carries a reference to every region of its
+  What the stage receives is `boundVisualWorld(...)`, not `world` (§24). The World /explore is
+  built from is the TypeScript engine's output -- 6,300 objects and 1,281 regions, not the 4,402
+  the live Core delivers on the same bytes -- and every object carries a reference to every region of its
   filing, so serializing it whole into the RSC payload costs hundreds of megabytes. The full model stays
   here, on the server, where the counts, the Ask answers and the technical drawer are read off
   it; the browser gets the drawn composition, one hop out from it, and the source regions that

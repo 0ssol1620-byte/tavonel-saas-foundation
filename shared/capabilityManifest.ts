@@ -93,11 +93,14 @@ const LIVE_LIMITS = [
   ...PROCESSING_CEILING_LIMITATIONS,
 ] as const;
 
-export const CAPABILITY_MANIFEST = {
+const MANIFEST_HEAD = {
   schemaVersion: CAPABILITY_MANIFEST_SCHEMA,
   generatedFrom: "shared/qualifiedDocumentInputs.ts@4c18e86 + shared/documentProcessing.ts CDR contract",
   defaultStatus: "UNSUPPORTED",
-  entries: [
+} as const;
+
+/** The rows the released CDR image accepts today. */
+const LIVE_ENTRIES = [
     {
       sourceFamily: "document",
       mime: "application/pdf",
@@ -287,7 +290,128 @@ export const CAPABILITY_MANIFEST = {
       qualifiedAt: null,
       qualificationReceipt: null,
     },
-  ],
+] as const;
+
+/*
+  The cheap text formats, declared here and withheld from the site until the CDR ships.
+
+  TXT, CSV and HTML need no new reader: `quarantine-sidecar/cdr-cloudrun/app.py` hands each one
+  to the same `soffice` conversion that already carries DOCX and XLSX, and the OCR release then
+  reads the rendered PDF. So the honesty story is the one DOCX already tells -- page, paragraph
+  text and a bounding box, nothing of the source structure -- plus `converted_from_text_before_reading`,
+  which is the part a customer would otherwise not expect: a CSV is rendered as a spreadsheet
+  page and read back as text, so its cells are gone by the time anything reads it.
+
+  Markdown is deliberately absent. LibreOffice ships a Markdown *export* filter and no import
+  filter, so `.md` reaches `soffice` as an unknown type; the honest outcomes are a refusal or an
+  untyped plain-text import that would make "Markdown support" mean "we ignored the markup".
+  Neither earns a row. EML is absent for a larger reason: an email is a MIME multipart tree with
+  headers, parts and attachments, and nothing here parses one -- it needs a reader and an `email`
+  locator kind, not a whitelist entry.
+*/
+const TEXT_ENTRIES = [
+  {
+    sourceFamily: "document",
+    mime: "text/plain",
+    extensions: ["txt"],
+    status: "BEST_EFFORT",
+    readerPlan: LIVE_READER_PLAN,
+    preserved: LIVE_PRESERVED,
+    visual: [],
+    knownLimitations: [
+      "converted_to_pdf_before_reading",
+      "converted_from_text_before_reading",
+      "decoded_as_utf8_before_conversion",
+      "no_document_structure_in_plain_text",
+      ...LIVE_LIMITS,
+    ],
+    evidenceLocatorKinds: ["pdf"],
+    qualifiedAt: null,
+    qualificationReceipt: null,
+  },
+  {
+    sourceFamily: "spreadsheet",
+    mime: "text/csv",
+    extensions: ["csv"],
+    status: "BEST_EFFORT",
+    readerPlan: LIVE_READER_PLAN,
+    preserved: LIVE_PRESERVED,
+    visual: [],
+    knownLimitations: [
+      "converted_to_pdf_before_reading",
+      "converted_from_text_before_reading",
+      "comma_delimiter_and_utf8_encoding_assumed",
+      "cells_are_read_back_as_rendered_text",
+      ...LIVE_LIMITS,
+      "page_count_not_defined_for_spreadsheets",
+    ],
+    evidenceLocatorKinds: ["pdf"],
+    qualifiedAt: null,
+    qualificationReceipt: null,
+  },
+  {
+    sourceFamily: "web",
+    mime: "text/html",
+    extensions: ["html", "htm"],
+    status: "BEST_EFFORT",
+    readerPlan: LIVE_READER_PLAN,
+    preserved: LIVE_PRESERVED,
+    visual: [],
+    knownLimitations: [
+      "converted_to_pdf_before_reading",
+      "converted_from_text_before_reading",
+      // The CDR refuses the file rather than letting LibreOffice resolve a reference for it.
+      "external_references_and_active_content_refused_before_conversion",
+      "laid_out_by_libreoffice_not_by_a_browser",
+      ...LIVE_LIMITS,
+    ],
+    evidenceLocatorKinds: ["pdf"],
+    qualifiedAt: null,
+    qualificationReceipt: null,
+  },
+] as const;
+
+/**
+ * Whether the site may accept the text formats yet. Founder-released, not agent-released.
+ *
+ * The deployed CDR is an image digest pinned in `quarantine-sidecar/cdr-cloudrun/service.yaml`,
+ * and the running revision refuses any MIME its own `ALLOWED_INPUTS` does not carry. Adding the
+ * rows to this manifest alone would therefore put the website back in the state the manifest
+ * exists to prevent: the picker offers `.csv`, intake accepts it, and the CDR answers 422 after
+ * the upload is paid for. So the rows are declared and withheld, and the gate flips only after:
+ *
+ *   1. the CDR image is rebuilt from this commit's `app.py` and `malware-scan-qualification`
+ *      passes for that exact SHA (it converts a TXT, CSV and HTML fixture inside the image);
+ *   2. the founder applies `service.yaml` with the new image digest;
+ *   3. `/health` on the deployed revision answers ok and a TXT/CSV/HTML fixture round-trips.
+ *
+ * Until then this is `false`, `DECLARED_INPUT_MANIFEST` is what the CDR source tree is tested
+ * against, and `CAPABILITY_MANIFEST` -- the whitelist, the picker and /sources -- is the live set.
+ */
+export const TEXT_INPUTS_LIVE = false;
+
+/** Every row this repository declares. The CDR service contract is derived from this one. */
+const DECLARED_ENTRIES = [...LIVE_ENTRIES, ...TEXT_ENTRIES] as const;
+
+/*
+  The gate is a literal, so the shipped entry *type* narrows with it rather than becoming a
+  union of both states. `shared/qualifiedDocumentInputs.ts` extracts `QualifiedDocumentMime`
+  from these entries, and a union that always included `text/plain` would type the intake
+  whitelist as holding a key it does not hold while the gate is off.
+*/
+type ShippedEntries = typeof TEXT_INPUTS_LIVE extends true
+  ? typeof DECLARED_ENTRIES
+  : typeof LIVE_ENTRIES;
+
+/** Everything declared, gate or no gate: what `quarantine-sidecar` is held to. */
+export const DECLARED_INPUT_MANIFEST = {
+  ...MANIFEST_HEAD,
+  entries: DECLARED_ENTRIES,
+} as const satisfies CapabilityManifest;
+
+export const CAPABILITY_MANIFEST = {
+  ...MANIFEST_HEAD,
+  entries: (TEXT_INPUTS_LIVE ? DECLARED_ENTRIES : LIVE_ENTRIES) as ShippedEntries,
 } as const satisfies CapabilityManifest;
 
 /**
@@ -315,6 +439,7 @@ export function assertDistinctMimes(manifest: CapabilityManifest): void {
 }
 
 assertDistinctMimes(CAPABILITY_MANIFEST);
+assertDistinctMimes(DECLARED_INPUT_MANIFEST);
 
 export function isAcceptedAtUpload(status: CapabilityStatus): boolean {
   return (capabilityStatusesAcceptedAtUpload as readonly string[]).includes(status);
@@ -374,4 +499,41 @@ export function deriveSourceFamilyChips(manifest: CapabilityManifest): string[] 
   // Array.from, not a spread: the root tsconfig sets no `target`, so spreading a Map iterator
   // needs --downlevelIteration and fails `pnpm check` at the repository root.
   return Array.from(byFamily.values(), (names) => names.join(" / "));
+}
+
+export const CAPABILITY_INPUTS_SCHEMA = "tavonel.capability_inputs.v1" as const;
+
+/**
+ * The same MIME list, emitted as data, because two of the parties that enforce it cannot import
+ * this file.
+ *
+ * The header above says five surfaces read the manifest instead of restating it, and that is
+ * true of the five it names -- all of them TypeScript in this tree. The enforcement points that
+ * actually refuse a byte are elsewhere: `quarantine-sidecar/cdr-cloudrun/app.py` is Python with
+ * its own `ALLOWED_INPUTS`, and `quarantine-sidecar/foundation-cdr-worker/src/keys.ts` is a
+ * separate Worker bundle with its own MIME map. They agreed by coincidence and by memory, which
+ * is the drift this file exists to remove -- one format added here and forgotten in two
+ * deployables is "website says yes, backend says no" across a language boundary.
+ *
+ * So the list is written out once as `shared/capabilityInputs.generated.json`, checked in, and
+ * both trees assert against it in their own test runners. Nothing reads it at runtime: coupling
+ * a Cloud Run service and a Cloudflare Worker to a file in this repository at request time would
+ * buy a deployment dependency to solve a review problem. The test is the coupling.
+ *
+ * `cdrAllowedInputs` is deliberately gate-independent. The CDR source tree learns a format
+ * first, the released image second, and the site last -- see `TEXT_INPUTS_LIVE`.
+ */
+export function deriveCanonicalInputs() {
+  return {
+    schemaVersion: CAPABILITY_INPUTS_SCHEMA,
+    generatedFrom: "shared/capabilityManifest.ts",
+    textInputsLive: TEXT_INPUTS_LIVE,
+    cdrAllowedInputs: deriveUploadWhitelist(DECLARED_INPUT_MANIFEST),
+    siteUploadWhitelist: deriveUploadWhitelist(CAPABILITY_MANIFEST),
+  };
+}
+
+/** Exactly the bytes of the checked-in artifact, so a comparison is a string comparison. */
+export function serializeCanonicalInputs(): string {
+  return `${JSON.stringify(deriveCanonicalInputs(), null, 2)}\n`;
 }

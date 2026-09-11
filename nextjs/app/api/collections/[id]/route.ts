@@ -6,6 +6,10 @@ import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
 import { collectionSourceDocumentIds } from "@/lib/collection-source-access";
 import { checkConnectorSourceAccess } from "@/lib/connector-source-access";
+import { listWorkspaceCompileJobs } from "@/lib/compile-job-store";
+import { listFoundationReviewDecisions } from "@/lib/review-store";
+import { buildWorldReadModel } from "@/lib/world-read-model";
+import { REVIEW_DECISION_READ_LIMIT, buildReviewQueue } from "@/lib/review-queue";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -43,5 +47,40 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503,
     headers: { "Cache-Control": "no-store" },
   });
-  return NextResponse.json({ code: "OK", artifactKey: loaded.value.key, candidatePromotion: false, artifact }, { headers: { "Cache-Control": "no-store" } });
+  /*
+    The per-document breakdown, from the same derivation the workspace renders (audit U05).
+
+    The artifact alone can only say what compiled. Which sources were excluded by a safety
+    check, and which were never read, lives on the compile-job row -- so this reads it, and
+    when no row is available `documentBreakdown.missing` says `compile_job` instead of
+    reporting a reassuring zero. Both reads are non-fatal: a candidate is still readable when
+    the job history has rolled past it, and the caller is told what is absent.
+  */
+  const model = buildWorldReadModel(loaded.value.artifact, id);
+  const [jobs, decisions] = await Promise.all([
+    listWorkspaceCompileJobs(auth.principal.workspaceKey),
+    listFoundationReviewDecisions(auth.principal.workspaceKey, id, REVIEW_DECISION_READ_LIMIT),
+  ]);
+  const job = jobs.ok ? jobs.value.find((entry) => entry.collectionId === id) : undefined;
+  const documentBreakdown = buildReviewQueue({
+    documentIds: job?.documentIds ?? null,
+    blocked: job?.blocked ?? [],
+    compileSettledAt: job?.settledAt ?? null,
+    reviewReasons: artifact.reviewReasons ?? artifact.validation.reviewReasons ?? [],
+    evidence: (model?.evidence ?? []).map((item) => ({ id: item.id, sourceId: item.sourceId })),
+    decisions: decisions.ok ? decisions.decisions.map((entry) => ({ evidenceId: entry.evidenceId, recordedAt: entry.recordedAt })) : [],
+    /*
+      The decision read is newest-first and bounded. A full window means older decisions exist
+      that this response cannot see, so `documentBreakdown.missing` carries `review_decisions`
+      and the first-review times stop claiming to be the first.
+    */
+    decisionsTruncated: decisions.ok && decisions.decisions.length >= REVIEW_DECISION_READ_LIMIT,
+  });
+  return NextResponse.json({
+    code: "OK",
+    artifactKey: loaded.value.key,
+    candidatePromotion: false,
+    artifact,
+    documentBreakdown,
+  }, { headers: { "Cache-Control": "no-store" } });
 }

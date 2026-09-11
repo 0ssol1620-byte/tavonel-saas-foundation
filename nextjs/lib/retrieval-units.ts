@@ -1,4 +1,5 @@
 import { canonicalize, sha256, stableId, type CollectionCandidateArtifact } from "./collection-compiler";
+import { coreCollectionSourceBinding, isCoreCollectionPackage } from "./collection-source-access";
 import { parseChunks, type GroundedChunk } from "./grounded-ask";
 import type { RetrievalViewKind } from "./retrieval-profile";
 
@@ -166,7 +167,46 @@ const VIEW_COMPILERS: Record<RetrievalViewKind, (candidate: CollectionCandidateA
 export type RetrievalUnitCompileResult = {
   units: RetrievalUnit[];
   skippedViews: RetrievalViewKind[];
+  /** Set when this package's sources cannot be named in the product's namespace. */
+  refusal?: "SOURCE_BINDING_UNRESOLVED";
 };
+
+/**
+ * Translate a chunk row's source ids into the namespace the rest of the product resolves.
+ *
+ * A Core V2 package's `rag/chunks.jsonl` names its sources with the Core's own `src_` / `dv_`
+ * identifiers. A retrieval unit's `documentId` and `documentVersionKey` are what a citation
+ * carries out to a customer and what `/api/documents/<id>/source` is asked to open, so storing
+ * the Core's ids there builds an index whose every citation points at a document this product
+ * cannot find — the same namespace mistake the connector ACL had, one layer down.
+ *
+ * The translation is `coreCollectionSourceBinding`'s, imported rather than re-derived: one join
+ * on the content digest both sides record, in one module. `null` means "not a Core package",
+ * which is the fallback engine's case and needs no translation. A Core package whose join fails
+ * is a refusal rather than a fallback, and the caller below makes it one.
+ */
+function coreSourceTranslation(candidate: CollectionCandidateArtifact) {
+  const binding = coreCollectionSourceBinding(candidate);
+  if (!binding) return null;
+  return new Map(binding.map((row) => [
+    `${row.documentId}\n${row.versionKey}`,
+    { documentId: row.productDocumentId, documentVersionKey: row.productVersionKey },
+  ]));
+}
+
+function inProductNamespace(
+  chunks: GroundedChunk[],
+  translation: ReadonlyMap<string, { documentId: string; documentVersionKey: string }>,
+): GroundedChunk[] | null {
+  const mapped: GroundedChunk[] = [];
+  for (const chunk of chunks) {
+    const product = translation.get(`${chunk.sourceId}\n${chunk.sourceVersionId}`);
+    // A row naming a source the manifest does not bind is refused, never guessed at.
+    if (!product) return null;
+    mapped.push({ ...chunk, sourceId: product.documentId, sourceVersionId: product.documentVersionKey });
+  }
+  return mapped;
+}
 
 // Compiles every view a RetrievalProfile asks for, from a Compiled World candidate
 // artifact's own rag/chunks.jsonl (the same page/bbox-bound chunks grounded-ask.ts
@@ -177,7 +217,15 @@ export function compileRetrievalUnits(
   candidate: CollectionCandidateArtifact,
   views: RetrievalViewKind[],
 ): RetrievalUnitCompileResult {
-  const chunks = parseChunks(candidate);
+  const parsed = parseChunks(candidate);
+  const translation = coreSourceTranslation(candidate);
+  const chunks = translation ? inProductNamespace(parsed, translation) : parsed;
+  if (!chunks) return { units: [], skippedViews: [], refusal: "SOURCE_BINDING_UNRESOLVED" };
+  if (isCoreCollectionPackage(candidate) && !translation) {
+    // A Core package whose manifest cannot be joined to the product's documents. Indexing it
+    // would publish citations in an identity scheme nothing else here can resolve.
+    return { units: [], skippedViews: [], refusal: "SOURCE_BINDING_UNRESOLVED" };
+  }
   const units: RetrievalUnit[] = [];
   const skippedViews: RetrievalViewKind[] = [];
   for (const view of views) {
