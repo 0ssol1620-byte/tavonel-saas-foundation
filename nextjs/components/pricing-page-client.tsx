@@ -85,11 +85,12 @@ const PLANS: ReadonlyArray<{
   PROCESSING_UNIT_USD`, the same two constants the estimator quotes and the reservation code
   charges against, and the included pages are the catalog's `includedPages`.
 
-  The rollover line is the one to read carefully. Nothing in the billing code expires a
-  balance: `apply_foundation_billing_event_v4` grants each renewal's allowance into
-  `credit_balance` and no job, trigger or route ever resets it. So the sentence states that as
-  the current behaviour and stops there. Whether unused capacity is *contractually* carried is
-  §40 item 1 and belongs to the founder; this page will say more when there is a term to say.
+  The rollover line is the one to read carefully. It used to say that nothing in the billing code
+  expires a balance, which was true of `apply_foundation_billing_event_v4` as 0035 wrote it. FD-03
+  then settled the term -- included pages belong to the billing month they are granted in -- and
+  `20260911130000_included_page_expiry_at_renewal.sql` enforces it: the next month's grant expires
+  whatever is left of the previous month as its own ledger row, and takes nothing that is not that
+  plan's included pages. So the sentence states the term, and the code now keeps it.
 */
 const STANDARD_PAGE_USD = STANDARD_UNITS_PER_PAGE * PROCESSING_UNIT_USD;
 const MAXIMUM_PAGE_USD = MAX_UNITS_PER_PAGE * PROCESSING_UNIT_USD;
@@ -108,16 +109,22 @@ const AT_A_GLANCE = [
     `${formatUsd(STANDARD_PAGE_USD)} per standard page. Complex-page processing is capped at ${formatUsd(MAXIMUM_PAGE_USD)}, shown before the run starts.`,
   ],
   /*
-    Audit P06, second half. Rollover was already stated from the code; what happens to a balance
-    when a subscription ends was stated nowhere. Read from the same place: no job, trigger or
-    route reduces `credit_balance` on cancellation -- only a refund adjustment does -- and
-    `reserve_foundation_compute_v3` spends a balance only while `subscription_status` is
-    `active` or `trialing`. So the balance is neither removed nor spendable, and both halves are
-    said rather than the flattering one.
+    Audit P06, second half, and FD-03/FD-04. This tile is the published term, and the term is now
+    enforced by `20260911130000_included_page_expiry_at_renewal.sql` rather than merely stated.
+
+    One thing the term rounds off, and it rounds in the customer's favour: expiry is applied when
+    the next month's grant arrives, not by a clock at midnight. Between a period ending and its
+    renewal transaction landing, the previous month's remainder is still spendable -- minutes,
+    normally, and never into a month whose payment failed, because
+    `reserve_foundation_compute_v3` spends a balance only while `subscription_status` is `active`
+    or `trialing`. The lane report carries that window as an open item for the owner; it is not a
+    second behaviour this page is hiding.
+
+    The wording is the entitlements lane's, kept verbatim so the two branches state one term.
   */
   [
     "Unused pages",
-    "Current billing behavior keeps unused pages in your balance. Cancelling stops the renewal that adds to it; nothing in the billing code removes a balance you already hold, and a balance can only be spent while a plan is active.",
+    `Included pages belong to the billing month they are granted in. Unused pages expire at the end of each billing month and do not roll over, and they are not refunded if you cancel. Pages past the included allowance are billed at the published rate of ${formatUsd(STANDARD_PAGE_USD)} per standard page.`,
   ],
   [
     "What differs by plan",

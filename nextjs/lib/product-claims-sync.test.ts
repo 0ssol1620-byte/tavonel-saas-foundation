@@ -333,13 +333,29 @@ describe("product claims sync", () => {
 
   /*
     Audit P06 and P08: two facts a buyer could only find by reading SQL, and a link.
+
+    P06 used to be pinned as *behaviour read out of the billing code* -- "nothing in the billing
+    code removes a balance you already hold", which was true of `apply_foundation_billing_event_v4`
+    as 0035 wrote it and said nothing about what the customer had bought. FD-03 settled the term:
+    included pages belong to their billing month, do not roll over, and are not refunded on
+    cancellation. So this pins the published term instead, and the rate beside it stays derived
+    from the constants the reservation code charges against rather than typed.
+
+    The term is no longer ahead of its enforcement:
+    `supabase/migrations/20260911130000_included_page_expiry_at_renewal.sql` expires the previous
+    month's remainder when the next month's grant lands, as a ledger row, and
+    `lib/included-page-expiry-migration.test.ts` guards that. What is still approximate is the
+    moment -- at the renewal grant, not at midnight on the period end -- and that window is the
+    lane report's open item.
   */
-  it("states the cancellation balance behaviour and points Enterprise at the trust index", () => {
+  it("states the page-expiry term and points Enterprise at the trust index", () => {
     const pricing = read("components/pricing-page-client.tsx");
-    expect(pricing, "P06: what happens to a balance on cancellation")
-      .toContain("nothing in the billing code removes a balance you already hold");
-    expect(pricing, "P06: and that it is only spendable while a plan is active")
-      .toContain("only be spent while a plan is active");
+    expect(pricing, "P06: unused included pages do not roll over")
+      .toContain("expire at the end of each billing month and do not roll over");
+    expect(pricing, "P06: and are not refunded on cancellation")
+      .toContain("they are not refunded if you cancel");
+    expect(pricing, "P06: the overage rate is derived, not typed")
+      .toContain("published rate of ${formatUsd(STANDARD_PAGE_USD)} per standard page");
     expect(pricing, "P03: whether Ask and search consume pages")
       .toContain("What does not consume pages");
     expect(pricing, "P08: the Enterprise card reaches the trust index")
