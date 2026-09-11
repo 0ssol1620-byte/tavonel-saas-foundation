@@ -1,0 +1,128 @@
+import { readdirSync, readFileSync } from "node:fs";
+import path from "node:path";
+import { describe, expect, it } from "vitest";
+import { duplicateLabelRate, groupingKey, LABEL_KEY_SEPARATOR } from "./metrics";
+
+/**
+ * NUL is spelled `String.fromCharCode(0)` throughout this file, never as a string escape. A raw
+ * 0x00 byte in a source file makes git treat the whole file as binary, so `git diff` prints
+ * "Binary files differ" instead of the content and the file drops out of code review -- which is
+ * exactly what happened to the first version of emit-inputs.test.ts. `\0` in a literal is the
+ * correct source form, but more than one editing tool collapses it back to the raw byte on write,
+ * so this file avoids the escape entirely. The `reviewable sources` suite below is the guard.
+ */
+const NUL = String.fromCharCode(0);
+
+describe("groupingKey", () => {
+  it("joins kind and label with a real NUL character", () => {
+    expect(LABEL_KEY_SEPARATOR).toBe(NUL);
+    expect(LABEL_KEY_SEPARATOR).toHaveLength(1);
+    expect(LABEL_KEY_SEPARATOR.charCodeAt(0)).toBe(0);
+    expect(groupingKey("entity", "Revenue")).toBe(`entity${NUL}revenue`);
+  });
+
+  it("normalises whitespace runs and case, and nothing else", () => {
+    expect(groupingKey("claim", "  Segment   Revenue \n rose ")).toBe(groupingKey("claim", "segment revenue rose"));
+    // Punctuation and digits are NOT normalised: that would be a sameness judgement, not a metric.
+    expect(groupingKey("claim", "Q4 revenue")).not.toBe(groupingKey("claim", "Q4, revenue"));
+  });
+
+  /**
+   * The failure path the NUL separator exists to prevent. A space-joined key maps both of these
+   * pairs to "entity segment revenue", which would report two distinct nodes as a duplicate pair.
+   * If someone ever "cleans up" the escape into a space, this is the test that fails.
+   */
+  it("does not collide when a space in the kind could be confused for the separator", () => {
+    const a = groupingKey("entity segment", "revenue");
+    const b = groupingKey("entity", "segment revenue");
+    expect(a).not.toBe(b);
+    expect(a.replace(LABEL_KEY_SEPARATOR, " ")).toBe(b.replace(LABEL_KEY_SEPARATOR, " "));
+  });
+});
+
+describe("duplicateLabelRate", () => {
+  it("counts every node sharing a (kind, label) pair, not just the extras", () => {
+    const result = duplicateLabelRate([
+      { kind: "entity", label: "Apple Inc." },
+      { kind: "entity", label: "apple inc." },
+      { kind: "entity", label: "Tim Cook" },
+    ]);
+    expect(result.labelledNodes).toBe(3);
+    expect(result.distinctLabels).toBe(2);
+    // Both members of the duplicated pair are in the numerator: the question is "how many nodes are
+    // not a distinct fact", not "how many could be deleted".
+    expect(result.nodesSharingALabel).toBe(2);
+    expect(result.rate).toBeCloseTo(2 / 3, 10);
+    expect(result.population).toBe("nodes carrying a non-empty label");
+  });
+
+  it("keeps the same label under two kinds apart", () => {
+    const result = duplicateLabelRate([
+      { kind: "entity", label: "revenue" },
+      { kind: "claim", label: "revenue" },
+    ]);
+    expect(result.nodesSharingALabel).toBe(0);
+    expect(result.rate).toBe(0);
+  });
+
+  it("excludes unlabelled and whitespace-only nodes from the denominator", () => {
+    const result = duplicateLabelRate([
+      { kind: "block" },
+      { kind: "block", label: "" },
+      { kind: "block", label: "   \n\t " },
+      { kind: "block", label: "note" },
+    ]);
+    expect(result.labelledNodes).toBe(1);
+    expect(result.rate).toBe(0);
+  });
+
+  it("is null rather than 0 when nothing carried a label", () => {
+    expect(duplicateLabelRate([]).rate).toBeNull();
+    expect(duplicateLabelRate([{ kind: "block" }, { kind: "block", label: " " }]).rate).toBeNull();
+  });
+});
+
+/**
+ * The root cause guard for the review-blindness defect above, rather than the one instance of it.
+ *
+ * A single 0x00 byte anywhere in a tracked source file makes git classify it as binary: `git diff`
+ * renders "Binary files a/... and b/... differ" and `--stat` renders "Bin 0 -> N bytes", so the
+ * file's content never reaches a reviewer using the plain git-diff path this campaign's
+ * self-approval process runs on. It is silent -- tsc, eslint and vitest all handle the byte fine.
+ *
+ * This suite fails closed: if it cannot read the eval tree it says so rather than passing on an
+ * empty scan.
+ */
+describe("reviewable sources", () => {
+  const evalRoot = path.resolve(import.meta.dirname, "..");
+
+  function walk(dir: string): string[] {
+    const found: string[] = [];
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === "node_modules") continue;
+        found.push(...walk(full));
+      } else if (entry.isFile()) {
+        found.push(full);
+      }
+    }
+    return found;
+  }
+
+  const files = walk(evalRoot);
+
+  it("scanned a non-empty eval tree", () => {
+    // No silent fallback: an empty scan would report "no NUL bytes" having looked at nothing.
+    expect(files.length).toBeGreaterThan(5);
+  });
+
+  it("has no raw NUL byte in any file under eval/", () => {
+    const offenders = files
+      .filter((file) => readFileSync(file).includes(0))
+      .map((file) => path.relative(evalRoot, file));
+    // A NUL belongs in a runtime string, written as the escape `\0`. It must never be a byte on
+    // disk: see this file's header for what that costs.
+    expect(offenders).toEqual([]);
+  });
+});
