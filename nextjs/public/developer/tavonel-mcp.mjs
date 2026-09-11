@@ -493,9 +493,16 @@ export async function runDoctor({ baseUrl = DEFAULT_BASE_URL, apiKey = "", fetch
       : "no active World in this workspace yet. Compile a collection and have a person promote it -- an API key cannot promote.");
   } catch (error) {
     const message = error instanceof Error ? error.message : "UNKNOWN";
-    record("authenticated_read", false, message.includes("API_ERROR_401") || message.includes("API_ERROR_403")
-      ? `${message} -- the key was rejected. Check it is not revoked and that it holds the collections:read scope.`
-      : message);
+    const rejected = message.includes("API_ERROR_401") || message.includes("API_ERROR_403");
+    // A 404 here is not a bad key: it is a deployment that predates GET /api/v1/collections.
+    // Saying "the key was rejected" would send the operator to rotate a credential that works.
+    const absent = message.includes("404");
+    record("authenticated_read", false,
+      rejected
+        ? `${message} -- the key was rejected. Check it is not revoked and that it holds the collections:read scope.`
+        : absent
+          ? `${message} -- ${base} has no /api/v1/collections endpoint. That deployment predates world discovery; the key is not the problem.`
+          : message);
     record("active_world", false, "not checked: the authenticated read did not succeed");
   }
 

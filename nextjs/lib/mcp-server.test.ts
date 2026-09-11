@@ -412,3 +412,25 @@ describe("the doctor path", () => {
     expect(world.detail).toContain("an API key cannot promote");
   });
 });
+
+describe("the doctor tells a deployment gap apart from a bad key", () => {
+  it("blames the deployment, not the credential, when the endpoint is absent", async () => {
+    /*
+      Verified against production while this branch was unmerged: tavonel.com answers 404 for
+      GET /api/v1/collections because the endpoint ships with this change. Reporting that as
+      "the key was rejected" would send an operator to rotate a credential that works fine.
+    */
+    const fetcher = (async (url: string) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/developer/channel.json") {
+        return new Response(JSON.stringify({ version: DISTRIBUTION_VERSION }), { status: 200 });
+      }
+      return new Response("<html>not found</html>", { status: 404, headers: { "content-type": "text/html" } });
+    }) as unknown as typeof fetch;
+    const report = await runDoctor({ baseUrl: "https://tavonel.test", apiKey: "tvnl_live_probe", fetcher });
+    const read = report.checks.find((check: { name: string }) => check.name === "authenticated_read")!;
+    expect(read.ok).toBe(false);
+    expect(read.detail).toContain("has no /api/v1/collections endpoint");
+    expect(read.detail).toContain("the key is not the problem");
+  });
+});
