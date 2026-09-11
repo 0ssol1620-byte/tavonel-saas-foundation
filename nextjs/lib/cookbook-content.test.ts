@@ -143,6 +143,22 @@ describe("the limits are read from the product, and sit above the calls to actio
     expect(READING_LIMIT_SENTENCE).toContain("not extracted as tables");
     expect(READING_LIMIT_SENTENCE).toContain("not recovered as typed structure");
     expect(READING_LIMIT_SENTENCE).toContain("80 pages");
+    /*
+      The whole list, not only the two the sentence derives from.
+
+      A limitation added to the manifest would not appear in this copy on its own -- the sentence
+      names the two it knows about -- and a limit the product has and the cookbook does not
+      mention is the failure these pages exist to avoid. Pinning the set makes that a failing
+      test and a copy decision rather than six pages quietly going stale.
+    */
+    expect(pdf.knownLimitations, "a new reading limit needs a sentence in cookbook-content.ts").toEqual([
+      "read_through_cdr_sanitized_pdf_and_ocr",
+      "no_native_structure_reader_yet",
+      "no_table_or_formula_extraction",
+      "no_visual_native_reconciliation",
+      "at_most_5_mib_per_source",
+      "at_most_80_pages_per_source",
+    ]);
   });
 
   it("puts that limit in the prerequisites and the limits of every record", () => {
