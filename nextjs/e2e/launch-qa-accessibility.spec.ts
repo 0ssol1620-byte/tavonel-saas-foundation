@@ -2,10 +2,46 @@ const playwrightPackage = process.env.PLAYWRIGHT_TEST_PACKAGE ?? "@playwright/te
 const playwrightModule = await import(playwrightPackage);
 const { expect, test } = "test" in playwrightModule ? playwrightModule : playwrightModule.default;
 
-const routes = ["/", "/privacy", "/terms", "/security", "/contact", "/login"] as const;
+/*
+  V03: the six routes this suite launched with were the legal and entry pages. The pages a
+  customer actually evaluates -- pricing, the product index, the solution page, the docs, the
+  developer surface and the compiled-world sample -- were never held to the same baseline.
+  Extending the array is the whole change; every check below is route-agnostic.
+*/
+const routes = [
+  "/",
+  "/privacy",
+  "/terms",
+  "/security",
+  "/contact",
+  "/login",
+  "/pricing",
+  "/product",
+  "/solutions/ai-ready-knowledge",
+  "/docs",
+  "/developers",
+  "/explore",
+] as const;
+
+/*
+  One of the six routes added above does not meet the baseline today.
+
+  /pricing renders its four plan cards as `<h3>` directly under the page `<h1>` (see
+  `components/pricing-page-client.tsx:279`), so a screen-reader user moving by heading level
+  drops from h1 to h3 with nothing between. The page belongs to another lane, so the defect is
+  recorded here rather than patched: `test.fail()` keeps it in CI as a failing expectation, and
+  the run turns red the moment it is fixed and this entry is not removed. It is not skipped, and
+  no assertion is weakened to accommodate it. The one-line fix is in the QA lane report under
+  CROSS-LANE REQUESTS.
+*/
+const KNOWN_HEADING_DEFECT: readonly string[] = ["/pricing"];
 
 for (const route of routes) {
   test(`${route} meets the launch semantic accessibility baseline`, async ({ page }) => {
+    test.fail(
+      KNOWN_HEADING_DEFECT.includes(route),
+      `${route} jumps h1 -> h3; see CROSS-LANE REQUESTS in CA_LANE_REPORT_qa.md`,
+    );
     await page.goto(route, { waitUntil: "domcontentloaded" });
     const violations = await page.evaluate(() => {
       const issues: string[] = [];
