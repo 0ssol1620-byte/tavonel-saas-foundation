@@ -30,26 +30,18 @@ import { PROCESSING_CEILING_SENTENCE } from "../../shared/intakeCeiling";
   a second copy on a content page is a disagreement waiting to happen. This file links instead.
 */
 
-/**
- * The six priority packages, as a closed list.
- *
- * Also the recipe ids: a cookbook's CTA and the recipe a login round-trip preserves are the same
- * thing named twice, and the integration test between this lane and `lib/recipe-intent.ts`
- * asserts the two lists are equal rather than merely overlapping.
- */
-export const COOKBOOK_SLUGS = [
-  "documents-to-grounded-work",
-  "financial-report-figures-with-provenance",
-  "manual-grounded-support-answers",
-  "connect-external-ai-mcp-api",
-  "portable-package-local-ai",
-  "source-revision-reuse",
-] as const;
+/*
+  The six slugs and the recipe version live in `lib/cookbook-slugs.ts` and are re-exported here.
 
-export type CookbookSlug = (typeof COOKBOOK_SLUGS)[number];
-
-/** The version a recipe intent carries. Moves when the recipe's steps change, not on an edit. */
-export const RECIPE_VERSION = "2026-09-11";
+  They used to be declared in this file, which made `lib/recipe-intent.ts` -- and through it the
+  two client sign-in routes -- depend on `docs-content.ts` and the capability manifest for a
+  six-string array. The list still has one owner; it is one file lighter. Every importer of this
+  module is unchanged, and `lib/recipe-intent.test.ts` still asserts the three names resolve to
+  the same six strings in the same order.
+*/
+export { COOKBOOK_SLUGS, RECIPE_VERSION } from "./cookbook-slugs";
+export type { CookbookSlug } from "./cookbook-slugs";
+import { RECIPE_VERSION, type CookbookSlug } from "./cookbook-slugs";
 
 /*
   The three demonstrations of the blueprint's section 4, as ids rather than as prose, so the

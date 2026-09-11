@@ -34,7 +34,7 @@
  * attribution reports every conversion as "direct".
  */
 
-import { COOKBOOK_SLUGS, RECIPE_VERSION as COOKBOOK_RECIPE_VERSION } from "@/lib/cookbook-content";
+import { COOKBOOK_SLUGS, RECIPE_VERSION as COOKBOOK_RECIPE_VERSION } from "@/lib/cookbook-slugs";
 
 /** The six cookbook slugs, read from the module that owns them rather than typed again here. */
 export const RECIPE_IDS = COOKBOOK_SLUGS;

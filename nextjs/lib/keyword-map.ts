@@ -33,7 +33,7 @@
  * The day a page prints one of these strings, that page joins the copy guards -- not this file.
  */
 
-import { COOKBOOK_SLUGS } from "@/lib/cookbook-content";
+import { COOKBOOK_SLUGS } from "@/lib/cookbook-slugs";
 
 /* ------------------------------------------------------------------ vocabulary */
 
