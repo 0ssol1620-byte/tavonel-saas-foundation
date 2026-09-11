@@ -11,10 +11,24 @@ import {
 } from "@/lib/immutable-keys";
 import { getWorkspaceCollectionCandidate, listImmutableWorkspaceObjects } from "@/lib/r2-objects";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
+import { ensureRetrievalIndexForActiveWorld } from "@/lib/retrieval-index-status";
 import { promoteFoundationCandidate } from "@/lib/world-store";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+/*
+ * Promotion now also compiles the World's retrieval index (audit R4-01), which embeds every
+ * compiled unit, so this handler needs the same wall clock /ask has rather than the platform
+ * default. The compile is idempotent per world version: a request that dies mid-compile leaves
+ * either a `running` run no query can read or a `failed` one, and the retry -- or
+ * POST /v1/collections/{id}/retrieval-index -- converges on a single completed run.
+ *
+ * ponytail: inline compile, bounded by this function's deadline. A corpus large enough to
+ * outlast 60s of embedding needs the compile moved onto the compile-job worker; the recompile
+ * endpoint is the recovery path until then, and the reported index state says plainly when it
+ * is missing rather than letting /ask look healthy while it serves the fallback.
+ */
+export const maxDuration = 60;
 
 const NO_STORE = { "Cache-Control": "no-store" };
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
@@ -222,8 +236,25 @@ export async function POST(
       }
     );
   }
+  /*
+    The World is active from here on. Everything below reports; nothing below can fail the
+    promotion (audit R4-01).
+
+    Compiling the retrieval index is what makes the hybrid pipeline reachable at all: before
+    this call existed, `compileRetrievalArtifacts` had no production caller, so every /ask in
+    production answered from the excerpt-concatenation fallback and every /search returned 409.
+    It runs after the pointer moved because 0021's trigger refuses a run against a world that
+    is not active -- the run can only legally exist once the promotion has committed.
+  */
+  const retrievalIndex = await ensureRetrievalIndexForActiveWorld({
+    workspaceKey: membership.workspaceId,
+    collectionId: id,
+    worldManifestDigest: manifestDigest,
+    artifact: loaded.json,
+    actorUserId: user.id,
+  });
   return NextResponse.json(
-    { code: "WORLD_ACTIVE", world: promoted.result },
+    { code: "WORLD_ACTIVE", world: promoted.result, retrievalIndex },
     { headers: NO_STORE }
   );
 }

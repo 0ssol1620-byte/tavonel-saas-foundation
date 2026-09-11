@@ -1,4 +1,9 @@
 import { createHash } from "node:crypto";
+import {
+  verifyGroundedCitations,
+  type ContextPacket,
+  type ContextPacketItem,
+} from "./context-packet";
 import { expandedTokens, tokens } from "./lexical-tokens";
 
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
@@ -317,6 +322,122 @@ export function answerGroundedQuestion(
       collectionId,
       manifestDigest,
       retrieval: "adaptive-multilingual-region-v2",
+      candidatePromotion: false,
+      outputSha256: `sha256:${createHash("sha256").update(canonicalize(unsigned)).digest("hex")}`,
+    },
+  };
+}
+
+/*
+  ---------------------------------------------------------------------------------------------
+  The same answer, built from a ContextPacket (audit R4-02)
+  ---------------------------------------------------------------------------------------------
+
+  The compiled pipeline returned a ContextPacket, retrieval diagnostics and the code
+  GROUNDED_ANSWER -- and no `answer` field. Only this module's excerpt-concatenation path ever
+  produced prose, so as long as the compiled path was unreachable (R4-01) the gap was hidden.
+  Wiring the compiled path without this would have made /ask "succeed" with citations and no
+  answer for the first time in production, and nothing would have caught it.
+
+  So both paths now answer the same way and say so: `answerMode: "evidence_excerpts"`. The
+  answer is the cited excerpts, concatenated in rank order. That is the founder default and it
+  is stated rather than implied -- no model generates anything here. There is no LLM in this
+  file, no LLM behind the compiled path, and choosing one is a Model Arena decision (masterplan
+  Phase 4-5), not something a retrieval fix gets to settle.
+
+  Two properties carried over deliberately:
+
+    * a citation can only name evidence the packet contains. verifyGroundedCitations is the
+      enforcement point and it runs here even though this builder cannot invent an id -- it is
+      the guard the seam promises, and a guard that is only called on the paths that need it is
+      a guard someone will forget to call.
+    * an item with no evidence id cannot be cited. The World Gate already rejects those
+      (NO_EVIDENCE_BOUND), and refusing them again here means a gate regression degrades into
+      an abstention rather than into an uncited claim.
+
+  What is NOT the same across the two paths, and is not pretended to be: the fallback scores
+  `relevance` with its own lexical/graph/temporal breakdown, while the compiled path carries
+  per-source ranks and a reranker score. Inventing a 0-1 `relevance` for a compiled citation to
+  make the shapes match would be a fabricated number. Each path reports what it actually has.
+*/
+
+export type PacketCitation = {
+  evidenceId: string;
+  evidenceIds: string[];
+  unitId: string;
+  sourceVersionId: string;
+  pageNumber1: number | null;
+  bbox1000: [number, number, number, number] | null;
+  authority: string;
+  claimIds: string[];
+  entityIds: string[];
+  excerpt: string;
+  retrieval: ContextPacketItem["retrieval"];
+};
+
+export type PacketAnswer = {
+  status: "grounded" | "abstained";
+  answer: string;
+  reason: string | null;
+  citations: PacketCitation[];
+  receipt: {
+    collectionId: string;
+    manifestDigest: string;
+    retrieval: string;
+    candidatePromotion: false;
+    outputSha256: string;
+  };
+};
+
+/**
+ * Build the excerpt answer for a compiled-retrieval ContextPacket.
+ *
+ * Pure. The packet's item order is the pipeline's final ranking (RRF then reranker then the
+ * World Gate), so this neither re-ranks nor re-scores -- re-ranking here would mean two
+ * different orders existed for one answer.
+ */
+export function answerFromContextPacket(
+  packet: ContextPacket,
+  meta: { collectionId: string; manifestDigest: string },
+): PacketAnswer {
+  const citations: PacketCitation[] = packet.items
+    .filter(item => item.evidenceIds.length > 0 && item.text.trim().length > 0)
+    .map(item => ({
+      evidenceId: item.evidenceIds[0]!,
+      evidenceIds: [...item.evidenceIds],
+      unitId: item.unitId,
+      sourceVersionId: item.sourceVersionId,
+      pageNumber1: item.pageNumber1,
+      bbox1000: item.bbox1000 === null ? null : ([...item.bbox1000] as [number, number, number, number]),
+      authority: item.authority,
+      claimIds: [...item.claimIds],
+      entityIds: [...item.entityIds],
+      excerpt: excerpt(item.text),
+      retrieval: { ...item.retrieval },
+    }));
+
+  const verified = verifyGroundedCitations(citations.map(citation => citation.evidenceId), packet);
+  const status = citations.length > 0 && verified.valid ? ("grounded" as const) : ("abstained" as const);
+  const reason =
+    status === "grounded"
+      ? null
+      : !verified.valid
+        ? "CITED_EVIDENCE_NOT_IN_PACKET"
+        : (packet.abstentionReasons[0] ?? "NO_REGION_BOUND_EVIDENCE_MATCH");
+  const unsigned = {
+    status,
+    answer: status === "grounded" ? citations.map(citation => citation.excerpt).join("\n\n") : "",
+    reason,
+    citations: status === "grounded" ? citations : [],
+  };
+  return {
+    ...unsigned,
+    receipt: {
+      collectionId: meta.collectionId,
+      manifestDigest: meta.manifestDigest,
+      // The profile that produced the packet, not a fixed label: two profiles retrieving the
+      // same World are two different retrievals and their receipts have to be distinguishable.
+      retrieval: packet.retrievalProfile,
       candidatePromotion: false,
       outputSha256: `sha256:${createHash("sha256").update(canonicalize(unsigned)).digest("hex")}`,
     },
