@@ -184,6 +184,9 @@ describe("compiler contract clauses", () => {
     const compiler = read("./collection-compiler.ts");
     // The entire edge vocabulary. A fourth type means the clause is re-derived, not extended.
     expect(compiler).toContain('type: "discusses_topic" | "mentions_entity" | "supported_by";');
+    // The live engine's own two, which clause 03 also names (knowledge CROSS-LANE 3). Pinned in
+    // the same place as the fallback's, so one vocabulary change fails one test.
+    expect(compiler).toContain('type: "mentions" | "contradicts";');
     // The one claim edge runs claim -> evidence, and that evidence is a whole document version.
     expect(compiler).toContain('type: "supported_by"');
     expect(compiler).toContain("from: claimId");
