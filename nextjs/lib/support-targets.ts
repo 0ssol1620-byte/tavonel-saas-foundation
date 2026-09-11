@@ -12,13 +12,12 @@
  * business day rather than 24 hours, because the two differ by a weekend and the weekend is
  * exactly when the promise would break.
  *
- * The label is the other half, and it is inside the constant rather than beside it. FD-09 is a
- * delegated decision, 2026-09-11 (orchestrator, under the founder's delegation) -- the same
- * standing as the DPA's three commitments, the 72-hour incident window and the pentest
- * sequencing, every one of which carries the pending-confirmation label on the page that states
- * it. This one did not, which made it the only delegated commitment on the site reading as
- * settled. Keeping the label in the string means the two pages cannot render the target without
- * it, which is the same reason the DPA's label lives inside its anchor.
+ * FD-09 in `docs/policy/DECISION_LOG_2026-09-11.md` is where the number came from: a delegated
+ * decision, 2026-09-11 (orchestrator, under the founder's delegation). That provenance is a
+ * comment and not copy. The log's "Public wording of delegated values" section says a stated
+ * commitment carries no process label on a public page -- a customer reading a support target
+ * needs the target, not the decision's paperwork -- and the founder's merge of the pull request
+ * carrying the log is the confirmation.
  */
 export const SUPPORT_ACKNOWLEDGEMENT =
-  "Email to support@tavonel.com is acknowledged within 1 business day (KST). That is an acknowledgement target and not a resolution time: no resolution time is committed, and security reports to security@tavonel.com are read first rather than queued behind product questions. The target is a delegated decision pending the founder's confirmation (decision log, FD-09).";
+  "Email to support@tavonel.com is acknowledged within 1 business day (KST). That is an acknowledgement target and not a resolution time: no resolution time is committed, and security reports to security@tavonel.com are read first rather than queued behind product questions.";

@@ -649,3 +649,80 @@ describe("hreflang is declared only where a counterpart exists", () => {
     }
   });
 });
+
+/*
+  The public surface states decisions, never the paperwork behind them.
+
+  `docs/policy/DECISION_LOG_2026-09-11.md` records which 2026-09-11 values were decided by the
+  orchestrator under the founder's delegation, and its "Public wording of delegated values"
+  section settles how they are published: a document still being reviewed says "under review", a
+  stated commitment carries no process label, and the provenance stays in the log and in a comment
+  above the value in the source. The founder's merge of the pull request that carries the log is
+  the confirmation.
+
+  This is the site-wide half of the pins in `lib/trust-page-answers.test.ts` and
+  `lib/support-targets.test.ts`. Those hold one page and one constant; this one reads every page
+  the route tree has, plus the five modules that supply money and plan copy to several pages at
+  once, because the failure being guarded is a label surviving on the one surface nobody pinned.
+
+  Comments are the intended home for the provenance, so they are removed before the ban runs --
+  block comments, and whole lines that begin with `//`. Not a blanket `//` strip: a URL in the
+  copy carries one, and eating the rest of that line would hide real text from the ban.
+*/
+describe("public surface: no process vocabulary in published copy", () => {
+  const MODULES = [
+    "components/pricing-page-client.tsx",
+    "components/recipe-preflight.tsx",
+    "lib/docs-content.ts",
+    "lib/cookbook-content.ts",
+    "lib/support-targets.ts",
+  ];
+  const sources = [
+    ...findFiles(appDirectory, "page.tsx").map((file) => [relative(appDirectory, file), file] as const),
+    ...MODULES.map((path) => [path, resolve(import.meta.dirname, "..", path)] as const),
+  ];
+  const rendered = (file: string) =>
+    readFileSync(file, "utf8")
+      .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, " ")
+      .replace(/\/\*[\s\S]*?\*\//g, " ")
+      .split("\n")
+      .filter((line) => !line.trim().startsWith("//") && !line.trim().startsWith("*"))
+      .join("\n");
+
+  it("reads every page the route tree has, and the shared copy modules", () => {
+    expect(sources.length).toBeGreaterThan(40);
+  });
+
+  it.each(sources)("%s prints no delegation vocabulary and no log id", (_name, file) => {
+    const copy = rendered(file);
+    for (const process of ["delegated decision", "pending the founder", "under the founder's delegation"]) {
+      expect(copy.toLowerCase(), `"${process}" is process vocabulary, not customer copy`)
+        .not.toContain(process.toLowerCase());
+    }
+    expect(copy, "a decision-log id is an internal reference").not.toMatch(/FD-\d\d/);
+    expect(copy, "and the founder is never presented as the author of a delegated decision")
+      .not.toMatch(/founder decided|decided by the founder/i);
+  });
+
+  /*
+    Not vacuous, in the direction that matters: the provenance has to still exist somewhere in the
+    source, or this ban would be satisfied by deleting it rather than by moving it into a comment.
+  */
+  it("keeps the provenance in the source of the surfaces that carry a delegated value", () => {
+    for (const path of [
+      "app/trust/page.tsx",
+      "app/security/page.tsx",
+      "app/refunds/page.tsx",
+      "app/ko/page.tsx",
+      "components/pricing-page-client.tsx",
+      "lib/docs-content.ts",
+      "lib/cookbook-content.ts",
+      "lib/support-targets.ts",
+    ]) {
+      const source = readFileSync(resolve(import.meta.dirname, "..", path), "utf8");
+      expect(source, `${path} renders a delegated value and must cite the log row`)
+        .toContain("docs/policy/DECISION_LOG_2026-09-11.md");
+      expect(source, `${path} must name the row it came from`).toMatch(/FD-\d\d/);
+    }
+  });
+});

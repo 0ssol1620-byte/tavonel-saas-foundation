@@ -152,6 +152,8 @@ const DEVELOPER_CLAUSE = DEVELOPER.saleChannel === "self_serve"
   ? `the ${DEVELOPER.label} plan, if you are the workspace owner`
   : `the ${DEVELOPER.label} plan, if you are the workspace owner and have arranged it with us`;
 
+// FD-02 (`docs/policy/DECISION_LOG_2026-09-11.md`): the plan that reaches activation is a
+// delegated decision, 2026-09-11. Both halves below are read off the catalog.
 const ACTIVATION_SENTENCE =
   `A compile produces a candidate, and a candidate becomes an active World only when a person activates it in the workspace. `
   + `That step needs a paid plan: ${DEVELOPER_CLAUSE}, or the ${TEAM.label} plan, which is ${ACTIVATION_CLAUSE}. `

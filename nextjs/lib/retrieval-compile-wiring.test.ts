@@ -47,6 +47,13 @@ vi.mock("@/lib/r2-objects", async (importOriginal) => ({
 vi.mock("@/lib/r2-synthetic-canary", () => ({
   readR2SignerEnv: () => ({ accountId: "account", bucket: "tavonel-foundation", accessKeyId: "key", secretAccessKey: "secret" }),
 }));
+/*
+  The FD-02 self-serve ceiling, passed through: it is asserted in
+  `lib/activation-rate-limit.test.ts` and exercised per route in
+  `lib/world-activation-plan-gate.test.ts`, and a limiter that read the audit tables from here
+  would answer every case with a transport error instead of the behaviour under test.
+*/
+vi.mock("@/lib/activation-rate-limit", () => ({ checkActivationRateLimit: async () => ({ ok: true }) }));
 vi.mock("@/lib/world-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./world-store")>()),
   promoteFoundationCandidate: promote,

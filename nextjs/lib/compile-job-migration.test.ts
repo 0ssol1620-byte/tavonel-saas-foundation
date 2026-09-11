@@ -186,6 +186,43 @@ describe("20260911120200 — the compile job records the World it produced", () 
     // is a runtime failure on a path with no user watching -- not a type error and not
     // something a database test can see from the other side.
     const store = readFileSync(resolve(import.meta.dirname, "compile-job-store.ts"), "utf8");
-    expect(store).toContain("p_candidate_manifest_digest: input.candidateManifestDigest ?? null");
+    expect(store).toContain("{ p_candidate_manifest_digest: input.candidateManifestDigest }");
+  });
+
+  /*
+    Deploy order, from both sides (integration stage-B repair).
+
+    The correct order is migrations first, then deploy (`docs/runbooks/RELEASE_ORDER.md`), and
+    the ninth parameter's `default null` is what makes the gap between the two steps survivable:
+    the worker that is still sending eight arguments keeps working.
+
+    The reverse order is the one that stalls the compile queue for every tenant, so the worker
+    carries a fallback for it -- one retry with the argument omitted, and an error log. Omitted,
+    not nulled: a `null` still names the ninth argument and PostgREST would answer PGRST202
+    again. `lib/compile-job-advance-digest.test.ts` asserts the request body,
+    `lib/compile-job-worker.test.ts` the behaviour; these two hold the seam itself.
+  */
+  it("keeps the eight-argument call resolvable, which is what makes the order survivable", () => {
+    expect(digestMigration).toContain("p_candidate_manifest_digest text default null");
+    const fixture = readFileSync(
+      resolve(import.meta.dirname, "../../supabase/tests/foundation_compile_candidate_digest.sql"),
+      "utf8",
+    );
+    expect(
+      fixture,
+      "a database test has to exercise the eight-argument shape, not just the nine",
+    ).toContain("the eight-argument call the deployed worker makes still resolves");
+  });
+
+  it("omits the ninth argument rather than nulling it, and says so when it has to", () => {
+    const store = readFileSync(resolve(import.meta.dirname, "compile-job-store.ts"), "utf8");
+    expect(store).toContain("input.candidateManifestDigest === undefined");
+    expect(store, "PGRST202 is its own answer, not a generic write failure")
+      .toContain("COMPILE_JOB_RPC_UNDEFINED");
+    const worker = readFileSync(resolve(import.meta.dirname, "compile-job-worker.ts"), "utf8");
+    expect(worker).toContain(
+      "candidate_manifest_digest not recorded: migration 20260911120200 not applied",
+    );
+    expect(worker, "the fallback is loud or it is not a fallback").toContain("console.error");
   });
 });

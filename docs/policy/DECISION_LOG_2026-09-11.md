@@ -38,10 +38,26 @@ the founder's confirmation. Nothing in this log makes an agent's decision the fo
 | FD-12 | Keep "no residency guarantee / no external pentest / no SOC 2"; add one roadmap sentence (pentest after first paying customer; SOC 2 timing not set). |
 | FD-50 | Docs reviewed against code on 2026-09-11 (R9); four stale statements fixed; DOCS_REVIEWED = 2026-09-11. |
 | FD-61 | robots.txt: search crawlers allowed; training crawlers disallowed: GPTBot, CCBot, ClaudeBot, anthropic-ai, Google-Extended, Applebot-Extended, Bytespider, Meta-ExternalAgent. User-triggered fetchers stay allowed. |
-| FD-18/19/20/21 | The four migrations (settlement `expired` terminal; retrieval refusal readable; compile-job manifest digest; audit action check) are written and CI-rehearsed; applied to production only with the release that ships them. |
+| FD-18/19/20/21 | The four decisions are implemented; FD-19 (retrieval refusal readable) reuses the existing failed-run row and needs no migration. New migration files on the release branch: exactly four — `20260911120000_compute_settlement_expired_terminal`, `20260911120100_oauth_reauthorization_audit_action`, `20260911120200_compile_job_candidate_manifest_digest`, and FD-03's `20260911130000_included_page_expiry_at_renewal`. CI-rehearsed; applied to production only with the release that ships them. |
 | IA-1 | Five-item top navigation; Sources inside the Product panel and in the footer (supersedes the placement half of A-3/B-5); Security not a bar item; English labels; docs regrouped into five groups; one shared header. |
 | FD-36 | K08 contradiction candidates: 0 of 23 real (R8). Contradiction records are not shown to customers until the rule binds dates and entities. |
 
 ## Not decided here
 Payment credentials, secrets, third-party account access, customer-data consent, corpus rights and any spend beyond the
 trial scale stay with the founder (FD-11, FD-28, FD-40, FD-56, FD-15, FD-55).
+
+## Brand-audit decisions (BA, 2026-09-11 late evening) — same delegation
+The premium-brand audit (`reports/brand-audit/BRAND_AUDIT_2026-09-11.md`, 258 findings) listed 37 items that remove a
+voluntary limitation disclosure or change a number/label. Decided under the same delegation: every "public wording
+removal" item is approved as the audit's recommended default — the limitation is not deleted from the site, it is stated
+once on the trust, security, docs or pricing surface with what is provided leading. Exceptions and specifics: BA-001 the
+landing hero binds to the real public corpus (fabricated figures removed); BA-032 sample objects badged "PUBLISHED SAMPLE";
+BA-034 the object count is labelled with the engine that produced it, recompiling with the customer engine is a later run;
+BA-078 locator model kept, status shown in the tiles; BA-119 intake gate becomes a footnote and candidate promotion is a
+listed feature; BA-121 the pricing estimator must agree with the volume table; BA-142 contact response target = 1 business
+day (KST); BA-250 no legal-entity line until the founder supplies one.
+
+## Public wording of delegated values
+On public pages the values above are not labelled with this log's vocabulary. Customer wording: a document under review is
+"Draft v1 (2026-09-11) — under review; not a signed agreement"; a stated commitment carries no process label. The provenance
+stays here. The founder's merge of the pull request that carries this file is the confirmation.

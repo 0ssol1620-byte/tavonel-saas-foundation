@@ -79,6 +79,8 @@ export default function KoreanEntryPage() {
                     나오고, 그 기준은 영문 페이지에 있습니다.
                   </p>
                 </article>
+                {/* FD-02 (`docs/policy/DECISION_LOG_2026-09-11.md`): the activation plan gate below is a
+                    delegated decision, 2026-09-11; both plan labels come from the catalog. */}
                 <article className="tile">
                   <h3>시작하기 전에 아는 편이 나은 한 가지</h3>
                   <p>

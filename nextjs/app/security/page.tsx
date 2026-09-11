@@ -164,8 +164,14 @@ const UNANSWERED = [
     refuses, and nothing has been commissioned. SOC 2 has no timing at all because none is chosen.
     `lib/trust-page-answers.test.ts` allows these three artefact names only inside this block and
     fails on a date appearing in it.
+
+    FD-12 (`docs/policy/DECISION_LOG_2026-09-11.md`): that sequencing is a delegated decision,
+    2026-09-11 (orchestrator, under the founder's delegation), reversible by the founder. The
+    provenance is this comment, not the row -- the log's "Public wording of delegated values"
+    section keeps process vocabulary off a public page, and the founder's merge of the pull
+    request carrying the log is the confirmation.
   */
-  ["Third-party certification and audit", "Not yet answered, because nothing exists to answer it with. No SOC 2 report, no ISO 27001 certificate and no independent penetration-test report exists for this deployment, and no such review has been commissioned — which is why no badge appears anywhere on this site. An external penetration test is planned after the first paying customer; SOC 2 timing is not set. That sequencing is a delegated decision pending the founder's confirmation (decision log, FD-12). Every control above is enforced and checked by us, and that is the whole of what is being claimed."],
+  ["Third-party certification and audit", "Not yet answered, because nothing exists to answer it with. No SOC 2 report, no ISO 27001 certificate and no independent penetration-test report exists for this deployment, and no such review has been commissioned — which is why no badge appears anywhere on this site. An external penetration test is planned after the first paying customer; SOC 2 timing is not set. Every control above is enforced and checked by us, and that is the whole of what is being claimed."],
 ] as const;
 
 export default function SecurityPage() {

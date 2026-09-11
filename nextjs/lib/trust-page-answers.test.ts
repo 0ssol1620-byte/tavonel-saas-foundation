@@ -166,6 +166,12 @@ describe("/security answers the §17.1 questions", () => {
     because it contains no date and nothing scheduled. The edit this guards against is the one
     that adds a quarter, a month or an "under way" and turns an order of events into a commitment
     nobody has funded -- so the ban list is checked against the rendered copy of the block.
+
+    What the sentence may not carry is the paperwork. The pin on "That sequencing is a delegated
+    decision pending the founder's confirmation (decision log, FD-12)" is inverted rather than
+    deleted: the decision log's "Public wording of delegated values" section says a public page
+    states the commitment and nothing about the process, and the founder's merge of the pull
+    request carrying that log is the confirmation. The provenance is the comment above the block.
   */
   it("sequences the external test without dating it", () => {
     const absent = withoutComments(
@@ -173,9 +179,12 @@ describe("/security answers the §17.1 questions", () => {
     );
     expect(absent).toContain("An external penetration test is planned after the first paying customer");
     expect(absent).toContain("SOC 2 timing is not set");
-    expect(absent, "the sequencing sentence carries its provenance label on this page too").toContain(
-      "That sequencing is a delegated decision pending the founder's confirmation (decision log, FD-12)",
+    expect(absent, "the sequencing sentence carries no process label on a public page").not.toContain(
+      "delegated decision pending the founder's confirmation",
     );
+    expect(absent, "and no log id either").not.toContain("FD-12");
+    expect(read("app/security/page.tsx"), "the provenance stays in the source, pointing at the log")
+      .toContain("docs/policy/DECISION_LOG_2026-09-11.md");
     for (const schedule of ["q1", "q2", "q3", "q4", "under way", "underway", "by the end of", "this year", "next year", "in progress", "scheduled for"]) {
       expect(absent.toLowerCase(), `"${schedule}" turns a sequence into a date`).not.toContain(schedule);
     }
@@ -277,27 +286,43 @@ describe("/trust indexes the six published surfaces", () => {
     without "draft ... not a signed agreement" has been handed a contract, so the label is asserted
     inside the anchor rather than merely somewhere on the page.
 
-    The label names two things the document waits on, and the second one is the repair of a defect
-    this test used to hold in place. The three commitments were not the founder's statement -- they
-    were a delegated decision (`docs/policy/DECISION_LOG_2026-09-11.md`, FD-06/07) -- so "pending
-    legal review" alone read as though the only missing signature was a lawyer's. Both halves are
-    asserted, because dropping either one overstates who has agreed to the document.
+    The label names the document's status in the customer's words: it is a draft, it is under
+    review, and it is not a signed agreement. The pins that used to require "delegated decision
+    pending the founder's confirmation and legal review" here, on the incident row and on the
+    certification row are inverted rather than deleted -- the "Public wording of delegated values"
+    section of `docs/policy/DECISION_LOG_2026-09-11.md` (FD-06/07, FD-12) says the process
+    vocabulary stays in the log, the page states the commitment, and the founder's merge of the
+    pull request carrying that log is the confirmation. What may never happen in either regime is
+    the page attributing a delegated decision to the founder, so that ban stays exactly as it was,
+    and the provenance has to remain findable in the source.
   */
   it("links the DPA with its draft label in the same tile", () => {
     expect(page).toContain('const DPA_URL = "/policy/TAVONEL_DPA_v1_2026-09-11.md"');
-    expect(page).toContain("v1 draft (2026-09-11)");
-    expect(page).toContain("delegated decision pending the founder's confirmation and legal review");
+    expect(page).toContain("Draft v1 (2026-09-11)");
+    expect(page).toContain("under review");
     expect(page).toContain("not a signed agreement");
     expect(page, "no copy here may present a delegated decision as the founder's own").not.toMatch(
       /founder decided|decided by the founder/,
     );
     const tile = page.slice(page.indexOf("href={DPA_URL}"));
     expect(tile.slice(0, 600), "the label has to travel with the link").toContain("{DPA_LABEL}");
-    expect(page, "the incident row restates the 72-hour number and must carry the same label").toContain(
-      "The 72-hour window is a delegated decision pending the founder's confirmation (decision log, FD-06/07)",
-    );
-    expect(page, "the certification row restates the FD-12 sequencing and must carry the same label").toContain(
-      "That sequencing is a delegated decision pending the founder's confirmation (decision log, FD-12)",
+    // Block comments and whole-line `//` comments both. Not a blanket "//" strip: a URL in the
+    // copy carries one, and eating the rest of that line would hide real text from the ban below.
+    const copy = withoutComments(page)
+      .split(/\r?\n/)
+      .filter((line) => !line.trim().startsWith("//"))
+      .join("\n");
+    for (const process of [
+      "delegated decision pending the founder's confirmation",
+      "pending the founder's confirmation",
+      "FD-06/07",
+      "FD-12",
+    ]) {
+      expect(copy, `"${process}" is process vocabulary and belongs in the log, not on the page`)
+        .not.toContain(process);
+    }
+    expect(page, "the provenance stays in the source, pointing at the log row").toContain(
+      "docs/policy/DECISION_LOG_2026-09-11.md",
     );
     for (const commitment of [
       "within 72 hours",
@@ -312,9 +337,19 @@ describe("/trust indexes the six published surfaces", () => {
   it("serves a DPA whose commitments match the ones the page advertises", () => {
     const document = read("public/policy/TAVONEL_DPA_v1_2026-09-11.md");
     expect(document).toContain(
-      "**v1 draft (2026-09-11) — delegated decision pending the founder's confirmation and legal review; not a signed agreement.**",
+      "**Draft v1 (2026-09-11) — under review; not a signed agreement.**",
     );
-    expect(document, "the served text has to point at the provenance it relies on").toContain(
+    /*
+      The served document is a public artefact, so the same rule applies to it: the status is the
+      customer's to read, the paperwork is not. The old pin required the decision-log path in the
+      served text; it is inverted, and the path is asserted in the HTML comment at the top of the
+      file instead -- which is where a reviewer of the repository, not a customer, will look.
+    */
+    const served = document.replace(/<!--[\s\S]*?-->/g, " ");
+    for (const process of ["delegated decision", "pending the founder", "FD-06/07"]) {
+      expect(served, `"${process}" is process vocabulary, not contract text`).not.toContain(process);
+    }
+    expect(document, "the provenance stays in the file, as a comment").toContain(
       "docs/policy/DECISION_LOG_2026-09-11.md",
     );
     expect(document).toContain("without undue delay and no later than 72 hours after becoming aware");

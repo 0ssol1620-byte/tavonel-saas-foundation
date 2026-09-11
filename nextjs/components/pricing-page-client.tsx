@@ -144,10 +144,16 @@ function glanceRows(planCapabilities: readonly PlanCapabilityRow[]) {
       "Past the included pages",
       `${formatUsd(STANDARD_PAGE_USD)} per standard page. Complex-page processing is capped at ${formatUsd(MAXIMUM_PAGE_USD)}, shown before the run starts.`,
     ],
+    // FD-03 (`docs/policy/DECISION_LOG_2026-09-11.md`): grant-time expiry, no roll-over, no refund
+    // of unused pages. Delegated decision, 2026-09-11; the wording here is the customer's, per the
+    // log's "Public wording of delegated values" section.
     [
       "Unused pages",
       `Included pages belong to the billing month they are granted in: when the next month's pages are granted, whatever is left of the previous month expires. Unused pages do not roll over and are not refunded if you cancel. Pages past the included allowance are billed at the published rate of ${formatUsd(STANDARD_PAGE_USD)} per standard page.`,
     ],
+    // FD-02 (`docs/policy/DECISION_LOG_2026-09-11.md`): Developer reaches activation when the
+    // caller owns the workspace. Delegated decision, 2026-09-11; the row is read off the
+    // entitlement function, so it cannot say more than the code admits.
     [
       "What differs by plan",
       `${activationPlans.join(" and ")} reach World activation — promoting a candidate to the active World, and rolling one back. On ${BILLING_OFFERS.observer_access.label} that is the workspace owner; ${BILLING_OFFERS.studio_access.label} keeps shared membership and roles, and is sold through a conversation rather than a checkout. Source connections are verified separately in Workspace.`,
@@ -160,6 +166,8 @@ function glanceRows(planCapabilities: readonly PlanCapabilityRow[]) {
       "Spreadsheets",
       "A spreadsheet is billed on the pages of the sanitized PDF it is converted to, counted after conversion. Before that conversion there is no page count to show, so preflight names those files and shows no number beside them rather than quoting one from file size.",
     ],
+    // FD-04 (`docs/policy/DECISION_LOG_2026-09-11.md`): the refund bright line. Delegated
+    // decision, 2026-09-11; every figure below is derived from the billing catalog.
     [
       "Refunds",
       `Ask within ${REFUND_WINDOW_DAYS} days of payment and you get a full refund, provided you have used fewer than ${REFUND_MAX_CONSUMED_PERCENT}% of the plan's included pages — ${refundablePageAllowance(BILLING_OFFERS.observer_access)} pages on ${BILLING_OFFERS.observer_access.label}, ${refundablePageAllowance(BILLING_OFFERS.studio_access)} on ${BILLING_OFFERS.studio_access.label}. Past that, the payment is not refunded. Unused pages are not refunded when you cancel. Subject to the terms as updated.`,

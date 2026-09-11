@@ -1,9 +1,11 @@
 # TAVONEL Data Processing Agreement
 
 <!-- One line on purpose: `lib/trust-page-answers.test.ts` pins this label as a single string, so a
-     wrap would split the label from the document it labels. -->
+     wrap would split the label from the document it labels. Customer wording, per the "Public
+     wording of delegated values" section of `docs/policy/DECISION_LOG_2026-09-11.md` (FD-06/07):
+     the reader is told the document's status, not the process behind it. -->
 
-**v1 draft (2026-09-11) — delegated decision pending the founder's confirmation and legal review; not a signed agreement.**
+**Draft v1 (2026-09-11) — under review; not a signed agreement.**
 
 This text is published so that a security or procurement reviewer can read the terms before
 asking for them. It has not been reviewed by a lawyer, it is not executed, and it binds nobody
@@ -14,11 +16,9 @@ the breach notification window (§8), the sub-processor change notice and object
 the deletion completion time (§7). The clauses marked **Not drafted — pending legal review** are
 the ones still open.
 
-**Who set those three, stated plainly because a reviewer is entitled to know.** They are a
-delegated decision, 2026-09-11 (orchestrator, under the founder's delegation), recorded in
-`docs/policy/DECISION_LOG_2026-09-11.md` (FD-06/07). They are not the founder's own statements and
-this draft does not present them as agreed by the operating entity: the founder may confirm, change
-or reverse any of them, and a reversal is a new version of this document.
+**Nothing in this draft is agreed by the operating entity yet.** The three numbers above are
+written into this version and are under review; any of them may change, and a change is a new
+version of this document rather than an edit to this one.
 
 Where this document and a published page disagree, the published page — `/privacy`,
 `/subprocessors`, `/security`, `/terms` — is the statement in force and this document is the
@@ -230,7 +230,7 @@ and the service terms, signature blocks and the annexes (the `/security` version
 
 ## What has to happen before this is a signable document
 
-- The founder's confirmation of the three delegated commitments below
+- The three commitments below confirmed by the operating entity
 - Lawyer reviewed, jurisdiction chosen, and the review recorded
 - Operating entity, registration number and address filled in (§1)
 - Transfer mechanism decided; Standard Contractual Clauses annexed if any customer is in the EEA
@@ -240,6 +240,5 @@ and the service terms, signature blocks and the annexes (the `/security` version
 
 Written down, and not re-opened by an agent on its own: the 72-hour breach notice (§8), the 30-day
 sub-processor change notice with a right to object (§6), and deletion completed within 30 days of a
-verified request (§7). All three are a delegated decision, 2026-09-11 (orchestrator, under the
-founder's delegation) — `docs/policy/DECISION_LOG_2026-09-11.md`, FD-06/07 — awaiting the founder's
-confirmation.
+verified request (§7). All three are under review, and a change to any of them is a new version of
+this document.

@@ -26,19 +26,39 @@ describe("the published support target", () => {
   });
 
   /*
-    The provenance label, pinned in the constant rather than on the pages.
+    The customer wording, pinned where the old process label was pinned.
 
-    Every other value the 2026-09-11 delegation produced carries this label where it is stated --
-    the DPA's three commitments, the 72-hour incident window, the pentest sequencing -- and this
-    one did not, so a reader met the only delegated commitment on the site that read as settled.
-    It is asserted on the string, not on the two pages, because both pages render the constant and
-    a label the pages carried separately could be edited off one of them.
+    This assertion used to require "a delegated decision pending the founder's confirmation" in the
+    sentence. The "Public wording of delegated values" section of
+    `docs/policy/DECISION_LOG_2026-09-11.md` settles it the other way: a stated commitment carries
+    no process label on a public page, the provenance stays in the log (FD-09) and in the comment
+    above the constant, and the founder's merge of the pull request carrying that log is the
+    confirmation. So the pin is inverted rather than deleted -- the sentence is the target and the
+    two bans it always carried, and none of the process vocabulary.
+
+    The wrong attribution is still barred in both directions: the copy may not say the founder
+    decided this, and it may not print the paperwork either.
   */
-  it("says whose decision it is, and that the founder has not confirmed it", () => {
-    expect(SUPPORT_ACKNOWLEDGEMENT).toContain("a delegated decision pending the founder's confirmation");
-    expect(SUPPORT_ACKNOWLEDGEMENT, "the log entry a reader can look up").toContain("FD-09");
+  it("states the target as a commitment, with no process vocabulary and no false attribution", () => {
+    expect(SUPPORT_ACKNOWLEDGEMENT).toContain(
+      "That is an acknowledgement target and not a resolution time",
+    );
+    for (const process of ["delegated decision", "pending the founder", "FD-09", "decision log"]) {
+      expect(SUPPORT_ACKNOWLEDGEMENT, `"${process}" is process vocabulary, not customer copy`)
+        .not.toContain(process);
+    }
     expect(SUPPORT_ACKNOWLEDGEMENT, "and never the phrasing the decision log bans")
       .not.toMatch(/the founder (decided|has decided|set)/i);
+  });
+
+  /*
+    The provenance is a comment, and the comment is the thing a reviewer follows back to the log.
+    Asserted on the module source because a comment nobody can find is the same as no provenance.
+  */
+  it("keeps the provenance in the source, pointing at the log row", () => {
+    const source = read("lib/support-targets.ts");
+    expect(source).toContain("docs/policy/DECISION_LOG_2026-09-11.md");
+    expect(source).toContain("FD-09");
   });
 
   it.each(SURFACES)("%s renders the constant", (surface) => {

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { checkActivationRateLimit } from "@/lib/activation-rate-limit";
 import { authorizeFoundationProduct } from "@/lib/billing-product-access";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { foundationPilotAccess } from "@/lib/foundation-pilot";
@@ -73,6 +74,19 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   }
 
   const workspaceKey = auth.principal.workspaceKey;
+  /*
+    The self-serve ceiling (FD-02 repair). This route is the one that spends embedder time on
+    purpose, so it is bounded per workspace per hour, off the compile runs it writes itself --
+    which means the rebuilds promotion triggers count against the same budget, and they should:
+    the budget is embedder time, not button presses. 429 with a typed code and a Retry-After.
+  */
+  const ceiling = await checkActivationRateLimit(workspaceKey, "retrieval_index_rebuild");
+  if (!ceiling.ok) {
+    return NextResponse.json(
+      { code: ceiling.code },
+      { status: ceiling.status, headers: { ...NO_STORE, "Retry-After": String(ceiling.retryAfterSeconds) } },
+    );
+  }
   const active = await getFoundationActiveWorld(workspaceKey, id);
   if (!active.ok) {
     return NextResponse.json(

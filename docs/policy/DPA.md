@@ -2,8 +2,9 @@
 
 **The document itself is `nextjs/public/policy/TAVONEL_DPA_v1_2026-09-11.md`**, served at
 `https://tavonel.com/policy/TAVONEL_DPA_v1_2026-09-11.md` and linked from `/trust` as
-*v1 draft (2026-09-11) — delegated decision pending the founder's confirmation and legal review;
-not a signed agreement*.
+*Draft v1 (2026-09-11) — under review; not a signed agreement*. That label is customer wording
+under the decision log's "Public wording of delegated values" section: the delegated-decision
+provenance is recorded here and in the log, never printed on a public page.
 
 This file used to be the draft. It is a pointer now, because a DPA written in two places is a DPA
 that will disagree with itself, and the copy in `docs/` would be the one a customer never reads.

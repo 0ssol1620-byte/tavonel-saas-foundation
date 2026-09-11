@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { checkActivationRateLimit } from "@/lib/activation-rate-limit";
 import { authorizeFoundationProduct } from "@/lib/billing-product-access";
 import { validatePromotableCollectionArtifact } from "@/lib/collection-download";
 import { checkConnectorSourceAccess } from "@/lib/connector-source-access";
@@ -104,6 +105,22 @@ export async function POST(
     return NextResponse.json(
       { code: "PROMOTION_ROLE_REQUIRED" },
       { status: 403, headers: NO_STORE }
+    );
+  }
+  /*
+    The self-serve ceiling (FD-02 repair). Checked after the plan and role gates and before any
+    storage read, so a caller over the hour's limit spends nothing: 429 with a typed code, and a
+    Retry-After the client can honour. `lib/activation-rate-limit.ts` explains why it is counted
+    off the durable audit rows rather than held in memory.
+  */
+  const ceiling = await checkActivationRateLimit(membership.workspaceId, "world_activation");
+  if (!ceiling.ok) {
+    return NextResponse.json(
+      { code: ceiling.code },
+      {
+        status: ceiling.status,
+        headers: { ...NO_STORE, "Retry-After": String(ceiling.retryAfterSeconds) },
+      }
     );
   }
   const signer = readR2SignerEnv();

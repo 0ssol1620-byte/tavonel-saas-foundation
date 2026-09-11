@@ -1,3 +1,4 @@
+import { ACTIVATION_RATE_LIMIT } from "./activation-rate-limit";
 import { API_VERSION } from "./api-version";
 import { COMPILE_MAX_DOCUMENTS, COMPILE_MIN_DOCUMENTS, CORPUS_MAX_DOCUMENTS } from "./compile-limits";
 import { MAX_FILES, MAX_SYNC_ARCHIVE_BYTES, MAX_WORKER_ARCHIVE_BYTES } from "./archive-expand";
@@ -101,6 +102,8 @@ export const DOCS_SECTIONS: DocsSection[] = [
           "Download the signed package and verify it offline with the published verifiers.",
         ],
       },
+      // FD-02 (`docs/policy/DECISION_LOG_2026-09-11.md`): the activation plan gate stated below is
+      // a delegated decision, 2026-09-11, read off `planReachesLevel` rather than typed here.
       {
         kind: "note",
         text: "Step 5 is the one that stops a script, and it stops for two separate reasons. Promotion is human-only by design — a candidate is not organizational truth until a person says so, and no API key of any plan has a promote or rollback path to call. Separately, the activation surface is plan-gated: it takes the **Developer** plan held by the workspace **owner**, or the **Team** plan under its usual workspace roles. `authorizeFoundationProduct(..., \"activation\", role)` refuses anything else with `STUDIO_SUBSCRIPTION_REQUIRED`, and an evaluation trial with `SUBSCRIPTION_REQUIRED`. So a self-serve Developer workspace can reach an active World on its own; Team remains sold through a conversation rather than self-serve checkout.",
@@ -958,9 +961,13 @@ export const DOCS_SECTIONS: DocsSection[] = [
           ["COMPILE_JOB_ALREADY_SETTLED", "409", "The job had already finished. Nothing was discarded."],
           ["COMPILE_JOB_NOT_FOUND", "404", "No such job in this workspace."],
           ["CORE_NOT_CONFIGURED", "503", "The compile runtime is unavailable. The request was not charged."],
+          // The FD-02 ceiling. Documented here because a client has to branch on it, and the
+          // number is imported so the page cannot quote a limit the code does not enforce.
+          ["ACTIVATION_RATE_LIMITED", "429", `The workspace has used its hour's allowance of World activations, rollbacks or retrieval-index rebuilds (${ACTIVATION_RATE_LIMIT} of each per hour). The Retry-After header carries the seconds until the oldest one leaves the window. Nothing was charged.`],
+          ["ACTIVATION_RATE_LIMIT_UNAVAILABLE", "503", "That allowance could not be read, so the request was refused rather than run unbounded. Retry."],
         ],
       },
-      { kind: "note", text: "A 503 means the work did not start. A 409 means the request was understood and the state refused it — those are different retries." },
+      { kind: "note", text: "A 503 means the work did not start. A 409 means the request was understood and the state refused it — those are different retries. A 429 means the work is allowed and the hour is full: honour the Retry-After header rather than retrying immediately." },
     ],
   },
   {

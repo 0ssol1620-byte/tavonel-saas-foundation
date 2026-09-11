@@ -42,17 +42,18 @@ export const metadata: Metadata = {
   the same failure as a claim with no receipt, pointing the other way, and it is corrected the same
   way -- by making the sentence match what happened.
 
-  Who settled them, because the label depends on it. Not the founder: delegated decision,
-  2026-09-11 (orchestrator, under the founder's delegation) -- see
-  `docs/policy/DECISION_LOG_2026-09-11.md`, FD-06/07. The founder may confirm, change or reverse
-  any of the three, which is why the published label reads "delegated decision pending the
-  founder's confirmation and legal review" and not "pending legal review" alone. No copy on this
-  page attributes any of it to the founder, because no record of a founder statement exists.
+  Who settled them: not the founder, but the orchestrator under the founder's delegation -- see
+  `docs/policy/DECISION_LOG_2026-09-11.md`, FD-06/07. That provenance stays in the log and is not
+  printed on the page. The log's "Public wording of delegated values" section is the rule this
+  page follows: a document still being reviewed is labelled "under review", a stated commitment
+  carries no process label, and the founder's merge of the pull request that carries the log is
+  the confirmation. No copy here attributes anything to the founder either, because no record of a
+  founder statement exists.
 
-  Neither new row claims more than happened. The DPA is a draft pending both that confirmation and
-  a legal review, and says so everywhere it appears; the incident row leads with the fact that
-  nobody is on call rather than with the window, because that is the fact a buyer would otherwise
-  find out during an incident.
+  Neither new row claims more than happened. The DPA says it is a draft under review and not a
+  signed agreement everywhere it appears; the incident row leads with the fact that nobody is on
+  call rather than with the window, because that is the fact a buyer would otherwise find out
+  during an incident.
 */
 
 /*
@@ -63,13 +64,17 @@ export const metadata: Metadata = {
   drift from the text a reviewer downloads. The version and date are in the filename so that a
   copy someone saved can be identified later; a new version is a new file, not an edit to this one.
 
-  The label names two separate things the document is still waiting on, and neither may be dropped:
-  the founder's confirmation of a delegated decision, and a legal review that has not been
-  commissioned. `docs/policy/DECISION_LOG_2026-09-11.md` is the provenance.
+  The label says the two things a reader has to know -- it is a draft, and it is not a signed
+  agreement -- and neither half may be dropped. What it is still waiting on (a delegated
+  decision's confirmation, and a legal review nobody has commissioned) is provenance, and
+  provenance lives in `docs/policy/DECISION_LOG_2026-09-11.md` rather than in customer copy.
 */
 const DPA_URL = "/policy/TAVONEL_DPA_v1_2026-09-11.md";
+// FD-06/07 in `docs/policy/DECISION_LOG_2026-09-11.md` settled the three numbers this document
+// commits to; that log's "Public wording of delegated values" section is why the label below is
+// customer wording and carries no process vocabulary. The provenance stays in the log.
 const DPA_LABEL =
-  "v1 draft (2026-09-11) — delegated decision pending the founder's confirmation and legal review; not a signed agreement";
+  "Draft v1 (2026-09-11) — under review; not a signed agreement";
 
 const DESTINATIONS: Array<[string, string, Route]> = [
   ["Security", "The path a document takes, what holds its bytes, what never sees them, and which controls are enforced in this deployment right now.", "/security" as Route],
@@ -91,17 +96,17 @@ const PUBLISHED: Array<[string, string, string]> = [
     Two rows moved here from the not-published list on 2026-09-11, when the three numbers that were
     blocking them were settled as a delegated decision (orchestrator, under the founder's
     delegation -- `docs/policy/DECISION_LOG_2026-09-11.md`, FD-06/07), not by the founder. Neither
-    is finished work and neither says it is: the DPA is labelled a draft pending the founder's
-    confirmation and a legal review wherever it appears, and the incident row leads with the absence
-    of an on-call rotation rather than with the window.
+    is finished work and neither says it is: the DPA is labelled a draft under review wherever it
+    appears, and the incident row leads with the absence of an on-call rotation rather than with
+    the window.
 
     The incident answer is the customer-facing half of `docs/policy/INCIDENT_RESPONSE_RUNBOOK.md`.
     The runbook stays internal -- severity tiers, evidence preservation and the record format are
     an operating procedure, not a statement to a buyer -- and the two sentences a buyer is actually
     choosing between are here: who is reachable, and by when they will be told.
   */
-  ["Data processing agreement", "DPA v1 draft", "Published for reading at a URL: the notification, sub-processor and deletion commitments are written down rather than described. It is a draft pending the founder's confirmation and a legal review, it is not a signed agreement, and the clauses still open -- governing law, transfer mechanism, liability -- say so in place."],
-  ["Incident response", "This page", "There is no on-call rotation: one person operates the service, and security@tavonel.com is an inbox that person reads. The commitment that follows from that is notification of an affected customer without undue delay and no later than 72 hours after becoming aware of a breach of their personal data. The 72-hour window is a delegated decision pending the founder's confirmation (decision log, FD-06/07). No tabletop exercise has been run yet."],
+  ["Data processing agreement", "DPA v1 draft", "Published for reading at a URL: the notification, sub-processor and deletion commitments are written down rather than described. It is a draft under review, it is not a signed agreement, and the clauses still open -- governing law, transfer mechanism, liability -- say so in place."],
+  ["Incident response", "This page", "There is no on-call rotation: one person operates the service, and security@tavonel.com is an inbox that person reads. The commitment that follows from that is notification of an affected customer without undue delay and no later than 72 hours after becoming aware of a breach of their personal data. No tabletop exercise has been run yet."],
   ["Data residency", "Privacy notice", "The database is configured in Seoul, and no data residency is guaranteed. Several providers may process limited data through infrastructure outside Korea, and the object-storage location hint is best-effort rather than a promise. The subprocessors page names which provider handles which data class."],
   ["Data handling", "Privacy notice", "Categories collected, purposes, storage locations, international processing, and the optional website analytics you can decline or withdraw."],
   ["Retention and deletion", "Privacy notice", "Source material and derived artifacts are deleted on a verified request. No retention period in days is published: data remains until workspace deletion, a verified request, or a legal duty."],
@@ -136,7 +141,7 @@ const PUBLISHED: Array<[string, string, string]> = [
 */
 const NOT_PUBLISHED: Array<[string, string, Route | null]> = [
   ["Recovery objectives", "Not yet published. This deployment states no recovery point objective, no recovery time objective and no backup retention period. One restore has been performed and checked, and the security page carries its date, its scope and what it does not commit to. The absence of a target is the state of it; ask before you depend on one.", "/security" as Route],
-  ["Third-party certification and audit", "Not published, because there is nothing to publish. No SOC 2 report, no ISO 27001 certificate and no independent penetration-test report exists for this deployment, and no such review has been commissioned. That is why no badge appears anywhere on this site. An external penetration test is planned after the first paying customer; SOC 2 timing is not set. That sequencing is a delegated decision pending the founder's confirmation (decision log, FD-12). What does exist is on the security page: the controls this deployment enforces, checked by us.", "/security" as Route],
+  ["Third-party certification and audit", "Not published, because there is nothing to publish. No SOC 2 report, no ISO 27001 certificate and no independent penetration-test report exists for this deployment, and no such review has been commissioned. That is why no badge appears anywhere on this site. An external penetration test is planned after the first paying customer; SOC 2 timing is not set. What does exist is on the security page: the controls this deployment enforces, checked by us.", "/security" as Route],
 ];
 
 export default function TrustCenterPage() {

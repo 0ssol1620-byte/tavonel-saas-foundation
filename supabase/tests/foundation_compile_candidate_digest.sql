@@ -14,7 +14,7 @@
 -- collection id and the digest, then the settling advance with neither). Everything is rolled
 -- back.
 begin;
-select plan(8);
+select plan(9);
 
 select has_column(
   'public', 'foundation_compile_jobs', 'candidate_manifest_digest',
@@ -61,6 +61,25 @@ select throws_ok(
   '23514',
   null,
   'a digest that is not a sha256 is refused by the column, not stored for a reader to trip over'
+);
+
+-- Deploy order, asserted rather than assumed (integration stage-B repair, 2026-09-11).
+--
+-- The worker that is running in production when this migration is applied sends eight named
+-- arguments, because the ninth is added by the release that follows. The ninth parameter's
+-- `default null` is the whole of what keeps that call resolving instead of answering PGRST202
+-- and stalling the compile queue, and a later edit that drops the default would not be visible
+-- in any other assertion here -- every other call in this fixture passes all nine.
+--
+-- Eight positional arguments, ending at p_queue_job_id, is exactly the shape PostgREST builds
+-- from the deployed worker's body. 'review_required' is forward of 'building_world' and short of
+-- the settling advance below, so this lands as a real state change rather than as a refusal.
+select is(
+  (select changed from public.advance_foundation_compile_job(
+     'cjob-' || repeat('1', 32), 'pilot-digest01', 'review_required', 1,
+     'collection-' || repeat('a', 32), null, null, null)),
+  true,
+  'the eight-argument call the deployed worker makes still resolves after the ninth is added'
 );
 
 select is(

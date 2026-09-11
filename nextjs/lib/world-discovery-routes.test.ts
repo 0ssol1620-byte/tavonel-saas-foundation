@@ -49,6 +49,13 @@ vi.mock("@/lib/retrieval-index-status", () => ({
   readRetrievalIndexState: readIndexState,
 }));
 vi.mock("@/lib/r2-synthetic-canary", () => ({ readR2SignerEnv: () => ({ accountId: "a", bucket: "b", accessKeyId: "k", secretAccessKey: "s" }) }));
+/*
+  The FD-02 self-serve ceiling, passed through: it is asserted in
+  `lib/activation-rate-limit.test.ts` and exercised per route in
+  `lib/world-activation-plan-gate.test.ts`, and a limiter that read the audit tables from here
+  would answer every case with a transport error instead of the behaviour under test.
+*/
+vi.mock("@/lib/activation-rate-limit", () => ({ checkActivationRateLimit: async () => ({ ok: true }) }));
 vi.mock("@/lib/r2-objects", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./r2-objects")>()),
   getWorkspaceCollectionCandidate: candidate,
