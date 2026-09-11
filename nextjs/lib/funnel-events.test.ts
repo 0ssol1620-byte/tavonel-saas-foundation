@@ -110,7 +110,6 @@ describe("every declared funnel event has a control that fires it", () => {
     // client event nobody had added yet.
     expect(declaredEvents.length, "a member was dropped by the extraction -- the last one in each union ends with `;`").toBe(clientEvents.length + serverEvents.length);
     expect(declaredEvents.length).toBe(new Set(declaredEvents).size);
-    expect(clientEvents.length, "the twenty-nine browser events are not renamed or redefined by the server half").toBe(29);
     expect(declaredEvents.length).toBeGreaterThan(20);
     expect(declaredEvents).toContain("workspace_compile_failed");
     expect(declaredEvents).toContain("checkout_completed");
@@ -146,7 +145,33 @@ const routeHandlers = sourceFiles(resolve(import.meta.dirname, "../app/api"))
   .map((path) => readFileSync(path, "utf8"))
   .join("\n");
 
+/*
+  The browser union as it stood before the server half was added.
+
+  Pinned as names and asserted as a subset, not as a count: a later surface may add a browser
+  event -- that is what the call-site rule is for -- but none of these may be renamed, redefined
+  or dropped, because each one is a column somebody is already reading. A count would have made
+  an addition fail and a rename pass, which is precisely backwards.
+*/
+const BROWSER_EVENTS_BEFORE_THE_SERVER_HALF = [
+  "generate_lead", "login_reached_with_intent", "signed_in", "checkout_opened", "checkout_completed",
+  "scene_reached", "cta_clicked", "source_filter_changed", "hero_explore_clicked", "hero_start_clicked",
+  "pricing_plan_viewed", "pricing_start_clicked", "source_category_viewed", "developer_mcp_started",
+  "developer_api_started", "explore_entered", "explore_object_selected", "explore_evidence_opened",
+  "explore_change_opened", "explore_ask_used", "explore_to_signup", "workspace_first_source_added",
+  "workspace_compile_started", "workspace_compile_failed", "workspace_candidate_ready",
+  "workspace_review_required", "workspace_world_activated", "workspace_first_ask",
+  "workspace_ai_connect_opened",
+];
+
 describe("server funnel events", () => {
+  it("renames, redefines and drops none of the browser events", () => {
+    expect(BROWSER_EVENTS_BEFORE_THE_SERVER_HALF).toHaveLength(29);
+    for (const event of BROWSER_EVENTS_BEFORE_THE_SERVER_HALF) {
+      expect(clientEvents, `${event} left the browser union -- a column somebody reads went to zero`).toContain(event);
+    }
+  });
+
   it("has a union of its own that redefines none of the browser names", () => {
     expect(serverEvents.length).toBeGreaterThan(0);
     for (const event of serverEvents) {
