@@ -12,6 +12,11 @@ export const PUBLIC_MARKETING_PATHS = new Set([
   "/docs/files-and-formats", "/docs/upload", "/docs/collections-and-compile", "/docs/run-events", "/docs/review",
   "/docs/world-api", "/docs/search", "/docs/ask", "/docs/connections", "/docs/exports", "/docs/mcp", "/docs/cli",
   "/docs/billing-and-limits", "/docs/errors", "/docs/security", "/docs/changelog",
+  // The §12.4 Korean entry page (seo-i18n CROSS-LANE 2). It is indexable, in the sitemap and in
+  // llms.txt, so a Korean visitor arrives on a public marketing page -- and was measured nowhere,
+  // because this set is what gates where consented analytics loads. Consent is unchanged: the
+  // path being listed is what makes a consented page view possible, never what makes it exempt.
+  "/ko",
 ]);
 export const MARKETING_EVENTS = new Set([
   "generate_lead",

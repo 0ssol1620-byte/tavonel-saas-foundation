@@ -48,6 +48,14 @@ export const metadata: Metadata = {
     "Compile the documents, scans and connected systems you already have into a current, traceable world your AI can use, with structured relationships, provenance and reusable retrieval artifacts.",
   alternates: {
     canonical: "/",
+    /*
+      §12.4 -- the reverse half of the pair `/ko` declares (seo-i18n CROSS-LANE 1; this file is in
+      no lane's row, which is why it arrives at integration). A search engine may ignore a one-way
+      annotation, and `/` and `/ko` are each the site's entry point in their own language, so each
+      names the other. `lib/page-seo.ts` holds the /ko side and refuses an alternate set that omits
+      the page carrying it.
+    */
+    languages: { en: "/", ko: "/ko", "x-default": "/" },
   },
   openGraph: {
     title: "Your knowledge already exists. Compile it.",

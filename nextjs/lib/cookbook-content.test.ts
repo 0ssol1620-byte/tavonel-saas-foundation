@@ -16,7 +16,7 @@ import {
 } from "./cookbook-content";
 import { COOKBOOK_WORKFLOW_IDS } from "./keyword-map";
 import { PACKAGE_CONTRACT } from "../scripts/journey/acceptance-checker.mjs";
-import { CAPABILITY_MANIFEST } from "../../shared/capabilityManifest";
+import { CAPABILITY_MANIFEST, TEXT_INPUTS_LIVE } from "../../shared/capabilityManifest";
 
 /*
   WG-045/058-063/074/076/077/086/088/089.
@@ -394,6 +394,41 @@ describe("a cookbook promises no file the download route does not write", () => 
     for (const record of COOKBOOKS) {
       const output = orderedSections(record).find((section) => section.key === "output")!;
       expect(output.status, `${record.slug}: an output list is a claim about a run`).toBe("locked");
+    }
+  });
+});
+
+/*
+  B10 / keyword-claims-data CROSS-LANE 2, the CLM-045 half.
+
+  `TEXT_INPUTS_LIVE` is `false`, so TXT, CSV and HTML are declared in the manifest and withheld
+  from `CAPABILITY_MANIFEST.entries`. The claims registry records that as CLM-045 (INTERNAL) with
+  four limitations no public sentence covers -- correct while the gate is closed, and a copy defect
+  on the day it opens. A cookbook naming one of those formats as an input would be advertising a
+  capability this deployment does not ship.
+
+  The accepted-format sentence is already derived (`describeAcceptedFormats`), so it cannot drift.
+  This is about the other kind of mention: a prose line in a body saying "export it as CSV first",
+  which no derivation covers and which would be the same claim in a softer voice. It is a format
+  name as an input, so the pattern is anchored on the word, not on a file extension -- `.csv`
+  inside `graph/relationships.csv` is a package member and is B6's business, not this one.
+*/
+describe("no cookbook offers an input the manifest withholds", () => {
+  it("holds while the text gate is closed", () => {
+    expect(TEXT_INPUTS_LIVE, "the gate opened: these sentences are now a copy task, not a guard").toBe(false);
+    // The formats the gate withholds, read from the manifest rather than listed here.
+    const shipped = CAPABILITY_MANIFEST.entries.flatMap((entry) => entry.extensions);
+    for (const withheld of ["txt", "csv", "html", "htm"]) expect(shipped).not.toContain(withheld);
+  });
+
+  it.each(["TXT", "CSV", "HTML"])("names %s in no body", (format) => {
+    for (const record of COOKBOOKS) {
+      for (const section of orderedSections(record)) {
+        expect(
+          section.body,
+          `${record.slug}/${section.key} names ${format} while TEXT_INPUTS_LIVE is false (CLM-045)`,
+        ).not.toMatch(new RegExp(`\\b${format}\\b`));
+      }
     }
   });
 });

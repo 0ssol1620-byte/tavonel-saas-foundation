@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import robots from "@/app/robots";
 import sitemap from "@/app/sitemap";
 import { COOKBOOKS, COOKBOOK_SLUGS } from "./cookbook-content";
+import { publicPageLocation } from "./marketing-analytics";
 import { pageMetadata } from "./page-seo";
 
 /*
@@ -378,6 +379,30 @@ describe("public surface: the Korean subtree", () => {
     expect(koreanPages.map((page) => page.route)).toEqual(["/ko"]);
     expect(sitemapPaths).toContain("/ko");
     expect(isNoindex("/ko")).toBe(false);
+  });
+
+/*
+    B10 / seo-i18n CROSS-LANE 1 and 2, both of which land here because neither file is in a lane's
+    row: `app/layout.tsx` carries the English half of the hreflang pair, and
+    `lib/marketing-analytics.ts` is what decides where a consented page view is even possible.
+
+    The pair is the point. `/ko` naming `/` as its English alternate is a claim a search engine may
+    ignore when only one side annotates it, and a one-way annotation is not wrong -- it is
+    incomplete in a way nothing on either side could see.
+  */
+  it("is named as the Korean alternate by the English entry page too", () => {
+    const layout = readFileSync(join(appDirectory, "layout.tsx"), "utf8");
+    expect(layout).toMatch(/languages:\s*\{[^}]*ko:\s*"\/ko"/);
+    expect(layout).toMatch(/languages:\s*\{[^}]*en:\s*"\/"/);
+    expect(layout).toMatch(/languages:\s*\{[^}]*"x-default":\s*"\/"/);
+    expect(layout).toMatch(/canonical:\s*"\/"/);
+  });
+
+  it("can be measured at all, which needs its path on the consented set", () => {
+    // Not a consent change: the set gates where a consented page view is possible, and a path
+    // missing from it is a public page measured nowhere -- which is what /ko was.
+    expect(publicPageLocation("/ko")).toBe("https://tavonel.com/ko");
+    expect(publicPageLocation("/workspace"), "the set still refuses a private path").toBeNull();
   });
 
   it("declares Korean on the subtree it renders", () => {

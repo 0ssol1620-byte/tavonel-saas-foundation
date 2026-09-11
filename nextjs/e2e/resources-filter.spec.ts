@@ -1,0 +1,38 @@
+import { test, expect } from "@playwright/test";
+import { RESOURCE_LINKS } from "../lib/site-navigation";
+
+/*
+  The hub narrows in CSS over a fully rendered list (WG-048/051/074): every entry stays in the
+  document and only the ones carrying the targeted tag stay visible.
+
+  This is the hub-explore lane's own cross-lane request, and the reason to want it is a bug that
+  already happened once. CSS Modules rewrites an `#id` selector the way it rewrites a class, so the
+  first version of the filter compiled to `#resources_find-build__eQphQ`, matched nothing, and
+  filtered nothing -- with no error anywhere and all nine tiles visible at `#find-build`.
+  `lib/resources-hub.test.ts` catches it by asserting the `:global()` wrapper in the CSS source;
+  that assertion is about the source text, so it goes blind the day the CSS pipeline changes again.
+  This one measures the rendered result, which is the thing that was wrong.
+
+  It runs in each of the seven width projects rather than once: the narrowing is a `:has()` rule
+  over a grid whose last visible card can end up in a half cell, so the width is a variable here
+  and not an incidental setting.
+*/
+test("the resources hub narrows by a fragment and keeps every entry in the HTML", async ({ page }) => {
+  await page.goto("/resources");
+  await expect(page.locator("[data-tags]")).toHaveCount(RESOURCE_LINKS.length);
+  await expect(page.locator("[data-tags]:visible")).toHaveCount(RESOURCE_LINKS.length);
+
+  await page.goto("/resources#find-build");
+  const expected = RESOURCE_LINKS.filter((link) => link.purposes.includes("build")).length;
+  // Fewer visible than total, or the fragment is doing nothing and the assertion below is met by
+  // a filter that never ran.
+  expect(expected).toBeLessThan(RESOURCE_LINKS.length);
+  await expect(page.locator("[data-tags]")).toHaveCount(RESOURCE_LINKS.length);
+  await expect(page.locator("[data-tags]:visible")).toHaveCount(expected);
+
+  // Every title stays in the served document at a filtered state, which is what WG-074 asks for:
+  // the page is one document to a crawler and to Ctrl+F whatever the filter is showing.
+  for (const link of RESOURCE_LINKS) {
+    await expect(page.locator(`[data-tags] a[href="${link.href}"]`)).toHaveCount(1);
+  }
+});
