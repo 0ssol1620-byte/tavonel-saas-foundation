@@ -115,6 +115,60 @@ type KnowledgeEdge = {
   evidenceIds: string[];
 };
 
+/*
+  The two predicates the live engine emits that this fallback has no equivalent for.
+
+  Core V2 (packages/product-core) has no Topic object at all, so it never emits
+  `discusses_topic`. What it does compute -- and what `projectProductCoreV2Candidate` used to
+  throw away -- is a claim->entity `mentions` relation and a claim/claim contradiction
+  candidate. They are a separate type rather than two more members of `KnowledgeEdge` because
+  the two engines emit different vocabularies and the artifact should not pretend otherwise:
+  the fallback's three are pinned to clause 03 of the compiler contract, and widening that
+  union in place would have read as the fallback gaining two predicates it does not have.
+*/
+export type CoreKnowledgeEdge = {
+  id: string;
+  type: "mentions" | "contradicts";
+  from: string;
+  to: string;
+  evidenceIds: string[];
+  /** Only on `contradicts`: the Core's own reason for flagging the pair, never a guess. */
+  reason?: "numeric_disagreement" | "polarity_disagreement";
+};
+
+/**
+ * The predicates this candidate actually contains, which is all its blueprint may advertise.
+ *
+ * Audit K01: `GENERIC_MIXED_CORPUS_BLUEPRINT.ontologyRelations` was attached verbatim to every
+ * candidate, Core V2 ones included, so an artifact compiled by an engine with no Topic concept
+ * still advertised `discusses_topic`. The blueprint list is the vocabulary the blueprint
+ * permits; this is the set the compile that produced *this* artifact emitted. Exported so the
+ * docs and the ontology tables can read the emitted set instead of retyping a list.
+ */
+export function advertisedOntologyRelations(
+  edges: ReadonlyArray<{ type: string }>,
+): readonly string[] {
+  return [...new Set(edges.map((edge) => edge.type))].sort();
+}
+
+/**
+ * What a later compile needs in order to ask the Core for a revision compile instead of a
+ * full one: the prior active World's identity, its artifact hashes and its retrieval units.
+ *
+ * Persisted on the candidate only while `TAVONEL_CORE_V2_REVISION_COMPILE=1`, because it is
+ * another copy of the source text inside an artifact that already carries several, and because
+ * with the flag off the artifact must stay byte-for-byte what it is today. `units` is the
+ * Core's own `PreviousUnit` shape (contracts.py) and is carried through unread rather than
+ * re-derived -- there is nowhere else it survives, and inventing an anchor or an identity state
+ * to fill the field would make the diff a fiction.
+ */
+export type RevisionCompileSnapshot = {
+  worldStateId: string;
+  manifestDigest: string;
+  artifactHashes: Record<string, string>;
+  units: Array<Record<string, unknown>>;
+};
+
 export type CollectionCandidateArtifact = {
   schemaVersion: typeof COLLECTION_CANDIDATE_SCHEMA;
   executionAuthority: "tavonel-foundation-core-runtime-v1";
@@ -122,7 +176,16 @@ export type CollectionCandidateArtifact = {
   candidatePromotion: false;
   collectionId: string;
   manifestDigest: string;
-  blueprint: typeof GENERIC_MIXED_CORPUS_BLUEPRINT;
+  /*
+    `ontologyRelations` is widened to `readonly string[]` for one reason: the Core V2
+    projection replaces it with `advertisedOntologyRelations(edges)`, so the list on the
+    artifact is the predicates that compile emitted rather than the ones this blueprint
+    permits. The fallback still attaches the blueprint unchanged, which is why the constant
+    keeps its own literal list and the digest it feeds is unmoved.
+  */
+  blueprint: Omit<typeof GENERIC_MIXED_CORPUS_BLUEPRINT, "ontologyRelations"> & {
+    ontologyRelations: readonly string[];
+  };
   sourceDocuments: Array<{
     documentId: string;
     versionKey: string;
@@ -135,8 +198,10 @@ export type CollectionCandidateArtifact = {
   directoryPlan: Array<{ path: string; kind: string; sourceIds: string[] }>;
   ontology: {
     nodes: KnowledgeNode[];
-    edges: KnowledgeEdge[];
+    edges: Array<KnowledgeEdge | CoreKnowledgeEdge>;
   };
+  /** Present only on a Core V2 candidate compiled with the revision-compile flag on. */
+  revisionCompile?: RevisionCompileSnapshot;
   package: {
     roots: readonly string[];
     files: Array<{
@@ -168,6 +233,13 @@ export type CollectionCandidateArtifact = {
       claims: number;
       evidence: number;
       relations: number;
+      /*
+        Contradiction candidates the engine flagged, counted separately from `relations`.
+
+        Optional because the TS fallback has no contradiction detector at all, and absent says
+        "this engine does not look for them" rather than "it looked and found none".
+      */
+      contradictions?: number;
       packageFiles: number;
       /*
         Every distinct object the extractor derived, including the ones the budget refused.
@@ -274,7 +346,19 @@ function mediaType(path: string) {
 export type LabelDerivedInput = {
   collectionId: string;
   nodes: readonly KnowledgeNode[];
-  edges: readonly KnowledgeEdge[];
+  edges: ReadonlyArray<KnowledgeEdge | CoreKnowledgeEdge>;
+  /*
+    The blueprint the canonical model declares, which `validate.mjs` reads as the allowlist a
+    package's edge predicates must be inside (PREDICATE_UNDECLARED).
+
+    Defaulted rather than required so the fallback compiler keeps writing the literal constant
+    it has always written -- the fallback's manifest digest is a hash over it. A caller
+    re-materialising a *Core V2* candidate must pass `artifact.blueprint`, whose
+    `ontologyRelations` is that compile's emitted set: the Core emits `mentions` and
+    `contradicts`, neither of which the constant declares, so defaulting there would write a
+    canonical model that its own validator refuses.
+  */
+  blueprint?: CollectionCandidateArtifact["blueprint"];
   inputBinding: ReadonlyArray<{
     documentId: string;
     versionKey: string;
@@ -303,7 +387,7 @@ export function materializeLabelDerivedFiles(input: LabelDerivedInput) {
   const canonicalModel = {
     schemaVersion: "akc.canonical-knowledge-model.v1",
     collectionId,
-    blueprint: GENERIC_MIXED_CORPUS_BLUEPRINT,
+    blueprint: input.blueprint ?? GENERIC_MIXED_CORPUS_BLUEPRINT,
     nodes,
     edges,
     inputBinding,

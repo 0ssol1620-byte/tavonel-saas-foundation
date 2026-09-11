@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   EXTRACTION_BUDGET_REACHED,
   EXTRACTION_CANDIDATE_BUDGET,
+  advertisedOntologyRelations,
   compileCollectionCandidate,
   validateCollectionOcrInput,
   type CollectionOcrInput,
@@ -362,5 +363,43 @@ describe("the validation record is derived from the package it describes", () =>
       immutableInputsOnly: true,
     });
     expect(report.counts).toEqual(artifact.validation.counts);
+  });
+});
+
+/*
+  K01, the fallback half. This engine may advertise only the predicates it emits.
+
+  The audit found the Core V2 projection attaching this blueprint's `ontologyRelations` -- which
+  names `discusses_topic` -- to artifacts from an engine that has no topic object at all. That
+  is fixed where it happened, in `core-runtime-v2.ts`, and this is the other direction: the
+  fallback keeps its own literal list, so the list has to stay true of what it emits. The check
+  is written as a subset rather than an equality on purpose: a corpus with no capitalised token
+  in it produces no `mentions_entity` edge, and advertising a predicate the vocabulary permits
+  is different from advertising one the engine cannot produce.
+*/
+describe("the fallback compiler's advertised predicate set", () => {
+  const artifact = compileCollectionCandidate([
+    input("doc-relations-1", "7".repeat(64), "Feedwater Pump 200 was inspected during the fiscal quarter and the reading stayed inside the policy limits."),
+    input("doc-relations-2", "8".repeat(64), "Feedwater Pump 200 governance policy requires a second inspection before the board meeting."),
+  ]);
+
+  it("emits nothing its blueprint does not declare", () => {
+    const emitted = advertisedOntologyRelations(artifact.ontology.edges);
+
+    expect(emitted.length).toBeGreaterThan(0);
+    for (const predicate of emitted) {
+      expect(artifact.blueprint.ontologyRelations, `${predicate} is emitted but not declared`)
+        .toContain(predicate);
+    }
+    // On a corpus with topics, entities and claims, all three of the declared set are real.
+    expect(emitted).toEqual(["discusses_topic", "mentions_entity", "supported_by"]);
+  });
+
+  it("declares none of the Core V2 predicates, which this engine cannot produce", () => {
+    for (const predicate of ["mentions", "contradicts"]) {
+      expect(artifact.blueprint.ontologyRelations).not.toContain(predicate);
+    }
+    expect(artifact.validation.counts.contradictions, "the fallback has no contradiction detector")
+      .toBeUndefined();
   });
 });
