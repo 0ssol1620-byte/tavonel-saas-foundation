@@ -153,7 +153,7 @@ function measureContrast(): { violations: ContrastFinding[]; unmeasured: number;
   two-line fix is in the QA lane report under CROSS-LANE REQUESTS. The threshold is WCAG AA as
   published and is not relaxed to make these pass.
 */
-const KNOWN_CONTRAST_DEFECT: readonly string[] = ["/product", "/product/continuous-knowledge"];
+const KNOWN_CONTRAST_DEFECT: readonly string[] = ["/product"];
 
 for (const route of CONTRAST_ROUTES) {
   test(`${route} keeps text above the WCAG AA contrast floor`, async ({ page }) => {
