@@ -7,7 +7,7 @@
 
 import Link from "next/link";
 import type { Route } from "next";
-import { Fragment, cloneElement, isValidElement, useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, cloneElement, isValidElement, useCallback, useEffect, useState } from "react";
 import CanvasTransitionLink from "@/components/canvas-transition-link";
 import CompileStagePlayer, { type CompileStage } from "@/components/compile-stage-player";
 import Logomark from "@/components/logomark";
@@ -95,40 +95,6 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
   const progress = useScrollProgress();
   const active = SCENES.find((s) => s.id === scene) ?? SCENES[0];
   const world = BANDS[(band as BandName) in BANDS ? (band as BandName) : "scatter"];
-  const barNextRef = useRef<HTMLButtonElement | null>(null);
-  useEffect(() => {
-    const button = barNextRef.current;
-    if (!button) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    if (!window.matchMedia("(pointer: fine)").matches) return;
-    const RANGE = 70;
-    const PULL = 0.32;
-    let raf = 0;
-    const reset = () => { button.style.removeProperty("--mx"); button.style.removeProperty("--my"); };
-    const onMove = (event: PointerEvent) => {
-      if (raf) return;
-      raf = window.requestAnimationFrame(() => {
-        raf = 0;
-        const box = button.getBoundingClientRect();
-        const dx = event.clientX - (box.left + box.width / 2);
-        const dy = event.clientY - (box.top + box.height / 2);
-        const dist = Math.hypot(dx, dy);
-        if (dist < RANGE) {
-          const pull = (1 - dist / RANGE) * PULL;
-          button.style.setProperty("--mx", `${dx * pull}px`);
-          button.style.setProperty("--my", `${dy * pull}px`);
-        } else {
-          reset();
-        }
-      });
-    };
-    window.addEventListener("pointermove", onMove, { passive: true });
-    return () => {
-      window.removeEventListener("pointermove", onMove);
-      if (raf) window.cancelAnimationFrame(raf);
-      reset();
-    };
-  }, []);
   useEffect(() => { trackSceneDepth(scene); }, [scene]);
 
   useEffect(() => {
@@ -150,20 +116,9 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
     document.getElementById(`s${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const cta = (name: string, run: () => void) => () => {
+  const cta = (name: string) => () => {
     trackFunnel("cta_clicked", { cta: name, scene: String(scene) });
-    run();
   };
-
-  const nextStep = ((): { label: string; run: () => void } => {
-    if (scene <= 1) return { label: "BRING YOUR SOURCES", run: () => jump(2) };
-    if (scene === 2) return { label: "WATCH IT COMPILE", run: () => jump(3) };
-    if (scene === 3) return { label: "FOLLOW THE EVIDENCE", run: () => jump(4) };
-    if (scene < 5) return { label: "START", run: () => jump(5) };
-    // The bar's final action is the page's primary action. It used to say SIGN IN in pilot,
-    // sending a first-time visitor to a login for an account they cannot create.
-    return { label: startLabel.toUpperCase(), run: () => window.location.assign(startHref) };
-  })();
 
   return (
     <div className="page landing-page">
@@ -191,12 +146,21 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
         stuck={progress > 0.005}
       />
 
+      {/*
+        BA-012. A progress indicator, not five controls a keyboard cannot reach.
+
+        These were `<button>`s with the container `aria-hidden` and every one of them
+        `tabIndex={-1}`: they looked like controls, worked for a mouse and did not exist for a
+        keyboard or a screen reader, which is worse than no control at all (§14.3). The rail's
+        job on this page is to say where the reader is, and that is what it now is -- the scene
+        jumper that is a real control lives in the bar, where the 44px floor is met.
+      */}
       <div className="rail" aria-hidden="true">
         {SCENES.map((s) => (
-          <button key={s.id} type="button" className={s.id === scene ? "tick on" : "tick"} onClick={() => jump(s.id)} tabIndex={-1}>
+          <span key={s.id} className={s.id === scene ? "tick on" : "tick"}>
             <i />
             {String(s.id).padStart(2, "0")}
-          </button>
+          </span>
         ))}
       </div>
 
@@ -331,8 +295,19 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
               <div><strong>Compile</strong><span>Supported content enters your World</span></div>
             </li>
           </ol>
+          {/*
+            BA-009. The same two facts, with the one the reader can act on first.
+
+            "ZIPs open locally. Only supported files inside are uploaded." told a visitor what
+            gets refused in the scene where they are deciding to hand over their own material.
+            Both facts are still here and neither is softened -- the archive is expanded in the
+            browser (`lib/archive-expand.ts`, on a worker or the main thread) and only the
+            manifest's formats leave the machine -- but the sentence now names what happens
+            rather than what does not. The step above already says supported content enters your
+            World, so this is that claim in the ZIP's own words, not a new one.
+          */}
           <p className="input-guidance rv">
-            ZIPs open locally. Only supported files inside are uploaded. <Link className="input-next" href="/sources">See supported formats →</Link>
+            ZIPs open on your machine, and the supported files inside compile straight into your World. <Link className="input-next" href="/sources">See supported formats →</Link>
           </p>
           <div className="source-routes rv" aria-label="Ways to bring sources into TAVONEL">
             <article className="source-route">
@@ -384,10 +359,21 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
             against a 44px floor, and a link inside a 14px `.fine` paragraph is about 18px. The
             pointer to the real interface goes in the actions row, where the floor is met.
           */}
+          {/*
+            BA-010. The same disclosure, in the order a confident page would write it.
+
+            It read "These four cuts are a directed recreation of a compile, not a screen
+            recording of the product. The working interface runs over a World compiled from
+            committed public filings by the same compiler" -- four words of throat-clearing
+            before the disclosure and the product in the passive. The disclosure is untouched
+            and still first, because that is where it belongs; what changed is that the compiler
+            is the subject of the sentence after it. "not a screen recording" stays verbatim:
+            `brand-copy.test.ts` pins that phrase, and rewording a disclosure the guard holds is
+            not something a copy pass gets to do.
+          */}
           <p className="fine rv">
-            These four cuts are a directed recreation of a compile, not a screen recording of the
-            product. The working interface runs over a World compiled from committed public
-            filings by the same compiler.
+            A directed recreation of a compile, not a screen recording. The same compiler runs
+            the working interface, over a World compiled from committed public filings.
           </p>
           <div className="actions rv">
             {/*
@@ -441,15 +427,38 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
             `?act=change` are the query vocabulary `lib/explore-story.ts` resolves, so each link
             lands on the act that shows the thing this scene just claimed.
           */}
+          {/*
+            BA-004. Two named proofs, not three buttons.
+
+            The row was "Explore a Compiled World" + "See what a new filing changed" + "What this
+            deployment reads": three controls in one batch, which §3.4 bars, and the first of
+            them repeated the door's label a third time in one render. Both surviving links are
+            `?act=` proofs of the sentence directly above them, so each carries its own label --
+            the rule `ExploreLink` already states. /sources lost its button and not its place on
+            the page: the hero proof strip and the input scene's "See supported formats" both
+            point at it, and a third pointer to the same page cannot be worth a third primary.
+            It is not an inline link in the caption for the reason this file records twice
+            already -- a link in a 14px `.fine` paragraph is an 18px tap target against a 44px
+            floor that `mobile-landing.spec.ts` measures.
+          */}
           <div className="actions rv">
-            <ExploreLink className="btn" act="evidence" />
+            <ExploreLink className="btn" act="evidence" label="Follow a citation to its source" />
             <ExploreLink className="btn ghost" act="change" label="See what a new filing changed" />
-            <Link className="btn ghost" href={"/sources" as Route}>What this deployment reads</Link>
           </div>
         </Scene>
 
         <Scene id={5} band="access" eyebrow="START" title="Compile your own knowledge.">
-          <p className="lede rv">Files go in. Structured, traceable knowledge comes out.</p>
+          {/*
+            BA-004, the half of it that is not a button count.
+
+            Scene 01 leads with Explore and scene 05 leads with the access action, and
+            `landing.spec.ts` asserts that mirror deliberately -- but the page never said why the
+            weights swap, so a reader met the same two buttons in the opposite order for no
+            stated reason. The lede now says it: the World they were just shown is ours, and the
+            next one is theirs. Nothing here claims the reader opened it; what it claims is what
+            the page has been showing, which is a World compiled from committed public filings.
+          */}
+          <p className="lede rv">The compiled World on this page is ours, built from public filings. The next one is yours: files go in, structured and traceable knowledge comes out.</p>
           {/*
             Scene F of §10.3, in one sentence rather than a sixth scene.
 
@@ -475,7 +484,7 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
               product to authorise OAuth against their company drive. It belongs in the empty
               state after sign-up, where connecting something is the obvious next move.
             */}
-            <Link className="btn" href={startHref}>{startLabel}</Link>
+            <Link className="btn" href={startHref} onClick={cta("closing_start")}>{startLabel}</Link>
             <ExploreLink className="btn ghost" />
           </div>
         </Scene>
@@ -499,7 +508,17 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
       <div className="bar" role="status" aria-live="off" data-scene={scene}>
         <span className="scroll" style={{ width: `${progress * 100}%` }} />
         {/*
-          The bar reports where the reader is, and nothing else.
+          BA-007. The bar reports where the reader is, and nothing else.
+
+          It also carried a control -- BRING YOUR SOURCES / WATCH IT COMPILE / FOLLOW THE
+          EVIDENCE / START / REQUEST ACCESS -- in 9.5px mono caps, which was a fifth CTA system
+          on a page that already has a sticky filled action in the header and one primary per
+          scene: three primaries could be on screen at once, and "SCENE 02" put stage-direction
+          vocabulary in front of a buyer. The scene jumper stays, because it is the only scene
+          control that meets the touch floor; the readout is now a position (`02 / 05`) rather
+          than a direction. `cta_clicked` moved with the deletion to the closing scene's primary,
+          which is a CTA click by any definition -- the event is not dropped, it is fired from a
+          control that means what it reports.
 
           It used to read WORLD v184 / FACTS 128,470 / NEEDS REVIEW 1, taken from a demo fixture.
           While the page still carried a large "this is a demonstration" disclaimer those numbers
@@ -509,20 +528,19 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
           with fictional metrics on it that is worth the disclaimer needed to keep them.
         */}
         <span className="bc"><span className="bk">STAGE</span><span className="bv">{filmStage}</span></span>
-        <span className="bar-ticks" aria-label="Scenes">
+        <span className="bar-ticks" aria-label="Sections of this page">
           {SCENES.map((sc) => (
             <button
               key={sc.id}
               type="button"
               className={sc.id === scene ? "bt on" : "bt"}
-              aria-label={`Scene ${sc.id}: ${sc.label}`}
+              aria-label={`Go to ${sc.label}`}
               aria-current={sc.id === scene ? "true" : undefined}
               onClick={() => jump(sc.id)}
             />
           ))}
         </span>
-        <span className="bc right"><span className="bv">SCENE {String(active.id).padStart(2, "0")} &middot; {active.label}</span></span>
-        <button ref={barNextRef} className="bar-next" type="button" onClick={cta("instrument_bar", nextStep.run)}>{nextStep.label}</button>
+        <span className="bc right"><span className="bv">{String(active.id).padStart(2, "0")} / {String(SCENES.length).padStart(2, "0")} &middot; {active.label}</span></span>
       </div>
     </div>
   );

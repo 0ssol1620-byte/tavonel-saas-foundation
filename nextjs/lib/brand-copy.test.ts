@@ -543,7 +543,16 @@ describe("public copy", () => {
     expect(source).not.toContain('<span className="st">ENTERPRISE-ASSISTED</span>');
     expect(source).not.toContain("Provider qualification and last-tested evidence stay visible on Integrations.");
     expect(source).not.toContain("The ZIP archive itself is never compiled");
-    expect(source).toContain("Only supported files inside are uploaded.");
+    /*
+      BA-009 turned "ZIPs open locally. Only supported files inside are uploaded." around, so the
+      scene where a visitor decides to hand over their own material leads with what happens
+      rather than with what is refused. Both facts stay pinned, and now separately: the archive
+      is expanded in the browser, and the manifest's formats are what leaves the machine. Two
+      substrings rather than one, because either half going missing is the defect this line
+      exists for -- copy that says only "supported files" has stopped saying where the ZIP opened.
+    */
+    expect(source).toContain("ZIPs open on your machine");
+    expect(source).toContain("the supported files inside compile straight into your World.");
     expect(source).toContain('className="intake-flow rv"');
     expect(source).toContain('href="/integrations"');
     expect(workspace).not.toContain('{ name: "Google Drive", availability: "Beta" }');

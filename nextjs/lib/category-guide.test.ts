@@ -124,6 +124,77 @@ describe("every solution page says where it stops too", () => {
   });
 });
 
+/*
+  The 2026-09-11 brand fix, checked where it can regress silently.
+
+  BA-017, BA-019 and BA-020 are structure rather than sentences: a page that lost the section index,
+  re-split the comparison into three, stopped collapsing the reference sections or rendered both
+  forms of the diagram at once would look fine in a screenshot at one width and be the defect the
+  findings named at another. The diagram's two forms are a render assertion because the list is
+  derived from the same two arrays as the drawing, and a `find` that matched the wrong span would
+  print the wrong category under a stage with nothing else noticing.
+*/
+describe("the brand fix's structure", () => {
+  const diagramCss = readFileSync(
+    resolve(import.meta.dirname, "../components/knowledge-compiler-diagram.module.css"),
+    "utf8",
+  );
+
+  it("renders the drawing and its phone list from the same data, and shows one at a time", async () => {
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { createElement } = await import("react");
+    const { default: Diagram } = await import("../components/knowledge-compiler-diagram");
+    const html = renderToStaticMarkup(createElement(Diagram));
+
+    // Both forms exist in the markup; CSS decides which one a width gets.
+    expect(html).toContain("<svg");
+    expect(html).toContain("<ol");
+    for (const stage of ["SOURCES", "READ", "STRUCTURE", "EVIDENCE", "WORLD", "PROJECTIONS"]) {
+      expect(html, stage).toContain(stage);
+    }
+    // Each single-stage span lands under its own stage, and the whole-line span is its own row.
+    expect(html).toContain("Enterprise search finds the document");
+    expect(html).toContain("Knowledge graph stores objects and relations");
+    expect(html).toContain("RAG retrieves chunks at question time");
+    expect(html).toContain("ALL SIX");
+    expect(html).toContain("Knowledge Compiler compiles, binds evidence to regions, and versions the result");
+
+    /*
+      The swap, and the reason it is `display: none` on both sides: a visually-hidden list would
+      be announced on top of the drawing's own title and description, so the six stages would
+      reach a screen reader twice.
+    */
+    expect(diagramCss).toContain(".stack { display: none; }");
+    expect(diagramCss).toMatch(/@media \(max-width: 640px\) \{\s*\.diagram \{ display: none; \}/);
+    expect(diagramCss, "a hidden-but-rendered list would double-announce the stages")
+      .not.toMatch(/\.stack \{[^}]*clip-path/);
+  });
+
+  it("keeps the section index, one comparison and the reference sections collapsed", () => {
+    expect(page, "the index is what replaced having no way to skip").toContain("<PublicProofRegistry index");
+    // Eight sections: the ten it had, with the three comparisons merged into one. Counted from
+    // `sections={[` so the page's own <title> metadata is not one of them.
+    const sections = page.slice(page.indexOf("sections={["));
+    expect((sections.match(/title: "/g) ?? []).length).toBe(8);
+    expect(page).toContain('title: "Compared with RAG, graphs and search"');
+    expect(rendered(page), "the three separate comparisons must not come back")
+      .not.toContain('title: "Compared with RAG"');
+    expect((page.match(/collapsed: true/g) ?? []).length).toBe(3);
+    for (const key of ["RAG", "KNOWLEDGE GRAPH", "ENTERPRISE SEARCH"]) {
+      expect(page, key).toContain(`key: "${key}"`);
+    }
+  });
+
+  it("ends on one primary and one secondary, with the references as a list", () => {
+    const closing = page.slice(page.indexOf('title: "The package is the contract"'));
+    expect(closing).toContain("readNext: [");
+    expect((closing.match(/label: "/g) ?? []).length).toBe(6);
+    // BA-016: the door describes the protocol behind it rather than announcing an absence.
+    expect(rendered(page)).not.toContain("WHAT WOULD BE MEASURED");
+    expect(closing).toContain('label: "How results are measured"');
+  });
+});
+
 describe("what the page must not become", () => {
   it("claims no customer, certification or performance figure", () => {
     /*

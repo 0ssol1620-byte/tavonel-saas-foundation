@@ -78,13 +78,30 @@ const OFFICE_CLAUSE = OFFICE.length > 1
   ? `${OFFICE.slice(0, -1).join(", ")} and ${OFFICE.at(-1)} are converted to PDF before anything reads them.`
   : `${OFFICE[0]} is converted to PDF before anything reads it.`;
 
+/*
+  BA-014. Every branch reads forwards, and the fact in it is untouched.
+
+  Three of the four cards opened on an absence: LAYOUT was titled "Reading order, not recovered
+  structure", UNCERTAINTY followed "Doubt is carried forward" with a clause saying the doubt
+  "does not route anything", and the two switches below printed "are not extracted yet" and "is
+  not recovered on this deployment" in the middle of the page that answers what a reader does
+  get. Honest, and written like an apology.
+
+  What changed is the order and the subject of each sentence. Both switches are still read from
+  the manifest, and both branches still say what the read does not recover -- a price table's
+  grid, a heading level -- because that is a property of the read a buyer has to know before
+  they compile a spreadsheet, and `product-claims-sync.test.ts` requires the claim to be derived
+  from the manifest in either state. The per-format table those limits belong to is /sources,
+  which prints `knownLimitations` for every accepted MIME type and is linked in the footnote
+  below the cards.
+*/
 const READ_BODY = [
   // There is no native text read on any path: the CDR rasterizes every accepted source, and
   // test_office_conversion.py asserts the sanitized output has no extractable text at all.
   "Every accepted source is sanitized to an image-only PDF and read by OCR, so a scan is read the same way a born-digital file is.",
   `What survives that read into the compile is ${PRESERVED_SENTENCE} — after the file has been sanitized to PDF and passed through OCR.`,
   NO_TABLE_EXTRACTION
-    ? "Structured tables and formulas are not extracted yet: a price table arrives as the paragraphs it was printed as, each with the box it sat in, so the figures are readable and the grid that arranged them is not."
+    ? "A price table arrives as the paragraphs it was printed as, each carrying the box it sat in, so every figure stays readable and locatable while the grid that arranged them is not yet recovered."
     : "Structured tables and formulas are extracted, and the manifest names the fields that survive.",
   OFFICE_CLAUSE,
 ].join(" ");
@@ -92,7 +109,7 @@ const READ_BODY = [
 const LAYOUT_BODY = [
   "Regions arrive in the order they were read, so a fact attaches to a place in the document rather than to an offset in a blob of text.",
   NO_STRUCTURE_READER
-    ? "Typed document structure — heading levels, sections, columns — is not recovered on this deployment: there is no native structure reader yet, and what the compiler receives is a paragraph and where it sat."
+    ? "What the compiler receives is that paragraph and where it sat, rather than typed structure: heading levels, sections and columns wait for a native structure reader."
     : "Heading levels, sections and columns are recovered as typed structure.",
   "The full list, per format, is the capability manifest.",
 ].join(" ");
@@ -110,10 +127,12 @@ const LAYOUT_BODY = [
 const PARTS = [
   ["READ", "Text, scans, and what survives them", READ_BODY],
   ["LOCATION", "The place, kept", "Every region keeps the address of where it was read — in a PDF, the page and the box on it. This is what later lets every compiled fact stay traceable to its exact source location."],
-  ["LAYOUT", "Reading order, not recovered structure", LAYOUT_BODY],
+  ["LAYOUT", "Read in the order it was printed", LAYOUT_BODY],
   // "arrive in review" was not supported: ocr-review.json is written only when the read fails,
   // and no threshold on confidence routes anything. The confidence is recorded, and that is all.
-  ["UNCERTAINTY", "Doubt is carried forward", "Per-region confidence is recorded in the OCR output; it does not route anything, and review is opened only when a read fails. A reader that never reports doubt cannot be believed later."],
+  // BA-014 keeps both halves of that and leads with the one a reader can use: the confidence
+  // travels with the region it belongs to, and a failed read opens review rather than passing.
+  ["UNCERTAINTY", "Confidence travels with the region", "Every region carries the read confidence recorded for it in the OCR output, and a failed read opens review rather than passing silently. No threshold routes on that confidence — it is recorded, and a reader that never reports doubt cannot be believed later."],
 ] as const;
 
 export default function DocumentUnderstandingPage() {
@@ -124,6 +143,8 @@ export default function DocumentUnderstandingPage() {
         <div className="shell">
           <div className="body">
             <div className="stack">
+              {/* BA-026. The trail BreadcrumbJsonLd already declares, rendered for the reader. */}
+              <p className="doc-breadcrumb"><Link href={"/product" as Route}>Product</Link> <span aria-hidden="true">/</span> Document understanding</p>
               <p className="slate"><b>PRODUCT</b><span />DOCUMENT UNDERSTANDING</p>
               <h1 className="document-title">Reading is the first compile step.</h1>
             </div>
@@ -137,7 +158,12 @@ export default function DocumentUnderstandingPage() {
                 {PARTS.map(([state, title, body]) => (
                   <article className="tile" key={title}>
                     <span className="n">{state}</span>
-                    <h3>{title}</h3>
+                    {/*
+                      BA-025. h2, not h3: the four cards are the first sections under the h1, and
+                      an h3 here left the outline h1 -> h3 so the page could not be walked by
+                      heading. `.tiles .tile h2` keeps the card treatment.
+                    */}
+                    <h2>{title}</h2>
                     <p>{body}</p>
                   </article>
                 ))}
@@ -150,9 +176,13 @@ export default function DocumentUnderstandingPage() {
                 methodology are published in the{" "}
                 <Link href={"/research/notes" as Route}>research notes</Link>.
               </p>
+              {/*
+                BA-019. Two actions, not three. The third pointed at /sources, which the footnote
+                directly above already offers as "supported sources" -- the same destination
+                twice in two adjacent elements, with the button competing with the primary.
+              */}
               <div className="actions">
                 <Link className="btn" href={"/explore" as Route}>See a page and its regions</Link>
-                <Link className="btn ghost" href={"/sources" as Route}>What this deployment reads</Link>
                 <Link className="btn ghost" href="/knowledge-compiler">What happens after the read</Link>
               </div>
             </div>

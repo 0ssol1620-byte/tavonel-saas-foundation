@@ -202,8 +202,24 @@ describe("product claims sync", () => {
       .toContain('from "@/lib/compiler-contract"');
     expect(page).toContain('clause("stable-semantic-identity")');
     expect(page).toContain('clause("typed-dependencies")');
-    expect(page, "the card prints the registry's state word, not a word chosen in the markup")
-      .toContain("CONTRACT_STATE[part.clause.state].label");
+    /*
+      BA-013 took the readiness ladder off the card -- the state word and "Not offered as a
+      shipped capability in this deployment" printed under two of six product cards -- and left
+      the pointer to the clause. So the tie to the registry is no longer a rendered label, and
+      this pins the thing that replaced it, which fails harder: the page declares the two states
+      its copy was written against and throws at module scope if either moves, so a clause that
+      flips stops the build instead of relabelling a sentence that has become false. The
+      assertion below on "are not merged automatically" is the other half of the same tie and is
+      unchanged.
+    */
+    expect(page, "the page names the clause states its copy was written against")
+      .toContain('IDENTITY.state !== "direction" || RELATIONS.state !== "demonstrated"');
+    expect(page, "and a state change stops the build rather than relabelling stale copy")
+      .toContain("re-derive the OBJECTS and RELATIONS cards");
+    expect(clause("stable-semantic-identity").state).toBe("direction");
+    expect(clause("typed-dependencies").state).toBe("demonstrated");
+    expect(page, "the ladder vocabulary belongs to /product/continuous-knowledge, not to a card")
+      .not.toContain("CONTRACT_STATE");
   });
 
   /*

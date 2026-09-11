@@ -6,6 +6,25 @@ import styles from "./public-proof-registry.module.css";
 
 export type RegistryRow = { key: string; description: string; state: string };
 
+/*
+  BA-020. A record page needs an address for each record, and a way past the ones you did not
+  come for.
+
+  /knowledge-compiler was ten of these rows in sequence: 4,796px at 1280 and 7,284px at 390, no
+  anchor on any section, nothing to skip with, and the first call to action at the very bottom.
+  Three additions, every one optional, so `/reproducibility` renders exactly as it did:
+
+    - every section takes a stable id, so it can be linked to and an index can point at it
+    - `index` renders that index under the hero
+    - `collapsed` puts a section's body in a `<details>`, which is what a glossary, an FAQ and a
+      when-not-to-use-this list are -- reference a reader consults, not argument they read
+
+  Native `<details>` rather than a state hook: the whole behaviour is open and closed, it needs
+  no JavaScript, and the browser's own find-in-page reaches inside a closed one.
+*/
+const sectionId = (title: string) =>
+  `section-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}`;
+
 /**
  * The record layout used by the reproducibility and category pages.
  *
@@ -23,10 +42,12 @@ export type RegistryRow = { key: string; description: string; state: string };
  * a page about an absence. A section with nothing to show is now simply not shown, and the
  * `empty` prop is kept only so callers do not have to change.
  */
-export default function PublicProofRegistry({ title, eyebrow, summary, state, sections, footer }: {
+export default function PublicProofRegistry({ title, eyebrow, summary, state, index, sections, footer }: {
   title: string;
   eyebrow: string;
   summary: string;
+  /** BA-020: render the section index under the hero. Off for a page short enough to read. */
+  index?: boolean;
   /*
     The status badge is optional because it belongs to a proof registry, not to every page
     that reuses this shell. `/knowledge-compiler` is a category guide and the only indexed
@@ -50,6 +71,10 @@ export default function PublicProofRegistry({ title, eyebrow, summary, state, se
     figure?: ReactNode;
     faq?: Array<{ question: string; answer: string }>;
     links?: Array<{ href: Route; label: string }>;
+    /** BA-019: references under the actions, as a list rather than as more buttons. */
+    readNext?: Array<{ href: Route; label: string }>;
+    /** BA-020: reference material, behind a disclosure rather than in the reading path. */
+    collapsed?: boolean;
   }>;
   /*
     One next step under the body, for a page that is a step in a sequence rather than a terminus.
@@ -64,7 +89,35 @@ export default function PublicProofRegistry({ title, eyebrow, summary, state, se
     <PublicSiteHeader />
     <main id="main">
       <section className={styles.hero}><div><p className={styles.eyebrow}>{eyebrow}</p><h1>{title}</h1></div><aside>{state ? <span className={styles.status}>{state}</span> : null}<p>{summary}</p></aside></section>
-      <div className={styles.body}>{sections.map((section) => <section className={styles.row} key={section.title}><h2>{section.title}</h2><div className={styles.rowBody}><p>{section.body}</p>{section.figure ? <figure className={styles.figure}>{section.figure}</figure> : null}{section.rows ? <ol className={styles.protocol}>{section.rows.map((row) => <li key={row.key}><b>{row.key}</b><span>{row.description}</span><em>{row.state}</em></li>)}</ol> : null}{section.faq ? <dl className={styles.faq}>{section.faq.map((entry) => <div key={entry.question}><dt>{entry.question}</dt><dd>{entry.answer}</dd></div>)}</dl> : null}{section.links ? <p className={styles.links}>{section.links.map((link) => <Link key={link.href} href={link.href}>{link.label}</Link>)}</p> : null}{section.download ? <a className={styles.download} href={section.download.href} download>{section.download.label}</a> : null}</div></section>)}</div>
+      <div className={styles.body}>
+        {index ? (
+          <nav className={styles.index} aria-label="On this page">
+            <p>On this page</p>
+            <ol>
+              {sections.map((section) => (
+                <li key={section.title}><a href={`#${sectionId(section.title)}`}>{section.title}</a></li>
+              ))}
+            </ol>
+          </nav>
+        ) : null}
+        {sections.map((section) => {
+          const body = <div className={styles.rowBody}>
+            <p>{section.body}</p>
+            {section.figure ? <figure className={styles.figure}>{section.figure}</figure> : null}
+            {section.rows ? <ol className={styles.protocol}>{section.rows.map((row) => <li key={row.key}><b>{row.key}</b><span>{row.description}</span><em>{row.state}</em></li>)}</ol> : null}
+            {section.faq ? <dl className={styles.faq}>{section.faq.map((entry) => <div key={entry.question}><dt>{entry.question}</dt><dd>{entry.answer}</dd></div>)}</dl> : null}
+            {section.links ? <p className={styles.links}>{section.links.map((link) => <Link key={link.href} href={link.href}>{link.label}</Link>)}</p> : null}
+            {section.readNext ? <div className={styles.readNext}><p>Read next</p><ul>{section.readNext.map((link) => <li key={link.href}><Link href={link.href}>{link.label}</Link></li>)}</ul></div> : null}
+            {section.download ? <a className={styles.download} href={section.download.href} download>{section.download.label}</a> : null}
+          </div>;
+          return <section className={styles.row} id={sectionId(section.title)} key={section.title}>
+            <h2>{section.title}</h2>
+            {section.collapsed
+              ? <details className={styles.disclosure}><summary>Open {section.title.toLowerCase()}</summary>{body}</details>
+              : body}
+          </section>;
+        })}
+      </div>
       {footer ? <div className={styles.body}>{footer}</div> : null}
     </main>
     <PublicSiteFooter />

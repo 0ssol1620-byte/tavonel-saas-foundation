@@ -33,7 +33,48 @@ const ROW_HEIGHT = 42;
 const startOf = (index: number) => LEFT + index * (STAGE_WIDTH + STAGE_GAP);
 const endOf = (index: number) => startOf(index) + STAGE_WIDTH;
 
+/*
+  BA-017. Below 640px the drawing is replaced by the same data as a list.
+
+  The figure is a real scroll container -- measured at 390 on this branch: a 354px box holding a
+  700px drawing with `overflow-x: auto`, so it does pan -- but panning was never the defect. At
+  700px the 980-unit viewBox renders at 0.71, which puts the stage labels at 9.6px and the span
+  notes at 8.6px: a picture of a diagram rather than a diagram, with the reader asked to scroll
+  sideways to read 8px type. The six stages and the four spans are the whole content, so a phone
+  gets them as rows it can read without scrolling in two directions.
+
+  One of the two is always `display: none`, which takes it out of the accessibility tree as well,
+  so the stages are announced once. The SVG keeps its title and description for the widths where
+  it is the thing being read.
+*/
+const spanStartingAt = (index: number) =>
+  SPANS.find(([from, to]) => from === index && to === index);
+const WHOLE_SPAN = SPANS.find(([from, to]) => from === 0 && to === STAGES.length - 1)!;
+
 export default function KnowledgeCompilerDiagram() {
+  return (
+    <>
+      <CompileSpanDrawing />
+      <ol className={styles.stack} aria-label="Where each category acts on the compile pipeline">
+        {STAGES.map((stage, index) => {
+          const span = spanStartingAt(index);
+          return (
+            <li key={stage}>
+              <b>{stage}</b>
+              {span ? <span>{span[2]} {span[3]}</span> : null}
+            </li>
+          );
+        })}
+        <li className={styles.stackWhole}>
+          <b>ALL SIX</b>
+          <span>{WHOLE_SPAN[2]} {WHOLE_SPAN[3]}</span>
+        </li>
+      </ol>
+    </>
+  );
+}
+
+function CompileSpanDrawing() {
   return (
     <svg
       className={styles.diagram}
