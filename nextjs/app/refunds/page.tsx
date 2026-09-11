@@ -8,7 +8,7 @@ import {
   refundablePageAllowance,
 } from "@/lib/billing-catalog";
 import { readCommercialState } from "@/lib/commercial-state";
-import { LEGAL_EFFECTIVE_DATE } from "@/lib/operations";
+import { LEGAL_EFFECTIVE_DATE, LEGAL_LAST_UPDATED } from "@/lib/operations";
 
 export const dynamic = "force-dynamic";
 
@@ -46,22 +46,25 @@ export default function RefundsPage() {
     return (
       <PolicyLayout
         label="CANCELLATION AND REFUNDS"
-        title="Cancellation and refund terms during the pilot."
-        intro={<>Effective {LEGAL_EFFECTIVE_DATE}.</>}
+        title="Cancellation and refunds."
+        effective={LEGAL_EFFECTIVE_DATE}
+        lastUpdated={LEGAL_LAST_UPDATED}
+        intro={<>TAVONEL is offered by invitation: there is no checkout, so there is nothing to cancel and no charge to refund. What happens when a paid plan opens is at the foot of this page.</>}
       >
         <BreadcrumbJsonLd trail={[{ name: "Refunds", path: "/refunds" }]} />
-        <h3>Nothing can be charged</h3>
+        <h2>Nothing can be charged</h2>
         <p>
           TAVONEL is offered as a private pilot. There is no checkout, no stored payment method
           and no subscription, so there is nothing to cancel and no charge to refund.
         </p>
-        <h3>Ending pilot access</h3>
+        <h2>Ending pilot access</h2>
         <p>
-          Write to support@tavonel.com to end access at any time. You can export your compiled
+          Write to <a href="mailto:support@tavonel.com">support@tavonel.com</a> to end access at
+          any time. You can export your compiled
           worlds as signed packages before access ends, and you can ask for your source material
           and derived artifacts to be deleted.
         </p>
-        <h3>If paid plans open</h3>
+        <h2>If paid plans open</h2>
         <p>
           Cancellation and refund terms will be published here, and presented at checkout, before
           any payment method can be entered.
@@ -73,18 +76,16 @@ export default function RefundsPage() {
   return (
     <PolicyLayout
       label="CANCELLATION AND REFUNDS"
-      title="Cancellation and refund terms for TAVONEL."
-      intro={
-        <>
-          Effective {LEGAL_EFFECTIVE_DATE}. Checkout is processed by Paddle as merchant of record.
-        </>
-      }
+      title="Cancellation and refunds."
+      effective={LEGAL_EFFECTIVE_DATE}
+      lastUpdated={LEGAL_LAST_UPDATED}
+      intro={<>Checkout is processed by Paddle as merchant of record.</>}
     >
         <BreadcrumbJsonLd trail={[{ name: "Refunds", path: "/refunds" }]} />
-      <h3>Access cancellation</h3>
-      <p>You may request cancellation of access at any time through support@tavonel.com.</p>
+      <h2>Access cancellation</h2>
+      <p>You may request cancellation of access at any time through <a href="mailto:support@tavonel.com">support@tavonel.com</a>.</p>
 
-      <h3>{REFUND_WINDOW_DAYS}-day refund window</h3>
+      <h2>{REFUND_WINDOW_DAYS}-day refund window</h2>
       <p>
         You may request a full refund within {REFUND_WINDOW_DAYS} calendar days of a one-time
         purchase or within {REFUND_WINDOW_DAYS} calendar days of the latest subscription renewal.
@@ -111,7 +112,7 @@ export default function RefundsPage() {
         only when `liveChargesEnabled` is true, which is the gate that keeps an unreviewed clause
         off a page that can take money.
       */}
-      <h3>Use and statutory rights</h3>
+      <h2>Use and statutory rights</h2>
       <p>
         Within {REFUND_WINDOW_DAYS} calendar days of a payment you may request a full refund,
         provided fewer than {Math.round(REFUND_MAX_CONSUMED_FRACTION * 100)}% of your
@@ -127,14 +128,14 @@ export default function RefundsPage() {
         days; payment-provider timing can vary.
       </p>
 
-      <h3>Cancellation</h3>
+      <h2>Cancellation</h2>
       <p>
         You may cancel a recurring plan at any time through the billing portal or support.
         Cancellation stops future renewals and normally preserves paid access until the current
         billing period ends. It does not automatically refund a completed renewal.
       </p>
 
-      <h3>Billing errors</h3>
+      <h2>Billing errors</h2>
       <p>
         If a charge does not match the plan and price you agreed to, contact support@tavonel.com.
         We will investigate with the payment provider and preserve the transaction evidence.

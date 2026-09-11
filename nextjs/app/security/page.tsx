@@ -55,7 +55,7 @@ const PATH = [
 const CONTROLS = [
   ["Tenant isolation", "Workspace identity is derived server-side from an authenticated session, never from an identifier the browser supplies. Storage prefixes, database rows and signed capabilities are all scoped to it."],
   ["Encryption and secrets", "Transport is TLS throughout, and stored objects are encrypted at rest by the storage provider. Authentication, billing, storage and disarm credentials are server-side secrets; the browser may hold a provider's own publishable token and nothing else."],
-  ["AI training", "Your documents are not used to train shared models. Models read your sources to compile your world, and for nothing else."],
+  ["Your data is not training data", "Your documents are not used to train shared models. Models read your sources to compile your world, and for nothing else."],
   ["Retention and deletion", "Source material, derived artifacts and compiled packages can be deleted on request, and that request is carried out by a person rather than by a self-service control. Which parts of it happen the moment you act, which wait on a provider backup schedule, and where no number is published yet, are set out step by step in the privacy notice."],
   ["Reliability", "A control opens only after the one before it is qualified, so a partial failure stops the pipeline rather than emitting an incomplete world. There is no best-effort path that publishes anyway."],
   /*
@@ -72,7 +72,7 @@ const CONTROLS = [
     RPO and RTO targets are a commitment the founder makes, they are not made, and they stay
     in the unanswered block below until they are.
   */
-  ["Backup and restore", "One restore has been performed and checked. On 2026-09-10 the production database was restored from its backup of 2026-09-08 16:33:31 UTC into a separate temporary project in the same region; the catalog of the original and the restored copy was compared object by object and all 431 matched; the temporary project was deleted when the check finished. That drill covered the database. It did not cover the document bytes in object storage, a full service recovery, or a run through the customer-facing application, and one drill is a demonstration rather than a practice. The catalog-fingerprint receipt (approved-db-catalog-receipt-20260910.json) is kept with the execution record and is not published at a URL; ask for it."],
+  ["Backup and restore", "One restore has been performed and checked. On 2026-09-10 the production database was restored from its backup of 2026-09-08 16:33:31 UTC into a separate temporary project in the same region; the catalog of the original and the restored copy was compared object by object and all 431 matched; the temporary project was deleted when the check finished. That drill covered the database. It did not cover the document bytes in object storage, a full service recovery, or a run through the customer-facing application, and one drill is a demonstration rather than a practice. The verification record for this drill is available under review."],
   /*
     §17.1 asks "who can access it" and "audit", and this page answered neither.
 
@@ -152,7 +152,7 @@ const CONTROLS = [
   the targets; until they are set, this stays where a reader looking for them will find it.
 */
 const UNANSWERED = [
-  ["Recovery objectives", "Not yet answered. There is no recovery point objective, no recovery time objective and no published backup retention period for this deployment. Those are commitments somebody has to make and nobody has: the restore above shows the database came back once, which is a different statement from how much work or how much time you would lose. Ask before you depend on either number, and read their absence here as the state of it."],
+  ["Recovery objectives — not committed", "The restore above shows the database came back once, verified. Not yet answered is the rest: there is no recovery point objective, no recovery time objective and no published backup retention period for this deployment. Those are commitments somebody has to make and nobody has, and one drill is a different statement from how much work or how much time you would lose. Ask before you depend on either number, and read their absence here as the state of it."],
   /*
     The question a procurement reader asks before any of the controls above, which this page left
     to /trust. It has to be answerable on the page a buyer is sent to, because the controls above
@@ -171,7 +171,7 @@ const UNANSWERED = [
     section keeps process vocabulary off a public page, and the founder's merge of the pull
     request carrying the log is the confirmation.
   */
-  ["Third-party certification and audit", "Not yet answered, because nothing exists to answer it with. No SOC 2 report, no ISO 27001 certificate and no independent penetration-test report exists for this deployment, and no such review has been commissioned — which is why no badge appears anywhere on this site. An external penetration test is planned after the first paying customer; SOC 2 timing is not set. Every control above is enforced and checked by us, and that is the whole of what is being claimed."],
+  ["Third-party certification and audit — none yet", "Every control above is enforced and checked by us, and that is the whole of what is being claimed. Not yet answered is who else has checked: no SOC 2 report, no ISO 27001 certificate and no independent penetration-test report exists for this deployment, and no such review has been commissioned — which is why no badge appears anywhere on this site. An external penetration test is planned after the first paying customer; SOC 2 timing is not set."],
 ] as const;
 
 export default function SecurityPage() {
@@ -182,7 +182,7 @@ export default function SecurityPage() {
           <div className="body">
             <div className="stack">
               <p className="slate"><b>SECURITY</b><span />DATA PATH AND CONTROLS</p>
-              <h1 className="document-title">Where your documents go,<br />and what never sees them.</h1>
+              <h1 className="document-title">{"Where your documents go, "}<br />and what never sees them.</h1>
             </div>
             <div className="stack">
               <p className="lede">
@@ -213,6 +213,22 @@ export default function SecurityPage() {
                 ))}
               </div>
 
+              {/*
+                BA-155. One grid, not a controls grid followed by a section labelled "NOT ANSWERED
+                HERE" holding exactly one card that opened with "Not yet answered." The structure
+                itself was declaring a hole, and a grid of one is a grid that looks broken.
+
+                Nothing was deleted to close it: both rows are still here, in the same order, with
+                every absence they carried, and each now leads with the fact that is on record.
+                What replaced the label is a sentence that says what the two rows are.
+
+                They stay their own grid rather than joining the controls grid, and the reason is
+                `.tiles > :last-child:nth-child(odd)` in `tavonel.css`: eleven controls plus two
+                rows is thirteen, and the thirteenth would be stretched to the full width of the
+                section -- which is the defect BA-151 is about, one section further down the page.
+                Two tiles is an even grid. `trust-page-answers.test.ts` still holds both rows'
+                contents, and both `CONTROLS.map` and `UNANSWERED.map` are still what renders.
+              */}
               <p className="slate"><span />CONTROLS</p>
               <div className="tiles">
                 {CONTROLS.map(([title, body]) => (
@@ -222,36 +238,62 @@ export default function SecurityPage() {
                   </article>
                 ))}
               </div>
-
-              <p className="slate"><span />NOT ANSWERED HERE</p>
+              <p>
+                The two rows below are the questions a review asks that this deployment answers
+                with a record rather than with a commitment.
+              </p>
               <div className="tiles">
                 {UNANSWERED.map(([title, body]) => (
-                  <article className="tile" key={title}>
+                  <article className="tile" key={title} data-unanswered="1">
                     <h3>{title}</h3>
                     <p>{body}</p>
                   </article>
                 ))}
               </div>
 
+{/*
+                BA-151 and BA-152.
+
+                BA-151: five tiles in a two-column grid left the fifth stretched across the full
+                width by `.status-list > :last-child:nth-child(odd)`, so the one capability that
+                is off -- compiling customer data -- was the largest object in the section, on the
+                security page of a knowledge compiler. The four controls a customer can rely on now
+                fill the grid evenly and the workspace-activation row is prose underneath it, which
+                is also what BA-151 asks for. No tile can be promoted to hero size by an odd count
+                again, because the count is even and the exception is stated below in words.
+
+                BA-152: one amber HUMAN GATE badge was carrying two opposite meanings -- a designed
+                human decision point we sell, and an activation that has not happened. They are two
+                states now. BY DESIGN takes the `operational` colour because a human gate that is
+                working is a control that is working, not a degradation; the row that is off is the
+                one in prose, and it says "on request" there in words rather than in a badge.
+              */}
               <p className="slate"><span />CURRENT DEPLOYMENT CONTROLS</p>
               <div className="status-list">
-                {Object.entries(activationPolicy).map(([key, value]) => (
-                  <article key={key} data-state={value.enabled ? "operational" : "restricted"}>
-                    <span>{value.enabled ? "enabled" : "human gate"}</span>
-                    <h2>{CAPABILITY_LABELS[key as keyof typeof CAPABILITY_LABELS]}</h2>
-                    <p>{value.reason}</p>
-                  </article>
-                ))}
+                {Object.entries(activationPolicy)
+                  .filter(([key]) => key !== "customerData")
+                  .map(([key, value]) => (
+                    <article key={key} data-state="operational">
+                      <span>{value.enabled ? "enabled" : "by design"}</span>
+                      <h2>{CAPABILITY_LABELS[key as keyof typeof CAPABILITY_LABELS]}</h2>
+                      <p>{value.reason}</p>
+                    </article>
+                  ))}
               </div>
               <p className="fine">
+                {CAPABILITY_LABELS.customerData} is enabled per workspace on request, not by a
+                checkout: {activationPolicy.customerData.reason}
+              </p>
+              <p className="fine">
                 Promotion is closed by design: a candidate world becomes active only after an
-                authenticated person approves it.
+                authenticated person approves it. Retention and deletion are set out step by step
+                in the <Link href={"/privacy" as Route}>privacy notice</Link>, and a security
+                review or a vulnerability report reaches us{" "}
+                <Link href={"/contact" as Route}>here</Link>.
               </p>
 
               <div className="actions">
                 <Link className="btn ghost" href={"/subprocessors" as Route}>Subprocessors</Link>
-                <Link className="btn ghost" href={"/privacy" as Route}>Data handling and retention</Link>
-                <Link className="btn ghost" href={"/contact" as Route}>Security contact</Link>
               </div>
             </div>
             <TrustNext from="/security" />

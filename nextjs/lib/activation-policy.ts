@@ -24,7 +24,12 @@
   the two enforced controls are the whole of what the string claims.
 */
 export const activationPolicy = {
-  customerIntake: { enabled: true, reason: "Customer intake is open. Files go to the TAVONEL quarantine bucket before processing, and no other part of the deployment reads them there." },
+  /*
+    BA-175. "Bucket" is a storage product, not a customer concept, and the PATH row on /security
+    already says "tenant-scoped quarantine" two sections above this one. The two now use the same
+    words for the same place.
+  */
+  customerIntake: { enabled: true, reason: "Customer intake is open. Files go to tenant-scoped quarantine storage before processing, and no other part of the deployment reads them there." },
   /*
     C-13 names the path that is actually carrying production Worker traffic.
 
@@ -41,7 +46,20 @@ export const activationPolicy = {
   cdr: { enabled: true, reason: "Quarantine source objects are sanitized by an IAM-only PDFium and ClamAV service before anything downstream reads them. The production Worker uses short-lived workload identity, refuses redirects, and stores only digest-bound immutable PDFs for downstream reading." },
   ocrGpu: { enabled: true, reason: "GPU OCR is open, with scale-to-zero and candidate-only review controls enforced." },
   candidatePromotion: { enabled: false, reason: "Promotion is always an explicit human decision." },
-  customerData: { enabled: false, reason: "Customer-data processing is gated until the security suite passes and the founder records an approval receipt." },
+  /*
+    BA-118. This one string renders on /pricing, /security, /status, /login and /workspace, so the
+    three words it used to carry -- "the founder", "the security suite" (our own CI) and "an
+    approval receipt" (our own word) -- described the company's unfinished internal work on the
+    page a buyer uses to judge it.
+
+    What replaces them is the same fact in the reader's terms: this deployment does not compile
+    your files yet, a finished public World is readable in full today, and intake is arranged with
+    us rather than switched on by a checkout. The audit's proposed sentence ("Source intake is
+    enabled per account") was not taken: there is no per-account intake flag anywhere in this
+    repository -- `activationPolicy` is one deployment-wide boolean -- so it would have described
+    a mechanism the code does not have.
+  */
+  customerData: { enabled: false, reason: "Compiling your own files is not open in this deployment yet. A completed public Compiled World is open to read in full today, and intake for your own sources is arranged with us." },
 } as const;
 
 export type ActivationCapability = keyof typeof activationPolicy;

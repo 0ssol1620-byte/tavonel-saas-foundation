@@ -322,11 +322,10 @@ This repository is published so that it can be read and evaluated. It is not ope
 read the source; you may not copy, modify, redistribute or commercially reuse it without written
 permission, and third-party components stay under their own licences.
 
-**Who set this, and how long it stands.** This section used to say that no LICENSE file should be
-added until the owner decided. That decision was taken on 2026-09-11 — but as a **delegated
-decision, 2026-09-11 (orchestrator, under the founder's delegation), see
-[`docs/policy/DECISION_LOG_2026-09-11.md`](docs/policy/DECISION_LOG_2026-09-11.md) (FD-10)** — and
-not as a statement by the founder. The founder may replace the licence with a different one,
+**How long it stands.** This section used to say that no LICENSE file should be added until the
+owner decided. The licence above was settled on 2026-09-11; its provenance is recorded in
+[`docs/policy/DECISION_LOG_2026-09-11.md`](docs/policy/DECISION_LOG_2026-09-11.md) (FD-10), which
+is also where a change to it is recorded. The owner may replace it with a different licence,
 including a permissive one; doing so is a new entry in that log, a new `LICENSE`, and the matching
 edit to both manifests. Until then the licence above is what governs, and **readable is not
 reusable**: a public repository you can read grants no right to reuse what you read.

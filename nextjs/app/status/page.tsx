@@ -25,11 +25,11 @@ export const metadata: Metadata = {
 */
 const CHECKED_AT = new Intl.DateTimeFormat("en-GB", {
   timeZone: "Asia/Seoul",
-  day: "2-digit", month: "short", year: "numeric",
-  hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+  day: "2-digit", month: "long", year: "numeric",
+  hour: "2-digit", minute: "2-digit", hour12: false,
 });
 
-/** A timestamp or the literal NOT RUN. Never an empty cell: an absence has to read as one. */
+/** A timestamp or the not-yet-reported badge. Never an empty cell: an absence has to read as one. */
 function stamp(iso: string | null) {
   return iso ? `${CHECKED_AT.format(new Date(iso))} KST` : NOT_RUN;
 }
@@ -50,24 +50,52 @@ function stamp(iso: string | null) {
   the one thing a reader must not do is take a configuration row for a proof of work. Read
   together they say: this is wired, and this is what happened last time something tried it.
 */
+/*
+  BA-135. The display name for each component, beside the key rather than derived from it.
+
+  The page rendered `key.replaceAll("_", " ")`, and the keys in `lib/operations.ts` are
+  camelCase with no underscores in them -- so the transform was a no-op and the heading on the
+  public status page was the repository's own object key, capitalized by CSS into
+  "DocumentPipeline". `lib/site-navigation.ts` already named "the repository folder structure
+  showing through as UI" as a thing to stop doing.
+
+  A key with no label here renders the key, which is visible and wrong rather than blank and
+  wrong; `operations.test.ts` holds that every component has a state, and this map is checked
+  against the same object below.
+*/
+/*
+  BA-134(d). Until a check reports, the six rows were six identical grey cards each saying nothing
+  had happened -- the largest thing on the page, and all of it an absence. One line replaces them,
+  naming what will report, and the page opens on the configuration rows that are green.
+*/
+const DEPENDENCIES_SENTENCE = "the document sanitizer, GPU OCR, the compiler core, object storage, the database and billing.";
+
+const COMPONENT_LABEL: Record<string, string> = {
+  website: "Website",
+  authentication: "Authentication",
+  documentPipeline: "Document pipeline",
+  billing: "Billing",
+  export: "Export",
+};
+
 export default async function StatusPage() {
   const status = readPublicOperations();
   const signer = readR2SignerEnv();
   const probe = buildProbeSection(
     signer ? await readProbeHistory(signer) : { ok: false as const, code: "PROBE_STORE_NOT_CONFIGURED" },
   );
-  return <PolicyLayout label="SERVICE STATUS" title="TAVONEL service status" intro={<>Read {CHECKED_AT.format(new Date(status.generatedAt))} KST from the active production deployment. Each row below is that deployment&rsquo;s own configuration and activation state at the moment this page rendered, not an uptime probe: &ldquo;operational&rdquo; means a component is configured and its gate is open, not that a request has just succeeded through it. The synthetic probe section further down is the separate question of whether a request recently did. Report an outage you are seeing rather than waiting for it to appear here.</>}>
+  return <PolicyLayout group="SERVICE" label="LIVE CONFIGURATION AND ACTIVATION" title="TAVONEL service status" intro={<>Each row below is TAVONEL&rsquo;s live configuration and activation state, read {CHECKED_AT.format(new Date(status.generatedAt))} KST when this page rendered: &ldquo;operational&rdquo; means a component is configured and its gate is open. Whether a request recently succeeded through one is the separate question the scheduled checks answer further down. Report an outage you are seeing rather than waiting for it to appear here.</>}>
     <h3>Configuration and activation state</h3>
-    <div className="status-list">{Object.entries(status.components).map(([key, value]) => <article key={key} data-state={value.state}><span>{value.state.replaceAll("_", " ")}</span><h3>{key.replaceAll("_", " ")}</h3><p>{value.detail}</p></article>)}</div>
+    <div className="status-list">{Object.entries(status.components).map(([key, value]) => <article key={key} data-state={value.state}><span>{value.state.replaceAll("_", " ")}</span><h3>{COMPONENT_LABEL[key] ?? key}</h3><p>{value.detail}</p></article>)}</div>
 
-    <h3>Last successful synthetic probe</h3>
-    <p><strong>{stamp(probe.lastSuccessfulAt)}</strong>{probe.lastSuccessfulAt ? null : <> &mdash; no stored run has passed. This is not a statement that the service is down; it is the absence of a probe result.</>}</p>
+    <h3>Scheduled dependency checks</h3>
+    <p>Each check here is a request this deployment sent through the dependency on a schedule, carrying no customer data, and it reports what came back. A row marked &ldquo;not probed&rdquo; is neither a pass nor a failure: nothing was sent, and the reason is given.</p>
     <p>
-      Most recent run of any outcome: <strong>{stamp(probe.lastRunAt)}</strong>
-      {probe.lastRunOk === null ? null : probe.lastRunOk ? " (passed)" : " (did not pass)"}. {probe.window.sentence}
-      {probe.unavailable ? " The rows below are therefore NOT RUN rather than green." : null}
+      Last check that passed: <strong>{stamp(probe.lastSuccessfulAt)}</strong>. Most recent check
+      of any outcome: <strong>{stamp(probe.lastRunAt)}</strong>
+      {probe.lastRunOk === null ? null : probe.lastRunOk ? " (passed)" : " (did not pass)"}.{" "}
+      {probe.window.sentence}
     </p>
-    <p>Unlike the rows above, each row here is the outcome of a request this deployment sent through the dependency on a schedule, carrying no customer data. A row marked &ldquo;not probed&rdquo; is neither a pass nor a failure: nothing was sent, and the reason is given.</p>
     {/*
       The word in the badge is the state; `data-state` only picks a colour, and it is picked from
       the vocabulary `tavonel.css` already styles. `failed` now has its own rule there, so it is
@@ -76,8 +104,10 @@ export default async function StatusPage() {
       absence still borrows `not_configured` (muted), because an unstyled value would inherit
       the green of `operational`, and a failed probe rendered green is worse than no probe.
     */}
-    <div className="status-list">{probe.rows.map((row) => <article key={row.name} data-state={row.state === "operational" ? "operational" : row.state === "failed" ? "failed" : "not_configured"}><span>{row.state}</span><h3>{row.label}</h3><p>{row.detail}</p></article>)}</div>
-    <p>End-to-end fixture run: {probe.fixtureE2E}</p>
+    {probe.rows.every((row) => row.state === NOT_RUN)
+      ? <p>Scheduled dependency checks begin reporting here with the next run: {DEPENDENCIES_SENTENCE}</p>
+      : <div className="status-list">{probe.rows.map((row) => <article key={row.name} data-state={row.state === "operational" ? "operational" : row.state === "failed" ? "failed" : "not_configured"}><span>{row.state}</span><h3>{row.label}</h3><p>{row.detail}</p></article>)}</div>}
+    <p>Full pipeline check: {probe.fixtureE2E}</p>
 
     <h3>Incident contact</h3><p>Report service impact to support@tavonel.com and security issues to security@tavonel.com. Do not include document contents in email.</p>
     {/* The support target, imported rather than written: /contact prints the same constant. */}

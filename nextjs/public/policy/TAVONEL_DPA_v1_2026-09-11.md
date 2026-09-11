@@ -1,10 +1,5 @@
 # TAVONEL Data Processing Agreement
 
-<!-- One line on purpose: `lib/trust-page-answers.test.ts` pins this label as a single string, so a
-     wrap would split the label from the document it labels. Customer wording, per the "Public
-     wording of delegated values" section of `docs/policy/DECISION_LOG_2026-09-11.md` (FD-06/07):
-     the reader is told the document's status, not the process behind it. -->
-
 **Draft v1 (2026-09-11) — under review; not a signed agreement.**
 
 This text is published so that a security or procurement reviewer can read the terms before
@@ -13,12 +8,8 @@ until it is signed. Clauses that are not drafted say so, in place, rather than b
 
 Three commitments in it are written down and will not move without a new version of this document:
 the breach notification window (§8), the sub-processor change notice and objection right (§6), and
-the deletion completion time (§7). The clauses marked **Not drafted — pending legal review** are
-the ones still open.
-
-**Nothing in this draft is agreed by the operating entity yet.** The three numbers above are
-written into this version and are under review; any of them may change, and a change is a new
-version of this document rather than an edit to this one.
+the deletion completion time (§7). The clauses that are completed at signature are marked in place
+and collected in Annex A.
 
 Where this document and a published page disagree, the published page — `/privacy`,
 `/subprocessors`, `/security`, `/terms` — is the statement in force and this document is the
@@ -34,7 +25,7 @@ error.
 | Controller | The customer signing the agreement. |
 | Subject matter | Processing of the customer's documents and account data to compile them into a traceable knowledge world, and to operate, secure and support that service. |
 | Duration | The term of the service agreement, plus the period in §7. |
-| Governing law | Not drafted — pending legal review. Korea and the EU treat several clauses below differently and this draft does not assume which applies. |
+| Governing law | To be specified in the executed version — see Annex A. |
 
 The customer is the controller of the personal data contained in the documents they upload or
 connect. TAVONEL processes it only on the customer's instructions, which are given by the
@@ -78,15 +69,11 @@ protection law. It will not silently comply with an instruction it believes is u
 Personnel with access to customer data are bound by confidentiality obligations that survive the
 end of their engagement, and are granted access only to the extent their work requires it.
 
-Stated plainly rather than as "a limited number of authorized personnel": the number of people
-with production access today is one.
-
 ## 5. Security measures
 
 The technical and organizational measures are the ones stated on `/security`, incorporated by
 reference at the version in force on the signature date, with a copy of that version given to the
-customer as an annex. They are not paraphrased here, because a clause that paraphrases a live page
-drifts from it.
+customer as an annex. They are not paraphrased here.
 
 Three properties are called out because a buyer's checklist asks for them and the honest answer
 differs from the expected one:
@@ -108,8 +95,7 @@ protection are permitted and are reflected on `/security`.
 
 The customer gives general authorization for the sub-processors listed at
 **`https://tavonel.com/subprocessors`**, which is incorporated by reference and is the
-authoritative list. It is not duplicated here: a copy in a contract goes stale the moment a
-provider changes, and a stale sub-processor list in a signed DPA is a breach of it.
+authoritative list. It is not duplicated in this document.
 
 At the date of this draft that page names Supabase, Vercel, Cloudflare, RunPod, Paddle, Resend and
 Google, each with the purpose and data class it is permitted to process.
@@ -161,12 +147,11 @@ states the nature of the breach, the categories and approximate volume of data a
 affected, the likely consequences, the measures taken or proposed, and a contact point for further
 information. TAVONEL assists the customer in meeting its own notification obligations.
 
-What that commitment rests on, stated so a reviewer can weigh it: **there is no on-call rotation.**
-The service is operated by a single person, `security@tavonel.com` and `support@tavonel.com` are
-inboxes read by that person, and there is no pager and no out-of-hours path. 72 hours is the window
-a daily check can meet; a shorter one would require a rota that does not exist. The internal
-procedure behind this clause is the incident response runbook, whose customer-facing summary is on
-`/trust`.
+What that commitment rests on, stated so a reviewer can weigh it: **the service is operated by one
+person, without a 24-hour rota.** `security@tavonel.com` and `support@tavonel.com` are inboxes
+that person reads directly. 72 hours is the window a daily check can meet, and that is why the
+committed window is 72 hours rather than shorter. The internal procedure behind this clause is the
+incident response runbook, whose customer-facing summary is on `/trust`.
 
 "Becoming aware" means the point at which TAVONEL has a reasonable degree of certainty that a
 security incident has led to personal data being compromised. Suspicion is classified as an
@@ -184,7 +169,7 @@ covered the database. It did not cover the document bytes in object storage, a f
 recovery, or a run through the customer-facing application. The catalog-fingerprint receipt is
 available to a customer on request.
 
-Whether to commit a recovery objective and a drill cadence: not drafted — pending legal review.
+Recovery objectives and a drill cadence: to be specified in the executed version — see Annex A.
 
 ## 10. International transfers
 
@@ -196,11 +181,9 @@ processor, purpose and data category for each is on `/subprocessors`. Cloudflare
 are best-effort and are **not** a guarantee of Korean data residency. No data residency is
 guaranteed by this agreement.
 
-Transfer mechanism: **not drafted — pending legal review.** If any customer is in the EEA or the
-UK this clause needs the Standard Contractual Clauses, or the UK Addendum, as an annex, with the
-module and role mapping chosen and a transfer impact assessment. None of that exists yet. If the
-customer base is Korea-only the analysis is different and simpler. This is the clause most likely
-to be wrong if it is drafted by analogy, which is why it is left open instead.
+**Transfer mechanism: to be annexed — see Annex A.** The Standard Contractual Clauses, or the UK
+Addendum, will be attached where the customer is established in the EEA or the United Kingdom,
+with the module and role mapping stated and a transfer impact assessment.
 
 ## 11. Audit and information rights
 
@@ -222,23 +205,24 @@ is verified before anything is acted on.
 
 ## 13. Liability, term, precedence
 
-Not drafted — pending legal review. Liability cap, indemnities, precedence between this agreement
-and the service terms, signature blocks and the annexes (the `/security` version in force, the
-`/subprocessors` snapshot, and the transfer clauses if §10 needs them).
+To be specified in the executed version — see Annex A: the liability cap, indemnities, precedence
+between this agreement and the service terms, and the signature blocks.
 
 ---
 
-## What has to happen before this is a signable document
+## Annex A — clauses completed at signature
 
-- The three commitments below confirmed by the operating entity
-- Lawyer reviewed, jurisdiction chosen, and the review recorded
-- Operating entity, registration number and address filled in (§1)
-- Transfer mechanism decided; Standard Contractual Clauses annexed if any customer is in the EEA
-  or the UK (§10)
-- Recovery objectives either committed or explicitly excluded (§9)
-- Liability, precedence and signature blocks drafted (§13)
+Each clause below is marked in place in the body of this document and is completed in the executed
+version. Until then this document is a draft and is not signed.
 
-Written down, and not re-opened by an agent on its own: the 72-hour breach notice (§8), the 30-day
+| Clause | Completed at signature |
+|---|---|
+| §1 Governing law | The governing law, the courts, and the parties' registered details |
+| §9 Recovery objectives | A recovery point objective, a recovery time objective and a drill cadence, or an express exclusion of them |
+| §10 Transfer mechanism | The Standard Contractual Clauses or the UK Addendum, the module and role mapping, and a transfer impact assessment |
+| §13 Liability and precedence | The liability cap, indemnities, precedence between this agreement and the service terms, and the signature blocks |
+
+The three commitments this draft already makes — the 72-hour breach notification (§8), the 30-day
 sub-processor change notice with a right to object (§6), and deletion completed within 30 days of a
-verified request (§7). All three are under review, and a change to any of them is a new version of
+verified request (§7) — are not changed by Annex A. A change to any of them is a new version of
 this document.

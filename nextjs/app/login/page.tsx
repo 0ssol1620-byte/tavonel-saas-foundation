@@ -162,7 +162,7 @@ export default function LoginPage() {
 
       <div className="auth-body">
         <div className="auth-card">
-          <p className="eyebrow">{intent || recipe ? "SIGN IN TO CONTINUE" : "SIGN IN"}</p>
+          {intent || recipe ? <p className="eyebrow">SIGN IN TO CONTINUE</p> : null}
           <h1>
             {intent ? "One step before checkout."
               : recipe ? "One step before you run this."
@@ -205,7 +205,7 @@ export default function LoginPage() {
           <div className="auth-actions">
             <button className="btn" type="button" onClick={() => void signIn()} disabled={busy || authState !== "ready"}>
               {authState === "checking" ? "Checking this deployment…" :
-                authState === "unconfigured" ? "Sign-in unavailable here" :
+                authState === "unconfigured" ? "Sign-in unavailable" :
                 busy ? "Opening Google…" : "Continue with Google"}
             </button>
             {authState === "ready" && !customerProcessingEnabled ? (
@@ -216,9 +216,8 @@ export default function LoginPage() {
 
           {authState === "unconfigured" ? (
             <p className="notice static" role="status">
-              <strong>No auth provider is configured in this deployment.</strong> The sign-in
-              control stays disabled rather than failing on click. Nothing is wrong with your
-              account.
+              <strong>Sign-in is temporarily unavailable.</strong> Try again shortly, or reach us
+              at <a href="mailto:support@tavonel.com">support@tavonel.com</a>.
             </p>
           ) : null}
           {error ? <p className="notice static" role="alert"><strong>Sign-in did not start.</strong> {error}</p> : null}
@@ -230,6 +229,10 @@ export default function LoginPage() {
             {selfService && customerProcessingEnabled ? <li><b>Bounded evaluation.</b> Free compute is limited before processing begins, so paid workloads remain protected.</li> : null}
           </ul>
         </div>
+        <p className="fine auth-legal">
+          <Link href="/privacy">Privacy notice</Link> · <Link href="/terms">Terms</Link> ·{" "}
+          <Link href="/security">Security</Link> · <Link href="/contact">Contact</Link>
+        </p>
       </div>
     </main>
   );

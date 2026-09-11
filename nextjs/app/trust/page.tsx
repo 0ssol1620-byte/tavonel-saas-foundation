@@ -90,8 +90,17 @@ const DESTINATIONS: Array<[string, string, Route]> = [
   that page and is asserted there by `lib/trust-page-answers.test.ts`; repeating it here would
   create a second copy to keep in step, and the copy on a summary page is the one that goes stale.
 */
-const PUBLISHED: Array<[string, string, string]> = [
-  ["Architecture and data flow", "Security", "The enforced boundary in order, and which component holds a document body at each step."],
+/*
+  BA-160. The fourth element is where the row's own label points.
+
+  Every row names the page that answers it -- "Security", "Privacy notice", "security.txt" -- and
+  not one of them was clickable, on an index whose entire reason to exist is to be a set of
+  destinations. The tiles above became anchors for exactly this reason (see the note there); these
+  rows now do the same. A row answered by this page itself carries `null` and stays an `article`,
+  because a link to where you already are is worse than no link.
+*/
+const PUBLISHED: Array<[string, string, string, string | null]> = [
+  ["Architecture and data flow", "Security", "The enforced boundary in order, and which component holds a document body at each step.", "/security"],
   /*
     Two rows moved here from the not-published list on 2026-09-11, when the three numbers that were
     blocking them were settled as a delegated decision (orchestrator, under the founder's
@@ -105,18 +114,34 @@ const PUBLISHED: Array<[string, string, string]> = [
     an operating procedure, not a statement to a buyer -- and the two sentences a buyer is actually
     choosing between are here: who is reachable, and by when they will be told.
   */
-  ["Data processing agreement", "DPA v1 draft", "Published for reading at a URL: the notification, sub-processor and deletion commitments are written down rather than described. It is a draft under review, it is not a signed agreement, and the clauses still open -- governing law, transfer mechanism, liability -- say so in place."],
-  ["Incident response", "This page", "There is no on-call rotation: one person operates the service, and security@tavonel.com is an inbox that person reads. The commitment that follows from that is notification of an affected customer without undue delay and no later than 72 hours after becoming aware of a breach of their personal data. No tabletop exercise has been run yet."],
-  ["Data residency", "Privacy notice", "The database is configured in Seoul, and no data residency is guaranteed. Several providers may process limited data through infrastructure outside Korea, and the object-storage location hint is best-effort rather than a promise. The subprocessors page names which provider handles which data class."],
-  ["Data handling", "Privacy notice", "Categories collected, purposes, storage locations, international processing, and the optional website analytics you can decline or withdraw."],
-  ["Retention and deletion", "Privacy notice", "Source material and derived artifacts are deleted on a verified request. No retention period in days is published: data remains until workspace deletion, a verified request, or a legal duty."],
-  ["Encryption", "Security", "TLS in transit throughout; stored objects encrypted at rest by the storage provider. There is no customer-managed key."],
-  ["Access control", "Security", "Workspace membership checked server-side on every request. There are no roles, no SSO and no seat model in this deployment."],
-  ["Tenant isolation", "Security", "Workspace identity is derived server-side from the session, never from an identifier the browser supplies; storage prefixes, rows and signed capabilities are scoped to it."],
-  ["Subprocessors", "Subprocessors", "Named service, purpose and data class, with a change notice commitment."],
-  ["Content disarm and malware", "Security", "Quarantine, mandatory scanning and sanitization before anything downstream reads a document. Which sanitizer build is actually running is named there rather than assumed."],
-  ["Vulnerability disclosure", "security.txt", "Reporting address and policy, served at the well-known path a scanner looks for."],
-  ["Security contact", "Contact and security.txt", "The same address in both places."],
+  ["Data processing agreement", "DPA v1 draft", "Published for reading at a URL: the notification, sub-processor and deletion commitments are written down rather than described. It is a draft under review, it is not a signed agreement, and the clauses still open -- governing law, transfer mechanism, liability -- say so in place.", DPA_URL],
+  /*
+    BA-144. The FD identifiers and the delegated-decision provenance this row used to carry were
+    already gone before this lane started; what was left was the order. The row opened on "There is
+    no on-call rotation", so the first thing a procurement reader learned about incident response
+    was a staffing gap.
+
+    It now opens with who is reachable and how directly, and the staffing fact follows in the same
+    breath -- which is the order `trust-page-answers.test.ts` requires, and it requires it for a
+    reason: a 72-hour window read without the staffing behind it looks like a staffed process.
+
+    The audit's proposed sentence was not used. "One team operates the service" claims a team this
+    company does not have, and "Severity handling and the post-incident record follow a written
+    internal procedure, summarised here" claims to publish a summary of a runbook that stays
+    internal -- the same test bans the word for that reason. The absence of a tabletop exercise
+    stays too: this is the page that is the right place to state it once.
+  */
+  ["Incident response", "This page", "One person operates the service and reads security@tavonel.com directly. There is no on-call rotation and no triage tier in front of that inbox. An affected customer is notified without undue delay and no later than 72 hours after we become aware of a breach of their personal data. No tabletop exercise has been run yet.", null],
+  ["Data residency", "Privacy notice", "The database is configured in Seoul, and no data residency is guaranteed. Several providers may process limited data through infrastructure outside Korea, and the object-storage location hint is best-effort rather than a promise. The subprocessors page names which provider handles which data class.", "/privacy"],
+  ["Data handling", "Privacy notice", "Categories collected, purposes, storage locations, international processing, and the optional website analytics you can decline or withdraw.", "/privacy"],
+  ["Retention and deletion", "Privacy notice", "Source material and derived artifacts are deleted on a verified request. No retention period in days is published: data remains until workspace deletion, a verified request, or a legal duty.", "/privacy"],
+  ["Encryption", "Security", "TLS in transit throughout; stored objects encrypted at rest by the storage provider. There is no customer-managed key.", "/security"],
+  ["Access control", "Security", "Workspace membership checked server-side on every request. There are no roles, no SSO and no seat model in this deployment.", "/security"],
+  ["Tenant isolation", "Security", "Workspace identity is derived server-side from the session, never from an identifier the browser supplies; storage prefixes, rows and signed capabilities are scoped to it.", "/security"],
+  ["Subprocessors", "Subprocessors", "Named service, purpose and data class, with a change notice commitment.", "/subprocessors"],
+  ["Content disarm and malware", "Security", "Quarantine, mandatory scanning and sanitization before anything downstream reads a document. Which sanitizer build is actually running is named there rather than assumed.", "/security"],
+  ["Vulnerability disclosure", "security.txt", "Reporting address and policy, served at the well-known path a scanner looks for.", "/.well-known/security.txt"],
+  ["Security contact", "Contact and security.txt", "The same address in both places.", "/contact"],
 ];
 
 /*
@@ -140,8 +165,16 @@ const PUBLISHED: Array<[string, string, string]> = [
   because none has been chosen. `lib/trust-page-answers.test.ts` fails on a date appearing here.
 */
 const NOT_PUBLISHED: Array<[string, string, Route | null]> = [
-  ["Recovery objectives", "Not yet published. This deployment states no recovery point objective, no recovery time objective and no backup retention period. One restore has been performed and checked, and the security page carries its date, its scope and what it does not commit to. The absence of a target is the state of it; ask before you depend on one.", "/security" as Route],
-  ["Third-party certification and audit", "Not published, because there is nothing to publish. No SOC 2 report, no ISO 27001 certificate and no independent penetration-test report exists for this deployment, and no such review has been commissioned. That is why no badge appears anywhere on this site. An external penetration test is planned after the first paying customer; SOC 2 timing is not set. What does exist is on the security page: the controls this deployment enforces, checked by us.", "/security" as Route],
+  /*
+    BA-150. Both rows start with the fact that is on record and then state what is not committed.
+
+    Nothing was deleted to do it: every absence these two rows carried is still in them, in the
+    same words. What changed is the order, because three of the four tiles on this page opened with
+    "Not yet published" and a reader scanning the section met the same non-answer three times
+    before meeting a single thing that is true.
+  */
+  ["Recovery objectives", "One database restore is on record: it was performed and checked, and the security page carries its date, its scope and what it does not commit to. No recovery point objective, no recovery time objective and no backup retention period is published for this deployment. The absence of a target is the state of it; ask before you depend on one.", "/security" as Route],
+  ["Third-party certification and audit", "What exists is on the security page: the controls this deployment enforces, checked by us. No SOC 2 report, no ISO 27001 certificate and no independent penetration-test report exists for this deployment, and no such review has been commissioned — which is why no badge appears anywhere on this site. An external penetration test is planned after the first paying customer; SOC 2 timing is not set.", "/security" as Route],
 ];
 
 export default function TrustCenterPage() {
@@ -151,26 +184,41 @@ export default function TrustCenterPage() {
         <div className="shell">
           <div className="body">
             <div className="stack">
-              <p className="slate"><b>TRUST CENTER</b><span />WHAT IS PUBLISHED, AND WHAT IS NOT</p>
-              <h1 className="document-title">Everything we publish<br />about handling your documents.</h1>
+              {/*
+                BA-150. The eyebrow named this page's two sections. It now names the page's
+                subject, which is what a procurement reader scanning for it is looking for.
+
+                BA-176: the trailing space before the break has to be a string literal. JSX drops
+                the whitespace at the end of a text line, so the accessible name and the document
+                outline both read "publishabout" without it.
+              */}
+              <p className="slate"><b>TRUST CENTER</b><span />SECURITY AND COMPLIANCE</p>
+              <h1 className="document-title">{"Everything we publish "}<br />about handling your documents.</h1>
             </div>
             <div className="stack">
               {/*
-                The count in this sentence has to reconcile with the two arrays above, because a
-                reader who counts the rows is exactly the reader this page is for. Fifteen rows:
-                twelve of §45's thirteen answered, one of them not, and two questions the checklist
-                never names -- where the data sits, which is answered, and whether anyone outside
-                this company has audited it, which is not. The residency row was added on
-                2026-09-11 and was for one commit uncounted here.
+                BA-164 and BA-150. Two things were wrong with this sentence and both were counting.
+
+                "The same thirteen things every time" states a universal thirteen-item security
+                review that does not exist -- the thirteen is §45's internal list, so the sentence
+                asserted an unverifiable fact as given and leaked the shape of an internal spec.
+                And building the lede out of "twelve... one... two more" made the reader do
+                arithmetic to find out what is published, with the bold weight landing on the two
+                absences.
+
+                So the count is gone from the copy, and what remains is checkable against the page
+                itself: the rows below, and the two that are named as unpublished. The absences are
+                still here, in the same paragraph, unbolded and after what is provided.
+                `lib/trust-page-answers.test.ts` holds this page and /pricing to the same two
+                absences instead of to a shared number.
               */}
               <p className="lede">
-                A security review asks the same thirteen things every time. Twelve of them are
-                answered on the pages below, including a data processing agreement you can read
-                now — as a draft, labelled as one.<b> One is not answered: this deployment sets no
-                recovery objective. Two more rows answer what the checklist never asks — where your
-                data sits, which is answered, and whether anyone outside this company has audited
-                it, which is not. Both absences are listed</b> — a review that finds them here is
-                faster than one that finds them after a pilot.
+                A security review asks for the same set of evidence every time. Those answers are
+                published on the pages below, in the wording the answering page maintains, including
+                a data processing agreement you can read now — as a draft, labelled as one. Two are
+                not published: this deployment sets no recovery objective, and nobody outside this
+                company has audited it. Both are listed below with what stands in their place, so a
+                review reaches its decision here.
               </p>
               {/*
                 B04. Five hubs -- this one, Evidence, Benchmarks, Reproducibility, Research --
@@ -244,16 +292,27 @@ export default function TrustCenterPage() {
 
               <p className="slate"><span />WHAT A REVIEW ASKS, AND WHERE IT IS ANSWERED</p>
               <div className="chain">
-                {PUBLISHED.map(([question, where, detail]) => (
-                  <article className="link" key={question}>
-                    <span className="st">{where}</span>
-                    <h2>{question}</h2>
-                    <p>{detail}</p>
-                  </article>
-                ))}
+                {/*
+                  BA-160. Each row is the anchor, for the same reason the tiles above are: the row
+                  already displays the name of the page that answers it, and a displayed
+                  destination that does not navigate is the defect on an index page. A row answered
+                  by this page carries no href and stays an `article`.
+
+                  The DPA is a served file rather than a route, so it takes a plain anchor, and the
+                  label travels with it in the `where` column exactly as it does on the tile.
+                */}
+                {PUBLISHED.map(([question, where, detail, href]) => {
+                  const inside = <><span className="st">{where}</span><h2>{question}</h2><p>{detail}</p></>;
+                  if (!href) return <article className="link" key={question}>{inside}</article>;
+                  if (href.startsWith("/policy/") || href.startsWith("/.well-known/")) {
+                    return <a className="link trust-link" key={question} href={href}>{inside}</a>;
+                  }
+                  return <Link className="link trust-link" key={question} href={href as Route}>{inside}</Link>;
+                })}
               </div>
 
-              <p className="slate"><span />NOT ANSWERED ANYWHERE YET</p>
+              {/* BA-150. The section label states its subject rather than declaring a hole. */}
+              <p className="slate"><span />WHAT IS NOT PUBLISHED YET</p>
               <div className="tiles">
                 {NOT_PUBLISHED.map(([title, body, href]) => (
                   <article className="tile" key={title}>
@@ -264,9 +323,15 @@ export default function TrustCenterPage() {
                 ))}
               </div>
 
+              {/*
+                BA-173. The first sentence answered an accusation nobody made ("nothing here is a
+                summary of a document you cannot read") in 11px mono at the foot of the page, which
+                is the tone `public-copy-purge.test.ts` exists to remove. What is left is the
+                maintenance rule, which is a fact a reviewer can use.
+              */}
               <p className="fine">
-                Nothing here is a summary of a document you cannot read. Each row points at the
-                page that makes the statement, and that page is where the wording is maintained.
+                Each row points at the page that makes the statement, and that page is where the
+                wording is maintained.
               </p>
 
               <div className="actions">

@@ -15,8 +15,11 @@ Edit the served file; this one records only what an agent must not decide again.
 - Now: v1 draft published for reading, with three of those numbers set as a **delegated decision,
   2026-09-11 (orchestrator, under the founder's delegation) — see
   `docs/policy/DECISION_LOG_2026-09-11.md`** (FD-06/07) and recorded below. Superseded
-  `[FOUNDER]` markers are gone from the served text; the clauses still open say *not drafted —
-  pending legal review* in place.
+  `[FOUNDER]` markers are gone from the served text; the clauses completed at signature are
+  marked in place as *to be specified in the executed version* and are collected in the served
+  document's **Annex A** (BA-170: four separate "not drafted" notices read as an abandoned
+  document, and the reasoning that stood in for three of the clauses was a founder's memo rather
+  than a clause).
 
 ## Delegated decision, 2026-09-11, and not re-opened by an agent on its own
 
@@ -42,7 +45,17 @@ version of the served document or a reversal in the decision log.
 
 Governing law and jurisdiction (§1) · transfer mechanism and any Standard Contractual Clauses
 (§10) · recovery objectives (§9) · liability, precedence and signature blocks (§13) · the
-operating entity's registered details (§1).
+operating entity's registered details (§1). These five are the served document's Annex A, and the
+annex is the list -- adding a sixth open clause means adding a row there, not a sixth notice in
+the body.
+
+Two customer-facing disclosures came off the served text on 2026-09-12 and are recorded here
+instead. BA-168: §4's confidentiality clause no longer states that the number of people with
+production access is one -- the obligation is unchanged, the count added nothing a customer could
+act on, and it published the size of the company. §8 keeps the staffing disclosure, because it is
+the honest reason the window is 72 hours rather than 24, in customer wording. BA-146: the paragraph
+saying nothing in the draft was agreed by the operating entity yet is gone; the draft label at the
+top of the document and the "new version, not an edit" rule say what a reader needs.
 
 ## What must change together
 

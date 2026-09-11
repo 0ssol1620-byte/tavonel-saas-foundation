@@ -51,10 +51,23 @@ describe("customer data is not on the live compile path", () => {
     expect(coreRuntimeSource).toContain('privacyPolicy: "foundation_synthetic_only";');
   });
 
-  it("keeps the deployment's customer-data capability closed", () => {
+  /*
+    BA-118. The fact this case exists to pin is that the closed gate is *stated* on every public
+    surface that renders the policy, not that it is stated in any particular words. It used to pin
+    "security suite" and "approval receipt" -- our CI and our own internal noun -- which held
+    internal-process vocabulary in place on /pricing, /security, /status and /login.
+
+    So the assertions moved to the fact and got tighter rather than looser: the gate is closed, the
+    sentence says the compile is not open, it names what a reader can do instead, and it may not
+    reach for the internal vocabulary again.
+  */
+  it("keeps the deployment's customer-data capability closed, and says so in customer words", () => {
     expect(activationPolicy.customerData.enabled).toBe(false);
-    expect(activationPolicy.customerData.reason).toMatch(/security suite/i);
-    expect(activationPolicy.customerData.reason).toMatch(/approval receipt/i);
+    const { reason } = activationPolicy.customerData;
+    expect(reason, "the closed gate is stated").toMatch(/is not open in this deployment/i);
+    expect(reason, "and what is open instead is named").toMatch(/public Compiled World/i);
+    expect(reason, "with no internal-process vocabulary on a public surface")
+      .not.toMatch(/founder|approval receipt|security suite|delegated|decision log|FD-\d\d/i);
   });
 
   it("says so on the public capability grid", () => {
