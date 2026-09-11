@@ -636,3 +636,35 @@ describe("CA I04 /integrations states how the customer-run agent actually behave
     }
   });
 });
+
+/*
+  The one number about /trust that is typed on another page.
+
+  `/pricing`'s purchase-friction row for "Can an enterprise security review approve it?" quotes a
+  count of what the trust index publishes. It said ten of thirteen with three absences, which was
+  already wrong when it was written and became wronger when the 2026-09-11 lanes answered the DPA
+  and residency questions. A count on a buyer surface that no test reads is a count that drifts,
+  so both sentences are held to the same number here -- and to the arrays they describe, which are
+  what a reader who counts the rows will find.
+*/
+describe("the security-review count reconciles across the two pages that state it", () => {
+  const trust = withoutComments(read("app/trust/page.tsx"));
+  const pricing = withoutComments(read("components/pricing-page-client.tsx"));
+  const rows = (source: string, start: string, end: string) =>
+    (source.slice(source.indexOf(start), end ? source.indexOf(end) : undefined).match(/^ {2}\[/gm) ?? []).length;
+
+  it("says twelve answered and one unanswered on both pages", () => {
+    expect(trust, "/trust's lede").toContain("Twelve of them are");
+    expect(trust, "/trust names the one absence").toContain("One is not answered");
+    expect(pricing, "/pricing quotes the same count").toContain("Twelve of the thirteen things such a review asks are published");
+    expect(pricing, "/pricing quotes the same absence").toContain("this deployment sets no recovery objective");
+    expect(pricing, "the superseded count must not come back").not.toContain("Ten of the thirteen");
+  });
+
+  it("matches the rows a reader would count on the page", () => {
+    // Thirteen published = §45's twelve answered plus the residency row the checklist never asks;
+    // two not published = the recovery objective and the external audit.
+    expect(rows(read("app/trust/page.tsx"), "const PUBLISHED", "const NOT_PUBLISHED")).toBe(13);
+    expect(rows(read("app/trust/page.tsx"), "const NOT_PUBLISHED", "export default")).toBe(2);
+  });
+});

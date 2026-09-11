@@ -253,7 +253,15 @@ const PURCHASE_FAQ: Array<[string, string, Route, string]> = [
   ["Will I be locked in?", "The package is open formats — canonical JSON, Turtle, JSON-LD, CSV and JSONL — and the two verifiers are readable scripts rather than a service, so a package can be checked and loaded without us.", "/docs/exports" as Route, "The package format"],
   ["Can I export?", "Yes. Signed export is included from the free evaluation up, and the export is the whole World rather than a report about it.", "/docs/exports" as Route, "What is in the package"],
   ["Can I delete my data?", "Source material, derived artifacts and compiled packages are deleted on a verified request to privacy@tavonel.com. The categories and purposes are set out in the privacy notice.", "/privacy" as Route, "Storage and lifecycle"],
-  ["Can an enterprise security review approve it?", "Ten of the thirteen things such a review asks are published in one index, and the three that are not are listed there by name rather than left to be discovered after a pilot.", "/trust" as Route, "Trust Center"],
+  /*
+    The count was wrong before this campaign and wronger after it: /trust answered ten of the
+    thirteen with three absences when this row was written, and it answers twelve with one --
+    plus two rows the checklist never asks, one of which is the external-audit absence. The
+    trust-policy lane found it and could not fix it (this file is not its path).
+    `lib/trust-page-answers.test.ts` now holds this sentence and /trust's own lede to the same
+    number, so the two cannot part company again without a red test.
+  */
+  ["Can an enterprise security review approve it?", "Twelve of the thirteen things such a review asks are published in one index, and the one that is not — this deployment sets no recovery objective — is listed there by name rather than left to be discovered after a pilot.", "/trust" as Route, "Trust Center"],
 ];
 
 export default function PricingPageClient({

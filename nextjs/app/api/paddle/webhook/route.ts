@@ -52,6 +52,17 @@ export async function POST(request: Request) {
     eventType: action.eventType,
     action: action.action,
     result: typeof applied.result.status === "string" ? applied.result.status : "unknown",
+    /*
+      20260911130000: the included-page credit this grant expired, 0 on every other event.
+
+      The expiry is a durable ledger row with its own `kind`, so nothing depends on this line --
+      but a month's pages disappearing from a balance is the kind of thing support hears about
+      before anyone queries the ledger, and the RPC already returns the number. An integer about
+      the workspace's own billing: no document name, question, locator or key, and nothing route-,
+      score- or cost-matrix-shaped.
+    */
+    expiredIncludedUnits:
+      typeof applied.result.expiredIncludedUnits === "number" ? applied.result.expiredIncludedUnits : 0,
   });
   return NextResponse.json({ code: "EVENT_APPLIED", eventId: action.eventId, result: applied.result }, { status: 200, headers });
 }
