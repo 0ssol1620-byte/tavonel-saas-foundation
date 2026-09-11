@@ -26,11 +26,38 @@
 .whole .bracket { stroke: var(--verified); }
 .whole .what { fill: var(--text-lo); }
 
+/*
+  BA-017. The same content, in whichever form the width can carry.
+
+  Above 640px the drawing is the thing being read and the list is not rendered; below it they
+  swap. `display: none` rather than a visually-hidden class, deliberately: otherwise the six
+  stages are announced twice to a screen reader.
+*/
+.stack { display: none; }
+
 @media (max-width: 760px) {
   /*
-    Scaled to a phone's width the whole drawing renders at about a third size, which is a
-    picture of a diagram rather than a diagram. It keeps a legible width and its container
-    scrolls -- the same treatment every other wide thing on this site gets.
+    Between 640 and 760 the drawing still reads at a legible width and its container scrolls --
+    the same treatment every other wide thing on this site gets.
   */
   .diagram { min-width: 700px; }
+}
+
+@media (max-width: 640px) {
+  .diagram { display: none; }
+  .stack {
+    display: grid;
+    gap: 1px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border: 1px solid var(--hairline-hi);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--hairline);
+  }
+  .stack li { display: grid; gap: 4px; padding: 12px 14px; background: var(--ground); }
+  .stack b { color: var(--text-hi); font: 11px var(--f-mono); letter-spacing: .12em; }
+  .stack span { color: var(--text-lo); font-size: 12px; line-height: 1.5; }
+  .stackWhole b, .stackWhole span { color: var(--verified); }
 }
