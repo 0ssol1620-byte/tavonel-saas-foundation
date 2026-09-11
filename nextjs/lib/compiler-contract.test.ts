@@ -1,8 +1,8 @@
 import { spawnSync } from "node:child_process";
 import { createHash, generateKeyPairSync } from "node:crypto";
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { readCapabilities } from "./capabilities";
 import { CLAIM_STATE } from "./claim-state";
@@ -364,7 +364,7 @@ describe("contract promises", () => {
     // And the verifier a holder is told to run is now one a holder can actually download.
     const shipped = readdirSync(resolve(import.meta.dirname, "../public/developer"));
     expect(shipped.filter((file) => file.toLowerCase().includes("verify")).sort())
-      .toEqual(["tavonel-verify-export.mjs", "tavonel-verify-package.mjs"]);
+      .toEqual(["tavonel-verify-export.mjs", "tavonel-verify-package.mjs", "tavonel-verify-roundtrip.py"]);
     expect(read("../public/developer/tavonel-cli.mjs")).not.toContain("verify:export");
     expect(read("./collection-download.ts"), "the archive no longer writes the README the clause describes")
       .toContain("Verify manifest/export-manifest.json against signatures/export-manifest.ed25519.json");
@@ -392,6 +392,7 @@ describe("contract promises", () => {
     const published = {
       verifyExport: ["tavonel-verify-export.mjs", "../scripts/verify-signed-export.mjs"],
       verifyPackage: ["tavonel-verify-package.mjs", "../scripts/compiled-world/validate.mjs"],
+      verifyRoundtrip: ["tavonel-verify-roundtrip.py", "../scripts/compiled-world/verify-external-roundtrip.py"],
     } as const;
 
     for (const [key, [filename, origin]] of Object.entries(published)) {
@@ -400,11 +401,34 @@ describe("contract promises", () => {
       expect(channel.assets[key]?.url).toBe(`https://tavonel.com/developer/${filename}`);
       expect(channel.assets[key]?.sha256, `${filename} is not pinned to its own bytes in channel.json`)
         .toBe(`sha256:${createHash("sha256").update(readFileSync(resolve(import.meta.dirname, `../public/developer/${filename}`))).digest("hex")}`);
+      if (!filename.endsWith(".mjs")) continue;
       for (const match of source.matchAll(/^import\s[^;]*?from\s+"([^"]+)"/gm)) {
         expect(match[1], `${filename} imports ${match[1]}, which a downloaded file cannot resolve`)
           .toMatch(/^node:/);
       }
     }
+
+    /*
+      The Python verifier's one third-party import is optional by construction.
+
+      rdflib is a better Turtle parser than the one in that file and is not a dependency a
+      customer should have to install to check a download, so it is imported inside a try and
+      its absence is printed as a check that did not run. Asserted here because the failure
+      mode -- someone hoisting the import to the top during a tidy-up -- turns the verifier into
+      one that refuses to start on a clean machine, which is the defect this whole item is about.
+    */
+    const roundtrip = read("../public/developer/tavonel-verify-roundtrip.py");
+    for (const match of roundtrip.matchAll(/^import\s+(\S+)/gm)) {
+      expect(
+        ["argparse", "csv", "io", "json", "os", "sqlite3", "sys", "zipfile"],
+        `tavonel-verify-roundtrip.py imports ${match[1]} at module scope`,
+      ).toContain(match[1]);
+    }
+    expect(roundtrip, "rdflib must be imported inside a guarded branch, not at module scope")
+      .toMatch(/try:\n {8}import rdflib/);
+    expect(roundtrip).toContain("except ImportError:");
+    expect(roundtrip, "a skipped check must never read as a pass")
+      .toContain("This check did not pass -- it did not run.");
   });
 
   /*
@@ -471,11 +495,64 @@ describe("contract promises", () => {
       const usage = run([asset("tavonel-verify-package.mjs")]);
       expect(usage.status, "the published validator ran with no arguments and reported nothing").toBe(2);
       expect(usage.stderr).toContain("tavonel-verify-package.mjs --package");
+
+      /*
+        The external round trip, when there is a Python to run it with.
+
+        This asserts the claim /docs/cli makes about tavonel-verify-roundtrip.py: the CSV loads
+        into SQLite and the ids come back out, and the three formats agree on the id set. The
+        failure path is asserted on the same archive with one relationship rewritten to point at
+        an id that is not in nodes.csv, because a round-trip check that cannot fail proves
+        nothing about the one that passed.
+
+        No Python on the runner is a loud skip, never a quiet pass: Node is a hard requirement of
+        this repository and Python 3.12 is a documented requirement of two published assets, so a
+        machine without it can still run everything else here.
+      */
+      const interpreter = ["py", "python3", "python"]
+        .find((name) => spawnSync(name, ["--version"], { encoding: "utf8" }).status === 0);
+      if (!interpreter) {
+        console.warn("SKIPPED: no Python interpreter on PATH, so tavonel-verify-roundtrip.py was not run");
+      } else {
+        const roundtrip = (pkg: string) => spawnSync(
+          interpreter,
+          [asset("tavonel-verify-roundtrip.py"), "--package", pkg, "--json"],
+          { encoding: "utf8", timeout: 120_000 },
+        );
+        const ok = roundtrip(archivePath);
+        expect(ok.status, `${ok.stdout}${ok.stderr}`).toBe(0);
+        const receipt = JSON.parse(ok.stdout) as {
+          ok: boolean;
+          sqlite: { nodes: number; relationships: number };
+          jsonld: { subjects: number };
+          turtle: { triples: number };
+        };
+        expect(receipt.ok).toBe(true);
+        expect(receipt.sqlite.nodes).toBeGreaterThan(0);
+        expect(receipt.sqlite.relationships).toBeGreaterThan(0);
+        expect(receipt.jsonld.subjects).toBe(receipt.sqlite.nodes);
+        expect(receipt.turtle.triples).toBeGreaterThan(receipt.sqlite.nodes);
+
+        const brokenPath = join(directory, "broken");
+        for (const file of artifact.package.files) {
+          const target = join(brokenPath, file.path);
+          mkdirSync(dirname(target), { recursive: true });
+          writeFileSync(
+            target,
+            file.path === "graph/relationships.csv"
+              ? file.content.replace(/topic-[a-f0-9]{32}/, `topic-${"0".repeat(32)}`)
+              : file.content,
+          );
+        }
+        const broken = roundtrip(brokenPath);
+        expect(broken.status, "a relationship pointing at a missing id was accepted").toBe(1);
+        expect(broken.stderr).toContain("SQL cannot find in nodes.csv");
+      }
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }
-    // Compiling the explore sample and running four child processes does not fit the 5 s default.
-  }, 180_000);
+    // Compiling the explore sample and running several child processes does not fit the 5 s default.
+  }, 300_000);
 
   /*
     What is left of the portable-world promise once the tool is gone.

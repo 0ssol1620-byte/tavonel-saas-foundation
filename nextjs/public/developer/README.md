@@ -3,9 +3,54 @@
 Create a scoped key in **Workspace > Developers**. The plaintext token is shown
 once. TAVONEL stores only its SHA-256 digest.
 
-## CLI
+## Install: fetch, then check the bytes
 
-Requires Node.js 20 or newer.
+There is no npm, pip or Homebrew package. Six files are published at
+`https://tavonel.com/developer/`, and `channel.json` names the exact SHA-256 of
+each one. Installing is downloading a file and checking its digest; nothing is
+written to a registry, a PATH or a profile.
+
+```bash
+curl -fsS https://tavonel.com/developer/channel.json -o channel.json
+jq -r '.assets | to_entries[] | "\(.value.sha256 | sub("^sha256:";"")) *\(.value.url | split("/") | last)"' \
+  channel.json > channel.sha256
+jq -r '.assets[].url' channel.json | xargs -n1 curl -fsS -O
+sha256sum --check channel.sha256
+```
+
+`sha256sum` prints one `OK` line per asset. A `FAILED` line means the bytes you
+received are not the bytes the channel names: delete the file and do not run it.
+
+```powershell
+$channel = Invoke-RestMethod https://tavonel.com/developer/channel.json
+foreach ($asset in $channel.assets.PSObject.Properties.Value) {
+  $name = Split-Path $asset.url -Leaf
+  Invoke-WebRequest $asset.url -OutFile $name
+  $actual = "sha256:" + (Get-FileHash $name -Algorithm SHA256).Hash.ToLower()
+  if ($actual -ne $asset.sha256) { Remove-Item $name; throw "$name does not match $($asset.sha256)" }
+  "$name OK"
+}
+"pinned version: $($channel.version)"
+```
+
+**Pin.** `node tavonel-cli.mjs --version` prints the distribution version
+compiled into the file you hold; keep the file and its digest and you are
+pinned. Nothing self-updates.
+
+**Update.** `node tavonel-cli.mjs update-check` compares your version with
+`channel.json` and prints the difference. It never downloads and never
+overwrites: updating is the install above, run again.
+
+**Uninstall.** Delete the files. The only state any of them writes is the
+connector cursor file you name yourself with `--state`.
+
+**Runtimes.** Node.js 20 or newer for the four `.mjs` files; Python 3.12 or
+newer for `tavonel-source-agent.py` and `tavonel-verify-roundtrip.py`. None of
+them has a required dependency: `boto3` is needed only for the agent S3 mode
+below, and `rdflib` only makes the round-trip checker strict about Turtle -- its
+absence is reported as a check that did not run, never as one that passed.
+
+## CLI
 
 ```powershell
 $env:TAVONEL_API_KEY = "tvnl_live_..."
@@ -14,12 +59,35 @@ node .\tavonel-cli.mjs world collection-...
 node .\tavonel-cli.mjs update-check
 ```
 
-`--version` prints the immutable distribution version. `update-check` compares
-it with `/developer/channel.json`; it never updates files automatically. API
-requests are pinned to `/api/v1` and advertise the v1 media type.
+API requests are pinned to `/api/v1` and advertise the v1 media type.
 
 The download command creates a new file and refuses to overwrite an existing
-path. Verify the ZIP with the bundled offline verifier before importing it.
+path. Verify the ZIP with the offline verifiers below before importing it.
+
+## Offline verifiers
+
+Three separate questions, three files, none of which reads a network.
+
+```bash
+# Is this archive intact, and signed by the key we publish?
+# The fingerprint comes from the trust endpoint, not from the archive.
+fingerprint=$(curl -fsS https://tavonel.com/api/export/trust | jq -r .publicKeySpkiSha256)
+node tavonel-verify-export.mjs --archive world.zip --trusted-fingerprint "$fingerprint"
+
+# Is what is inside it a coherent Compiled World?
+node tavonel-verify-package.mjs --package world.zip --require-signature
+
+# Do the ids and the provenance survive a load by something that is not ours?
+python tavonel-verify-roundtrip.py --package world.zip
+```
+
+`--package` also accepts an extracted directory or a candidate artifact JSON.
+`--json` makes each of them print a machine-readable report. All three exit
+non-zero on any failure, and the package validator exits 2 rather than 0 when
+its arguments are wrong, so a mistyped command is never a silent pass.
+
+All three are the files this repository runs in its own tests, published
+byte-for-byte rather than ported, and pinned in `channel.json`.
 
 ## Read-only MCP
 

@@ -59,3 +59,4 @@ nextjs/scripts/secret-scan.mjs text eol=lf
 # of this file: content that is hashed or served verbatim gets an explicit eol.
 nextjs/scripts/verify-signed-export.mjs text eol=lf
 nextjs/scripts/compiled-world/validate.mjs text eol=lf
+nextjs/scripts/compiled-world/verify-external-roundtrip.py text eol=lf
