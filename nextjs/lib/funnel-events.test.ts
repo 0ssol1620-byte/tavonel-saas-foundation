@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { extname, join, resolve } from "node:path";
-import { describe, expect, it } from "vitest";
-import { FUNNEL_DETAIL_KEYS, allowedDetail } from "./funnel-events";
+import { describe, expect, it, vi } from "vitest";
+import { FUNNEL_DETAIL_KEYS, allowedDetail, recordServerFunnel } from "./funnel-events";
 
 /*
   The privacy sentence at the top of `funnel-events.ts`, made checkable.
@@ -62,6 +62,25 @@ const moduleSource = readFileSync(modulePath, "utf8");
 const declaredEvents = [...moduleSource.matchAll(/^\s*\|\s*"([a-z_]+)";?$/gm)].map((match) => match[1]);
 
 /*
+  There are two unions now, and the extraction above reads both: `FunnelEvent`, fired from a
+  control in a browser, and `ServerFunnelEvent`, fired from a server state that already
+  happened. Every rule in this file applies to both -- a name with no caller is a funnel column
+  that is always zero whichever sink it belongs to -- so the members are separated only for the
+  assertions where the two unions actually differ.
+
+  Sliced rather than counted by line shape, and `+ 1` on the end index for the final member,
+  whose closing quote is immediately before the `;` that ends the declaration.
+*/
+function unionMembers(name: string): string[] {
+  const start = moduleSource.indexOf(`export type ${name} =`);
+  if (start < 0) throw new Error(`${name} is not declared in funnel-events.ts`);
+  const body = moduleSource.slice(start, moduleSource.indexOf('";', start) + 1);
+  return [...body.matchAll(/"([a-z_]+)"/g)].map((match) => match[1]);
+}
+const clientEvents = unionMembers("FunnelEvent");
+const serverEvents = unionMembers("ServerFunnelEvent");
+
+/*
   The union's own lines are struck out of the corpus and the rest of the module is kept. The
   declaration is not a call site; `trackSceneDepth`, three functions further down, is -- it is the
   only wrapper that names an event itself, and dropping the whole file would make `scene_reached`
@@ -84,14 +103,14 @@ describe("every declared funnel event has a control that fires it", () => {
     extraction red. The invariant is "every declared name was extracted", not "the union begins
     with a particular event".
   */
-  it("extracts every member of the union, including the one that ends it", () => {
-    // Sliced to the union's own text and counted without the line anchoring the extraction uses,
-    // so a line-shape mistake in one is not repeated in the other. `+ 1` for the final member,
-    // whose closing quote is where the slice ends.
-    const start = moduleSource.indexOf("export type FunnelEvent =");
-    const unionBody = moduleSource.slice(start, moduleSource.indexOf('";', start));
-    expect(declaredEvents.length, "a member was dropped by the extraction -- the last one ends with `;`").toBe((unionBody.match(/"[a-z_]+"/g) ?? []).length + 1);
+  it("extracts every member of both unions, including the one that ends each", () => {
+    // Counted a second way, from the union text rather than from the line shape the extraction
+    // anchors on, so a mistake in one is not repeated in the other. Summed across both unions:
+    // a `ServerFunnelEvent` member the line extraction dropped would otherwise look like a
+    // client event nobody had added yet.
+    expect(declaredEvents.length, "a member was dropped by the extraction -- the last one in each union ends with `;`").toBe(clientEvents.length + serverEvents.length);
     expect(declaredEvents.length).toBe(new Set(declaredEvents).size);
+    expect(clientEvents.length, "the twenty-nine browser events are not renamed or redefined by the server half").toBe(29);
     expect(declaredEvents.length).toBeGreaterThan(20);
     expect(declaredEvents).toContain("workspace_compile_failed");
     expect(declaredEvents).toContain("checkout_completed");
@@ -110,5 +129,67 @@ describe("every declared funnel event has a control that fires it", () => {
     expect(callSites.includes("trackFunnel(\"scene_reached\""), "the module body is not in the corpus, so a wrapper's event reads as dead").toBe(true);
     expect(callSites.includes("| \"cta_clicked\""), "the union is in the corpus, so every name matches its own declaration").toBe(false);
     expect(callSites.includes("\"film_stage_selected\""), "a name deleted for having no caller is back in the tree").toBe(false);
+  });
+});
+
+/*
+  §15.2's rule, made checkable: a product event is a server state or a real consumer receipt, and
+  an export click is not a package verified.
+
+  The check above would pass a `ServerFunnelEvent` fired from a button, which is the exact
+  mistake the second union exists to prevent, so this one is narrower: each server event's call
+  site has to be inside a route handler. That is not a style preference. A name that means "the
+  server accepted the work" and fires from an onClick reports intent as outcome, and the funnel
+  it feeds cannot tell the difference afterwards.
+*/
+const routeHandlers = sourceFiles(resolve(import.meta.dirname, "../app/api"))
+  .map((path) => readFileSync(path, "utf8"))
+  .join("\n");
+
+describe("server funnel events", () => {
+  it("has a union of its own that redefines none of the browser names", () => {
+    expect(serverEvents.length).toBeGreaterThan(0);
+    for (const event of serverEvents) {
+      expect(clientEvents, `${event} is in both unions -- one name cannot mean a click and a server state`).not.toContain(event);
+    }
+    // The renamed one, and why. `package_verified` would need a consumer telling us it checked a
+    // signature; nothing in this deployment calls `verifyExportSignature` on a consumer's
+    // behalf, so what is measured is what the name says.
+    expect(serverEvents).toContain("export_package_signed");
+    expect(serverEvents).not.toContain("package_verified");
+  });
+
+  it.each(serverEvents)("%s fires from a route handler, not from a control", (event) => {
+    expect(routeHandlers.includes(`"${event}"`), `${event} has no call site under app/api -- a server event fired from a component reports a click as an outcome`).toBe(true);
+  });
+
+  it("emits one structured line and drops a key that is not on the allowlist", () => {
+    const lines: string[] = [];
+    const info = vi.spyOn(console, "info").mockImplementation((line: unknown) => { lines.push(String(line)); });
+    try {
+      recordServerFunnel("world_activated", { status: "compiled", sources: "3" });
+      // The keys a route would find most convenient to attach are the forbidden ones. The type
+      // rejects them at the call site; this is the runtime half, on the server sink too.
+      recordServerFunnel("candidate_ready", { mode: "durable", collectionId: "col-1", question: "what is the revenue" } as never);
+    } finally {
+      info.mockRestore();
+    }
+    expect(lines).toHaveLength(2);
+    expect(JSON.parse(lines[0])).toEqual({ event: "world_activated", status: "compiled", sources: "3" });
+    expect(JSON.parse(lines[1])).toEqual({ event: "candidate_ready", mode: "durable" });
+    expect(lines[1]).not.toContain("col-1");
+    expect(lines[1]).not.toContain("revenue");
+  });
+
+  /*
+    Consent is a browser fact, and a route handler cannot ask. So the server sink is the process
+    log -- the same shape `app/api/csp-report/route.ts` already writes -- and not the external
+    collector `trackFunnel` posts to. A server event that reached `track()` would be a signed-in
+    customer's activity posted to a third party on nobody's consent.
+  */
+  it("does not post a server event to the external analytics collector", () => {
+    const body = moduleSource.slice(moduleSource.indexOf("export function recordServerFunnel"));
+    expect(body).toContain("console.info");
+    expect(body.slice(0, body.indexOf("\n}"))).not.toContain("track(");
   });
 });

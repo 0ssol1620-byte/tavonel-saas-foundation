@@ -4,6 +4,7 @@ import { validatePromotableCollectionArtifact } from "@/lib/collection-download"
 import { checkConnectorSourceAccess } from "@/lib/connector-source-access";
 import { assertEquivalenceGate } from "@/lib/equivalence-gate";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
+import { recordServerFunnel } from "@/lib/funnel-events";
 import {
   checkCurrentSourceVersions,
   collectionCandidateKey,
@@ -276,6 +277,24 @@ export async function POST(
     artifact: loaded.json,
     actorUserId: user.id,
   });
+  /*
+    A2's server truth, fired after the index attempt rather than after the pointer move: a World
+    that is active but has no queryable index answers from the fallback, and a funnel that
+    counted both as the same activation would report the degraded one as a success. `status`
+    carries which one it is.
+
+    `source_revision_applied` is the same promotion seen from J3: a request that names the
+    manifest it expects to replace is a revision of a World that was already active, and a first
+    activation sends `null`. Both come off the request the caller already had to make correctly,
+    so neither needs a second read of the pointer.
+  */
+  recordServerFunnel("world_activated", {
+    status: retrievalIndex.status,
+    sources: String(sourceDocuments.length),
+  });
+  if (expectedCurrentManifest !== null) {
+    recordServerFunnel("source_revision_applied", { status: retrievalIndex.status });
+  }
   return NextResponse.json(
     { code: "WORLD_ACTIVE", world: promoted.result, retrievalIndex },
     { headers: NO_STORE }

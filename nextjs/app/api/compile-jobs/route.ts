@@ -10,6 +10,7 @@ import {
 import { CORPUS_MAX_DOCUMENTS, judgeCorpusSet, needsCorpusCompile } from "@/lib/corpus-batching";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { readBoundedJson } from "@/lib/enterprise-http";
+import { recordServerFunnel } from "@/lib/funnel-events";
 import { DOCUMENT_ID_PATTERN } from "@/lib/immutable-keys";
 import { checkTrialCompileCapacity } from "@/lib/self-service-trial";
 
@@ -91,6 +92,13 @@ export async function POST(request: Request) {
       const status = enqueueFailureStatus(corpus.code);
       return NextResponse.json({ code: corpus.code }, { status, headers: HEADERS });
     }
+    // §15.2: the server accepting and enqueueing the work, which is what `compile_started`
+    // means here. `workspace_compile_started` is the button; this is the job.
+    recordServerFunnel("compile_started", {
+      mode: "corpus",
+      plan: auth.principal.accessSource ?? "unknown",
+      sources: String(documentIds.length),
+    });
     return NextResponse.json({
       code: "COMPILE_CORPUS_ACCEPTED",
       corpusId: corpus.value.corpusId,
@@ -115,6 +123,11 @@ export async function POST(request: Request) {
     const status = enqueueFailureStatus(enqueued.code);
     return NextResponse.json({ code: enqueued.code }, { status, headers: HEADERS });
   }
+  recordServerFunnel("compile_started", {
+    mode: "durable",
+    plan: auth.principal.accessSource ?? "unknown",
+    sources: String(documentIds.length),
+  });
 
   return NextResponse.json({
     code: "COMPILE_JOB_ACCEPTED",
