@@ -356,6 +356,12 @@ function parseCanonicalModel(content: string, collectionId: string): CanonicalMo
       // This package's rows are already in the product's namespace; the two are one string.
       productDocumentId: binding.documentId,
       productVersionKey: binding.versionKey,
+      /*
+        One carrier, always. `sourceIds` above already refused a repeated `documentId`, and this
+        path never joins on a digest, so the several-documents-under-one-digest case the Core
+        binding handles cannot arise here.
+      */
+      productDocumentIds: [binding.documentId],
     });
   }
 

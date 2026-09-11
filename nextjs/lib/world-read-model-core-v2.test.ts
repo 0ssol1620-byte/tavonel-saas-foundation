@@ -412,11 +412,27 @@ describe("an unreadable Core V2 artifact still refuses", () => {
       ...stored,
       sourceDocuments: [{ ...stored.sourceDocuments[0], inputSha256: `sha256:${"7".repeat(64)}` }],
     }, COLLECTION)).toBeNull();
-    // Two documents under one digest would make the join ambiguous.
-    expect(buildWorldReadModel({
+  });
+
+  /*
+    Two documents under one digest is the same file uploaded twice, not a malformed input.
+
+    This asserted `null`, and `null` is a 422 on every read of the World: a customer who uploaded
+    the same PDF under two names compiled a collection, promoted it, and could then open none of
+    it. The Core does not merge them either -- it derives its source id from the product's own
+    document id, echoed as `nativeId` -- so the counts agree and only the pairing is unknowable
+    from the package. The read builds, citations carry the deterministic pick, and the permission
+    check is handed both carriers (`lib/collection-source-access.test.ts`).
+  */
+  it("reads a World compiled from the same file uploaded twice", () => {
+    const stored = storedArtifact();
+    const model = buildWorldReadModel({
       ...stored,
       sourceDocuments: [stored.sourceDocuments[0], { ...stored.sourceDocuments[0], documentId: "doc-2" }],
-    }, COLLECTION)).toBeNull();
+    }, COLLECTION);
+    expect(model, "a realistic corpus must not make a World unreadable").not.toBeNull();
+    expect(model!.evidence[0].sourceId, "the pick is stable, and both uploads carry these bytes")
+      .toBe("doc-1");
   });
 
   it("refuses a chunk row bound to a source version the manifest does not name", () => {
