@@ -7,6 +7,18 @@ Status: **IMPLEMENTED_NOT_PROVEN.** Both engines were run in process over the sa
 on 2026-09-11. These are counts on one public corpus, not a product measurement, and no number here
 calibrates a threshold.
 
+> **Two of the completion bar's four clauses are not met by this document, and not by this engine.**
+> This file supplies **node kind별 수량** and **중복률** for Core V2, the live engine. It does **not**
+> supply **근거 정밀도** or **다문서 질의 성공률** for Core V2: those two numbers exist only in
+> `../ask-eval/results/ask-eval-2026-09-11.md`, which measured the **TypeScript fallback engine's**
+> artifact through a **stand-in lexical ranker** — a different engine and a simulated ranking. No
+> Core V2 world has been through the Ask harness. The four clauses are therefore not four
+> measurements of one engine and must never be quoted as one row.
+>
+> Recorded as `K08 (live-engine Ask)` in the NOT DONE table of the lane report. Closing it needs a
+> Core V2 world served through the retrieval path, which depends on R4-01 — the compiled path has no
+> production caller today.
+
 ## What was run
 
 | | |
