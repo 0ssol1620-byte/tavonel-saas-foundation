@@ -195,6 +195,21 @@ const COPY_SURFACES = [
   "lib/support-targets.ts",
   // `/contact` carries three addresses and the support target, and had no row.
   "app/contact/page.tsx",
+  /*
+    The navigation, 2026-09-11. The menu became prose.
+
+    A flat bar was eight one-word labels with nothing to guard. The IA redesign's panels carry
+    column titles, link labels and audience lines -- "Supported files and what is preserved",
+    "Trust center", "AI and platform engineers" -- written in the nav data and rendered by both
+    chromes, which makes them public copy on every page of the site, checked by nothing. The
+    components are listed alongside the data because a label written straight into the JSX would
+    otherwise slip past a guard that only reads the array.
+  */
+  "lib/site-navigation.ts",
+  "components/site-nav/desktop-primary-nav.tsx",
+  "components/mobile-primary-nav.tsx",
+  "components/public-site-chrome.tsx",
+  "components/policy-layout.tsx",
 ];
 
 const BARRED = [

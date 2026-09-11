@@ -25,12 +25,18 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { FOOTER_GROUPS, PRIMARY_NAV, RESOURCE_LINKS } from "../lib/site-navigation";
+import { FOOTER_GROUPS, NAV_PENDING_HREFS, PRIMARY_NAV, RESOURCE_LINKS, navHrefs } from "../lib/site-navigation";
 
 const WIDTHS = [360, 390, 412, 768, 1024, 1280, 1440] as const;
 
 /* The routes the audit named explicitly, plus every route the navigation itself declares --
-   so a new nav entry is audited without anyone remembering to add it here. */
+   so a new nav entry is audited without anyone remembering to add it here.
+
+   `navHrefs()` is the 2026-09-11 menu, which reaches pages no flat list mentioned:
+   `/product/compiled-world`, the four docs sections in the Developers panel, and the four
+   solution slugs the bar's single "Solutions" link never named. `NAV_PENDING_HREFS` is
+   subtracted because a route another lane is still building has nothing to measure; the one
+   entry in it is pinned by `lib/site-nav-model.test.ts`, which fails once the page lands. */
 const ROUTES = [
   ...new Set([
     "/",
@@ -44,8 +50,11 @@ const ROUTES = [
     ...PRIMARY_NAV.map(link => link.href),
     ...RESOURCE_LINKS.map(link => link.href),
     ...FOOTER_GROUPS.flatMap(group => group.links.map(link => link.href)),
+    ...navHrefs(),
   ]),
-].sort();
+]
+  .filter(route => !NAV_PENDING_HREFS.includes(route))
+  .sort();
 
 type Offender = { selector: string; reason: string; box: string };
 type RouteReport = { route: string; documentOverflow: number; offenders: Offender[] };

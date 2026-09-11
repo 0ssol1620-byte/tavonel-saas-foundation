@@ -121,13 +121,14 @@ test("carries no empty structural cell and never overflows its viewport", async 
 });
 
 /*
-  An eighth primary link is a header measurement, not a data change.
+  A wider bar item is a header measurement, not a data change.
 
   `tavonel.css` swaps the section row for the phone disclosure at 1079px because the seven-link
   row pushed the primary action past the right edge up to 1076px, and `overflow-x: hidden` hid
   it from every document-overflow check. 1080px is the first width that shows the row, so it is
-  where a link added to `PRIMARY_NAV` gets measured. This test fails if the row stops fitting,
-  which is the only honest way to add to it.
+  where the bar gets measured. The 2026-09-11 IA redesign took the row from eight links to five
+  items, which buys room rather than spending it -- but a group label is free to grow, and this
+  test is what fails if the row stops fitting.
 */
 test("keeps the header's primary action reachable at the width the section row appears", async ({ page }) => {
   await page.setViewportSize({ width: 1080, height: 900 });
@@ -143,19 +144,42 @@ test("keeps the header's primary action reachable at the width the section row a
 });
 
 /*
-  Primary navigation, not the resources hub.
+  A product surface, and still a product surface from three places.
 
-  The founder resolved this (contract 4.2, RESOLVED A-3/B-5): what a deployment can read is a
-  product surface, so the row lives in `PRIMARY_NAV`. Both chromes render that list -- the
-  desktop row and the phone disclosure -- and this asserts both, because the first version of
-  this page was reachable only from a hub two clicks in.
+  The founder resolved (contract 4.2, RESOLVED A-3/B-5) that what a deployment can read is a
+  product surface rather than a resources entry, and this spec enforced that as a flat top-level
+  link in `PRIMARY_NAV`. The 2026-09-11 IA redesign supersedes the *placement* half of that
+  resolution and keeps the substance: the bar is five items, so Sources is a Product panel item
+  now, and the compensation for losing the flat link is that it is also in the footer's Product
+  group -- reachable with no menu open at all -- and that the Product trigger itself carries
+  `aria-current` while a reader is on this page.
+
+  What the resolution forbade has not changed: it is not a `/resources` tile, it is not two
+  clicks in from a hub, and its URL did not move.
+
+  The desktop half sets its own viewport, because the section row does not exist below 1080px and
+  this file runs in every width project.
 */
-test("is in the primary navigation and listed in the sitemap", async ({ page }) => {
+test("is reachable from the Product panel, the phone accordion and the footer", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/sources");
-  await expect(page.locator('header.nav nav[aria-label="Sections"] a[href="/sources"]')).toHaveCount(1);
-  await expect(page.locator('.mobile-primary-nav nav a[href="/sources"]')).toHaveCount(1);
-  await expect(page.locator('.site-footer-groups a[href="/sources"]')).toHaveCount(0);
+
+  // Desktop: one open, one link. The trigger says this is where the reader already is.
+  await expect(page.locator("#site-nav-trigger-product")).toHaveAttribute("aria-current", "true");
+  await page.locator("#site-nav-trigger-product").click();
+  await expect(page.locator('#site-nav-product a[href="/sources"]')).toHaveCount(1);
+  await page.keyboard.press("Escape");
+
+  // The footer, which needs no menu at all.
+  await expect(page.locator('.site-footer-groups a[href="/sources"]')).toHaveCount(1);
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", "https://tavonel.com/sources");
+
+  // Phone: the Product group of the accordion, which starts open on this page.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator("header.nav details.mobile-primary-nav > summary").click();
+  const product = page.locator('details.mobile-nav-group[data-section="product"]');
+  expect(await product.evaluate((element: HTMLDetailsElement) => element.open)).toBe(true);
+  await expect(product.locator('a[href="/sources"]')).toHaveCount(1);
 
   const sitemap = await page.request.get("/sitemap.xml");
   expect(await sitemap.text()).toContain("https://tavonel.com/sources");

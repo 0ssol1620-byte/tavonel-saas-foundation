@@ -11,11 +11,11 @@ import { Fragment, cloneElement, isValidElement, useCallback, useEffect, useRef,
 import CanvasTransitionLink from "@/components/canvas-transition-link";
 import CompileStagePlayer, { type CompileStage } from "@/components/compile-stage-player";
 import Logomark from "@/components/logomark";
-import MobilePrimaryNav from "@/components/mobile-primary-nav";
+import { PublicSiteHeader } from "@/components/public-site-chrome";
 import WorldField, { type WorldMode } from "@/components/world-field";
 import { trackFunnel, trackSceneDepth } from "@/lib/funnel-events";
 import { sourceFamilyChips } from "@/lib/qualified-input";
-import { FOOTER_GROUPS, PRIMARY_NAV } from "@/lib/site-navigation";
+import { FOOTER_GROUPS } from "@/lib/site-navigation";
 import { useScrollProgress, useScrollScenes } from "@/lib/use-scroll-scenes";
 
 const SCENES = [
@@ -179,24 +179,17 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
       <link rel="preload" as="image" href="/film/poster-1.webp" fetchPriority="low" />
       <OpeningWorldField band={band} mode={world.mode} />
 
-      <header className="nav" data-stuck={progress > 0.005 ? 1 : 0}>
-        <Link href="/" className="wordmark" aria-label="TAVONEL home">
-          <Logomark />
-          <b>TAVONEL</b>
-        </Link>
-        <span className="mode" title="Source-grounded document and knowledge compilation.">
-          <i aria-hidden="true" />
-          KNOWLEDGE COMPILER
-        </span>
-        <nav aria-label="Sections">
-          {PRIMARY_NAV.map((link) => <Link key={link.href} href={link.href as Route}>{link.label}</Link>)}
-        </nav>
-        <MobilePrimaryNav />
-        <span className="nav-actions">
-          <Link className="btn small" href={startHref}>{startLabel}</Link>
-          {signedIn ? null : <Link className="nav-signin" href="/login">Sign in</Link>}
-        </span>
-      </header>
+      {/*
+        The shared header, with the three things the landing page needs on top of it: the badge,
+        the scroll-reactive ground, and its own access label. What it no longer keeps is a second
+        copy of the section row -- the reason a menu change had to be made in four files.
+      */}
+      <PublicSiteHeader
+        cta={{ label: startLabel, href: startHref }}
+        mode={{ label: "KNOWLEDGE COMPILER", title: "Source-grounded document and knowledge compilation." }}
+        signedIn={signedIn}
+        stuck={progress > 0.005}
+      />
 
       <div className="rail" aria-hidden="true">
         {SCENES.map((s) => (

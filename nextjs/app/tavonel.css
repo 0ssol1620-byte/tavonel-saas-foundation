@@ -3663,3 +3663,180 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
   .pricing-page .plan { padding: 24px; }
   .pricing-page .pricing-glance { gap: 20px; }
 }
+
+/* ============================================================ site navigation (IA redesign, 2026-09-11)
+   BEGIN wg-ia-nav. Appended as one block so the rules that need to out-specify `.nav > nav a`
+   (0,1,2) can do it with `.nav .site-nav-panel a` (0,2,1) instead of by reordering anything above.
+   END marker at the bottom of the file. */
+
+/* The trigger is a control, so it gets the row's link treatment plus a caret and a state. The
+   caret is inside the button, not beside it: a 10px arrow is not a click target. */
+.site-nav-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+}
+.site-nav-trigger::after {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-right: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 160ms ease;
+}
+.site-nav-trigger[aria-expanded="true"]::after { transform: translateY(1px) rotate(225deg); }
+.nav > nav .site-nav-trigger[aria-expanded="true"],
+.nav > nav [aria-current="true"] { color: var(--text-hi); }
+.nav > nav [aria-current="true"] { box-shadow: inset 0 -1px 0 var(--verified); }
+.site-nav-trigger:focus-visible,
+.nav .site-nav-panel a:focus-visible { outline: 2px solid var(--verified); outline-offset: 3px; }
+
+/*
+   The panel hangs off the header, edge to edge, for the same reason the phone panel does.
+
+   `header.nav` is `position: fixed`, so it is the containing block for any absolutely positioned
+   descendant as long as nothing in between takes that job -- which is why `.site-nav-group` is
+   deliberately not `position: relative`. Pinning the panel to the trigger instead would put a
+   wide panel off the left edge under the first trigger and off the right under the last, and the
+   arithmetic that avoids that has to be redone at every width. `left: 0; right: 0` has no
+   arithmetic in it, and `.site-nav-panel-inner` carries the reading width.
+
+   `.site-nav-group` gets no rule at all, which is the point: the moment it is given
+   `position: relative` it becomes the containing block and the panel is pinned to the trigger
+   again.
+*/
+.site-nav-panel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  /* Opaque, not a 97% tint with a blur behind it. Measured on this build at 1280: the page's h1
+     fell inside the panel's box and stayed legible through it. The header above already
+     establishes a backdrop root, and a second `backdrop-filter` nested inside one does not
+     composite the way the first does. A menu is not a glass surface -- it is the thing being
+     read -- so the ground is solid and there is no filter left to reason about. */
+  background: var(--ground);
+  border-top: 1px solid var(--hairline-hi);
+  border-bottom: 1px solid var(--hairline-hi);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.46);
+  /* Bounded by the viewport rather than by shrinking anything: a long panel on a short laptop
+     scrolls, and `contain` keeps that scroll from chaining out to the page underneath. */
+  max-height: calc(100svh - 68px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* `display` on the panel would otherwise beat the `[hidden]` default and leave every panel open. */
+.site-nav-panel[hidden] { display: none; }
+.site-nav-panel-inner {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px 40px;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 22px clamp(16px, 3vw, 30px) 20px;
+}
+.site-nav-column { display: grid; align-content: start; gap: 2px; min-width: 0; }
+.site-nav-column-title {
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-xlo);
+  margin-bottom: 6px;
+}
+.nav .site-nav-panel a {
+  display: grid;
+  gap: 1px;
+  padding: 7px 10px;
+  margin-left: -10px;
+  border-radius: 3px;
+  font-family: var(--f-sans);
+  font-size: 13px;
+  letter-spacing: 0;
+  color: var(--text-lo);
+  transition: background 160ms ease, color 160ms ease;
+}
+.nav .site-nav-panel a:hover,
+.nav .site-nav-panel a:focus-visible { color: var(--text-hi); background: var(--g1); }
+.nav .site-nav-panel a b { font-weight: 500; color: inherit; }
+.nav .site-nav-panel a i {
+  font-style: normal;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--text-xlo);
+}
+/* The hub reads first even where it is the last thing in the panel. */
+.nav .site-nav-panel a[data-overview] b { color: var(--text-hi); }
+.site-nav-featured {
+  grid-column: 1 / -1;
+  border-top: 1px solid var(--hairline);
+  padding-top: 12px;
+  margin-top: 4px;
+}
+.nav .site-nav-panel .site-nav-featured a {
+  display: inline-flex;
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--verified);
+}
+
+/* ---- the phone accordion. The outer panel's grid already draws a hairline between its rows
+   through `gap: 1px` on a hairline ground, so a group needs no border of its own. */
+/*
+   Every rule here is qualified with `.mobile-primary-nav`, which is not decoration.
+
+   The panel's own controls are styled by `.mobile-primary-nav summary` (0,1,1) and
+   `.mobile-primary-nav[open] summary` (0,2,1), and both are *descendant* selectors, so they
+   reach the nested group summaries too. Measured on this build at 390: every collapsed group
+   drew the open marker, because that second rule out-specified a bare
+   `.mobile-nav-group[open] > summary::after` (0,1,1) and applied its "−" to all five summaries
+   whenever the outer disclosure was open -- which is whenever any of them is on screen. These
+   are (0,2,1) and (0,3,1) and come later, so a group's marker is its own.
+
+   The same inheritance hands a nested summary the MENU button's border, radius and ground,
+   which inside a flush list of rows reads as five stacked boxes. They are reset rather than
+   overridden one property at a time by a more specific selector somewhere else.
+*/
+.mobile-nav-group { background: var(--ground); }
+.mobile-primary-nav .mobile-nav-group > summary {
+  /* Same 44px floor as a link row: a category is the only way to that category's links. */
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 clamp(14px, 4vw, 24px);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-lo);
+  font: 500 12px var(--f-mono);
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  list-style: none;
+}
+.mobile-primary-nav .mobile-nav-group > summary::-webkit-details-marker { display: none; }
+.mobile-primary-nav .mobile-nav-group > summary::after { content: "+"; margin-left: 0; color: var(--verified); }
+.mobile-primary-nav .mobile-nav-group[open] > summary::after { content: "−"; }
+.mobile-primary-nav .mobile-nav-group > summary:focus-visible { outline: 2px solid var(--verified); outline-offset: -2px; }
+.mobile-primary-nav .mobile-nav-group > summary[aria-current="true"] { color: var(--text-hi); }
+.mobile-primary-nav .mobile-nav-group[open] > summary { color: var(--text-hi); background: var(--g1); }
+.mobile-nav-links { display: grid; }
+/* Indented, quieter, and still a 44px row -- the indent is what says these belong to the group
+   above rather than to the list of categories. */
+.mobile-primary-nav .mobile-nav-links a {
+  padding-left: clamp(28px, 8vw, 40px);
+  font-size: 11.5px;
+  border-top: 1px solid var(--hairline);
+}
+.mobile-primary-nav nav > a[aria-current="true"],
+.mobile-primary-nav .mobile-nav-links a[aria-current="true"] { color: var(--text-hi); }
+/* END wg-ia-nav */

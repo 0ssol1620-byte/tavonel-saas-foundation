@@ -20,9 +20,17 @@ test("mobile public navigation remains reachable", async ({ page }, testInfo) =>
   await page.goto("/");
   const menu = page.locator(".mobile-primary-nav");
   await expect(menu).toBeVisible();
-  await menu.locator("summary").click();
+  await menu.locator("> summary").click();
   await expect(menu.getByRole("link", { name: "Pricing" })).toBeVisible();
-  await expect(menu.getByRole("link", { name: "Developers" })).toBeVisible();
+  /*
+    Developers is a category since the 2026-09-11 IA redesign, not a link.
+
+    The panel was a flat list of the eight top-level links; it is four groups plus Pricing now.
+    What this test is about -- a phone can still reach the site's structure -- did not change, so
+    it is asserted one level down: the category expands and the guide behind it is a real link.
+  */
+  await menu.locator('details.mobile-nav-group[data-section="developers"] > summary').click();
+  await expect(menu.getByRole("link", { name: "Developer guide", exact: true })).toBeVisible();
 });
 
 test("audited public and docs routes keep horizontal overflow local", async ({ page }, testInfo) => {
