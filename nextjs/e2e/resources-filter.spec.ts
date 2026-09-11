@@ -53,17 +53,25 @@ test("the resources hub narrows by a fragment and keeps every entry in the HTML"
 const FILTER_LINKS = "nav[aria-label^='Narrow the resources'] a";
 
 test("shows exactly one selected filter, and no chip under the tap-target floor", async ({ page }) => {
-  // A chip reads as selected when its border takes the same high-contrast colour as its text,
-  // which is what both the default rule and the `:target` rule do and the resting state does not.
+  /*
+    "Selected" is read as the chip that looks unlike the others, not as a named colour.
+
+    Both the default rule and the `:target` rule raise the border and the text off the resting
+    token, and which token that is belongs to the design system rather than to this test. So the
+    measurement is the one thing the requirement actually states: exactly one chip in the row is
+    drawn differently from the rest. Asserting a literal colour here would fail the day the
+    palette moves, and would pass if every chip were highlighted at once.
+  */
   const selected = async () =>
-    await page.locator(FILTER_LINKS).evaluateAll((links) =>
-      links
-        .filter((link) => {
-          const style = getComputedStyle(link);
-          return style.borderTopColor === style.color;
-        })
-        .map((link) => (link.textContent ?? "").trim()),
-    );
+    await page.locator(FILTER_LINKS).evaluateAll((links) => {
+      const border = links.map((link) => getComputedStyle(link).borderTopColor);
+      const counts = new Map<string, number>();
+      for (const colour of border) counts.set(colour, (counts.get(colour) ?? 0) + 1);
+      const resting = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+      return links
+        .filter((_, index) => border[index] !== resting)
+        .map((link) => (link.textContent ?? "").trim());
+    });
 
   await page.goto("/resources");
   expect(await selected(), "'Everything' is the state on arrival and nothing said so")

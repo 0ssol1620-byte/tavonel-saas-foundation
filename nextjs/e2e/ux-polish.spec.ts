@@ -1,3 +1,4 @@
+import { ACCESS_CTA, SELF_SERVE_CTA } from "../lib/site-navigation";
 const playwrightPackage = process.env.PLAYWRIGHT_TEST_PACKAGE ?? "@playwright/test";
 const playwrightModule = await import(playwrightPackage);
 const { expect, test } = "test" in playwrightModule ? playwrightModule : playwrightModule.default;
@@ -106,10 +107,13 @@ test("Explore reaches the actual interactive instrument without a hero-length de
 });
 
 test("product page shows the product path before secondary product surfaces", async ({ page }) => {
-  // Public CTA is runtime-derived, not compiled into the page. Pin the access posture here so
-  // this test verifies the live self-service wording rather than whichever environment the
-  // runner happens to inherit.
-  await page.route("**/api/status", route => route.fulfill({ json: { selfService: true, liveCheckout: true } }));
+  // The primary CTA is now server-rendered. A browser route mock cannot change that
+  // commercial state: read the actual public snapshot and verify both label and destination.
+  const statusResponse = await page.request.get("/api/status");
+  expect(statusResponse.ok()).toBe(true);
+  const status = await statusResponse.json();
+  expect(typeof status.liveCheckout).toBe("boolean");
+  const expectedCta = status.liveCheckout ? SELF_SERVE_CTA : ACCESS_CTA;
   await page.goto("/product");
   /*
     The product path's own stages, not "the word SOURCE somewhere on the document". Unscoped,
@@ -128,5 +132,7 @@ test("product page shows the product path before secondary product surfaces", as
     before it can check either. Scoping to `#main` is what this test's name already claims to be
     checking, and it still fails if the product path loses its call to action.
   */
-  await expect(page.locator("#main").getByRole("link", { name: "Start free" })).toBeVisible();
+  const cta = page.locator("#main").getByRole("link", { name: expectedCta.label, exact: true });
+  await expect(cta).toBeVisible();
+  await expect(cta).toHaveAttribute("href", expectedCta.href);
 });

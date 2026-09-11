@@ -257,7 +257,7 @@ test("filters the matrix by source family without changing any row's tier", asyn
   expect(
     chips.map((chip) => chip.trim()),
     "filtering may hide a row, never restate its tier",
-  ).toEqual(expected.map((entry) => entry.status));
+  ).toEqual(expected.map((entry) => TIER_LABEL[entry.status]));
 
   await page.getByRole("button", { name: /All formats/ }).click();
   await expect(rows).toHaveCount(served.entries.length);

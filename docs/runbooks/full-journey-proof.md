@@ -6,15 +6,24 @@ The harness is `nextjs/scripts/journey/` (`README.md` there describes the 18-ste
 This document does not authorise the run. It lists what the run costs and what it touches so the
 decision can be made once, with the facts in front of it.
 
-## What is already true, before anything is run
+## Source-verified implementation and separately verified deployment
+
+Reviewed 2026-09-12 during takeover. The plan rules below describe this release candidate,
+not a claim that its production migrations or deployment have completed. Follow
+`RELEASE_ORDER.md`: verify/apply the actual pending migrations before deploying this release.
+The older 2026-09-06 attempts below remain historical evidence, not current failure rates.
 
 - **Promotion has no API. It is a browser session.** `app/api/collections/[id]/promote/route.ts`
   authorizes with `getRequestUser` and there is no `/api/v1` promote route at all. A person signs
   in, reviews the candidate and clicks promote. No key, CLI, MCP client or worker can do it.
-- **Promotion also needs the Team plan.** The promote route requires plan `studio`
-  (`lib/billing-catalog.ts`: Team, `saleChannel: "contact"`). Evaluation trial and Developer
-  ($29 self-serve) get `402 STUDIO_SUBSCRIPTION_REQUIRED`. There is no self-serve path to an
-  approved World today.
+- **Promotion uses the `activation` plan-and-role gate in this release candidate.**
+  `app/api/collections/[id]/promote/route.ts` calls `authorizeFoundationProduct` with the
+  server-resolved membership role. `lib/billing-product-access.ts` admits Developer
+  (`observer_access`) only as workspace owner; Team (`studio_access`) still needs the
+  owner/admin route check. An absent role, billing hold, missing entitlement, stale source,
+  invalid candidate, or failed re-authorization is not bypassed.
+  **A free evaluation is not automatically an activation entitlement.** Verify the actual
+  plan/grant in the target workspace rather than promising a trial path this helper does not grant.
 - **The 2026-09-06 run reached step 7 and stopped.** 4 of 6 formats produced a candidate
   collection; none reached a World, because nobody promoted one. `xlsx` never once compiled to
   `ready` (both attempts settled at `review_required`). 10 of 30 receipts landed in
@@ -38,8 +47,11 @@ FD-15 and from FD-59.
 
 ## What the run needs
 
-1. **An account on a plan that can promote** — Team (`studio`). Without it step 8 returns
-   `402 STUDIO_SUBSCRIPTION_REQUIRED` and steps 9-13 are unreachable.
+1. **A normally authenticated workspace with an activation entitlement.** For this release
+   candidate, use a Developer workspace owner, a Team workspace owner/admin, or a legitimately
+   provisioned grant that passes the same plan-and-role checks. Confirm the deployed version
+   and actual entitlement first; do not change a subscription, mint a grant, forge a session,
+   or update the database merely to make a demonstration pass.
 2. **A `tvnl_live_` API key minted at `/api/developer/keys`, with every scope the chain uses.**
    Read out of the routes rather than guessed:
 
@@ -50,7 +62,7 @@ FD-15 and from FD-59.
    | 6 | `POST /api/compile-jobs` | `collections:compile` | observer |
    | 6 | `GET /api/compile-jobs/{jobId}` | `collections:read` | observer |
    | 7 | `GET /api/v1/collections/{id}` | `collections:read` | observer |
-   | 8 | `POST /api/collections/{id}/promote` | **none — browser session** | studio |
+   | 8 | `POST /api/collections/{id}/promote` | **none ? normal browser session** | activation: Developer owner or Team owner/admin |
    | 9 | `GET /api/v1/collections/{id}/world` | `worlds:read` | observer |
    | 10 | `POST /api/v1/collections/{id}/ask` | `ask:read` | observer |
    | 12 | `POST /api/v1/collections/{id}/search` | `ask:read` | observer |

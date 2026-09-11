@@ -27,7 +27,19 @@ const TASKS = [
   {
     question: "which files can I put in, and what is preserved?",
     section: "product",
-    link: "Supported files and what is preserved",
+    /*
+      BA-248 moved this sentence off the label and into the row's description, so the label is
+      "Sources" -- the name the bar, the footer and the page's own metadata already used.
+
+      Two locators, because the two surfaces really are different. A desktop row's accessible
+      name is label plus description, where "Sources" alone also matches "Connect sources" two
+      rows below, so the desktop locator carries two words of the description -- which is what
+      separates them for a reader as well. The phone sheet renders labels only (BA-246: a
+      five-word sentence was the row that wrapped at 360), so there the exact label is the whole
+      name and matches one row.
+    */
+    link: "Sources",
+    desktopLink: "Sources What TAVONEL reads",
     url: /\/sources$/,
   },
   {
@@ -45,7 +57,9 @@ const TASKS = [
   {
     question: "where is my material stored, and how do I delete it?",
     section: "product",
-    link: "Trust center",
+    // BA-252: one spelling, and it is the footer's. The old one differed by a single letter,
+    // which is exactly the drift a case-insensitive locator would never have caught.
+    link: "Trust Center",
     url: /\/trust$/,
   },
   {
@@ -64,8 +78,8 @@ const TASKS = [
   the label as a substring inside the panel is what a reader does -- they look for the words, and
   the audience line underneath is extra information, not a different link.
 */
-const panelLink = (scope: ReturnType<Page["locator"]>, label: string) =>
-  scope.getByRole("link", { name: label });
+const panelLink = (scope: ReturnType<Page["locator"]>, label: string, exact = false) =>
+  scope.getByRole("link", { name: label, exact });
 
 const openPhoneMenu = (page: Page) => page.locator("header.nav details.mobile-primary-nav > summary").click();
 const phoneGroup = (page: Page, section: string) =>
@@ -84,7 +98,7 @@ const DESKTOP: Scenario[] = [
       await page.locator(`#site-nav-trigger-${task.section}`).click();
       const panel = page.locator(`#site-nav-${task.section}`);
       await expect(panel).toBeVisible();
-      await panelLink(panel, task.link).click();
+      await panelLink(panel, "desktopLink" in task ? task.desktopLink : task.link).click();
       await expect(page).toHaveURL(task.url);
     },
   })),
@@ -120,14 +134,26 @@ const DESKTOP: Scenario[] = [
     run: async (page) => {
       await page.goto("/product");
       const panel = page.locator("#site-nav-developers");
-      await page.locator("#site-nav-trigger-developers").focus();
-      await page.keyboard.press("Enter");
-      await expect(panel).toBeVisible();
+      /*
+        The press is retried, because a key press that lands before hydration is simply lost.
+
+        `toBeVisible` retries the *assertion*, not the gesture, so the one press this scenario
+        made was spent on a button whose click handler did not exist yet -- and WebKit failed here
+        intermittently, on the engine the founder's phone runs, for a reason that had nothing to
+        do with keyboard support. A press that has to be repeated once is still a keyboard-only
+        path; a press that is never re-sent is a flake pretending to be a feature test.
+      */
+      const pressToOpen = async (key: "Enter" | " ") => {
+        await expect(async () => {
+          await page.locator("#site-nav-trigger-developers").focus();
+          await page.keyboard.press(key === " " ? "Space" : key);
+          await expect(panel).toBeVisible({ timeout: 1000 });
+        }).toPass({ timeout: 20_000 });
+      };
+      await pressToOpen("Enter");
       await page.keyboard.press("Escape");
       await expect(panel).toBeHidden();
-      await page.locator("#site-nav-trigger-developers").focus();
-      await page.keyboard.press("Space");
-      await expect(panel).toBeVisible();
+      await pressToOpen(" ");
     },
   },
   {
@@ -240,7 +266,8 @@ const PHONE: Scenario[] = [
       await openPhoneMenu(page);
       const group = phoneGroup(page, task.section);
       await group.locator("> summary").click();
-      await panelLink(group, task.link).click();
+      // The phone sheet renders labels only, so the label is the whole accessible name.
+      await panelLink(group, task.link, true).click();
       await expect(page).toHaveURL(task.url);
     },
   })),

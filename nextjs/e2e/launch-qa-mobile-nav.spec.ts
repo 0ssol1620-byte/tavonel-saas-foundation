@@ -106,7 +106,16 @@ test("a group expands to its links, all of them on screen", async ({ page }, tes
   const product = menu.locator('details.mobile-nav-group[data-section="product"]');
   await product.locator("> summary").click();
 
-  for (const label of ["Product overview", "Supported files and what is preserved", "Trust center", "Explore a public sample"]) {
+  /*
+    BA-246 / BA-248 / BA-232: the labels these rows carry now.
+
+    "Supported files and what is preserved" was the five-word sentence that wrapped at 360 and
+    is "Sources" here, with the sentence moved to the desktop panel's description row; "Trust
+    center" and "Explore a public sample" were a second spelling and a fourth name for pages the
+    rest of the site already called "Trust Center" and "Explore a Compiled World". The exact
+    match is kept, which is what makes this the assertion that notices the next drift.
+  */
+  for (const label of ["Product overview", "Sources", "Trust Center", "Explore a Compiled World"]) {
     const link = product.getByRole("link", { name: label, exact: true });
     await expect(link).toBeVisible();
     const box = await link.boundingBox();
@@ -140,7 +149,7 @@ test("following a link closes the menu", async ({ page }) => {
   const menu = page.locator("header.nav details.mobile-primary-nav");
   await menu.locator("> summary").click();
   await menu.locator('details.mobile-nav-group[data-section="product"] > summary').click();
-  await menu.getByRole("link", { name: "Trust center", exact: true }).click();
+  await menu.getByRole("link", { name: "Trust Center", exact: true }).click();
   await page.waitForURL(/\/trust$/);
   await expect(page.locator("header.nav details.mobile-primary-nav > nav")).toBeHidden();
 });

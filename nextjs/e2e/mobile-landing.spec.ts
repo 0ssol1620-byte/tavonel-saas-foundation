@@ -240,8 +240,23 @@ test("the mobile menu opens inside the viewport and closes the way a menu closes
   for (const label of ["Product", "Solutions", "Developers", "Resources"]) {
     await expect(panel.locator("details.mobile-nav-group > summary").filter({ hasText: label })).toBeVisible();
   }
-  await expect(panel.locator("> a")).toHaveCount(1);
+  /*
+    Two direct links now: Pricing, and the sheet's closing action (BA-232 / BA-245).
+
+    The action is the header's own `cta` object handed down, which is the whole point of it --
+    the desktop bar said "Contact" while this header said "Request access", from two different
+    constants. It ends the sheet because a reader who opened the menu can then reach it without
+    closing the menu first. A category is still never also a link: these two are the only `> a`
+    rows, and the count stays a literal for the reason the paragraph above gives.
+  */
+  await expect(panel.locator("> a")).toHaveCount(2);
   await expect(panel.getByRole("link", { name: "Pricing", exact: true })).toBeVisible();
+  const sheetAction = panel.locator("> a.mobile-nav-cta");
+  await expect(sheetAction).toBeVisible();
+  expect(
+    (await sheetAction.innerText()).trim(),
+    "the sheet's action is the header's own, not a second label for the same thing",
+  ).toBe((await page.locator("header.nav .nav-actions .btn").innerText()).trim());
   // Nothing is expanded until a reader chooses one; `/` belongs to no section.
   expect(await panel.locator("details.mobile-nav-group[open]").count()).toBe(0);
 

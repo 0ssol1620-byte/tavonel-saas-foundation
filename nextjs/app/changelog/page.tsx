@@ -37,8 +37,13 @@ export default function ChangelogPage() {
         changes carry the migration beside them.
       </p>
     </div>
-    <div className="stack"><ChangelogList /></div>
+    {/*
+      The action row lives inside the same stack as the list, not in a third one: `.body` carries
+      the two-column contract `e2e/public-layout-balance.spec.ts` measures, and a third direct
+      child breaks the grid on every long-form page that shares this shell.
+    */}
     <div className="stack">
+      <ChangelogList />
       <div className="actions">
         <a className="btn" href="/changelog/feed.xml">Subscribe to the Atom feed</a>
         <Link className="btn ghost" href={"/docs/errors" as Route}>Read the API contract</Link>

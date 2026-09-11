@@ -1132,7 +1132,8 @@ h3 { font-size: 19px; letter-spacing: -0.014em; font-variation-settings: "wght" 
     budget. The 44px link rows are the part that may not shrink, so the padding gives way
     instead: the block above the groups is what was generous, not the targets inside them.
   */
-  footer.site { padding-top: 26px; padding-bottom: calc(var(--bar) + 22px); }
+  /* Outrank the later footer.site base padding without reducing the 44px link targets. */
+  .page footer.site { padding-top: 26px; padding-bottom: calc(var(--bar) + 22px); }
   .compile-film-viewport { max-height: calc(100svh - 260px); }
 }
 .evidence-path {
@@ -1257,6 +1258,13 @@ h3 { font-size: 19px; letter-spacing: -0.014em; font-variation-settings: "wght" 
 .processor-list > :last-child:nth-child(odd) > p,
 .status-list > :last-child:nth-child(odd) > p { flex: 1 1 30ch; max-width: 64ch; }
 .processor-list article, .status-list article { padding: 20px; background: var(--ground); }
+/* Takeover regression: the full-width final processor card still split its paragraphs into
+   narrow flex items. Keep each disclosure in the reading column; do not shorten or hide it. */
+.processor-list > :last-child:nth-child(odd) { display: block; }
+.processor-list > :last-child:nth-child(odd) > p { max-width: none; }
+/* Long export filenames must wrap inside their table cell, including WebKit on phones. */
+.docs-table code { overflow-wrap: anywhere; }
+
 /* `.status-list h3` was missing, so /status rendered its row names unstyled while /security,
    which uses h2 in the same grid, did not. */
 /* BA-156 -- `text-transform: capitalize` turned sentence-shaped source strings into "Content

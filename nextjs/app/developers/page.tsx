@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { Route } from "next";
@@ -114,6 +115,23 @@ const PACKAGE_PURPOSE: Record<string, string> = {
   "signatures/export-manifest.ed25519.json": "The detached Ed25519 signature over that manifest.",
 };
 
+/*
+  A package path that can wrap (measured, webkit at 390).
+
+  The paths are in a `.docs-table` cell now, and `signatures/export-manifest.ed25519.json` in a
+  `<code>` has no break opportunity in it, so WebKit pushed the document 48px wider than the
+  viewport rather than scrolling the table's own container. `<wbr>` after each separator is the
+  standard answer and needs no rule in `app/tavonel.css`, which this lane does not own -- and the
+  break points it gives (after a slash, after a hyphen) are the ones a reader would choose. The
+  root fix, `overflow-wrap: anywhere` on `.docs-table code`, is in the report as a cross-lane
+  request, because the same 48px is waiting for the next long value any table on the site prints.
+*/
+function breakable(path: string) {
+  return path.split(/(?<=[/-])/).map((part, index) => (
+    <Fragment key={index}>{part}<wbr /></Fragment>
+  ));
+}
+
 function packagePurpose(path: string): string {
   const purpose = PACKAGE_PURPOSE[path];
   if (!purpose) throw new Error(`the export writes ${path} and this page says nothing about it`);
@@ -226,7 +244,7 @@ export default function DevelopersPage() {
                       .sort((a, b) => a.localeCompare(b))
                       .map((path) => (
                         <tr key={path}>
-                          <td data-label="Path"><code>{path}</code></td>
+                          <td data-label="Path"><code>{breakable(path)}</code></td>
                           <td data-label="Use it for">{packagePurpose(path)}</td>
                         </tr>
                       ))}
