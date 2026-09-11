@@ -1233,8 +1233,20 @@ h3 { font-size: 19px; letter-spacing: -0.014em; font-variation-settings: "wght" 
 .policy-copy p { margin: 0; color: var(--text-lo); line-height: 1.72; }
 .policy-copy a { color: var(--text-hi); text-decoration-thickness: 1px; text-underline-offset: 3px; }
 .processor-list, .status-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; margin: 8px 0 18px; background: var(--hairline); border: 1px solid var(--hairline); }
+/* BA-242 -- as in .tiles: the odd last row spends its width instead of holding a column
+   measure with 590px of empty card beside it. */
 .processor-list > :last-child:nth-child(odd),
-.status-list > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+.status-list > :last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-flow: row wrap;
+  align-items: baseline;
+  column-gap: clamp(20px, 3vw, 44px);
+}
+.processor-list > :last-child:nth-child(odd) > :is(h2, h3),
+.status-list > :last-child:nth-child(odd) > :is(h2, h3) { flex: 0 0 auto; max-width: 24ch; }
+.processor-list > :last-child:nth-child(odd) > p,
+.status-list > :last-child:nth-child(odd) > p { flex: 1 1 30ch; max-width: 64ch; }
 .processor-list article, .status-list article { padding: 20px; background: var(--ground); }
 /* `.status-list h3` was missing, so /status rendered its row names unstyled while /security,
    which uses h2 in the same grid, did not. */
@@ -1353,8 +1365,28 @@ h3 { font-size: 19px; letter-spacing: -0.014em; font-variation-settings: "wght" 
 
 /* Changelog: a filter row, entry headers that carry their own metadata, and grouped bullets. */
 .changelog-filter { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 0 6px; }
-.changelog-filter button { padding: 7px 11px; border: 1px solid var(--hairline); color: var(--text-xlo); font: 9px var(--f-mono); letter-spacing: .1em; text-transform: uppercase; }
-.changelog-filter button[aria-pressed="true"] { border-color: var(--verified); color: var(--verified); }
+/*
+  BA-241 -- the same control, three designs.
+
+  A filter chip row is 9.5px uppercase mono here, sentence-case text type at 11.5px on
+  /resources and a third format on /sources -- and all three were under a usable tap size on a
+  phone. This is the /resources shape, which was closest to right: text type, sentence case, a
+  hairline and a 44px row. The chips on /resources and /sources take the same two numbers;
+  their files belong to other lanes and the patch is in the lane report.
+*/
+.changelog-filter button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 6px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
+  color: var(--text-mid);
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.changelog-filter button[aria-pressed="true"] { border-color: var(--text-mid); color: var(--text-hi); }
 .changelog-entry header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; margin-bottom: 10px; }
 .changelog-entry header time { color: var(--text-lo); font: 10px var(--f-mono); letter-spacing: .09em; }
 .changelog-entry header b { color: var(--verified); font: 10px var(--f-mono); letter-spacing: .09em; }
@@ -1850,7 +1882,24 @@ h3 { font-size: 19px; letter-spacing: -0.014em; font-variation-settings: "wght" 
 /* ---------------------------------------------------------- 11 evidence tiles */
 
 .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 4px; overflow: hidden; }
-.tiles > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+/*
+  BA-242 -- a stretched last tile that keeps a single-column measure reads as a missing tile.
+
+  Odd counts happen (/solutions, /trust's seven pages, /research/notes, /resources), and in a
+  bordered grid the reader sees a full-width card that is half empty. Removing the stretch is
+  worse rather than better here: these grids draw their seams with a hairline background behind
+  a 1px gap, so an unfilled cell paints as a hairline block. The stretched tile becomes a row
+  instead -- heading and prose side by side -- and spends the width it took.
+*/
+.tiles > :last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+  flex-flow: row wrap;
+  align-items: baseline;
+  column-gap: clamp(20px, 3vw, 44px);
+}
+.tiles > :last-child:nth-child(odd) > .n { flex: 0 0 100%; }
+.tiles > :last-child:nth-child(odd) > :is(h2, h3) { flex: 0 0 auto; max-width: 22ch; }
+.tiles > :last-child:nth-child(odd) > p { flex: 1 1 30ch; max-width: 64ch; }
 .tile { background: var(--g1); padding: 16px 18px; display: flex; flex-direction: column; gap: 9px; }
 .tile .n { font-family: var(--f-mono); font-size: 9.5px; letter-spacing: 0.16em; color: var(--text-xlo); }
 /* A card heading is a card heading at any level. The landing tiles are h2 because they are the
@@ -4006,4 +4055,55 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
 :lang(ko) :is(.slate, .fine, .mode, .tick, .eyebrow, .band-head .kicker, .site-footer-title) {
   font-family: var(--f-sans);
   letter-spacing: 0.02em;
+}
+
+/* ============================================================ BA-243 · card grids that were poured, not edited
+
+   A grid whose cells differ by 90px of height reads as content dropped into a template: nine
+   /resources tiles at four different heights, a one-line /trust card stretched to a three-line
+   row, /product's four surface cards breaking their titles 2/2/1/2 lines so the body baselines
+   never line up.
+
+   Two of the three causes are CSS and are fixed here: the heading block reserves two lines so
+   every body in the row starts on the same baseline, and a card's action link sits on its own
+   bottom row so the links align even when the prose above them does not. The third cause is
+   copy -- one card carrying three paragraphs beside one carrying a sentence -- and it belongs to
+   the lanes that own those pages; the patch is in the lane report.
+   -------------------------------------------------------------------------------------------- */
+:is(.public-page, .landing-page) :is(.tiles, .chain, .solution-outcomes) :is(.tile, .link, article) {
+  align-content: start;
+}
+:is(.public-page, .landing-page) :is(.tiles, .chain) :is(.tile, .link) > :is(h2, h3) {
+  /* Two lines at the 19px card size and 1.2 leading, so a one-line title holds the same block. */
+  min-height: 2.4em;
+}
+:is(.public-page, .landing-page) :is(.tiles, .chain) :is(.tile, .link) > a:last-child {
+  margin-top: auto;
+}
+
+/* ============================================================ BA-240 · the 44px floor, past the one page that tested it
+
+   `e2e/mobile-landing.spec.ts:330` measures every `a` and `button` against 44px on a coarse
+   pointer -- on `/` only. So `/` passes and /pricing fails at 22 controls, /resources at 17, the
+   policy footer at all six links, the docs pager, the chips and every inline link inside fine
+   print. The pattern is the one the consent banner already documents: grow the hit area with
+   block padding and take it back with an equal negative margin, so the line box keeps its text
+   height and the paragraph does not reflow.
+   -------------------------------------------------------------------------------------------- */
+@media (pointer: coarse), (max-width: 1079px) {
+  :is(.public-page, .landing-page) :is(.fine, .lede, .policy-copy, .input-guidance) a,
+  :is(.public-page, .landing-page) .faq a,
+  :is(.public-page, .landing-page) .tile a,
+  :is(.public-page, .landing-page) .link a,
+  :is(.public-page, .landing-page) .docs-pager a,
+  :is(.public-page, .landing-page) .src-matrix a {
+    display: inline-block;
+    padding-block: 12.5px;
+    margin-block: -12.5px;
+  }
+  :is(.public-page, .landing-page) :is(.docs-langs button, .changelog-filter button, .tag) {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
 }
