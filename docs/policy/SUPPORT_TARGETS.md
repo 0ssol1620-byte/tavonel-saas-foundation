@@ -37,7 +37,8 @@ For anyone using the service without a written pilot agreement, on `/status` and
 
 > Email to support@tavonel.com is acknowledged within 1 business day (KST). That is an
 > acknowledgement target and not a resolution time: no resolution time is committed, and security
-> reports to security@tavonel.com are read first rather than queued behind product questions.
+> reports to security@tavonel.com are read first rather than queued behind product questions. The
+> target is a delegated decision pending the founder's confirmation (decision log, FD-09).
 
 Read the exact string from `nextjs/lib/support-targets.ts`; the block above is a quotation and the
 constant is the source.

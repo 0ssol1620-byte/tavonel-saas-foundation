@@ -25,6 +25,22 @@ describe("the published support target", () => {
     expect(SUPPORT_ACKNOWLEDGEMENT).toContain("support@tavonel.com");
   });
 
+  /*
+    The provenance label, pinned in the constant rather than on the pages.
+
+    Every other value the 2026-09-11 delegation produced carries this label where it is stated --
+    the DPA's three commitments, the 72-hour incident window, the pentest sequencing -- and this
+    one did not, so a reader met the only delegated commitment on the site that read as settled.
+    It is asserted on the string, not on the two pages, because both pages render the constant and
+    a label the pages carried separately could be edited off one of them.
+  */
+  it("says whose decision it is, and that the founder has not confirmed it", () => {
+    expect(SUPPORT_ACKNOWLEDGEMENT).toContain("a delegated decision pending the founder's confirmation");
+    expect(SUPPORT_ACKNOWLEDGEMENT, "the log entry a reader can look up").toContain("FD-09");
+    expect(SUPPORT_ACKNOWLEDGEMENT, "and never the phrasing the decision log bans")
+      .not.toMatch(/the founder (decided|has decided|set)/i);
+  });
+
   it.each(SURFACES)("%s renders the constant", (surface) => {
     const source = read(surface);
     expect(source, `${surface} must import the target`).toContain('from "@/lib/support-targets"');
