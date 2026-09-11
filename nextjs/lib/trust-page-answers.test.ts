@@ -146,7 +146,10 @@ describe("/security answers the §17.1 questions", () => {
       expect(elsewhere, `"${artefact}" outside the unanswered block reads as a claim`).not.toContain(artefact);
     }
     const row = absent.slice(absent.indexOf("Third-party certification"));
-    expect(row).toContain("No SOC 2 report");
+    // BA-155: the row leads with what is on record, so the three artefact names are now in the
+    // middle of a sentence rather than at the start of one. Matched case-insensitively for that
+    // reason, and only for that reason -- all three still have to be there, and still as a "no".
+    expect(row).toMatch(/no SOC 2 report/i);
     expect(row).toContain("no ISO 27001 certificate");
     expect(row).toContain("no independent penetration-test report exists");
     expect(row, "a badge is the marketing decoration this row exists to refuse").toContain("no badge");
@@ -449,9 +452,16 @@ describe("§37 the CDR row names the build that is actually running", () => {
 describe("§77 /status scope", () => {
   const page = read("app/status/page.tsx");
 
+  /*
+    BA-136. §77's requirement is that a reader cannot take "operational" on this page for a
+    request that succeeded. The page used to meet it with three negations before saying what it
+    was -- "not an uptime probe", "not that a request has just succeeded" -- and it now meets it
+    by stating both halves positively: what the word means, and which section answers the other
+    question. Both halves are pinned, so the distinction cannot be dropped by editing one line.
+  */
   it("says what its rows are, so 'operational' cannot be read as a probe", () => {
-    expect(page).toContain("not an uptime probe");
     expect(page).toContain("configured and its gate is open");
+    expect(page).toContain("the separate question the scheduled checks answer");
   });
 
   it("never claims all systems are operational", () => {
