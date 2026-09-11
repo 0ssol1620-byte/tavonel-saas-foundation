@@ -39,6 +39,21 @@ import { PROCESSING_UNIT_USD, STANDARD_UNITS_PER_PAGE, formatUsd } from "./usage
 */
 
 export type DocsBlock =
+  /*
+    A subheading inside a section, and the reason the type has one (BA-185/201).
+
+    Every one of the twenty-two sections had exactly zero h2s inside its body -- including an
+    1,100-word quickstart with six code blocks -- so there was nothing to render, nothing to
+    anchor a link to, and nothing for "On this page" to list. The jump list compensated by
+    indexing the only labelled blocks there were, which are code captions, so a reader looking
+    for a concept got "Steps 1 to 4 — Python".
+
+    The text is the anchor: `app/docs/[section]/page.tsx` slugifies it through the same
+    `tocEntries` the cookbook route uses, so the heading's id and the link that names it are one
+    derivation. Which is also why a heading may not be the last block in a section -- a heading
+    with nothing under it is a jump link to a blank space. `docs-content.test.ts` asserts it.
+  */
+  | { kind: "heading"; text: string }
   | { kind: "prose"; text: string }
   | { kind: "steps"; items: string[] }
   /*
@@ -47,10 +62,25 @@ export type DocsBlock =
     one language while carrying another, and so the quickstart's bash/python/typescript parity
     is a property a test can assert rather than a habit.
   */
-  | { kind: "code"; label: string; language: "bash" | "powershell" | "python" | "typescript" | "json" | "text"; body: string }
+  | { kind: "code"; label: string; language: DocsLanguage; body: string }
+  /*
+    One step of the quickstart in three languages, as tabs rather than as three figures (BA-189).
+
+    /docs/quickstart was 5,176px tall and about 4,000px of that was six code blocks: steps 1-4 in
+    bash, Python and TypeScript, then steps 6-7 in the same three. A reader who writes TypeScript
+    scrolled past roughly 250 lines of two other languages to reach either half. Nobody was served
+    by all three being open at once.
+
+    The endpoint blocks on this same page already did this -- `DocsSnippet`, three tabs, all three
+    bodies rendered server-side so a reader with no JavaScript still gets the first. This is that
+    component, given a block kind so the section data can use it too.
+  */
+  | { kind: "snippets"; label: string; items: ReadonlyArray<{ label: string; language: DocsLanguage; body: string }> }
   | { kind: "table"; head: string[]; rows: string[][] }
   | { kind: "endpoint"; operationId: string }
   | { kind: "note"; text: string };
+
+export type DocsLanguage = "bash" | "powershell" | "python" | "typescript" | "json" | "text";
 
 export type DocsSection = {
   slug: string;
@@ -90,6 +120,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
     summary: "From an API key to a verified evidence-bound answer, with the one step no key can take.",
     blocks: [
       { kind: "prose", text: "Every request is tenant-scoped by the key it carries. There is no account switch and no impersonation header: a key belongs to one workspace and reaches nothing else." },
+      { kind: "heading", text: "The seven steps" },
       {
         kind: "steps",
         items: [
@@ -104,15 +135,17 @@ export const DOCS_SECTIONS: DocsSection[] = [
       },
       // FD-02 (`docs/policy/DECISION_LOG_2026-09-11.md`): the activation plan gate stated below is
       // a delegated decision, 2026-09-11, read off `planReachesLevel` rather than typed here.
+      { kind: "heading", text: "Why step 5 stops a script" },
       {
         kind: "note",
         text: "Step 5 is the one that stops a script, and it stops for two separate reasons. Promotion is human-only by design — a candidate is not organizational truth until a person says so, and no API key of any plan has a promote or rollback path to call. Separately, the activation surface is plan-gated: it runs on the **Developer** plan held by the workspace **owner**, or on the **Team** plan under its usual workspace roles, so steps 1-4 and 6-7 work on Developer today and step 5 does too when you own the workspace. Any other caller is refused with `STUDIO_SUBSCRIPTION_REQUIRED`, and an evaluation trial with `SUBSCRIPTION_REQUIRED`; branch on those two codes. Team is arranged with us rather than bought at a checkout.",
       },
+      { kind: "heading", text: "Compile a document set" },
       {
-        kind: "code",
-        label: "Steps 1 to 4 — bash",
-        language: "bash",
-        body: [
+        kind: "snippets",
+        label: "Steps 1 to 4",
+        items: [
+          { label: "cURL", language: "bash", body: [
           `# Requires curl and jq. TAVONEL_API_KEY holds a key scoped documents:intake + collections:compile + collections:read.`,
           `capability=$(curl -fsS https://tavonel.com/api/v1/uploads/capability \\`,
           `  -H "${KEY_HEADER}" -H "content-type: application/json" \\`,
@@ -138,13 +171,8 @@ export const DOCS_SECTIONS: DocsSection[] = [
           `done`,
           `collection_id=$(printf '%s' "$job" | jq -r .job.collectionId)`,
           `echo "candidate: $collection_id — a person activates it in the workspace before step 6"`,
-        ].join("\n"),
-      },
-      {
-        kind: "code",
-        label: "Steps 1 to 4 — Python",
-        language: "python",
-        body: [
+          ].join("\n") },
+          { label: "Python", language: "python", body: [
           `import json, os, time, urllib.request`,
           ``,
           `BASE = "https://tavonel.com"`,
@@ -183,13 +211,8 @@ export const DOCS_SECTIONS: DocsSection[] = [
           `    time.sleep(5)`,
           ``,
           `print("candidate:", job["collectionId"], "— a person activates it before step 6")`,
-        ].join("\n"),
-      },
-      {
-        kind: "code",
-        label: "Steps 1 to 4 — TypeScript",
-        language: "typescript",
-        body: [
+          ].join("\n") },
+          { label: "TypeScript", language: "typescript", body: [
           `import { readFile, stat } from "node:fs/promises";`,
           ``,
           `const BASE = "https://tavonel.com";`,
@@ -227,13 +250,15 @@ export const DOCS_SECTIONS: DocsSection[] = [
           `} while (!settled.has(job.state));`,
           ``,
           `console.log("candidate:", job.collectionId, "— a person activates it before step 6");`,
-        ].join("\n"),
+          ].join("\n") },
+        ],
       },
+      { kind: "heading", text: "Ask a question and download the package" },
       {
-        kind: "code",
-        label: "Steps 6 and 7 — bash, after a person has activated the World",
-        language: "bash",
-        body: [
+        kind: "snippets",
+        label: "Steps 6 and 7, after a person has activated the World",
+        items: [
+          { label: "cURL", language: "bash", body: [
           `# 6. Ask the active World. \`retrievalPath\` names which runtime answered:`,
           `#    compiled-retrieval-v1, or excerpt-concatenation-fallback when the active World`,
           `#    has no compiled retrieval run. /search has no fallback and answers 409 in that case.`,
@@ -250,13 +275,8 @@ export const DOCS_SECTIONS: DocsSection[] = [
           `fingerprint=$(curl -fsS https://tavonel.com/api/export/trust | jq -r .publicKeySpkiSha256)`,
           `node tavonel-verify-export.mjs --archive world.zip --trusted-fingerprint "$fingerprint"`,
           `node tavonel-verify-package.mjs --package world.zip --require-signature`,
-        ].join("\n"),
-      },
-      {
-        kind: "code",
-        label: "Steps 6 and 7 — Python",
-        language: "python",
-        body: [
+          ].join("\n") },
+          { label: "Python", language: "python", body: [
           `answer = call("POST", f"/api/v1/collections/{job['collectionId']}/ask",`,
           `              {"question": "What is the documented retention period?"})`,
           `print(answer["code"], answer["retrievalPath"])`,
@@ -271,13 +291,8 @@ export const DOCS_SECTIONS: DocsSection[] = [
           ``,
           `# Verification is the two published Node verifiers; there is no Python port of them.`,
           `# See the CLI page for the download-and-pin commands.`,
-        ].join("\n"),
-      },
-      {
-        kind: "code",
-        label: "Steps 6 and 7 — TypeScript",
-        language: "typescript",
-        body: [
+          ].join("\n") },
+          { label: "TypeScript", language: "typescript", body: [
           `import { writeFile } from "node:fs/promises";`,
           ``,
           `const answer = await call<{ code: string; retrievalPath: string; retrievalNotice?: string }>(`,
@@ -292,8 +307,10 @@ export const DOCS_SECTIONS: DocsSection[] = [
           `await writeFile("world.zip", Buffer.from(await archive.arrayBuffer()));`,
           ``,
           `// Then run the two published verifiers; see the CLI page.`,
-        ].join("\n"),
+          ].join("\n") },
+        ],
       },
+      { kind: "heading", text: "What /ask answers from" },
       { kind: "note", text: "`/ask` answers only from the World a person has approved. A `review_required` candidate stays readable and exportable until then, and it is never treated as authoritative: there is no parameter that points `/ask` at a candidate." },
     ],
   },
@@ -303,10 +320,12 @@ export const DOCS_SECTIONS: DocsSection[] = [
     group: "External AI",
     summary: "Choose live MCP/API access or the signed portable package, and keep answers grounded in the same evidence.",
     blocks: [
+      { kind: "heading", text: "Live access or a portable package" },
       {
         kind: "prose",
         text: "There are two supported ways to use TAVONEL output. **Live access** through Ask, the API or the read-only MCP server reads the active World and is the preferred path for a production assistant that needs the current revision. The **signed knowledge package** is a portable snapshot for offline work, handoff, archive and systems that consume files rather than an API.",
       },
+      { kind: "heading", text: "Which surface for which use" },
       {
         kind: "table",
         head: ["Use case", "Recommended surface", "Why"],
@@ -318,6 +337,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
           ["Graph/RDF/RAG import", "Signed ZIP", "Use the projection that matches the target system while retaining validation and provenance beside it."],
         ],
       },
+      { kind: "heading", text: "Setting either path up" },
       {
         kind: "steps",
         items: [
@@ -328,12 +348,14 @@ export const DOCS_SECTIONS: DocsSection[] = [
           "Require the consuming AI to preserve uncertainty and cite the package evidence/source locator it actually used. README.md and AGENTS.md are instructions, not evidence sources.",
         ],
       },
+      { kind: "heading", text: "Telling an agent what to read first" },
       {
         kind: "code",
         label: "Minimal prompt for a local agent",
         language: "text",
         body: "Read AGENTS.md in this folder first. Use manifest/ai-entrypoint.json to locate the compiled knowledge and evidence. Answer from this package, preserve uncertainty, and cite the source evidence you relied on. If the task requires the latest organizational state, tell me to use the live TAVONEL MCP/API instead of assuming this snapshot is current.",
       },
+      { kind: "heading", text: "What each package file is for" },
       {
         kind: "table",
         head: ["Package path", "Use it for"],
@@ -363,6 +385,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
     group: "External AI",
     summary: "Import the Compiled World ontology into RDF, linked-data and graph systems without losing validation, evidence or stable identity.",
     blocks: [
+      { kind: "heading", text: "The two projections in every package" },
       { kind: "prose", text: "Every portable package includes **ontology/knowledge.jsonld** and **ontology/knowledge.ttl**. They are semantic projections of the Compiled World. The current export is RDF/JSON-LD with TAVONEL node kinds and compiled relation predicates; it should not be described as a hand-authored OWL/TBox schema. Keep provenance and validation beside the ontology, because the ontology is for semantic navigation and integration rather than a replacement for source evidence." },
       /*
         Audit K01/K05: the predicate set, named as what the engine emits rather than as an
@@ -382,6 +405,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
         is written by hand today; it is regenerated from the emitter's own predicate constant once
         that constant exists (`CORE_RELATION_PREDICATES` covers the live engine's half).
       */
+      { kind: "heading", text: "The predicates each engine emits" },
       {
         kind: "table",
         head: ["Predicate", "Emitted by", "How it is derived"],
@@ -394,6 +418,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
         ],
       },
       { kind: "note", text: "Relations the ontology vocabulary could express and no engine emits — `supports`, `supersedes`, `depends_on` — are not in a package. Query for a predicate that is not in the table above and the result is empty rather than wrong. `contradicts` is in a package now and was not before, so a query written against an older export finds nothing rather than nothing being there; and a `contradicts` row is a flagged pair awaiting a person, never a decided conflict." },
+      { kind: "heading", text: "Loading it into a target system" },
       {
         kind: "table",
         head: ["Target", "Use", "Important companion"],
@@ -414,6 +439,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
           "Treat a signed ZIP as a snapshot. When the active World changes, import the newer signed projection or use MCP/API instead of editing the old snapshot in place.",
         ],
       },
+      { kind: "heading", text: "Inspecting it with SPARQL" },
       {
         kind: "code",
         label: "Portable SPARQL inspection",
@@ -429,10 +455,15 @@ export const DOCS_SECTIONS: DocsSection[] = [
     group: "Getting started",
     summary: "Sources, Compiled Worlds, candidate and active versions, and evidence.",
     blocks: [
+      { kind: "heading", text: "Sources" },
       { kind: "prose", text: "A **source** is an immutable document version. Uploading the same file twice produces two documents with two source records that share one content digest; nothing merges them, each citation names one of the documents carrying those bytes, and editing the file produces a second version without rewriting the first." },
+      { kind: "heading", text: "Compiled Worlds" },
       { kind: "prose", text: "A **Compiled World** is what a set of sources compiles into: semantic objects, relations between them, and the evidence each one rests on. It is addressed by a collection id and a manifest digest, and the digest is computed over the whole artifact, so two Worlds with the same digest are the same World." },
+      { kind: "heading", text: "Candidate and active versions" },
       { kind: "prose", text: "A **candidate** version is a compile result nobody has accepted yet. An **active** version is the one answers are served from. Promotion is an explicit human action in a signed-in session — no API key can promote, and no compile promotes itself." },
+      { kind: "heading", text: "Evidence" },
       { kind: "prose", text: "**Evidence** is a page and a region on that page, bound to a source version by digest. An object with no evidence is not published, and an answer that cannot cite one abstains rather than guessing." },
+      { kind: "heading", text: "What each identifier changes with" },
       {
         kind: "table",
         head: ["Term", "Identified by", "Changes when"],
@@ -451,13 +482,16 @@ export const DOCS_SECTIONS: DocsSection[] = [
     group: "Getting started",
     summary: "Bearer keys, the scopes they carry, and what no key can do.",
     blocks: [
+      { kind: "heading", text: "Sending the key" },
       { kind: "prose", text: "Send the key as a bearer token. Keys are workspace-scoped and carry an explicit scope set; a request outside its scopes is refused with 403 rather than silently returning less." },
       { kind: "code", label: "Every request", language: "bash", body: `curl -sS https://tavonel.com/api/v1/documents -H "${KEY_HEADER}"` },
+      { kind: "heading", text: "The scopes a key can hold" },
       {
         kind: "table",
         head: ["Scope", "Grants"],
         rows: DEVELOPER_SCOPES.map((scope) => [scope, SCOPE_COPY[scope] ?? "See the endpoint reference."]),
       },
+      { kind: "heading", text: "What no key can do" },
       { kind: "note", text: "Promotion, rollback and destructive workspace actions are human-session-only. There is no scope that grants them, which is why you will not find one in this table." },
     ],
   },
@@ -467,6 +501,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
     group: "Input and compile",
     summary: "What can be uploaded, what is expanded in the browser, and the ceilings on both.",
     blocks: [
+      { kind: "heading", text: "What is accepted" },
       { kind: "prose", text: `${describeAcceptedFormats(CAPABILITY_MANIFEST)} are accepted, and nothing else is. A ZIP archive is expanded before upload so its contents arrive as individual sources, which is why the archive ceilings below are browser limits rather than server ones.` },
       /*
         The support table is the manifest, not a description of it.
@@ -478,6 +513,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
         things, and a reader planning an integration needs to know that before they send us a
         spreadsheet expecting cells.
       */
+      { kind: "heading", text: "What each format preserves" },
       {
         kind: "table",
         head: ["Format", "Support tier", "What is preserved"],
@@ -488,6 +524,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
         ]),
       },
       { kind: "note", text: "Every format above is read through the same sanitize-to-PDF and OCR path, and the table states exactly what each one preserves. A format is promoted above its tier only with a published qualification result and the date it was produced. The Sources page prints the same manifest with every limitation attached." },
+      { kind: "heading", text: "The ceilings, and why they are those numbers" },
       {
         kind: "table",
         head: ["Limit", "Value", "Why it is that number"],
@@ -505,6 +542,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
         other. The unit is now decided -- the pages of the sanitized PDF -- and the byte bound is
         gone from `estimateBillablePages` entirely, so the two sections say one thing.
       */
+      { kind: "heading", text: "Archives that are refused" },
       { kind: "note", text: "Encrypted archives, nested archives and paths that escape the archive root are refused at expansion time, not after upload. A spreadsheet is billed on the pages of the sanitized PDF it is converted to, counted after that conversion — so before a compile there is no page number for one, and preflight shows its absence rather than a figure derived from the file size." },
     ],
   },
@@ -514,7 +552,9 @@ export const DOCS_SECTIONS: DocsSection[] = [
     group: "Input and compile",
     summary: "Direct-to-storage upload, and why bytes never reach the application server.",
     blocks: [
+      { kind: "heading", text: "Why bytes never reach our server" },
       { kind: "prose", text: "Uploads are direct. The capability endpoint returns a short-lived URL to object storage; you PUT the bytes there. The application server sees the request for permission and the receipt afterwards, and never the document." },
+      { kind: "heading", text: "Requesting a capability and listing documents" },
       { kind: "endpoint", operationId: "createDirectUploadCapability" },
       { kind: "endpoint", operationId: "listDocuments" },
     ],
@@ -526,10 +566,13 @@ export const DOCS_SECTIONS: DocsSection[] = [
     summary: `A compile carries up to ${COMPILE_MAX_DOCUMENTS} documents; a run carries up to ${CORPUS_MAX_DOCUMENTS}.`,
     blocks: [
       { kind: "prose", text: `A compile takes between ${COMPILE_MIN_DOCUMENTS} and ${COMPILE_MAX_DOCUMENTS} documents. That is one Core request and one artifact, and it is not the limit on how much you can compile: a selection larger than that is partitioned server-side into parts of that size and answered as a corpus, up to ${CORPUS_MAX_DOCUMENTS} documents in one run.` },
+      { kind: "heading", text: "Corpora and their parts" },
       { kind: "prose", text: "Each part of a corpus is an ordinary compile job with its own id, state and event stream. The parts are not merged into one World: deciding that an entity in one part and an entity in another are the same thing is identity resolution with its own evidence requirements, and joining the ontologies without it would manufacture duplicates." },
+      { kind: "heading", text: "Starting a compile and reading a corpus" },
       { kind: "endpoint", operationId: "startCompileJob" },
       { kind: "endpoint", operationId: "getCompileCorpus" },
       { kind: "endpoint", operationId: "compileCollection" },
+      { kind: "heading", text: "Submitting the same set twice" },
       { kind: "note", text: "Submitting the same document set again returns the job that already exists. A retried request, a double-clicked button and an at-least-once redelivery converge on one compile." },
     ],
   },
@@ -539,15 +582,18 @@ export const DOCS_SECTIONS: DocsSection[] = [
     group: "Input and compile",
     summary: "The persisted transition log, and how to resume it after a disconnect.",
     blocks: [
+      { kind: "heading", text: "The transition ledger" },
       { kind: "prose", text: "A compile publishes its transitions to an append-only ledger. The event stream replays that ledger from `Last-Event-ID` and then follows it, so a client that reconnects sees everything it missed rather than the current state alone." },
       { kind: "endpoint", operationId: "streamCompileJobEvents" },
       { kind: "endpoint", operationId: "getCompileJob" },
+      { kind: "heading", text: "Resuming after a disconnect" },
       {
         kind: "code",
         label: "Resume after a disconnect",
         language: "bash",
         body: `curl -N https://tavonel.com/api/compile-jobs/<jobId>/events \\\n  -H "${KEY_HEADER}" \\\n  -H "Last-Event-ID: 42"`,
       },
+      { kind: "heading", text: "Reconnecting is the normal case" },
       { kind: "note", text: "The server closes the stream on its own clock. Reconnecting is the normal case, not an error path — every frame carries the sequence to resume from." },
     ],
   },
@@ -557,7 +603,9 @@ export const DOCS_SECTIONS: DocsSection[] = [
     group: "Input and compile",
     summary: "Partial failures, the four decisions, and the one that cannot be taken casually.",
     blocks: [
+      { kind: "heading", text: "When a compile stops and waits" },
       { kind: "prose", text: "A compile that cannot read every source stops and waits. Nothing is skipped automatically: a World quietly missing documents you believe are in it is worse than a compile that asks." },
+      { kind: "heading", text: "The four decisions" },
       {
         kind: "table",
         head: ["Decision", "Effect"],
@@ -568,8 +616,10 @@ export const DOCS_SECTIONS: DocsSection[] = [
           ["cancel", "Settle the job without compiling."],
         ],
       },
+      { kind: "heading", text: "Answering blockers, or cancelling" },
       { kind: "endpoint", operationId: "resolveCompileJobBlockers" },
       { kind: "endpoint", operationId: "cancelCompileJob" },
+      { kind: "heading", text: "What continue will not do" },
       { kind: "note", text: "A file stopped by a safety check leaves the set only through an explicit removal. `continue` will not step over it, because a pipeline that learns to skip security stops has stopped being one." },
     ],
   },
@@ -579,6 +629,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
     group: "World and questions",
     summary: "Reading a compiled World, its objects, relations and evidence.",
     blocks: [
+      { kind: "heading", text: "Reading a World by collection id" },
       { kind: "prose", text: "A World is read by collection id. Objects carry their stable keys, the relations they participate in and the evidence they rest on; evidence carries the source version, the page and the region." },
       /*
         R9 finding #3. This block named `getCollection`, which is a different artifact: `GET
@@ -590,8 +641,10 @@ export const DOCS_SECTIONS: DocsSection[] = [
         "the active World, its objects, relations and evidence". Both World operations are named
         now, because the per-lens read is how anyone consuming one lens at a time uses this page.
       */
+      { kind: "heading", text: "The whole read model, or one lens" },
       { kind: "endpoint", operationId: "getWorldReadModel" },
       { kind: "endpoint", operationId: "getWorldLens" },
+      { kind: "heading", text: "What is never in a response" },
       { kind: "note", text: "Route features, scores, thresholds and the cost matrix are not in any public response. They are internal, and a public DTO that filtered them would be one refactor away from leaking them." },
     ],
   },
@@ -601,8 +654,11 @@ export const DOCS_SECTIONS: DocsSection[] = [
     group: "World and questions",
     summary: "Hybrid retrieval — lexical, dense and structure, RRF-fused and reranked — over the active World.",
     blocks: [
+      { kind: "heading", text: "What Search runs against" },
       { kind: "prose", text: "Search runs against the active version. A workspace with no promoted World returns nothing rather than falling back to a candidate — an answer from a version nobody accepted is not a smaller answer, it is a different one." },
+      { kind: "heading", text: "The pipeline, source by source" },
       { kind: "prose", text: "Three retrieval sources run concurrently over the World's compiled index: lexical full-text, dense vectors, and structure (claim and entity overlap with what the query already matched). Their ranks are fused with reciprocal rank fusion — ranks only, so native scores from different scoring spaces never mix — then reranked, then filtered by the World Gate, which admits a region only if it belongs to your tenant, to the active world version, and is bound to evidence." },
+      { kind: "heading", text: "The fields that say what ran" },
       {
         kind: "table",
         head: ["Field", "What it tells you"],
@@ -616,6 +672,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
         ],
       },
       { kind: "prose", text: "A degradation is reported, never hidden. `dense retrieval skipped: no embedder configured` means the answer came from lexical and structure alone; a reranker outage returns the fused order and says so. Reading `degradations` is how you tell a full-pipeline result from a partial one — the two otherwise look identical." },
+      { kind: "heading", text: "When there is no compiled index" },
       { kind: "note", text: "Search requires a compiled retrieval index for the active World. Without one the response is 409 with the code RETRIEVAL_RUN_NOT_FOUND (or RETRIEVAL_PROFILE_NOT_FOUND), carrying `retrievalIndex` and `retrievalNotice` to say which state the index is in. It is not a 200 with fewer results: Search has no fallback, and a weaker answer presented as the real one is worse than a refusal you can act on. POST /v1/collections/{id}/retrieval-index rebuilds the index. It takes the collections:compile scope, the owner or admin role, and the same plan bar activating a World takes: **Team**, or **Developer** held by the workspace owner. The two bars are identical on purpose — this endpoint is the recovery path for a promote whose index did not compile, so a plan that may promote and may not rebuild would leave its own Worlds answering from the fallback with nothing to call. Naming the plan here at all is R9 finding #2: this sentence used to give the scope and the role and leave the plan out." },
       { kind: "endpoint", operationId: "searchActiveWorld" },
     ],
@@ -626,8 +683,11 @@ export const DOCS_SECTIONS: DocsSection[] = [
     group: "World and questions",
     summary: "Grounded answers, their citations, which retrieval runtime answered, and when the system abstains.",
     blocks: [
+      { kind: "heading", text: "How an answer is built" },
       { kind: "prose", text: "Ask retrieves regions from the active World and answers from them. Every answer carries the regions it used, with the source version, page and bounding box of each. The answer text is those regions' excerpts, concatenated in the order the retriever ranked them — `answerMode` is `evidence_excerpts`, and no language model writes any part of it. That is a deliberate boundary, not a gap waiting to be filled quietly: the day a model does generate an answer, `answerMode` will say a different word, and you will be able to tell from the response rather than from a changelog." },
+      { kind: "heading", text: "Abstention, and why it is a result" },
       { kind: "prose", text: "When no region matched the question, the response is an abstention with a reason. That is a result, not a failure: an answer with no evidence behind it is the failure. A region can also be retrieved and still not be citable — if it carries no evidence binding it is dropped, and an answer left with no citations abstains rather than claiming something no region supports." },
+      { kind: "heading", text: "Which runtime answered" },
       { kind: "prose", text: "Two retrieval runtimes can answer, and the response always says which one did. `retrievalPath` is the field; both values are real and neither is a placeholder." },
       {
         kind: "table",
@@ -640,6 +700,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
       { kind: "prose", text: "The fallback is not a rare edge. A World promoted before its index was compiled, a compile that failed on an unreachable embedder, and a run still in flight all land here, and the response distinguishes them: `retrievalIndex.status` is `missing`, `compiled` or `failed`, `retrievalIndex.errorClass` names the failure class, and `retrievalNotice` says the same thing in a sentence. An index that exists but has not finished is reported as `missing` — an incomplete index is not queryable, and half an index is not a smaller index." },
       { kind: "prose", text: "Both paths return `answer`, `reason`, `citations`, `receipt`, `activeWorld`, `freshness`, `answerMode` and `retrievalPath`. What differs is the per-citation scoring, and it is not normalized across the two: the fallback reports `relevance` with its lexical, graph, temporal and authority breakdown, while the compiled path reports each source's rank and the reranker score. Presenting one as the other would mean inventing a number neither path measured." },
       { kind: "prose", text: "The two paths differ in retrieval quality, so read `retrievalPath` before comparing answers across Worlds: a difference between two answers can be a difference between two runtimes rather than between two corpora." },
+      { kind: "heading", text: "The freshness clocks" },
       {
         kind: "table",
         head: ["freshness", "Which clock it is"],
@@ -662,7 +723,9 @@ export const DOCS_SECTIONS: DocsSection[] = [
     group: "Operations and errors",
     summary: "Connected sources, their cursors, and what a revoke does immediately.",
     blocks: [
+      { kind: "heading", text: "Cursors, and what a revoke does" },
       { kind: "prose", text: "A connection carries a durable cursor, so a re-sync collects what changed rather than everything. Access removal takes effect on the next request rather than waiting for a background reindex." },
+      { kind: "heading", text: "Availability by provider" },
       { kind: "note", text: "Connector availability differs by provider and by workspace. The Integrations page states which are live; this page does not restate it, because two pages saying different things about the same connector is how that goes wrong." },
     ],
   },
@@ -672,6 +735,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
     group: "World and questions",
     summary: "The signed package: what is in it, and what the signature covers.",
     blocks: [
+      { kind: "heading", text: "What a package contains" },
       { kind: "prose", text: "A compiled World exports as a package containing the canonical model, the ontology in Turtle and JSON-LD, the graph as CSV, the retrieval chunks, the evidence and a validation report. Every file carries its own sha256 and the manifest digest covers the set." },
       {
         kind: "table",
@@ -689,6 +753,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
           ["validation/report.json", "The validation status and any review reasons."],
         ],
       },
+      { kind: "heading", text: "Signature states a caller can observe" },
       {
         kind: "table",
         head: ["Artifact", "Signature state", "What happens"],
@@ -697,6 +762,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
           ["Public sample World", "Deliberately unsigned", "The sample on the Reproducibility page is a fixture, labelled unsigned, and is not a promoted customer World. Do not use it to test the signature path."],
         ],
       },
+      { kind: "heading", text: "Verifying against a fingerprint you fetch separately" },
       { kind: "note", text: "The signing key lives with an external signer, so a deployment without one cannot hand out an archive at all. `GET /api/export/trust` publishes the public key and its sha256 fingerprint, and returns `EXPORT_SIGNER_NOT_CONFIGURED` by the same rule. Verify against the fingerprint from that endpoint, never against the one inside the archive you are checking." },
     ],
   },
@@ -706,7 +772,9 @@ export const DOCS_SECTIONS: DocsSection[] = [
     group: "External AI",
     summary: "The read-only tools an agent gets, and the two the server deliberately does not offer.",
     blocks: [
+      { kind: "heading", text: "The server, and how to pin it" },
       { kind: "prose", text: "A read-only MCP server is published on the Developers page as tavonel-mcp.mjs, pinned by sha256 in the channel manifest. It speaks JSON-RPC over stdio with no dependency and no build step, so it can be read before it is pointed at anything. Set TAVONEL_API_KEY and register it; TAVONEL_BASE_URL defaults to https://tavonel.com. Run `node tavonel-mcp.mjs --doctor` first: it checks the key, the channel pin and one real read, so a failure names which of the three is wrong instead of surfacing as a silent agent." },
+      { kind: "heading", text: "The tools it exposes" },
       {
         kind: "table",
         head: ["Tool", "What it returns"],
@@ -722,6 +790,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
           ["download_package", "Where the signed package is, how large, and what its manifest hashes to."],
         ],
       },
+      { kind: "heading", text: "The tools it deliberately does not offer" },
       { kind: "note", text: "There is no write tool and there is no promotion tool. Promotion is the moment a candidate becomes the World an organisation answers from, and it stays with a person in a browser; the server refuses to start if a tool that writes is ever added to it." },
       { kind: "note", text: "list_worlds lists only active Worlds, over `GET /v1/collections`. Candidates are excluded: a discovery list mixing accepted and unaccepted output would present both as organizational truth." },
       { kind: "note", text: "download_package returns a descriptor rather than the archive: the URL, the size, the signed manifest digest and the signing key id. The bytes are fetched over HTTP with the same key and checked with the verifier on the CLI page." },
@@ -733,8 +802,10 @@ export const DOCS_SECTIONS: DocsSection[] = [
     group: "External AI",
     summary: "The five published files, how to pin them, and how to verify an export with nothing but a download.",
     blocks: [
+      { kind: "heading", text: "What the distribution is" },
       { kind: "prose", text: "The developer distribution is published on the Developers page and pinned by sha256 in `/developer/channel.json`. Six files: `tavonel-cli.mjs` covers the upload and compile path from a terminal, `tavonel-mcp.mjs` is the read-only MCP bridge, `tavonel-source-agent.py` walks a folder or bucket, and `tavonel-verify-export.mjs`, `tavonel-verify-package.mjs` and `tavonel-verify-roundtrip.py` check an export offline." },
       { kind: "note", text: "It is a distribution rather than a package-manager release: there is no npm, pip or Homebrew package. The manifest names the exact bytes, and you check them before anything runs. Each file imports nothing — Node 20+ for the four `.mjs` files, Python 3.12+ for the agent — so there is no install step, no lockfile and no transitive dependency to audit. Reading a file before you run it is the intended workflow, not a fallback." },
+      { kind: "heading", text: "Fetching and verifying it" },
       {
         kind: "code",
         label: "Fetch and verify against the channel manifest — bash",
@@ -767,7 +838,9 @@ export const DOCS_SECTIONS: DocsSection[] = [
           `"pinned version: $($channel.version)"`,
         ].join("\n"),
       },
-      { kind: "prose", text: "**Pin, update, uninstall.** `--version` prints the immutable distribution version compiled into the file you hold, so pinning is keeping the file and its digest. `node tavonel-cli.mjs update-check` compares that version with the published channel and prints the difference; it never downloads and never overwrites anything, so updating is deliberately the same act as installing — fetch, check the digest, replace the file. Uninstalling is deleting the file: nothing is written to a registry, a PATH, a profile or a system directory, and the only state the CLI keeps is the connector cursor file you name yourself." },
+      { kind: "heading", text: "Pin, update, uninstall" },
+      { kind: "prose", text: "`--version` prints the immutable distribution version compiled into the file you hold, so pinning is keeping the file and its digest. `node tavonel-cli.mjs update-check` compares that version with the published channel and prints the difference; it never downloads and never overwrites anything, so updating is deliberately the same act as installing — fetch, check the digest, replace the file. Uninstalling is deleting the file: nothing is written to a registry, a PATH, a profile or a system directory, and the only state the CLI keeps is the connector cursor file you name yourself." },
+      { kind: "heading", text: "The two verifiers" },
       { kind: "prose", text: "Two verifiers answer different questions, and both are downloads rather than commands in the CLI. `tavonel-verify-export.mjs` checks the archive: that the Ed25519 signature was made by the key whose fingerprint you supply, that every file matches the digest we signed, and that nothing was added. `tavonel-verify-package.mjs` checks what is inside it: that relations resolve to objects that exist, that every region sits inside its page in the 0-1000 coordinate frame, that the Turtle, the JSON-LD and the CSV describe the same graph, and that the package's own report counts what the package holds." },
       {
         kind: "code",
@@ -790,7 +863,8 @@ export const DOCS_SECTIONS: DocsSection[] = [
         ].join("\n"),
       },
       { kind: "note", text: "A tampered archive fails at the signature. A package whose relations point at objects that are not there verifies perfectly and is still wrong, which is why the second check exists. Both exit non-zero on any error, and the package validator exits 2 when its arguments are wrong rather than exiting 0 having checked nothing." },
-      { kind: "prose", text: "**Checking the export in something that is not ours.** Cross-format parity inside the package is what `tavonel-verify-package.mjs` proves. Whether the ids and the provenance survive being loaded by a tool that has never heard of TAVONEL is a different question, and `tavonel-verify-roundtrip.py`, the third published verifier, answers it against a package you already hold: it loads `graph/nodes.csv` and `graph/relationships.csv` into an in-memory SQLite database and queries the ids back through SQL, parses `ontology/knowledge.jsonld` as plain JSON, and counts triples and subjects in `ontology/knowledge.ttl`. Python 3.12 and the standard library, nothing else." },
+      { kind: "heading", text: "Checking an export outside our tools" },
+      { kind: "prose", text: "Cross-format parity inside the package is what `tavonel-verify-package.mjs` proves. Whether the ids and the provenance survive being loaded by a tool that has never heard of TAVONEL is a different question, and `tavonel-verify-roundtrip.py`, the third published verifier, answers it against a package you already hold: it loads `graph/nodes.csv` and `graph/relationships.csv` into an in-memory SQLite database and queries the ids back through SQL, parses `ontology/knowledge.jsonld` as plain JSON, and counts triples and subjects in `ontology/knowledge.ttl`. Python 3.12 and the standard library, nothing else." },
       {
         kind: "code",
         label: "Load the export into SQLite and query the ids back",
@@ -814,6 +888,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
     group: "External AI",
     summary: "Three paths pinned to a specific tool, each with a smoke script that runs them.",
     blocks: [
+      { kind: "heading", text: "Why three pinned recipes" },
       { kind: "prose", text: "A general integration guide ages badly and cannot be checked. These three are pinned to a named tool, and each one is executed by `scripts/developer-recipes/smoke.mjs` in this repository, so a recipe that has drifted from the product fails a check rather than a customer's afternoon. Three is the number on purpose: two or three verified recipes are worth more than a dozen plausible ones." },
       {
         kind: "table",
@@ -824,7 +899,8 @@ export const DOCS_SECTIONS: DocsSection[] = [
           ["curl before you have a key", "curl and jq, no key", "What this deployment can read, what its contract publishes, and who signs its exports."],
         ],
       },
-      { kind: "prose", text: "**Recipe 1 — Claude Desktop and Claude Code.** Download and pin `tavonel-mcp.mjs` as the CLI page describes, then register it with an absolute path. Claude Desktop reads `%APPDATA%\\Claude\\claude_desktop_config.json` on Windows and `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS; restart the app after editing, because the config is read at launch. Claude Code reads `.mcp.json` at the root of the project you open, which is the scope to use when a repository and a World belong together. Other MCP clients accept the same object under their own path — check the client's own documentation rather than assuming these two." },
+      { kind: "heading", text: "Recipe 1 — Claude Desktop and Claude Code" },
+      { kind: "prose", text: "Download and pin `tavonel-mcp.mjs` as the CLI page describes, then register it with an absolute path. Claude Desktop reads `%APPDATA%\\Claude\\claude_desktop_config.json` on Windows and `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS; restart the app after editing, because the config is read at launch. Claude Code reads `.mcp.json` at the root of the project you open, which is the scope to use when a repository and a World belong together. Other MCP clients accept the same object under their own path — check the client's own documentation rather than assuming these two." },
       {
         kind: "code",
         label: "claude_desktop_config.json / .mcp.json",
@@ -845,7 +921,8 @@ export const DOCS_SECTIONS: DocsSection[] = [
         ].join("\n"),
       },
       { kind: "note", text: "The key lives in the client's `env` block or its secret facility, never in `args` — arguments show up in process listings. The server refuses to start if a tool that writes is ever added to it, so an agent holding this config cannot promote a candidate, revoke a connection or spend anything. Give it a key scoped to reads and nothing else." },
-      { kind: "prose", text: "**Recipe 2 — Python over the public sample World.** `GET /reproducibility/sample-world` needs no key and returns a deterministic sample: three objects, two evidence records, one source version, page and region. Its response carries a `Content-Digest: sha-256=:…:` header over the exact bytes, so the same verification habit the signed package asks for works here first. `scripts/developer-recipes/public-sample.py` is the recipe: it recomputes that digest, resolves every object's evidence, checks each region against the 0-1000 page frame, and asserts the object marked `research_frontier` cites no evidence at all." },
+      { kind: "heading", text: "Recipe 2 — Python over the public sample World" },
+      { kind: "prose", text: "`GET /reproducibility/sample-world` needs no key and returns a deterministic sample: three objects, two evidence records, one source version, page and region. Its response carries a `Content-Digest: sha-256=:…:` header over the exact bytes, so the same verification habit the signed package asks for works here first. `scripts/developer-recipes/public-sample.py` is the recipe: it recomputes that digest, resolves every object's evidence, checks each region against the 0-1000 page frame, and asserts the object marked `research_frontier` cites no evidence at all." },
       {
         kind: "code",
         label: "Read the sample and follow one claim to its evidence",
@@ -860,7 +937,8 @@ export const DOCS_SECTIONS: DocsSection[] = [
         ].join("\n"),
       },
       { kind: "note", text: "The sample is a product fixture and says so in its own `disclosure` field: it is unsigned, it is not a promoted customer World, and it is not a quality measurement. Use it to build against the shape, not to judge extraction." },
-      { kind: "prose", text: "**Recipe 3 — curl, before you have a key.** Three unauthenticated reads answer the three questions an evaluator asks first. `/api/v1/capabilities` is the same list the upload route validates against, so a format absent from it is refused at upload rather than accepted and dropped. `/api/openapi` is the contract itself — and carries no promote or rollback path, because neither exists for a key. `/api/export/trust` publishes the export signing key, or refuses with `EXPORT_SIGNER_NOT_CONFIGURED` on a deployment that has none." },
+      { kind: "heading", text: "Recipe 3 — curl, before you have a key" },
+      { kind: "prose", text: "Three unauthenticated reads answer the three questions an evaluator asks first. `/api/v1/capabilities` is the same list the upload route validates against, so a format absent from it is refused at upload rather than accepted and dropped. `/api/openapi` is the contract itself — and carries no promote or rollback path, because neither exists for a key. `/api/export/trust` publishes the export signing key, or refuses with `EXPORT_SIGNER_NOT_CONFIGURED` on a deployment that has none." },
       {
         kind: "code",
         label: "What this deployment can read, publish and sign",
@@ -882,6 +960,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
         ].join("\n"),
       },
       { kind: "note", text: "The digest line above is a shape, not a one-liner to trust blindly: `jq -S` reorders keys and the published digest is taken over the manifest's own key order, so the value it prints will not match unless your jq preserves that order. The procedure that does reproduce it is the one on the capabilities route — delete `contentSha256`, re-serialize with the key order unchanged — and `scripts/developer-recipes/smoke.mjs` performs exactly that and fails when it disagrees." },
+      { kind: "heading", text: "Running all three" },
       { kind: "prose", text: "Run all three with `node scripts/developer-recipes/smoke.mjs`, or one at a time with `mcp`, `public-sample` or `curl`. It targets `http://127.0.0.1:3207` by default and takes `TAVONEL_RECIPE_BASE_URL` for a real deployment. Every request it makes is an unauthenticated GET: no key, no upload, no compile, nothing that spends." },
     ],
   },
@@ -891,6 +970,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
     group: "Operations and errors",
     summary: "What is counted, how a page is quoted, and the ceilings that apply.",
     blocks: [
+      { kind: "heading", text: "How a page is quoted" },
       { kind: "prose", text: "Processing is quoted in pages before a compile starts, with the maximum charge shown alongside the estimate. A page count read from the document itself is labelled verified; a count the document only declares — the number Word saved — is labelled declared. A file whose format states no count at all is quoted at nothing: it is named in the preflight with the reason and left out of the total, because a page count derived from file size is an invented number." },
       /*
         Audit P01, second pass. The unit is now decided, so this states it instead of stating
@@ -903,6 +983,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
         spreadsheet is billed on the pages of the sanitized PDF it is converted to, counted after
         the conversion, and before that there is no number to show.
       */
+      { kind: "heading", text: "Spreadsheets" },
       { kind: "prose", text: "A spreadsheet is billed on the page count of the sanitized PDF it is converted to, counted after that conversion. Before it, there is no page count: preflight names xlsx, ods and csv files and shows no number for them rather than quoting one from file size. What is charged is settled against the pages the read actually produced, and never above the maximum shown before the run." },
       /*
         Stage-B integration, 2026-09-11. The entitlements lane held FD-03's page-expiry term back
@@ -923,8 +1004,11 @@ export const DOCS_SECTIONS: DocsSection[] = [
         attributing them to the founder -- and the lane report makes the founder's direct
         ratification a merge condition.
       */
+      { kind: "heading", text: "Included pages, and what expires" },
       { kind: "prose", text: `Included pages belong to the billing month they are granted in: when the next month's pages are granted, whatever is left of the previous month expires. Unused pages do not roll over and are not refunded if you cancel. A balance can only be spent while a plan is active. Pages past the included allowance are billed at the published rate of ${formatUsd(STANDARD_UNITS_PER_PAGE * PROCESSING_UNIT_USD)} per standard page.` },
+      { kind: "heading", text: "Refunds" },
       { kind: "prose", text: `Refunds: ask within ${REFUND_WINDOW_DAYS} days of payment and the payment is refunded in full, provided fewer than ${Math.round(REFUND_MAX_CONSUMED_FRACTION * 100)}% of the plan's included pages have been consumed — ${refundablePageAllowance(BILLING_OFFERS.observer_access)} pages on ${BILLING_OFFERS.observer_access.label}, ${refundablePageAllowance(BILLING_OFFERS.studio_access)} on ${BILLING_OFFERS.studio_access.label}. Past that, the payment is not refunded. Unused pages are not refunded on cancellation. Subject to the terms as updated.` },
+      { kind: "heading", text: "The ceilings" },
       {
         kind: "table",
         head: ["Limit", "Value"],
@@ -944,7 +1028,9 @@ export const DOCS_SECTIONS: DocsSection[] = [
     group: "Operations and errors",
     summary: "The codes a client has to branch on, and what each one means.",
     blocks: [
+      { kind: "heading", text: "Branch on the code, not the status" },
       { kind: "prose", text: "Failures return a machine code alongside the HTTP status. Branch on the code: the status says what kind of problem it is, and the code says which one." },
+      { kind: "heading", text: "The catalogue" },
       {
         kind: "table",
         head: ["Code", "Status", "Meaning"],
@@ -965,6 +1051,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
           ["ACTIVATION_RATE_LIMIT_UNAVAILABLE", "503", "That allowance could not be read, so the request was refused rather than run unbounded. Retry."],
         ],
       },
+      { kind: "heading", text: "503 and 409 are different problems" },
       { kind: "note", text: "A 503 means the work did not start. A 409 means the request was understood and the state refused it — those are different retries. A 429 means the work is allowed and the hour is full: honour the Retry-After header rather than retrying immediately." },
     ],
   },
@@ -974,7 +1061,9 @@ export const DOCS_SECTIONS: DocsSection[] = [
     group: "Operations and errors",
     summary: "Where bytes live, what the parsing models can reach, and what fails closed.",
     blocks: [
+      { kind: "heading", text: "Where bytes live, and what reads them" },
       { kind: "prose", text: "Uploaded bytes go to quarantine storage and are disarmed before anything reads them. Parsing models get no tools, no broad credentials and no outbound network: every document is treated as hostile input." },
+      { kind: "heading", text: "What fails closed" },
       { kind: "prose", text: "Integrity violations fail closed. A World with an unresolved link is not emitted, a package whose file digests do not match is not served, and a compile whose inputs cannot be validated does not produce a partial result." },
       { kind: "note", text: "The Security page states the controls in full and the Subprocessors page names every service permitted to touch each class of data. This section does not restate them." },
     ],
@@ -1051,6 +1140,8 @@ export function docsSearchIndex() {
 
 function blockText(block: DocsBlock): string[] {
   switch (block.kind) {
+    // A subheading is the phrase a reader is most likely to search for, so it is indexed.
+    case "heading":
     case "prose":
     case "note":
       return [block.text];
@@ -1058,6 +1149,8 @@ function blockText(block: DocsBlock): string[] {
       return block.items;
     case "code":
       return [block.label, block.body];
+    case "snippets":
+      return [block.label, ...block.items.map((item) => item.body)];
     case "table":
       return [...block.head, ...block.rows.flat()];
     case "endpoint":

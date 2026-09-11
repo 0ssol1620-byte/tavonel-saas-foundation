@@ -422,9 +422,13 @@ describe("the quickstart names only endpoints the contract publishes", () => {
     expect(quickstart, "the quickstart section is gone").toBeTruthy();
 
     const bodies = quickstart!.blocks
-      .filter((block): block is Extract<typeof block, { kind: "code" }> => block.kind === "code")
-      .map((block) => block.body)
+      .flatMap((block) =>
+        block.kind === "code" ? [block.body]
+        : block.kind === "snippets" ? block.items.map((item) => item.body)
+        : [],
+      )
       .join("\n");
+    expect(bodies.length, "the quickstart carries no code at all").toBeGreaterThan(500);
 
     /*
       Compare shapes, not parameter names.
@@ -511,7 +515,11 @@ describe("the quickstart names only endpoints the contract publishes", () => {
 
     // Parity in the languages the audit asked for, asserted rather than trusted.
     const languages = new Set(
-      quickstart.blocks.filter((block) => block.kind === "code").map((block) => block.language),
+      quickstart.blocks.flatMap((block) =>
+        block.kind === "code" ? [block.language]
+        : block.kind === "snippets" ? block.items.map((item) => item.language)
+        : [],
+      ),
     );
     for (const language of ["bash", "python", "typescript"]) {
       expect(languages, `the quickstart has no ${language} example`).toContain(language);

@@ -109,6 +109,60 @@ describe("the information architecture", () => {
     expect(Object.values(expected).flat()).toHaveLength(DOCS_SECTIONS.length);
   });
 
+  /*
+    BA-185/201. Every section had zero subheadings, which is three defects wearing one coat: no
+    visible structure in a 1,100-word page, no anchor for anyone to link to, and no material for
+    an "On this page" rail -- which then indexed code captions because that was all it had.
+
+    What this pins is the shape, not the wording. A section long enough to need dividing has
+    three to six of them; a heading is never the last block, because a jump link that lands on a
+    blank space is worse than no jump link; and no two headings inside one section repeat, since
+    the anchor id is derived from the text.
+
+    The two sections under four blocks are the ones BA-187 says should be merged into a
+    neighbour. Headings would not fix a 44-word page, so they are not required to carry three.
+  */
+  it("divides every substantial section into three to six subheadings", () => {
+    for (const section of DOCS_SECTIONS) {
+      const headings = section.blocks.filter((block) => block.kind === "heading");
+      const texts = headings.map((block) => (block.kind === "heading" ? block.text : ""));
+      expect(new Set(texts).size, `${section.slug}: two subheadings with the same text collide on one anchor`)
+        .toBe(texts.length);
+      expect(headings.length, `${section.slug}: more than six subheadings is an outline, not a page`)
+        .toBeLessThanOrEqual(6);
+      expect(section.blocks.at(-1)?.kind, `${section.slug}: a heading with nothing under it`).not.toBe("heading");
+      if (section.blocks.length - headings.length < 4) continue;
+      expect(headings.length, `${section.slug}: a section this long needs at least three subheadings`)
+        .toBeGreaterThanOrEqual(3);
+    }
+    // And the check cannot go blind: some section has to carry them.
+    expect(DOCS_SECTIONS.flatMap((section) => section.blocks).filter((block) => block.kind === "heading").length)
+      .toBeGreaterThan(40);
+  });
+
+  /*
+    BA-189. Steps 1-4 and 6-7 were six full-height figures -- bash, Python, TypeScript, twice --
+    on a page that was 5,176px tall and about 4,000px of code. They are two tab groups now, which
+    is the control the endpoint blocks on the same page already used.
+
+    What this pins is that the three languages stayed together and stayed three: a tab group that
+    lost a language, or a language that escaped back into a figure of its own, both fail here.
+  */
+  it("offers the quickstart's three languages as tabs rather than six figures", () => {
+    const quickstart = DOCS_SECTIONS.find((section) => section.slug === "quickstart")!;
+    const groups = quickstart.blocks.filter((block) => block.kind === "snippets");
+    expect(groups.length, "the two step groups are one tab group each").toBe(2);
+    for (const group of groups) {
+      if (group.kind !== "snippets") continue;
+      expect(group.items.map((item) => item.label)).toEqual(["cURL", "Python", "TypeScript"]);
+      for (const item of group.items) expect(item.body.length, group.label + "/" + item.label).toBeGreaterThan(80);
+    }
+    expect(
+      quickstart.blocks.filter((block) => block.kind === "code"),
+      "a language back in a figure of its own is three times the page again",
+    ).toEqual([]);
+  });
+
   it("gives every section a summary long enough to be a description", () => {
     for (const section of DOCS_SECTIONS) {
       expect(section.summary.length, section.slug).toBeGreaterThanOrEqual(40);

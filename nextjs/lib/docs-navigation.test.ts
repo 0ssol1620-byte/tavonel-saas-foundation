@@ -62,9 +62,15 @@ describe("in-page table of contents", () => {
   it("is wired into the section page from the same data as the blocks", () => {
     expect(sectionPage).toContain("<PageToc entries={toc} />");
     expect(sectionPage).toContain("id={anchorIds.get(position)}");
-    // The label comes from the contract for an endpoint, so an unpublished operation -- which
-    // renders no block at all -- is never offered as a destination.
-    expect(sectionPage).toContain("return endpoint ? `${endpoint.method} ${endpoint.path}` : null;");
+    /*
+      BA-201. The label used to come from a code block's caption or an endpoint's method and
+      path, because those were the only labelled blocks the section data had -- so the jump list
+      on the quickstart named three languages and no concept. The sections carry real
+      subheadings now, and the rail lists those and nothing else; a code block or an endpoint is
+      reached through the heading that introduces it.
+    */
+    expect(sectionPage).toContain('return block.kind === "heading" ? block.text : null;');
+    expect(sectionPage, "a code caption is not a landmark").not.toContain("if (block.kind === \"code\") return block.label;");
   });
 
   /*
