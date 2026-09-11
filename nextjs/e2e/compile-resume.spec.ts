@@ -206,6 +206,11 @@ test("a tab that never started the compile picks it up from the server", async (
     documentIds: DOCUMENTS.map((document) => document.documentId),
     settledAt: null,
     errorCode: null,
+    // Required on CompileJobView, and the panel reads `blocked.length` before it renders
+    // anything -- an entry without them is a row the server cannot produce and a render that
+    // throws, which is a blank page rather than a failed assertion.
+    blocked: [],
+    blockedResolution: null,
   }] };
   await installFixtureSession(page);
   await installWorkspaceRoutes(page, { documents: DOCUMENTS });
