@@ -343,24 +343,47 @@ describe("/trust indexes the six published surfaces", () => {
       "**Draft v1 (2026-09-11) — under review; not a signed agreement.**",
     );
     /*
-      The served document is a public artefact, so the same rule applies to it: the status is the
-      customer's to read, the paperwork is not. The old pin required the decision-log path in the
-      served text; it is inverted, and the path is asserted in the HTML comment at the top of the
-      file instead -- which is where a reviewer of the repository, not a customer, will look.
+      BA-147. The served document is a public artefact and the rule now applies to all of it,
+      comments included. The provenance used to be pinned *in* the file, as an HTML comment -- and
+      because the file is served raw, the third line of our data processing agreement was a comment
+      naming one of our test files and an internal repository path. A reviewer of the repository
+      finds the provenance where the page that links the document keeps it (asserted above, on
+      app/trust/page.tsx); a customer reading the contract finds contract text.
+
+      So the ban widened instead of moving: no repository path, no test filename, and none of the
+      process vocabulary, anywhere in the file.
     */
-    const served = document.replace(/<!--[\s\S]*?-->/g, " ");
     for (const process of ["delegated decision", "pending the founder", "FD-06/07"]) {
-      expect(served, `"${process}" is process vocabulary, not contract text`).not.toContain(process);
+      expect(document, `"${process}" is process vocabulary, not contract text`).not.toContain(process);
     }
-    expect(document, "the provenance stays in the file, as a comment").toContain(
-      "docs/policy/DECISION_LOG_2026-09-11.md",
-    );
+    expect(document, "a served contract names no repository path").not.toMatch(/docs\/[a-z]/i);
+    expect(document, "and no test file of ours").not.toContain(".test.ts");
     expect(document).toContain("without undue delay and no later than 72 hours after becoming aware");
     expect(document).toContain("30 days in advance of that sub-processor beginning to process");
     expect(document).toContain("right to object");
     expect(document).toContain("completed within 30 days of the verified request");
-    // The clauses that are not drafted have to say so in place rather than be quietly absent.
-    expect(document).toContain("Not drafted — pending legal review");
+    /*
+      BA-170. The clauses that are not settled still have to say so where a reader looks for them.
+      They said it four times as "Not drafted — pending legal review", which reads as a document
+      somebody abandoned; they now say it as clauses and are collected in one annex. Both halves
+      are pinned -- the in-place marker on each of the four, and the annex that lists them -- so
+      neither can be dropped without a red test, which is tighter than the one substring was.
+    */
+    expect(document).toContain("## Annex A — clauses completed at signature");
+    for (const clause of ["§1 Governing law", "§9 Recovery objectives", "§10 Transfer mechanism", "§13 Liability and precedence"]) {
+      expect(document, `${clause} has to be listed in the annex`).toContain(clause);
+    }
+    for (const inPlace of [
+      "| Governing law | To be specified in the executed version",
+      "**Transfer mechanism: to be annexed",
+      "Recovery objectives and a drill cadence: to be specified in the executed version",
+      "To be specified in the executed version — see Annex A: the liability cap",
+    ]) {
+      expect(document, `"${inPlace}" is the marker in place; the annex is not a substitute for it`)
+        .toContain(inPlace);
+    }
+    expect(document, "and the document may not publish our project plan as a checklist")
+      .not.toContain("What has to happen before this is a signable document");
     expect(document, "the deletion clause must not promise a provider's backup expiry").toContain(
       "publishes no day count for it",
     );
@@ -630,20 +653,51 @@ describe("CA S04 the privacy notice states deletion mechanics and no invented nu
     expect(page).toContain("privacy@tavonel.com");
   });
 
-  it("says where a number is missing instead of supplying one", () => {
-    expect(page).toContain("We publish no completion time for that");
-    expect(page).toContain("we publish no day count for it");
+  /*
+    BA-153. This case used to require "We publish no completion time for that" on /privacy, and
+    that sentence cancelled the deletion term of the served DPA: §7 commits to completion within
+    30 days, the document's own precedence rule says /privacy wins where the two differ, and a
+    reviewer comparing them found our priority rule voiding our own clause.
+
+    So /privacy publishes the DPA's number, and the number is not free-floating: the case below
+    reads it out of the served document. Where a number genuinely does not exist -- the provider
+    backup tail, and the operational logs -- the page still says so, and those two assertions are
+    unchanged.
+  */
+  it("publishes the same deletion completion time the served DPA commits to", () => {
+    expect(page).toContain("A verified deletion request is completed within 30 days");
+    expect(
+      read("public/policy/TAVONEL_DPA_v1_2026-09-11.md"),
+      "the 30 days on /privacy is the DPA's term, not a number this page chose",
+    ).toContain("completed within 30 days of the verified request");
+    expect(page, "the part with no number still says it has none").toContain("we publish no day count for it");
     expect(page).toContain("have no published retention period");
   });
 
-  it("promises no deletion receipt, because no route issues one", () => {
-    expect(page).toContain("no part of the running service issues one today");
+  /*
+    BA-163. The old pin required "no part of the running service issues one today", which arrived
+    at the end of four sentences explaining an internal receipt contract, its four preconditions
+    and our own meaning of the word "receipt" -- to a reader of a privacy notice, who asked for
+    none of it. The promise that is refused is the same one; it is now one sentence, and the
+    internal mechanism may not come back.
+  */
+  it("promises no deletion certificate, and explains no internal mechanism to refuse one", () => {
+    expect(page).toContain("A signed deletion certificate is not issued today");
+    expect(page).toContain("confirmed to you in writing, with the date it finished");
+    const copy = withoutComments(page);
+    for (const internal of ["receipt contract", "audit digest", "storage listing is empty"]) {
+      expect(copy, `"${internal}" is an internal mechanism, not a privacy statement`)
+        .not.toContain(internal);
+    }
   });
 
   it("invents no retention period in days", () => {
     const copy = withoutComments(page);
     const numbers = copy.match(/\b\d+\s*(?:calendar )?(?:days?|weeks?|months?|years?)\b/gi) ?? [];
-    const invented = numbers.filter((match) => !/180 days/.test(match));
+    // 180 days is the analytics cookie lifetime, set in code. 30 days is the DPA's deletion
+    // term, asserted against the served document above. Every other day count on this page
+    // would be a retention period no run has measured, which is the claim that stops the line.
+    const invented = numbers.filter((match) => !/180 days|30 days/.test(match));
     expect(
       invented,
       `a retention period in days has to come from a measured run: ${invented.join(", ")}`,

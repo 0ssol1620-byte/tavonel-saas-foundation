@@ -219,9 +219,14 @@ export default function SecurityPage() {
                 itself was declaring a hole, and a grid of one is a grid that looks broken.
 
                 Nothing was deleted to close it: both rows are still here, in the same order, with
-                every absence they carried. They are the last two tiles in the control matrix,
-                which is where a reader comparing controls will read them, and each now leads with
-                the fact that is on record. `trust-page-answers.test.ts` still holds their
+                every absence they carried, and each now leads with the fact that is on record.
+                What replaced the label is a sentence that says what the two rows are.
+
+                They stay their own grid rather than joining the controls grid, and the reason is
+                `.tiles > :last-child:nth-child(odd)` in `tavonel.css`: eleven controls plus two
+                rows is thirteen, and the thirteenth would be stretched to the full width of the
+                section -- which is the defect BA-151 is about, one section further down the page.
+                Two tiles is an even grid. `trust-page-answers.test.ts` still holds both rows'
                 contents, and both `CONTROLS.map` and `UNANSWERED.map` are still what renders.
               */}
               <p className="slate"><span />CONTROLS</p>
@@ -232,6 +237,12 @@ export default function SecurityPage() {
                     <p>{body}</p>
                   </article>
                 ))}
+              </div>
+              <p>
+                The two rows below are the questions a review asks that this deployment answers
+                with a record rather than with a commitment.
+              </p>
+              <div className="tiles">
                 {UNANSWERED.map(([title, body]) => (
                   <article className="tile" key={title} data-unanswered="1">
                     <h3>{title}</h3>

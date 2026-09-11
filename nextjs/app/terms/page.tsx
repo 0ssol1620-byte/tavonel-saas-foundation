@@ -3,7 +3,7 @@ import PolicyLayout from "@/components/policy-layout";
 import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
 import LegalOperatorDisclosure from "@/components/legal-operator-disclosure";
 import { readCommercialState } from "@/lib/commercial-state";
-import { LEGAL_EFFECTIVE_DATE } from "@/lib/operations";
+import { LEGAL_EFFECTIVE_DATE, LEGAL_LAST_UPDATED } from "@/lib/operations";
 
 export const dynamic = "force-dynamic";
 
@@ -44,10 +44,12 @@ export default function TermsPage() {
   return (
     <PolicyLayout
       label="TERMS"
-      title="Terms written for the service that exists today."
+      title="Terms of service."
+      effective={LEGAL_EFFECTIVE_DATE}
+      lastUpdated={LEGAL_LAST_UPDATED}
       intro={
         <>
-          Effective {LEGAL_EFFECTIVE_DATE}. These terms govern the TAVONEL service.{" "}
+          These terms govern the TAVONEL service.{" "}
           {liveChargesEnabled
             ? "Paid subscriptions are sold through Paddle, which acts as merchant of record."
             : "TAVONEL is currently offered as a private pilot. No paid checkout is available and no charge can be created."}
@@ -55,10 +57,19 @@ export default function TermsPage() {
       }
     >
       <BreadcrumbJsonLd trail={[{ name: "Terms", path: "/terms" }]} />
+      {/*
+        BA-154, the part this lane can do. "TAVONEL Foundation is a service name, not a separate
+        incorporated entity" is a detail of our corporate structure that raises the question it
+        answers, in a document where the reader is looking for the contracting party. It is gone.
+
+        The rest of BA-154 -- naming the contracting party, the governing law, the jurisdiction,
+        a liability section and a notices clause -- is legal and founder work and is not something
+        a lane may write. The operator disclosure below renders the published party when the
+        operator record exists, and BA-250 is in the lane report as an open question.
+      */}
       <h2>Service operator</h2>
       <p>
-        TAVONEL is the operating brand for the service described on this site. TAVONEL Foundation
-        is a service name, not a separate incorporated entity.{" "}
+        TAVONEL is the operating brand for the service described on this site.{" "}
         {liveChargesEnabled ? "Paddle acts as merchant of record for checkout it processes." : null}
       </p>
       <LegalOperatorDisclosure />
