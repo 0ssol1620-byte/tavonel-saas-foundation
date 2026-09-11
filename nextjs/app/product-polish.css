@@ -14,7 +14,7 @@
 }
 .product-flow article { min-height: 164px; display: flex; flex-direction: column; justify-content: space-between; padding: 20px; background: var(--g1); }
 .product-flow article:last-child { background: color-mix(in srgb, var(--verified-deep) 30%, var(--g1)); }
-.product-flow span { color: var(--text-xlo); font: 9px var(--f-mono); letter-spacing: .13em; }
+.product-flow span { color: var(--text-lo); font: 9px var(--f-mono); letter-spacing: .13em; }
 .product-flow strong { max-width: 20ch; color: var(--text-hi); font-size: 16px; font-weight: 540; line-height: 1.35; }
 /* Four surfaces; every column count below divides four, so the last row is never a card beside
    empty tracks. Three columns left exactly that orphan slot when the fourth card was added. */
