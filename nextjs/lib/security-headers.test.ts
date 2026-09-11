@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   cspEnforcedWithNonce,
   cspNonceEnforcedPath,
@@ -175,8 +175,68 @@ describe("production security headers", () => {
     });
 
     it("leaves the shipped Report-Only header minted per request, unchanged", () => {
-      const middleware = readFileSync(resolve(import.meta.dirname, "../middleware.ts"), "utf8");
-      expect(middleware).toContain('response.headers.set("Content-Security-Policy-Report-Only", cspReportOnly(generateCspNonce()));');
+      const source = readFileSync(resolve(import.meta.dirname, "../middleware.ts"), "utf8");
+      /*
+        The pin, re-derived when the flag was wired (ops CROSS-LANE 1). The nonce is minted once
+        at the top of the handler and both policies use that value, so what gets enforced is what
+        the Report-Only window has been measuring. The header and its value are unchanged; the
+        only difference is where the nonce comes from.
+      */
+      expect(source).toContain("const nonce = generateCspNonce();");
+      expect(source).toContain('response.headers.set("Content-Security-Policy-Report-Only", cspReportOnly(nonce));');
+      expect(source, "a second mint would enforce a policy nobody observed")
+        .not.toContain("cspReportOnly(generateCspNonce())");
+      // A refused nonce sets no header and is logged. Asserted as source because the builder
+      // cannot be made to refuse a nonce it just minted; its refusals are unit-tested above.
+      expect(source).toContain('JSON.stringify({ event: "csp_nonce_refused", code: enforced.code })');
+      expect(source.slice(source.indexOf("csp_nonce_refused") - 220, source.indexOf("csp_nonce_refused")),
+        "the refusal branch is the else of the only header set").toContain("if (enforced.ok) response.headers.set");
+    });
+
+    /*
+      The flag, at the one place it decides anything.
+
+      The first case is the one that matters the day this merges: with the variable unset -- which
+      is every deployment today -- no response gains an enforced header, so nothing changes. Then
+      the covered route gets the policy carrying the nonce that is being observed, and a
+      prerendered route does not, because an enforced nonce policy there refuses the framework's
+      own bootstrap and blanks the page.
+    */
+    describe("the enforced nonce policy in middleware", () => {
+      const url = (path: string) => new URL(`https://tavonel.com${path}`);
+
+      async function run(path: string, flag: string) {
+        vi.stubEnv("TAVONEL_CSP_ENFORCE_NONCE", flag);
+        const { middleware } = await import("../middleware");
+        return middleware({ nextUrl: url(path) } as Request & { nextUrl: URL });
+      }
+
+      afterEach(() => { vi.unstubAllEnvs(); });
+
+      it("sets no enforced header while the flag is unset, which is production today", async () => {
+        const response = await run("/workspace/sources", "");
+        expect(response.headers.get("Content-Security-Policy")).toBeNull();
+        expect(response.headers.get("Content-Security-Policy-Report-Only")).toContain("'nonce-");
+      });
+
+      it("enforces on a covered route with the same nonce the report-only policy carries", async () => {
+        const response = await run("/workspace/sources", "1");
+        const enforced = response.headers.get("Content-Security-Policy");
+        expect(enforced).not.toBeNull();
+        const minted = /'nonce-([^']+)'/.exec(enforced!)?.[1];
+        expect(minted, "a nonce reached the enforced policy").toBeTruthy();
+        expect(response.headers.get("Content-Security-Policy-Report-Only"),
+          "and it is the same one being observed").toContain(`'nonce-${minted}'`);
+        expect(enforced).toContain(cspNonceScriptSrc(minted!));
+        expect(enforced).not.toContain("script-src 'self' 'unsafe-inline'");
+      });
+
+      it("leaves a prerendered route on the static policy even with the flag on", async () => {
+        for (const path of ["/workspace", "/workspace/admin", "/pricing", "/"]) {
+          const response = await run(path, "1");
+          expect(response.headers.get("Content-Security-Policy"), path).toBeNull();
+        }
+      });
     });
   });
 
