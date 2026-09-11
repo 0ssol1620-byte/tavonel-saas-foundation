@@ -346,3 +346,34 @@ describe("steps a promoted World would unlock", () => {
     expect(rows.find((r) => r.step === "revision_input")!.evidence).toMatch(/new source version/);
   });
 });
+
+
+/*
+  The hashbang line ending, which is why the import at the top of this file is the first thing here
+  that can fail. Every script under `scripts/` that opens with `#!/usr/bin/env node` is checked out
+  through core.autocrlf unless `.gitattributes` pins it, and a CRLF hashbang breaks the file twice:
+  the module transform applied to an imported .mjs stops on the stray carriage return and reports
+  `SyntaxError: Invalid or unexpected token` against the *importing* line, and a Linux shell resolves
+  the interpreter as `node\r` and reports no such file. That is exactly how this suite passed in the
+  lane that wrote the harness -- where those files had never round-tripped through a checkout -- and
+  failed on the first fresh checkout of the same commit. A lane cannot see the checkout that breaks
+  its own file, so the pin needs an assertion rather than a convention.
+*/
+describe("the node scripts this suite and a shell both execute", () => {
+  const scriptsRoot = resolve(import.meta.dirname, "..", "scripts");
+
+  const mjsFiles = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) return mjsFiles(full);
+      return entry.isFile() && entry.name.endsWith(".mjs") ? [full] : [];
+    });
+
+  it("keeps every hashbang on a bare newline", () => {
+    const offenders = mjsFiles(scriptsRoot).filter((file) => {
+      const text = readFileSync(file, "utf8");
+      return text.startsWith("#!") && text.slice(0, text.indexOf("\n")).endsWith("\r");
+    });
+    expect(offenders.map((file) => file.slice(scriptsRoot.length + 1))).toEqual([]);
+  });
+});
