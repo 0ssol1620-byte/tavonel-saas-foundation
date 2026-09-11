@@ -111,11 +111,12 @@ import { resetWorkspaceCostGuard } from "./workspace-cost-guard";
 /*
   Real routes the quickstart depends on that the OpenAPI document does not publish.
 
-  Not a convenience list: every entry is asserted below to exist as a route file, and the reason
-  it is here rather than in the contract is written in the devx lane report as a patch for the
-  lane that owns app/api/openapi/route.ts.
+  Empty since /api/export/trust was published (stage 2 C11, devx CROSS-LANE 2). Kept as a
+  mechanism rather than deleted: it is asserted empty below, and an entry added later is still
+  required to name a route file that exists, so the allowance can never cover a path that is
+  merely absent everywhere.
 */
-const CONTRACT_GAPS = new Set(["/api/export/trust"]);
+const CONTRACT_GAPS = new Set<string>([]);
 
 const WORKSPACE = "pilot-openapishape";
 const COLLECTION = `collection-${"e".repeat(32)}`;
@@ -456,20 +457,16 @@ describe("the quickstart names only endpoints the contract publishes", () => {
   });
 
   /*
-    One real route the quickstart needs and the contract does not publish.
+    Nothing the quickstart needs is missing from the contract any more.
 
-    `GET /api/export/trust` is how a holder gets the signing-key fingerprint from somewhere other
-    than the archive, which is the whole basis of the offline verification the portable-world
-    clause promises. The route exists and answers; it is simply not in the OpenAPI document, so
-    an SDK generated from that document has no method for the one call a verification flow cannot
-    skip. Adding it belongs to whoever owns app/api/openapi/route.ts -- the exact patch is in the
-    devx lane report under CROSS-LANE REQUESTS.
-
-    Until then it is allow-listed above and asserted here instead: the route file must exist, so
-    the allowance can never cover a path that is merely absent everywhere.
+    `GET /api/export/trust` -- the only way a holder gets the signing fingerprint from outside the
+    archive -- was the single entry, and it is published now, so the allow-list is empty and
+    asserted so. The per-entry check stays because the list may be needed again: an allowance
+    must always name a route that exists, or it would excuse a path that is simply absent.
   */
-  it("names its one unpublished dependency, and proves that route exists", async () => {
+  it("has no unpublished dependency left, and would make any future one prove its route", async () => {
     const document = await spec();
+    expect([...CONTRACT_GAPS], "an allow-listed gap is a promise to publish it; publish it").toEqual([]);
     for (const gap of CONTRACT_GAPS) {
       const routeFile = resolve(import.meta.dirname, `..${gap.replace(/^\/api/, "/app/api")}/route.ts`);
       expect(existsSync(routeFile), `${gap} is allow-listed but has no route at ${routeFile}`).toBe(true);

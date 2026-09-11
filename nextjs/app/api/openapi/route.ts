@@ -51,6 +51,25 @@ export function GET(request: Request) {
           responses: { "200": { description: "The capability manifest and the sha256 of its serialized form" } },
         },
       },
+      /*
+        The signing fingerprint, unauthenticated, and at /api rather than /api/v1 like the
+        capability manifest above it.
+
+        It is the only way a holder gets the public key from OUTSIDE the archive, which is the
+        entire basis of the offline verification the portable-world clause promises -- an archive
+        that vouches for its own key has proven nothing. The route existed and answered and was
+        simply absent from this document, so an SDK generated from the contract had no method for
+        the one call a verification flow cannot skip.
+      */
+      "/export/trust": {
+        servers: [{ url: `${origin}/api` }],
+        get: {
+          operationId: "getExportTrustRecord",
+          security: [],
+          description: "The Ed25519 public key every signed export is signed with, and its sha256 fingerprint. Fetched here rather than read out of an archive, because an archive that vouches for its own key has proven nothing. A deployment with no signing key configured answers 503 EXPORT_SIGNER_NOT_CONFIGURED rather than a fingerprint nobody can verify against.",
+          responses: { "200": { description: "{ schemaVersion, algorithm, keyId, publicKeySpkiDerBase64, publicKeySpkiSha256 }" }, "503": errorResponse },
+        },
+      },
       "/uploads/capability": {
         post: {
           operationId: "createDirectUploadCapability",
