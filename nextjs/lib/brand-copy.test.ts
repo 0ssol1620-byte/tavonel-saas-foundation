@@ -625,6 +625,56 @@ describe("public copy", () => {
   });
 
   /*
+    BA-078, the other half of A-1, and the most expensive contradiction the 2026-09-11 audit found.
+
+    A-1 stopped one locator shape being published as the shape of all evidence, and /evidence
+    answered it with a model: eight locator families, one tile each. Every tile then stated its
+    locator in the present tense, eight capability-shaped panels as the page's largest visual
+    element, while exactly one of the eight has a reader -- and /sources says so in as many words,
+    because every accepted format there preserves page, paragraph text and region. A buyer who
+    read both pages caught the brand contradicting itself on the subject the brand is built on.
+
+    The model is not the fix and is not what this checks. What it checks is that the two pages
+    cannot drift apart again: /evidence may lead with exactly one locator, it must be the one
+    /sources actually preserves a region for, and every other family must carry a state chip in
+    the grid rather than a correction folded underneath it.
+  */
+  it("marks one shipped locator on /evidence, and states the rest as unshipped", () => {
+    const page = read("app/evidence/page.tsx");
+    const shipped = page.match(/const READING_TODAY = \["([^"]+)"/);
+    expect(shipped, "/evidence no longer names the locator that reads today").not.toBeNull();
+    expect(shipped![1]).toBe("PDF");
+
+    // Every other family is in the contracted list, and none of them is the shipped one.
+    const contracted = page.match(/const CONTRACTED_LOCATORS = \[([\s\S]*?)\n\] as const;/);
+    expect(contracted, "the evidence model is no longer published").not.toBeNull();
+    const families = [...contracted![1]!.matchAll(/\["([^"]+)",/g)].map((match) => match[1]!);
+    expect(families.length, "the model is eight families: one shipped, seven contracted").toBe(7);
+    expect(families).not.toContain(shipped![1]);
+
+    // The status is in the grid, not folded under it, and it says what it is.
+    expect(page, "an unshipped locator needs its state on its own tile")
+      .toContain("Reading today");
+    expect(page).toContain("Reader not shipped");
+    expect(page, "the correction may not go back into a fold")
+      .not.toContain("See current locator coverage");
+
+    /*
+      And the claim is the one `/sources` supports. `LIVE_PRESERVED` is the manifest's own list,
+      so a day when the pipeline starts preserving a spreadsheet cell fails here instead of
+      leaving /evidence understating what it does.
+    */
+    const manifest = read("../shared/capabilityManifest.ts");
+    expect(manifest).toContain('const LIVE_PRESERVED = ["page", "paragraph_text", "bbox1000"]');
+
+    // BA-099: one casing rule across the grid -- the site writes "and", never a spaced slash.
+    for (const family of families) {
+      expect(family, "a space-slash pair in a name the site would write with 'and'")
+        .not.toContain(" / ");
+    }
+  });
+
+  /*
     §17's five pages are one sequence, and the sequence is what breaks first.
 
     Before this pass each of them ended in three sibling links to two or three of the others, in
