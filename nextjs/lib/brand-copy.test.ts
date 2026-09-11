@@ -35,7 +35,6 @@ const COPY_SURFACES = [
   "components/compile-pipeline.tsx",
   "components/evidence-tether.tsx",
   "components/identity-resolve.tsx",
-  "components/rebuild-console.tsx",
   "components/world-explorer.tsx",
   "app/login/page.tsx",
   "app/not-found.tsx",

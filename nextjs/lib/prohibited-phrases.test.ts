@@ -93,17 +93,13 @@ const FROZEN_MECHANISMS: Array<[string, RegExp]> = [
 ];
 
 /*
-  One exemption, and it is not a mute button.
+  There is no exemption any more, and that is the point.
 
-  `components/rebuild-console.tsx` is Scene 07 of the retired landing film. It is imported by
-  nothing -- `brand-copy.test.ts` asserts the landing page does not reference it -- and its own
-  copy carries the hedge the claims registry requires of that demonstration: a research direction
-  on declared fixture data, tracked as RESTRICTED. So the file is exempted from the name, and the
-  test then checks that the hedge is still there. An exemption that stopped checking anything
-  would be the mechanism by which this rule quietly stops applying.
+  The one surface that had one was `components/rebuild-console.tsx`, Scene 07 of the retired
+  landing film: mounted by nothing, and exempted from the frozen-mechanism names on condition
+  that its own copy kept the hedge. Audit B03 deleted the file instead. An exemption with no
+  file behind it is a mute button waiting for a second occupant, so the exemption went with it.
 */
-const HEDGED = "components/rebuild-console.tsx";
-const HEDGE = "Selective recompilation is a research direction on declared fixture data.";
 
 describe("prohibited public phrases", () => {
   it("has a tree to check", () => {
@@ -127,16 +123,7 @@ describe("prohibited public phrases", () => {
   });
 
   it.each(FROZEN_MECHANISMS)("finds no %s anywhere in app/ or components/", (_name, pattern) => {
-    const offenders = SOURCES
-      .filter((surface) => surface !== HEDGED)
-      .filter((surface) => pattern.test(sourceOf(surface)));
+    const offenders = SOURCES.filter((surface) => pattern.test(sourceOf(surface)));
     expect(offenders, "this needs an IP disclosure review before it is published").toEqual([]);
-  });
-
-  it("keeps the one exempted surface hedged and unreferenced", () => {
-    expect(sourceOf(HEDGED)).toContain(HEDGE);
-    const importers = SOURCES.filter((surface) => surface !== HEDGED)
-      .filter((surface) => sourceOf(surface).includes("rebuild-console"));
-    expect(importers, `${HEDGED} is exempted because nothing renders it`).toEqual([]);
   });
 });
