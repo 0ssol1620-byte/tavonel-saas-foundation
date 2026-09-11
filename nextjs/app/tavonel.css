@@ -1788,6 +1788,10 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 .tiles > :last-child:nth-child(odd) { grid-column: 1 / -1; }
 .tile { background: var(--g1); padding: 16px 18px; display: flex; flex-direction: column; gap: 9px; }
 .tile .n { font-family: var(--f-mono); font-size: 9.5px; letter-spacing: 0.16em; color: var(--text-xlo); }
+/* A card heading is a card heading at any level. The landing tiles are h2 because they are the
+   first sections under the hero and an h3 there jumped the document outline; the size is the h3
+   treatment, exactly as `.chain .link h2` does it. */
+.tiles .tile h2 { font-size: 17px; letter-spacing: -0.012em; font-variation-settings: "wght" 560; }
 .tile[data-state="measured"] .n { color: var(--verified); }
 .tile[data-state="unsupported"] .n { color: var(--changed); }
 .tile[data-state="unproven"] .n { color: var(--unresolved); }

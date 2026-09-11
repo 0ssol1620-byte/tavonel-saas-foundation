@@ -288,7 +288,13 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
               {JOBS.map((job) => (
                 <article className="tile" key={job.href}>
                   <span className="n">{job.eyebrow}</span>
-                  <h3>{job.title}</h3>
+                  {/*
+                    h2, not h3: these are the first sections under the hero, so an h3 here jumped the
+                    outline h1 -> h3 on the landing page - the same defect the qa lane found on
+                    /pricing, introduced on / when this block was added. `.tiles .tile h2` keeps the
+                    card treatment, the way `.chain .link h2` already does for the same situation.
+                  */}
+                  <h2>{job.title}</h2>
                   <p>{job.body}</p>
                   <Link className="input-next" href={job.href}>{job.action} →</Link>
                 </article>
