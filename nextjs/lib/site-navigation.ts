@@ -43,6 +43,21 @@ export type ResourceLink = SiteLink & {
     compiled at build time from committed public filings and refuses to load if a digest moves.
   */
   representativeCase?: true;
+  /*
+    Which column of the Resources menu panel this entry appears in, or none.
+
+    The 2026-09-11 IA redesign's Resources panel is a short list -- learn and do on the left,
+    verify and compare on the right -- while the hub keeps all nine entries. That is one list with
+    a column marker on five of them, not a second list: a tenth resource arrives with `column`
+    undefined and reaches the hub without silently appearing in the menu, and a resource promoted
+    into the menu cannot drift out of agreement with the hub's own label for it.
+
+    `/docs`, `/api`, `/evidence` and `/reproducibility` are deliberately unmarked. The first two
+    are the Developers panel's job now, `/evidence` is reached from `/trust` and from the research
+    it supports, and doc 5.4 says `/reproducibility` is not the first thing to put in front of a
+    general reader.
+  */
+  column?: "learn" | "verify";
 };
 
 export const RESOURCE_PURPOSES: readonly ResourcePurpose[] = ["evaluate", "build", "verify", "learn"] as const;
@@ -91,8 +106,9 @@ export const RESOURCE_LINKS: readonly ResourceLink[] = [
     purposes: ["evaluate", "verify"],
     workflows: ["compile-and-review"],
     representativeCase: true,
+    column: "learn",
   },
-  { href: "/knowledge-compiler", label: "Knowledge Compiler guide", purposes: ["learn"], workflows: [] },
+  { href: "/knowledge-compiler", label: "Knowledge Compiler guide", purposes: ["learn"], workflows: [], column: "learn" },
   {
     href: "/docs",
     label: "Documentation",
@@ -100,9 +116,9 @@ export const RESOURCE_LINKS: readonly ResourceLink[] = [
     workflows: ["compile-and-review", "use-elsewhere", "handle-a-revision"],
   },
   { href: "/api", label: "API", purposes: ["build"], workflows: ["use-elsewhere"] },
-  { href: "/changelog", label: "Changelog", purposes: ["build"], workflows: [] },
-  { href: "/research", label: "Research", purposes: ["learn"], workflows: [] },
-  { href: "/benchmarks", label: "Benchmarks", purposes: ["verify"], workflows: [] },
+  { href: "/changelog", label: "Changelog", purposes: ["build"], workflows: [], column: "verify" },
+  { href: "/research", label: "Research", purposes: ["learn"], workflows: [], column: "verify" },
+  { href: "/benchmarks", label: "Benchmarks", purposes: ["verify"], workflows: [], column: "verify" },
   {
     href: "/evidence",
     label: "Technical evidence",
@@ -126,6 +142,15 @@ export const FOOTER_GROUPS: readonly { title: string; links: readonly SiteLink[]
       { href: "/product", label: "Product" },
       { href: "/solutions/ai-ready-knowledge", label: "Solutions" },
       { href: "/integrations", label: "Integrations" },
+      /*
+        Added when the bar stopped carrying a flat "Sources" link (IA redesign, 2026-09-11).
+
+        The founder resolution the direct link came from (RESOLVED A-3/B-5) is that what a
+        deployment can read is a product surface rather than a resources entry. The redesign moves
+        where it is listed, not what it is: it is a Product panel item now, and this row is the
+        second way to it that does not require opening a menu at all.
+      */
+      { href: "/sources", label: "Supported files" },
       { href: "/pricing", label: "Pricing" },
     ],
   },
@@ -159,3 +184,225 @@ export const FOOTER_GROUPS: readonly { title: string; links: readonly SiteLink[]
     ],
   },
 ] as const;
+
+/* ==================================================== the global menu (IA redesign, 2026-09-11)
+
+  Five things in the bar, four of which open a panel.
+
+  The bar was eight flat links at one level -- Product, Solutions, Integrations, Developers,
+  Security, Pricing, Sources, Resources -- which asked a first-time reader to already know that
+  "Sources" means supported file formats and that "Integrations" is where a connector lives. The
+  redesign groups them by the question a reader arrives with and keeps every URL exactly where it
+  is: a menu position is not a URL, so nothing here is renamed, moved or redirected.
+
+  `PRIMARY_NAV` above is untouched on purpose. It is no longer the rendered bar, but it is still
+  the flat inventory `e2e/overflow-audit.spec.ts` walks and an export several call sites read by
+  name, and retiring it in the same change that introduces the panels would leave two failures to
+  tell apart if the header row regresses.
+
+  What is in a panel is decided by `NAV_GROUPS` and nothing else. Both chromes render this one
+  structure -- the desktop disclosure row and the phone accordion -- so the four-chrome drift
+  this file's own top comment describes cannot come back through a second menu list.
+*/
+
+export type NavPanelItem = SiteLink & { description?: string };
+export type NavPanelColumn = { title: string; items: readonly NavPanelItem[] };
+export type NavSection = "product" | "solutions" | "developers" | "resources" | "pricing";
+
+export type NavGroup = {
+  /** Panel id, `aria-current` key and accordion key. Never a URL. */
+  section: Exclude<NavSection, "pricing">;
+  label: string;
+  /**
+   * The group's hub, which is always one of this panel's own links.
+   *
+   * Kept as an href rather than a second rendered row so that no panel lists the same page
+   * twice: Product's hub is the first item of its first column, and the other three groups' hubs
+   * are their `featured` link.
+   */
+  overviewHref: string;
+  columns: readonly NavPanelColumn[];
+  /** The link the panel ends on, set apart from the columns. Carries the hub where no column does. */
+  featured?: NavPanelItem;
+};
+
+/**
+ * The Resources panel, read off `RESOURCE_LINKS` rather than written again.
+ *
+ * Order follows the declaration order of that array and not the order the design document's
+ * mockup drew them, because reordering `RESOURCE_LINKS` would reorder the hub's own tiles -- a
+ * page another lane owns -- to settle a question the mockup does not depend on.
+ */
+const resourceColumn = (column: "learn" | "verify"): readonly NavPanelItem[] =>
+  RESOURCE_LINKS.filter((link) => link.column === column).map(({ href, label }) => ({ href, label }));
+
+/*
+  Labels and audiences are the ones `app/solutions/[slug]/page.tsx` already publishes.
+
+  `lib/site-nav-model.test.ts` reads that file and fails if a label here stops matching the
+  eyebrow it came from or an audience stops matching the "For:" line the page renders, which is
+  what keeps the menu from inventing a positioning the page does not make.
+*/
+const SOLUTION_ITEMS: readonly NavPanelItem[] = [
+  { href: "/solutions/ai-ready-knowledge", label: "AI-ready knowledge", description: "AI and platform engineers" },
+  {
+    href: "/solutions/source-grounded-assistants",
+    label: "Grounded assistants",
+    description: "Application and agent developers",
+  },
+  { href: "/solutions/knowledge-graph", label: "Knowledge graph", description: "Data and knowledge architects" },
+  {
+    href: "/solutions/knowledge-operations",
+    label: "Knowledge operations",
+    description: "Knowledge owners and security reviewers",
+  },
+  {
+    href: "/solutions/document-intelligence",
+    label: "Document intelligence",
+    description: "Document and operations teams",
+  },
+] as const;
+
+export const NAV_GROUPS: readonly NavGroup[] = [
+  {
+    section: "product",
+    label: "Product",
+    overviewHref: "/product",
+    columns: [
+      {
+        title: "Understand the product",
+        items: [
+          { href: "/product", label: "Product overview" },
+          { href: "/product/document-understanding", label: "Document understanding" },
+          { href: "/product/compiled-world", label: "Compiled World" },
+        ],
+      },
+      {
+        /*
+          Security is not a bar item, and this is where a reader finds it instead.
+
+          `/trust` is the summary hub that indexes `/security`, `/status`, `/subprocessors` and
+          `/privacy`; it is one link from the bar here and it is in the footer's Trust group. The
+          two pages keep their separate jobs -- `/trust` summarises, `/security` is the detail --
+          so neither is duplicated to give the menu a second entry.
+        */
+        title: "Input, connections, trust",
+        items: [
+          { href: "/sources", label: "Supported files and what is preserved" },
+          { href: "/integrations", label: "Connect sources" },
+          { href: "/trust", label: "Trust center" },
+        ],
+      },
+    ],
+    featured: { href: "/explore", label: "Explore a public sample" },
+  },
+  {
+    section: "solutions",
+    label: "Solutions",
+    overviewHref: "/solutions",
+    columns: [{ title: "By workflow", items: SOLUTION_ITEMS }],
+    featured: { href: "/solutions", label: "All solutions" },
+  },
+  {
+    section: "developers",
+    label: "Developers",
+    overviewHref: "/docs",
+    columns: [
+      {
+        title: "Get connected",
+        items: [
+          { href: "/developers", label: "Developer guide" },
+          { href: "/docs/quickstart", label: "Quickstart" },
+          { href: "/docs/use-with-ai", label: "Use results with AI" },
+        ],
+      },
+      {
+        title: "Interfaces and tools",
+        items: [
+          { href: "/api", label: "API reference" },
+          { href: "/docs/mcp", label: "MCP" },
+          { href: "/docs/cli", label: "CLI and package verification" },
+        ],
+      },
+    ],
+    featured: { href: "/docs", label: "All documentation" },
+  },
+  {
+    section: "resources",
+    label: "Resources",
+    overviewHref: "/resources",
+    columns: [
+      // An approved execution guide belongs in this column. `/cookbooks` is a draft route in
+      // another lane and a draft is not advertised, so nothing links to it from here yet.
+      { title: "Learn and do", items: resourceColumn("learn") },
+      { title: "Verify and compare", items: resourceColumn("verify") },
+    ],
+    featured: { href: "/resources", label: "All resources" },
+  },
+] as const;
+
+/** Pricing answers its question on the page itself, so it opens nothing. */
+export const NAV_PRICING: SiteLink = { href: "/pricing", label: "Pricing" };
+
+/**
+ * Declared in the menu before the route exists on this branch.
+ *
+ * `/solutions` is the hub the `ia-hubs` lane is building on a sibling branch, and the menu needs
+ * its "All solutions" link on the day the two merge. Keeping the exception in one named constant
+ * is what makes it temporary: `lib/site-nav-model.test.ts` fails if anything else joins this
+ * list, and fails again once the page lands and the entry is stale. It is deliberately absent
+ * from `app/sitemap.ts` -- a sitemap entry is a request to index a page that does not answer yet.
+ */
+export const NAV_PENDING_HREFS: readonly string[] = ["/solutions"] as const;
+
+/*
+  Which bar item owns the page being read.
+
+  Exact before prefix, because `/api` is one page and `/docs` is twenty. A path this does not
+  recognise returns null and no trigger is marked: the bar says nothing rather than guessing,
+  which is the honest answer for `/contact`, `/login` and every workspace route.
+*/
+const SECTION_BY_PATH: Readonly<Record<string, NavSection>> = {
+  "/sources": "product",
+  "/integrations": "product",
+  "/trust": "product",
+  "/security": "product",
+  "/developers": "developers",
+  "/api": "developers",
+  "/resources": "resources",
+  "/explore": "resources",
+  "/knowledge-compiler": "resources",
+  "/benchmarks": "resources",
+  "/changelog": "resources",
+  "/evidence": "resources",
+  "/reproducibility": "resources",
+  "/pricing": "pricing",
+};
+
+const SECTION_BY_PREFIX: readonly (readonly [string, NavSection])[] = [
+  ["/product", "product"],
+  ["/solutions", "solutions"],
+  ["/docs", "developers"],
+  ["/research", "resources"],
+] as const;
+
+export function navSectionForPath(pathname: string): NavSection | null {
+  const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
+  const exact = SECTION_BY_PATH[path];
+  if (exact) return exact;
+  for (const [prefix, section] of SECTION_BY_PREFIX) {
+    if (path === prefix || path.startsWith(`${prefix}/`)) return section;
+  }
+  return null;
+}
+
+/** Every destination the menu offers, so a route sweep does not need updating by hand. */
+export const navHrefs = (): readonly string[] => [
+  ...new Set([
+    ...NAV_GROUPS.flatMap((group) => [
+      ...group.columns.flatMap((column) => column.items.map((item) => item.href)),
+      ...(group.featured ? [group.featured.href] : []),
+    ]),
+    NAV_PRICING.href,
+  ]),
+];

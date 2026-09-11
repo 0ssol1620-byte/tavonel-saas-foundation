@@ -1,7 +1,7 @@
 import Link from "next/link";
 import LegalOperatorDisclosure from "@/components/legal-operator-disclosure";
 import Logomark from "@/components/logomark";
-import MobilePrimaryNav from "@/components/mobile-primary-nav";
+import { PublicSiteHeader } from "@/components/public-site-chrome";
 
 export default function PolicyLayout({
   label,
@@ -16,12 +16,16 @@ export default function PolicyLayout({
 }) {
   return (
     <div className="page">
-      <header className="nav" data-stuck={1}>
-        <Link href="/" className="wordmark" aria-label="TAVONEL home"><Logomark /><b>TAVONEL</b></Link>
-        <nav aria-label="Policy navigation"><Link href="/status">Service status</Link><Link href="/contact">Contact</Link></nav>
-        <MobilePrimaryNav />
-        <Link className="btn small" href="/login">Sign in</Link>
-      </header>
+      {/*
+        The site's header, not a two-link one of its own.
+
+        `/privacy`, `/terms`, `/refunds`, `/subprocessors` and `/status` are pages a reader lands
+        on from a search result or a contract, and the nav here offered them two links and no way
+        back into the product -- the fourth chrome `site-navigation.ts` describes, still standing.
+        The two destinations it did carry, Service status and Contact, moved into the legal footer
+        below so nothing on these pages became harder to reach.
+      */}
+      <PublicSiteHeader />
       <main id="main" tabIndex={-1}>
         <section className="scene doc policy-page">
           <div className="shell"><div className="body">
@@ -30,7 +34,7 @@ export default function PolicyLayout({
           </div></div>
         </section>
       </main>
-      <footer className="site"><div className="shell"><span className="wordmark"><Logomark /><b>TAVONEL</b></span><nav className="site-links" aria-label="Legal"><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link><Link href="/refunds">Refunds</Link><Link href="/subprocessors">Subprocessors</Link><Link href="/security">Security</Link></nav><LegalOperatorDisclosure compact /><p className="fine">Questions about this record: <a href="mailto:privacy@tavonel.com">privacy@tavonel.com</a></p></div></footer>
+      <footer className="site"><div className="shell"><span className="wordmark"><Logomark /><b>TAVONEL</b></span><nav className="site-links" aria-label="Legal"><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link><Link href="/refunds">Refunds</Link><Link href="/subprocessors">Subprocessors</Link><Link href="/security">Security</Link><Link href="/status">Service status</Link><Link href="/contact">Contact</Link></nav><LegalOperatorDisclosure compact /><p className="fine">Questions about this record: <a href="mailto:privacy@tavonel.com">privacy@tavonel.com</a></p></div></footer>
     </div>
   );
 }

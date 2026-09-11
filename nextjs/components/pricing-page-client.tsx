@@ -4,12 +4,12 @@ import Link from "next/link";
 import type { Route } from "next";
 import { useEffect, useRef, useState } from "react";
 import Logomark from "@/components/logomark";
-import MobilePrimaryNav from "@/components/mobile-primary-nav";
+import { PublicSiteHeader } from "@/components/public-site-chrome";
 import { useCheckout } from "@/lib/use-checkout";
 import { loginUrlForOffer } from "@/lib/checkout-intent";
 import { BILLING_OFFERS, type BillingOfferCode } from "@/lib/billing-catalog";
 import { trackFunnel } from "@/lib/funnel-events";
-import { FOOTER_GROUPS, PRIMARY_NAV } from "@/lib/site-navigation";
+import { FOOTER_GROUPS } from "@/lib/site-navigation";
 import {
   MAX_UNITS_PER_PAGE,
   PROCESSING_UNIT_USD,
@@ -313,22 +313,12 @@ export default function PricingPageClient({
 
   return (
     <div className="page pricing-page">
-      <header className="nav" data-stuck={1}>
-        <Link href="/" className="wordmark" aria-label="TAVONEL home">
-          <Logomark />
-          <b>TAVONEL</b>
-        </Link>
-        <nav aria-label="Sections">
-          {PRIMARY_NAV.map((link) => <Link key={link.href} href={link.href as Route}>{link.label}</Link>)}
-        </nav>
-        <MobilePrimaryNav />
-        <span className="nav-actions">
-          <Link className="btn small" href={(liveCheckout || selfService ? "/login" : "/contact") as Route}>
-            {liveCheckout || selfService ? "Start with your files" : "Request access"}
-          </Link>
-          <Link className="nav-signin" href="/login">Sign in</Link>
-        </span>
-      </header>
+      <PublicSiteHeader
+        cta={{
+          href: liveCheckout || selfService ? "/login" : "/contact",
+          label: liveCheckout || selfService ? "Start with your files" : "Request access",
+        }}
+      />
       <main id="main">
         <section className="scene doc">
           <div className="shell">
