@@ -572,43 +572,52 @@ export async function getWorldFreshness(
   const config = readSupabaseAdminConfig();
   if (!config) return { ...EMPTY_WORLD_FRESHNESS };
 
-  const pointerRows = await readFreshnessRows(
-    config,
-    `/rest/v1/foundation_active_worlds?${new URLSearchParams({
-      select: "manifest_digest",
-      workspace_key: `eq.${workspaceKey}`,
-      collection_id: `eq.${collectionId}`,
-      limit: "1",
-    })}`,
-  );
+  /*
+    Three independent reads, issued together.
+
+    None depends on another's result, and /ask and /search attach this block on every request --
+    running them in sequence would put three extra round trips on the critical path of the most
+    latency-sensitive route on the surface for no reason. Only the source-version read below has
+    to wait, because it needs the document ids off the compile-job row.
+  */
+  const [pointerRows, versionRows, jobRows] = await Promise.all([
+    readFreshnessRows(
+      config,
+      `/rest/v1/foundation_active_worlds?${new URLSearchParams({
+        select: "manifest_digest",
+        workspace_key: `eq.${workspaceKey}`,
+        collection_id: `eq.${collectionId}`,
+        limit: "1",
+      })}`,
+    ),
+    readFreshnessRows(
+      config,
+      `/rest/v1/foundation_world_versions?${new URLSearchParams({
+        select: "manifest_digest,last_activated_at,created_at",
+        workspace_key: `eq.${workspaceKey}`,
+        collection_id: `eq.${collectionId}`,
+        order: "created_at.desc",
+        limit: "50",
+      })}`,
+    ),
+    readFreshnessRows(
+      config,
+      `/rest/v1/foundation_compile_jobs?${new URLSearchParams({
+        select: "settled_at,blocked_resolved_at,document_ids",
+        workspace_key: `eq.${workspaceKey}`,
+        collection_id: `eq.${collectionId}`,
+        order: "settled_at.desc.nullslast",
+        limit: "1",
+      })}`,
+    ),
+  ]);
+
   const pointerDigest = String(pointerRows?.[0]?.manifest_digest ?? "");
   const activeManifestDigest = SHA256.test(pointerDigest) ? pointerDigest : null;
-
-  const versionRows = await readFreshnessRows(
-    config,
-    `/rest/v1/foundation_world_versions?${new URLSearchParams({
-      select: "manifest_digest,last_activated_at,created_at",
-      workspace_key: `eq.${workspaceKey}`,
-      collection_id: `eq.${collectionId}`,
-      order: "created_at.desc",
-      limit: "50",
-    })}`,
-  );
   const activeVersion = versionRows?.find(row => row.manifest_digest === activeManifestDigest) ?? null;
   const activatedAt = validTimestamp(activeVersion?.last_activated_at)
     ? String(activeVersion.last_activated_at)
     : null;
-
-  const jobRows = await readFreshnessRows(
-    config,
-    `/rest/v1/foundation_compile_jobs?${new URLSearchParams({
-      select: "settled_at,blocked_resolved_at,document_ids",
-      workspace_key: `eq.${workspaceKey}`,
-      collection_id: `eq.${collectionId}`,
-      order: "settled_at.desc.nullslast",
-      limit: "1",
-    })}`,
-  );
   const processedAt = firstTimestamp(jobRows, "settled_at");
   const reviewedAt = firstTimestamp(jobRows, "blocked_resolved_at");
 
