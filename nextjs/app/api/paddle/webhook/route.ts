@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { applyFoundationBillingAction } from "@/lib/billing-store";
+import { recordServerFunnel } from "@/lib/funnel-events";
 import { parsePaddleBillingAction } from "@/lib/paddle-billing-event";
 import { verifyPaddleSignature } from "@/lib/paddle-webhook";
 
@@ -27,6 +28,26 @@ export async function POST(request: Request) {
   }
   const applied = await applyFoundationBillingAction(action);
   if (!applied.ok) return NextResponse.json({ code: applied.code }, { status: 503, headers });
+  /*
+    The paid hop, from the receipt rather than from the browser that came back from checkout.
+    `checkout_completed` already counts the return trip; this counts the subscription the
+    provider says is active, which is the one that can be reconciled against revenue.
+
+    Only `subscription.activated`. Paddle's renewal arrives as a transaction against an existing
+    subscription, and this handler sees one event at a time with no history to compare it to, so
+    §15.2's `subscription_retained` is not derivable here -- it is a cohort reading, and
+    `lib/activation-cohorts.ts` is where repeat value is computed.
+
+    And only on the application that persisted the event. Paddle redelivers, so the projection
+    answers an event it has already stored with `status: "duplicate"`
+    (`apply_foundation_billing_event_v3`, migration 0011, reached through v4) -- a redelivery is
+    the same subscription arriving twice, not a second one starting.
+  */
+  if (action.action === "subscription"
+    && action.eventType === "subscription.activated"
+    && applied.result.status !== "duplicate") {
+    recordServerFunnel("subscription_started", { offer: action.offerCode });
+  }
   console.info("foundation_billing_event_applied", {
     eventType: action.eventType,
     action: action.action,
