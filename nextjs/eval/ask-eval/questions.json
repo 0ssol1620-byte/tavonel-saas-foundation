@@ -1,0 +1,556 @@
+{
+  "schema": "tavonel.ask-eval.question-set.v1",
+  "corpus": "explore-sample-w4",
+  "corpusNote": "The five committed Apple SEC filings behind /explore (lib/explore-sample.w4.inputs.json): 2025 Form 10-K, 2026 Q1/Q2/Q3 Form 10-Q, 2026 DEF 14A proxy. 290 pages, 1,281 OCR regions. Public filings; no customer data.",
+  "authoring": "Hand-authored 2026-09-11 by the evidence lane against the committed corpus. Every gold locator was read out of lib/explore-sample.w4.inputs.json, never inferred. The runner fails closed if any gold locator does not exist in the corpus.",
+  "knownBias": "The questions are written in the corpus's own vocabulary, because a question a reader could not answer from the corpus either is not a retrieval test. Both paths evaluated here are lexical, so shared vocabulary between question and gold region flatters them. These are fixture numbers on one public corpus, not a product measurement and not a calibrated threshold.",
+  "goldSemantics": "A gold locator is (documentId, pageNumber1, regionId) of a region that contains the answer. Several regions may be gold for one question. A question with an empty gold list is deliberately unanswerable from this corpus.",
+  "questions": [
+    {
+      "id": "A01",
+      "kind": "answerable",
+      "question": "What were total net sales by reportable segment for fiscal 2025?",
+      "gold": [{ "documentId": "apple-form-10-k", "pageNumber1": 25, "regionId": "apple-form-10-k-p25-r139" }]
+    },
+    {
+      "id": "A02",
+      "kind": "answerable",
+      "question": "What were net sales by product category for fiscal 2025?",
+      "gold": [{ "documentId": "apple-form-10-k", "pageNumber1": 26, "regionId": "apple-form-10-k-p26-r146" }]
+    },
+    {
+      "id": "A03",
+      "kind": "answerable",
+      "question": "What was total gross margin in fiscal 2025?",
+      "gold": [
+        { "documentId": "apple-form-10-k", "pageNumber1": 27, "regionId": "apple-form-10-k-p27-r154" },
+        { "documentId": "apple-form-10-k", "pageNumber1": 32, "regionId": "apple-form-10-k-p32-r194" }
+      ]
+    },
+    {
+      "id": "A04",
+      "kind": "answerable",
+      "question": "What was the provision for income taxes and the effective tax rate for fiscal 2025?",
+      "gold": [
+        { "documentId": "apple-form-10-k", "pageNumber1": 28, "regionId": "apple-form-10-k-p28-r164" },
+        { "documentId": "apple-form-10-k", "pageNumber1": 32, "regionId": "apple-form-10-k-p32-r196" }
+      ]
+    },
+    {
+      "id": "A05",
+      "kind": "answerable",
+      "question": "What was the aggregate principal amount of outstanding fixed-rate notes as of September 27, 2025?",
+      "gold": [{ "documentId": "apple-form-10-k", "pageNumber1": 28, "regionId": "apple-form-10-k-p28-r168" }]
+    },
+    {
+      "id": "A06",
+      "kind": "answerable",
+      "question": "What were the fixed lease payment obligations as of September 27, 2025?",
+      "gold": [{ "documentId": "apple-form-10-k", "pageNumber1": 28, "regionId": "apple-form-10-k-p28-r169" }]
+    },
+    {
+      "id": "A07",
+      "kind": "answerable",
+      "question": "What share repurchase program was announced in May 2025 and what happened to the quarterly dividend?",
+      "gold": [{ "documentId": "apple-form-10-k", "pageNumber1": 29, "regionId": "apple-form-10-k-p29-r175" }]
+    },
+    {
+      "id": "A08",
+      "kind": "answerable",
+      "question": "What were Products and Services net sales for the years ended September 27, 2025 and September 28, 2024?",
+      "gold": [{ "documentId": "apple-form-10-k", "pageNumber1": 32, "regionId": "apple-form-10-k-p32-r193" }]
+    },
+    {
+      "id": "A09",
+      "kind": "answerable",
+      "question": "What were research and development operating expenses for fiscal 2025?",
+      "gold": [{ "documentId": "apple-form-10-k", "pageNumber1": 32, "regionId": "apple-form-10-k-p32-r195" }]
+    },
+    {
+      "id": "A10",
+      "kind": "answerable",
+      "question": "What were basic and diluted earnings per share for fiscal 2025?",
+      "gold": [{ "documentId": "apple-form-10-k", "pageNumber1": 32, "regionId": "apple-form-10-k-p32-r197" }]
+    },
+    {
+      "id": "A11",
+      "kind": "answerable",
+      "question": "What was the total amount of gross unrecognized tax benefits as of September 27, 2025?",
+      "gold": [{ "documentId": "apple-form-10-k", "pageNumber1": 45, "regionId": "apple-form-10-k-p45-r293" }]
+    },
+    {
+      "id": "A12",
+      "kind": "answerable",
+      "question": "What are the lease liability maturities by calendar year as of September 27, 2025?",
+      "gold": [{ "documentId": "apple-form-10-k", "pageNumber1": 46, "regionId": "apple-form-10-k-p46-r300" }]
+    },
+    {
+      "id": "A13",
+      "kind": "answerable",
+      "question": "How many shares of common stock were repurchased during fiscal 2025 and at what cost?",
+      "gold": [
+        { "documentId": "apple-form-10-k", "pageNumber1": 47, "regionId": "apple-form-10-k-p47-r313" },
+        { "documentId": "apple-form-10-k", "pageNumber1": 29, "regionId": "apple-form-10-k-p29-r175" }
+      ]
+    },
+    {
+      "id": "A14",
+      "kind": "answerable",
+      "question": "Which countries and territories does the Greater China reportable segment include?",
+      "gold": [
+        { "documentId": "apple-form-10-k", "pageNumber1": 50, "regionId": "apple-form-10-k-p50-r326" },
+        { "documentId": "apple-form-10-k", "pageNumber1": 5, "regionId": "apple-form-10-k-p5-r27" }
+      ]
+    },
+    {
+      "id": "A15",
+      "kind": "answerable",
+      "question": "Who has overall responsibility for managing material risks from cybersecurity threats?",
+      "gold": [{ "documentId": "apple-form-10-k", "pageNumber1": 20, "regionId": "apple-form-10-k-p20-r111" }]
+    },
+    {
+      "id": "A16",
+      "kind": "answerable",
+      "question": "Where are the Company's headquarters located, and what facilities did it own or lease as of September 27, 2025?",
+      "gold": [{ "documentId": "apple-form-10-k", "pageNumber1": 20, "regionId": "apple-form-10-k-p20-r112" }]
+    },
+    {
+      "id": "A17",
+      "kind": "answerable",
+      "question": "What Digital Markets Act investigations are described under legal proceedings?",
+      "gold": [{ "documentId": "apple-form-10-k", "pageNumber1": 21, "regionId": "apple-form-10-k-p21-r114" }]
+    },
+    {
+      "id": "A18",
+      "kind": "answerable",
+      "question": "Which models are in the iPhone line?",
+      "gold": [{ "documentId": "apple-form-10-k", "pageNumber1": 4, "regionId": "apple-form-10-k-p4-r16" }]
+    },
+    {
+      "id": "A19",
+      "kind": "answerable",
+      "question": "Which laptops and desktops make up the Mac line?",
+      "gold": [{ "documentId": "apple-form-10-k", "pageNumber1": 4, "regionId": "apple-form-10-k-p4-r17" }]
+    },
+    {
+      "id": "A20",
+      "kind": "answerable",
+      "question": "Why has the Company historically experienced higher net sales in its first quarter?",
+      "gold": [{ "documentId": "apple-form-10-k", "pageNumber1": 7, "regionId": "apple-form-10-k-p7-r38" }]
+    },
+    {
+      "id": "A21",
+      "kind": "answerable",
+      "question": "What does the annual report say about components obtained from single or limited sources?",
+      "gold": [{ "documentId": "apple-form-10-k", "pageNumber1": 6, "regionId": "apple-form-10-k-p6-r33" }]
+    },
+    {
+      "id": "A22",
+      "kind": "answerable",
+      "question": "What fiscal year end does the Form 10-K cover?",
+      "gold": [
+        { "documentId": "apple-form-10-k", "pageNumber1": 1, "regionId": "apple-form-10-k-p1-r1" },
+        { "documentId": "apple-form-10-k", "pageNumber1": 3, "regionId": "apple-form-10-k-p3-r11" }
+      ]
+    },
+    {
+      "id": "A23",
+      "kind": "answerable",
+      "question": "What were Products and Services net sales in the first quarter of fiscal 2026?",
+      "gold": [{ "documentId": "apple-2026-q1-10-q", "pageNumber1": 4, "regionId": "apple-2026-q1-10-q-p4-r12" }]
+    },
+    {
+      "id": "A24",
+      "kind": "answerable",
+      "question": "What were total operating expenses for the three months ended December 27, 2025?",
+      "gold": [{ "documentId": "apple-2026-q1-10-q", "pageNumber1": 4, "regionId": "apple-2026-q1-10-q-p4-r14" }]
+    },
+    {
+      "id": "A25",
+      "kind": "answerable",
+      "question": "What were basic and diluted earnings per share for the three months ended December 27, 2025?",
+      "gold": [
+        { "documentId": "apple-2026-q1-10-q", "pageNumber1": 4, "regionId": "apple-2026-q1-10-q-p4-r16" },
+        { "documentId": "apple-2026-q1-10-q", "pageNumber1": 11, "regionId": "apple-2026-q1-10-q-p11-r63" }
+      ]
+    },
+    {
+      "id": "A26",
+      "kind": "answerable",
+      "question": "What were cash and cash equivalents as of December 27, 2025?",
+      "gold": [{ "documentId": "apple-2026-q1-10-q", "pageNumber1": 6, "regionId": "apple-2026-q1-10-q-p6-r28" }]
+    },
+    {
+      "id": "A27",
+      "kind": "answerable",
+      "question": "What dividends and dividend equivalents were declared per share or RSU in the first quarter of fiscal 2026?",
+      "gold": [{ "documentId": "apple-2026-q1-10-q", "pageNumber1": 8, "regionId": "apple-2026-q1-10-q-p8-r42" }]
+    },
+    {
+      "id": "A28",
+      "kind": "answerable",
+      "question": "What was total deferred revenue as of December 27, 2025?",
+      "gold": [{ "documentId": "apple-2026-q1-10-q", "pageNumber1": 10, "regionId": "apple-2026-q1-10-q-p10-r59" }]
+    },
+    {
+      "id": "A29",
+      "kind": "answerable",
+      "question": "How many customers individually represented 10% or more of total trade receivables as of December 27, 2025?",
+      "gold": [{ "documentId": "apple-2026-q1-10-q", "pageNumber1": 14, "regionId": "apple-2026-q1-10-q-p14-r77" }]
+    },
+    {
+      "id": "A30",
+      "kind": "answerable",
+      "question": "How many shares were repurchased during the three months ended December 27, 2025?",
+      "gold": [{ "documentId": "apple-2026-q1-10-q", "pageNumber1": 15, "regionId": "apple-2026-q1-10-q-p15-r86" }]
+    },
+    {
+      "id": "A31",
+      "kind": "answerable",
+      "question": "What were segment net sales and operating income by reportable segment for the three months ended December 27, 2025?",
+      "gold": [{ "documentId": "apple-2026-q1-10-q", "pageNumber1": 17, "regionId": "apple-2026-q1-10-q-p17-r95" }]
+    },
+    {
+      "id": "A32",
+      "kind": "answerable",
+      "question": "Why did Greater China net sales change in the first quarter of 2026?",
+      "gold": [{ "documentId": "apple-2026-q1-10-q", "pageNumber1": 19, "regionId": "apple-2026-q1-10-q-p19-r109" }]
+    },
+    {
+      "id": "A33",
+      "kind": "answerable",
+      "question": "What were iPhone net sales for the three months ended December 27, 2025?",
+      "gold": [{ "documentId": "apple-2026-q1-10-q", "pageNumber1": 21, "regionId": "apple-2026-q1-10-q-p21-r114" }]
+    },
+    {
+      "id": "A34",
+      "kind": "answerable",
+      "question": "What were total net sales for the three and six months ended March 28, 2026?",
+      "gold": [{ "documentId": "apple-2026-q2-10-q", "pageNumber1": 4, "regionId": "apple-2026-q2-10-q-p4-r12" }]
+    },
+    {
+      "id": "A35",
+      "kind": "answerable",
+      "question": "What was the aggregate carrying amount of outstanding fixed-rate notes as of March 28, 2026?",
+      "gold": [{ "documentId": "apple-2026-q2-10-q", "pageNumber1": 16, "regionId": "apple-2026-q2-10-q-p16-r86" }]
+    },
+    {
+      "id": "A36",
+      "kind": "answerable",
+      "question": "What was the remaining share repurchase availability as of March 28, 2026?",
+      "gold": [{ "documentId": "apple-2026-q2-10-q", "pageNumber1": 26, "regionId": "apple-2026-q2-10-q-p26-r142" }]
+    },
+    {
+      "id": "A37",
+      "kind": "answerable",
+      "question": "What were total net sales for the three and nine months ended June 27, 2026?",
+      "gold": [{ "documentId": "apple-2026-q3-10-q", "pageNumber1": 4, "regionId": "apple-2026-q3-10-q-p4-r12" }]
+    },
+    {
+      "id": "A38",
+      "kind": "answerable",
+      "question": "How many shares were repurchased during the nine months ended June 27, 2026?",
+      "gold": [{ "documentId": "apple-2026-q3-10-q", "pageNumber1": 17, "regionId": "apple-2026-q3-10-q-p17-r88" }]
+    },
+    {
+      "id": "A39",
+      "kind": "answerable",
+      "question": "How does the Audit Committee oversee privacy and data security risks?",
+      "gold": [{ "documentId": "apple-2026-proxy-def14a", "pageNumber1": 20, "regionId": "apple-2026-proxy-def14a-p20-r48" }]
+    },
+    {
+      "id": "A40",
+      "kind": "answerable",
+      "question": "Who served on the Audit and Finance Committee as of October 29, 2025?",
+      "gold": [
+        { "documentId": "apple-2026-proxy-def14a", "pageNumber1": 79, "regionId": "apple-2026-proxy-def14a-p79-r183" },
+        { "documentId": "apple-2026-proxy-def14a", "pageNumber1": 17, "regionId": "apple-2026-proxy-def14a-p17-r37" }
+      ]
+    },
+    {
+      "id": "A41",
+      "kind": "answerable",
+      "question": "Which independent registered public accounting firm has been re-appointed as auditors for 2026?",
+      "gold": [{ "documentId": "apple-2026-proxy-def14a", "pageNumber1": 64, "regionId": "apple-2026-proxy-def14a-p64-r155" }]
+    },
+    {
+      "id": "A42",
+      "kind": "answerable",
+      "question": "Who has the Board nominated for election as directors?",
+      "gold": [{ "documentId": "apple-2026-proxy-def14a", "pageNumber1": 63, "regionId": "apple-2026-proxy-def14a-p63-r154" }]
+    },
+    {
+      "id": "A43",
+      "kind": "answerable",
+      "question": "What is the total target value of the CEO equity award for 2025?",
+      "gold": [{ "documentId": "apple-2026-proxy-def14a", "pageNumber1": 43, "regionId": "apple-2026-proxy-def14a-p43-r110" }]
+    },
+    {
+      "id": "A44",
+      "kind": "answerable",
+      "question": "What do the stock ownership guidelines require of the CEO?",
+      "gold": [{ "documentId": "apple-2026-proxy-def14a", "pageNumber1": 50, "regionId": "apple-2026-proxy-def14a-p50-r126" }]
+    },
+    {
+      "id": "A45",
+      "kind": "answerable",
+      "question": "What is the record date for the annual meeting?",
+      "gold": [{ "documentId": "apple-2026-proxy-def14a", "pageNumber1": 83, "regionId": "apple-2026-proxy-def14a-p83-r195" }]
+    },
+    {
+      "id": "A46",
+      "kind": "answerable",
+      "question": "How does the Nominating Committee identify and evaluate potential board candidates?",
+      "gold": [{ "documentId": "apple-2026-proxy-def14a", "pageNumber1": 25, "regionId": "apple-2026-proxy-def14a-p25-r57" }]
+    },
+    {
+      "id": "M01",
+      "kind": "multihop",
+      "question": "Compare total net sales in the first quarter of fiscal 2026 with total net sales in the second quarter of fiscal 2026.",
+      "gold": [
+        { "documentId": "apple-2026-q1-10-q", "pageNumber1": 4, "regionId": "apple-2026-q1-10-q-p4-r12" },
+        { "documentId": "apple-2026-q2-10-q", "pageNumber1": 4, "regionId": "apple-2026-q2-10-q-p4-r12" }
+      ],
+      "hops": "two filings, same line item, different periods"
+    },
+    {
+      "id": "M02",
+      "kind": "multihop",
+      "question": "How did the aggregate carrying amount of fixed-rate notes change between December 27, 2025 and June 27, 2026?",
+      "gold": [
+        { "documentId": "apple-2026-q1-10-q", "pageNumber1": 15, "regionId": "apple-2026-q1-10-q-p15-r85" },
+        { "documentId": "apple-2026-q3-10-q", "pageNumber1": 17, "regionId": "apple-2026-q3-10-q-p17-r87" }
+      ],
+      "hops": "two filings, term debt, two balance-sheet dates"
+    },
+    {
+      "id": "M03",
+      "kind": "multihop",
+      "question": "What were Greater China segment net sales in each quarter of fiscal 2026 reported so far?",
+      "gold": [
+        { "documentId": "apple-2026-q1-10-q", "pageNumber1": 17, "regionId": "apple-2026-q1-10-q-p17-r95" },
+        { "documentId": "apple-2026-q2-10-q", "pageNumber1": 18, "regionId": "apple-2026-q2-10-q-p18-r96" },
+        { "documentId": "apple-2026-q3-10-q", "pageNumber1": 20, "regionId": "apple-2026-q3-10-q-p20-r97" }
+      ],
+      "hops": "three filings, one segment, three periods"
+    },
+    {
+      "id": "M04",
+      "kind": "multihop",
+      "question": "How do share repurchases over the nine months ended June 27, 2026 compare with repurchases during fiscal 2025?",
+      "gold": [
+        { "documentId": "apple-2026-q3-10-q", "pageNumber1": 17, "regionId": "apple-2026-q3-10-q-p17-r88" },
+        { "documentId": "apple-form-10-k", "pageNumber1": 47, "regionId": "apple-form-10-k-p47-r313" }
+      ],
+      "hops": "annual filing and quarterly filing, same programme, different windows"
+    },
+    {
+      "id": "M05",
+      "kind": "multihop",
+      "question": "How does the dividend per share declared in the first quarter of fiscal 2026 compare with the rate announced in May 2025?",
+      "gold": [
+        { "documentId": "apple-2026-q1-10-q", "pageNumber1": 8, "regionId": "apple-2026-q1-10-q-p8-r42" },
+        { "documentId": "apple-form-10-k", "pageNumber1": 29, "regionId": "apple-form-10-k-p29-r175" }
+      ],
+      "hops": "quarterly statement of equity and annual capital-return discussion"
+    },
+    {
+      "id": "M06",
+      "kind": "multihop",
+      "question": "Which committee reviews privacy and data security risks, and who leads cybersecurity risk management according to the annual report?",
+      "gold": [
+        { "documentId": "apple-2026-proxy-def14a", "pageNumber1": 20, "regionId": "apple-2026-proxy-def14a-p20-r48" },
+        { "documentId": "apple-form-10-k", "pageNumber1": 20, "regionId": "apple-form-10-k-p20-r111" }
+      ],
+      "hops": "proxy governance section and 10-K Item 1C"
+    },
+    {
+      "id": "M07",
+      "kind": "multihop",
+      "question": "What was research and development expense for fiscal 2025 and for the three months ended December 27, 2025?",
+      "gold": [
+        { "documentId": "apple-form-10-k", "pageNumber1": 32, "regionId": "apple-form-10-k-p32-r195" },
+        { "documentId": "apple-2026-q1-10-q", "pageNumber1": 4, "regionId": "apple-2026-q1-10-q-p4-r14" }
+      ],
+      "hops": "annual and quarterly income statements, same line item, different unit of period"
+    },
+    {
+      "id": "M08",
+      "kind": "multihop",
+      "question": "How did the effective tax rate for fiscal 2025 compare with the effective tax rate for the second quarter of fiscal 2026?",
+      "gold": [
+        { "documentId": "apple-form-10-k", "pageNumber1": 28, "regionId": "apple-form-10-k-p28-r164" },
+        { "documentId": "apple-2026-q2-10-q", "pageNumber1": 25, "regionId": "apple-2026-q2-10-q-p25-r134" }
+      ],
+      "hops": "two filings, effective tax rate, annual versus quarterly denominator"
+    },
+    {
+      "id": "M09",
+      "kind": "multihop",
+      "question": "Which firm audits the consolidated financial statements, and where is its opinion presented in the annual report?",
+      "gold": [
+        { "documentId": "apple-2026-proxy-def14a", "pageNumber1": 64, "regionId": "apple-2026-proxy-def14a-p64-r155" },
+        { "documentId": "apple-form-10-k", "pageNumber1": 52, "regionId": "apple-form-10-k-p52-r334" }
+      ],
+      "hops": "proxy proposal and 10-K auditor report"
+    },
+    {
+      "id": "M10",
+      "kind": "multihop",
+      "question": "What repurchase authorisation was announced in May 2025 and how much of it remained available on March 28, 2026?",
+      "gold": [
+        { "documentId": "apple-form-10-k", "pageNumber1": 29, "regionId": "apple-form-10-k-p29-r175" },
+        { "documentId": "apple-2026-q2-10-q", "pageNumber1": 26, "regionId": "apple-2026-q2-10-q-p26-r142" }
+      ],
+      "hops": "annual authorisation and quarterly remaining availability"
+    },
+    {
+      "id": "M11",
+      "kind": "multihop",
+      "question": "How did iPhone net sales in the first quarter of fiscal 2026 compare with iPhone net sales for fiscal 2025?",
+      "gold": [
+        { "documentId": "apple-2026-q1-10-q", "pageNumber1": 21, "regionId": "apple-2026-q1-10-q-p21-r114" },
+        { "documentId": "apple-form-10-k", "pageNumber1": 26, "regionId": "apple-form-10-k-p26-r146" }
+      ],
+      "hops": "quarterly and annual category tables"
+    },
+    {
+      "id": "M12",
+      "kind": "multihop",
+      "question": "What were Americas segment net sales in the second and third quarters of fiscal 2026?",
+      "gold": [
+        { "documentId": "apple-2026-q2-10-q", "pageNumber1": 18, "regionId": "apple-2026-q2-10-q-p18-r96" },
+        { "documentId": "apple-2026-q3-10-q", "pageNumber1": 20, "regionId": "apple-2026-q3-10-q-p20-r97" }
+      ],
+      "hops": "two filings, one segment, two quarters"
+    },
+    {
+      "id": "U01",
+      "kind": "unanswerable",
+      "reason": "wrong_period",
+      "question": "What were total net sales for the fiscal year ended September 26, 2027?",
+      "gold": [],
+      "why": "The corpus ends with the quarter ended June 27, 2026. No fiscal 2027 figure exists in it."
+    },
+    {
+      "id": "U02",
+      "kind": "unanswerable",
+      "reason": "wrong_period",
+      "question": "What were Greater China segment net sales in the fourth quarter of fiscal 2026?",
+      "gold": [],
+      "why": "Only Q1, Q2 and Q3 of fiscal 2026 are filed in this corpus."
+    },
+    {
+      "id": "U03",
+      "kind": "unanswerable",
+      "reason": "wrong_period",
+      "question": "What was the effective tax rate for fiscal 2021?",
+      "gold": [],
+      "why": "The annual filing in this corpus reports 2025, 2024 and 2023 only."
+    },
+    {
+      "id": "U04",
+      "kind": "unanswerable",
+      "reason": "wrong_period",
+      "question": "How many shares of common stock were repurchased during the twelve months ended June 27, 2026?",
+      "gold": [],
+      "why": "The Q3 filing reports the nine-month figure; a trailing-twelve-month repurchase total is not stated anywhere in the corpus."
+    },
+    {
+      "id": "U05",
+      "kind": "unanswerable",
+      "reason": "wrong_period",
+      "question": "What quarterly dividend per share was declared for the fourth quarter of fiscal 2026?",
+      "gold": [],
+      "why": "No Q4 2026 filing is in the corpus."
+    },
+    {
+      "id": "U06",
+      "kind": "unanswerable",
+      "reason": "wrong_entity",
+      "question": "What were Microsoft's Intelligent Cloud segment net sales?",
+      "gold": [],
+      "why": "Another issuer entirely; nothing in the corpus reports it."
+    },
+    {
+      "id": "U07",
+      "kind": "unanswerable",
+      "reason": "wrong_entity",
+      "question": "Who chairs the audit committee of Samsung Electronics?",
+      "gold": [],
+      "why": "Another issuer's governance; the proxy in this corpus covers one company only."
+    },
+    {
+      "id": "U08",
+      "kind": "unanswerable",
+      "reason": "wrong_entity",
+      "question": "What quarterly dividend per share does Alphabet pay?",
+      "gold": [],
+      "why": "Another issuer; the dividend figures in this corpus belong to a different registrant."
+    },
+    {
+      "id": "U09",
+      "kind": "unanswerable",
+      "reason": "wrong_entity",
+      "question": "What data center revenue did NVIDIA report for its most recent quarter?",
+      "gold": [],
+      "why": "Another issuer; no such segment exists in this corpus."
+    },
+    {
+      "id": "U10",
+      "kind": "unanswerable",
+      "reason": "wrong_entity",
+      "question": "Which accounting firm audits Tesla's consolidated financial statements?",
+      "gold": [],
+      "why": "Another issuer's auditor; the corpus names only one registrant's auditor."
+    },
+    {
+      "id": "U11",
+      "kind": "unanswerable",
+      "reason": "out_of_corpus",
+      "question": "What is the manufacturing unit cost of the A19 Pro system-on-chip?",
+      "gold": [],
+      "why": "Component-level unit costs are never disclosed in SEC filings and are absent from this corpus."
+    },
+    {
+      "id": "U12",
+      "kind": "unanswerable",
+      "reason": "out_of_corpus",
+      "question": "How many retail stores were open in Japan as of June 27, 2026?",
+      "gold": [],
+      "why": "No store count by country appears anywhere in these five filings."
+    },
+    {
+      "id": "U13",
+      "kind": "unanswerable",
+      "reason": "out_of_corpus",
+      "question": "What revenue guidance did management give for the next quarter?",
+      "gold": [],
+      "why": "These filings contain no forward revenue guidance."
+    },
+    {
+      "id": "U14",
+      "kind": "unanswerable",
+      "reason": "out_of_corpus",
+      "question": "What was the average selling price of an iPhone in the third quarter of fiscal 2026?",
+      "gold": [],
+      "why": "Average selling price is not a disclosed metric in this corpus; category net sales are, unit prices are not."
+    },
+    {
+      "id": "U15",
+      "kind": "unanswerable",
+      "reason": "out_of_corpus",
+      "question": "How much did the Company pay to acquire Vantablack Semiconductor GmbH in 2026?",
+      "gold": [],
+      "why": "No such acquisition or counterparty is named in the corpus; the entity is invented for this probe."
+    },
+    {
+      "id": "U16",
+      "kind": "unanswerable",
+      "reason": "out_of_corpus",
+      "question": "What is the Company's headcount as of June 27, 2026?",
+      "gold": [],
+      "why": "The human-capital discussion in the annual filing states no employee count, and no quarterly filing reports one."
+    }
+  ]
+}
