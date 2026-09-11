@@ -68,7 +68,7 @@ projection it describes.
    what a customer gets: it is 1.4× the delivered count and 0.74× the computed one.
 2. **Evidence granularity differs by 256×, in the live engine's favour.** The TS engine emits ONE
    Evidence node per document-version (`stableId("evidence", documentId, versionKey)` in
-   `collection-compiler.ts`), so all 1,281 of its rag chunks in a document share one evidence id.
+   `collection-compiler.ts`), so every rag chunk in a document shares that document's single evidence id — 1,281 chunks bound to 5 evidence objects.
    Core V2 emits one evidence object per region: 1,281. Any statement of the form "every claim is
    bound to its evidence" means *bound to a document* on the TS path and *bound to a region* on the
    Core V2 path. The page/bbox locator is still per-chunk on both, so the customer-visible citation
@@ -102,7 +102,7 @@ seven is a repeat of another node's label.** A node count is not a fact count.
 ### Evidence precision — measured, in the other report, and not on this engine
 
 Evidence precision and multi-document query success are in
-`ASK_EVAL_…` / `ask-eval-2026-09-11.md` beside this file: 74 fixed questions with gold locators over
+`ask-eval-2026-09-11.md` beside this file: 74 fixed questions with gold locators over
 the same corpus, both Ask paths, region- and page-level precision with their ceilings, and 12
 multi-hop questions. Two limits apply to reading those numbers here:
 
