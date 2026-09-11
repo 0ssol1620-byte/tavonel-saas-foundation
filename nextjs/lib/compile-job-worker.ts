@@ -295,12 +295,17 @@ export async function runCompileJobTurn(job: CompileJob): Promise<CompileJobTurn
     return rest("failed", "failed", classified.ready.length, classified.blocked);
   }
 
+  // The digest goes on both advances, not because it is written twice -- the RPC coalesces --
+  // but because either call can be the one that lands. A redelivery whose first advance is
+  // refused for moving backwards (the job is already at review_required) would otherwise settle
+  // with no record of the artifact it produced.
   await advanceCompileJob({
     workspaceKey: job.workspaceKey,
     jobId: job.jobId,
     state: "building_world",
     documentsReady: classified.ready.length,
     collectionId: run.payload.collectionId,
+    candidateManifestDigest: run.payload.manifestDigest,
   });
 
   const settled: CompileState = run.payload.lifecycle === "review_required" ? "review_required" : "ready";
@@ -311,6 +316,7 @@ export async function runCompileJobTurn(job: CompileJob): Promise<CompileJobTurn
     documentsReady: classified.ready.length,
     collectionId: run.payload.collectionId,
     blocked: classified.blocked,
+    candidateManifestDigest: run.payload.manifestDigest,
   });
   return rest("compiled", settled, classified.ready.length, classified.blocked);
 }

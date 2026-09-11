@@ -571,6 +571,15 @@ export async function advanceCompileJob(input: {
   errorCode?: string | null;
   blocked?: CompileBlocker[] | null;
   queueJobId?: string | null;
+  /**
+   * The digest of the candidate artifact this compile produced, once it has produced one.
+   *
+   * Recorded so `candidateAwaitingActivation` is a fact in the database rather than something
+   * only the request that already loaded the candidate can see: `foundation_world_versions`
+   * learns a digest at promotion, which is the event that flag exists to wait for. The RPC
+   * coalesces, so an advance that omits it does not erase what an earlier one recorded.
+   */
+  candidateManifestDigest?: string | null;
 }): Promise<CompileJobResult<{ state: CompileState; changed: boolean }>> {
   if (!WORKSPACE_KEY.test(input.workspaceKey) || !COMPILE_JOB_ID.test(input.jobId)) {
     return fail("COMPILE_JOB_SCOPE_INVALID");
@@ -584,6 +593,7 @@ export async function advanceCompileJob(input: {
     p_error_code: input.errorCode ?? null,
     p_blocked: input.blocked ?? null,
     p_queue_job_id: input.queueJobId ?? null,
+    p_candidate_manifest_digest: input.candidateManifestDigest ?? null,
   });
   if (!result.ok) return result;
   const row = Array.isArray(result.value) ? result.value[0] : result.value;
