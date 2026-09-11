@@ -236,7 +236,13 @@ export default async function SolutionPage({ params }: { params: Promise<{ slug:
           content, stated as an input to a decision.
         */}
         <details className="solution-notes">
-          <summary><span>WHAT TO PLAN FOR</span> · Before your first compile</summary>
+          {/*
+            No separator between the two halves: `.solution-notes summary` is
+            `justify-content: space-between`, so a "·" written between them lands at the start of
+            the right-hand phrase with nothing on its left -- which is how the old title rendered
+            and is a punctuation mark doing no work.
+          */}
+          <summary><span>WHAT TO PLAN FOR</span> Before your first compile</summary>
           <div>
             {solution.limitations.map((item) => <p key={item}>{item}</p>)}
           </div>

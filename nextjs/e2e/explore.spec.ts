@@ -128,8 +128,16 @@ test("Act 1 offers the same composition as an accessible list", async ({ page })
 
   // Every target is a real button; a clickable div would not be in the button role (§20).
   expect(await objects.evaluateAll((nodes) => nodes.every((node) => node.tagName === "BUTTON"))).toBe(true);
-  // State is a word, never colour alone.
-  await expect(objects.first().locator("small")).toHaveText(/^[A-Z]+ · [A-Z]+$/);
+  /*
+    State is a word, never colour alone.
+
+    BA-032 changed which word: every object in this fixture is lifecycle `candidate`, and our own
+    glossary defines a CANDIDATE as something nothing answers from, so the badge contradicted the
+    Ask act beside it. The assertion is tighter than the `[A-Z]+` it replaces -- the state has to
+    be one of the six words `STATE_WORD` publishes, so a seventh cannot appear here unnoticed.
+  */
+  await expect(objects.first().locator("small"))
+    .toHaveText(/^[A-Z]+ · (PUBLISHED SAMPLE|CURRENT|CHANGED|AFFECTED|UNRESOLVED|UNCHANGED)$/);
   // Every relation between two drawn objects is named in text.
   const relations = await list.locator("li li").count();
   expect(relations).toBeGreaterThan(0);
