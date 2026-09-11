@@ -419,7 +419,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
     group: "Concepts",
     summary: "Sources, Compiled Worlds, candidate and active versions, and evidence.",
     blocks: [
-      { kind: "prose", text: "A **source** is an immutable document version. Uploading the same file twice produces one source with one digest; editing the file produces a second version, and the first is never rewritten." },
+      { kind: "prose", text: "A **source** is an immutable document version. Uploading the same file twice produces two documents with two source records that share one content digest; nothing merges them, each citation names one of the documents carrying those bytes, and editing the file produces a second version without rewriting the first." },
       { kind: "prose", text: "A **Compiled World** is what a set of sources compiles into: semantic objects, relations between them, and the evidence each one rests on. It is addressed by a collection id and a manifest digest, and the digest is computed over the whole artifact, so two Worlds with the same digest are the same World." },
       { kind: "prose", text: "A **candidate** version is a compile result nobody has accepted yet. An **active** version is the one answers are served from. Promotion is an explicit human action in a signed-in session — no API key can promote, and no compile promotes itself." },
       { kind: "prose", text: "**Evidence** is a page and a region on that page, bound to a source version by digest. An object with no evidence is not published, and an answer that cannot cite one abstains rather than guessing." },
@@ -427,7 +427,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
         kind: "table",
         head: ["Term", "Identified by", "Changes when"],
         rows: [
-          ["Source version", "sha256 of the sanitized bytes", "the file changes"],
+          ["Source version", "the document plus the sha256 of its sanitized bytes", "the file changes"],
           ["Compiled World", "collection id + manifest digest", "any input or the compiler changes"],
           ["Object", "stable key derived from its content", "its label or bindings change"],
           ["Evidence", "source version + page + region", "the region moves or the source is replaced"],
