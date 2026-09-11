@@ -34,51 +34,70 @@
   overflow: hidden;
   background: var(--ground);
 }
+/*
+  BA-041 / BA-043 / BA-056 -- the four drawn tiles are gone, and with them the icon stack, the
+  striped fake page, the empty dot grid under a candidate count, and the glowing timeline dot.
+  What is left holds one real region rendered by /explore's own `SourceSheet`, so the styling
+  here is a frame and a caption; the evidence inside brings its own.
+*/
 .solution-proof-sample-head {
   min-height: 44px;
-  padding: 0 16px;
+  padding: 10px 16px;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
+  gap: 6px 18px;
   border-bottom: 1px solid var(--hairline);
-  color: var(--text-xlo);
-  font: 9px var(--f-mono);
-  letter-spacing: .12em;
+  color: var(--text-lo);
+  font-size: 12px;
+  letter-spacing: .01em;
 }
-.solution-proof-sample-head a { color: var(--verified); letter-spacing: .04em; }
-.solution-proof-sample-grid {
+/* The card's only link was 115x11px on a phone (BA-056): it is now a 44px row target. */
+.solution-proof-sample-head a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--verified);
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.solution-proof-sample-body {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  background: var(--hairline);
-  gap: 1px;
-}
-.solution-proof-sample-grid section {
-  min-width: 0;
-  min-height: 220px;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  gap: 0;
   background: var(--g1);
 }
-.solution-proof-label { color: var(--text-xlo); font: 9px var(--f-mono); letter-spacing: .13em; }
-.solution-proof-sample-grid strong { margin-top: auto; color: var(--text-hi); font-size: 18px; font-weight: 550; }
-.solution-proof-sample-grid small { margin-top: 5px; color: var(--text-xlo); font: 9px var(--f-mono); letter-spacing: .04em; }
-.solution-proof-documents { height: 92px; margin-top: 20px; display: flex; align-items: flex-end; gap: 8px; }
-.solution-proof-documents i { width: 30px; border: 1px solid var(--hairline-hi); background: var(--ground); position: relative; }
-.solution-proof-documents i::after { content: ""; position: absolute; inset: 7px 5px auto; height: 1px; background: var(--hairline-hi); box-shadow: 0 6px 0 var(--hairline), 0 12px 0 var(--hairline); }
-.solution-proof-page { width: 76px; height: 96px; margin-top: 16px; position: relative; border: 1px solid var(--hairline-hi); background: var(--ground); }
-.solution-proof-page::before { content: ""; position: absolute; inset: 12px 10px; background: repeating-linear-gradient(to bottom, var(--hairline) 0 1px, transparent 1px 7px); }
-.solution-proof-page i { position: absolute; z-index: 1; min-width: 3px; min-height: 3px; border: 1px solid var(--verified); background: color-mix(in srgb, var(--verified) 18%, transparent); }
-.solution-proof-object-map { width: min(100%, 152px); margin-top: 23px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px 20px; }
-.solution-proof-object-map i { width: 7px; height: 7px; border-radius: 50%; background: var(--text-xlo); box-shadow: 18px 8px 0 -3px var(--hairline-hi); }
-.solution-proof-object-map i:nth-child(3n) { background: var(--verified); }
-.solution-proof-timeline { width: min(100%, 178px); height: 48px; margin-top: 34px; display: flex; align-items: center; }
-.solution-proof-timeline i { width: 9px; height: 9px; flex: 0 0 auto; border: 1px solid var(--text-xlo); border-radius: 50%; background: var(--g1); }
-.solution-proof-timeline i + i { margin-left: calc((100% - 45px) / 4); position: relative; }
-.solution-proof-timeline i + i::before { content: ""; position: absolute; top: 3px; right: 8px; width: calc((178px - 45px) / 4); height: 1px; background: var(--hairline-hi); }
-.solution-proof-timeline i[data-active="true"] { border-color: var(--verified); background: var(--verified); box-shadow: 0 0 0 4px var(--verified-dim); }
+.solution-proof-claim {
+  margin: 0;
+  padding: 16px;
+  border-bottom: 1px solid var(--hairline);
+  color: var(--text-hi);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.solution-proof-claim span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text-xlo);
+  font: 12px var(--f-mono);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+/* The sheet is a flex child in /explore's stage; here it is a block in a figure. */
+.solution-proof-sample-body > article {
+  border: 0;
+  border-radius: 0;
+}
+.solution-proof-counts {
+  margin: 0;
+  padding: 12px 16px;
+  border-top: 1px solid var(--hairline);
+  color: var(--text-lo);
+  font: 12px/1.6 var(--f-mono);
+  overflow-wrap: anywhere;
+}
+.solution-proof-digest { color: var(--text-xlo); }
 
 .solution-section {
   display: grid;
@@ -145,8 +164,10 @@
 .solution-actions { margin-left: 0; }
 
 /* --------------------------------------------------------------------------
-   Landing compilation film: autoplay-first. The motion control remains for WCAG but it is
-   deliberately secondary and never blocks the frame with a play button.
+   Landing compilation film. Autoplay-first where autoplay is wanted -- and where it is not,
+   the same control is the way in rather than being absent (film-01, film-02): under reduced
+   motion or Save-Data it reads Play and is drawn at full contrast, because it is the only
+   thing on the frame that will start it.
    -------------------------------------------------------------------------- */
 .compile-film-viewport { position: relative; }
 .compile-film-motion-control {
@@ -170,8 +191,14 @@
   transition: opacity 160ms ease, border-color 160ms ease;
 }
 .compile-film-viewport:hover .compile-film-motion-control,
+.compile-film-motion-control[data-control="play"],
 .compile-film-motion-control:focus-visible { opacity: 1; }
-.compile-film-motion-control span { font: 10px/1 var(--f-mono); transform: translateY(-.5px); }
+.compile-film-motion-control[data-control="play"] {
+  border-color: var(--hairline-hi);
+  background: color-mix(in srgb, var(--ground) 92%, transparent);
+  color: var(--text-hi);
+}
+.compile-film-motion-control span { font: 12px/1 var(--f-mono); transform: translateY(-.5px); }
 .compile-film-caption { align-items: center; }
 .compile-film-caption p { margin-right: auto; }
 .compile-film-progress { color: var(--text-xlo); font: 9px var(--f-mono); letter-spacing: .12em; white-space: nowrap; }
@@ -361,8 +388,6 @@
   .workspace-getting-started-actions { min-width: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .solution-hero { grid-template-columns: minmax(0, 1fr); align-items: start; }
   .solution-outcomes { grid-template-columns: minmax(0, 1fr); }
-  .solution-proof-sample-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .solution-proof-sample-grid section { min-height: 196px; padding: 18px; }
   .workspace-intake[data-existing-documents="1"] .workspace-intake-copy { grid-template-columns: minmax(0, 1fr); }
   .workspace-intake[data-existing-documents="1"] .workspace-intake-actions { grid-column: 1; grid-row: auto; justify-content: flex-start; margin-top: 6px; }
   .board-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -378,17 +403,19 @@
   .solution-flow li:last-child { grid-column: 1 / -1; }
   .solution-notes { margin-top: 54px; }
   .solution-proof-sample-head { align-items: flex-start; flex-direction: column; justify-content: center; gap: 5px; padding-block: 12px; }
-  .solution-proof-sample-grid { grid-template-columns: minmax(0, 1fr); }
-  .solution-proof-sample-grid section { min-height: 176px; }
   .board-metrics { grid-template-columns: repeat(2, 1fr); }
   .board-row-summary { grid-template-columns: minmax(0, 1fr) auto 18px; gap: 8px; }
   .board-row-status { max-width: 112px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .compile-stage { aspect-ratio: 1 / 1; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .compile-film-motion-control { display: none; }
-}
+/*
+  film-01 -- this block used to be `.compile-film-motion-control { display: none }`.
+
+  Under reduced motion the frame is a still, and hiding the control left a poster of a film
+  with no way to watch it. The control stays; it reads Play there, and a click is the visitor's
+  own request, which is what WCAG 2.2.2 permits.
+*/
 
 /*
   /sources quick navigator — §14.3.

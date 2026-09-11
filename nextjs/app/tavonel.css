@@ -100,6 +100,14 @@
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/*
+  BA-254 -- the native UI has to know which world it is in.
+
+  Without this, the scrollbars, the select popup, the autofill background, the date picker and
+  /contact's form controls all render light inside a near-black page.
+*/
+:root { color-scheme: dark; }
+
 /* This design commits to one visual world on purpose -- it is an instrument panel, and an
    inverted "light mode" would be a different product, not the same one in another theme. So
    there is no prefers-color-scheme block: every colour is painted explicitly from the tokens
@@ -272,6 +280,18 @@ a { color: inherit; text-decoration: none; }
   view-transition-name: world-canvas;
 }
 
+/*
+  BA-005 -- no live canvas under 900px, and none on a coarse pointer up to 1023px.
+
+  `components/world-field.tsx` already refuses to mount below this boundary, so the frame loop
+  never starts there. This is the belt to that braces: if the canvas ever reaches a phone by some
+  other path -- a stale render, a re-used shell -- it stays out of the way rather than animating
+  the whole viewport behind a stacked mobile flow.
+*/
+@media (max-width: 899px), (pointer: coarse) and (max-width: 1023px) {
+  .world-field { display: none; }
+}
+
 .shell {
   /* width:100% is load-bearing. .scene is a column flexbox and `margin:0 auto` on a flex item
      cancels the default stretch -- without an explicit width the shell shrink-wraps to its
@@ -322,9 +342,23 @@ main { position: relative; z-index: 5; }
 
 h1, h2, h3 { margin: 0; color: var(--text-hi); font-weight: 500; text-wrap: balance; }
 
+/*
+  BA-008 -- two display sizes, assigned rather than assumed.
+
+  Three were in use at once with no rule: /explore shouted at 71.68px, the landing page at 52,
+  and every other page at 48.64 -- the sample page larger than the landing page -- while the
+  home h1's 1.02 line-height sat under the 1.05 floor. Display 1 is the landing page's alone;
+  every other h1, /explore included, is Display 2. Heading leading is 1.08 throughout.
+*/
 h1 {
-  font-size: clamp(38px, 6.4vw, 82px);
-  line-height: 1.02;
+  font-size: clamp(34px, 3.8vw, 52px);
+  line-height: 1.08;
+  letter-spacing: -0.032em;
+  font-variation-settings: "wght" 600;
+}
+.landing-page h1 {
+  font-size: clamp(38px, 5.2vw, 72px);
+  line-height: 1.08;
   letter-spacing: -0.035em;
   font-variation-settings: "wght" 620;
 }
@@ -334,13 +368,13 @@ h1 .line.dim { color: var(--text-lo); }
 
 h2 {
   font-size: clamp(27px, 3.3vw, 43px);
-  line-height: 1.1;
+  line-height: 1.08;
   letter-spacing: -0.025em;
   font-variation-settings: "wght" 600;
 }
 .document-title {
-  font-size: clamp(34px, 3.8vw, 56px);
-  line-height: 1.055;
+  font-size: clamp(34px, 3.8vw, 52px);
+  line-height: 1.08;
   letter-spacing: -0.038em;
   font-variation-settings: "wght" 590;
   text-wrap: pretty;
@@ -352,21 +386,34 @@ h2 {
   max-width: 64ch;
 }
 .scene.doc .tile p { font-size: 14px; line-height: 1.65; }
-h3 { font-size: 17px; letter-spacing: -0.012em; font-variation-settings: "wght" 560; }
+/*
+  BA-237 -- 17px card headings sat 2px above 15px body, so a card read as a paragraph with a bold
+  first line. 19px at wght 560 is the step that makes the grid legible as a set of cards, and it
+  is one number in one place rather than a size per surface.
+*/
+h3 { font-size: 19px; letter-spacing: -0.014em; font-variation-settings: "wght" 560; }
 
 .lede { margin: 0; font-size: clamp(14.5px, 1.15vw, 16.5px); color: var(--text-mid); max-width: 62ch; }
 .lede b { color: var(--text-hi); font-weight: 500; }
 .lede i { font-style: italic; }
 
+/*
+  BA-235 -- `.fine` was 11px monospace, and it was carrying body prose in 17 places.
+
+  Monospace had stopped signalling anything: it was on identifiers, form labels, FAQ questions,
+  links, headings and whole explanatory paragraphs at once, which is the single choice that made
+  these pages read as terminal output rather than as a product company's site. It is text type
+  now -- 14px, 1.6, the readable tone -- and `var(--f-mono)` survives inside it for the things
+  monospace is actually for: a digest, a bbox tuple, a route, an event name.
+*/
 .fine {
   margin: 0;
-  font-family: var(--f-mono);
-  font-size: 11px;
-  line-height: 1.72;
-  color: var(--text-xlo);
-  max-width: 76ch;
-  letter-spacing: 0.005em;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-mid);
+  max-width: 72ch;
 }
+.fine code, .fine samp, .fine kbd, .fine time { font-family: var(--f-mono); font-size: 13px; }
 .fine b { color: var(--text-lo); font-weight: 500; }
 /*
    A link in fine print was not identifiable as one.
@@ -385,14 +432,16 @@ h3 { font-size: 17px; letter-spacing: -0.012em; font-variation-settings: "wght" 
 }
 .fine a:hover { color: var(--text-hi); }
 
+/* BA-236 -- 10.5px was under the system's own 12px floor, and 0.16em tracking at that size is
+   16% of the em. 12px with the tracking cut to 0.1em. */
 .slate {
   margin: 0;
   display: flex;
   align-items: center;
   gap: 12px;
   font-family: var(--f-mono);
-  font-size: 10.5px;
-  letter-spacing: 0.16em;
+  font-size: 12px;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-xlo);
 }
@@ -403,9 +452,20 @@ h3 { font-size: 17px; letter-spacing: -0.012em; font-variation-settings: "wght" 
 .band-head .kicker { font-family: var(--f-mono); font-size: 10px; letter-spacing: 0.18em; color: var(--text-xlo); }
 
 
-/* Prose sits over a live canvas. The halo is invisible against the ground but guarantees a
-   line separates from whatever node happens to land behind it. */
-h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(--ground), 0 0 6px var(--ground); }
+/*
+  BA-239 -- the halo is scoped to the one page that has a canvas behind its type.
+
+  Every headline on the site carried a two-stop dark glow, including /product and
+  /knowledge-compiler, which have nothing behind them to earn contrast against; at 390 it read as
+  a smear around the letterforms. No premium product site drop-shadows its display type. The
+  landing page does have a live field passing under its text, so it keeps the halo -- and only
+  above 900px, which is the only place the field now mounts.
+*/
+@media (min-width: 900px) {
+  .landing-page :is(h1, h2, .lede, .slate, .interlude-h, .interlude-sub) {
+    text-shadow: 0 0 14px var(--ground), 0 0 6px var(--ground);
+  }
+}
 
 /* ============================================================ reveal */
 
@@ -735,13 +795,16 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
   .scene.hero { min-height: 100svh; }
   .scene.hero .film-band,
   .scene.hero .film-band-video { max-height: calc(100svh - 330px); }
-  .scene.hero h1 {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  }
-  .scene.hero .slate,
-  .scene.hero .btn {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  }
+  /*
+    BA-002 -- three families on one phone screen, and the brand's own was not among them.
+
+    This block used to override the hero h1 to the system sans and the hero slate and buttons to
+    a generic mono, so at 390 the headline rendered in Segoe UI or SF, an h2 two scrolls down in
+    Wanted Sans, and the buttons in a third family that is not even the site's IBM Plex Mono.
+    The one line the brand is judged on gave up the typeface. Both overrides are deleted: the
+    faces are self-hosted, the variable font carries the display weight as a real cut, and
+    `font-display: optional` already bounds what a slow connection costs.
+  */
   .js .scene.hero .rv {
     opacity: 1;
     transform: none;
@@ -1060,7 +1123,16 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
   .site-footer-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 480px) {
-  .site-footer-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); gap-inline: 18px; }
+  .site-footer-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 18px; margin: 14px 0 4px; }
+  /*
+    The footer earns its height back.
+
+    `public-layout-balance.spec.ts` holds the phone footer under 90% of the viewport, and the
+    12px floor on the group titles plus text-type fine print pushed it to 759.7 of a 759.6
+    budget. The 44px link rows are the part that may not shrink, so the padding gives way
+    instead: the block above the groups is what was generous, not the targets inside them.
+  */
+  footer.site { padding-top: 26px; padding-bottom: calc(var(--bar) + 22px); }
   .compile-film-viewport { max-height: calc(100svh - 260px); }
 }
 .evidence-path {
@@ -1170,12 +1242,28 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 .policy-copy p { margin: 0; color: var(--text-lo); line-height: 1.72; }
 .policy-copy a { color: var(--text-hi); text-decoration-thickness: 1px; text-underline-offset: 3px; }
 .processor-list, .status-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; margin: 8px 0 18px; background: var(--hairline); border: 1px solid var(--hairline); }
+/* BA-242 -- as in .tiles: the odd last row spends its width instead of holding a column
+   measure with 590px of empty card beside it. */
 .processor-list > :last-child:nth-child(odd),
-.status-list > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+.status-list > :last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-flow: row wrap;
+  align-items: baseline;
+  column-gap: clamp(20px, 3vw, 44px);
+}
+.processor-list > :last-child:nth-child(odd) > :is(h2, h3),
+.status-list > :last-child:nth-child(odd) > :is(h2, h3) { flex: 0 0 auto; max-width: 24ch; }
+.processor-list > :last-child:nth-child(odd) > p,
+.status-list > :last-child:nth-child(odd) > p { flex: 1 1 30ch; max-width: 64ch; }
 .processor-list article, .status-list article { padding: 20px; background: var(--ground); }
 /* `.status-list h3` was missing, so /status rendered its row names unstyled while /security,
    which uses h2 in the same grid, did not. */
-.processor-list h3, .status-list h2, .status-list h3 { margin: 0 0 8px; font-size: 17px; letter-spacing: -0.012em; text-transform: capitalize; }
+/* BA-156 -- `text-transform: capitalize` turned sentence-shaped source strings into "Content
+   Disarm And Reconstruction" and "Candidate Promotion Into A Live World". Capitalised articles
+   and prepositions on a security page are the clearest possible signal that nobody read it. The
+   strings are written in sentence case; they are rendered that way. */
+.processor-list h3, .status-list h2, .status-list h3 { margin: 0 0 8px; font-size: 17px; letter-spacing: -0.012em; }
 .chain .link h2 { font-size: 17px; letter-spacing: -0.012em; font-variation-settings: "wght" 560; }
 .processor-list p, .status-list p { margin: 4px 0; }
 .status-list article > span { display: inline-block; margin-bottom: 18px; font: 600 10px/1 var(--f-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--verified); }
@@ -1286,8 +1374,28 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 
 /* Changelog: a filter row, entry headers that carry their own metadata, and grouped bullets. */
 .changelog-filter { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 0 6px; }
-.changelog-filter button { padding: 7px 11px; border: 1px solid var(--hairline); color: var(--text-xlo); font: 9px var(--f-mono); letter-spacing: .1em; text-transform: uppercase; }
-.changelog-filter button[aria-pressed="true"] { border-color: var(--verified); color: var(--verified); }
+/*
+  BA-241 -- the same control, three designs.
+
+  A filter chip row is 9.5px uppercase mono here, sentence-case text type at 11.5px on
+  /resources and a third format on /sources -- and all three were under a usable tap size on a
+  phone. This is the /resources shape, which was closest to right: text type, sentence case, a
+  hairline and a 44px row. The chips on /resources and /sources take the same two numbers;
+  their files belong to other lanes and the patch is in the lane report.
+*/
+.changelog-filter button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 6px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
+  color: var(--text-mid);
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.changelog-filter button[aria-pressed="true"] { border-color: var(--text-mid); color: var(--text-hi); }
 .changelog-entry header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; margin-bottom: 10px; }
 .changelog-entry header time { color: var(--text-lo); font: 10px var(--f-mono); letter-spacing: .09em; }
 .changelog-entry header b { color: var(--verified); font: 10px var(--f-mono); letter-spacing: .09em; }
@@ -1708,20 +1816,17 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
     padding: clamp(18px, 2vw, 26px) clamp(16px, 2vw, 28px);
   }
   .intake-flow li + li { border-left: 1px solid var(--hairline); }
-  .intake-flow li:not(:last-child)::after {
-    content: "";
-    position: absolute;
-    z-index: 1;
-    top: 50%;
-    right: -4px;
-    width: 7px;
-    height: 7px;
-    border-top: 1px solid var(--verified);
-    border-right: 1px solid var(--verified);
-    background: var(--g0);
-    transform: translateY(-50%) rotate(45deg);
-  }
-  .intake-flow-index { padding-top: 4px; color: var(--verified); font: 500 10px/1 var(--f-mono); letter-spacing: 0.12em; }
+  /*
+    BA-011 -- the chevron and the 01/02/03 index are decoration, and one of them was spending the
+    accent.
+
+    A three-item list is already ordered and already short, so the numbers said nothing the
+    headings did not -- and painting them `--verified` claimed the accent, which rule 6.2 keeps
+    for state. The glyph also landed on the cell boundary rather than between cells. Both are
+    gone; the list's own order and its headings carry it. The index spans stay in the markup as
+    hidden ordinals until the lane that owns home-page-client.tsx removes them.
+  */
+  .intake-flow-index { display: none; }
   .intake-flow div { display: grid; gap: 7px; min-width: 0; }
   .intake-flow strong { color: var(--text-hi); font-size: clamp(15px, 1.2vw, 18px); font-weight: 520; line-height: 1.2; }
   .intake-flow div span { color: var(--text-lo); font-size: 12.5px; line-height: 1.45; }
@@ -1743,7 +1848,8 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
     background: var(--g1);
   }
   .source-route-heading { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 13px; align-items: start; min-width: 0; }
-  .source-route-index { padding-top: 4px; color: var(--verified); font: 500 10px/1 var(--f-mono); letter-spacing: 0.12em; }
+  /* BA-011 -- same decoration on /product's two source routes, same removal. */
+  .source-route-index { display: none; }
   .source-route-kind { margin: 0 0 7px; color: var(--text-xlo); font: 500 9.5px/1.2 var(--f-mono); letter-spacing: 0.15em; text-transform: uppercase; }
   .source-route h3 { font-size: clamp(16px, 1.45vw, 20px); line-height: 1.25; letter-spacing: -0.018em; }
   .source-route > p { margin: 0; max-width: 62ch; color: var(--text-lo); font-size: 13px; line-height: 1.68; }
@@ -1785,16 +1891,42 @@ h1, h2, .lede, .slate, .interlude-h, .interlude-sub { text-shadow: 0 0 14px var(
 /* ---------------------------------------------------------- 11 evidence tiles */
 
 .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 4px; overflow: hidden; }
-.tiles > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+/*
+  BA-242 -- a stretched last tile that keeps a single-column measure reads as a missing tile.
+
+  Odd counts happen (/solutions, /trust's seven pages, /research/notes, /resources), and in a
+  bordered grid the reader sees a full-width card that is half empty. Removing the stretch is
+  worse rather than better here: these grids draw their seams with a hairline background behind
+  a 1px gap, so an unfilled cell paints as a hairline block. The stretched tile becomes a row
+  instead -- heading and prose side by side -- and spends the width it took.
+*/
+.tiles > :last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+  flex-flow: row wrap;
+  align-items: baseline;
+  column-gap: clamp(20px, 3vw, 44px);
+}
+.tiles > :last-child:nth-child(odd) > .n { flex: 0 0 100%; }
+.tiles > :last-child:nth-child(odd) > :is(h2, h3) { flex: 0 0 auto; max-width: 22ch; }
+.tiles > :last-child:nth-child(odd) > p { flex: 1 1 30ch; max-width: 64ch; }
 .tile { background: var(--g1); padding: 16px 18px; display: flex; flex-direction: column; gap: 9px; }
 .tile .n { font-family: var(--f-mono); font-size: 9.5px; letter-spacing: 0.16em; color: var(--text-xlo); }
 /* A card heading is a card heading at any level. The landing tiles are h2 because they are the
    first sections under the hero and an h3 there jumped the document outline; the size is the h3
    treatment, exactly as `.chain .link h2` does it. */
 .tiles .tile h2 { font-size: 17px; letter-spacing: -0.012em; font-variation-settings: "wght" 560; }
+/*
+  BA-111 -- a research claim's status is not a document's change state.
+
+  These three read `--verified` / `--changed` / `--unresolved`, which mean "this source is
+  verified", "this source changed" and "this needs review" everywhere else in the product. Amber
+  on a failed hypothesis and blue on an unproven one borrow meanings a reader has learned for
+  something else, and `--unresolved` appears on no other public page at all, so there is nothing
+  to learn it from. Two values: measured, and not yet. Colour means one thing per system.
+*/
 .tile[data-state="measured"] .n { color: var(--verified); }
-.tile[data-state="unsupported"] .n { color: var(--changed); }
-.tile[data-state="unproven"] .n { color: var(--unresolved); }
+.tile[data-state="unsupported"] .n,
+.tile[data-state="unproven"] .n { color: var(--text-lo); }
 .tile p { margin: 0; font-size: 12.5px; color: var(--text-lo); }
 
 /* ---------------------------------------------------------- 12 access */
@@ -2132,8 +2264,12 @@ footer.site .shell { display: flex; flex-direction: column; gap: 14px; }
 
 .docs-endpoint { width: 100%; max-width: 100%; min-width: 0; display: grid; gap: 12px; padding: 16px; border: 1px solid var(--hairline-hi); background: var(--g1); }
 .docs-endpoint header { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 9px; font: 10px var(--f-mono); }
-.docs-endpoint header b { padding: 3px 6px; color: var(--ground); background: var(--text-hi); letter-spacing: .08em; }
-.docs-endpoint header b[data-method="GET"] { background: var(--verified); }
+/* BA-215 -- the GET badge was a filled accent, the most saturated thing on the page, and it is
+   not interactive. A filled accent is for buttons; a label gets a neutral tint and coloured
+   text. */
+.docs-endpoint header b { padding: 4px 7px; border: 1px solid var(--hairline-hi); background: var(--g2); color: var(--text-hi); letter-spacing: .08em; }
+.docs-endpoint header b[data-method="GET"] { color: var(--verified); }
+.docs-endpoint header b[data-method="POST"] { color: var(--changed); }
 .docs-endpoint header code { min-width: 0; max-width: 100%; color: var(--text-hi); overflow-wrap: anywhere; white-space: normal; }
 .docs-endpoint header em { color: var(--text-xlo); font-style: normal; }
 
@@ -3840,3 +3976,143 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
 .mobile-primary-nav nav > a[aria-current="true"],
 .mobile-primary-nav .mobile-nav-links a[aria-current="true"] { color: var(--text-hi); }
 /* END wg-ia-nav */
+
+/* ============================================================ BA-236 · the 12px floor
+
+   The design system sets its own minimum at 12px for body and UI text (7.3 [CONFIRMED], and
+   decision.md:438 agrees), and a measurement across the public routes found 138 text nodes under
+   it on /explore alone, 37 of them at 8px, plus 9px link labels on /product, 9px table headers on
+   /pricing and a 10px footer heading. Two of them failed WCAG AA for ordinary text as well.
+
+   This block is the floor, applied where visitors read -- the public chrome and the landing page,
+   not the authenticated workspace, whose dense instrument surfaces are a separate argument. It is
+   one block on purpose: the sizes it corrects were set in thirty different rules across 3,800
+   lines, and a reader trying to find out what the floor is should find it in one place. Tracking
+   comes down with each size, because letter-spacing authored for 9px is 40% too wide at 12px.
+
+   A label that does not fit at 12px is a label that is too long.
+   -------------------------------------------------------------------------------------------- */
+:is(.public-page, .landing-page) :is(
+  .mode,
+  .tick,
+  .band-head .kicker,
+  .site-footer-title,
+  .tile .n,
+  .tag,
+  .cap-s,
+  .link .st,
+  .interlude-sub,
+  .source-route-kind,
+  .eyebrow,
+  .changelog-filter button,
+  .changelog-entry header time,
+  .changelog-entry header b,
+  .changelog-breaking b,
+  .changelog-group > p,
+  .integration-facts dt,
+  .docs-code figcaption,
+  .docs-langs button,
+  .docs-endpoint header,
+  .docs-table th,
+  .docs-pager,
+  .src-matrix thead th,
+  .document-meta li small,
+  .price small,
+  .plan ul,
+  .cap-n,
+  .src-none,
+  .usage-estimator label,
+  .usage-estimator dt,
+  .gate-list p
+) {
+  font-size: 12px;
+}
+:is(.public-page, .landing-page) :is(
+  .mode,
+  .tick,
+  .band-head .kicker,
+  .site-footer-title,
+  .tile .n,
+  .tag,
+  .cap-s,
+  .link .st,
+  .source-route-kind,
+  .eyebrow,
+  .changelog-filter button,
+  .changelog-breaking b,
+  .changelog-group > p,
+  .integration-facts dt,
+  .docs-code figcaption,
+  .docs-langs button,
+  .docs-table th,
+  .src-matrix thead th
+) {
+  letter-spacing: 0.1em;
+}
+/* The /explore node labels the audit measured at 8px on --text-xlo: one step up in tone as well,
+   because the graph is meant to be an argument and it was annotated in the faintest ink there is. */
+:is(.public-page, .landing-page) :is(.tile .n, .link .st, .source-route-kind, .site-footer-title) {
+  color: var(--text-lo);
+}
+
+/*
+  BA-235 -- and never monospace for Korean.
+
+  IBM Plex Mono has no Hangul, so every mono class on /ko fell back to a system face at monospace
+  metrics and misaligned against everything around it.
+*/
+:lang(ko) :is(.slate, .fine, .mode, .tick, .eyebrow, .band-head .kicker, .site-footer-title) {
+  font-family: var(--f-sans);
+  letter-spacing: 0.02em;
+}
+
+/* ============================================================ BA-243 · card grids that were poured, not edited
+
+   A grid whose cells differ by 90px of height reads as content dropped into a template: nine
+   /resources tiles at four different heights, a one-line /trust card stretched to a three-line
+   row, /product's four surface cards breaking their titles 2/2/1/2 lines so the body baselines
+   never line up.
+
+   Two of the three causes are CSS and are fixed here: the heading block reserves two lines so
+   every body in the row starts on the same baseline, and a card's action link sits on its own
+   bottom row so the links align even when the prose above them does not. The third cause is
+   copy -- one card carrying three paragraphs beside one carrying a sentence -- and it belongs to
+   the lanes that own those pages; the patch is in the lane report.
+   -------------------------------------------------------------------------------------------- */
+:is(.public-page, .landing-page) :is(.tiles, .chain, .solution-outcomes) :is(.tile, .link, article) {
+  align-content: start;
+}
+:is(.public-page, .landing-page) :is(.tiles, .chain) :is(.tile, .link) > :is(h2, h3) {
+  /* Two lines at the 19px card size and 1.2 leading, so a one-line title holds the same block. */
+  min-height: 2.4em;
+}
+:is(.public-page, .landing-page) :is(.tiles, .chain) :is(.tile, .link) > a:last-child {
+  margin-top: auto;
+}
+
+/* ============================================================ BA-240 · the 44px floor, past the one page that tested it
+
+   `e2e/mobile-landing.spec.ts:330` measures every `a` and `button` against 44px on a coarse
+   pointer -- on `/` only. So `/` passes and /pricing fails at 22 controls, /resources at 17, the
+   policy footer at all six links, the docs pager, the chips and every inline link inside fine
+   print. The pattern is the one the consent banner already documents: grow the hit area with
+   block padding and take it back with an equal negative margin, so the line box keeps its text
+   height and the paragraph does not reflow.
+   -------------------------------------------------------------------------------------------- */
+@media (pointer: coarse), (max-width: 1079px) {
+  :is(.public-page, .landing-page) :is(.fine, .lede, .policy-copy, .input-guidance) a,
+  :is(.public-page, .landing-page) .faq a,
+  :is(.public-page, .landing-page) .tile a,
+  :is(.public-page, .landing-page) .link a,
+  :is(.public-page, .landing-page) .docs-pager a,
+  :is(.public-page, .landing-page) .src-matrix a {
+    display: inline-block;
+    padding-block: 12.5px;
+    margin-block: -12.5px;
+  }
+  :is(.public-page, .landing-page) :is(.docs-langs button, .changelog-filter button, .tag) {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+}

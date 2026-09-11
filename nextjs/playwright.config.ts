@@ -16,7 +16,7 @@ const widths = [1920, 1440, 1280, 1024, 768, 390, 360] as const;
   same measurement seven times. `auditWidthSpecs` is the subset for which the viewport is the
   variable rather than something the spec sets itself.
 */
-const auditSpecs = /(overflow-audit|contrast-zoom-audit|dialog-focus-audit|film-fallback-audit|failure-states-audit|billing-lifecycle|cross-tenant-negative|compile-resume)\.spec\.ts/;
+const auditSpecs = /(overflow-audit|contrast-zoom-audit|dialog-focus-audit|film-fallback-audit|film-motion-control-audit|failure-states-audit|billing-lifecycle|cross-tenant-negative|compile-resume)\.spec\.ts/;
 const auditWidthSpecs = /(contrast-zoom-audit|failure-states-audit|billing-lifecycle)\.spec\.ts/;
 const testPort = Number(process.env.PLAYWRIGHT_PORT ?? "3117");
 /*

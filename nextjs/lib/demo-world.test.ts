@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AREAS, CHANGE, KEPT, REBUILT, WORLD, n } from "./demo-world";
+import { CHANGE, KEPT, REBUILT, WORLD, n } from "./demo-world";
 
 describe("demo world figures", () => {
   it("splits the whole world into rebuilt, kept and held with nothing left over", () => {
@@ -9,10 +9,6 @@ describe("demo world figures", () => {
   it("rebuilds exactly the changed origins plus what the wavefront reached", () => {
     expect(REBUILT).toBe(42);
     expect(CHANGE.affected).toBe(CHANGE.levels.reduce((sum, level) => sum + level, 0));
-  });
-
-  it("keeps the per-area fact counts summing to the world total", () => {
-    expect(AREAS.reduce((sum, area) => sum + area.facts, 0)).toBe(WORLD.facts);
   });
 
   it("changes fewer facts than the document it came from contains", () => {
