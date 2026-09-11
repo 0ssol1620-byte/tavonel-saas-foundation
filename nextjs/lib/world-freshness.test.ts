@@ -58,9 +58,17 @@ describe("the rendered block", () => {
 
   it("prints a missing time as not recorded rather than substituting one", () => {
     const markup = renderToStaticMarkup(createElement(WorldFreshness, { freshness: full }));
+    // `full.reviewedAt` is null, which is the production value today.
     expect(markup).toContain("not recorded");
     expect(markup).not.toContain("undefined");
     expect(markup).not.toContain("Invalid Date");
+    expect(markup).not.toContain("now");
+  });
+
+  it("qualifies REVIEWED as the blocker-resolution decision and nothing wider", () => {
+    const markup = renderToStaticMarkup(createElement(WorldFreshness, { freshness: full }));
+    expect(markup).toContain("when a person resolved a compile blocker, the only review decision recorded");
+    expect(markup).not.toContain("when a person last decided on it");
   });
 
   it("omits the waiting-candidate notice when no candidate is waiting", () => {

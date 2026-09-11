@@ -1,4 +1,5 @@
 import { formatTimestamp } from "@/lib/format";
+import type { WorldFreshness } from "@/lib/world-store";
 
 /*
   Four times and one warning (audit TM04).
@@ -10,21 +11,12 @@ import { formatTimestamp } from "@/lib/format";
   handed out right now comes from the previous one. That is a safety property, not a bug, and it
   is only safe if it is said.
 
-  The block is produced by the read model (L2's contract shape). The type is declared here from
-  that contract rather than imported, and read defensively: an absent or malformed block renders
-  nothing at all. Nulls are real nulls -- a missing timestamp prints as "not recorded", never as
-  a substituted one.
+  The block is produced by the World read model, and the type is that producer's own
+  (lib/world-store's WorldFreshness) so the two cannot drift. It is still read defensively at
+  runtime, because the value arrives over the wire: an absent or malformed block renders nothing
+  at all. Nulls are real nulls -- a missing timestamp prints as "not recorded", never as a
+  substituted one.
 */
-
-export type WorldFreshness = {
-  observedAt: string | null;
-  processedAt: string | null;
-  reviewedAt: string | null;
-  activatedAt: string | null;
-  activeManifestDigest: string | null;
-  candidateAwaitingActivation: boolean;
-  candidateManifestDigest: string | null;
-};
 
 const CANDIDATE_WAITING_NOTICE =
   "A newer candidate is waiting for activation; consumers are reading the previous active World";
@@ -67,7 +59,9 @@ export function readWorldFreshness(value: unknown): WorldFreshness | null {
 const ROWS: Array<[keyof WorldFreshness, string, string]> = [
   ["observedAt", "OBSERVED", "when the source itself was last seen to change"],
   ["processedAt", "PROCESSED", "when the compile settled"],
-  ["reviewedAt", "REVIEWED", "when a person last decided on it"],
+  // The schema records exactly one review instant: the decision that cleared a compile blocker.
+  // Not "someone reviewed this World" -- that would be a claim the column cannot keep.
+  ["reviewedAt", "REVIEWED", "when a person resolved a compile blocker, the only review decision recorded"],
   ["activatedAt", "ACTIVE SINCE", "when this revision became the one consumers read"],
 ];
 
