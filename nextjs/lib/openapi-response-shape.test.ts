@@ -173,7 +173,31 @@ const packet = {
   worldVersion: "4",
   retrievalProfile: "production",
   question: "what is the retention period",
-  items: [{ evidenceIds: ["evidence-1"] }],
+  /*
+    A whole ContextPacketItem, not a stub with one field.
+
+    It carried only `evidenceIds`, which was enough while this fixture only had to be counted.
+    `answerFromContextPacket` reads the excerpt text off each item, so the partial item threw
+    inside the route and the documented 200 never came back -- the failure appeared only once this
+    lane's contract test and the retrieval lane's ask path were in one tree.
+
+    Completing it rather than guarding the reader is the fix, because `parseContextPacket` already
+    rejects an item shaped like the old stub (context-packet.test.ts): a packet item without text
+    is not something the product would accept from anything but a mock, so the mock was the thing
+    that was wrong.
+  */
+  items: [{
+    unitId: "unit-shape-1",
+    text: "Records are retained for seven years after the end of the contract.",
+    claimIds: ["claim-shape-1"],
+    entityIds: [],
+    sourceVersionId: "d".repeat(64),
+    evidenceIds: ["evidence-1"],
+    pageNumber1: 1,
+    bbox1000: [10, 20, 400, 60],
+    authority: "contract",
+    retrieval: { lexicalRank: 1, denseRank: null, structureRank: null, rerankerScore: null },
+  }],
   heldConflicts: [],
   abstentionReasons: [],
 };
