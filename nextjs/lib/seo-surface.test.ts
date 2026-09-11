@@ -183,6 +183,8 @@ const READER_CONTROLS = [
   "/film",
   "/benchmarks",
   "/reproducibility",
+  // The index (BA-210) for the same reason as its entries: advertised nowhere, so read here.
+  "/cookbooks",
   ...COOKBOOK_SLUGS.map((slug) => `/cookbooks/${slug}`),
 ];
 
@@ -566,12 +568,25 @@ describe("public surface: what is advertised is what is measured", () => {
 describe("public surface: the draft cookbooks", () => {
   const cookbookPaths = COOKBOOK_SLUGS.map((slug) => `/cookbooks/${slug}`);
 
-  it("has one route and six records, and reads a head for each", () => {
-    expect(pages.filter((page) => page.route.startsWith("/cookbooks")).map((page) => page.route)).toEqual([
+  it("has an index, one record route and six records, and reads a head for each", () => {
+    /*
+      BA-210. This pinned the absence of an index, which was the defect: the six pages were
+      reachable from nowhere and each emitted a one-node breadcrumb trail for a parent that
+      answered 404. The index exists now and carries the same refusal its entries do, which is
+      the assertion below -- the guard moved from "there is no hub" to "the hub is not advertised
+      either", and the sitemap and llms.txt assertions cover both routes unchanged.
+    */
+    expect(pages.filter((page) => page.route.startsWith("/cookbooks")).map((page) => page.route).sort()).toEqual([
+      "/cookbooks",
       "/cookbooks/[slug]",
     ]);
     expect(cookbookPaths).toHaveLength(6);
-    for (const path of cookbookPaths) expect(isRealRoute(path), path).toBe(true);
+    for (const path of ["/cookbooks", ...cookbookPaths]) expect(isRealRoute(path), path).toBe(true);
+  });
+
+  it("keeps the index out of search while every record it lists is a draft", () => {
+    expect(isNoindex("/cookbooks"), "a hub of six drafts is not a page to advertise").toBe(true);
+    expect(heads.get("/cookbooks")?.alternates?.canonical).toBe("/cookbooks");
   });
 
   it.each(COOKBOOK_SLUGS)("/cookbooks/%s declares noindex in the head it renders", (slug) => {
@@ -585,6 +600,7 @@ describe("public surface: the draft cookbooks", () => {
   it("advertises none of them while every record is a draft", () => {
     const drafts = COOKBOOKS.filter((record) => record.publication === "draft").map((record) => `/cookbooks/${record.slug}`);
     expect(drafts).toEqual(cookbookPaths);
+    // Both routes: the six records and the index that lists them.
     expect(sitemapPaths.filter((path) => path.startsWith("/cookbooks"))).toEqual([]);
     expect(llmsPaths.filter((path) => path.startsWith("/cookbooks"))).toEqual([]);
   });
