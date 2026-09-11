@@ -56,9 +56,14 @@ type Props = {
   change: ExploreChangeView;
   answers: ExploreAnswerView[];
   technical: ExploreTechnicalRecord;
+  /*
+    WG-034, as a prop rather than a constant: the day the sample's sources were captured, read in
+    `app/explore/page.tsx` off the acquisition manifest the fetch script wrote.
+  */
+  capturedOn: string;
 };
 
-export default function ExploreStage({ model, layout, change, answers, technical }: Props) {
+export default function ExploreStage({ model, layout, change, answers, technical, capturedOn }: Props) {
   const reduced = useReducedMotion();
   const narrow = useNarrowStage();
   const entryProof = useMemo(() => chooseExploreEntryProof(model.evidence, answers), [model.evidence, answers]);
@@ -375,7 +380,17 @@ export default function ExploreStage({ model, layout, change, answers, technical
                 </aside>
               ) : null}
             </div>
-            <p className={styles.entryScope}>{technical.documents.length} public filings · Follow the evidence back to its source</p>
+            {/*
+              WG-034 asks for three facts before anything else on this page: when the sources were
+              captured, how much material is in scope, and that this is a sample you read rather
+              than a compile you are watching. The first two are read off the fixture -- the
+              acquisition manifest's own timestamp and the documents actually compiled -- so
+              neither can drift from what the page is built from.
+            */}
+            <p className={styles.entryScope}>
+              Read-only sample · sources captured {capturedOn} · {technical.documents.length} public
+              filings · Follow the evidence back to its source
+            </p>
             {/*
               Audit E04 and G06, at the demo rather than two pages away.
 
