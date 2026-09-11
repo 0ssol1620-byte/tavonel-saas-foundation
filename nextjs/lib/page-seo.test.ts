@@ -126,24 +126,37 @@ describe("pageMetadata refuses a verification date that verifies nothing", () =>
 /*
   The one page built with it, and the one product fact its copy stands on.
 
-  §0 of the campaign contract: activating a reviewed World requires the Team plan, and that plan
-  is sold through a conversation (`saleChannel: "contact"`). No public copy may imply a
-  self-serve path to an approved World. The Korean page says so in Korean -- and the day the
-  plan becomes self-serve, that sentence becomes wrong in a language most reviewers of this
-  repository do not read. So the assertion is on the catalog: when `saleChannel` changes, this
-  fails, and the Korean sentence is revisited with it.
+  §0 of the campaign contract said activating a reviewed World requires the Team plan, sold
+  through a conversation. FD-02 changed half of that: the Developer plan reaches activation when
+  the caller is the workspace owner, and Team is still `saleChannel: "contact"`. What did not
+  change is that a *free* evaluation cannot activate, so no public copy may imply a self-serve
+  path to an approved World without a paid plan.
+
+  The Korean page states all three facts in Korean -- and the day either channel flips, or the
+  owner condition moves, that sentence becomes wrong in a language most reviewers of this
+  repository do not read. So the assertions are on the catalog and on the words that carry the
+  conditions: when `saleChannel` changes on either offer, or the page stops naming the owner
+  condition or the evaluation's refusal, this fails and the Korean sentence is revisited with it.
 */
 describe("the Korean entry page stands on a fact, not a translation", () => {
   const source = readFileSync(new URL("../app/ko/page.tsx", import.meta.url), "utf8");
 
-  it("reads the plan label from the catalog instead of writing it again in Korean", () => {
+  it("reads both plan labels from the catalog instead of writing them again in Korean", () => {
     expect(source).toContain("BILLING_OFFERS.studio_access");
+    expect(source).toContain("BILLING_OFFERS.observer_access");
     expect(source).toContain("{TEAM_PLAN.label} 플랜");
+    expect(source).toContain("{DEVELOPER_PLAN.label} 플랜");
   });
 
-  it("says activation goes through a conversation, and notices when that stops being true", () => {
-    expect(BILLING_OFFERS.studio_access.saleChannel, "activation is self-serve now -- the Korean page says it is not").toBe("contact");
+  it("says which plans activate, that Team goes through a conversation, and who is refused", () => {
+    expect(BILLING_OFFERS.studio_access.saleChannel, "Team is self-serve now -- the Korean page says it is not").toBe("contact");
+    expect(BILLING_OFFERS.observer_access.saleChannel, "Developer is not self-serve now -- the Korean page says it is").toBe("self_serve");
     expect(source, "the page must state the consultation step before any call to action").toContain("상담");
+    // Activation is the owner's on Developer, and a free evaluation is refused. Both in Korean.
+    expect(source, "the owner condition is what stops this reading as any Developer seat").toContain("워크스페이스");
+    expect(source, "the owner condition, in the sentence itself").toContain("소유자라면");
+    expect(source, "the free evaluation must still read as refused at activation").toContain("활성화 요청은 거절됩니다");
+    expect(source, "a paid plan is the bar, and the page must say so").toContain("유료 플랜");
   });
 
   it("quotes no price, page count or limit it would have to keep in step", () => {

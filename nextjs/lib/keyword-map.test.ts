@@ -127,8 +127,10 @@ describe("validateKeywordRecord", () => {
   });
 
   it("refuses a work package marked live", () => {
+    // The rule is unchanged by FD-02 -- a work package still ends at an approved World and no
+    // free reader reaches one -- so only the sentence naming the bar moved with the entitlement.
     expect(validateKeywordRecord(seed({ workflow_id: "documents-to-grounded-work", product_ready: "live" }))).toContain(
-      "a work package that ends at an approved World cannot be product_ready live while promote requires the Team plan",
+      "a work package that ends at an approved World cannot be product_ready live while promote requires a paid plan (Developer as workspace owner, or Team)",
     );
   });
 

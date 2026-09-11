@@ -300,13 +300,36 @@ describe("recipe preflight", () => {
     }
   });
 
-  it("states the activation plan as the catalog has it, with no self-serve path", () => {
+  /*
+    The activation row, re-pinned to FD-02 rather than loosened.
+
+    This asserted `not.toContain("/pricing")`, and it was right while Team was the only plan that
+    could activate: a checkout link beside the activation sentence would have promised a
+    self-serve path to an approved World that no plan had. FD-02 gave the Developer plan that
+    path for the workspace owner, so the link is now correct -- and the assertion is replaced by
+    a stricter one rather than deleted, because the same row can still over-sell in three ways
+    that the old single negative could not see: dropping the owner condition (any Developer
+    member would read as able to activate), dropping the evaluation's refusal (a free reader
+    would read as able to), and letting Team read as a checkout while `saleChannel` is `contact`.
+    All three are pinned below, both channels are pinned to the catalog, and either one flipping
+    fails here.
+  */
+  it("states both activation plans as the catalog has them, with no self-serve path for Team", () => {
     const html = render({ intent: intentFor() });
     expect(BILLING_OFFERS.studio_access.saleChannel).toBe("contact");
+    expect(BILLING_OFFERS.observer_access.saleChannel).toBe("self_serve");
     expect(html).toContain(BILLING_OFFERS.studio_access.label);
+    expect(html).toContain(BILLING_OFFERS.observer_access.label);
+    // Team's half: a conversation, and the destination is /contact, not a checkout.
     expect(html).toContain("set up with you directly");
     expect(html).toContain("/contact");
-    expect(html).not.toContain("/pricing");
+    // Developer's half: self-serve, and only for the owner.
+    expect(html).toContain("if you own the workspace");
+    expect(html).toContain("/pricing");
+    // The refusal is as plain as the permission.
+    expect(html).toContain("its activation request is refused");
+    expect(html, "Team must not read as a checkout while it is sold through a conversation")
+      .not.toMatch(/Team plan, which you can start on/);
   });
 
   it("names the human review gate and the page the reader comes back to", () => {

@@ -20,10 +20,13 @@ import {
  * to stop, so `pages={null}` is the normal case and not a degraded one.
  *
  * The activation row is the fact readers are most likely to get wrong on the way in: turning a
- * reviewed candidate into a live World is the Team step, and that plan is arranged in a
- * conversation. Both halves are read from the catalog, so if `saleChannel` ever flips the sentence
- * follows it. What a given deployment will accept from a given account is a separate question the
- * sign-in page asks `/api/status`; this component states the plan, not the deployment.
+ * reviewed candidate into a live World needs a paid plan -- Developer if the reader owns the
+ * workspace (FD-02, `planReachesLevel(..., "activation", "owner")`), or Team, which is arranged
+ * in a conversation. Every half is read from the catalog, so if either `saleChannel` flips the
+ * sentence follows it. The refusal is stated as plainly as the permission: a free evaluation
+ * compiles, reviews and exports and is refused at activation, which is the sentence that must
+ * not soften. What a given deployment will accept from a given account is a separate question
+ * the sign-in page asks `/api/status`; this component states the plan, not the deployment.
  */
 export function RecipePreflight({
   intent,
@@ -33,6 +36,7 @@ export function RecipePreflight({
   pages?: number | null;
 }) {
   const team = BILLING_OFFERS.studio_access;
+  const developer = BILLING_OFFERS.observer_access;
   const quote = typeof pages === "number" ? quoteCompilePages(pages) : null;
   const perPageCeiling = formatUsd(MAX_UNITS_PER_PAGE * PROCESSING_UNIT_USD);
 
@@ -57,15 +61,23 @@ export function RecipePreflight({
         <b>Review.</b> {activationPolicy.candidatePromotion.reason}
       </li>
       <li>
-        <b>Activation.</b> Turning a reviewed candidate into a live World runs on the {team.label} plan
+        <b>Activation.</b> Turning a reviewed candidate into a live World needs a paid plan: the{" "}
+        {developer.label} plan if you own the workspace
+        {developer.saleChannel === "self_serve" ? (
+          <>, which you can start on <Link href="/pricing">pricing</Link></>
+        ) : (
+          <>, which we arrange with you</>
+        )}
+        , or the {team.label} plan
         {team.saleChannel === "contact" ? (
           <>
             , which we set up with you directly — <Link href="/contact">talk to us</Link> to arrange
-            it.
+            it
           </>
         ) : (
-          <>, shown on <Link href="/pricing">pricing</Link>.</>
+          <>, also shown on <Link href="/pricing">pricing</Link></>
         )}
+        . A free evaluation compiles, reviews and exports; its activation request is refused.
       </li>
       <li>
         {/*

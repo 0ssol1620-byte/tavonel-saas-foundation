@@ -84,13 +84,20 @@ const TOOL_ENGINE: Record<KeywordSourceTool, "google" | "naver"> = {
 /**
  * Whether a reader who follows this row can do the thing today.
  *
- * `activation_needs_team_plan` is the live entitlement, not a hedge: promoting a candidate to an
- * active World requires plan `studio` (Team, `saleChannel: "contact"`), and an Evaluation trial
- * or a Developer subscription is refused with `402 STUDIO_SUBSCRIPTION_REQUIRED`
- * (`lib/billing-catalog.ts`, `app/api/collections/[id]/promote/route.ts`). Every one of the six
- * work packages ends at an approved World, so none of them may be marked `live` while that is
- * true -- `validateKeywordRecord` enforces it. FD-02/FD-14 are the decisions that would change
- * this, and when they do, this field moves because the entitlement moved.
+ * `activation_needs_team_plan` is the live entitlement, not a hedge -- and since FD-02 the value
+ * is named after the narrower rule it used to describe. What the entitlement now is: promoting a
+ * candidate to an active World needs a paid plan, either Developer held by the workspace owner
+ * or Team (`saleChannel: "contact"`), and every other caller -- a Developer member, an Evaluation
+ * trial -- is refused with `402 STUDIO_SUBSCRIPTION_REQUIRED` or `402 SUBSCRIPTION_REQUIRED`
+ * (`planReachesLevel` in `lib/billing-product-access.ts`,
+ * `app/api/collections/[id]/promote/route.ts`). Every one of the six work packages ends at an
+ * approved World, which no free reader can reach, so none of them may be marked `live` --
+ * `validateKeywordRecord` enforces it, and that rule is unchanged by FD-02.
+ *
+ * The value's *name* is the legacy half and is deliberately not renamed here: it is carried by 36
+ * seed rows and four test cases, none of which a reader outside this module sees, and a rename is
+ * a mechanical sweep worth doing when something else touches those rows. The docstring is the
+ * thing a reader reads, so the docstring is what was corrected.
  */
 export const PRODUCT_READINESS = ["live", "activation_needs_team_plan", "not_live"] as const;
 export type ProductReadiness = (typeof PRODUCT_READINESS)[number];
@@ -206,7 +213,7 @@ export function validateKeywordRecord(record: KeywordRecord): readonly string[] 
   }
 
   if (COOKBOOK_WORKFLOW_IDS.includes(record.workflow_id as (typeof COOKBOOK_WORKFLOW_IDS)[number]) && record.product_ready === "live") {
-    problems.push("a work package that ends at an approved World cannot be product_ready live while promote requires the Team plan");
+    problems.push("a work package that ends at an approved World cannot be product_ready live while promote requires a paid plan (Developer as workspace owner, or Team)");
   }
   if (record.product_ready === "not_live" && (record.CTA === "compare_plans" || record.CTA === "contact_team_plan")) {
     problems.push("a not_live capability may not carry a sales CTA");

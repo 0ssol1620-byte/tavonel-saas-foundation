@@ -28,6 +28,7 @@ import { pageMetadata } from "@/lib/page-seo";
 */
 
 const TEAM_PLAN = BILLING_OFFERS.studio_access;
+const DEVELOPER_PLAN = BILLING_OFFERS.observer_access;
 
 export const metadata: Metadata = pageMetadata({
   title: "한국어 안내 — TAVONEL",
@@ -81,10 +82,11 @@ export default function KoreanEntryPage() {
                 <article className="tile">
                   <h3>시작하기 전에 아는 편이 나은 한 가지</h3>
                   <p>
-                    사람이 승인한 World를 활성화하는 단계는 현재 {TEAM_PLAN.label} 플랜에서 열립니다.
-                    그리고 {TEAM_PLAN.label} 플랜은 오늘 상담을 거쳐 제공됩니다. 자기 문서로 활성화까지
-                    가는 경로가 결제 한 번으로 끝나지 않는다는 뜻이고, 먼저 알아 두는 편이 낫습니다.
-                    요금과 각 플랜의 범위는 Pricing 페이지가 기준입니다.
+                    사람이 승인한 World를 활성화하는 단계는 유료 플랜에서 열립니다. 워크스페이스
+                    소유자라면 {DEVELOPER_PLAN.label} 플랜에서, 또는 {TEAM_PLAN.label} 플랜에서
+                    가능합니다. {TEAM_PLAN.label} 플랜은 오늘 상담을 거쳐 제공됩니다. 무료 평가판은
+                    업로드와 컴파일, 검토, 내보내기까지 되지만 활성화 요청은 거절됩니다. 요금과 각
+                    플랜의 범위는 Pricing 페이지가 기준입니다.
                   </p>
                 </article>
                 <article className="tile">

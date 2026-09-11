@@ -172,13 +172,30 @@ describe("the limits are read from the product, and sit above the calls to actio
     }
   });
 
-  it("names the plan that activation needs, and how it is sold", () => {
+  /*
+    Both plans that reach activation, and the one that does not.
+
+    This pinned `saleChannel === "contact"` alone while Team was the only plan that could
+    activate. FD-02 made the Developer plan reach it for the workspace owner, so the pin is now
+    on both channels -- Team's `contact` and Developer's `self_serve` -- because either one
+    flipping makes a different half of the sentence wrong. The owner condition and the
+    evaluation's refusal are asserted too: those are the two ways this copy could over-sell,
+    and the old assertion could not see either.
+  */
+  it("names the plans that activation needs, how each is sold, and who is refused", () => {
     const team = BILLING_OFFERS.studio_access;
+    const developer = BILLING_OFFERS.observer_access;
     expect(team.saleChannel, "if Team becomes self-serve the activation sentence must be re-read").toBe("contact");
+    expect(developer.saleChannel, "if Developer stops being self-serve the same sentence must be re-read").toBe("self_serve");
     for (const record of COOKBOOKS) {
       const prerequisites = record.sections.find((section) => section.key === "prerequisites")!;
       expect(prerequisites.body, `${record.slug}: the activation plan is not named`).toContain(team.label);
+      expect(prerequisites.body, `${record.slug}: the self-serve activation plan is not named`).toContain(developer.label);
       expect(prerequisites.body).toContain("rather than self-serve checkout");
+      expect(prerequisites.body, `${record.slug}: Developer activation is the owner's, not any member's`)
+        .toContain("if you are the workspace owner");
+      expect(prerequisites.body, `${record.slug}: the free evaluation still cannot activate`)
+        .toContain("its activation request is refused");
     }
   });
 

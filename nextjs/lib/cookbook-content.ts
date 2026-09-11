@@ -145,15 +145,25 @@ const DEVELOPER = BILLING_OFFERS.observer_access;
   `self_serve` in `billing-catalog.ts` when that ships. A sentence typed here would keep telling
   readers to book a call for a month after the checkout opened, and -- the worse direction --
   would keep promising self-serve after a gate closed.
+
+  Stage-B integration: FD-02 opened activation to the Developer plan when the caller is the
+  workspace owner (`planReachesLevel` in `lib/billing-product-access.ts` -- `required ===
+  "activation" && role === "owner"`), so the sentence that said activation needs Team was wrong
+  in the direction that under-sells. Both halves are still read off the catalog, and the free
+  evaluation is still refused, which is the half that must not soften.
 */
 const ACTIVATION_CLAUSE = TEAM.saleChannel === "contact"
   ? "sold through a conversation today rather than self-serve checkout"
   : "available on self-serve checkout";
 
+const DEVELOPER_CLAUSE = DEVELOPER.saleChannel === "self_serve"
+  ? `the ${DEVELOPER.label} plan, if you are the workspace owner`
+  : `the ${DEVELOPER.label} plan, if you are the workspace owner and have arranged it with us`;
+
 const ACTIVATION_SENTENCE =
   `A compile produces a candidate, and a candidate becomes an active World only when a person activates it in the workspace. `
-  + `That step needs the ${TEAM.label} plan, which is ${ACTIVATION_CLAUSE}. `
-  + `A ${DEVELOPER.label} workspace and a free evaluation can upload, compile, review and export; the activation request is refused, so plan the conversation before you plan the run.`;
+  + `That step needs a paid plan: ${DEVELOPER_CLAUSE}, or the ${TEAM.label} plan, which is ${ACTIVATION_CLAUSE}. `
+  + `A free evaluation can upload, compile, review and export; its activation request is refused, so decide the plan before you plan the run.`;
 
 const READING = CAPABILITY_MANIFEST.entries.find((entry) => entry.mime === "application/pdf");
 if (!READING) {
