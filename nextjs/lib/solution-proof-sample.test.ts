@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { chooseExploreEntryProof } from "./explore-entry-proof";
+import { chooseExploreEntryProof, excerptPreview } from "./explore-entry-proof";
 import {
   EXPLORE_SAMPLE_DIGEST,
   exploreSampleDocuments,
@@ -12,11 +12,9 @@ import {
 import { toVisualWorldModel } from "./visual-world-model";
 
 /*
-  The proof card on the five solution pages (BA-041, BA-043, BA-056).
-
-  The vitest environment here is node, so this checks the two things that can actually go wrong
-  without a DOM: the data the figure binds to, and the drawn anti-patterns coming back. Layout is
-  the Playwright and screenshot pass's job.
+  The shared proof card on solution and entry pages.
+  Node tests verify the frozen source data and its rendering contract. Playwright verifies
+  the actual displayed passage, selected region, evidence deep link and layout together.
 */
 const source = readFileSync(
   join(process.cwd(), "components/solution-proof-sample.tsx"),
@@ -29,8 +27,6 @@ const region = chooseExploreEntryProof(world.evidence, []);
 describe("solution proof sample", () => {
   it("binds to a real region a reader can actually read", () => {
     expect(region).not.toBeNull();
-    // The whole point of the card is that the words inside the box are legible: a cover page or
-    // a "Table of Contents" line is what the earlier fake page was captioned with.
     expect(region!.excerpt.trim().length).toBeGreaterThanOrEqual(100);
     expect(region!.page).toBeGreaterThan(2);
     expect(region!.bbox1000).toHaveLength(4);
@@ -38,18 +34,28 @@ describe("solution proof sample", () => {
   });
 
   it("opens on the same region /explore does", () => {
-    // Same chooser, so the proof a buyer sees here is the proof they land on there.
     expect(chooseExploreEntryProof(world.evidence, [])!.id).toBe(region!.id);
   });
 
-  it("shows a claim the compiler bound to that region, or none at all", () => {
-    const claim = world.nodes.find(
-      (node) => node.kind === "Claim" && node.evidenceRefs.includes(region!.id),
-    );
-    expect(claim).toBeDefined();
-    expect(claim!.label.trim().length).toBeGreaterThan(0);
-    // The figure prints `claim.label` -- the object's own text. Nothing is authored for the page.
-    expect(source).toContain("excerptPreview(claim.label");
+  it("quotes the selected source instead of treating a claim reference as verified support", () => {
+    const preview = excerptPreview(region!.excerpt, 180).text;
+    expect(preview.trim().length).toBeGreaterThan(80);
+    expect(preview.replace(/\s+/g, " ").slice(0, 80))
+      .toBe(region!.excerpt.replace(/\s+/g, " ").slice(0, 80));
+    expect(source).toContain("excerptPreview(region.excerpt, 180).text");
+    expect(source).toContain('data-proof-kind="source-passage"');
+    expect(source).toContain('data-evidence-id={region.id}');
+    expect(source).toContain("Source passage · excerpt");
+    // A matching evidenceRefs ID did not establish that the old document-heading Claim
+    // was supported by this business-description passage. Do not restore that shortcut.
+    expect(source).not.toContain("excerptPreview(claim.label");
+    expect(source).not.toContain("<span>Compiled claim</span>");
+  });
+
+  it("links to the displayed region, not an unrelated default World entry", () => {
+    expect(source).toContain('pathname: "/explore"');
+    expect(source).toContain('act: "evidence", evidence: region.id');
+    expect(source).toContain("activeId={region.id}");
   });
 
   it("prints only counts the compiled artifact holds", () => {
@@ -62,7 +68,6 @@ describe("solution proof sample", () => {
   });
 
   it("never prints the candidate count as an object count", () => {
-    // 6,300 is `validation.counts.candidatesConsidered`. It was published as "6,300 objects".
     expect(exploreSampleWorld.objects.length).not.toBe(6_300);
     expect(source).not.toContain("candidatesConsidered");
     expect(source).not.toMatch(/objects</);
@@ -78,7 +83,6 @@ describe("solution proof sample", () => {
     ]) {
       expect(source, `${banned} is a drawn stand-in for evidence`).not.toContain(banned);
     }
-    // The real surface, by import: a figure that stops rendering /explore's sheet has drifted.
     expect(source).toContain('from "@/components/world-visual/source-sheet"');
   });
 

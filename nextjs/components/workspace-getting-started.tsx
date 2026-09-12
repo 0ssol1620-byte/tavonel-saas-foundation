@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Check, ChevronDown, CircleHelp } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import type { OnboardingStep } from "@/lib/workspace-onboarding";
 
 type Props = {
@@ -23,6 +23,7 @@ export default function WorkspaceGettingStarted({
   onOpenWorld,
 }: Props) {
   const [open, setOpen] = useState(false);
+  const guideId = useId();
   const completed = steps.filter((step) => step.done).length;
 
   useEffect(() => {
@@ -46,6 +47,7 @@ export default function WorkspaceGettingStarted({
         type="button"
         className="workspace-getting-started-toggle"
         aria-expanded={open}
+        aria-controls={open ? guideId : undefined}
         onClick={() => setOpen((value) => !value)}
       >
         <span><CircleHelp size={15} aria-hidden="true" /><strong>{hasActiveWorld ? "Using your World" : "Getting started"}</strong></span>
@@ -53,14 +55,17 @@ export default function WorkspaceGettingStarted({
       </button>
 
       {open ? (
-        <div className="workspace-getting-started-body">
+        <div className="workspace-getting-started-body" id={guideId}>
           <div className="workspace-getting-started-copy">
-            <p className="eyebrow">FIRST SUCCESS</p>
+            <p className="eyebrow">WORKSPACE SETUP</p>
             <h2>{hasActiveWorld ? "Your World is ready to use." : "The short path to a useful Compiled World."}</h2>
             <p>
               Add a source, compile a candidate, review what needs a decision, then activate.
               Nothing an AI reads becomes your current World until you activate it.
             </p>
+            {hasActiveWorld ? (
+              <p>Next, ask a real question. Check the cited passage, then use the result in your work.</p>
+            ) : null}
           </div>
 
           {/*
