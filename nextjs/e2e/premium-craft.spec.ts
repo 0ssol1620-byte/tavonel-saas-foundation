@@ -55,8 +55,8 @@ test("pricing puts catalog-backed choices before detailed explanations", async (
   await expect(plans.locator(".plan")).toHaveCount(4);
   await expect(page.locator(".pricing-faq details")).toHaveCount(17);
   /*
-    Nine since the entitlements lane added "Refunds", which states the window and the consumed
-    share in the glance rather than only in the FAQ below it.
+    Ten with the explicit human-promotion policy beside the nine plan details. Refunds states
+    the window and consumed share here rather than only in the FAQ below it.
 
     Still an exact count, not a floor -- this glance is the summary a buyer reads instead of the
     detail, so a row appearing has to be a decision someone made rather than something that
@@ -74,7 +74,10 @@ test("pricing puts catalog-backed choices before detailed explanations", async (
     "Spreadsheets",
     "Refunds",
     "How to start",
+    "Human promotion",
   ]);
+  await expect(page.locator('[data-purchase-gate="candidatePromotion"]'))
+    .toContainText("Promotion is always an explicit human decision.");
   const choice = await plans.boundingBox();
   const details = await page.locator(".pricing-details").boundingBox();
   expect(choice!.y + choice!.height).toBeLessThan(details!.y);

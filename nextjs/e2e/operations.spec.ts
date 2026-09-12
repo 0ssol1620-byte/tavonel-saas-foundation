@@ -4,9 +4,9 @@ const { expect, test } = "test" in playwrightModule ? playwrightModule : playwri
 
 const publicRoutes = [
   ["/privacy", "Your documents are inputs"],
-  ["/terms", "Terms written for the service"],
-  ["/refunds", "Cancellation and refund terms"],
-  ["/subprocessors", "services allowed to touch"],
+  ["/terms", "Terms of service"],
+  ["/refunds", "Cancellation and refunds"],
+  ["/subprocessors", "Every service permitted to process your data"],
   ["/status", "TAVONEL service status"],
 ] as const;
 

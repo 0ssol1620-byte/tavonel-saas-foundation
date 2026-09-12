@@ -24,7 +24,7 @@
   border-bottom: 1px solid var(--hairline);
 }
 .solution-hero > .stack:first-child { position: static; }
-.solution-hero .document-title { max-width: 15ch; }
+.solution-hero .document-title { width: 100%; max-width: 17ch; }
 .solution-hero-copy { width: 100%; max-width: 680px; justify-self: end; align-self: center; }
 .solution-proof-sample {
   grid-column: 1 / -1;

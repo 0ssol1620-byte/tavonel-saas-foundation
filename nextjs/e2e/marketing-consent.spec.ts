@@ -68,7 +68,7 @@ test("only successful commercial inquiries produce a lead event", async ({ page 
   await page.getByRole("button", { name: "No thanks" }).click();
   await page.getByRole("textbox", { name: "Name", exact: true }).fill("Test Visitor");
   await page.getByRole("textbox", { name: "Work email" }).fill("test@example.com");
-  await page.getByRole("textbox", { name: "What should we understand?" }).fill("Test inquiry with no production delivery.");
+  await page.getByRole("textbox", { name: "What are you trying to do?", exact: true }).fill("Test inquiry with no production delivery.");
   await page.clock.fastForward(2_000);
   await page.getByRole("button", { name: "Send inquiry" }).click();
   await expect(page.getByText("Unavailable", { exact: true })).toBeVisible();
