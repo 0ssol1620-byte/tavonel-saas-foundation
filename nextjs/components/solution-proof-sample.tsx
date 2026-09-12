@@ -36,12 +36,12 @@ export default function SolutionProofSample() {
     <figure className="solution-proof-sample" aria-labelledby="solution-proof-sample-title" data-proof-kind="source-passage">
       <figcaption className="solution-proof-sample-head">
         <span id="solution-proof-sample-title">Public compiled World · Apple SEC corpus</span>
-        <Link href="/explore">Inspect the evidence</Link>
+        <Link href={{ pathname: "/explore", query: { act: "evidence", evidence: region.id } }}>Inspect the evidence</Link>
       </figcaption>
 
       <div className="solution-proof-sample-body">
         <p className="solution-proof-claim" data-evidence-id={region.id}>
-          <span>Source passage</span>
+          <span>Source passage · excerpt</span>
           {excerptPreview(region.excerpt, 180).text}
         </p>
         <SourceSheet regions={onPage} activeId={region.id} compact />
