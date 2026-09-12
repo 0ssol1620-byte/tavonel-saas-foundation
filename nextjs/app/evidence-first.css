@@ -54,8 +54,9 @@
 .home-evidence-preview .solution-proof-claim > span { color: #59646e; }
 .home-evidence-preview .solution-proof-counts { font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
 /* Entry-page preview: one selected passage, with the original-PDF and SEC links retained.
-   Explore still exposes the whole page and full provenance; this is not a full-page rendition. */
-:is(.home-evidence-preview, .ko-published-proof) [data-source-sheet] p:not([data-active-region]) { display: none; }
+   Explore still exposes the whole page and full provenance; this is not a full-page rendition.
+   Only nonselected evidence paragraphs are trimmed; notices and source disclosures remain. */
+:is(.home-evidence-preview, .ko-published-proof) [data-source-sheet] p[data-region-id]:not([data-active-region]) { display: none; }
 :is(.home-evidence-preview, .ko-published-proof) [data-source-provenance] { display: none; }
 :is(.home-evidence-preview, .ko-published-proof) a { min-height: 44px; display: inline-flex; align-items: center; white-space: normal; }
 .landing-page .hero > .shell > .tiles { grid-column: 1 / -1; margin-top: 48px; }
