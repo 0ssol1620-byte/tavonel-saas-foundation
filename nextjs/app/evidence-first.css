@@ -6,8 +6,10 @@
   column-gap: clamp(32px, 4vw, 64px);
   row-gap: 0;
   max-width: 1408px;
+  align-items: start;
+  align-content: start;
 }
-.landing-page .hero > .shell > :not(.home-evidence-preview):not(.tiles) { grid-column: 1; }
+.landing-page .hero > .shell > :not(.home-evidence-preview):not(.tiles) { grid-column: 1; align-self: start; }
 .landing-page .hero h1 {
   max-width: 16ch;
   font-size: clamp(56px, 4.8vw, 76px);
@@ -51,11 +53,23 @@
 }
 .home-evidence-preview .solution-proof-claim > span { color: #59646e; }
 .home-evidence-preview .solution-proof-counts { font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+/* Entry-page preview: one selected passage, with the original-PDF and SEC links retained.
+   Explore still exposes the whole page and full provenance; this is not a full-page rendition. */
+:is(.home-evidence-preview, .ko-published-proof) [data-source-sheet] p:not([data-active-region]) { display: none; }
+:is(.home-evidence-preview, .ko-published-proof) [data-source-provenance] { display: none; }
+:is(.home-evidence-preview, .ko-published-proof) a { min-height: 44px; display: inline-flex; align-items: center; white-space: normal; }
 .landing-page .hero > .shell > .tiles { grid-column: 1 / -1; margin-top: 48px; }
-.landing-page .hero .tile h2 { font-size: 24px; line-height: 1.2; text-wrap: balance; }
+.landing-page .hero .tile { min-width: 0; overflow-wrap: anywhere; }
+.landing-page .hero .tile > * { min-width: 0; max-width: 100%; }
+.landing-page .hero .tiles .tile > h2 { width: 100%; max-width: 100%; min-width: 0; text-wrap: wrap; align-self: stretch; }
+.landing-page .hero .tile h2 { font-size: 24px; line-height: 1.2; }
 .landing-page .hero .tile p { font-size: 16px; line-height: 1.55; }
 .ko-published-proof { min-width: 0; margin: 16px 0 24px; }
 .ko-published-proof .solution-proof-sample { margin-inline: 0; }
+@media (min-width: 1101px) {
+  /* A tall proof panel must not distribute empty space into the headline and action rows. */
+  .landing-page .hero > .shell { grid-template-rows: repeat(4, max-content) minmax(min-content, 1fr) auto; }
+}
 @media (max-width: 1100px) {
   .landing-page .hero > .shell { grid-template-columns: minmax(0, 1fr); }
   .landing-page .home-evidence-preview { grid-column: 1; grid-row: auto; margin-top: 32px; max-width: 680px; width: 100%; }
