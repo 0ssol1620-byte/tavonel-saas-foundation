@@ -1,3 +1,4 @@
+import { ACCESS_CTA, SELF_SERVE_CTA } from "../lib/site-navigation";
 const playwrightPackage = process.env.PLAYWRIGHT_TEST_PACKAGE ?? "@playwright/test";
 const playwrightModule = await import(playwrightPackage);
 const { expect, test } = "test" in playwrightModule ? playwrightModule : playwrightModule.default;
@@ -28,7 +29,18 @@ test("solution workflow is five complete steps with no orphan cell", async ({ pa
   await expect(steps).toHaveCount(5);
   for (let index = 0; index < 5; index += 1) await expect(steps.nth(index)).not.toHaveText(/^\s*$/);
   await expect(page.getByRole("heading", { name: "What it does not do." })).toHaveCount(0);
-  await expect(page.getByText("Things to know before you compile")).toBeVisible();
+  /*
+    BA-044 retitled the limits fold: "WHERE THIS STOPS · Things to know before you compile" is
+    internal scope vocabulary that reads to a buyer as a warning label. Same fold, same content,
+    titled as the decision input it is.
+
+    BA-045: and the fifth step stopped being tinted green. Decorative colour is barred in a
+    system where colour reports state, and the tint said the last step is a different kind of
+    thing when nothing makes it one.
+  */
+  await expect(page.getByText("Before your first compile")).toBeVisible();
+  const tints = await steps.evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).backgroundColor));
+  expect([...new Set(tints)], "one of the five steps carries decorative colour").toHaveLength(1);
   await testInfo.attach("solution-polish", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
 });
 
@@ -58,8 +70,18 @@ test("compilation film is autoplay-first without a blocking play control", async
     const media = await video.evaluate((element: HTMLVideoElement) => ({ autoplay: element.autoplay, muted: element.muted, inline: element.playsInline, controls: element.controls }));
     expect(media).toEqual({ autoplay: true, muted: true, inline: true, controls: false });
   }
-  await expect(frame.getByRole("button", { name: /^Play$/i })).toHaveCount(0);
-  await expect(frame.getByRole("button", { name: /Pause compilation film|Resume compilation film/ })).toHaveCount(1);
+  /*
+    film-01 -- the control is always rendered now, and says which of three things it does.
+
+    What this case is about is unchanged: on a default browser the film starts by itself and
+    nothing blocks the frame waiting for a click. So the control must read Pause here -- if it
+    ever reads Play at these media settings, autoplay-first has regressed.
+  */
+  const control = frame.locator(".compile-film-motion-control");
+  await expect(control).toHaveCount(1);
+  await expect(control).toHaveAttribute("data-control", "pause");
+  await expect(control).toHaveAttribute("aria-label", "Pause the compilation film");
+  await expect(frame.getByRole("button", { name: /^Play/i })).toHaveCount(0);
 });
 
 test("Explore reaches the actual interactive instrument without a hero-length detour", async ({ page }, testInfo) => {
@@ -85,10 +107,13 @@ test("Explore reaches the actual interactive instrument without a hero-length de
 });
 
 test("product page shows the product path before secondary product surfaces", async ({ page }) => {
-  // Public CTA is runtime-derived, not compiled into the page. Pin the access posture here so
-  // this test verifies the live self-service wording rather than whichever environment the
-  // runner happens to inherit.
-  await page.route("**/api/status", route => route.fulfill({ json: { selfService: true, liveCheckout: true } }));
+  // The primary CTA is now server-rendered. A browser route mock cannot change that
+  // commercial state: read the actual public snapshot and verify both label and destination.
+  const statusResponse = await page.request.get("/api/status");
+  expect(statusResponse.ok()).toBe(true);
+  const status = await statusResponse.json();
+  expect(typeof status.liveCheckout).toBe("boolean");
+  const expectedCta = status.liveCheckout ? SELF_SERVE_CTA : ACCESS_CTA;
   await page.goto("/product");
   /*
     The product path's own stages, not "the word SOURCE somewhere on the document". Unscoped,
@@ -107,5 +132,7 @@ test("product page shows the product path before secondary product surfaces", as
     before it can check either. Scoping to `#main` is what this test's name already claims to be
     checking, and it still fails if the product path loses its call to action.
   */
-  await expect(page.locator("#main").getByRole("link", { name: "Start free" })).toBeVisible();
+  const cta = page.locator("#main").getByRole("link", { name: expectedCta.label, exact: true });
+  await expect(cta).toBeVisible();
+  await expect(cta).toHaveAttribute("href", expectedCta.href);
 });

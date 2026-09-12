@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
+import { checkActivationRateLimit } from "@/lib/activation-rate-limit";
 import { authorizeFoundationProduct } from "@/lib/billing-product-access";
 import { validatePromotableCollectionArtifact } from "@/lib/collection-download";
 import { checkConnectorSourceAccess } from "@/lib/connector-source-access";
 import { assertEquivalenceGate } from "@/lib/equivalence-gate";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
+import { recordServerFunnel } from "@/lib/funnel-events";
 import {
   checkCurrentSourceVersions,
   collectionCandidateKey,
@@ -97,12 +99,28 @@ export async function POST(
   const access = foundationPilotAccess(user.id);
   if (!access) return NextResponse.json({ code: "PILOT_ACCESS_REQUIRED" }, { status: 403, headers: NO_STORE });
   const { membership } = access;
-  const productAccess = await authorizeFoundationProduct(membership.workspaceId, user.id, "studio");
+  const productAccess = await authorizeFoundationProduct(membership.workspaceId, user.id, "activation", membership.role);
   if (!productAccess.ok) return NextResponse.json({ code: productAccess.code }, { status: productAccess.status, headers: NO_STORE });
   if (membership.role !== "owner" && membership.role !== "admin") {
     return NextResponse.json(
       { code: "PROMOTION_ROLE_REQUIRED" },
       { status: 403, headers: NO_STORE }
+    );
+  }
+  /*
+    The self-serve ceiling (FD-02 repair). Checked after the plan and role gates and before any
+    storage read, so a caller over the hour's limit spends nothing: 429 with a typed code, and a
+    Retry-After the client can honour. `lib/activation-rate-limit.ts` explains why it is counted
+    off the durable audit rows rather than held in memory.
+  */
+  const ceiling = await checkActivationRateLimit(membership.workspaceId, "world_activation");
+  if (!ceiling.ok) {
+    return NextResponse.json(
+      { code: ceiling.code },
+      {
+        status: ceiling.status,
+        headers: { ...NO_STORE, "Retry-After": String(ceiling.retryAfterSeconds) },
+      }
     );
   }
   const signer = readR2SignerEnv();
@@ -234,7 +252,7 @@ export async function POST(
   ) {
     return NextResponse.json({ code: "AUTHORIZATION_CHANGED_RETRY" }, { status: 403, headers: NO_STORE });
   }
-  const currentProductAccess = await authorizeFoundationProduct(membership.workspaceId, user.id, "studio");
+  const currentProductAccess = await authorizeFoundationProduct(membership.workspaceId, user.id, "activation", currentPilot.membership.role);
   if (!currentProductAccess.ok) return NextResponse.json({ code: currentProductAccess.code }, {
     status: currentProductAccess.status, headers: NO_STORE,
   });
@@ -276,6 +294,24 @@ export async function POST(
     artifact: loaded.json,
     actorUserId: user.id,
   });
+  /*
+    A2's server truth, fired after the index attempt rather than after the pointer move: a World
+    that is active but has no queryable index answers from the fallback, and a funnel that
+    counted both as the same activation would report the degraded one as a success. `status`
+    carries which one it is.
+
+    `source_revision_applied` is the same promotion seen from J3: a request that names the
+    manifest it expects to replace is a revision of a World that was already active, and a first
+    activation sends `null`. Both come off the request the caller already had to make correctly,
+    so neither needs a second read of the pointer.
+  */
+  recordServerFunnel("world_activated", {
+    status: retrievalIndex.status,
+    sources: String(sourceDocuments.length),
+  });
+  if (expectedCurrentManifest !== null) {
+    recordServerFunnel("source_revision_applied", { status: retrievalIndex.status });
+  }
   return NextResponse.json(
     { code: "WORLD_ACTIVE", world: promoted.result, retrievalIndex },
     { headers: NO_STORE }

@@ -32,7 +32,7 @@ export function GET(request: Request) {
     info: {
       title: "TAVONEL Knowledge Compiler API",
       version: API_VERSION,
-      description: "Tenant-scoped access to immutable documents, candidate knowledge packages, active worlds, grounded retrieval and durable connector cursors. Promotion and rollback remain human-session-only.",
+      description: "Tenant-scoped access to immutable documents, candidate knowledge packages, active Worlds, grounded retrieval and durable connector cursors. Promotion and rollback remain human-session-only.",
     },
     servers: [{ url: `${origin}/api/v1` }],
     security: [{ TavonelApiKey: [] }],
@@ -47,7 +47,7 @@ export function GET(request: Request) {
         get: {
           operationId: "getCapabilityManifest",
           security: [],
-          description: "Every source format this deployment can read, with its support tier, what survives into the compiled world, its known limitations and its qualification receipt when one exists. A verified tier without a receipt is not representable. Anything absent from the manifest is refused at upload.",
+          description: "Every source format this deployment can read, with its support tier, what survives into the compiled World, its known limitations and its qualification receipt when one exists. A verified tier without a receipt is not representable. Anything absent from the manifest is refused at upload.",
           responses: { "200": { description: "The capability manifest and the sha256 of its serialized form" } },
         },
       },
@@ -198,15 +198,15 @@ export function GET(request: Request) {
           operationId: "recompileRetrievalIndex",
           "x-tavonel-scope": "collections:compile",
           parameters: [{ $ref: "#/components/parameters/CollectionId" }],
-          description: "Compiles the retrieval index for the collection's ACTIVE world, and is a no-op returning alreadyCompiled: true when a completed run for that world version already exists. The manifest comes from the active pointer, so this cannot index an unpromoted candidate. Requires the workspace owner or admin role in addition to the scope. A rebuild that does not reach a queryable index answers 503 with RETRIEVAL_INDEX_NOT_COMPILED and the failure class in retrievalIndex.errorClass -- never 200.",
-          responses: { "200": { description: "{ code: RETRIEVAL_INDEX_COMPILED, alreadyCompiled, activeWorld, retrievalIndex }" }, "400": errorResponse, "401": errorResponse, "403": errorResponse, "404": errorResponse, "409": { ...errorResponse, description: "ACTIVE_WORLD_NOT_FOUND: nothing has been promoted for this collection, so there is no world to index." }, "503": errorResponse },
+          description: "Compiles the retrieval index for the collection's ACTIVE World, and is a no-op returning alreadyCompiled: true when a completed run for that World version already exists. The manifest comes from the active pointer, so this cannot index an unpromoted candidate. Requires the workspace owner or admin role in addition to the scope. A rebuild that does not reach a queryable index answers 503 with RETRIEVAL_INDEX_NOT_COMPILED and the failure class in retrievalIndex.errorClass -- never 200.",
+          responses: { "200": { description: "{ code: RETRIEVAL_INDEX_COMPILED, alreadyCompiled, activeWorld, retrievalIndex }" }, "400": errorResponse, "401": errorResponse, "403": errorResponse, "404": errorResponse, "409": { ...errorResponse, description: "ACTIVE_WORLD_NOT_FOUND: nothing has been promoted for this collection, so there is no World to index." }, "503": errorResponse },
         },
       },
       "/collections/{id}/download": {
         get: { operationId: "downloadCollection", "x-tavonel-scope": "collections:download", parameters: [{ $ref: "#/components/parameters/CollectionId" }], responses: { "200": { description: "Signed, hash-verifiable ZIP", content: { "application/zip": { schema: { type: "string", contentEncoding: "binary" } } } }, "404": errorResponse } },
       },
       "/collections/{id}/world": {
-        get: { operationId: "getActiveWorld", "x-tavonel-scope": "worlds:read", parameters: [{ $ref: "#/components/parameters/CollectionId" }], responses: { "200": { description: "Human-promoted active world and retained versions" }, "404": errorResponse } },
+        get: { operationId: "getActiveWorld", "x-tavonel-scope": "worlds:read", parameters: [{ $ref: "#/components/parameters/CollectionId" }], responses: { "200": { description: "Human-promoted active World and retained versions" }, "404": errorResponse } },
       },
       "/collections/{id}/ask": {
         post: {
@@ -214,7 +214,7 @@ export function GET(request: Request) {
           "x-tavonel-scope": "ask:read",
           parameters: [{ $ref: "#/components/parameters/CollectionId" }],
           requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["question"], properties: { question: { type: "string", minLength: 3, maxLength: 500 } } } } } },
-          responses: { "200": { description: "Grounded answer with exact page and bbox citations, or an explicit abstention. Both retrieval paths return the same fields: `answer`, `reason`, `citations`, `receipt`, `activeWorld`, `freshness`, `answerMode` and `retrievalPath`. `answerMode` is `evidence_excerpts` on both -- the answer is the cited excerpts, concatenated in rank order, and no language model writes any part of it. `retrievalPath` names which runtime answered: `compiled-retrieval-v1` (lexical + dense + structure, RRF-fused, reranked and World Gate filtered; also returns `contextPacket` and `retrieval` diagnostics) or `excerpt-concatenation-fallback` when the active world has no queryable compiled index, which also returns `retrievalIndex` ({ status: missing | compiled | failed, errorClass, runId, retrievalProfileId }) and a human-readable `retrievalNotice`. Per-citation scoring differs by path and is not normalized across them: the fallback carries `relevance` with its lexical/graph/temporal/authority breakdown, the compiled path carries per-source ranks and the reranker score." }, "409": errorResponse },
+          responses: { "200": { description: "Grounded answer with exact page and bbox citations, or an explicit abstention. Both retrieval paths return the same fields: `answer`, `reason`, `citations`, `receipt`, `activeWorld`, `freshness`, `answerMode` and `retrievalPath`. `answerMode` is `evidence_excerpts` on both -- the answer is the cited excerpts, concatenated in rank order, and no language model writes any part of it. `retrievalPath` names which runtime answered: `compiled-retrieval-v1` (lexical + dense + structure, RRF-fused, reranked and World Gate filtered; also returns `contextPacket` and `retrieval` diagnostics) or `excerpt-concatenation-fallback` when the active World has no queryable compiled index, which also returns `retrievalIndex` ({ status: missing | compiled | failed, errorClass, runId, retrievalProfileId }) and a human-readable `retrievalNotice`. Per-citation scoring differs by path and is not normalized across them: the fallback carries `relevance` with its lexical/graph/temporal/authority breakdown, the compiled path carries per-source ranks and the reranker score." }, "409": errorResponse },
         },
       },
       "/runs/{runId}/events": {
@@ -246,10 +246,10 @@ export function GET(request: Request) {
         post: {
           operationId: "searchActiveWorld",
           "x-tavonel-scope": "ask:read",
-          description: "Retrieval-only search over the active world's compiled retrieval index: hybrid lexical + dense + structure retrieval, RRF-fused, reranked, then World Gate filtered. Returns the ContextPacket (the same runtime contract /ask, MCP and the CLI share) plus per-source retrieval telemetry, without generating an answer. There is no excerpt fallback here -- a world with no queryable compiled index is a 409, not a weaker answer.",
+          description: "Retrieval-only search over the active World's compiled retrieval index: hybrid lexical + dense + structure retrieval, RRF-fused, reranked, then World Gate filtered. Returns the ContextPacket (the same runtime contract /ask, MCP and the CLI share) plus per-source retrieval telemetry, without generating an answer. There is no excerpt fallback here -- a World with no queryable compiled index is a 409, not a weaker answer.",
           parameters: [{ $ref: "#/components/parameters/CollectionId" }],
           requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["query"], properties: { query: { type: "string", minLength: 3, maxLength: 500 }, limit: { type: "integer", minimum: 1, maximum: 25, default: 10 } } } } } },
-          responses: { "200": { description: "ContextPacket of evidence-bound retrieval units with lexical/dense/structure ranks, reranker score and World Gate decisions, plus `retrievalPath` (always `compiled-retrieval-v1`), `degradations` (a named list of what did not run, e.g. dense retrieval skipped with no embedder configured, or the reranker degrading to the fused order), `activeWorld` and `freshness`" }, "400": errorResponse, "409": { ...errorResponse, description: "RETRIEVAL_RUN_NOT_FOUND or RETRIEVAL_PROFILE_NOT_FOUND: this active world has no queryable compiled retrieval index. The body carries `retrievalIndex` and `retrievalNotice` saying which state it is in, and POST /collections/{id}/retrieval-index rebuilds it." }, "503": errorResponse },
+          responses: { "200": { description: "ContextPacket of evidence-bound retrieval units with lexical/dense/structure ranks, reranker score and World Gate decisions, plus `retrievalPath` (always `compiled-retrieval-v1`), `degradations` (a named list of what did not run, e.g. dense retrieval skipped with no embedder configured, or the reranker degrading to the fused order), `activeWorld` and `freshness`" }, "400": errorResponse, "409": { ...errorResponse, description: "RETRIEVAL_RUN_NOT_FOUND or RETRIEVAL_PROFILE_NOT_FOUND: this active World has no queryable compiled retrieval index. The body carries `retrievalIndex` and `retrievalNotice` saying which state it is in, and POST /collections/{id}/retrieval-index rebuilds it." }, "503": errorResponse },
         },
       },
       /*

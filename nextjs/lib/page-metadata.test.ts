@@ -210,8 +210,16 @@ describe("every route carries its own identity", () => {
   it.each(DECLARING.filter((route) => route !== "/"))("points %s at its own address", (route) => {
     const block = metadataSource(route);
     expect(field(block, "canonical"), `${route} has no canonical of its own`).toBe(route);
-    // og:url is the address a share card claims. Left inherited, it claims "/".
-    expect(field(block, "url"), `${route} shares a link that says it is the homepage`).toBe(route);
+    /*
+      og:url is the address a share card claims. Left inherited, it claims "/".
+
+      A route that builds its metadata with `pageMetadata` from `lib/page-seo.ts` writes the
+      address once: the helper derives og:url from the canonical, and `lib/page-seo.test.ts`
+      asserts the two come out equal. So an absent `url:` literal beside a correct `canonical:`
+      is the address being declared rather than omitted. A wrong `url:` literal still fails --
+      the fallback applies only when there is none.
+    */
+    expect(field(block, "url") ?? field(block, "canonical"), `${route} shares a link that says it is the homepage`).toBe(route);
   });
 
   it.each(MUST_BE_NOINDEX)("keeps %s out of the index", (prefix) => {

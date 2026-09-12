@@ -2,14 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { Route } from "next";
 import { PublicSitePage } from "@/components/public-site-chrome";
-import { EVIDENCE, EVIDENCE_STATE } from "@/lib/evidence-record";
+import { EVIDENCE, EVIDENCE_STATE, shortDigest } from "@/lib/evidence-record";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/research/notes" },
   openGraph: { url: "/research/notes" },
   title: "Research notes — TAVONEL",
   description:
-    "What we measured, what we built without proving, and one hypothesis that failed and was not shipped.",
+    "What we measured and how: the figures, their denominators, their receipts, and the hypotheses that did not hold.",
 };
 
 /**
@@ -21,9 +21,28 @@ export const metadata: Metadata = {
  * They are addressed to the reader who came looking for findings.
  *
  * The states are load-bearing and stay:
- *   MEASURED           a number we produced, with a scoring path we did not touch
- *   NOT SUPPORTED      a hypothesis that failed; not shipped as a feature
- *   BUILT, NOT PROVEN  code that passes its tests, which does not make its thresholds right
+ *   MEASURED       a number we produced, with a scoring path we did not touch
+ *   NOT SUPPORTED  a hypothesis that failed; not shipped as a feature
+ *   OPEN           code that passes its tests, which does not make its thresholds right
+ *
+ * What the 2026-09-11 brand audit changed:
+ *
+ * BA-090  Half the headline and the whole share card were an absence. Publishing the failure is
+ *         right and stays; leading with "what we did not" is a separate choice, and it was the
+ *         first thing a searcher and a link preview saw. The lede carries the honesty now.
+ * BA-073  The receipts were named by internal filename, so the retired campaign name was
+ *         published twice on the page a technical evaluator reads most closely.
+ * BA-074  One paragraph published an internal repository path, the internal words "campaign" and
+ *         "claims pack", the admission that our evidence is effectively unreachable, and then
+ *         asked the reader to email for an attachment.
+ * BA-092  Two 64-character digests were typeset as body prose and wrapped mid-string.
+ * BA-088  Five consecutive pages opened with the same 11px mono template sentence followed by
+ *         the same four cross-links in the same order. The role each page plays is now part of
+ *         its own opening argument, and the cross-links are one labelled row at the foot.
+ * BA-089  "Ask{' '}<a>" was missing its space, rendering as "Askhello@tavonel.com". The
+ *         sentence it was in is gone with BA-074; its replacement carries the space.
+ * BA-110  The page was a dead end -- three equal ghosts, no primary -- while four other pages
+ *         send readers here.
  */
 export default function ResearchNotesPage() {
   return (
@@ -33,51 +52,53 @@ export default function ResearchNotesPage() {
           <div className="body">
             <div className="stack">
               <p className="slate"><b>RESEARCH</b><span />NOTES AND FINDINGS</p>
-              <h1 className="document-title">What we measured,<br />and what we did not.</h1>
+              <h1 className="document-title">What we measured,<br />and how.</h1>
             </div>
             <div className="stack">
               <p className="lede">
-                Every result carries the state of its evidence. A measurement is a number we
-                produced and can describe the conditions for. Built is code that passes its tests,
-                which is not the same as a threshold being right. Not supported is a hypothesis we
+                This is the record of <b>what has actually been measured</b>, and what has not.
+                Every result carries the state of its evidence: a measurement is a number we
+                produced and can describe the conditions for, open is code that passes its tests
+                without that making a threshold right, and not supported is a hypothesis we
                 tested, that failed, and that we did not ship anyway.
               </p>
 
               <div className="tiles">
-                {EVIDENCE.map(([state, title, body]) => (
-                  <article className="tile" key={title} data-state={state}>
-                    <span className="n">{EVIDENCE_STATE[state]}</span>
-                    <h3>{title}</h3>
-                    <p>{body}</p>
+                {EVIDENCE.map((entry) => (
+                  <article className="tile" key={entry.title} data-state={entry.state}>
+                    <span className="n">{EVIDENCE_STATE[entry.state]}</span>
+                    <h3>{entry.title}</h3>
+                    <p>{entry.body}</p>
+                    {/*
+                      BA-073 / BA-092. The receipt as a footer line rather than the last clause
+                      of the paragraph: its public identifier, what it is of, its date, and a
+                      shortened digest whose whole value sits in the `title` attribute. The
+                      internal filename is not rendered at all -- it is what we quote back to
+                      someone who asks for the file, and renaming the artifact would break the
+                      reproducibility the hash exists for.
+                    */}
+                    {entry.receipt ? (
+                      <p className="fine">
+                        <b>Receipt {entry.receipt.id}</b> · {entry.receipt.of} ·{" "}
+                        {entry.receipt.date} ·{" "}
+                        <code title={`sha256 ${entry.receipt.digest}`}>
+                          sha256 {shortDigest(entry.receipt.digest)}
+                        </code>
+                      </p>
+                    ) : null}
                   </article>
                 ))}
               </div>
 
               {/*
-                B04. Five hubs answered five different questions with nothing saying which was
-                which, so a reader looking for one of them read parts of three. One line, the
-                same shape on each: what this page answers, and where the next question goes.
+                BA-074. What is left of a paragraph that published a repository path, two
+                internal words, a confession and a request for an attachment: the two facts a
+                reader can act on.
               */}
               <p className="fine">
-                <b>This page answers one question:</b> what has actually been measured, and what
-                has not. Which problems are still open is on <Link href={"/research" as Route}>Research</Link>;
-                how a citation stays bound to its source is on <Link href={"/evidence" as Route}>Evidence</Link>;
-                what a number has to carry before it is published is on <Link href={"/benchmarks" as Route}>Benchmarks</Link>;
-                the security and compliance status is on <Link href={"/trust" as Route}>Trust</Link>.
-              </p>
-
-              {/*
-                E02/E05. The two measured entries now state their figures and name the receipt
-                each figure came from. A named receipt a reader cannot reach is only half an
-                answer, so this says where they are and how to get one — rather than linking a
-                URL that does not exist.
-              */}
-              <p className="fine">
-                The receipts named above are files in the compiler repository, under
-                <code> docs/evidence/artifacts/</code>, each bound by sha256 in the campaign&rsquo;s
-                claims pack. They are not published at a public URL yet. Ask
-                <a href="mailto:hello@tavonel.com">hello@tavonel.com</a> for the file whose hash is
-                named here, and check the hash yourself.
+                Every receipt above is bound by sha256. Request any receipt named here at{" "}
+                <a href="mailto:hello@tavonel.com">hello@tavonel.com</a> and check the hash
+                yourself.
               </p>
 
               <p className="fine">
@@ -87,11 +108,27 @@ export default function ResearchNotesPage() {
                 failures included.
               </p>
 
+              {/*
+                BA-110. A primary and one ghost, instead of three equal ghosts and no primary on
+                a page four others link into.
+              */}
               <div className="actions">
-                <Link className="btn ghost" href="/research">Research areas</Link>
-                <Link className="btn ghost" href="/evidence">How evidence is bound</Link>
-                <Link className="btn ghost" href={"/reproducibility" as Route}>Reproducibility</Link>
+                <Link className="btn" href={"/benchmarks" as Route}>See the benchmark protocol</Link>
+                <Link className="btn ghost" href={"/reproducibility" as Route}>Rerun a published sample</Link>
               </div>
+
+              {/*
+                BA-088. The cross-links the template sentence used to carry, as a labelled row at
+                the foot -- where a reader who has finished the page is looking for the next one.
+              */}
+              <p className="fine">
+                <b>Also in the trust case:</b>{" "}
+                <Link href={"/evidence" as Route}>Evidence</Link> ·{" "}
+                <Link href={"/benchmarks" as Route}>Benchmarks</Link> ·{" "}
+                <Link href={"/reproducibility" as Route}>Reproducibility</Link> ·{" "}
+                <Link href={"/research" as Route}>Research</Link> ·{" "}
+                <Link href={"/trust" as Route}>Trust</Link>
+              </p>
             </div>
           </div>
         </div>

@@ -16,7 +16,22 @@ import { DOCS_SECTIONS } from "@/lib/docs-content";
   llms-only URL exactly when that page declares itself noindex -- so the next page added to
   `llms.txt` and forgotten here fails the suite, and this one does not.
 */
-const ROUTES = ["", "/api", "/benchmarks", "/changelog", "/contact", "/developers", "/docs", "/enterprise", "/evidence", "/explore", "/integrations", "/knowledge-compiler", "/pricing", "/privacy", "/product", "/product/compiled-world", "/product/continuous-knowledge", "/product/document-understanding", "/refunds", "/research", "/research/notes", "/resources", "/security", "/solutions/ai-ready-knowledge", "/solutions/document-intelligence", "/solutions/knowledge-graph", "/solutions/source-grounded-assistants", "/solutions/knowledge-operations", "/sources", "/status", "/subprocessors", "/terms", "/trust"];
+/*
+  A sitemap entry is a request to index, so this array holds approved pages and nothing else.
+
+  There is no publication flag in the content layer and this campaign does not add one: a page
+  that is not approved carries `robots: { index: false }` in its own metadata and is absent from
+  the list below, and when it is approved both change in the same commit. That was already the
+  discipline -- `/reproducibility` above is the standing example -- and it is now checked in both
+  directions. `lib/seo-surface.test.ts` fails when a path listed here resolves to a page that
+  declares itself noindex, which is the state a draft `/cookbooks/[slug]` is in: adding a draft
+  to this array can no longer half-publish it, it breaks the suite instead.
+
+  `/ko` is here because it is approved, indexable Korean copy with a self-canonical and an
+  hreflang pair (§12.4). It is the only `/ko` URL; the rest of the site keeps its existing
+  English addresses, which is why no other entry carries a locale prefix.
+*/
+const ROUTES = ["", "/api", "/benchmarks", "/changelog", "/contact", "/developers", "/docs", "/enterprise", "/evidence", "/explore", "/integrations", "/knowledge-compiler", "/ko", "/pricing", "/privacy", "/product", "/product/compiled-world", "/product/continuous-knowledge", "/product/document-understanding", "/refunds", "/research", "/research/notes", "/resources", "/security", "/solutions", "/solutions/ai-ready-knowledge", "/solutions/document-intelligence", "/solutions/knowledge-graph", "/solutions/source-grounded-assistants", "/solutions/knowledge-operations", "/sources", "/status", "/subprocessors", "/terms", "/trust"];
 /*
   The documentation sections come from the documentation rather than being listed again here.
 

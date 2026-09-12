@@ -4,6 +4,8 @@ import Link from "next/link";
 import Logomark from "@/components/logomark";
 import ContactForm from "@/components/contact-form";
 import MobilePrimaryNav from "@/components/mobile-primary-nav";
+import DesktopPrimaryNav from "@/components/site-nav/desktop-primary-nav";
+import { SUPPORT_ACKNOWLEDGEMENT } from "@/lib/support-targets";
 
 export const metadata: Metadata = {
   // Each page declares its own address. Without this every route inherited the root
@@ -22,12 +24,11 @@ export default function ContactPage() {
           <Logomark />
           <b>TAVONEL</b>
         </Link>
-        <nav aria-label="Sections">
-          <Link href="/">Back to the compiler</Link>
-          <Link href="/security">Security</Link>
-        </nav>
+        <DesktopPrimaryNav />
         <MobilePrimaryNav />
-        <Link className="btn small" href="/login">Sign in</Link>
+        <span className="nav-actions">
+          <Link className="nav-signin" href="/login">Sign in</Link>
+        </span>
       </header>
 
       <main id="main" tabIndex={-1}>
@@ -35,7 +36,6 @@ export default function ContactPage() {
           <div className="shell">
             <div className="body">
               <div className="stack">
-                <p className="slate"><b>DIRECT LINE</b><span />INQUIRY</p>
                 <h1 className="document-title">Tell us what your knowledge needs to become.</h1>
                 {/*
                   13.4 asks for a direct route to support and security. A single general
@@ -54,11 +54,14 @@ export default function ContactPage() {
                   <span>Vulnerability reports</span>
                   <a href="mailto:security@tavonel.com">security@tavonel.com</a>
                 </div>
+                {/* One constant, printed here and on /status. See lib/support-targets.ts. */}
+                <p className="fine">{SUPPORT_ACKNOWLEDGEMENT}</p>
               </div>
               <div className="stack">
                 <p className="lede">
-                  The questions below are optional, and answering them is what makes the first
-                  reply useful rather than a request for more detail.
+                  Open <b>Help us prepare a better reply</b> and the first answer comes back with
+                  specifics rather than a request for more detail. Every question in it is
+                  optional.
                   <b> Do not attach or paste customer documents here.</b>
                 </p>
                 <ContactForm />
@@ -76,7 +79,7 @@ export default function ContactPage() {
             delete: it is a sentence about our internal address policy on a page whose reader
             wants to know what happens to their inquiry. What replaces it is that.
           */}
-          <p className="fine">Every inquiry is read by a person. There is no automated reply, and the answer comes from an address on this domain.</p>
+          <p className="fine">Every inquiry is read by a person, and the reply comes from an address on this domain.</p>
         </div>
       </footer>
     </div>

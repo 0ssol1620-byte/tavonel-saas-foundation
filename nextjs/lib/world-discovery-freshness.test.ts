@@ -277,6 +277,41 @@ describe("freshness keeps four clocks apart", () => {
     expect(freshness.activatedAt).toBe("2026-09-10T10:00:00.000Z");
   });
 
+  /*
+    G3's read side (`20260911120200`). A candidate that was compiled and never promoted has no
+    row in `foundation_world_versions` -- that table only learns a digest at promotion, which is
+    the event this flag exists to wait for -- so before the compile job recorded its digest the
+    only way to see one was for the caller to hand it over. The three cases below are the whole
+    precedence: the recorded digest answers with no hint at all, a caller's hint still wins over
+    it, and a job that recorded nothing (every job older than the column) degrades to the
+    previous answer rather than guessing.
+  */
+  it("reads an unpromoted candidate from the digest the compile job recorded, with no hint", async () => {
+    tables.foundation_compile_jobs[0].candidate_manifest_digest = MANIFEST_2;
+    const freshness = await getWorldFreshness(WORKSPACE, COLLECTION_A);
+    expect(freshness).toMatchObject({ candidateAwaitingActivation: true, candidateManifestDigest: MANIFEST_2 });
+    // The column is read, not inferred: the request has to ask for it.
+    expect(requests.some((href) => href.includes("candidate_manifest_digest"))).toBe(true);
+  });
+
+  it("prefers the caller's candidate over the recorded one, and ignores a recorded active digest", async () => {
+    tables.foundation_compile_jobs[0].candidate_manifest_digest = MANIFEST_2;
+    const hinted = await getWorldFreshness(WORKSPACE, COLLECTION_A, {
+      candidateManifestDigest: `sha256:${"3".repeat(64)}`,
+    });
+    expect(hinted.candidateManifestDigest).toBe(`sha256:${"3".repeat(64)}`);
+    // A compile that produced what is already active is not a waiting candidate.
+    tables.foundation_compile_jobs[0].candidate_manifest_digest = MANIFEST_1;
+    const active = await getWorldFreshness(WORKSPACE, COLLECTION_A);
+    expect(active).toMatchObject({ candidateAwaitingActivation: false, candidateManifestDigest: null });
+  });
+
+  it("reads false for a compile that predates the digest column instead of inventing one", async () => {
+    delete tables.foundation_compile_jobs[0].candidate_manifest_digest;
+    const freshness = await getWorldFreshness(WORKSPACE, COLLECTION_A);
+    expect(freshness).toMatchObject({ candidateAwaitingActivation: false, candidateManifestDigest: null });
+  });
+
   it("takes a candidate the caller already loaded, since the database cannot see an unpromoted one", async () => {
     const hinted = await getWorldFreshness(WORKSPACE, COLLECTION_A, { candidateManifestDigest: MANIFEST_2 });
     expect(hinted).toMatchObject({ candidateAwaitingActivation: true, candidateManifestDigest: MANIFEST_2 });

@@ -13,14 +13,25 @@ const { expect, test } = "test" in playwrightModule ? playwrightModule : playwri
   So the assertions below read the API first and then require the page to match it row for row.
 */
 
-const TIERS = [
-  "VERIFIED_NATIVE",
-  "VERIFIED_HYBRID",
-  "BEST_EFFORT",
-  "METADATA_ONLY",
-  "REVIEW_REQUIRED",
-  "UNSUPPORTED",
-];
+/*
+  BA-062: the six frozen tiers, and the label each one prints.
+
+  The enum is still the enum -- it is what `/api/v1/capabilities` serves and what the server
+  compares -- but a `SCREAMING_SNAKE_CASE` identifier rendered as a UI badge on a
+  primary-navigation page is a machine word shown to a buyer. The pairing is what this file
+  asserts, in both directions: every chip is a written label, no chip is an identifier, and the
+  label on a row is the label of the tier the API sent for that row's MIME type.
+*/
+const TIER_LABEL: Record<string, string> = {
+  VERIFIED_NATIVE: "Verified, native reader",
+  VERIFIED_HYBRID: "Verified, native and checked",
+  BEST_EFFORT: "Best effort",
+  METADATA_ONLY: "Metadata only",
+  REVIEW_REQUIRED: "Needs review",
+  UNSUPPORTED: "Not read",
+};
+
+const TIERS = Object.values(TIER_LABEL);
 
 type ManifestEntry = { mime: string; status: string; qualificationReceipt: string | null };
 
@@ -36,7 +47,8 @@ test("prints the same capability manifest the API serves", async ({ page }) => {
   expect(served.contentSha256).toMatch(/^sha256:[0-9a-f]{64}$/);
 
   await page.goto("/sources");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("can actually read");
+  // BA-063: the headline names the product and leads with what the read produces.
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("what survives the read");
 
   const rows = page.locator("table.src-matrix tbody tr");
   await expect(rows).toHaveCount(served.entries.length);
@@ -48,11 +60,16 @@ test("prints the same capability manifest the API serves", async ({ page }) => {
     ).toHaveCount(1);
   }
 
-  // Every chip is one of the six frozen tiers, and every chip on the page is one the API sent.
+  // Every chip is a written label for one of the six frozen tiers, in the API's own row order.
   const chips = await page.locator("table.src-matrix .src-tier").allInnerTexts();
   expect(chips).toHaveLength(served.entries.length);
-  for (const chip of chips) expect(TIERS).toContain(chip.trim());
-  expect(chips.map((chip) => chip.trim())).toEqual(served.entries.map((entry) => entry.status));
+  for (const chip of chips) {
+    expect(TIERS).toContain(chip.trim());
+    expect(chip.trim(), "a manifest identifier is being printed as a badge").not.toMatch(/[A-Z]_[A-Z]/);
+  }
+  expect(chips.map((chip) => chip.trim())).toEqual(
+    served.entries.map((entry) => TIER_LABEL[entry.status]),
+  );
 });
 
 test("shows no verified tier while no format carries a qualification receipt", async ({ page }) => {
@@ -65,17 +82,44 @@ test("shows no verified tier while no format carries a qualification receipt", a
   await page.goto("/sources");
   const table = page.locator("table.src-matrix");
   await expect(table.locator(".src-tier[data-token='verified']")).toHaveCount(0);
-  await expect(table).not.toContainText("VERIFIED_NATIVE");
-  await expect(table).not.toContainText("VERIFIED_HYBRID");
+  await expect(table).not.toContainText(TIER_LABEL.VERIFIED_NATIVE!);
+  await expect(table).not.toContainText(TIER_LABEL.VERIFIED_HYBRID!);
 
-  // The legend still explains the tiers nothing has reached; the state line says why.
-  await expect(page.locator(".src-legend")).toContainText("VERIFIED_NATIVE");
-  await expect(page.locator("main")).toContainText("No format on this deployment carries a qualification receipt.");
+  // The legend still explains the tiers nothing has reached.
+  await expect(page.locator(".src-legend")).toContainText(TIER_LABEL.VERIFIED_NATIVE!);
+
+  /*
+    BA-058. The bordered callout under the lede said nothing on this page is verified, which is
+    what the table already says row by row, and it said it before a reader had read a row.
+
+    What replaces it is the rule written forwards, in the fold that explains how a row is filled
+    in -- so this pins two things the deleted sentence did not: that the page still states what
+    earns a tier, and that it no longer announces the count of formats that have not earned one.
+    A count sentence coming back fails here.
+  */
+  await page.evaluate(() => {
+    for (const fold of document.querySelectorAll("details")) fold.open = true;
+  });
+  const main = page.locator("main");
+  await expect(main).toContainText("A tier is earned by a measurement.");
+  await expect(main).toContainText("a qualification run produces a receipt");
+  await expect(main).not.toContainText("No format on this deployment");
+  await expect(main).not.toContainText("carries a qualification receipt.");
 });
 
 test("states the refusal rule once and claims nothing it cannot support", async ({ page }) => {
   await page.goto("/sources");
-  await expect(page.locator(".src-refusal")).toHaveText("Formats not listed are refused at upload.");
+  /*
+    BA-068. The refusal rule is a clause of the lede now, not a tracked-uppercase line floating
+    between two folds where it read as a system error. Still stated exactly once: the assertion
+    is on the count as well as the wording, and the old standalone element is asserted gone.
+  */
+  await expect(page.locator(".src-refusal")).toHaveCount(0);
+  await expect(page.locator("p.lede")).toContainText("refused at upload rather than accepted");
+  expect(
+    (await page.locator("main").innerText()).match(/refused at upload/g)?.length ?? 0,
+    "the refusal rule is stated once",
+  ).toBe(1);
 
   /*
     Open every fold before reading the page.
@@ -121,13 +165,14 @@ test("carries no empty structural cell and never overflows its viewport", async 
 });
 
 /*
-  An eighth primary link is a header measurement, not a data change.
+  A wider bar item is a header measurement, not a data change.
 
   `tavonel.css` swaps the section row for the phone disclosure at 1079px because the seven-link
   row pushed the primary action past the right edge up to 1076px, and `overflow-x: hidden` hid
   it from every document-overflow check. 1080px is the first width that shows the row, so it is
-  where a link added to `PRIMARY_NAV` gets measured. This test fails if the row stops fitting,
-  which is the only honest way to add to it.
+  where the bar gets measured. The 2026-09-11 IA redesign took the row from eight links to five
+  items, which buys room rather than spending it -- but a group label is free to grow, and this
+  test is what fails if the row stops fitting.
 */
 test("keeps the header's primary action reachable at the width the section row appears", async ({ page }) => {
   await page.setViewportSize({ width: 1080, height: 900 });
@@ -143,19 +188,42 @@ test("keeps the header's primary action reachable at the width the section row a
 });
 
 /*
-  Primary navigation, not the resources hub.
+  A product surface, and still a product surface from three places.
 
-  The founder resolved this (contract 4.2, RESOLVED A-3/B-5): what a deployment can read is a
-  product surface, so the row lives in `PRIMARY_NAV`. Both chromes render that list -- the
-  desktop row and the phone disclosure -- and this asserts both, because the first version of
-  this page was reachable only from a hub two clicks in.
+  The founder resolved (contract 4.2, RESOLVED A-3/B-5) that what a deployment can read is a
+  product surface rather than a resources entry, and this spec enforced that as a flat top-level
+  link in `PRIMARY_NAV`. The 2026-09-11 IA redesign supersedes the *placement* half of that
+  resolution and keeps the substance: the bar is five items, so Sources is a Product panel item
+  now, and the compensation for losing the flat link is that it is also in the footer's Product
+  group -- reachable with no menu open at all -- and that the Product trigger itself carries
+  `aria-current` while a reader is on this page.
+
+  What the resolution forbade has not changed: it is not a `/resources` tile, it is not two
+  clicks in from a hub, and its URL did not move.
+
+  The desktop half sets its own viewport, because the section row does not exist below 1080px and
+  this file runs in every width project.
 */
-test("is in the primary navigation and listed in the sitemap", async ({ page }) => {
+test("is reachable from the Product panel, the phone accordion and the footer", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/sources");
-  await expect(page.locator('header.nav nav[aria-label="Sections"] a[href="/sources"]')).toHaveCount(1);
-  await expect(page.locator('.mobile-primary-nav nav a[href="/sources"]')).toHaveCount(1);
-  await expect(page.locator('.site-footer-groups a[href="/sources"]')).toHaveCount(0);
+
+  // Desktop: one open, one link. The trigger says this is where the reader already is.
+  await expect(page.locator("#site-nav-trigger-product")).toHaveAttribute("aria-current", "true");
+  await page.locator("#site-nav-trigger-product").click();
+  await expect(page.locator('#site-nav-product a[href="/sources"]')).toHaveCount(1);
+  await page.keyboard.press("Escape");
+
+  // The footer, which needs no menu at all.
+  await expect(page.locator('.site-footer-groups a[href="/sources"]')).toHaveCount(1);
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", "https://tavonel.com/sources");
+
+  // Phone: the Product group of the accordion, which starts open on this page.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator("header.nav details.mobile-primary-nav > summary").click();
+  const product = page.locator('details.mobile-nav-group[data-section="product"]');
+  expect(await product.evaluate((element: HTMLDetailsElement) => element.open)).toBe(true);
+  await expect(product.locator('a[href="/sources"]')).toHaveCount(1);
 
   const sitemap = await page.request.get("/sitemap.xml");
   expect(await sitemap.text()).toContain("https://tavonel.com/sources");
@@ -189,7 +257,7 @@ test("filters the matrix by source family without changing any row's tier", asyn
   expect(
     chips.map((chip) => chip.trim()),
     "filtering may hide a row, never restate its tier",
-  ).toEqual(expected.map((entry) => entry.status));
+  ).toEqual(expected.map((entry) => TIER_LABEL[entry.status]));
 
   await page.getByRole("button", { name: /All formats/ }).click();
   await expect(rows).toHaveCount(served.entries.length);

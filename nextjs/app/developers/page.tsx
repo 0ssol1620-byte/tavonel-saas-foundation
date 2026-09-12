@@ -1,7 +1,9 @@
+import { Fragment } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { Route } from "next";
 import { PublicSitePage } from "@/components/public-site-chrome";
+import { DocsCopyButton } from "@/components/docs-copy-button";
 import { TrackedLink } from "@/components/tracked-link";
 import { REQUIRED_PACKAGE_PATHS } from "@/lib/collection-download";
 
@@ -31,6 +33,11 @@ export const metadata: Metadata = {
   last one still standing, so a reader arriving from the primary nav watched the site's
   structure change under them and lost the way to every other page.
 */
+/* The curl block above the tooling tiles, hoisted so the copy control and the <pre> are one
+   string rather than two that have to agree. */
+const FIRST_CALL = `curl -H "Authorization: Bearer $TAVONEL_API_KEY" \\
+  https://tavonel.com/api/v1/documents`;
+
 const PATHS = [
   {
     kind: "LIVE",
@@ -42,7 +49,7 @@ const PATHS = [
     kind: "PORTABLE",
     title: "A signed package",
     body: "Take the World away as files: JSON-LD and Turtle semantic projections, graph nodes and relationships, a retrieval corpus, provenance activities and a validation report, under a signed manifest with a digest for every file.",
-    detail: "Verifiable without asking us — and a snapshot, so it ages the moment the sources do.",
+    detail: "Verifiable offline against a fingerprint you fetch separately. It is a snapshot of one revision — take the live path when the reader must stay current.",
   },
   {
     kind: "HUMAN",
@@ -79,6 +86,58 @@ const PACKAGE_EXTRAS = [
   "signatures/export-manifest.ed25519.json",
 ] as const;
 
+/*
+  What each file is for (BA-204).
+
+  The list itself still comes from the exporter -- `REQUIRED_PACKAGE_PATHS` plus the six the same
+  function adds on the way out -- so this is a purpose per path and not a second inventory. The
+  lookup below throws on a path with no purpose, which is the point: a file added to the exporter
+  arrives here as a build failure rather than as a blank cell.
+
+  `/docs/use-with-ai` carries the same idea as a table of its own. The wording differs because
+  that page groups two paths per row for a reader choosing a consumer, and this one is the
+  archive's own inventory, file by file.
+*/
+const PACKAGE_PURPOSE: Record<string, string> = {
+  "ontology/knowledge.jsonld": "JSON-LD semantic projection, for linked-data consumers.",
+  "ontology/knowledge.ttl": "The same projection in Turtle, for RDF and SPARQL.",
+  "graph/nodes.csv": "Graph nodes, for a plain graph import.",
+  "graph/relationships.csv": "Graph edges, with the relation each one carries.",
+  "rag/documents.jsonl": "Document-level retrieval records.",
+  "rag/chunks.jsonl": "Retrieval chunks, each bound to the source location it came from.",
+  "provenance/activities.jsonl": "Lineage for every compiled artifact in the package.",
+  "validation/report.json": "The validation status, and any reason the result still requires review.",
+  "README.md": "Where a person starts, and which consumption path to take.",
+  "AGENTS.md": "What a filesystem-capable agent reads first.",
+  "manifest/ai-entrypoint.json": "The machine-readable map of the entrypoints and the grounding rules.",
+  "manifest/candidate-world.json": "The compiled World this archive was written from.",
+  "manifest/export-manifest.json": "A digest for every file above. The signature is made over these bytes.",
+  "signatures/export-manifest.ed25519.json": "The detached Ed25519 signature over that manifest.",
+};
+
+/*
+  A package path that can wrap (measured, webkit at 390).
+
+  The paths are in a `.docs-table` cell now, and `signatures/export-manifest.ed25519.json` in a
+  `<code>` has no break opportunity in it, so WebKit pushed the document 48px wider than the
+  viewport rather than scrolling the table's own container. `<wbr>` after each separator is the
+  standard answer and needs no rule in `app/tavonel.css`, which this lane does not own -- and the
+  break points it gives (after a slash, after a hyphen) are the ones a reader would choose. The
+  root fix, `overflow-wrap: anywhere` on `.docs-table code`, is in the report as a cross-lane
+  request, because the same 48px is waiting for the next long value any table on the site prints.
+*/
+function breakable(path: string) {
+  return path.split(/(?<=[/-])/).map((part, index) => (
+    <Fragment key={index}>{part}<wbr /></Fragment>
+  ));
+}
+
+function packagePurpose(path: string): string {
+  const purpose = PACKAGE_PURPOSE[path];
+  if (!purpose) throw new Error(`the export writes ${path} and this page says nothing about it`);
+  return purpose;
+}
+
 export default function DevelopersPage() {
   return (
     <PublicSitePage>
@@ -86,7 +145,7 @@ export default function DevelopersPage() {
         <div className="shell">
           <div className="body">
             <div className="stack">
-              <p className="slate"><b>DEVELOPERS</b><span />ONE WORLD</p>
+              <p className="slate"><b>DEVELOPERS</b><span aria-hidden="true" />· ONE WORLD</p>
               <h1 className="document-title">Give every model the same grounded world.</h1>
             </div>
             <div className="stack">
@@ -96,7 +155,7 @@ export default function DevelopersPage() {
                 the asset.
               </p>
 
-              <p className="slate"><span />THREE WAYS TO USE A COMPILED WORLD</p>
+              <p className="slate"><span aria-hidden="true" />THREE WAYS TO USE A COMPILED WORLD</p>
               <div className="chain dev-paths">
                 {PATHS.map((path) => (
                   <article className="link" key={path.kind}>
@@ -108,7 +167,7 @@ export default function DevelopersPage() {
                 ))}
               </div>
 
-              <p className="slate"><span />FROM SOURCES TO A GROUNDED ANSWER</p>
+              <p className="slate"><span aria-hidden="true" />FROM SOURCES TO A GROUNDED ANSWER</p>
               <ol className="dev-journey">
                 {JOURNEY.map(([title, body]) => (
                   <li key={title}>
@@ -123,18 +182,23 @@ export default function DevelopersPage() {
                 <Link href="/docs">the documentation</Link>. If you are deciding between live
                 MCP/API access and a portable package, start with{" "}
                 <Link href={"/docs/use-with-ai" as Route}>Use your results with AI</Link>. Current
-                availability is published at <Link href={"/status" as Route}>/status</Link>.
+                availability is on the <Link href={"/status" as Route}>status page</Link>.
               </p>
 
               <div className="stack">
-                <p className="slate"><b>PUBLIC TOOLING</b><span />VERSIONED FILES</p>
+                <p className="slate"><b>PUBLIC TOOLING</b><span aria-hidden="true" />· VERSIONED FILES</p>
                 <h3>Start with the contract, then a scoped key.</h3>
-                <pre><code>{`curl -H "Authorization: Bearer $TAVONEL_API_KEY" \\
-  https://tavonel.com/api/v1/documents`}</code></pre>
+                <figure className="docs-code">
+                  <figcaption>
+                    <span>Your first authenticated read</span>
+                    <DocsCopyButton value={FIRST_CALL} />
+                  </figcaption>
+                  <pre><code>{FIRST_CALL}</code></pre>
+                </figure>
                 <div className="tiles">
-                  <article className="tile"><h3>OpenAPI</h3><p>Machine-readable v1 HTTP contract.</p><TrackedLink event="developer_api_started" href="/openapi.json">Open schema</TrackedLink></article>
-                  <article className="tile"><h3>CLI</h3><p>Node.js 20+ client with immutable version and update check.</p><a href="/developer/tavonel-cli.mjs" download>Download CLI</a></article>
-                  <article className="tile"><h3>MCP</h3><p>Eight stdio tools: sources, World, search, Ask, objects, relations, evidence, package. No write tool, and it refuses to start if one is added.</p><TrackedLink event="developer_mcp_started" href="/developer/tavonel-mcp.mjs" download>Download MCP server</TrackedLink></article>
+                  <article className="tile"><h3>OpenAPI</h3><p>Machine-readable v1 HTTP contract.</p><TrackedLink className="btn ghost" event="developer_api_started" href="/api/openapi">OpenAPI contract</TrackedLink></article>
+                  <article className="tile"><h3>CLI</h3><p>Node.js 20+ client with immutable version and update check.</p><a className="btn ghost" href="/developer/tavonel-cli.mjs" download>Download CLI</a></article>
+                  <article className="tile"><h3>MCP</h3><p>Eight stdio tools: sources, World, search, Ask, objects, relations, evidence, package. No write tool, and it refuses to start if one is added.</p><TrackedLink className="btn ghost" event="developer_mcp_started" href="/developer/tavonel-mcp.mjs" download>Download MCP server</TrackedLink></article>
                   {/*
                     The tile stays because the agent is real; its wording changes because
                     "connector agent" is not what it is. RESOLVED A-4 (2026-09-06).
@@ -147,7 +211,7 @@ export default function DevelopersPage() {
                     NFS, SFTP and S3-compatible connector" put four connectors on a page that
                     has none.
                   */}
-                  <article className="tile"><h3>Source agent</h3><p>Runs inside your network and pushes to TAVONEL, which reaches into nothing. Reads a mounted directory — an SMB, NFS or SFTP mount included — or an S3-compatible bucket. An assisted import route, not a self-serve connector.</p><a href="/developer/tavonel-source-agent.py" download>Download source agent</a></article>
+                  <article className="tile"><h3>Source agent</h3><p>Runs inside your network and pushes to TAVONEL, which reaches into nothing. Reads a mounted directory — an SMB, NFS or SFTP mount included — or an S3-compatible bucket. An assisted import route, not a self-serve connector.</p><a className="btn ghost" href="/developer/tavonel-source-agent.py" download>Download source agent</a></article>
                   {/*
                     The two reference verifiers, added when channel.json went from four assets to
                     six (devx CROSS-LANE 1). A customer who could not find them here could still
@@ -158,29 +222,40 @@ export default function DevelopersPage() {
                     a seventh asset can go unlisted the same way these two did. Generating the tiles
                     from channel.json is the root fix and a larger change than this campaign.
                   */}
-                  <article className="tile"><h3>Export verifier</h3><p>Checks a downloaded archive offline: the Ed25519 signature against a fingerprint you fetch separately, every file against the digest we signed, and nothing added. Node.js 20+, no dependency.</p><a href="/developer/tavonel-verify-export.mjs" download>Download export verifier</a></article>
-                  <article className="tile"><h3>Package verifier</h3><p>Checks what is inside the archive: relations resolve, every region sits inside its page in the 0-1000 frame, and the Turtle, JSON-LD and CSV describe the same graph. Add <code>tavonel-verify-roundtrip.py</code> to load it into SQLite and query the ids back.</p><a href="/developer/tavonel-verify-package.mjs" download>Download package verifier</a></article>
+                  <article className="tile"><h3>Export verifier</h3><p>Checks a downloaded archive offline: the Ed25519 signature against a fingerprint you fetch separately, every file against the digest we signed, and nothing added. Node.js 20+, no dependency.</p><a className="btn ghost" href="/developer/tavonel-verify-export.mjs" download>Download export verifier</a></article>
+                  <article className="tile"><h3>Package verifier</h3><p>Checks what is inside the archive: relations resolve, every region sits inside its page in the 0-1000 frame, and the Turtle, JSON-LD and CSV describe the same graph. Add <code>tavonel-verify-roundtrip.py</code> to load it into SQLite and query the ids back.</p><a className="btn ghost" href="/developer/tavonel-verify-package.mjs" download>Download package verifier</a></article>
                 </div>
                 <p className="fine">Verify versions and SHA-256 values against <a href="/developer/channel.json">the public distribution channel</a>. The <a href="/developer/README.md">setup and safety contract</a> documents scopes, secret handling and fail-closed behavior.</p>
               </div>
 
               <div className="stack">
-                <p className="slate"><b>PORTABLE PACKAGE</b><span />WHAT IS IN THE ARCHIVE</p>
+                <p className="slate"><b>PORTABLE PACKAGE</b><span aria-hidden="true" />· WHAT IS IN THE ARCHIVE</p>
                 <p className="fine">
                   Every signed export contains these files, written by the exporter and named in
                   a manifest carrying a digest for each one. The two ontology files are the
                   Compiled World&rsquo;s RDF / JSON-LD semantic projection — a projection of the
                   compiled objects and relations, not a hand-authored OWL schema.
                 </p>
-                <ul className="dev-package">
-                  {[...REQUIRED_PACKAGE_PATHS, ...PACKAGE_EXTRAS].map((path) => <li key={path}>{path}</li>)}
-                </ul>
+                <table className="docs-table">
+                  <thead><tr><th>Path</th><th>Use it for</th></tr></thead>
+                  <tbody>
+                    {[...REQUIRED_PACKAGE_PATHS, ...PACKAGE_EXTRAS]
+                      .slice()
+                      .sort((a, b) => a.localeCompare(b))
+                      .map((path) => (
+                        <tr key={path}>
+                          <td data-label="Path"><code>{breakable(path)}</code></td>
+                          <td data-label="Use it for">{packagePurpose(path)}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
               </div>
 
-              <p className="slate"><span />NEXT</p>
+              <p className="slate"><span aria-hidden="true" />NEXT</p>
               <div className="actions">
                 <Link className="btn" href={"/docs/quickstart" as Route}>Run the quickstart</Link>
-                <Link className="btn ghost" href={"/api" as Route}>API reference</Link>
+                <Link className="btn ghost" href={"/docs/authentication" as Route}>API reference</Link>
                 <Link className="btn ghost" href="/evidence">How evidence is bound</Link>
               </div>
             </div>

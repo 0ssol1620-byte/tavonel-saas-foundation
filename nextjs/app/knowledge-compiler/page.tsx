@@ -18,9 +18,33 @@ export const metadata: Metadata = { title: "What Is a Knowledge Compiler? — TA
   this product genuinely does not serve -- not a straw man chosen because the answer is flattering.
 */
 
+/*
+  BA-020. Ten identical rows become eight, with an index over them and the reference behind a
+  disclosure.
+
+  Measured on this branch before the change: 4,796px at 1280 and 7,284px at 390 -- about nine
+  phone screens -- as ten heading-left/table-right rows with no anchor on any of them, nothing to
+  skip with, and no call to action until the last. Three changes, none of which deletes a
+  sentence:
+
+    - the three "Compared with" sections become one section of three rows. They were three rows
+      of the same shape, each ending in a COMPILER row saying the compiler is the larger thing,
+      so the page made that argument three times and a reader took it once.
+    - `index` puts the section list under the hero, and every section now has an id to point at.
+    - the reference sections -- when it is not the right tool, the glossary, the questions --
+      are `collapsed`. They are what a reader consults rather than what they read, and together
+      they were about half the page's height.
+
+  The primary action moves up to the compile contract, the section that either convinces a reader
+  or does not. It was at the very bottom, six screens later.
+*/
 export default function KnowledgeCompilerPage() {
-  return <PublicProofRegistry eyebrow="CATEGORY GUIDE" title="What is a Knowledge Compiler?" summary="A Knowledge Compiler turns changing source material into a versioned, evidence-bound, portable knowledge object that people and AI systems can inspect together." sections={[
-    { title: "The compile contract", body: "The unit of value is not a chat response. It is a Compiled World with immutable inputs, structured objects, exact evidence, review state, retrieval material and portable files.", rows: [
+  return <PublicProofRegistry index eyebrow="CATEGORY GUIDE" title="What is a Knowledge Compiler?" summary="A Knowledge Compiler turns changing source material into a versioned, evidence-bound, portable knowledge object that people and AI systems can inspect together." sections={[
+    { title: "The compile contract", body: "The unit of value is not a chat response. It is a Compiled World with immutable inputs, structured objects, exact evidence, review state, retrieval material and portable files.", links: [
+      // One action, not the closing pair repeated: a reader convinced by the contract wants to
+      // see one, and the page's two-button close is three thousand pixels below this.
+      { href: "/explore", label: "OPEN A COMPILED WORLD" },
+    ], rows: [
       { key: "INPUT", description: "Versioned source files and connector cursors.", state: "IMMUTABLE" },
       { key: "STRUCTURE", description: "Directory, ontology, entities, claims and relations.", state: "REVIEWABLE" },
       { key: "EVIDENCE", description: "Source version, the exact location inside it, excerpt and digest.", state: "TRACEABLE" },
@@ -31,17 +55,10 @@ export default function KnowledgeCompilerPage() {
       body: "These are not four competing products. They are four different spans of one pipeline, which is why the comparisons below are about scope rather than quality.",
       figure: <KnowledgeCompilerDiagram />,
     },
-    { title: "Compared with RAG", body: "RAG retrieves chunks at question time. A Knowledge Compiler can produce retrieval units too, but treats them as one projection of a reviewed World rather than the final asset.", rows: [
-      { key: "RAG", description: "Question-time retrieval over an index; quality depends on chunking, retrieval and generation.", state: "COMPLEMENTARY" },
-      { key: "COMPILER", description: "Build-time structure, evidence and versions that multiple retrieval or model layers can consume.", state: "PERSISTENT ASSET" },
-    ] },
-    { title: "Compared with a knowledge graph", body: "A graph stores entities and relations. A Knowledge Compiler adds the source pipeline, evidence contract, review lifecycle, retrieval projections and portable package around that graph.", rows: [
-      { key: "GRAPH", description: "A representation of connected objects.", state: "COMPONENT" },
-      { key: "COMPILER", description: "The process and receipts that make the representation inspectable and maintainable.", state: "SYSTEM" },
-    ] },
-    { title: "Compared with enterprise search", body: "Enterprise search helps people find documents. A Knowledge Compiler materializes reusable claims, objects and evidence paths for both people and agents, while preserving links back to those documents.", rows: [
-      { key: "SEARCH", description: "Find and rank relevant source material.", state: "DOCUMENT-CENTRIC" },
-      { key: "COMPILER", description: "Build a versioned knowledge layer without discarding source provenance.", state: "WORLD-CENTRIC" },
+    { title: "Compared with RAG, graphs and search", body: "RAG retrieves chunks at question time, a graph stores entities and relations, and enterprise search helps people find documents. A Knowledge Compiler produces all three — retrieval units, a graph, a document index — and treats each as one projection of a reviewed World rather than as the final asset. Build-time structure, evidence and versions that several retrieval or model layers can consume, in other words, and the rows below are about that scope rather than about quality.", rows: [
+      { key: "RAG", description: "Question-time retrieval over an index; quality depends on chunking, retrieval and generation. The units a compiler emits come out of a reviewed World, so each one carries the region it was read from and changes only when the World does.", state: "COMPLEMENTARY" },
+      { key: "KNOWLEDGE GRAPH", description: "A representation of connected objects. A compiler adds the source pipeline, evidence contract, review lifecycle, retrieval projections and portable package around that graph — the process and the receipts that make the representation inspectable and maintainable.", state: "COMPONENT" },
+      { key: "ENTERPRISE SEARCH", description: "Find and rank relevant source material. A compiler materializes reusable claims, objects and evidence paths for both people and agents, and preserves the links back to those documents rather than discarding provenance.", state: "DOCUMENT-CENTRIC" },
     ] },
     { title: "When a compiler is the right tool", body: "Compiling costs a reading pass and a review. It pays for itself where the same material is answered from repeatedly, where being wrong is expensive, and where somebody will eventually ask how an answer was reached.", rows: [
       { key: "REPEATED USE", description: "The same corpus answers many questions, for many people, over months.", state: "PAYS BACK" },
@@ -49,13 +66,13 @@ export default function KnowledgeCompilerPage() {
       { key: "SCRUTINY", description: "Somebody will ask which page an answer came from, and a plausible sentence is not an acceptable reply.", state: "NEEDS EVIDENCE" },
       { key: "CHANGE", description: "Sources are revised, superseded and amended, and last quarter's answer still has to be explainable.", state: "NEEDS VERSIONS" },
     ] },
-    { title: "When it is not the right tool", body: "A category page that cannot say where its category stops is an advertisement. These are cases this product does not serve, and saying so here is cheaper for everyone than finding out after a pilot.", rows: [
+    { title: "When it is not the right tool", collapsed: true, body: "A category page that cannot say where its category stops is an advertisement. These are cases this product does not serve, and saying so here is cheaper for everyone than finding out after a pilot.", rows: [
       { key: "ONE DOCUMENT", description: "A single file you will read once. Open it. The compile buys nothing you do not already have.", state: "USE A READER" },
       { key: "LIVE RECORDS", description: "Answers that are a query over a database or a ticket queue, not a claim written in a document.", state: "QUERY THE SYSTEM" },
       { key: "NO REVIEWER", description: "Nobody who can decide whether a candidate World is correct. Promotion is a human decision by design, and without one the World never becomes active.", state: "NEEDS A PERSON" },
       { key: "BEYOND THE SOURCES", description: "Questions whose answer is not in the material. Retrieval here is a matching test, not a judgement about whether what matched answers you: it declines only when nothing matched at all, so a question the corpus cannot answer comes back as the nearest matching regions with their locators rather than as a refusal. Deciding they do not answer it is the reader\u2019s work, and buying a compiler to do that work is the wrong purchase.", state: "OUT OF SCOPE" },
     ] },
-    { title: "Glossary", body: "The words this product uses in the exact sense it uses them. Where a term has a looser industry meaning, the narrower one here is deliberate.", rows: [
+    { title: "Glossary", collapsed: true, body: "The words this product uses in the exact sense it uses them. Where a term has a looser industry meaning, the narrower one here is deliberate.", rows: [
       { key: "COMPILED WORLD", description: "The output of one compile: objects, relations, evidence, retrieval material and a validation report, addressed by a digest.", state: "THE ARTIFACT" },
       { key: "CANDIDATE", description: "A compiled result that has not been promoted. It can be read, downloaded and reviewed; nothing answers from it.", state: "LIFECYCLE" },
       { key: "ACTIVE", description: "The one revision a workspace answers from. It changes only when a person promotes a candidate or rolls back to a prior revision.", state: "LIFECYCLE" },
@@ -65,7 +82,7 @@ export default function KnowledgeCompilerPage() {
       { key: "ABSTENTION", description: "The answer given when the sources do not support one. It is a result, not a failure.", state: "BEHAVIOUR" },
       { key: "PACKAGE", description: "The portable form: canonical model, Turtle, JSON-LD, CSV, retrieval JSONL, provenance and a validation report.", state: "PORTABILITY" },
     ] },
-    { title: "Questions people ask", body: "Short answers about what the product does today, not what a category could do in principle.", faq: [
+    { title: "Questions people ask", collapsed: true, body: "Short answers about what the product does today, not what a category could do in principle.", faq: [
       {
         question: "Is this just RAG with extra steps?",
         answer: "RAG is a retrieval strategy; this is an artifact. The chunks a retriever needs are one file in the package, produced from a reviewed World rather than from raw text — so they carry the page and region they came from, and they change only when the World does.",
@@ -98,14 +115,27 @@ export default function KnowledgeCompilerPage() {
         /benchmarks became crawlable in the Category Leadership campaign and nothing pointed at it
         from here. `lib/trust-page-answers.test.ts` holds the two links in place.
       */
+      /*
+        BA-019. Six chips of equal weight are a link list in button clothing, and with no primary
+        among them the page ended without asking for anything. One primary, one secondary, and
+        the four references as the reading list they already were.
+
+        BA-016 is the third of those references. It read "WHAT WOULD BE MEASURED", sitting between
+        two labels that describe things that exist, and announced an absence in the one place a
+        reader decides whether to go further. /benchmarks publishes the protocol -- what a
+        knowledge-compilation result has to carry before it may be published as a number -- so the
+        door says that, and the page behind it still says plainly that it has no table yet.
+      */
       links: [
         { href: "/explore", label: "OPEN A COMPILED WORLD" },
-        { href: "/evidence", label: "HOW EVIDENCE IS BOUND" },
-        { href: "/benchmarks", label: "WHAT WOULD BE MEASURED" },
-        // `/docs/[section]` is a dynamic route, so a literal section needs the cast typedRoutes asks for.
-        { href: "/docs/exports" as Route, label: "PACKAGE FORMAT" },
-        { href: "/docs/cli" as Route, label: "VERIFIERS" },
         { href: "/login", label: "START WITH YOUR FILES" },
+      ],
+      readNext: [
+        { href: "/evidence", label: "How evidence is bound" },
+        { href: "/benchmarks", label: "How results are measured" },
+        // `/docs/[section]` is a dynamic route, so a literal section needs the cast typedRoutes asks for.
+        { href: "/docs/exports" as Route, label: "Package format" },
+        { href: "/docs/cli" as Route, label: "Verifiers" },
       ],
     },
   ]} />;

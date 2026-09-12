@@ -31,6 +31,41 @@ import { readR2SignerEnv } from "./r2-synthetic-canary";
 const STALL_AFTER_MS = 15 * 60 * 1_000;
 
 /**
+ * What this worker logs when it meets a database that has not been migrated yet.
+ *
+ * Stable string on purpose: it is the thing an operator greps for, and the thing an alert is
+ * built on. It names the migration so the fix is in the message.
+ */
+export const DIGEST_MIGRATION_NOT_APPLIED =
+  "candidate_manifest_digest not recorded: migration 20260911120200 not applied";
+
+/**
+ * Advance a job that has a digest to record, on a deployment that may not be able to record it.
+ *
+ * Release order for 2026-09-11 is migrations first, then deploy (`docs/runbooks/RELEASE_ORDER.md`),
+ * and the migration's ninth parameter defaults to null so a worker that is still sending eight
+ * arguments keeps working. This is the other direction: the worker arrives first, the function
+ * still takes eight arguments, and every advance would answer PGRST202 -- which would stall the
+ * whole compile queue rather than lose one column.
+ *
+ * So: retry once without the digest, and say so at error level. Loud, because the queue running
+ * while a recorded fact is silently missing is exactly the state that must not look healthy --
+ * `candidateAwaitingActivation` reads conservatively from the digest, and a compile that ran
+ * during this window has none. Once, because a second PGRST202 on the eight-argument call is a
+ * different problem and retrying it forever would hide that one too.
+ */
+async function advanceRecordingDigest(
+  input: Parameters<typeof advanceCompileJob>[0] & { candidateManifestDigest?: string | null },
+) {
+  const first = await advanceCompileJob(input);
+  if (first.ok || first.code !== "COMPILE_JOB_RPC_UNDEFINED") return first;
+  console.error(DIGEST_MIGRATION_NOT_APPLIED, { jobId: input.jobId, state: input.state });
+  // `undefined` omits the argument from the request body; `null` would still name it and fail
+  // the same way. The store's own note on the field says why.
+  return advanceCompileJob({ ...input, candidateManifestDigest: undefined });
+}
+
+/**
  * How long a compile may sit in `structuring` before another worker may take it over.
  *
  * The transition into `structuring` is the lease: only the worker whose advance actually
@@ -295,22 +330,28 @@ export async function runCompileJobTurn(job: CompileJob): Promise<CompileJobTurn
     return rest("failed", "failed", classified.ready.length, classified.blocked);
   }
 
-  await advanceCompileJob({
+  // The digest goes on both advances, not because it is written twice -- the RPC coalesces --
+  // but because either call can be the one that lands. A redelivery whose first advance is
+  // refused for moving backwards (the job is already at review_required) would otherwise settle
+  // with no record of the artifact it produced.
+  await advanceRecordingDigest({
     workspaceKey: job.workspaceKey,
     jobId: job.jobId,
     state: "building_world",
     documentsReady: classified.ready.length,
     collectionId: run.payload.collectionId,
+    candidateManifestDigest: run.payload.manifestDigest,
   });
 
   const settled: CompileState = run.payload.lifecycle === "review_required" ? "review_required" : "ready";
-  await advanceCompileJob({
+  await advanceRecordingDigest({
     workspaceKey: job.workspaceKey,
     jobId: job.jobId,
     state: settled,
     documentsReady: classified.ready.length,
     collectionId: run.payload.collectionId,
     blocked: classified.blocked,
+    candidateManifestDigest: run.payload.manifestDigest,
   });
   return rest("compiled", settled, classified.ready.length, classified.blocked);
 }

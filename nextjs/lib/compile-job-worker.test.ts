@@ -10,7 +10,8 @@ import type { CompileJob, CompileJobResult, CompileState } from "./compile-job-s
   compiles of one submission; a cancelled job that finished anyway.
 */
 
-const advance = vi.fn(async () => ({
+// Typed as the store's own result so a case can hand the worker a refusal as well as a success.
+const advance = vi.fn(async (): Promise<CompileJobResult<{ state: CompileState; changed: boolean }>> => ({
   ok: true as const,
   value: { state: "reading" as CompileState, changed: true },
 }));
@@ -53,7 +54,8 @@ vi.mock("./immutable-keys", async (importOriginal) => {
   real ones -- the factory spreads the actual module -- so reading them late is what makes them
   readable.
 */
-const { runCompileJobBatch, runCompileJobTurn } = await import("./compile-job-worker");
+const { runCompileJobBatch, runCompileJobTurn, DIGEST_MIGRATION_NOT_APPLIED } =
+  await import("./compile-job-worker");
 const { RESTING_COMPILE_STATES, SCHEDULER_EXCLUDED_STATES } = await import("./compile-job-store");
 
 const DOCUMENT = (id: string, state: "ocr_ready" | "sanitized" | "operator_review") => ({
@@ -138,6 +140,83 @@ describe("the durable compile worker", () => {
     expect(turn.note).toBe("compiled");
     expect(turn.state).toBe("ready");
     expect(runCompile).toHaveBeenCalledWith("pilot-alpha", ["doc-a"]);
+  });
+
+  it("records the digest of the artifact it produced, on whichever advance lands", async () => {
+    /*
+      `candidateAwaitingActivation` was computable only from versions the workspace had already
+      promoted, plus the candidate the current request happened to have loaded -- so a compiled
+      World waiting for approval could read as "nothing is waiting". The digest is the one value
+      that identifies that artifact, and this is the only place that knows it.
+
+      Both settling advances carry it because either can be the one that lands: a redelivery
+      whose building_world advance is refused for moving backwards would otherwise settle with
+      no record of what it built. The RPC coalesces, so writing it twice writes it once.
+    */
+    group.mockReturnValue([DOCUMENT("doc-a", "ocr_ready"), DOCUMENT("doc-b", "ocr_ready")]);
+    const manifestDigest = `sha256:${"c".repeat(64)}`;
+    runCompile.mockResolvedValue({
+      ok: true,
+      status: 200,
+      payload: { collectionId: "collection-" + "b".repeat(32), manifestDigest, lifecycle: "candidate" },
+    });
+
+    const turn = await runCompileJobTurn(job());
+    expect(turn.note).toBe("compiled");
+
+    const calls = advance.mock.calls as unknown as Array<[{ state: CompileState; candidateManifestDigest?: string }]>;
+    // The lease into `structuring` has no artifact yet and must not claim one.
+    expect(calls.map(([input]) => [input.state, input.candidateManifestDigest ?? null])).toEqual([
+      ["structuring", null],
+      ["building_world", manifestDigest],
+      ["ready", manifestDigest],
+    ]);
+  });
+
+  it("keeps advancing, loudly, against a database the digest migration has not reached", async () => {
+    /*
+      Deploy order, from the wrong side of it.
+
+      Release order for 2026-09-11 is migrations first, then deploy. If it is reversed, the
+      function in the database still takes eight arguments and every advance this worker makes
+      answers PGRST202 -- so the failure is not a missing column, it is the whole compile queue
+      stopping. The fallback sends the call the deployed function does have, once, and logs the
+      stable message an operator greps for. What must not happen is either half alone: a silent
+      fallback that hides an unapplied migration, or a stall that hides behind a retry loop.
+    */
+    group.mockReturnValue([DOCUMENT("doc-a", "ocr_ready"), DOCUMENT("doc-b", "ocr_ready")]);
+    const manifestDigest = `sha256:${"c".repeat(64)}`;
+    runCompile.mockResolvedValue({
+      ok: true,
+      status: 200,
+      payload: { collectionId: "collection-" + "b".repeat(32), manifestDigest, lifecycle: "candidate" },
+    });
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    // Call 1 is the lease into `structuring`; call 2 is the building_world advance that carries
+    // the digest, and it is the one the old function cannot resolve.
+    advance.mockResolvedValueOnce({ ok: true, value: { state: "structuring", changed: true } });
+    advance.mockResolvedValueOnce({ ok: false, code: "COMPILE_JOB_RPC_UNDEFINED" });
+
+    const turn = await runCompileJobTurn(job());
+
+    expect(turn.note, "the queue keeps moving").toBe("compiled");
+    expect(logged).toHaveBeenCalledWith(
+      DIGEST_MIGRATION_NOT_APPLIED,
+      expect.objectContaining({ state: "building_world" }),
+    );
+    const calls = advance.mock.calls as unknown as Array<[{ state: CompileState; candidateManifestDigest?: string }]>;
+    expect(calls.map(([input]) => [input.state, input.candidateManifestDigest ?? "omitted"])).toEqual([
+      ["structuring", "omitted"],
+      ["building_world", manifestDigest],
+      // The retry names no digest at all, which is what makes it the eight-argument call.
+      ["building_world", "omitted"],
+      ["ready", manifestDigest],
+    ]);
+    expect(calls[2][0], "the retry omits the argument rather than nulling it")
+      .not.toHaveProperty("candidateManifestDigest", null);
+    // Once, not in a loop: a second PGRST202 is a different problem.
+    expect(logged).toHaveBeenCalledTimes(1);
+    logged.mockRestore();
   });
 
   it("does not compile twice when two workers pick up the same job", async () => {

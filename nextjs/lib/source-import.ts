@@ -1,5 +1,5 @@
 import { reserveFoundationCompute } from "./compute-reservation";
-import { estimateBillablePages } from "./usage-pricing";
+import { reservationPageCeiling } from "./usage-pricing";
 import { oauthSourceDownloadRequest, type OAuthSourceItem, type OAuthSourceTarget } from "./connector-oauth-adapters";
 import { type OAuthConnectorProvider } from "./connector-oauth";
 import { confirmFoundationIntake, reserveFoundationIntake } from "./intake-admission";
@@ -153,7 +153,9 @@ export async function importSourceObject(context: ImportContext, item: OAuthSour
     workspaceKey: context.workspaceKey,
     documentId,
     userId: context.userId,
-    estimatedPages: estimateBillablePages({ bytes: bytes.byteLength, mimeType: descriptor.mimeType })?.pages ?? 1,
+    // Same reservation rule as the upload route: the documented page ceiling for a source whose
+    // format states no page count, never one page and never a byte-derived fact.
+    estimatedPages: reservationPageCeiling({ bytes: bytes.byteLength, mimeType: descriptor.mimeType }),
   });
   if (!compute.ok) return { ok: false, nativeId: item.nativeId, code: compute.code };
 

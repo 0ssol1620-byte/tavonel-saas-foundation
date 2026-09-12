@@ -115,7 +115,11 @@ test("draws the final five-scene journey over the opening world field", async ({
    */
   await expect(page.locator("section.scene")).toHaveCount(5);
   await expect(page.locator("section.scene.cont")).toHaveCount(0);
-  await expect(page.locator(".world-field")).toHaveCount(1);
+  const liveFrame = await page.evaluate(() => window.matchMedia(
+    "(min-width: 900px) and (not ((pointer: coarse) and (max-width: 1023px)))",
+  ).matches);
+  // Phones retain every scene without mounting a full-screen animation loop.
+  await expect(page.locator(".world-field")).toHaveCount(liveFrame ? 1 : 0);
 
   const scenes = await page.evaluate(() =>
     Array.from(document.querySelectorAll("[data-scene]")).map((el) => el.getAttribute("data-scene")));
@@ -127,10 +131,12 @@ test("draws the final five-scene journey over the opening world field", async ({
     "scatter", "structure", "change", "answer", "access",
   ]);
 
-  const field = await page.locator(".world-field").boundingBox();
-  const viewport = await page.evaluate(() => ({ width: window.innerWidth, height: window.innerHeight }));
-  expect(field?.width).toBe(viewport.width);
-  expect(field?.height).toBe(viewport.height);
+  if (liveFrame) {
+    const field = await page.locator(".world-field").boundingBox();
+    const viewport = await page.evaluate(() => ({ width: window.innerWidth, height: window.innerHeight }));
+    expect(field?.width).toBe(viewport.width);
+    expect(field?.height).toBe(viewport.height);
+  }
 });
 
 /*
@@ -250,6 +256,17 @@ test("the Explore CTA crossfades the world canvas rather than cutting", async ({
     Array.from(document.querySelectorAll("*"))
       .filter((element) => getComputedStyle(element).viewTransitionName === "world-canvas")
       .map((element) => String(element.className || element.tagName)));
+  const liveFrame = await page.evaluate(() => window.matchMedia(
+    "(min-width: 900px) and (not ((pointer: coarse) and (max-width: 1023px)))",
+  ).matches);
+  if (!liveFrame) {
+    // This is a positive mobile navigation check, not a skipped desktop assertion.
+    expect(claimants, "mobile must not mount a hidden canvas just for a transition").toHaveLength(0);
+    await page.locator('main a[href="/explore"]').first().click();
+    await page.waitForURL(/\/explore$/);
+    await expect(page.locator("main")).toBeVisible();
+    return;
+  }
   expect(claimants, "exactly one element may carry the world-canvas transition name").toHaveLength(1);
   expect(claimants[0]).toContain("world-field");
 

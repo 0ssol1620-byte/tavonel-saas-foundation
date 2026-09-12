@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { PublicSitePage } from "@/components/public-site-chrome";
 import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
-import { CONTRACT_STATE, clause } from "@/lib/compiler-contract";
+import { clause } from "@/lib/compiler-contract";
 
 export const metadata: Metadata = {
   // Each page declares its own address. Without this every route inherited the root
@@ -32,19 +32,43 @@ export const metadata: Metadata = {
   world" and "what supports, supersedes, depends on or contradicts what" in the present tense,
   one click from `lib/compiler-contract.ts`, which marks cross-string identity merge `direction`
   and names the edges the compiler actually emits. Two pages on the same site disagreeing about
-  the same compiler is worse than either sentence alone, so the two cards now import their clause
-  and print the registry's own state word under themselves. The day a clause flips to
-  `demonstrated`, the word on the card flips with it and `product-claims-sync.test.ts` requires
-  the sentence to be re-derived rather than left standing.
+  the same compiler is worse than either sentence alone, so the two cards are written against
+  their clause, import it, and link to it. The day a clause changes state the check below stops
+  the build, and `product-claims-sync.test.ts` requires the sentence to be re-derived rather than
+  left standing.
 */
 const IDENTITY = clause("stable-semantic-identity");
 const RELATIONS = clause("typed-dependencies");
+
+/*
+  BA-013. The tie to the registry is a build error now, not a readiness ladder in the card.
+
+  Two of the six cards ended with the state word and its definition printed in mono -- "DIRECTION
+  An intended property of the compiler contract. Not offered as a shipped capability in this
+  deployment." and "DEMONSTRATED Built and shown on a declared sample or controlled path; not a
+  production qualification." A prospect read a card and was then told by us that what they had
+  just read does not qualify. That vocabulary belongs on /product/continuous-knowledge, where all
+  eight clauses are the subject and a reader arrives for exactly that distinction; the card keeps
+  its pointer to the clause, without the grade.
+
+  What the printed label bought was drift protection: change a clause's state and the card's word
+  changed with it. This buys more. The two cards are written against these two states, so a flip
+  now stops the build and names the cards to re-derive, instead of swapping an adjective under
+  copy that has quietly become false. `product-claims-sync.test.ts` pins this in place of the
+  label it used to pin, and the identity card's "are not merged automatically" sentence is still
+  required by the assertion beside it.
+*/
+if (IDENTITY.state !== "direction" || RELATIONS.state !== "demonstrated") {
+  throw new Error(
+    "a compiler-contract clause changed state: re-derive the OBJECTS and RELATIONS cards on /product/compiled-world",
+  );
+}
 
 type Part = {
   state: string;
   title: string;
   body: string;
-  /** The contract clause this card is derived from, printed with its state and its meaning. */
+  /** The contract clause this card is derived from, pointed at rather than graded. */
   clause?: typeof IDENTITY;
 };
 
@@ -69,14 +93,25 @@ const PARTS: readonly Part[] = [
     state: "RELATIONS",
     title: "What connects to what",
     /*
-      The live engine's set, re-derived after audit R3-K09 stopped the projection discarding two
-      thirds of it. The edges are the Core's own, read from semantics.py: `mentions` runs from a
-      claim to an entity found by a case-folded match over capitalised phrases, acronyms and
-      Korean organisation names in that claim's sentence, and `contradicts` is a candidate a
-      person resolves, never a resolution. The fallback's two document-level heuristics keep
-      their own sentence because they are a different engine with different subjects.
+      The live engine's set, read from the Core's own semantics.py after audit R3-K09 stopped the
+      projection discarding two thirds of it: `mentions` runs from a claim to an entity matched
+      in that claim's sentence, and `contradicts` is a candidate a person resolves, never a
+      resolution.
+
+      BA-015. Three sentences, and the implementation stays in the documentation.
+
+      This card was a 130-word dump: it named the predicate set, explained a case-folded match
+      over capitalised phrases, acronyms and Korean organisation names, described a
+      capitalised-token scan and a keyword rule set, told the reader the public Explore sample
+      runs a different engine, and closed on "are still directions: the gate in front of
+      retrieval does not check them". Every one of those facts is still published, in the place
+      that maintains it: the per-predicate table with its engine column is
+      /docs/ontology-output, which this page's own actions row links to; the business-relation
+      limit is the typed-dependencies clause this card points at; and the sample's engine is
+      labelled where its figures are, on Explore. What the card keeps is the contract a buyer is
+      reading it for -- typed, evidence-bearing edges, and a contradiction that goes to a person.
     */
-    body: "Every edge is typed and carries the evidence ids that justify it — an edge naming no evidence is not a row this emitter can produce. What a compile emits on this deployment is the claim-to-evidence edge — a claim is supported_by one exact document version — and a claim mentions an entity, from a case-folded match over capitalised phrases, acronyms and Korean organisation names in that claim's own sentence. Two claims that disagree on a number or on whether something is the case, inside one topic and one time reference, are emitted as a contradicts candidate and sent to review: the compiler flags the pair, a person resolves it, and it knows nothing about jurisdiction, units or exception clauses. The engine behind the public Explore sample instead emits two document-level edges from text heuristics, mentions_entity from a capitalised-token scan and discusses_topic from a small set of keyword rules. Business relations — what supports, what replaces what, what depends on what — are still directions: the gate in front of retrieval does not check them.",
+    body: "Every edge is typed and carries the evidence ids that justify it — an edge naming no evidence is not a row the compiler can produce. A claim is supported_by the one exact document version it was read from, and mentions the entities named inside it. Two claims that disagree on a number, or on whether something is the case, inside one topic and one time reference are emitted as a contradicts candidate and sent to review: the compiler flags the pair and a person resolves it.",
     clause: RELATIONS,
   },
   /*
@@ -123,8 +158,21 @@ export default function CompiledWorldPage() {
         <div className="shell">
           <div className="body">
             <div className="stack">
+              {/*
+                BA-026. The trail the page already declares to a crawler, now on the screen.
+
+                `BreadcrumbJsonLd` above emits Product -> Compiled World for search engines, and
+                a reader arriving on this page from that same search had no visible way back to
+                /product except the navigation's disclosure menu.
+              */}
+              <p className="doc-breadcrumb"><Link href={"/product" as Route}>Product</Link> <span aria-hidden="true">/</span> Compiled World</p>
               <p className="slate"><b>PRODUCT</b><span />COMPILED WORLD</p>
-              <h1 className="document-title">Not searchable files. A world an AI can reason about.</h1>
+              {/*
+                BA-024. The headline spent its first two words on what the product is not, and
+                repeated the home page's contrast instead of advancing it. Six cards under it
+                make the case; the headline states the claim.
+              */}
+              <h1 className="document-title">A world your AI can reason about.</h1>
             </div>
             <div className="stack">
               <p className="lede">
@@ -136,12 +184,16 @@ export default function CompiledWorldPage() {
                 {PARTS.map((part) => (
                   <article className="tile" key={part.title}>
                     <span className="n">{part.state}</span>
-                    <h3>{part.title}</h3>
+                    {/*
+                      BA-025. h2, not h3: these cards are the first sections under the h1, so an
+                      h3 here left the page's heading outline h1 -> h3 and a screen-reader user
+                      could not walk it. `.tiles .tile h2` in tavonel.css already carries the
+                      card treatment, so the visual weight is unchanged.
+                    */}
+                    <h2>{part.title}</h2>
                     <p>{part.body}</p>
                     {part.clause ? (
                       <p className="fine">
-                        <b>{CONTRACT_STATE[part.clause.state].label}</b>{" "}
-                        {CONTRACT_STATE[part.clause.state].meaning}{" "}
                         <Link href={`/product/continuous-knowledge#${part.clause.id}` as Route}>
                           {part.clause.name} in the Compiler Contract
                         </Link>
@@ -150,15 +202,22 @@ export default function CompiledWorldPage() {
                   </article>
                 ))}
               </div>
+              {/*
+                BA-019. Five buttons in a row are a link list wearing buttons, and at phone width
+                they stacked left-aligned at five different widths. One primary, one secondary,
+                and the three references become links in the closing sentence -- which is also
+                where a reader who has finished the six cards is looking.
+              */}
               <p className="fine">
                 Every compile emits the same package shape, so a world built today can be read by
-                a tool written against one built last month.
+                a tool written against one built last month. The formats are set out in{" "}
+                <Link href="/docs/ontology-output">the ontology output</Link>, how a fact is bound
+                to its source in <Link href="/evidence">Evidence</Link>, and how to consume a
+                world from an assistant in{" "}
+                <Link href="/docs/use-with-ai">Use the result with AI</Link>.
               </p>
               <div className="actions">
                 <Link className="btn" href={"/explore" as Route}>Explore a Compiled World</Link>
-                <Link className="btn ghost" href="/docs/use-with-ai">Use the result with AI</Link>
-                <Link className="btn ghost" href="/docs/ontology-output">Use the ontology output</Link>
-                <Link className="btn ghost" href="/evidence">How evidence is bound</Link>
                 <Link className="btn ghost" href="/developers">Read it from your code</Link>
               </div>
             </div>

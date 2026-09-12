@@ -30,11 +30,19 @@ export const TRUST_SEQUENCE = [
 
 export type TrustStep = (typeof TRUST_SEQUENCE)[number]["href"];
 
-/** The precise action that moves a reader from one step to the next. Never a generic CTA. */
+/**
+ * The precise action that moves a reader from one step to the next. Never a generic CTA.
+ *
+ * BA-096: "Rebuild the measurement" was a promise /reproducibility does not keep. What that page
+ * publishes is three digest-bound public sample PDFs and two downloadable manifests -- byte
+ * identity, which is a real thing to offer and is not a measurement to rebuild. A CTA whose
+ * destination contradicts it costs more than a plainer one, so the label names what the page
+ * actually hands over.
+ */
 const NEXT_ACTION: Record<TrustStep, string> = {
   "/security": "See how evidence is bound",
   "/evidence": "See what was measured",
-  "/benchmarks": "Rebuild the measurement",
+  "/benchmarks": "Rerun the public sample",
   "/reproducibility": "Read the open questions",
   "/research": "Understand what it costs",
   "/pricing": "Start with your files",
@@ -44,8 +52,15 @@ const NEXT_ACTION: Record<TrustStep, string> = {
  * The one next step at the foot of a trust page.
  *
  * `from` is the page rendering it, so a page never has to know its own position in the order.
+ *
+ * BA-097: `emphasis`. /evidence renders its own filled CTA -- "Open a result at its exact source
+ * location", the proof the page has just spent a screen promising -- and then this component
+ * rendered a second filled button 200px below it, so one view had two primaries competing. The
+ * host page's own action is the better primary, so a page that already has one passes
+ * `emphasis="quiet"` and this step renders as a ghost. The step is not removed: the sequence
+ * exists because /reproducibility and /research had no way onward at all.
  */
-export function TrustNext({ from }: { from: TrustStep }) {
+export function TrustNext({ from, emphasis = "primary" }: { from: TrustStep; emphasis?: "primary" | "quiet" }) {
   const index = TRUST_SEQUENCE.findIndex((step) => step.href === from);
   const next = TRUST_SEQUENCE[index + 1];
   if (!next) return null;
@@ -54,7 +69,9 @@ export function TrustNext({ from }: { from: TrustStep }) {
       <p className="slate"><span />NEXT · {next.label.toUpperCase()}</p>
       <p className="fine">{next.question}</p>
       <div className="actions">
-        <Link className="btn" href={next.href as Route}>{NEXT_ACTION[from]}</Link>
+        <Link className={emphasis === "quiet" ? "btn ghost" : "btn"} href={next.href as Route}>
+          {NEXT_ACTION[from]}
+        </Link>
       </div>
     </div>
   );

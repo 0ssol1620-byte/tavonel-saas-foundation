@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { checkActivationRateLimit } from "@/lib/activation-rate-limit";
 import { authorizeFoundationProduct } from "@/lib/billing-product-access";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
@@ -69,12 +70,28 @@ export async function POST(
   const access = foundationPilotAccess(user.id);
   if (!access) return NextResponse.json({ code: "PILOT_ACCESS_REQUIRED" }, { status: 403, headers: NO_STORE });
   const { membership } = access;
-  const productAccess = await authorizeFoundationProduct(membership.workspaceId, user.id, "studio");
+  const productAccess = await authorizeFoundationProduct(membership.workspaceId, user.id, "activation", membership.role);
   if (!productAccess.ok) return NextResponse.json({ code: productAccess.code }, { status: productAccess.status, headers: NO_STORE });
   if (membership.role !== "owner" && membership.role !== "admin") {
     return NextResponse.json(
       { code: "ROLLBACK_ROLE_REQUIRED" },
       { status: 403, headers: NO_STORE }
+    );
+  }
+  /*
+    The self-serve ceiling (FD-02 repair). Checked after the plan and role gates and before any
+    storage read, so a caller over the hour's limit spends nothing: 429 with a typed code, and a
+    Retry-After the client can honour. `lib/activation-rate-limit.ts` explains why it is counted
+    off the durable audit rows rather than held in memory.
+  */
+  const ceiling = await checkActivationRateLimit(membership.workspaceId, "world_activation");
+  if (!ceiling.ok) {
+    return NextResponse.json(
+      { code: ceiling.code },
+      {
+        status: ceiling.status,
+        headers: { ...NO_STORE, "Retry-After": String(ceiling.retryAfterSeconds) },
+      }
     );
   }
   const rolledBack = await rollbackFoundationWorld({

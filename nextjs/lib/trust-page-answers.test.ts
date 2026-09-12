@@ -27,6 +27,9 @@ const withoutComments = (source: string) =>
 */
 const SECURITY_ANSWERS: Array<[string, string]> = [
   ["where data goes", "Tenant-scoped quarantine holds the bytes"],
+  // The two statements a procurement reader looks for before reading any control on the page.
+  ["data residency", "No data residency is guaranteed"],
+  ["third-party audit", "no such review has been commissioned"],
   ["who can access it", "Access is a workspace membership checked server-side"],
   ["tenant isolation", "Workspace identity is derived server-side"],
   ["retention / deletion", "can be deleted on request"],
@@ -124,10 +127,77 @@ describe("/security answers the §17.1 questions", () => {
     ).toContain("what is wired today");
   });
 
+  /*
+    §49: never preclaim. This was a substring ban over the whole page, and it moved to the shape
+    `/trust` already uses, for the reason `/trust` already recorded: a rule that cannot tell a
+    claim from its denial makes the honest sentence unwriteable, and an absence nobody is allowed
+    to name is an absence the reader discovers after the pilot.
+
+    So the three artefact names are allowed in the unanswered block, which is the only place on
+    this page where naming one is a "no", and the words that would assert the claim -- certified,
+    attestation, compliant, audited by -- stay banned outright.
+  */
+  it("names SOC 2, ISO 27001 and a penetration test only as things that do not exist", () => {
+    const source = read("app/security/page.tsx");
+    const absent = source.match(/const UNANSWERED = \[[\s\S]*?\] as const;/)?.[0] ?? "";
+    expect(absent).not.toBe("");
+    const elsewhere = withoutComments(source.replace(absent, " ")).toLowerCase();
+    for (const artefact of ["soc 2", "soc2", "iso 27001", "iso27001", "pen test", "penetration test"]) {
+      expect(elsewhere, `"${artefact}" outside the unanswered block reads as a claim`).not.toContain(artefact);
+    }
+    const row = absent.slice(absent.indexOf("Third-party certification"));
+    // BA-155: the row leads with what is on record, so the three artefact names are now in the
+    // middle of a sentence rather than at the start of one. Matched case-insensitively for that
+    // reason, and only for that reason -- all three still have to be there, and still as a "no".
+    expect(row).toMatch(/no SOC 2 report/i);
+    expect(row).toContain("no ISO 27001 certificate");
+    expect(row).toContain("no independent penetration-test report exists");
+    expect(row, "a badge is the marketing decoration this row exists to refuse").toContain("no badge");
+    expect(
+      row,
+      'none commissioned and one under way are the two answers a buyer is choosing between',
+    ).toContain("no such review has been commissioned");
+  });
+
+  /*
+    The roadmap sentence, and its failure path.
+
+    One sentence of sequencing is authorised on this page and on `/trust` -- a delegated decision,
+    2026-09-11 (orchestrator, under the founder's delegation), FD-12 in
+    `docs/policy/DECISION_LOG_2026-09-11.md`, and reversible by the founder: an external
+    penetration test after the first paying customer, and no SOC 2 timing. It is publishable
+    because it contains no date and nothing scheduled. The edit this guards against is the one
+    that adds a quarter, a month or an "under way" and turns an order of events into a commitment
+    nobody has funded -- so the ban list is checked against the rendered copy of the block.
+
+    What the sentence may not carry is the paperwork. The pin on "That sequencing is a delegated
+    decision pending the founder's confirmation (decision log, FD-12)" is inverted rather than
+    deleted: the decision log's "Public wording of delegated values" section says a public page
+    states the commitment and nothing about the process, and the founder's merge of the pull
+    request carrying that log is the confirmation. The provenance is the comment above the block.
+  */
+  it("sequences the external test without dating it", () => {
+    const absent = withoutComments(
+      read("app/security/page.tsx").match(/const UNANSWERED = \[[\s\S]*?\] as const;/)?.[0] ?? "",
+    );
+    expect(absent).toContain("An external penetration test is planned after the first paying customer");
+    expect(absent).toContain("SOC 2 timing is not set");
+    expect(absent, "the sequencing sentence carries no process label on a public page").not.toContain(
+      "delegated decision pending the founder's confirmation",
+    );
+    expect(absent, "and no log id either").not.toContain("FD-12");
+    expect(read("app/security/page.tsx"), "the provenance stays in the source, pointing at the log")
+      .toContain("docs/policy/DECISION_LOG_2026-09-11.md");
+    for (const schedule of ["q1", "q2", "q3", "q4", "under way", "underway", "by the end of", "this year", "next year", "in progress", "scheduled for"]) {
+      expect(absent.toLowerCase(), `"${schedule}" turns a sequence into a date`).not.toContain(schedule);
+    }
+    expect(absent, "a year in this block is a date nobody has committed to").not.toMatch(/\b20\d\d\b/);
+  });
+
   it("claims no certification, audit or attestation", () => {
-    // §49: never preclaim. These are the words a procurement reader searches for first.
-    for (const claim of ["soc 2", "soc2", "iso 27001", "iso27001", "pen test", "penetration test", "attestation", "certified"]) {
-      expect(page.toLowerCase(), `"${claim}" is a claim this deployment cannot make`).not.toContain(claim);
+    const copy = withoutComments(page).toLowerCase();
+    for (const claim of ["attestation", "certified", "compliant", "audited by", "independently audited"]) {
+      expect(copy, `"${claim}" is a claim this deployment cannot make`).not.toContain(claim);
     }
   });
 });
@@ -181,23 +251,165 @@ describe("/trust indexes the six published surfaces", () => {
     the old, now half-false claim. The objectives are the part still missing, so that is what
     the row has to name.
 
-    The fourth entry is new: certification and third-party audit, which §45 does not list and
-    every procurement reader asks first.
+    Two more rows left this list on 2026-09-11 and the list shrank to two. The DPA and the
+    incident procedure are published now, which means the assertion that has to exist is the
+    opposite one: they must NOT be in the not-published block, or the page would be denying
+    something it also links. Both directions are checked here, because "the string is somewhere on
+    the page" was never the interesting half -- the row it is in is.
   */
   it("says which elements are not published, without promising them", () => {
-    for (const missing of [
-      "Recovery objectives",
-      "Data processing agreement",
-      "Incident response process",
-      "Third-party certification and audit",
-    ]) {
-      expect(page).toContain(missing);
-    }
     const absent = page.match(/const NOT_PUBLISHED[\s\S]*?\];/)?.[0] ?? "";
     expect(absent).not.toBe("");
+    for (const missing of ["Recovery objectives", "Third-party certification and audit"]) {
+      expect(absent, `${missing} is the honest absence this block exists for`).toContain(missing);
+    }
+    for (const published of ["Data processing agreement", "Incident response", "Data residency"]) {
+      expect(
+        absent,
+        `${published} is published now -- a page that links it and lists it as absent contradicts itself`,
+      ).not.toContain(published);
+    }
     for (const promise of ["coming soon", "will be published", "shortly", "in progress", "roadmap"]) {
       expect(absent.toLowerCase(), `"${promise}" turns a missing answer into a commitment`).not.toContain(promise);
     }
+    // The one authorised sequencing sentence carries no date, on this page as on /security.
+    expect(absent).toContain("An external penetration test is planned after the first paying customer");
+    expect(absent).toContain("SOC 2 timing is not set");
+    for (const schedule of ["q1", "q2", "q3", "q4", "under way", "underway", "by the end of", "scheduled for"]) {
+      expect(absent.toLowerCase(), `"${schedule}" turns a sequence into a date`).not.toContain(schedule);
+    }
+  });
+
+  /*
+    P1. The DPA is served as a file, and this is the pair of facts that makes publishing an
+    unsigned contract safe: the reader gets the URL and the label together, and the numbers on the
+    page are the numbers in the document.
+
+    The failure path is the edit that keeps the link and loses the label. A reader who sees the URL
+    without "draft ... not a signed agreement" has been handed a contract, so the label is asserted
+    inside the anchor rather than merely somewhere on the page.
+
+    The label names the document's status in the customer's words: it is a draft, it is under
+    review, and it is not a signed agreement. The pins that used to require "delegated decision
+    pending the founder's confirmation and legal review" here, on the incident row and on the
+    certification row are inverted rather than deleted -- the "Public wording of delegated values"
+    section of `docs/policy/DECISION_LOG_2026-09-11.md` (FD-06/07, FD-12) says the process
+    vocabulary stays in the log, the page states the commitment, and the founder's merge of the
+    pull request carrying that log is the confirmation. What may never happen in either regime is
+    the page attributing a delegated decision to the founder, so that ban stays exactly as it was,
+    and the provenance has to remain findable in the source.
+  */
+  it("links the DPA with its draft label in the same tile", () => {
+    expect(page).toContain('const DPA_URL = "/policy/TAVONEL_DPA_v1_2026-09-11.md"');
+    expect(page).toContain("Draft v1 (2026-09-11)");
+    expect(page).toContain("under review");
+    expect(page).toContain("not a signed agreement");
+    expect(page, "no copy here may present a delegated decision as the founder's own").not.toMatch(
+      /founder decided|decided by the founder/,
+    );
+    const tile = page.slice(page.indexOf("href={DPA_URL}"));
+    expect(tile.slice(0, 600), "the label has to travel with the link").toContain("{DPA_LABEL}");
+    // Block comments and whole-line `//` comments both. Not a blanket "//" strip: a URL in the
+    // copy carries one, and eating the rest of that line would hide real text from the ban below.
+    const copy = withoutComments(page)
+      .split(/\r?\n/)
+      .filter((line) => !line.trim().startsWith("//"))
+      .join("\n");
+    for (const process of [
+      "delegated decision pending the founder's confirmation",
+      "pending the founder's confirmation",
+      "FD-06/07",
+      "FD-12",
+    ]) {
+      expect(copy, `"${process}" is process vocabulary and belongs in the log, not on the page`)
+        .not.toContain(process);
+    }
+    expect(page, "the provenance stays in the source, pointing at the log row").toContain(
+      "docs/policy/DECISION_LOG_2026-09-11.md",
+    );
+    for (const commitment of [
+      "within 72 hours",
+      "30 days in advance",
+      "right to object",
+      "within 30 days of a verified request",
+    ]) {
+      expect(page, `the page must state the same "${commitment}" the document commits to`).toContain(commitment);
+    }
+  });
+
+  it("serves a DPA whose commitments match the ones the page advertises", () => {
+    const document = read("public/policy/TAVONEL_DPA_v1_2026-09-11.md");
+    expect(document).toContain(
+      "**Draft v1 (2026-09-11) — under review; not a signed agreement.**",
+    );
+    /*
+      BA-147. The served document is a public artefact and the rule now applies to all of it,
+      comments included. The provenance used to be pinned *in* the file, as an HTML comment -- and
+      because the file is served raw, the third line of our data processing agreement was a comment
+      naming one of our test files and an internal repository path. A reviewer of the repository
+      finds the provenance where the page that links the document keeps it (asserted above, on
+      app/trust/page.tsx); a customer reading the contract finds contract text.
+
+      So the ban widened instead of moving: no repository path, no test filename, and none of the
+      process vocabulary, anywhere in the file.
+    */
+    for (const process of ["delegated decision", "pending the founder", "FD-06/07"]) {
+      expect(document, `"${process}" is process vocabulary, not contract text`).not.toContain(process);
+    }
+    expect(document, "a served contract names no repository path").not.toMatch(/docs\/[a-z]/i);
+    expect(document, "and no test file of ours").not.toContain(".test.ts");
+    expect(document).toContain("without undue delay and no later than 72 hours after becoming aware");
+    expect(document).toContain("30 days in advance of that sub-processor beginning to process");
+    expect(document).toContain("right to object");
+    expect(document).toContain("completed within 30 days of the verified request");
+    /*
+      BA-170. The clauses that are not settled still have to say so where a reader looks for them.
+      They said it four times as "Not drafted — pending legal review", which reads as a document
+      somebody abandoned; they now say it as clauses and are collected in one annex. Both halves
+      are pinned -- the in-place marker on each of the four, and the annex that lists them -- so
+      neither can be dropped without a red test, which is tighter than the one substring was.
+    */
+    expect(document).toContain("## Annex A — clauses completed at signature");
+    for (const clause of ["§1 Governing law", "§9 Recovery objectives", "§10 Transfer mechanism", "§13 Liability and precedence"]) {
+      expect(document, `${clause} has to be listed in the annex`).toContain(clause);
+    }
+    for (const inPlace of [
+      "| Governing law | To be specified in the executed version",
+      "**Transfer mechanism: to be annexed",
+      "Recovery objectives and a drill cadence: to be specified in the executed version",
+      "To be specified in the executed version — see Annex A: the liability cap",
+    ]) {
+      expect(document, `"${inPlace}" is the marker in place; the annex is not a substitute for it`)
+        .toContain(inPlace);
+    }
+    expect(document, "and the document may not publish our project plan as a checklist")
+      .not.toContain("What has to happen before this is a signable document");
+    expect(document, "the deletion clause must not promise a provider's backup expiry").toContain(
+      "publishes no day count for it",
+    );
+  });
+
+  /*
+    P1's other half. The customer-facing incident summary leads with the absence of an on-call
+    rotation, because that is the fact a buyer would otherwise learn during an incident -- and
+    because a 72-hour window read without it looks like a staffed process.
+  */
+  it("summarises incident response with the on-call absence before the window", () => {
+    const published = page.match(/const PUBLISHED[\s\S]*?\n\];/)?.[0] ?? "";
+    expect(published).toContain("Incident response");
+    const row = published.slice(published.indexOf('["Incident response"'));
+    const summary = row.slice(0, row.indexOf("],") + 1);
+    expect(summary).toContain("There is no on-call rotation");
+    expect(summary).toContain("72 hours");
+    expect(
+      summary.indexOf("no on-call rotation") < summary.indexOf("72 hours"),
+      "the window read without the staffing reads as a staffed process",
+    ).toBe(true);
+    expect(summary, "no tabletop has been run and the summary may not imply one").toContain(
+      "No tabletop exercise has been run yet",
+    );
+    // The procedure itself stays internal; the page must not claim to publish it.
+    expect(summary.toLowerCase()).not.toContain("severity");
   });
 
   /*
@@ -263,9 +475,16 @@ describe("§37 the CDR row names the build that is actually running", () => {
 describe("§77 /status scope", () => {
   const page = read("app/status/page.tsx");
 
+  /*
+    BA-136. §77's requirement is that a reader cannot take "operational" on this page for a
+    request that succeeded. The page used to meet it with three negations before saying what it
+    was -- "not an uptime probe", "not that a request has just succeeded" -- and it now meets it
+    by stating both halves positively: what the word means, and which section answers the other
+    question. Both halves are pinned, so the distinction cannot be dropped by editing one line.
+  */
   it("says what its rows are, so 'operational' cannot be read as a probe", () => {
-    expect(page).toContain("not an uptime probe");
     expect(page).toContain("configured and its gate is open");
+    expect(page).toContain("the separate question the scheduled checks answer");
   });
 
   it("never claims all systems are operational", () => {
@@ -332,14 +551,41 @@ const CASE_SURFACES = [
   "app/reproducibility/page.tsx",
 ] as const;
 
+/*
+  BA-072, 2026-09-11. The label stays. Where it is said, and how many times, changes.
+
+  B07 was right that an absence nothing names reads as an oversight. What it produced was the
+  identical sentence -- ending on "no customer has given it" -- printed on all three surfaces
+  above, so three pages volunteered to a reader who had not asked, and to no legal requirement,
+  that we have no customers. /reproducibility ended its *hero paragraph* on it.
+
+  The consent policy is a policy, so it is stated once, on /trust, as one: customer names,
+  figures and logos appear on this site only with that customer's written sign-off on the exact
+  wording. No sentence anywhere states the current count.
+
+  The failure path is the half that matters and it is unchanged in force: the day a customer
+  result does appear it must not appear as a logo wall with no consent behind it. That check
+  still runs on all three surfaces, and a new one holds the policy to its single home -- so
+  deleting it from /trust fails here, and restoring it to the other three fails here too.
+*/
 describe("CA B07 customer cases are labelled absent, not implied", () => {
-  it.each(CASE_SURFACES)("%s says customer results need written consent and there are none", (surface) => {
-    const source = read(surface);
-    expect(source).toContain("only with written consent");
+  it("states the consent policy once, on /trust, with no count of customers", () => {
+    const trust = read("app/trust/page.tsx");
+    expect(trust).toContain("only with");
+    expect(trust.toLowerCase()).toContain("written sign-off");
+    // Stripped: the paragraph's own comment quotes the sentence it replaced, on purpose.
     expect(
-      source.toLowerCase(),
-      'a page that names consent has to say whether it has any',
-    ).toMatch(/no customer has given it|none has been given/);
+      withoutComments(trust).toLowerCase(),
+      "the policy says what the rule is, not how many have met it",
+    ).not.toMatch(/no customer has given it|none has been given/);
+  });
+
+  it.each(CASE_SURFACES)("%s neither repeats the consent policy nor counts our customers", (surface) => {
+    const copy = withoutComments(read(surface)).toLowerCase();
+    expect(copy, "the consent policy has one home, and it is /trust")
+      .not.toContain("only with written consent");
+    expect(copy, "a public page does not publish the number of customers we have")
+      .not.toMatch(/no customer has given it|none has been given/);
   });
 
   it.each(CASE_SURFACES)("%s invents no customer, logo or before-and-after figure", (surface) => {
@@ -401,11 +647,49 @@ describe("CA E02/E05 the measured entries carry their figures and their receipts
     A named receipt a reader cannot reach is half an answer, so the page that renders these
     entries has to say where the files are and how to ask for one.
   */
-  it("says on the page where the named receipts live", () => {
-    const notes = read("app/research/notes/page.tsx");
-    expect(notes).toContain("docs/evidence/artifacts/");
-    expect(notes).toContain("not published at a public URL");
-    expect(notes).toContain("check the hash yourself");
+  /*
+    BA-073 / BA-074, 2026-09-11. The same requirement, pinned to a sentence a buyer can read.
+
+    The paragraph this used to check published an internal repository path, the internal words
+    "campaign" and "claims pack", the admission that our own evidence is not reachable at a URL,
+    and then asked the reader to email for an attachment. Two of its facts were worth keeping --
+    a receipt is bound by sha256, and we will send one -- and those are the two a reader can act
+    on.
+
+    So the check is stricter in both directions than the three substrings it replaces: the
+    actionable facts are still required, and the internal vocabulary is asserted absent.
+    `withoutComments` matters, because the page explains in a comment which words it stopped
+    printing.
+  */
+  it("says on the page that a receipt is hash-bound and how to get one", () => {
+    const notes = withoutComments(read("app/research/notes/page.tsx"));
+    expect(notes).toContain("bound by sha256");
+    expect(notes).toContain("Request any receipt named here");
+    expect(notes).toContain("check the hash");
+    expect(notes).toContain("hello@tavonel.com");
+    // BA-089: the missing space that rendered as "Askhello@tavonel.com".
+    expect(notes, "a JSX element after a word needs its space").not.toMatch(/[a-z]\s*\n?\s*<a href="mailto/);
+    for (const internal of ["docs/evidence/artifacts/", "claims pack", "campaign", "not published at a public URL"]) {
+      expect(notes, `"${internal}" is internal vocabulary on a public page`).not.toContain(internal);
+    }
+  });
+
+  /*
+    BA-073 / BA-092. The receipt is a field now, and the page renders its public half.
+
+    The filename stays in `lib/evidence-record.ts` -- the two assertions above describe why, and
+    renaming an artifact would break the reproducibility its hash exists for -- but the retired
+    internal campaign name may not reach the page, and a 64-character digest may not be typeset
+    as body prose. Both are asserted on the page rather than on the record.
+  */
+  it("renders a receipt identifier and a shortened digest, not an internal filename", () => {
+    const notes = withoutComments(read("app/research/notes/page.tsx"));
+    expect(notes).toContain("Receipt {entry.receipt.id}");
+    expect(notes).toContain("shortDigest(entry.receipt.digest)");
+    // The whole value stays one hover or one copy away, so nothing is withheld.
+    expect(notes).toContain("title={`sha256 ${entry.receipt.digest}`}");
+    expect(notes.toLowerCase(), "the internal campaign name may not be rendered").not.toContain("folynta");
+    expect(notes, "a receipt file name may not be rendered").not.toContain(".json");
   });
 });
 
@@ -434,20 +718,51 @@ describe("CA S04 the privacy notice states deletion mechanics and no invented nu
     expect(page).toContain("privacy@tavonel.com");
   });
 
-  it("says where a number is missing instead of supplying one", () => {
-    expect(page).toContain("We publish no completion time for that");
-    expect(page).toContain("we publish no day count for it");
+  /*
+    BA-153. This case used to require "We publish no completion time for that" on /privacy, and
+    that sentence cancelled the deletion term of the served DPA: §7 commits to completion within
+    30 days, the document's own precedence rule says /privacy wins where the two differ, and a
+    reviewer comparing them found our priority rule voiding our own clause.
+
+    So /privacy publishes the DPA's number, and the number is not free-floating: the case below
+    reads it out of the served document. Where a number genuinely does not exist -- the provider
+    backup tail, and the operational logs -- the page still says so, and those two assertions are
+    unchanged.
+  */
+  it("publishes the same deletion completion time the served DPA commits to", () => {
+    expect(page).toContain("A verified deletion request is completed within 30 days");
+    expect(
+      read("public/policy/TAVONEL_DPA_v1_2026-09-11.md"),
+      "the 30 days on /privacy is the DPA's term, not a number this page chose",
+    ).toContain("completed within 30 days of the verified request");
+    expect(page, "the part with no number still says it has none").toContain("we publish no day count for it");
     expect(page).toContain("have no published retention period");
   });
 
-  it("promises no deletion receipt, because no route issues one", () => {
-    expect(page).toContain("no part of the running service issues one today");
+  /*
+    BA-163. The old pin required "no part of the running service issues one today", which arrived
+    at the end of four sentences explaining an internal receipt contract, its four preconditions
+    and our own meaning of the word "receipt" -- to a reader of a privacy notice, who asked for
+    none of it. The promise that is refused is the same one; it is now one sentence, and the
+    internal mechanism may not come back.
+  */
+  it("promises no deletion certificate, and explains no internal mechanism to refuse one", () => {
+    expect(page).toContain("A signed deletion certificate is not issued today");
+    expect(page).toContain("confirmed to you in writing, with the date it finished");
+    const copy = withoutComments(page);
+    for (const internal of ["receipt contract", "audit digest", "storage listing is empty"]) {
+      expect(copy, `"${internal}" is an internal mechanism, not a privacy statement`)
+        .not.toContain(internal);
+    }
   });
 
   it("invents no retention period in days", () => {
     const copy = withoutComments(page);
     const numbers = copy.match(/\b\d+\s*(?:calendar )?(?:days?|weeks?|months?|years?)\b/gi) ?? [];
-    const invented = numbers.filter((match) => !/180 days/.test(match));
+    // 180 days is the analytics cookie lifetime, set in code. 30 days is the DPA's deletion
+    // term, asserted against the served document above. Every other day count on this page
+    // would be a retention period no run has measured, which is the claim that stops the line.
+    const invented = numbers.filter((match) => !/180 days|30 days/.test(match));
     expect(
       invented,
       `a retention period in days has to come from a measured run: ${invented.join(", ")}`,
@@ -483,5 +798,49 @@ describe("CA I04 /integrations states how the customer-run agent actually behave
     for (const overclaim of ["updates itself", "automatically retries", "always in sync", "we monitor"]) {
       expect(copy, `"${overclaim}" is not what the script does`).not.toContain(overclaim);
     }
+  });
+});
+
+/*
+  What /trust and /pricing both say about the security review, held to each other.
+
+  This used to reconcile a *count*. `/pricing` said "ten of the thirteen things such a review
+  asks", then "twelve of the thirteen", and /trust's lede did the same arithmetic -- and the count
+  drifted every time the index gained an answer, because it was ours: §45's internal list of
+  thirteen, quoted on two public pages as though it were a standard a reviewer would recognise.
+
+  BA-164 removed the number from both pages, so the thing to reconcile is what is actually
+  checkable: the two answers the index says are not published, which are the two rows a reader
+  counts in `NOT_PUBLISHED`. That is a tighter pin than the number was -- the number could be
+  right while the rows were wrong -- and the ban below stops either page from reaching for the
+  thirteen again.
+*/
+describe("the security-review answer reconciles across the two pages that state it", () => {
+  const trust = withoutComments(read("app/trust/page.tsx"));
+  const pricing = withoutComments(read("components/pricing-page-client.tsx"));
+  const rows = (source: string, start: string, end: string) =>
+    (source.slice(source.indexOf(start), end ? source.indexOf(end) : undefined).match(/^ {2}\[/gm) ?? []).length;
+
+  it("names the same two unpublished answers on both pages", () => {
+    expect(trust, "/trust's lede leads with what is published").toContain("Those answers are");
+    expect(trust, "/trust names both absences").toContain("this deployment sets no recovery objective, and nobody outside this");
+    expect(pricing, "/pricing names the same two").toContain("no recovery objective, and no outside audit");
+    expect(pricing, "/pricing leads with the index rather than with a gap").toContain("the Trust Center publishes the data path");
+  });
+
+  it("quotes no checklist total on either page", () => {
+    for (const [name, copy] of [["/trust", trust], ["/pricing", pricing]] as const) {
+      expect(copy, `${name} may not quote an internal checklist size as a public fact`)
+        .not.toMatch(/\b(?:ten|twelve|thirteen) of (?:them|the thirteen)\b/i);
+      expect(copy, `${name} may not assert a universal thirteen-question review`)
+        .not.toMatch(/same thirteen things/i);
+    }
+  });
+
+  it("matches the rows a reader would count on the page", () => {
+    // Thirteen published = §45's twelve answered plus the residency row the checklist never asks;
+    // two not published = the recovery objective and the external audit.
+    expect(rows(read("app/trust/page.tsx"), "const PUBLISHED", "const NOT_PUBLISHED")).toBe(13);
+    expect(rows(read("app/trust/page.tsx"), "const NOT_PUBLISHED", "export default")).toBe(2);
   });
 });

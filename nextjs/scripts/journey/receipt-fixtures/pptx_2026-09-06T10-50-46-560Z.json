@@ -1,0 +1,1050 @@
+{
+  "origin": "https://tavonel.com",
+  "format": "pptx",
+  "fileName": "sample.pptx",
+  "sha256": "92fa1155d1e29883e1ba3625af1a18c6a65c141fbd5ac2552b97b63c8c989f2c",
+  "bytes": 29265,
+  "declaredMimeType": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "uniqueToken": "TAVONEL-E2E-PPTX-7f3a-r5",
+  "question": "What is the audit token for this deck?",
+  "startedAt": "2026-09-06T10:50:46.679Z",
+  "capability": null,
+  "capabilityManifestSha256": null,
+  "capabilityLookup": "GET /api/v1/capabilities 404 -- capability status unavailable from the API",
+  "calls": [
+    {
+      "step": "UPLOAD_CAPABILITY",
+      "method": "POST",
+      "path": "/api/v1/uploads/capability",
+      "status": 200,
+      "code": "QUALIFIED",
+      "latencyMs": 434
+    },
+    {
+      "step": "R2_PUT",
+      "method": "PUT",
+      "path": "https://r2-account-redacted.r2.cloudflarestorage.com/tavonel-saas-foundation-quarantine/quarantine/pilot-969dc192daa24119/658be712-893e-410e-988e-a6ff639bedcf/source (presigned query redacted)",
+      "status": 200,
+      "code": null,
+      "latencyMs": 1779
+    },
+    {
+      "step": "CONFIRM",
+      "method": "POST",
+      "path": "/api/uploads/confirm",
+      "status": 200,
+      "code": "UPLOAD_CONFIRMED",
+      "latencyMs": 452
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 939
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 756
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 851
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 998
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 911
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 966
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 854
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 832
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 659
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 1012
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 721
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 685
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 782
+    },
+    {
+      "step": "COMPILE_JOB",
+      "method": "POST",
+      "path": "/api/compile-jobs",
+      "status": 202,
+      "code": "COMPILE_JOB_ACCEPTED",
+      "latencyMs": 296
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-a288d4e212e13686a32cd4e23b1697cd",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 268
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-a288d4e212e13686a32cd4e23b1697cd",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 324
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-a288d4e212e13686a32cd4e23b1697cd",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 300
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-a288d4e212e13686a32cd4e23b1697cd",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 303
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-a288d4e212e13686a32cd4e23b1697cd",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 300
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-a288d4e212e13686a32cd4e23b1697cd",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 393
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-a288d4e212e13686a32cd4e23b1697cd",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 334
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-a288d4e212e13686a32cd4e23b1697cd",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 358
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-a288d4e212e13686a32cd4e23b1697cd",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 314
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-a288d4e212e13686a32cd4e23b1697cd",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 401
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-a288d4e212e13686a32cd4e23b1697cd",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 314
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-a288d4e212e13686a32cd4e23b1697cd",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 291
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-a288d4e212e13686a32cd4e23b1697cd",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 288
+    },
+    {
+      "step": "COLLECTION",
+      "method": "GET",
+      "path": "/api/v1/collections/collection-932a1bb80875e4f4e05f33306d126075",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 593
+    },
+    {
+      "step": "WORLD",
+      "method": "GET",
+      "path": "/api/v1/collections/collection-932a1bb80875e4f4e05f33306d126075/world",
+      "status": 404,
+      "code": "ACTIVE_WORLD_NOT_FOUND",
+      "latencyMs": 247
+    }
+  ],
+  "documentId": "658be712-893e-410e-988e-a6ff639bedcf",
+  "documentProcessingState": "ocr_ready",
+  "compileJobId": "cjob-a288d4e212e13686a32cd4e23b1697cd",
+  "compileJobState": "ready",
+  "collectionId": "collection-932a1bb80875e4f4e05f33306d126075",
+  "readerRouteLabel": "tavonel-python-core-v2",
+  "evidenceLocators": null,
+  "tokenFoundInEvidence": null,
+  "blockedBy": "PROMOTION_IS_BROWSER_SESSION_ONLY (no API-key route to POST /api/collections/{id}/promote)",
+  "documentInventoryRow": {
+    "documentId": "658be712-893e-410e-988e-a6ff639bedcf",
+    "versionKey": "bfa26645366b8c7a8b58282f4ed16eb7251150bad88488fa8735207d27d0df81",
+    "sanitizedKey": "immutable/pilot-969dc192daa24119/pilot-969dc192daa24119/658be712-893e-410e-988e-a6ff639bedcf/bfa26645366b8c7a8b58282f4ed16eb7251150bad88488fa8735207d27d0df81/sanitized.pdf",
+    "sanitizedSize": 35792,
+    "ocrJsonKey": "immutable/pilot-969dc192daa24119/pilot-969dc192daa24119/658be712-893e-410e-988e-a6ff639bedcf/bfa26645366b8c7a8b58282f4ed16eb7251150bad88488fa8735207d27d0df81/ocr.json",
+    "ocrJsonSize": 1442,
+    "hasOcrJson": true,
+    "cdrReceiptKey": "immutable/pilot-969dc192daa24119/pilot-969dc192daa24119/658be712-893e-410e-988e-a6ff639bedcf/bfa26645366b8c7a8b58282f4ed16eb7251150bad88488fa8735207d27d0df81/cdr-receipt.json",
+    "ocrReviewKey": null,
+    "processingState": "ocr_ready"
+  },
+  "compileJob": {
+    "jobId": "cjob-a288d4e212e13686a32cd4e23b1697cd",
+    "workspaceKey": "pilot-969dc192daa24119",
+    "documentIds": [
+      "658be712-893e-410e-988e-a6ff639bedcf"
+    ],
+    "state": "ready",
+    "collectionId": "collection-932a1bb80875e4f4e05f33306d126075",
+    "errorCode": null,
+    "blocked": [],
+    "blockedResolution": null,
+    "documentsTotal": 1,
+    "documentsReady": 1,
+    "corpusId": null,
+    "batchIndex": null,
+    "batchCount": null,
+    "createdAt": "2026-09-06T10:52:00.777002+00:00",
+    "updatedAt": "2026-09-06T10:53:02.122633+00:00",
+    "settledAt": "2026-09-06T10:53:02.122633+00:00"
+  },
+  "collection": {
+    "code": "OK",
+    "artifactKey": "immutable/pilot-969dc192daa24119/pilot-969dc192daa24119/collections/collection-932a1bb80875e4f4e05f33306d126075/cad29f210d507a4de1a3a338b287e1897b22db16ff997ae0346da45f70ec921e/candidate-world.json",
+    "candidatePromotion": false,
+    "artifact": {
+      "schemaVersion": "tavonel.collection_candidate.v1",
+      "executionAuthority": "tavonel-foundation-core-runtime-v1",
+      "lifecycle": "candidate",
+      "candidatePromotion": false,
+      "collectionId": "collection-932a1bb80875e4f4e05f33306d126075",
+      "manifestDigest": "sha256:cad29f210d507a4de1a3a338b287e1897b22db16ff997ae0346da45f70ec921e",
+      "blueprint": {
+        "id": "generic-mixed-corpus",
+        "version": "1.0.0",
+        "roots": [
+          "Sources",
+          "Topics",
+          "Entities",
+          "Claims",
+          "Evidence",
+          "Assets",
+          "MOCs",
+          "Packages"
+        ],
+        "maximumDepth": 3,
+        "namingPolicy": "stable-id-title",
+        "preserveExistingFolders": true,
+        "ontologyClasses": [
+          "Document",
+          "Topic",
+          "Entity",
+          "Claim",
+          "Evidence",
+          "Asset"
+        ],
+        "ontologyRelations": [
+          "discusses_topic",
+          "mentions_entity",
+          "supported_by"
+        ]
+      },
+      "sourceDocuments": [
+        {
+          "documentId": "658be712-893e-410e-988e-a6ff639bedcf",
+          "versionKey": "bfa26645366b8c7a8b58282f4ed16eb7251150bad88488fa8735207d27d0df81",
+          "sanitizedKey": "immutable/pilot-969dc192daa24119/pilot-969dc192daa24119/658be712-893e-410e-988e-a6ff639bedcf/bfa26645366b8c7a8b58282f4ed16eb7251150bad88488fa8735207d27d0df81/sanitized.pdf",
+          "ocrJsonKey": "immutable/pilot-969dc192daa24119/pilot-969dc192daa24119/658be712-893e-410e-988e-a6ff639bedcf/bfa26645366b8c7a8b58282f4ed16eb7251150bad88488fa8735207d27d0df81/ocr.json",
+          "pageCount": 2,
+          "textCharacters": 175,
+          "inputSha256": "sha256:bfa26645366b8c7a8b58282f4ed16eb7251150bad88488fa8735207d27d0df81"
+        }
+      ],
+      "directoryPlan": [
+        {
+          "path": "source",
+          "kind": "root",
+          "sourceIds": []
+        },
+        {
+          "path": "canonical",
+          "kind": "root",
+          "sourceIds": []
+        },
+        {
+          "path": "obsidian",
+          "kind": "root",
+          "sourceIds": []
+        },
+        {
+          "path": "ontology",
+          "kind": "root",
+          "sourceIds": []
+        },
+        {
+          "path": "graph",
+          "kind": "root",
+          "sourceIds": []
+        },
+        {
+          "path": "semantics",
+          "kind": "root",
+          "sourceIds": []
+        },
+        {
+          "path": "rag",
+          "kind": "root",
+          "sourceIds": []
+        },
+        {
+          "path": "provenance",
+          "kind": "root",
+          "sourceIds": []
+        },
+        {
+          "path": "validation",
+          "kind": "root",
+          "sourceIds": []
+        },
+        {
+          "path": "Sources",
+          "kind": "knowledge_view",
+          "sourceIds": [],
+          "blueprint": "generic-mixed-corpus"
+        },
+        {
+          "path": "Documents",
+          "kind": "knowledge_view",
+          "sourceIds": [],
+          "blueprint": "generic-mixed-corpus"
+        },
+        {
+          "path": "Topics",
+          "kind": "knowledge_view",
+          "sourceIds": [],
+          "blueprint": "generic-mixed-corpus"
+        },
+        {
+          "path": "Entities",
+          "kind": "knowledge_view",
+          "sourceIds": [],
+          "blueprint": "generic-mixed-corpus"
+        },
+        {
+          "path": "Claims",
+          "kind": "knowledge_view",
+          "sourceIds": [],
+          "blueprint": "generic-mixed-corpus"
+        },
+        {
+          "path": "MOCs",
+          "kind": "knowledge_view",
+          "sourceIds": [],
+          "blueprint": "generic-mixed-corpus"
+        },
+        {
+          "path": "Evidence",
+          "kind": "knowledge_view",
+          "sourceIds": [],
+          "blueprint": "generic-mixed-corpus"
+        },
+        {
+          "path": "Packages",
+          "kind": "knowledge_view",
+          "sourceIds": [],
+          "blueprint": "generic-mixed-corpus"
+        },
+        {
+          "path": "canonical/model.json",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a"
+          ]
+        },
+        {
+          "path": "graph/nodes.csv",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a"
+          ]
+        },
+        {
+          "path": "graph/relationships.csv",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a"
+          ]
+        },
+        {
+          "path": "obsidian/Claims.md",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a"
+          ]
+        },
+        {
+          "path": "obsidian/Documents.md",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a"
+          ]
+        },
+        {
+          "path": "obsidian/Entities.md",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a"
+          ]
+        },
+        {
+          "path": "obsidian/Home.md",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a"
+          ]
+        },
+        {
+          "path": "obsidian/MOCs/Claims MOC.md",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a"
+          ]
+        },
+        {
+          "path": "obsidian/MOCs/Entities MOC.md",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a"
+          ]
+        },
+        {
+          "path": "obsidian/MOCs/Topics MOC.md",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a"
+          ]
+        },
+        {
+          "path": "obsidian/Sources/src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a.md",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a"
+          ]
+        },
+        {
+          "path": "obsidian/Topics.md",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a"
+          ]
+        },
+        {
+          "path": "ontology/architecture-plan.json",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a"
+          ]
+        },
+        {
+          "path": "ontology/knowledge.jsonld",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a"
+          ]
+        },
+        {
+          "path": "ontology/knowledge.ttl",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a"
+          ]
+        },
+        {
+          "path": "provenance/activities.jsonl",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a"
+          ]
+        },
+        {
+          "path": "rag/chunks.jsonl",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a"
+          ]
+        },
+        {
+          "path": "rag/documents.jsonl",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a"
+          ]
+        },
+        {
+          "path": "rag/retrieval-profile.json",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a"
+          ]
+        },
+        {
+          "path": "semantics/claims.jsonl",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a"
+          ]
+        },
+        {
+          "path": "semantics/contradictions.jsonl",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a"
+          ]
+        },
+        {
+          "path": "semantics/entities.jsonl",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a"
+          ]
+        },
+        {
+          "path": "semantics/profile.json",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a"
+          ]
+        },
+        {
+          "path": "semantics/relations.jsonl",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a"
+          ]
+        },
+        {
+          "path": "source/collection-files.json",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a"
+          ]
+        },
+        {
+          "path": "validation/report.json",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a"
+          ]
+        }
+      ],
+      "ontology": {
+        "nodes": [
+          {
+            "id": "ko_document_5c005218234b32462afbed2a59da690220d89633278a3d28eea1efe770145773",
+            "kind": "Document",
+            "label": "Document 658be712",
+            "documentId": "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "evidenceIds": []
+          },
+          {
+            "id": "ko_evidence_4dcfa834639b1e8dbaa559886ad290706c8a654bda02d4368812f0a827e64ed2",
+            "kind": "Evidence",
+            "label": "ev_deba0e7d557e367c1907bdc9f6565dc992beee805119d16a80fcf9ace5abeb66",
+            "documentId": "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "evidenceIds": [
+              "ev_deba0e7d557e367c1907bdc9f6565dc992beee805119d16a80fcf9ace5abeb66"
+            ]
+          },
+          {
+            "id": "ko_evidence_7eb7fc50a4b90c9e7fa90432b6ee7c9ba2e519b1b4098d6ae79b3fb27e6d3632",
+            "kind": "Evidence",
+            "label": "ev_39795f94e9ec9a7584aff8aec6f5c91e929d51857ccc3c5c5942d96c7138c614",
+            "documentId": "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "evidenceIds": [
+              "ev_39795f94e9ec9a7584aff8aec6f5c91e929d51857ccc3c5c5942d96c7138c614"
+            ]
+          },
+          {
+            "id": "ko_evidence_601651820708cf32d5b553355fa92717ba4cf14d66b2814d7aa37ddeefa8983b",
+            "kind": "Evidence",
+            "label": "ev_dcb8492a3f6da9e980271e2f28ea804211a77be6d0646afbc521e01ffde96f89",
+            "documentId": "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "evidenceIds": [
+              "ev_dcb8492a3f6da9e980271e2f28ea804211a77be6d0646afbc521e01ffde96f89"
+            ]
+          },
+          {
+            "id": "ko_evidence_76fb862f73626271415ba3c199d25d82a0ab991c66919733ea86ce500a2b259c",
+            "kind": "Evidence",
+            "label": "ev_880f3364f97a4859bac9ddb629a5003e52684bcd9ae46f66ed11165cb892c5ec",
+            "documentId": "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "evidenceIds": [
+              "ev_880f3364f97a4859bac9ddb629a5003e52684bcd9ae46f66ed11165cb892c5ec"
+            ]
+          },
+          {
+            "id": "claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9",
+            "kind": "Claim",
+            "label": "The audit token for this deck is TAVONEL-E2E-PPTX-7f3a-r5.",
+            "documentId": "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "evidenceIds": []
+          },
+          {
+            "id": "entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a",
+            "kind": "Entity",
+            "label": "entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a",
+            "documentId": "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "evidenceIds": []
+          },
+          {
+            "id": "entity_ce0392ab7819885fcf3edf76a07ce2ff1dcfc8331dbe12874df6e0be97080558",
+            "kind": "Entity",
+            "label": "entity_ce0392ab7819885fcf3edf76a07ce2ff1dcfc8331dbe12874df6e0be97080558",
+            "documentId": "src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a",
+            "evidenceIds": []
+          }
+        ],
+        "edges": [
+          {
+            "id": "relation-7b09b3e5c22312dc282f812cf33f22e0",
+            "type": "supported_by",
+            "from": "claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9",
+            "to": "ko_evidence_7eb7fc50a4b90c9e7fa90432b6ee7c9ba2e519b1b4098d6ae79b3fb27e6d3632",
+            "evidenceIds": [
+              "ev_39795f94e9ec9a7584aff8aec6f5c91e929d51857ccc3c5c5942d96c7138c614"
+            ]
+          }
+        ]
+      },
+      "package": {
+        "roots": [
+          "source",
+          "canonical",
+          "obsidian",
+          "ontology",
+          "graph",
+          "semantics",
+          "rag",
+          "provenance",
+          "validation"
+        ],
+        "files": [
+          {
+            "path": "canonical/model.json",
+            "mediaType": "application/json",
+            "sizeBytes": 23504,
+            "sha256": "sha256:7dcf7856daed8a4f1dc28faadaeeb06eef1f9fd935cd8fb6a89f462eeef8e474",
+            "content": "{\"collectionId\":\"collection-932a1bb80875e4f4e05f33306d126075\",\"objects\":[{\"collectionId\":\"collection-932a1bb80875e4f4e05f33306d126075\",\"createdByActivity\":\"activity_c6ec88cfe883d915feae47c20f7719203e1ab64f841305dbb6895de49445e785\",\"hash\":\"sha256:693f036118f98092a7532a440985dca3e7d4e7f311423a763bfa78ab6e06b334\",\"kind\":\"collection\",\"links\":[\"ko_document_5c005218234b32462afbed2a59da690220d89633278a3d28eea1efe770145773\"],\"origin\":\"structured_derived\",\"payload\":{\"workspaceId\":\"pilot-969dc192daa24119\"},\"sourceRefs\":[{\"bbox1000\":[124,139,428,181],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00001\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null},{\"bbox1000\":[125,182,872,220],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00002\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null},{\"bbox1000\":[29,141,328,181],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0002-l00001\",\"pageIndex0\":1,\"pageNumber1\":2,\"timeEndMs\":null,\"timeStartMs\":null},{\"bbox1000\":[27,178,970,227],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0002-l00002\",\"pageIndex0\":1,\"pageNumber1\":2,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ko_collection_1bb833d575f6e9e517422b775d16aa447f6a4ce6875ae38aa3e2ae2907f1ec4f\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified\",\"version\":1},{\"collectionId\":\"collection-932a1bb80875e4f4e05f33306d126075\",\"createdByActivity\":\"activity_c6ec88cfe883d915feae47c20f7719203e1ab64f841305dbb6895de49445e785\",\"hash\":\"sha256:ac17f8c5ffe8e2b177208864a603019bd2e307d9e2b063bbfb7be5409b6c6e22\",\"kind\":\"document\",\"links\":[\"ko_block_91fcb6519b6275b7111cf001577313e81b2104f000851e73cca1ee854813e360\",\"ko_block_52f46f8f6514812fc1b9db8d04d4f43ecbc965122d3135bdb20cb86d0448e3a8\",\"ko_block_e431d8fb48418aedb51aa7c7f3d5375624d75dba450cbc25931a61f5b5307fa7\",\"ko_block_e0738947632d40c7477cc8f02ed29a1f87389dae4c77a084403edcc03d2b655a\"],\"origin\":\"native_extracted\",\"payload\":{\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"title\":\"Document 658be712\"},\"sourceRefs\":[{\"bbox1000\":[124,139,428,181],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00001\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null},{\"bbox1000\":[125,182,872,220],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00002\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null},{\"bbox1000\":[29,141,328,181],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0002-l00001\",\"pageIndex0\":1,\"pageNumber1\":2,\"timeEndMs\":null,\"timeStartMs\":null},{\"bbox1000\":[27,178,970,227],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0002-l00002\",\"pageIndex0\":1,\"pageNumber1\":2,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ko_document_5c005218234b32462afbed2a59da690220d89633278a3d28eea1efe770145773\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified\",\"version\":1},{\"collectionId\":\"collection-932a1bb80875e4f4e05f33306d126075\",\"createdByActivity\":\"activity_c6ec88cfe883d915feae47c20f7719203e1ab64f841305dbb6895de49445e785\",\"hash\":\"sha256:cc4563a4afb513bd35b6a0c961a9cdd21bd88b6446ea8cb2b6572a744c7af355\",\"kind\":\"block\",\"links\":[],\"origin\":\"visual_extracted\",\"payload\":{\"blockType\":\"paragraph\",\"text\":\"TAVONEL E2E Slide One\"},\"sourceRefs\":[{\"bbox1000\":[124,139,428,181],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00001\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ko_block_91fcb6519b6275b7111cf001577313e81b2104f000851e73cca1ee854813e360\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified_with_warning\",\"version\":1},{\"collectionId\":\"collection-932a1bb80875e4f4e05f33306d126075\",\"createdByActivity\":\"activity_c6ec88cfe883d915feae47c20f7719203e1ab64f841305dbb6895de49445e785\",\"hash\":\"sha256:a15b2e9dcbbb1b6fb7494020b10c9b34a80c3d3bd0c275a1c35e02b8f1419c2b\",\"kind\":\"block\",\"links\":[],\"origin\":\"visual_extracted\",\"payload\":{\"blockType\":\"paragraph\",\"text\":\"The audit token for this deck is TAVONEL-E2E-PPTX-7f3a-r5.\"},\"sourceRefs\":[{\"bbox1000\":[125,182,872,220],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00002\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ko_block_52f46f8f6514812fc1b9db8d04d4f43ecbc965122d3135bdb20cb86d0448e3a8\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified_with_warning\",\"version\":1},{\"collectionId\":\"collection-932a1bb80875e4f4e05f33306d126075\",\"createdByActivity\":\"activity_c6ec88cfe883d915feae47c20f7719203e1ab64f841305dbb6895de49445e785\",\"hash\":\"sha256:fa036d7f709aad2b082484a8294568b8458ec5c022160ec710c332288ef3b4b8\",\"kind\":\"block\",\"links\":[],\"origin\":\"visual_extracted\",\"payload\":{\"blockType\":\"paragraph\",\"text\":\"TAVONEL E2E Slide Two\"},\"sourceRefs\":[{\"bbox1000\":[29,141,328,181],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0002-l00001\",\"pageIndex0\":1,\"pageNumber1\":2,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ko_block_e431d8fb48418aedb51aa7c7f3d5375624d75dba450cbc25931a61f5b5307fa7\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified_with_warning\",\"version\":1},{\"collectionId\":\"collection-932a1bb80875e4f4e05f33306d126075\",\"createdByActivity\":\"activity_c6ec88cfe883d915feae47c20f7719203e1ab64f841305dbb6895de49445e785\",\"hash\":\"sha256:97416fabae235a97d0ce30e16f48ce5f9c27198b2c3cbda1270f461b4999c7da\",\"kind\":\"block\",\"links\":[],\"origin\":\"visual_extracted\",\"payload\":{\"blockType\":\"paragraph\",\"text\":\"Compressor C-88 tripped on 2026-07-19 at a discharge pressure of 31 bar.\"},\"sourceRefs\":[{\"bbox1000\":[27,178,970,227],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0002-l00002\",\"pageIndex0\":1,\"pageNumber1\":2,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ko_block_e0738947632d40c7477cc8f02ed29a1f87389dae4c77a084403edcc03d2b655a\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified_with_warning\",\"version\":1},{\"collectionId\":\"collection-932a1bb80875e4f4e05f33306d126075\",\"createdByActivity\":\"activity_c6ec88cfe883d915feae47c20f7719203e1ab64f841305dbb6895de49445e785\",\"hash\":\"sha256:e980d8206e2806cbcc250fc0b9c6556d4385058111bd4e71da86cccf58a7f185\",\"kind\":\"evidence\",\"links\":[],\"origin\":\"visual_extracted\",\"payload\":{\"evidenceId\":\"ev_deba0e7d557e367c1907bdc9f6565dc992beee805119d16a80fcf9ace5abeb66\"},\"sourceRefs\":[{\"bbox1000\":[124,139,428,181],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00001\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ko_evidence_4dcfa834639b1e8dbaa559886ad290706c8a654bda02d4368812f0a827e64ed2\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified_with_warning\",\"version\":1},{\"collectionId\":\"collection-932a1bb80875e4f4e05f33306d126075\",\"createdByActivity\":\"activity_c6ec88cfe883d915feae47c20f7719203e1ab64f841305dbb6895de49445e785\",\"hash\":\"sha256:e53b9048db26104a5363c07220a83cf0113795315f15eccb2766f53537fe369c\",\"kind\":\"evidence\",\"links\":[],\"origin\":\"visual_extracted\",\"payload\":{\"evidenceId\":\"ev_39795f94e9ec9a7584aff8aec6f5c91e929d51857ccc3c5c5942d96c7138c614\"},\"sourceRefs\":[{\"bbox1000\":[125,182,872,220],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00002\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ko_evidence_7eb7fc50a4b90c9e7fa90432b6ee7c9ba2e519b1b4098d6ae79b3fb27e6d3632\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified_with_warning\",\"version\":1},{\"collectionId\":\"collection-932a1bb80875e4f4e05f33306d126075\",\"createdByActivity\":\"activity_c6ec88cfe883d915feae47c20f7719203e1ab64f841305dbb6895de49445e785\",\"hash\":\"sha256:547a48d413ec7afbc701b103d018b7ab99441cfef2443809694b7dc57da4ca89\",\"kind\":\"evidence\",\"links\":[],\"origin\":\"visual_extracted\",\"payload\":{\"evidenceId\":\"ev_dcb8492a3f6da9e980271e2f28ea804211a77be6d0646afbc521e01ffde96f89\"},\"sourceRefs\":[{\"bbox1000\":[29,141,328,181],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0002-l00001\",\"pageIndex0\":1,\"pageNumber1\":2,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ko_evidence_601651820708cf32d5b553355fa92717ba4cf14d66b2814d7aa37ddeefa8983b\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified_with_warning\",\"version\":1},{\"collectionId\":\"collection-932a1bb80875e4f4e05f33306d126075\",\"createdByActivity\":\"activity_c6ec88cfe883d915feae47c20f7719203e1ab64f841305dbb6895de49445e785\",\"hash\":\"sha256:05f0ab62dfc0ab16a9436f354950d05bcb6521b0404f604128f297d9652f92e1\",\"kind\":\"evidence\",\"links\":[],\"origin\":\"visual_extracted\",\"payload\":{\"evidenceId\":\"ev_880f3364f97a4859bac9ddb629a5003e52684bcd9ae46f66ed11165cb892c5ec\"},\"sourceRefs\":[{\"bbox1000\":[27,178,970,227],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0002-l00002\",\"pageIndex0\":1,\"pageNumber1\":2,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ko_evidence_76fb862f73626271415ba3c199d25d82a0ab991c66919733ea86ce500a2b259c\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified_with_warning\",\"version\":1},{\"collectionId\":\"collection-932a1bb80875e4f4e05f33306d126075\",\"createdByActivity\":\"activity_c6ec88cfe883d915feae47c20f7719203e1ab64f841305dbb6895de49445e785\",\"hash\":\"sha256:8ae9fe5786f72de73f0ff92ff15dc125b62fa717f1be2598998180374b2723b6\",\"kind\":\"claim\",\"links\":[\"ko_evidence_7eb7fc50a4b90c9e7fa90432b6ee7c9ba2e519b1b4098d6ae79b3fb27e6d3632\",\"entity_ce0392ab7819885fcf3edf76a07ce2ff1dcfc8331dbe12874df6e0be97080558\",\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\"],\"origin\":\"rule_derived\",\"payload\":{\"authority\":\"informal\",\"authorityScore\":0.4,\"authorityTier\":\"informal\",\"claimId\":\"claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9\",\"entityIds\":[\"entity_ce0392ab7819885fcf3edf76a07ce2ff1dcfc8331dbe12874df6e0be97080558\",\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\"],\"evidenceId\":\"ev_39795f94e9ec9a7584aff8aec6f5c91e929d51857ccc3c5c5942d96c7138c614\",\"language\":\"en\",\"logicalId\":\"ku_952ea8c8e266a6e2266dd6a7165d4dda09c1460f4ef34443cf86bcdf12e5f21c\",\"modality\":\"asserted\",\"numericValues\":[\"7\"],\"polarity\":\"positive\",\"retrievalTerms\":[\"audit\",\"token\",\"deck\",\"tavonel-e2e-pptx-7f3a-r5.\"],\"sourceId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"sourceVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"temporalRefs\":[],\"text\":\"The audit token for this deck is TAVONEL-E2E-PPTX-7f3a-r5.\",\"topicKey\":\"audit token deck tavonel-e2e-pptx- f3a-r5.\"},\"sourceRefs\":[{\"bbox1000\":[125,182,872,220],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00002\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified_with_warning\",\"version\":1},{\"collectionId\":\"collection-932a1bb80875e4f4e05f33306d126075\",\"createdByActivity\":\"activity_c6ec88cfe883d915feae47c20f7719203e1ab64f841305dbb6895de49445e785\",\"hash\":\"sha256:156aa27ff0608f9879d1daa9c8fc229b1489ed2f744db44a4d0ebe3842e00fdc\",\"kind\":\"entity\",\"links\":[],\"origin\":\"rule_derived\",\"payload\":{\"canonicalName\":\"TAVONEL-E2E-\",\"claimIds\":[\"claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9\"],\"entityId\":\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\",\"entityType\":\"acronym\",\"evidenceIds\":[\"ev_39795f94e9ec9a7584aff8aec6f5c91e929d51857ccc3c5c5942d96c7138c614\"]},\"sourceRefs\":[{\"bbox1000\":[125,182,872,220],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00002\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified_with_warning\",\"version\":1},{\"collectionId\":\"collection-932a1bb80875e4f4e05f33306d126075\",\"createdByActivity\":\"activity_c6ec88cfe883d915feae47c20f7719203e1ab64f841305dbb6895de49445e785\",\"hash\":\"sha256:3d3987c828218d473ef4bd3c30758be2780c85019dff9b9c99c6fcb328d5b01c\",\"kind\":\"entity\",\"links\":[],\"origin\":\"rule_derived\",\"payload\":{\"canonicalName\":\"PPTX-\",\"claimIds\":[\"claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9\"],\"entityId\":\"entity_ce0392ab7819885fcf3edf76a07ce2ff1dcfc8331dbe12874df6e0be97080558\",\"entityType\":\"acronym\",\"evidenceIds\":[\"ev_39795f94e9ec9a7584aff8aec6f5c91e929d51857ccc3c5c5942d96c7138c614\"]},\"sourceRefs\":[{\"bbox1000\":[125,182,872,220],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00002\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"entity_ce0392ab7819885fcf3edf76a07ce2ff1dcfc8331dbe12874df6e0be97080558\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified_with_warning\",\"version\":1},{\"collectionId\":\"collection-932a1bb80875e4f4e05f33306d126075\",\"createdByActivity\":\"activity_c6ec88cfe883d915feae47c20f7719203e1ab64f841305dbb6895de49445e785\",\"hash\":\"sha256:b3f367b9f81516c359826632a7aafadfe4940cb91a55921979e9aababc7b28c9\",\"kind\":\"relation\",\"links\":[\"claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9\",\"entity_ce0392ab7819885fcf3edf76a07ce2ff1dcfc8331dbe12874df6e0be97080558\"],\"origin\":\"rule_derived\",\"payload\":{\"evidenceId\":\"ev_39795f94e9ec9a7584aff8aec6f5c91e929d51857ccc3c5c5942d96c7138c614\",\"objectId\":\"entity_ce0392ab7819885fcf3edf76a07ce2ff1dcfc8331dbe12874df6e0be97080558\",\"predicate\":\"mentions\",\"relationId\":\"relation_0b520955267e4e2d43faa638d16f79ff5b2e034a5505db20b6d1135dc5dd9801\",\"subjectId\":\"claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9\"},\"sourceRefs\":[{\"bbox1000\":[125,182,872,220],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00002\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"relation_0b520955267e4e2d43faa638d16f79ff5b2e034a5505db20b6d1135dc5dd9801\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified_with_warning\",\"version\":1},{\"collectionId\":\"collection-932a1bb80875e4f4e05f33306d126075\",\"createdByActivity\":\"activity_c6ec88cfe883d915feae47c20f7719203e1ab64f841305dbb6895de49445e785\",\"hash\":\"sha256:ab73925fe5f2e678b2b0fb27db8a4df96431114c18661f73b4c7369738fe6135\",\"kind\":\"relation\",\"links\":[\"claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9\",\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\"],\"origin\":\"rule_derived\",\"payload\":{\"evidenceId\":\"ev_39795f94e9ec9a7584aff8aec6f5c91e929d51857ccc3c5c5942d96c7138c614\",\"objectId\":\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\",\"predicate\":\"mentions\",\"relationId\":\"relation_a66b40524958d219c5397c377a48862a5f65223854e3d9ce5a8a68e4d1d7cbe4\",\"subjectId\":\"claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9\"},\"sourceRefs\":[{\"bbox1000\":[125,182,872,220],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00002\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"relation_a66b40524958d219c5397c377a48862a5f65223854e3d9ce5a8a68e4d1d7cbe4\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified_with_warning\",\"version\":1},{\"collectionId\":\"collection-932a1bb80875e4f4e05f33306d126075\",\"createdByActivity\":\"activity_c6ec88cfe883d915feae47c20f7719203e1ab64f841305dbb6895de49445e785\",\"hash\":\"sha256:8c85aef3102f71a4df42332520ab295029f380645be14aeadb668a273c7f28b1\",\"kind\":\"ontology_term\",\"links\":[],\"origin\":\"structured_derived\",\"payload\":{\"blueprint\":\"generic-mixed-corpus\",\"blueprintVersion\":\"1.0.0\",\"moduleSha256\":\"sha256:694759884a1ccc6d3b23ce402155eadf39ec85b3fc62d4c12ed39ec6d3357963\",\"term\":\"document\"},\"sourceRefs\":[{\"bbox1000\":[124,139,428,181],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00001\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ontology_term_430f2b1ec1824207afeccda66477f0c8f5e75696f7380e0231e92d6ccfc81f01\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified\",\"version\":1},{\"collectionId\":\"collection-932a1bb80875e4f4e05f33306d126075\",\"createdByActivity\":\"activity_c6ec88cfe883d915feae47c20f7719203e1ab64f841305dbb6895de49445e785\",\"hash\":\"sha256:98a76dcbacf74d45d05c489bab29665fe679ba03aa753fa2821e86f2327318ce\",\"kind\":\"ontology_term\",\"links\":[],\"origin\":\"structured_derived\",\"payload\":{\"blueprint\":\"generic-mixed-corpus\",\"blueprintVersion\":\"1.0.0\",\"moduleSha256\":\"sha256:694759884a1ccc6d3b23ce402155eadf39ec85b3fc62d4c12ed39ec6d3357963\",\"term\":\"note\"},\"sourceRefs\":[{\"bbox1000\":[124,139,428,181],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00001\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ontology_term_f4526f3d5996a8ed37b86daa4a9a3a8b330afb9f2a82bb1b6d1eba30c3912469\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified\",\"version\":1},{\"collectionId\":\"collection-932a1bb80875e4f4e05f33306d126075\",\"createdByActivity\":\"activity_c6ec88cfe883d915feae47c20f7719203e1ab64f841305dbb6895de49445e785\",\"hash\":\"sha256:4d936b2c0ecedcf5110a36b30f6a0fcabb394c4b0d321f0d9425a0db42912003\",\"kind\":\"ontology_term\",\"links\":[],\"origin\":\"structured_derived\",\"payload\":{\"blueprint\":\"generic-mixed-corpus\",\"blueprintVersion\":\"1.0.0\",\"moduleSha256\":\"sha256:694759884a1ccc6d3b23ce402155eadf39ec85b3fc62d4c12ed39ec6d3357963\",\"term\":\"entity\"},\"sourceRefs\":[{\"bbox1000\":[124,139,428,181],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00001\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ontology_term_7d2c870f73ce23900b178254217d389c25e9ba593de8fd31584efd3c2440143f\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified\",\"version\":1},{\"collectionId\":\"collection-932a1bb80875e4f4e05f33306d126075\",\"createdByActivity\":\"activity_c6ec88cfe883d915feae47c20f7719203e1ab64f841305dbb6895de49445e785\",\"hash\":\"sha256:27c84c3ea0ca1e0b46f89692df5e212c1003b96e114018afeb0e3bad540d4bef\",\"kind\":\"ontology_term\",\"links\":[],\"origin\":\"structured_derived\",\"payload\":{\"blueprint\":\"generic-mixed-corpus\",\"blueprintVersion\":\"1.0.0\",\"moduleSha256\":\"sha256:694759884a1ccc6d3b23ce402155eadf39ec85b3fc62d4c12ed39ec6d3357963\",\"term\":\"relation\"},\"sourceRefs\":[{\"bbox1000\":[124,139,428,181],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00001\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ontology_term_01db5ef35fe3ece90baf85bb66bf55b9ea3698fcf45d66dc4c8da3d91e5cd360\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified\",\"version\":1},{\"collectionId\":\"collection-932a1bb80875e4f4e05f33306d126075\",\"createdByActivity\":\"activity_c6ec88cfe883d915feae47c20f7719203e1ab64f841305dbb6895de49445e785\",\"hash\":\"sha256:cdb1f16161718e7b79f720648eb2da7484fca7861f79f8572d657e89a7799d88\",\"kind\":\"ontology_term\",\"links\":[],\"origin\":\"structured_derived\",\"payload\":{\"blueprint\":\"generic-mixed-corpus\",\"blueprintVersion\":\"1.0.0\",\"moduleSha256\":\"sha256:694759884a1ccc6d3b23ce402155eadf39ec85b3fc62d4c12ed39ec6d3357963\",\"term\":\"claim\"},\"sourceRefs\":[{\"bbox1000\":[124,139,428,181],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00001\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ontology_term_e2b013adc3c97e6da6f2df413dff11d6b5d71873a49109ef717f610b07bffee1\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified\",\"version\":1}],\"schemaVersion\":\"canonical-knowledge-1.0.0\",\"tenantId\":\"pilot-969dc192daa24119\"}\n"
+          },
+          {
+            "path": "graph/nodes.csv",
+            "mediaType": "text/csv; charset=utf-8",
+            "sizeBytes": 6505,
+            "sha256": "sha256:549406b2f274845c12a611c3ed4176e87208dd78dae4c215d5e906a8120e2c5a",
+            "content": "id,kind,payload,verification_state\n\"ko_collection_1bb833d575f6e9e517422b775d16aa447f6a4ce6875ae38aa3e2ae2907f1ec4f\",\"collection\",\"{\"\"workspaceId\"\":\"\"pilot-969dc192daa24119\"\"}\",\"verified\"\n\"ko_document_5c005218234b32462afbed2a59da690220d89633278a3d28eea1efe770145773\",\"document\",\"{\"\"documentVersionId\"\":\"\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\"\",\"\"title\"\":\"\"Document 658be712\"\"}\",\"verified\"\n\"ko_block_91fcb6519b6275b7111cf001577313e81b2104f000851e73cca1ee854813e360\",\"block\",\"{\"\"blockType\"\":\"\"paragraph\"\",\"\"text\"\":\"\"TAVONEL E2E Slide One\"\"}\",\"verified_with_warning\"\n\"ko_block_52f46f8f6514812fc1b9db8d04d4f43ecbc965122d3135bdb20cb86d0448e3a8\",\"block\",\"{\"\"blockType\"\":\"\"paragraph\"\",\"\"text\"\":\"\"The audit token for this deck is TAVONEL-E2E-PPTX-7f3a-r5.\"\"}\",\"verified_with_warning\"\n\"ko_block_e431d8fb48418aedb51aa7c7f3d5375624d75dba450cbc25931a61f5b5307fa7\",\"block\",\"{\"\"blockType\"\":\"\"paragraph\"\",\"\"text\"\":\"\"TAVONEL E2E Slide Two\"\"}\",\"verified_with_warning\"\n\"ko_block_e0738947632d40c7477cc8f02ed29a1f87389dae4c77a084403edcc03d2b655a\",\"block\",\"{\"\"blockType\"\":\"\"paragraph\"\",\"\"text\"\":\"\"Compressor C-88 tripped on 2026-07-19 at a discharge pressure of 31 bar.\"\"}\",\"verified_with_warning\"\n\"ko_evidence_4dcfa834639b1e8dbaa559886ad290706c8a654bda02d4368812f0a827e64ed2\",\"evidence\",\"{\"\"evidenceId\"\":\"\"ev_deba0e7d557e367c1907bdc9f6565dc992beee805119d16a80fcf9ace5abeb66\"\"}\",\"verified_with_warning\"\n\"ko_evidence_7eb7fc50a4b90c9e7fa90432b6ee7c9ba2e519b1b4098d6ae79b3fb27e6d3632\",\"evidence\",\"{\"\"evidenceId\"\":\"\"ev_39795f94e9ec9a7584aff8aec6f5c91e929d51857ccc3c5c5942d96c7138c614\"\"}\",\"verified_with_warning\"\n\"ko_evidence_601651820708cf32d5b553355fa92717ba4cf14d66b2814d7aa37ddeefa8983b\",\"evidence\",\"{\"\"evidenceId\"\":\"\"ev_dcb8492a3f6da9e980271e2f28ea804211a77be6d0646afbc521e01ffde96f89\"\"}\",\"verified_with_warning\"\n\"ko_evidence_76fb862f73626271415ba3c199d25d82a0ab991c66919733ea86ce500a2b259c\",\"evidence\",\"{\"\"evidenceId\"\":\"\"ev_880f3364f97a4859bac9ddb629a5003e52684bcd9ae46f66ed11165cb892c5ec\"\"}\",\"verified_with_warning\"\n\"claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9\",\"claim\",\"{\"\"authority\"\":\"\"informal\"\",\"\"authorityScore\"\":0.4,\"\"authorityTier\"\":\"\"informal\"\",\"\"claimId\"\":\"\"claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9\"\",\"\"entityIds\"\":[\"\"entity_ce0392ab7819885fcf3edf76a07ce2ff1dcfc8331dbe12874df6e0be97080558\"\",\"\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\"\"],\"\"evidenceId\"\":\"\"ev_39795f94e9ec9a7584aff8aec6f5c91e929d51857ccc3c5c5942d96c7138c614\"\",\"\"language\"\":\"\"en\"\",\"\"logicalId\"\":\"\"ku_952ea8c8e266a6e2266dd6a7165d4dda09c1460f4ef34443cf86bcdf12e5f21c\"\",\"\"modality\"\":\"\"asserted\"\",\"\"numericValues\"\":[\"\"7\"\"],\"\"polarity\"\":\"\"positive\"\",\"\"retrievalTerms\"\":[\"\"audit\"\",\"\"token\"\",\"\"deck\"\",\"\"tavonel-e2e-pptx-7f3a-r5.\"\"],\"\"sourceId\"\":\"\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\"\",\"\"sourceVersionId\"\":\"\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\"\",\"\"temporalRefs\"\":[],\"\"text\"\":\"\"The audit token for this deck is TAVONEL-E2E-PPTX-7f3a-r5.\"\",\"\"topicKey\"\":\"\"audit token deck tavonel-e2e-pptx- f3a-r5.\"\"}\",\"verified_with_warning\"\n\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\",\"entity\",\"{\"\"canonicalName\"\":\"\"TAVONEL-E2E-\"\",\"\"claimIds\"\":[\"\"claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9\"\"],\"\"entityId\"\":\"\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\"\",\"\"entityType\"\":\"\"acronym\"\",\"\"evidenceIds\"\":[\"\"ev_39795f94e9ec9a7584aff8aec6f5c91e929d51857ccc3c5c5942d96c7138c614\"\"]}\",\"verified_with_warning\"\n\"entity_ce0392ab7819885fcf3edf76a07ce2ff1dcfc8331dbe12874df6e0be97080558\",\"entity\",\"{\"\"canonicalName\"\":\"\"PPTX-\"\",\"\"claimIds\"\":[\"\"claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9\"\"],\"\"entityId\"\":\"\"entity_ce0392ab7819885fcf3edf76a07ce2ff1dcfc8331dbe12874df6e0be97080558\"\",\"\"entityType\"\":\"\"acronym\"\",\"\"evidenceIds\"\":[\"\"ev_39795f94e9ec9a7584aff8aec6f5c91e929d51857ccc3c5c5942d96c7138c614\"\"]}\",\"verified_with_warning\"\n\"relation_0b520955267e4e2d43faa638d16f79ff5b2e034a5505db20b6d1135dc5dd9801\",\"relation\",\"{\"\"evidenceId\"\":\"\"ev_39795f94e9ec9a7584aff8aec6f5c91e929d51857ccc3c5c5942d96c7138c614\"\",\"\"objectId\"\":\"\"entity_ce0392ab7819885fcf3edf76a07ce2ff1dcfc8331dbe12874df6e0be97080558\"\",\"\"predicate\"\":\"\"mentions\"\",\"\"relationId\"\":\"\"relation_0b520955267e4e2d43faa638d16f79ff5b2e034a5505db20b6d1135dc5dd9801\"\",\"\"subjectId\"\":\"\"claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9\"\"}\",\"verified_with_warning\"\n\"relation_a66b40524958d219c5397c377a48862a5f65223854e3d9ce5a8a68e4d1d7cbe4\",\"relation\",\"{\"\"evidenceId\"\":\"\"ev_39795f94e9ec9a7584aff8aec6f5c91e929d51857ccc3c5c5942d96c7138c614\"\",\"\"objectId\"\":\"\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\"\",\"\"predicate\"\":\"\"mentions\"\",\"\"relationId\"\":\"\"relation_a66b40524958d219c5397c377a48862a5f65223854e3d9ce5a8a68e4d1d7cbe4\"\",\"\"subjectId\"\":\"\"claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9\"\"}\",\"verified_with_warning\"\n\"ontology_term_430f2b1ec1824207afeccda66477f0c8f5e75696f7380e0231e92d6ccfc81f01\",\"ontology_term\",\"{\"\"blueprint\"\":\"\"generic-mixed-corpus\"\",\"\"blueprintVersion\"\":\"\"1.0.0\"\",\"\"moduleSha256\"\":\"\"sha256:694759884a1ccc6d3b23ce402155eadf39ec85b3fc62d4c12ed39ec6d3357963\"\",\"\"term\"\":\"\"document\"\"}\",\"verified\"\n\"ontology_term_f4526f3d5996a8ed37b86daa4a9a3a8b330afb9f2a82bb1b6d1eba30c3912469\",\"ontology_term\",\"{\"\"blueprint\"\":\"\"generic-mixed-corpus\"\",\"\"blueprintVersion\"\":\"\"1.0.0\"\",\"\"moduleSha256\"\":\"\"sha256:694759884a1ccc6d3b23ce402155eadf39ec85b3fc62d4c12ed39ec6d3357963\"\",\"\"term\"\":\"\"note\"\"}\",\"verified\"\n\"ontology_term_7d2c870f73ce23900b178254217d389c25e9ba593de8fd31584efd3c2440143f\",\"ontology_term\",\"{\"\"blueprint\"\":\"\"generic-mixed-corpus\"\",\"\"blueprintVersion\"\":\"\"1.0.0\"\",\"\"moduleSha256\"\":\"\"sha256:694759884a1ccc6d3b23ce402155eadf39ec85b3fc62d4c12ed39ec6d3357963\"\",\"\"term\"\":\"\"entity\"\"}\",\"verified\"\n\"ontology_term_01db5ef35fe3ece90baf85bb66bf55b9ea3698fcf45d66dc4c8da3d91e5cd360\",\"ontology_term\",\"{\"\"blueprint\"\":\"\"generic-mixed-corpus\"\",\"\"blueprintVersion\"\":\"\"1.0.0\"\",\"\"moduleSha256\"\":\"\"sha256:694759884a1ccc6d3b23ce402155eadf39ec85b3fc62d4c12ed39ec6d3357963\"\",\"\"term\"\":\"\"relation\"\"}\",\"verified\"\n\"ontology_term_e2b013adc3c97e6da6f2df413dff11d6b5d71873a49109ef717f610b07bffee1\",\"ontology_term\",\"{\"\"blueprint\"\":\"\"generic-mixed-corpus\"\",\"\"blueprintVersion\"\":\"\"1.0.0\"\",\"\"moduleSha256\"\":\"\"sha256:694759884a1ccc6d3b23ce402155eadf39ec85b3fc62d4c12ed39ec6d3357963\"\",\"\"term\"\":\"\"claim\"\"}\",\"verified\"\n"
+          },
+          {
+            "path": "graph/relationships.csv",
+            "mediaType": "text/csv; charset=utf-8",
+            "sizeBytes": 2868,
+            "sha256": "sha256:a34995ab6f67efd1f28f8f8a34659ba336522f7693a8871a0684208213a36097",
+            "content": "id,subject_id,predicate,object_id\n\"edge_c5126ef5936a9f25cb33abaa7e5984a0416aab8347e4de5cff59a418fcd57c35\",\"ko_collection_1bb833d575f6e9e517422b775d16aa447f6a4ce6875ae38aa3e2ae2907f1ec4f\",\"links_to\",\"ko_document_5c005218234b32462afbed2a59da690220d89633278a3d28eea1efe770145773\"\n\"edge_7de57a8a082c62abc8ae6fc5e545b0fdc912b590eb5e9def6b99d8dfc8679ccb\",\"ko_document_5c005218234b32462afbed2a59da690220d89633278a3d28eea1efe770145773\",\"contains\",\"ko_block_91fcb6519b6275b7111cf001577313e81b2104f000851e73cca1ee854813e360\"\n\"edge_a84a794b6514b2fb6903fdbc4e75aea6539a924c8aa0181239e53cc8b9bb6ada\",\"ko_document_5c005218234b32462afbed2a59da690220d89633278a3d28eea1efe770145773\",\"contains\",\"ko_block_52f46f8f6514812fc1b9db8d04d4f43ecbc965122d3135bdb20cb86d0448e3a8\"\n\"edge_ed8fa6f7351ecac6a99311001d8cefe6ab45887accbfdcb8dcda88577ade1465\",\"ko_document_5c005218234b32462afbed2a59da690220d89633278a3d28eea1efe770145773\",\"contains\",\"ko_block_e431d8fb48418aedb51aa7c7f3d5375624d75dba450cbc25931a61f5b5307fa7\"\n\"edge_f852b0ea50dd7146acee00a0877ca33dff522940bdc1f7e4604d218b183ed997\",\"ko_document_5c005218234b32462afbed2a59da690220d89633278a3d28eea1efe770145773\",\"contains\",\"ko_block_e0738947632d40c7477cc8f02ed29a1f87389dae4c77a084403edcc03d2b655a\"\n\"edge_96097ddff854c75ce4eadef6e7c407fc15acaf2a5283d0a56373dc2b3aa17f21\",\"claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9\",\"supported_by\",\"ko_evidence_7eb7fc50a4b90c9e7fa90432b6ee7c9ba2e519b1b4098d6ae79b3fb27e6d3632\"\n\"edge_0b520955267e4e2d43faa638d16f79ff5b2e034a5505db20b6d1135dc5dd9801\",\"claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9\",\"mentions\",\"entity_ce0392ab7819885fcf3edf76a07ce2ff1dcfc8331dbe12874df6e0be97080558\"\n\"edge_a66b40524958d219c5397c377a48862a5f65223854e3d9ce5a8a68e4d1d7cbe4\",\"claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9\",\"mentions\",\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\"\n\"edge_44f195ff52bef32d6b9d35655a498dd7d66e67fc5ac01a77bb126f18ad305749\",\"relation_0b520955267e4e2d43faa638d16f79ff5b2e034a5505db20b6d1135dc5dd9801\",\"has_subject\",\"claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9\"\n\"edge_880c07a0a9a81eda423013779cb1bea7a61059f29cea645158f2a40432f796e6\",\"relation_0b520955267e4e2d43faa638d16f79ff5b2e034a5505db20b6d1135dc5dd9801\",\"has_object\",\"entity_ce0392ab7819885fcf3edf76a07ce2ff1dcfc8331dbe12874df6e0be97080558\"\n\"edge_9f72b584295a6911a0699f36fab068f01afc43bb778685ab58d71b24234f26bf\",\"relation_a66b40524958d219c5397c377a48862a5f65223854e3d9ce5a8a68e4d1d7cbe4\",\"has_subject\",\"claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9\"\n\"edge_19ea63ca7291412502e66ca77ab6445b93f079379ad515aa301af74fe5b1fdca\",\"relation_a66b40524958d219c5397c377a48862a5f65223854e3d9ce5a8a68e4d1d7cbe4\",\"has_object\",\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\"\n"
+          },
+          {
+            "path": "obsidian/Claims.md",
+            "mediaType": "text/markdown; charset=utf-8",
+            "sizeBytes": 420,
+            "sha256": "sha256:05cf41831a3e8649f4acbe633ce5028bf946dd6ef7fe6ec9d06b1ee897f35826",
+            "content": "# Claims\n\nBlueprint: `generic-mixed-corpus`\n\n## Evidence-bound entities\n\n- **TAVONEL-E2E-** (`acronym`)\n- **PPTX-** (`acronym`)\n\n## Evidence-bound claims\n\n- The audit token for this deck is TAVONEL-E2E-PPTX-7f3a-r5. ([[Sources/src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a|source]])\n\n## Sources\n\n- [[Sources/src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a|Document 658be712]]\n"
+          },
+          {
+            "path": "obsidian/Documents.md",
+            "mediaType": "text/markdown; charset=utf-8",
+            "sizeBytes": 423,
+            "sha256": "sha256:a5718c1928663e37bff202295a0fd9b7040c336b226714ee92a82f3209c9bc24",
+            "content": "# Documents\n\nBlueprint: `generic-mixed-corpus`\n\n## Evidence-bound entities\n\n- **TAVONEL-E2E-** (`acronym`)\n- **PPTX-** (`acronym`)\n\n## Evidence-bound claims\n\n- The audit token for this deck is TAVONEL-E2E-PPTX-7f3a-r5. ([[Sources/src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a|source]])\n\n## Sources\n\n- [[Sources/src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a|Document 658be712]]\n"
+          },
+          {
+            "path": "obsidian/Entities.md",
+            "mediaType": "text/markdown; charset=utf-8",
+            "sizeBytes": 422,
+            "sha256": "sha256:4106eff616208d616b6f825cdd5c2965022807c1256833b6ab29f940a2763ef7",
+            "content": "# Entities\n\nBlueprint: `generic-mixed-corpus`\n\n## Evidence-bound entities\n\n- **TAVONEL-E2E-** (`acronym`)\n- **PPTX-** (`acronym`)\n\n## Evidence-bound claims\n\n- The audit token for this deck is TAVONEL-E2E-PPTX-7f3a-r5. ([[Sources/src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a|source]])\n\n## Sources\n\n- [[Sources/src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a|Document 658be712]]\n"
+          },
+          {
+            "path": "obsidian/Home.md",
+            "mediaType": "text/markdown; charset=utf-8",
+            "sizeBytes": 272,
+            "sha256": "sha256:ca50ee66fe056846010cc2b87e456c614b3979fb96d3ceebcd4b9d356dbc4065",
+            "content": "# TAVONEL Candidate Knowledge Package\n\nBlueprint: `generic-mixed-corpus` v1.0.0\n\n## Knowledge views\n\n- [[Documents]]\n- [[Topics]]\n- [[Entities]]\n- [[Claims]]\n\n## Sources\n\n- [[Sources/src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a|Document 658be712]]\n"
+          },
+          {
+            "path": "obsidian/MOCs/Claims MOC.md",
+            "mediaType": "text/markdown; charset=utf-8",
+            "sizeBytes": 203,
+            "sha256": "sha256:95a410c169c41b35024b4839b9070312a35ebb34889bfa21be5b225a3251fbb1",
+            "content": "# Claims MOC MOC\n\n- [[../Claims MOC|Claims MOC view]]\n- [[../Home|Package home]]\n\n## Source index\n\n- [[../Sources/src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a|Document 658be712]]\n"
+          },
+          {
+            "path": "obsidian/MOCs/Entities MOC.md",
+            "mediaType": "text/markdown; charset=utf-8",
+            "sizeBytes": 209,
+            "sha256": "sha256:e9770d6b44da8e7de22ee252ea7e2cc5c22a5a4ea69899efa1d2477b79edc47e",
+            "content": "# Entities MOC MOC\n\n- [[../Entities MOC|Entities MOC view]]\n- [[../Home|Package home]]\n\n## Source index\n\n- [[../Sources/src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a|Document 658be712]]\n"
+          },
+          {
+            "path": "obsidian/MOCs/Topics MOC.md",
+            "mediaType": "text/markdown; charset=utf-8",
+            "sizeBytes": 203,
+            "sha256": "sha256:ed882bb339eebfe46005256322fd121090d12eb368b15ffab668481287986cd9",
+            "content": "# Topics MOC MOC\n\n- [[../Topics MOC|Topics MOC view]]\n- [[../Home|Package home]]\n\n## Source index\n\n- [[../Sources/src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a|Document 658be712]]\n"
+          },
+          {
+            "path": "obsidian/Sources/src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a.md",
+            "mediaType": "text/markdown; charset=utf-8",
+            "sizeBytes": 380,
+            "sha256": "sha256:648279e9b67de6f740bec69c69f9bd29e730f48e6d110a21bf479b67a796d792",
+            "content": "---\ndocument_id: src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\ndocument_version_id: dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\n---\n\n# Document 658be712\n\nTAVONEL E2E Slide One\n\nThe audit token for this deck is TAVONEL-E2E-PPTX-7f3a-r5.\n\nTAVONEL E2E Slide Two\n\nCompressor C-88 tripped on 2026-07-19 at a discharge pressure of 31 bar.\n"
+          },
+          {
+            "path": "obsidian/Topics.md",
+            "mediaType": "text/markdown; charset=utf-8",
+            "sizeBytes": 420,
+            "sha256": "sha256:4fb4fc6a9f27583e69a597b46d56283539026b3a0d5fde4102649a1e016908cc",
+            "content": "# Topics\n\nBlueprint: `generic-mixed-corpus`\n\n## Evidence-bound entities\n\n- **TAVONEL-E2E-** (`acronym`)\n- **PPTX-** (`acronym`)\n\n## Evidence-bound claims\n\n- The audit token for this deck is TAVONEL-E2E-PPTX-7f3a-r5. ([[Sources/src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a|source]])\n\n## Sources\n\n- [[Sources/src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a|Document 658be712]]\n"
+          },
+          {
+            "path": "ontology/architecture-plan.json",
+            "mediaType": "application/json",
+            "sizeBytes": 644,
+            "sha256": "sha256:c24927193ea0a046bd75a63ccfea000c0d8a67cb458b20d0546857a2ffdc971a",
+            "content": "{\"blueprint\":\"generic-mixed-corpus\",\"blueprint_version\":\"1.0.0\",\"folder_depth\":3,\"folder_paths\":[\"Sources\",\"Documents\",\"Topics\",\"Entities\",\"Claims\",\"MOCs\",\"Evidence\",\"Packages\"],\"mocs\":[\"Topics MOC\",\"Entities MOC\",\"Claims MOC\"],\"module_sha256\":\"sha256:694759884a1ccc6d3b23ce402155eadf39ec85b3fc62d4c12ed39ec6d3357963\",\"naming_policy\":\"stable-title\",\"plan_sha256\":\"sha256:51cd758f133e446d6cbdadb031bbf0c612360a2e3a1678af39be5bd61983e2d1\",\"preserved_existing_folders\":false,\"relation_policy\":[\"source_explicit\",\"structured_derived\",\"rule_derived\"],\"root_views\":[\"Documents\",\"Topics\",\"Entities\",\"Claims\"],\"source_preservation\":true,\"warnings\":[]}\n"
+          },
+          {
+            "path": "ontology/knowledge.jsonld",
+            "mediaType": "application/ld+json",
+            "sizeBytes": 12371,
+            "sha256": "sha256:c558110299a60fcc95d08b2ac6cb16e397e5d4591d1fcbd884f6efad812402b8",
+            "content": "{\"@context\":{\"@vocab\":\"urn:tavonel:\",\"evidence\":\"http://www.w3.org/ns/prov#wasDerivedFrom\"},\"@graph\":[{\"@id\":\"urn:tavonel:ko_collection_1bb833d575f6e9e517422b775d16aa447f6a4ce6875ae38aa3e2ae2907f1ec4f\",\"@type\":\"collection\",\"evidence\":[{\"bbox1000\":[124,139,428,181],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"pageNumber1\":1},{\"bbox1000\":[125,182,872,220],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"pageNumber1\":1},{\"bbox1000\":[29,141,328,181],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"pageNumber1\":2},{\"bbox1000\":[27,178,970,227],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"pageNumber1\":2}],\"workspaceId\":\"pilot-969dc192daa24119\"},{\"@id\":\"urn:tavonel:ko_document_5c005218234b32462afbed2a59da690220d89633278a3d28eea1efe770145773\",\"@type\":\"document\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"evidence\":[{\"bbox1000\":[124,139,428,181],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"pageNumber1\":1},{\"bbox1000\":[125,182,872,220],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"pageNumber1\":1},{\"bbox1000\":[29,141,328,181],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"pageNumber1\":2},{\"bbox1000\":[27,178,970,227],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"pageNumber1\":2}],\"title\":\"Document 658be712\"},{\"@id\":\"urn:tavonel:ko_block_91fcb6519b6275b7111cf001577313e81b2104f000851e73cca1ee854813e360\",\"@type\":\"block\",\"blockType\":\"paragraph\",\"evidence\":[{\"bbox1000\":[124,139,428,181],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"pageNumber1\":1}],\"text\":\"TAVONEL E2E Slide One\"},{\"@id\":\"urn:tavonel:ko_block_52f46f8f6514812fc1b9db8d04d4f43ecbc965122d3135bdb20cb86d0448e3a8\",\"@type\":\"block\",\"blockType\":\"paragraph\",\"evidence\":[{\"bbox1000\":[125,182,872,220],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"pageNumber1\":1}],\"text\":\"The audit token for this deck is TAVONEL-E2E-PPTX-7f3a-r5.\"},{\"@id\":\"urn:tavonel:ko_block_e431d8fb48418aedb51aa7c7f3d5375624d75dba450cbc25931a61f5b5307fa7\",\"@type\":\"block\",\"blockType\":\"paragraph\",\"evidence\":[{\"bbox1000\":[29,141,328,181],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"pageNumber1\":2}],\"text\":\"TAVONEL E2E Slide Two\"},{\"@id\":\"urn:tavonel:ko_block_e0738947632d40c7477cc8f02ed29a1f87389dae4c77a084403edcc03d2b655a\",\"@type\":\"block\",\"blockType\":\"paragraph\",\"evidence\":[{\"bbox1000\":[27,178,970,227],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"pageNumber1\":2}],\"text\":\"Compressor C-88 tripped on 2026-07-19 at a discharge pressure of 31 bar.\"},{\"@id\":\"urn:tavonel:ko_evidence_4dcfa834639b1e8dbaa559886ad290706c8a654bda02d4368812f0a827e64ed2\",\"@type\":\"evidence\",\"evidence\":[{\"bbox1000\":[124,139,428,181],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"pageNumber1\":1}],\"evidenceId\":\"ev_deba0e7d557e367c1907bdc9f6565dc992beee805119d16a80fcf9ace5abeb66\"},{\"@id\":\"urn:tavonel:ko_evidence_7eb7fc50a4b90c9e7fa90432b6ee7c9ba2e519b1b4098d6ae79b3fb27e6d3632\",\"@type\":\"evidence\",\"evidence\":[{\"bbox1000\":[125,182,872,220],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"pageNumber1\":1}],\"evidenceId\":\"ev_39795f94e9ec9a7584aff8aec6f5c91e929d51857ccc3c5c5942d96c7138c614\"},{\"@id\":\"urn:tavonel:ko_evidence_601651820708cf32d5b553355fa92717ba4cf14d66b2814d7aa37ddeefa8983b\",\"@type\":\"evidence\",\"evidence\":[{\"bbox1000\":[29,141,328,181],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"pageNumber1\":2}],\"evidenceId\":\"ev_dcb8492a3f6da9e980271e2f28ea804211a77be6d0646afbc521e01ffde96f89\"},{\"@id\":\"urn:tavonel:ko_evidence_76fb862f73626271415ba3c199d25d82a0ab991c66919733ea86ce500a2b259c\",\"@type\":\"evidence\",\"evidence\":[{\"bbox1000\":[27,178,970,227],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"pageNumber1\":2}],\"evidenceId\":\"ev_880f3364f97a4859bac9ddb629a5003e52684bcd9ae46f66ed11165cb892c5ec\"},{\"@id\":\"urn:tavonel:claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9\",\"@type\":\"claim\",\"authority\":\"informal\",\"authorityScore\":0.4,\"authorityTier\":\"informal\",\"claimId\":\"claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9\",\"entityIds\":[\"entity_ce0392ab7819885fcf3edf76a07ce2ff1dcfc8331dbe12874df6e0be97080558\",\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\"],\"evidence\":[{\"bbox1000\":[125,182,872,220],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"pageNumber1\":1}],\"evidenceId\":\"ev_39795f94e9ec9a7584aff8aec6f5c91e929d51857ccc3c5c5942d96c7138c614\",\"language\":\"en\",\"logicalId\":\"ku_952ea8c8e266a6e2266dd6a7165d4dda09c1460f4ef34443cf86bcdf12e5f21c\",\"modality\":\"asserted\",\"numericValues\":[\"7\"],\"polarity\":\"positive\",\"retrievalTerms\":[\"audit\",\"token\",\"deck\",\"tavonel-e2e-pptx-7f3a-r5.\"],\"sourceId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"sourceVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"temporalRefs\":[],\"text\":\"The audit token for this deck is TAVONEL-E2E-PPTX-7f3a-r5.\",\"topicKey\":\"audit token deck tavonel-e2e-pptx- f3a-r5.\"},{\"@id\":\"urn:tavonel:entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\",\"@type\":\"entity\",\"canonicalName\":\"TAVONEL-E2E-\",\"claimIds\":[\"claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9\"],\"entityId\":\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\",\"entityType\":\"acronym\",\"evidence\":[{\"bbox1000\":[125,182,872,220],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"pageNumber1\":1}],\"evidenceIds\":[\"ev_39795f94e9ec9a7584aff8aec6f5c91e929d51857ccc3c5c5942d96c7138c614\"]},{\"@id\":\"urn:tavonel:entity_ce0392ab7819885fcf3edf76a07ce2ff1dcfc8331dbe12874df6e0be97080558\",\"@type\":\"entity\",\"canonicalName\":\"PPTX-\",\"claimIds\":[\"claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9\"],\"entityId\":\"entity_ce0392ab7819885fcf3edf76a07ce2ff1dcfc8331dbe12874df6e0be97080558\",\"entityType\":\"acronym\",\"evidence\":[{\"bbox1000\":[125,182,872,220],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"pageNumber1\":1}],\"evidenceIds\":[\"ev_39795f94e9ec9a7584aff8aec6f5c91e929d51857ccc3c5c5942d96c7138c614\"]},{\"@id\":\"urn:tavonel:relation_0b520955267e4e2d43faa638d16f79ff5b2e034a5505db20b6d1135dc5dd9801\",\"@type\":\"relation\",\"evidence\":[{\"bbox1000\":[125,182,872,220],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"pageNumber1\":1}],\"evidenceId\":\"ev_39795f94e9ec9a7584aff8aec6f5c91e929d51857ccc3c5c5942d96c7138c614\",\"objectId\":\"entity_ce0392ab7819885fcf3edf76a07ce2ff1dcfc8331dbe12874df6e0be97080558\",\"predicate\":\"mentions\",\"relationId\":\"relation_0b520955267e4e2d43faa638d16f79ff5b2e034a5505db20b6d1135dc5dd9801\",\"subjectId\":\"claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9\"},{\"@id\":\"urn:tavonel:relation_a66b40524958d219c5397c377a48862a5f65223854e3d9ce5a8a68e4d1d7cbe4\",\"@type\":\"relation\",\"evidence\":[{\"bbox1000\":[125,182,872,220],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"pageNumber1\":1}],\"evidenceId\":\"ev_39795f94e9ec9a7584aff8aec6f5c91e929d51857ccc3c5c5942d96c7138c614\",\"objectId\":\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\",\"predicate\":\"mentions\",\"relationId\":\"relation_a66b40524958d219c5397c377a48862a5f65223854e3d9ce5a8a68e4d1d7cbe4\",\"subjectId\":\"claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9\"},{\"@id\":\"urn:tavonel:ontology_term_430f2b1ec1824207afeccda66477f0c8f5e75696f7380e0231e92d6ccfc81f01\",\"@type\":\"ontology_term\",\"blueprint\":\"generic-mixed-corpus\",\"blueprintVersion\":\"1.0.0\",\"evidence\":[{\"bbox1000\":[124,139,428,181],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"pageNumber1\":1}],\"moduleSha256\":\"sha256:694759884a1ccc6d3b23ce402155eadf39ec85b3fc62d4c12ed39ec6d3357963\",\"term\":\"document\"},{\"@id\":\"urn:tavonel:ontology_term_f4526f3d5996a8ed37b86daa4a9a3a8b330afb9f2a82bb1b6d1eba30c3912469\",\"@type\":\"ontology_term\",\"blueprint\":\"generic-mixed-corpus\",\"blueprintVersion\":\"1.0.0\",\"evidence\":[{\"bbox1000\":[124,139,428,181],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"pageNumber1\":1}],\"moduleSha256\":\"sha256:694759884a1ccc6d3b23ce402155eadf39ec85b3fc62d4c12ed39ec6d3357963\",\"term\":\"note\"},{\"@id\":\"urn:tavonel:ontology_term_7d2c870f73ce23900b178254217d389c25e9ba593de8fd31584efd3c2440143f\",\"@type\":\"ontology_term\",\"blueprint\":\"generic-mixed-corpus\",\"blueprintVersion\":\"1.0.0\",\"evidence\":[{\"bbox1000\":[124,139,428,181],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"pageNumber1\":1}],\"moduleSha256\":\"sha256:694759884a1ccc6d3b23ce402155eadf39ec85b3fc62d4c12ed39ec6d3357963\",\"term\":\"entity\"},{\"@id\":\"urn:tavonel:ontology_term_01db5ef35fe3ece90baf85bb66bf55b9ea3698fcf45d66dc4c8da3d91e5cd360\",\"@type\":\"ontology_term\",\"blueprint\":\"generic-mixed-corpus\",\"blueprintVersion\":\"1.0.0\",\"evidence\":[{\"bbox1000\":[124,139,428,181],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"pageNumber1\":1}],\"moduleSha256\":\"sha256:694759884a1ccc6d3b23ce402155eadf39ec85b3fc62d4c12ed39ec6d3357963\",\"term\":\"relation\"},{\"@id\":\"urn:tavonel:ontology_term_e2b013adc3c97e6da6f2df413dff11d6b5d71873a49109ef717f610b07bffee1\",\"@type\":\"ontology_term\",\"blueprint\":\"generic-mixed-corpus\",\"blueprintVersion\":\"1.0.0\",\"evidence\":[{\"bbox1000\":[124,139,428,181],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"pageNumber1\":1}],\"moduleSha256\":\"sha256:694759884a1ccc6d3b23ce402155eadf39ec85b3fc62d4c12ed39ec6d3357963\",\"term\":\"claim\"}]}\n"
+          },
+          {
+            "path": "ontology/knowledge.ttl",
+            "mediaType": "text/turtle; charset=utf-8",
+            "sizeBytes": 4528,
+            "sha256": "sha256:46ab04cdb7d0899a824db0d2f7476d8173b97fe8af992d5a55ee2a528c8106e3",
+            "content": "@prefix tav: <urn:tavonel:> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n\n<urn:tavonel:ko_collection_1bb833d575f6e9e517422b775d16aa447f6a4ce6875ae38aa3e2ae2907f1ec4f> a tav:collection .\n<urn:tavonel:ko_collection_1bb833d575f6e9e517422b775d16aa447f6a4ce6875ae38aa3e2ae2907f1ec4f> tav:links_to <urn:tavonel:ko_document_5c005218234b32462afbed2a59da690220d89633278a3d28eea1efe770145773> .\n<urn:tavonel:ko_document_5c005218234b32462afbed2a59da690220d89633278a3d28eea1efe770145773> a tav:document .\n<urn:tavonel:ko_document_5c005218234b32462afbed2a59da690220d89633278a3d28eea1efe770145773> tav:contains <urn:tavonel:ko_block_91fcb6519b6275b7111cf001577313e81b2104f000851e73cca1ee854813e360> .\n<urn:tavonel:ko_document_5c005218234b32462afbed2a59da690220d89633278a3d28eea1efe770145773> tav:contains <urn:tavonel:ko_block_52f46f8f6514812fc1b9db8d04d4f43ecbc965122d3135bdb20cb86d0448e3a8> .\n<urn:tavonel:ko_document_5c005218234b32462afbed2a59da690220d89633278a3d28eea1efe770145773> tav:contains <urn:tavonel:ko_block_e431d8fb48418aedb51aa7c7f3d5375624d75dba450cbc25931a61f5b5307fa7> .\n<urn:tavonel:ko_document_5c005218234b32462afbed2a59da690220d89633278a3d28eea1efe770145773> tav:contains <urn:tavonel:ko_block_e0738947632d40c7477cc8f02ed29a1f87389dae4c77a084403edcc03d2b655a> .\n<urn:tavonel:ko_block_91fcb6519b6275b7111cf001577313e81b2104f000851e73cca1ee854813e360> a tav:block .\n<urn:tavonel:ko_block_52f46f8f6514812fc1b9db8d04d4f43ecbc965122d3135bdb20cb86d0448e3a8> a tav:block .\n<urn:tavonel:ko_block_e431d8fb48418aedb51aa7c7f3d5375624d75dba450cbc25931a61f5b5307fa7> a tav:block .\n<urn:tavonel:ko_block_e0738947632d40c7477cc8f02ed29a1f87389dae4c77a084403edcc03d2b655a> a tav:block .\n<urn:tavonel:ko_evidence_4dcfa834639b1e8dbaa559886ad290706c8a654bda02d4368812f0a827e64ed2> a tav:evidence .\n<urn:tavonel:ko_evidence_7eb7fc50a4b90c9e7fa90432b6ee7c9ba2e519b1b4098d6ae79b3fb27e6d3632> a tav:evidence .\n<urn:tavonel:ko_evidence_601651820708cf32d5b553355fa92717ba4cf14d66b2814d7aa37ddeefa8983b> a tav:evidence .\n<urn:tavonel:ko_evidence_76fb862f73626271415ba3c199d25d82a0ab991c66919733ea86ce500a2b259c> a tav:evidence .\n<urn:tavonel:claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9> a tav:claim .\n<urn:tavonel:claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9> tav:supported_by <urn:tavonel:ko_evidence_7eb7fc50a4b90c9e7fa90432b6ee7c9ba2e519b1b4098d6ae79b3fb27e6d3632> .\n<urn:tavonel:claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9> tav:mentions <urn:tavonel:entity_ce0392ab7819885fcf3edf76a07ce2ff1dcfc8331dbe12874df6e0be97080558> .\n<urn:tavonel:claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9> tav:mentions <urn:tavonel:entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a> .\n<urn:tavonel:entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a> a tav:entity .\n<urn:tavonel:entity_ce0392ab7819885fcf3edf76a07ce2ff1dcfc8331dbe12874df6e0be97080558> a tav:entity .\n<urn:tavonel:relation_0b520955267e4e2d43faa638d16f79ff5b2e034a5505db20b6d1135dc5dd9801> a tav:relation .\n<urn:tavonel:relation_0b520955267e4e2d43faa638d16f79ff5b2e034a5505db20b6d1135dc5dd9801> tav:has_subject <urn:tavonel:claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9> .\n<urn:tavonel:relation_0b520955267e4e2d43faa638d16f79ff5b2e034a5505db20b6d1135dc5dd9801> tav:has_object <urn:tavonel:entity_ce0392ab7819885fcf3edf76a07ce2ff1dcfc8331dbe12874df6e0be97080558> .\n<urn:tavonel:relation_a66b40524958d219c5397c377a48862a5f65223854e3d9ce5a8a68e4d1d7cbe4> a tav:relation .\n<urn:tavonel:relation_a66b40524958d219c5397c377a48862a5f65223854e3d9ce5a8a68e4d1d7cbe4> tav:has_subject <urn:tavonel:claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9> .\n<urn:tavonel:relation_a66b40524958d219c5397c377a48862a5f65223854e3d9ce5a8a68e4d1d7cbe4> tav:has_object <urn:tavonel:entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a> .\n<urn:tavonel:ontology_term_430f2b1ec1824207afeccda66477f0c8f5e75696f7380e0231e92d6ccfc81f01> a tav:ontology_term .\n<urn:tavonel:ontology_term_f4526f3d5996a8ed37b86daa4a9a3a8b330afb9f2a82bb1b6d1eba30c3912469> a tav:ontology_term .\n<urn:tavonel:ontology_term_7d2c870f73ce23900b178254217d389c25e9ba593de8fd31584efd3c2440143f> a tav:ontology_term .\n<urn:tavonel:ontology_term_01db5ef35fe3ece90baf85bb66bf55b9ea3698fcf45d66dc4c8da3d91e5cd360> a tav:ontology_term .\n<urn:tavonel:ontology_term_e2b013adc3c97e6da6f2df413dff11d6b5d71873a49109ef717f610b07bffee1> a tav:ontology_term .\n"
+          },
+          {
+            "path": "provenance/activities.jsonl",
+            "mediaType": "application/x-ndjson",
+            "sizeBytes": 1112,
+            "sha256": "sha256:aec34c87c670a4bed04b1e4f9a4650adc4d40269daa37326af6a98fde3fb10e6",
+            "content": "{\"evidenceId\":\"ev_deba0e7d557e367c1907bdc9f6565dc992beee805119d16a80fcf9ace5abeb66\",\"identityState\":\"new\",\"logicalId\":\"ku_b191ca9327f35c2456a719fdf8e149a39efbf2d0c3583425ec6eb3b30f6fb791\",\"requestId\":\"core-e7ae669d-38fe-47f8-a660-bc28306cdd0e\",\"type\":\"core.region.compiled.v2\"}\n{\"evidenceId\":\"ev_39795f94e9ec9a7584aff8aec6f5c91e929d51857ccc3c5c5942d96c7138c614\",\"identityState\":\"new\",\"logicalId\":\"ku_952ea8c8e266a6e2266dd6a7165d4dda09c1460f4ef34443cf86bcdf12e5f21c\",\"requestId\":\"core-e7ae669d-38fe-47f8-a660-bc28306cdd0e\",\"type\":\"core.region.compiled.v2\"}\n{\"evidenceId\":\"ev_dcb8492a3f6da9e980271e2f28ea804211a77be6d0646afbc521e01ffde96f89\",\"identityState\":\"new\",\"logicalId\":\"ku_0a6fdd703fb17d05376c795e5bf9efbe398144f7d5cf63568ae82a6e75b34f85\",\"requestId\":\"core-e7ae669d-38fe-47f8-a660-bc28306cdd0e\",\"type\":\"core.region.compiled.v2\"}\n{\"evidenceId\":\"ev_880f3364f97a4859bac9ddb629a5003e52684bcd9ae46f66ed11165cb892c5ec\",\"identityState\":\"new\",\"logicalId\":\"ku_652e640ff62302ddbcaceac0c386999379f542eb76d75a2463301af44df38749\",\"requestId\":\"core-e7ae669d-38fe-47f8-a660-bc28306cdd0e\",\"type\":\"core.region.compiled.v2\"}\n"
+          },
+          {
+            "path": "rag/chunks.jsonl",
+            "mediaType": "application/x-ndjson",
+            "sizeBytes": 3871,
+            "sha256": "sha256:0e96cd875a809a7ba2e0dc40e9aeb4ba06d0da151a810aacfe891c0d88e3055d",
+            "content": "{\"authority\":\"informal\",\"authorityScore\":0.4,\"authorityTier\":\"informal\",\"bbox1000\":[124,139,872,220],\"chunkId\":\"chunk_8a0a92b825e6c037a9197f33808adea56ab2203b5b924575bf55dd646de8436c\",\"claimIds\":[\"claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9\"],\"entityIds\":[\"entity_ce0392ab7819885fcf3edf76a07ce2ff1dcfc8331dbe12874df6e0be97080558\",\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\"],\"entityNames\":[\"PPTX-\",\"TAVONEL-E2E-\"],\"evidenceId\":\"ev_deba0e7d557e367c1907bdc9f6565dc992beee805119d16a80fcf9ace5abeb66\",\"evidenceIds\":[\"ev_deba0e7d557e367c1907bdc9f6565dc992beee805119d16a80fcf9ace5abeb66\",\"ev_39795f94e9ec9a7584aff8aec6f5c91e929d51857ccc3c5c5942d96c7138c614\"],\"evidenceRefs\":[{\"bbox1000\":[124,139,428,181],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00001\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null},{\"bbox1000\":[125,182,872,220],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00002\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"languages\":[\"en\"],\"logicalId\":\"ku_b191ca9327f35c2456a719fdf8e149a39efbf2d0c3583425ec6eb3b30f6fb791\",\"logicalIds\":[\"ku_b191ca9327f35c2456a719fdf8e149a39efbf2d0c3583425ec6eb3b30f6fb791\",\"ku_952ea8c8e266a6e2266dd6a7165d4dda09c1460f4ef34443cf86bcdf12e5f21c\"],\"pageNumber1\":1,\"retrievalTerms\":[\"tavonel\",\"e2e\",\"slide\",\"one\",\"audit\",\"token\",\"deck\",\"tavonel-e2e-pptx-7f3a-r5.\"],\"sourceId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"sourceVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"temporalRefs\":[],\"text\":\"TAVONEL E2E Slide One\\nThe audit token for this deck is TAVONEL-E2E-PPTX-7f3a-r5.\"}\n{\"authority\":\"informal\",\"authorityScore\":0.4,\"authorityTier\":\"informal\",\"bbox1000\":[27,141,970,227],\"chunkId\":\"chunk_391371e582c9771e107ee02abc17b7b53f48bde1da870fd6f0c2941b458cd30a\",\"claimIds\":[],\"entityIds\":[],\"entityNames\":[],\"evidenceId\":\"ev_dcb8492a3f6da9e980271e2f28ea804211a77be6d0646afbc521e01ffde96f89\",\"evidenceIds\":[\"ev_dcb8492a3f6da9e980271e2f28ea804211a77be6d0646afbc521e01ffde96f89\",\"ev_880f3364f97a4859bac9ddb629a5003e52684bcd9ae46f66ed11165cb892c5ec\"],\"evidenceRefs\":[{\"bbox1000\":[29,141,328,181],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0002-l00001\",\"pageIndex0\":1,\"pageNumber1\":2,\"timeEndMs\":null,\"timeStartMs\":null},{\"bbox1000\":[27,178,970,227],\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0002-l00002\",\"pageIndex0\":1,\"pageNumber1\":2,\"timeEndMs\":null,\"timeStartMs\":null}],\"languages\":[\"en\"],\"logicalId\":\"ku_0a6fdd703fb17d05376c795e5bf9efbe398144f7d5cf63568ae82a6e75b34f85\",\"logicalIds\":[\"ku_0a6fdd703fb17d05376c795e5bf9efbe398144f7d5cf63568ae82a6e75b34f85\",\"ku_652e640ff62302ddbcaceac0c386999379f542eb76d75a2463301af44df38749\"],\"pageNumber1\":2,\"retrievalTerms\":[\"tavonel\",\"e2e\",\"slide\",\"two\",\"compressor\",\"c-88\",\"tripped\",\"2026\",\"07\",\"19\",\"discharge\",\"pressure\",\"31\",\"bar.\"],\"sourceId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"sourceVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"temporalRefs\":[],\"text\":\"TAVONEL E2E Slide Two\\nCompressor C-88 tripped on 2026-07-19 at a discharge pressure of 31 bar.\"}\n"
+          },
+          {
+            "path": "rag/documents.jsonl",
+            "mediaType": "application/x-ndjson",
+            "sizeBytes": 293,
+            "sha256": "sha256:92da7008a89328f675459986b1344e0b2eb4dfc64d1a2e1c8ce6d7b36f3f500a",
+            "content": "{\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"sourceSha256\":\"sha256:bfa26645366b8c7a8b58282f4ed16eb7251150bad88488fa8735207d27d0df81\",\"title\":\"Document 658be712\"}\n"
+          },
+          {
+            "path": "rag/retrieval-profile.json",
+            "mediaType": "application/json",
+            "sizeBytes": 333,
+            "sha256": "sha256:6cd0d1041fac3ceccecbfb20ec9ab004f7353ad57e435923dd6ca680698f42fa",
+            "content": "{\"candidateK\":30,\"materializedSignals\":[\"multilingual_lexical\",\"entity_graph\",\"authority_prior\"],\"schemaVersion\":\"tavonel.adaptive_hybrid_profile.v1\",\"tokenization\":\"unicode-script-aware-v1\",\"topK\":8,\"vectorMaterialization\":\"external_embedding_provider_required\",\"weights\":{\"authority\":0.1,\"graph\":0.2,\"lexical\":0.35,\"vector\":0.35}}\n"
+          },
+          {
+            "path": "semantics/claims.jsonl",
+            "mediaType": "application/x-ndjson",
+            "sizeBytes": 947,
+            "sha256": "sha256:7a8175953132cb6e8090d2bbc9e6ce61ec5948862a58fb7fe6e824d48322c4fe",
+            "content": "{\"authority\":\"informal\",\"authorityScore\":0.4,\"authorityTier\":\"informal\",\"claimId\":\"claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9\",\"entityIds\":[\"entity_ce0392ab7819885fcf3edf76a07ce2ff1dcfc8331dbe12874df6e0be97080558\",\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\"],\"evidenceId\":\"ev_39795f94e9ec9a7584aff8aec6f5c91e929d51857ccc3c5c5942d96c7138c614\",\"language\":\"en\",\"logicalId\":\"ku_952ea8c8e266a6e2266dd6a7165d4dda09c1460f4ef34443cf86bcdf12e5f21c\",\"modality\":\"asserted\",\"numericValues\":[\"7\"],\"polarity\":\"positive\",\"retrievalTerms\":[\"audit\",\"token\",\"deck\",\"tavonel-e2e-pptx-7f3a-r5.\"],\"sourceId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"sourceVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"temporalRefs\":[],\"text\":\"The audit token for this deck is TAVONEL-E2E-PPTX-7f3a-r5.\",\"topicKey\":\"audit token deck tavonel-e2e-pptx- f3a-r5.\"}\n"
+          },
+          {
+            "path": "semantics/contradictions.jsonl",
+            "mediaType": "application/x-ndjson",
+            "sizeBytes": 0,
+            "sha256": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "content": ""
+          },
+          {
+            "path": "semantics/entities.jsonl",
+            "mediaType": "application/x-ndjson",
+            "sizeBytes": 619,
+            "sha256": "sha256:071e6238f713a090c59512cab5660a06a19245f5c4532b7fcb6ca07e64ef870b",
+            "content": "{\"canonicalName\":\"TAVONEL-E2E-\",\"claimIds\":[\"claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9\"],\"entityId\":\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\",\"entityType\":\"acronym\",\"evidenceIds\":[\"ev_39795f94e9ec9a7584aff8aec6f5c91e929d51857ccc3c5c5942d96c7138c614\"]}\n{\"canonicalName\":\"PPTX-\",\"claimIds\":[\"claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9\"],\"entityId\":\"entity_ce0392ab7819885fcf3edf76a07ce2ff1dcfc8331dbe12874df6e0be97080558\",\"entityType\":\"acronym\",\"evidenceIds\":[\"ev_39795f94e9ec9a7584aff8aec6f5c91e929d51857ccc3c5c5942d96c7138c614\"]}\n"
+          },
+          {
+            "path": "semantics/profile.json",
+            "mediaType": "application/json",
+            "sizeBytes": 604,
+            "sha256": "sha256:6614b4e6e8439deea59d8564c399c4d32680815757dd65adf5a29fdb1be5e3e5",
+            "content": "{\"claimCount\":1,\"contradictionCandidateCount\":0,\"domain\":\"mixed\",\"entityCount\":2,\"languages\":{\"en\":1},\"objectTypes\":[\"document\",\"note\",\"entity\",\"relation\",\"claim\"],\"relationCount\":2,\"retrieval\":{\"candidateK\":30,\"materializedSignals\":[\"multilingual_lexical\",\"entity_graph\",\"authority_prior\"],\"schemaVersion\":\"tavonel.adaptive_hybrid_profile.v1\",\"tokenization\":\"unicode-script-aware-v1\",\"topK\":8,\"vectorMaterialization\":\"external_embedding_provider_required\",\"weights\":{\"authority\":0.1,\"graph\":0.2,\"lexical\":0.35,\"vector\":0.35}},\"schemaVersion\":\"tavonel.semantic_profile.v1\",\"temporalStructure\":\"undated\"}\n"
+          },
+          {
+            "path": "semantics/relations.jsonl",
+            "mediaType": "application/x-ndjson",
+            "sizeBytes": 734,
+            "sha256": "sha256:c88b1164c88fbd64f0d8f763bc07fd621a593a41b605f5fd50e95f8763381fea",
+            "content": "{\"evidenceId\":\"ev_39795f94e9ec9a7584aff8aec6f5c91e929d51857ccc3c5c5942d96c7138c614\",\"objectId\":\"entity_ce0392ab7819885fcf3edf76a07ce2ff1dcfc8331dbe12874df6e0be97080558\",\"predicate\":\"mentions\",\"relationId\":\"relation_0b520955267e4e2d43faa638d16f79ff5b2e034a5505db20b6d1135dc5dd9801\",\"subjectId\":\"claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9\"}\n{\"evidenceId\":\"ev_39795f94e9ec9a7584aff8aec6f5c91e929d51857ccc3c5c5942d96c7138c614\",\"objectId\":\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\",\"predicate\":\"mentions\",\"relationId\":\"relation_a66b40524958d219c5397c377a48862a5f65223854e3d9ce5a8a68e4d1d7cbe4\",\"subjectId\":\"claim_0a93df31bbaca71c236f5bd2667b1dbac53fdd83670fa0142aadddfd86bb33e9\"}\n"
+          },
+          {
+            "path": "source/collection-files.json",
+            "mediaType": "application/json",
+            "sizeBytes": 267,
+            "sha256": "sha256:93715dbd7e9a6a68ae31267f325ad5fc34a1494419b950fd945468fb5465c476",
+            "content": "[{\"documentId\":\"src_58f438d04958b5ca05542de1f2a67219427c9c2c9eda7d389ba55969dabcc21a\",\"documentVersionId\":\"dv_a0e6f779f3919bd01704aa4a98a6ccbe252d54091b35bf84296432534ae05a3b\",\"sourceSha256\":\"sha256:bfa26645366b8c7a8b58282f4ed16eb7251150bad88488fa8735207d27d0df81\"}]\n"
+          },
+          {
+            "path": "validation/report.json",
+            "mediaType": "application/json",
+            "sizeBytes": 532,
+            "sha256": "sha256:e10b0f9cce961ed52464d37e2aa3dc4cad9d2a91d510281b6422c09311acd6fe",
+            "content": "{\"architecturePlanSha256\":\"sha256:51cd758f133e446d6cbdadb031bbf0c612360a2e3a1678af39be5bd61983e2d1\",\"blueprint\":\"generic-mixed-corpus\",\"candidatePromotion\":false,\"claimCount\":1,\"contradictionCandidateCount\":0,\"documentCount\":1,\"entityCount\":2,\"knowledgeObjectCount\":20,\"languages\":{\"en\":1},\"matchingPolicy\":\"legacy\",\"relationCount\":2,\"retrievalChunkCount\":2,\"retrievalEvidenceCoverage\":1.0,\"retrievalMeanCharacters\":87.0,\"retrievalTinyChunkCount\":0,\"reviewReasons\":[],\"semanticEvidenceCoverage\":1.0,\"status\":\"passed\",\"unitCount\":4}\n"
+          }
+        ],
+        "signatureStatus": "external_signer_required"
+      },
+      "validation": {
+        "status": "passed",
+        "deterministicMaterialization": true,
+        "sourceCoverage": true,
+        "evidenceCoverage": true,
+        "immutableInputsOnly": true,
+        "fullRebuildEquivalence": "not_run",
+        "reviewReasons": [],
+        "counts": {
+          "documents": 1,
+          "topics": 0,
+          "entities": 2,
+          "claims": 1,
+          "evidence": 4,
+          "relations": 1,
+          "packageFiles": 26
+        }
+      },
+      "reviewReasons": [],
+      "coreExecution": {
+        "status": "completed",
+        "runtime": "tavonel-python-core-v2",
+        "worldStateId": "ws_533310615a7cb85a11d8d7b073dc162a83898d9c94fdeb8dea458429f0b55b46",
+        "receipt": {
+          "requestId": "core-e7ae669d-38fe-47f8-a660-bc28306cdd0e",
+          "inputSha256": "sha256:faac32e78fa36994734bc5aa57477aa8e879088b23455c94db18deaad239611f",
+          "outputSha256": "sha256:2e1137cdfc28ff7664389d33e779225ce6ef7d81c38dd5895bdc61118bedb4c3",
+          "coreReleaseDigest": "sha256:26903719e1bbcabada67a15b659d392b3b9c9d0159abdcf74dc5260a50a11f31",
+          "matchingPolicy": "legacy",
+          "candidatePromotion": false,
+          "equivalence": "not_run",
+          "totalArtifacts": 16,
+          "rebuiltArtifacts": 16,
+          "workAvoidedArtifacts": 0
+        }
+      }
+    }
+  },
+  "finishedAt": "2026-09-06T10:53:05.850Z",
+  "reachedStep": "COLLECTION",
+  "stepChain": [
+    "CAPABILITIES",
+    "UPLOAD_CAPABILITY",
+    "R2_PUT",
+    "CONFIRM",
+    "DOCUMENT_TERMINAL",
+    "COMPILE_JOB",
+    "COMPILE_TERMINAL",
+    "COLLECTION",
+    "WORLD",
+    "ASK"
+  ],
+  "verdict": "REACHED_COLLECTION"
+}

@@ -1,19 +1,24 @@
-# DRAFT — not in force — founder/legal review required
+# Incident response runbook
 
-**This procedure is not in force.** It is not published, not linked from the site, and nobody is
-on call under it. Audit item **S03**.
+**In force from 2026-09-11 for the one clause that binds: the customer notification window.**
+The rest of this procedure is written and unexercised — no tabletop has been run (§8), there is
+no out-of-hours path (§3), and `docs/incidents/` does not exist yet. Audit item **S03**.
 
-`/trust` says: "Incident response process — Not yet published… no severity definitions, no
-notification window, no post-incident record format." That row stays correct until this document
-is approved, a person is actually reachable under it, and the tabletop in §8 has been run.
+**There is no on-call rotation.** The service is operated by a single person. `security@tavonel.com`
+and `support@tavonel.com` are inboxes that person reads; there is no pager, no rota and no second
+responder. A SEV1 reported at 02:00 is found in the morning. That single fact is why the published
+window is 72 hours and not 24 (§5), and any future change to the window starts by changing that
+fact rather than the sentence.
 
-The single clause with contractual weight is the **customer notification window** (§5). It is
-left as `[FOUNDER]` on purpose. A published window is a promise that requires somebody to be
-awake, and today the on-call roster is one person with no formal rotation.
+The customer-facing summary of this document is on `/trust`; the procedure itself stays here.
 
 - Drafted: 2026-09-11 KST, competitive-audit remediation campaign, lane L9.
-- Status: `PROPOSED`.
-- Feeds: `DPA_DRAFT.md` §8, and a future public summary on `/trust`.
+- Window set by: **delegated decision, 2026-09-11 (orchestrator, under the founder's delegation) —
+  see `docs/policy/DECISION_LOG_2026-09-11.md`** (FD-06/07). Not the founder's own statement; the
+  founder may reverse it, and a reversal is a new entry in that log and a new version of the DPA.
+- Status: notification window `DECIDED_UNDER_DELEGATION`; procedure `WRITTEN_NOT_EXERCISED`.
+- Feeds: the served DPA (`nextjs/public/policy/TAVONEL_DPA_v1_2026-09-11.md`) §8, which carries
+  the same 72-hour window, and the `/trust` incident-response row.
 
 ---
 
@@ -101,9 +106,9 @@ the record.
 - `support@tavonel.com` — service impact.
 - Both are read by a person. There is no automated acknowledgement and no pager.
 
-`[FOUNDER]` — whether to add an out-of-hours path (a phone number, a pager, a rota). Without one,
-a SEV1 reported at 02:00 is found in the morning, and no notification window shorter than that is
-truthfully publishable.
+There is no out-of-hours path: no phone number, no pager, no rota. That is a decision and not an
+omission, and §5's window is the consequence of it. Adding one is the only thing that makes a
+window shorter than 72 hours truthfully publishable.
 
 **Never include document contents in an incident email.** `/status` already says this and it
 applies internally too: an incident thread must not become a second copy of the data.
@@ -129,25 +134,33 @@ Remediation destroys evidence. This step comes first, and a SEV1 that skipped it
 6. **Hash what was captured**, and record the hash in the timeline, so the record can later be
    shown to be the record.
 
-## 5. Customer notification — PLACEHOLDER
+## 5. Customer notification — 72 hours, delegated decision 2026-09-11
 
-**The window is not set.** This is the decision this document exists to raise.
+**TAVONEL notifies an affected customer without undue delay and no later than 72 hours after
+becoming aware of a personal data breach affecting their personal data.** That is the commitment,
+it is the same sentence as the served DPA §8, and the two move together or not at all.
 
-What is drafted is the content, not the clock. A notification says: what happened, when it was
-detected, which of the customer's data was involved and which was not, what has been done, what
-the customer should do, and who to reply to. It does not speculate about cause, and it does not
-state a number that has not been confirmed.
+"Becoming aware" is the point at which there is a reasonable degree of certainty that a security
+incident has led to personal data being compromised. Suspicion is classified as an incident
+immediately (§1, ambiguity resolves upward); the 72 hours runs from awareness, not from
+classification, and a classification that is later downgraded does not reset it.
 
-`[FOUNDER]` — pick one, knowing the consequence:
+The content, which matters as much as the clock. A notification says: what happened, when it was
+detected, which of the customer's data was involved **and which was not**, what has been done,
+what the customer should do, and who to reply to. It does not speculate about cause, and it does
+not state a number that has not been confirmed.
+
+Why 72 and not 24, recorded so the next reader does not re-argue it:
 
 | Window | What it requires | What it costs |
 |---|---|---|
-| 24 hours from awareness | Someone reachable out of hours | The window a processor is normally asked for; unmeetable today |
-| 72 hours from awareness | A daily check | Matches the GDPR **controller** deadline, which leaves a controller-customer no time to meet its own; buyers notice |
-| "Without undue delay", no number | Nothing new | Honest for the current team size; reads as evasive in procurement |
+| 24 hours from awareness | Someone reachable out of hours | The window a processor is normally asked for; unmeetable with one operator and no rota |
+| **72 hours from awareness** — chosen | A daily check, which exists | Matches the GDPR **controller** deadline, so a controller-customer has no time left to meet its own; buyers notice, and the honest answer is that this is what one operator can keep |
+| "Without undue delay", no number | Nothing new | Honest for the team size; reads as evasive in procurement |
 
-Whichever is chosen goes into `DPA_DRAFT.md` §8 and onto `/trust` in the same change, and neither
-is written before the other.
+The chosen window is meetable by a daily check and by nothing else about the current setup. If the
+operator will be unreachable for longer than a day, that is the thing to fix before the window is
+missed — not the sentence.
 
 Say plainly on `/status` during a SEV1 or a customer-visible SEV2 that an incident is open. A
 status page that stays quiet during an outage is worse than one that says "we are investigating".
@@ -204,20 +217,22 @@ Reviewed by: <name; and the limitation if it is the same person who caused it>
 The **"why it was not caught"** section is the reason this format exists. An incident whose record
 names only the bug repeats; one that names the missing check does not.
 
-## 8. Tabletop — after this is approved, not before
+## 8. Tabletop — not yet run
 
-A drill against a procedure that does not exist tests nothing. Sequence: approve this document →
-name the notification window → run the tabletop → publish a public summary on `/trust`.
+The window is published and the procedure is written; the drill is the part that is still missing,
+and nothing here pretends otherwise. Sequence, with the first three done: name the notification
+window → publish the `/trust` summary → run the tabletop → record what it found.
 
-First exercise, once approved: **a suspected cross-tenant leak.** It is the stop-the-line item,
-it is the hardest to scope, and it is the one a buyer will ask whether we have rehearsed.
+First exercise: **a suspected cross-tenant leak.** It is the stop-the-line item, it is the hardest
+to scope, and it is the one a buyer will ask whether we have rehearsed. Until it has been run, the
+honest answer to that question is no.
 
 The drill is scored on the procedure, not on the fix:
 
 - [ ] Severity declared within 15 minutes of the injected report
 - [ ] Evidence captured before any remediation
 - [ ] Blast radius scoped, with the query that scoped it recorded
-- [ ] Notification drafted within the chosen window, with content per §5
+- [ ] Notification drafted within 72 hours of the injected awareness, with content per §5
 - [ ] Post-incident record produced in the §7 format
 - [ ] A gap found and written down
 
@@ -229,13 +244,23 @@ also a commitment: do not publish a cadence that will be missed.
 
 ---
 
-## Checklist before this is in force
+## What is done, and what is still open
 
-- [ ] Founder approved the severity tiers as written
-- [ ] Customer notification window chosen (§5), and someone is reachable to meet it
-- [ ] Out-of-hours path decided (§3), or its absence accepted and recorded
+Done 2026-09-11:
+
+- [x] Customer notification window chosen (§5): 72 hours from awareness, in the served DPA §8 and
+      on `/trust` in the same change.
+- [x] Out-of-hours path decided (§3): there is none, and its absence is recorded here and in the
+      `/trust` summary rather than smoothed over.
+- [x] Public summary on `/trust`, with the `lib/trust-page-answers.test.ts` update in the same
+      commit.
+
+Still open:
+
+- [ ] Founder approval of the severity tiers as written (§1)
+- [ ] Whether a SEV2 carries a notification commitment at all (§1)
 - [ ] `docs/incidents/` created with the §7 template
-- [ ] Tabletop run and its record filed
-- [ ] Public summary drafted for `/trust`, and the not-published row flipped in the same commit
-      as the `lib/trust-page-answers.test.ts` update
-- [ ] `DPA_DRAFT.md` §8 filled in with the same window, not a different one
+- [ ] Tabletop run and its record filed (§8)
+- [ ] Drill cadence (§8)
+- [ ] The vacant reviewer role (§2) — a SEV1 review is signed by the person who ran it until
+      there is a second person

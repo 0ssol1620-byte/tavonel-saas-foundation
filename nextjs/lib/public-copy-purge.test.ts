@@ -36,6 +36,9 @@ const SALES_SURFACES = [
   "product/continuous-knowledge",
   "product/document-understanding",
   "product/knowledge-compiler",
+  // The hub and the five detail pages. The hub reads its cards from the detail page record, so
+  // the two entries check one body of copy from both ends.
+  "solutions",
   "solutions/[slug]",
   "integrations",
   "pricing",
@@ -55,6 +58,23 @@ const SALES_SURFACES = [
   // `trust` answers buyer questions and is linked from the footer, so it is a sales surface and
   // is held to the same purge as the rest of them (trust lane CROSS-LANE 3).
   "trust",
+  /*
+    The cookbooks are drafts and carry `noindex`, which would have qualified them for the exempt
+    list. They are held to the purge instead: the register this test guards is exactly the one a
+    page reaches for when it has to say a section has not been run, and a page that has eleven
+    reasons to defend itself is the page that most needs the rule.
+  */
+  "cookbooks/[slug]",
+  // And the index that lists them (BA-210), held to the same purge for the same reason.
+  "cookbooks",
+  /*
+    `ko` is the §12.4 Korean entry page: indexable, in the sitemap, in llms.txt, and the first
+    TAVONEL page a Korean-language searcher lands on. That makes it a sales surface. It is on
+    this list for its metadata as much as its markup -- the title and description are the whole
+    of what a search result shows, and they are Korean, so nothing else on the site would have
+    read them.
+  */
+  "ko",
 ] as const;
 
 /*

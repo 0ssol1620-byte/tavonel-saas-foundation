@@ -54,6 +54,28 @@ describe("plan entitlement", () => {
     expect(decision.ok === false && decision.code).toBe("STUDIO_SUBSCRIPTION_REQUIRED");
   });
 
+  /*
+    World activation is the exception, and neither card claims it either way.
+
+    No plan bullet promises or withholds promotion -- the /pricing capability table is where a
+    buyer reads it, rendered from this same function. What is pinned here is the shape of the
+    grant: Developer reaches activation as the workspace owner and not otherwise, and Team's
+    answer has not moved, so "Everything in Developer" on the Team card stays true.
+  */
+  it("admits the Developer plan to World activation only as the workspace owner", () => {
+    expect(billingProductDecision(account("observer_access"), "activation", "owner")).toEqual({ ok: true });
+    for (const role of ["admin", "member", "viewer"] as const) {
+      const decision = billingProductDecision(account("observer_access"), "activation", role);
+      expect(decision.ok, `a Developer-plan ${role} must not activate a World`).toBe(false);
+    }
+  });
+
+  it("leaves the Team plan's activation answer where it was", () => {
+    for (const role of ["owner", "admin", "member", "viewer"] as const) {
+      expect(billingProductDecision(account("studio_access"), "activation", role)).toEqual({ ok: true });
+    }
+  });
+
   it.each(PROMISED_ROUTES)("%s is reachable by the entry plan, so it can %s", (route) => {
     const source = read(route);
     expect(source, `${route} must not require a Team subscription`)

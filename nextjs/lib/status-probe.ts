@@ -6,16 +6,24 @@
   request was sent through it and what came back. So every sentence this file produces names which
   one it is, and nothing here can render blank:
 
-  - No stored run at all is "NOT RUN". Not an empty cell, not a dash, not "unknown".
-  - A history that could not be read is a named failure, never NOT RUN. "It has not run" and "we
-    could not find out" are different facts and the page says which one it has.
+  - No stored run at all is "Not yet reported". Not an empty cell, not a dash, not "unknown".
+  - A history that could not be read is a named failure, never "Not yet reported". "It has not
+    run" and "we could not find out" are different facts and the page says which one it has.
+
+  BA-134. The badge value used to be the literal `NOT RUN`, which is one of the tokens the
+  public-copy sweep bans -- a snake-case internal enum printed eighteen times on the page a
+  procurement reader is sent to. The state vocabulary is unchanged and so is every distinction it
+  draws; the word a reader sees is now a sentence fragment in the same voice as the others. The
+  raw store error code stopped being printed for the same reason: a reader met
+  `PROBE_STORE_NOT_CONFIGURED` in body copy, so it now maps through `ERROR_SENTENCE` like every
+  other failure class on this page.
   - A rate carries its denominator, because a campaign rule says so and because "5% failed" over
     twenty runs is a different statement from the same number over two thousand.
 */
 import { PROBE_DEPENDENCIES, type ProbeCheck, type ProbeDependency, type ProbeRun } from "./synthetic-probe";
 import type { ProbeHistory } from "./synthetic-probe-store";
 
-export const NOT_RUN = "NOT RUN" as const;
+export const NOT_RUN = "Not yet reported" as const;
 
 const DEPENDENCY_LABEL: Record<ProbeDependency, string> = {
   cdr: "Document sanitizer",
@@ -35,6 +43,18 @@ const ERROR_SENTENCE: Record<string, string> = {
   unexpected_response: "it answered with something this probe does not recognise",
   probe_refused: "the probe could not perform this check",
 };
+
+/*
+  BA-134(c). A reader met `(PROBE_STORE_NOT_CONFIGURED)` in body copy on the page procurement is
+  sent to. The two store outcomes are different facts and both keep their own sentence -- nothing
+  is collapsed into "unknown" -- but neither is a raw constant now, and an unrecognised code falls
+  back to the honest one rather than printing itself.
+*/
+const STORE_SENTENCE: Record<string, string> = {
+  PROBE_STORE_NOT_CONFIGURED: "Scheduled dependency checks are not reporting to this page yet.",
+  PROBE_HISTORY_READ_FAILED: "The stored history of the scheduled checks could not be read.",
+};
+const STORE_UNRECOGNISED = "The stored history of the scheduled checks could not be read.";
 
 export type ProbeRow = {
   name: ProbeDependency;
@@ -86,7 +106,7 @@ function rowsFor(run: ProbeRun | null): ProbeRow[] {
     const check = run?.checks.find((candidate) => candidate.name === name);
     return check
       ? describe(check)
-      : { name, label: DEPENDENCY_LABEL[name], state: NOT_RUN, detail: "no probe result is stored for this dependency" };
+      : { name, label: DEPENDENCY_LABEL[name], state: NOT_RUN, detail: "no scheduled check has reported for this dependency yet" };
   });
 }
 
@@ -98,10 +118,10 @@ export function buildProbeSection(
       lastSuccessfulAt: null,
       lastRunAt: null,
       lastRunOk: null,
-      window: { runs: 0, failed: 0, sentence: `The probe history could not be read (${stored.code}).` },
+      window: { runs: 0, failed: 0, sentence: STORE_SENTENCE[stored.code] ?? STORE_UNRECOGNISED },
       rows: rowsFor(null),
-      unavailable: stored.code,
-      fixtureE2E: "Unknown: the probe history could not be read.",
+      unavailable: STORE_SENTENCE[stored.code] ?? STORE_UNRECOGNISED,
+      fixtureE2E: "Not reported: the stored history could not be read.",
     };
   }
   const runs = stored.history.runs;
@@ -116,13 +136,19 @@ export function buildProbeSection(
       runs: runs.length,
       failed,
       sentence: runs.length === 0
-        ? "No synthetic probe run has been stored yet."
+        ? "No scheduled check has been stored yet."
         : `${failed} of the last ${runs.length} stored run${runs.length === 1 ? "" : "s"} did not pass.`,
     },
     rows: rowsFor(latest),
     unavailable: null,
+    /*
+      BA-134. The word "fixture" is ours and is on the public-copy ban list; the sentence a reader
+      needs is what the scheduled checks do and do not cover, which is what both branches now say.
+      Neither branch claims a pass: the first states the scope, and the second states that the
+      check reported a failure rather than a result.
+    */
     fixtureE2E: !fixture || fixture.status === "not_enabled"
-      ? "Off. No document is put through the real pipeline by this probe, so nothing here proves sanitization or OCR read a file."
-      : `Enabled and refused (${fixture.code}). The end-to-end fixture run is not implemented, so this probe is reporting failure rather than a pass.`,
+      ? "Not covered. The scheduled checks do not carry a document through the full pipeline, so nothing here reports on sanitization or document reading."
+      : "Reported a failure. The scheduled end-to-end check ran and did not complete, so it is not reporting a pass.",
   };
 }

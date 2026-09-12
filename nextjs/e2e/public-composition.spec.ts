@@ -53,9 +53,25 @@ test("solution pages use a readable hero and visible source-bound proof", async 
     expect(geometry.titleLines, `${route} headline has a readable line count`).toBeLessThanOrEqual(4);
     expect(geometry.proofWidth, `${route} proof uses the main reading width`).toBeGreaterThan(300);
     expect(geometry.delayedSections, `${route} does not leave buyer-facing sections as off-screen placeholders`).toBe(0);
-    expect(await page.locator(".solution-proof-sample-grid section").count()).toBe(4);
-    await expect(page.locator(".solution-proof-region")).toContainText("1,281 regions");
-    await expect(page.locator(".solution-proof-objects")).toContainText("6,300 objects");
+    /*
+      BA-041 -- the four drawn tiles are gone, so this pins what replaced them.
+
+      The figure renders /explore's own source sheet over one real region: the page, the
+      excerpt, the locator line and the digests. The assertions are tighter than the ones they
+      replace, not looser -- the region's own words have to be on screen, the counts have to be
+      the artifact's, and the candidate count may not be published as an object count again.
+    */
+    const sheet = page.locator(".solution-proof-sample [data-source-sheet]");
+    await expect(sheet).toHaveCount(1);
+    await expect(sheet.locator("[data-active-region]")).toHaveCount(1);
+    const quoted = (await sheet.locator("[data-active-region]").innerText()).trim();
+    expect(quoted.length, `${route} highlights a region too short to read`).toBeGreaterThanOrEqual(100);
+    await expect(sheet.locator("[data-source-provenance]")).toContainText("bbox (per mille)");
+    const counts = page.locator(".solution-proof-counts");
+    for (const figure of ["5 filings", "290 pages", "1,281 regions", "W0", "W4", "sha256"]) {
+      await expect(counts).toContainText(figure);
+    }
+    await expect(page.locator(".solution-proof-sample")).not.toContainText("6,300");
 
     const viewport = page.viewportSize()!;
     if (viewport.width >= 1440) {

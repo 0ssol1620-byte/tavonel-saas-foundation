@@ -49,6 +49,17 @@ shared/*.schema.json text eol=lf
 # Imported executable script: keep its hashbang compatible with module transforms.
 nextjs/scripts/secret-scan.mjs text eol=lf
 
+# Every script that opens with `#!/usr/bin/env node`, for that reason and one more. Through
+# core.autocrlf the hashbang is checked out as `#!/usr/bin/env node\r`, which breaks the file
+# twice: Linux resolves the interpreter as `node\r` and reports no such file, and the module
+# transform applied to an imported .mjs fails on the stray carriage return with
+# `SyntaxError: Invalid or unexpected token` reported against the importing line. That is how
+# lib/journey-acceptance.test.ts passed in the lane that wrote it -- where the files had never
+# round-tripped through a checkout -- and failed on the first fresh checkout of the same commit.
+nextjs/scripts/fetch-explore-sec-corpus.mjs text eol=lf
+nextjs/scripts/verify-developer-clean-install.mjs text eol=lf
+nextjs/scripts/journey/*.mjs text eol=lf
+
 # The two reference verifiers are copied verbatim to nextjs/public/developer/ as
 # tavonel-verify-export.mjs and tavonel-verify-package.mjs, pinned by sha256 in
 # channel.json, and lib/compiler-contract.test.ts asserts the published copy is

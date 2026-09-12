@@ -85,3 +85,11 @@ commit a tag points to has already gone through required status checks and revie
 5. Add the corresponding entry to `/changelog`.
 
 No tag is cut from an unreviewed branch, and no tag is cut to make a broken `main` look released.
+
+## Releases that carry a migration
+
+Apply the migrations to production **before** the merge that deploys the application. A merge to
+`main` deploys automatically and nothing applies a production migration automatically, so the
+order is held by a person and the wrong order can stall the compile queue for every tenant.
+[`docs/runbooks/RELEASE_ORDER.md`](docs/runbooks/RELEASE_ORDER.md) is the procedure and names what
+defends each direction.

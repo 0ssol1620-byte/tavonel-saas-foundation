@@ -1,0 +1,111 @@
+/*
+  WG-048 / WG-051: the hub's purpose filter, with no JavaScript and no second URL.
+
+  Three things ruled out the obvious implementations. A `?purpose=` query string filtered on the
+  server would mint eight thin near-duplicate URLs for a crawler to find, each needing a
+  canonical the seo lane owns. A client component would take the page's `metadata` export with
+  it and ship a bundle to narrow nine links. Either way, server-side narrowing removes the other
+  entries from the HTML, and WG-074 asks the opposite: the body stays searchable, which means all
+  nine descriptions stay in the document at every filter state, for Ctrl+F and for a crawler.
+
+  So the control is a fragment link and the narrowing is `:target`. `/resources#find-build` is
+  a sendable link, is the same document to a crawler, and works with scripting off. Each tile
+  publishes its tags in `data-tags`, and one rule per tag hides the tiles that do not carry it.
+
+  Two details the rules depend on. CSS Modules rewrites an id selector the way it rewrites a
+  class, so the ids are wrapped in `:global()` -- without it the rule looks for
+  #resources_find-build__hash and the filter silently never matches. `[data-tags]` needs no
+  wrapping, because an attribute selector is never rewritten.
+
+  ponytail: the rules below enumerate the tag slugs, because CSS cannot compare `:target`'s id
+  to an attribute value. `lib/resources-hub.test.ts` fails if a tag exists with no rule here, so
+  the duplication cannot drift; if the tag list ever grows past a screenful, generate this block.
+*/
+
+.hub { display: grid; gap: 20px; }
+
+/*
+  BA-085. Three things were wrong with the control row, and all three are fixed here.
+
+  The chips were 29px tall on a phone, where Apple's floor is 44px -- and every one of the 17
+  sub-32px interactive elements this page reported was one of these. They are `min-height: 44px`
+  and 12px type now, which is also the type floor the audit asks for site-wide.
+
+  The group labels (SHOW, BY PURPOSE, BY WORKFLOW) sat inline between the chips on a different
+  baseline, so the row read as a jumble rather than as three groups. `flex-basis: 100%` puts each
+  label on its own line above the chips it labels, which is what the grouping was for.
+
+  And "Everything" is the state a reader arrives in, with nothing saying so. `:first-of-type`
+  gives it the active treatment by default; the `:has()` rule takes it away the moment another
+  control is the target, so the page never shows two selections. Order matters: the default has
+  to be declared before the rule that overrides it.
+*/
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+}
+
+.filters a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
+  padding: 6px 13px;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--text-mid);
+  text-decoration: none;
+}
+
+.filters a:hover { border-color: var(--hairline-hi); color: var(--text-hi); }
+
+/* "Everything" is the state on arrival, so it looks like the state on arrival. */
+.filters a:first-of-type { border-color: var(--text-mid); color: var(--text-hi); }
+
+/* The targeted control is the one describing what you are looking at. */
+.filters a:target { border-color: var(--text-mid); color: var(--text-hi); }
+
+/* Once anything else is targeted, the default stops claiming to be the selection. */
+.hub:has(.filters a:not(:first-of-type):target) .filters a:first-of-type:not(:target) {
+  border-color: var(--hairline);
+  color: var(--text-mid);
+}
+
+.groupLabel {
+  flex-basis: 100%;
+  margin: 10px 0 0;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  color: var(--text-xlo);
+}
+
+.groupLabel:first-child { margin-top: 0; }
+
+/* BA-083: the card's way in, where the tracked-uppercase tag repetition used to be. */
+.tileAction { margin: 0; font-size: 12px; }
+.tileAction a { color: var(--text-mid); text-decoration: none; }
+.tileAction a:hover { color: var(--text-hi); }
+
+.representative { margin: 0; font-size: 11.5px; color: var(--text-mid); }
+
+.hub:has(:global(#find-evaluate):target) [data-tags]:not([data-tags~="evaluate"]),
+.hub:has(:global(#find-build):target) [data-tags]:not([data-tags~="build"]),
+.hub:has(:global(#find-verify):target) [data-tags]:not([data-tags~="verify"]),
+.hub:has(:global(#find-learn):target) [data-tags]:not([data-tags~="learn"]),
+.hub:has(:global(#find-compile-and-review):target) [data-tags]:not([data-tags~="compile-and-review"]),
+.hub:has(:global(#find-use-elsewhere):target) [data-tags]:not([data-tags~="use-elsewhere"]),
+.hub:has(:global(#find-handle-a-revision):target) [data-tags]:not([data-tags~="handle-a-revision"]) {
+  display: none;
+}
+
+/*
+  A browser without `:has()` gets the unfiltered list rather than a broken one: the rules above
+  never match, every tile stays visible, and the controls become ordinary in-page links. That is
+  the whole fallback, and it is why the filter is not allowed to be the only way to read the hub.
+*/

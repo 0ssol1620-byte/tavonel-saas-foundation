@@ -15,7 +15,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
   request the endpoint cannot honour is refused rather than answered approximately.
 */
 
-const { authorize, listWorlds, manifestStatus, readModel, activeWorld, pilot, ensureIndex, readIndexState, candidate } =
+const { authorize, listWorlds, manifestStatus, readModel, activeWorld, pilot, ensureIndex, readIndexState, candidate, productAccess } =
   vi.hoisted(() => ({
     authorize: vi.fn(),
     listWorlds: vi.fn(),
@@ -26,12 +26,16 @@ const { authorize, listWorlds, manifestStatus, readModel, activeWorld, pilot, en
     ensureIndex: vi.fn(),
     readIndexState: vi.fn(),
     candidate: vi.fn(),
+    productAccess: vi.fn(),
   }));
 
 vi.mock("@/lib/developer-auth", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./developer-auth")>()),
   authorizeFoundationRequest: authorize,
 }));
+// The index rebuild takes the activation plan-and-role bar promotion takes, so it asks this too.
+// Admitted here; *which* plans and roles it admits is `world-activation-plan-gate.test.ts`.
+vi.mock("@/lib/billing-product-access", () => ({ authorizeFoundationProduct: productAccess }));
 vi.mock("@/lib/world-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./world-store")>()),
   listFoundationActiveWorlds: listWorlds,
@@ -45,6 +49,13 @@ vi.mock("@/lib/retrieval-index-status", () => ({
   readRetrievalIndexState: readIndexState,
 }));
 vi.mock("@/lib/r2-synthetic-canary", () => ({ readR2SignerEnv: () => ({ accountId: "a", bucket: "b", accessKeyId: "k", secretAccessKey: "s" }) }));
+/*
+  The FD-02 self-serve ceiling, passed through: it is asserted in
+  `lib/activation-rate-limit.test.ts` and exercised per route in
+  `lib/world-activation-plan-gate.test.ts`, and a limiter that read the audit tables from here
+  would answer every case with a transport error instead of the behaviour under test.
+*/
+vi.mock("@/lib/activation-rate-limit", () => ({ checkActivationRateLimit: async () => ({ ok: true }) }));
 vi.mock("@/lib/r2-objects", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./r2-objects")>()),
   getWorkspaceCollectionCandidate: candidate,
@@ -90,6 +101,7 @@ beforeEach(() => {
     principal: { kind: "api-key", workspaceKey: WORKSPACE, userId: USER, keyId: "key-1", scopes: [] },
   });
   pilot.mockReturnValue({ membership: { workspaceId: WORKSPACE, role: "owner" } });
+  productAccess.mockResolvedValue({ ok: true, source: "paid", billingExempt: false });
   listWorlds.mockResolvedValue({ ok: true, worlds: [{ collectionId: COLLECTION, manifestDigest: MANIFEST, revision: 1, updatedAt: "2026-09-11T00:00:00.000Z" }], nextCursor: null });
   manifestStatus.mockResolvedValue({ ok: true, status: { collectionId: COLLECTION, manifestDigest: MANIFEST, active: true, activeManifestDigest: MANIFEST, knownToWorkspace: true, lifecycleStatus: "active", activatedAt: "2026-09-10T00:00:00.000Z" } });
   readModel.mockResolvedValue({ ok: true, model: objectsModel(5) });
