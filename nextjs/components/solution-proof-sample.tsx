@@ -11,24 +11,8 @@ import {
 import { toVisualWorldModel } from "@/lib/visual-world-model";
 
 /*
-  The product surface, not a picture of it (BA-041).
-
-  This figure used to be four drawn tiles: five flat document-stack icons whose text lines were
-  box-shadows, a striped fake page with a real bbox drawn on it captioned with a real locator,
-  twelve empty dots beside the number "6,300 objects", and five timeline dots ending in a
-  coloured glow. Four named anti-patterns in one component, on five pages, on a site whose whole
-  argument is that it shows evidence rather than describing it.
-
-  What replaces them is the component /explore already renders -- `SourceSheet` over the frozen
-  public Apple corpus -- so the proof on a solution page is the same page-bound region, the same
-  excerpt, the same digests and the same locator line a visitor reaches by clicking through, and
-  it cannot drift from the product because it *is* the product. The region is chosen by
-  `chooseExploreEntryProof`, the same chooser /explore opens with.
-
-  The four drawn figures are one caption line of counts read off the compiled artifact. Nothing
-  here is drawn, and nothing is a number the artifact does not hold: the "6,300 objects" label is
-  gone, because 6,300 was the number of candidates the compiler considered, not objects it
-  published (BA-043).
+  Real source evidence, shared with Explore. Counts come from the published artifact,
+  not from candidates considered by the compiler or decorative marketing fixtures.
 */
 const world = toVisualWorldModel(exploreSampleWorld, exploreSampleDocuments);
 const region = chooseExploreEntryProof(world.evidence, []);
@@ -40,30 +24,26 @@ export default function SolutionProofSample() {
     (item) => item.sourceId === region.sourceId && item.page === region.page,
   );
   /*
-    One region, and what it supports. The claim is an object the compiler bound to this region --
-    its own text, never a headline written for the page -- and it is omitted rather than
-    substituted when the artifact binds none.
+    Quote the selected region itself. An evidenceRefs match alone previously selected a
+    document-heading Claim while the highlighted region described the business. Presenting
+    that pair as a verified claim would overstate the artifact's binding. This is explicitly
+    a source passage, not an answer, a new model result, or claim-level verification.
   */
-  const claim = world.nodes.find(
-    (node) => node.kind === "Claim" && node.evidenceRefs.includes(region.id),
-  );
   const first = exploreSampleSnapshots[0];
   const last = exploreSampleSnapshots[exploreSampleSnapshots.length - 1];
 
   return (
-    <figure className="solution-proof-sample" aria-labelledby="solution-proof-sample-title">
+    <figure className="solution-proof-sample" aria-labelledby="solution-proof-sample-title" data-proof-kind="source-passage">
       <figcaption className="solution-proof-sample-head">
         <span id="solution-proof-sample-title">Public compiled World · Apple SEC corpus</span>
         <Link href="/explore">Inspect the evidence</Link>
       </figcaption>
 
       <div className="solution-proof-sample-body">
-        {claim ? (
-          <p className="solution-proof-claim">
-            <span>Compiled claim</span>
-            {excerptPreview(claim.label, 180).text}
-          </p>
-        ) : null}
+        <p className="solution-proof-claim" data-evidence-id={region.id}>
+          <span>Source passage</span>
+          {excerptPreview(region.excerpt, 180).text}
+        </p>
         <SourceSheet regions={onPage} activeId={region.id} compact />
       </div>
 
