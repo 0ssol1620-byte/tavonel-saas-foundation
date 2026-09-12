@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import HomePageClient from "@/components/home-page-client";
+import SolutionProofSample from "@/components/solution-proof-sample";
 import { isLiveCommerce } from "@/lib/commercial-state";
 
 /**
@@ -13,6 +14,8 @@ import { isLiveCommerce } from "@/lib/commercial-state";
  * object rather than merging into it.
  */
 export const metadata: Metadata = {
+  title: "TAVONEL — Knowledge you can check",
+  description: "Explore a published Compiled World. Open the source behind a result, inspect its evidence, and see how reviewed knowledge can be used in AI tools.",
   alternates: { canonical: "/", languages: { en: "/", ko: "/ko", "x-default": "/" } },
 };
 
@@ -31,5 +34,5 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default function HomePage() {
-  return <HomePageClient liveCommerce={isLiveCommerce()} />;
+  return <HomePageClient liveCommerce={isLiveCommerce()} proof={<SolutionProofSample />} />;
 }
