@@ -104,7 +104,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                   name: "TAVONEL",
                   url: "https://tavonel.com",
                   description:
-                    "Compile documents, scans, code and connected systems into source-grounded knowledge.",
+                    "Compile documents, scans and connected systems into source-grounded knowledge.",
                 },
                 {
                   "@type": "SoftwareApplication",
@@ -112,7 +112,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                   url: "https://tavonel.com",
                   applicationCategory: "Knowledge Compiler",
                   description:
-                    "Compile documents, scans, code and connected systems into source-grounded knowledge.",
+                    "Compile documents, scans and connected systems into source-grounded knowledge.",
                 },
               ],
             }),
