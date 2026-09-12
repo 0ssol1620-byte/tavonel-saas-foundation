@@ -7,8 +7,17 @@ test("the first screen offers a real published sample without promising open cus
   const panel = page.locator('.home-evidence-preview[aria-label="Published sample and its source"]');
   await expect(panel).toBeVisible();
   await expect(panel.locator(".solution-proof-sample")).toHaveCount(1);
+  await expect(panel.locator(".solution-proof-sample")).toHaveAttribute("data-proof-kind", "source-passage");
   await expect(panel).toContainText("Apple SEC corpus");
-  await expect(panel).toContainText("Compiled claim");
+  await expect(panel).toContainText("Source passage");
+  const activeRegion = panel.locator("[data-active-region]");
+  await expect(activeRegion).toHaveCount(1);
+  const regionId = await activeRegion.getAttribute("data-region-id");
+  expect(regionId).toBeTruthy();
+  await expect(panel.locator(".solution-proof-claim")).toHaveAttribute("data-evidence-id", regionId!);
+  const passage = (await activeRegion.innerText()).replace(/\s+/g, " ").trim();
+  expect(passage.length).toBeGreaterThan(80);
+  await expect(panel.locator(".solution-proof-claim")).toContainText(passage.slice(0, 80));
   await expect(panel.getByRole("link", { name: "Inspect the evidence" })).toHaveAttribute("href", "/explore");
   await expect(page.locator(".hero .tiles .tile")).toHaveCount(3);
   await expect(page.locator(".hero .tiles")).toContainText("AI APPLICATIONS");
