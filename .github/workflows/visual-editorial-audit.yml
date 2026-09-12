@@ -1,0 +1,39 @@
+name: Visual editorial audit
+on:
+  push:
+    branches: [agent/evidence-first-20260912]
+    paths: [.github/workflows/visual-editorial-audit.yml, nextjs/scripts/visual-editorial-audit.mjs]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: visual-editorial-audit-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.34.4 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: nextjs/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+        working-directory: nextjs
+      - run: pnpm exec playwright install --with-deps chromium
+        working-directory: nextjs
+      - name: Capture all discovered static pages, fixed preview and Reducto
+        run: node scripts/visual-editorial-audit.mjs
+        working-directory: nextjs
+      - name: Preserve every attempted route, screenshot, text and source inventory
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-editorial-audit-${{ github.sha }}
+          path: visual-editorial-audit
+          retention-days: 7
+          if-no-files-found: error
