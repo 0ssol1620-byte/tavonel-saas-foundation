@@ -28,7 +28,7 @@ test("the hero uses the approved encoded film instead of mounting a crushed live
   await expect(video).toBeVisible();
   await expect(video.locator("source")).toHaveCount(1);
   await expect(video.locator("source")).toHaveAttribute("src", "/film/compile-cut.mp4");
-  await expect(video).toHaveAttribute("poster", "/film/poster-1.webp");
+  await expect(video).toHaveAttribute("poster", "/film/poster-1-hero.webp");
 });
 
 test("the hero film keeps its 16:10 source shape on a narrow screen", async ({ page }, testInfo) => {
