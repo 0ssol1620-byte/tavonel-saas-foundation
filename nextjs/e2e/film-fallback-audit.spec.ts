@@ -77,7 +77,7 @@ test("reduced motion gives the first screen its words and its actions with no wa
     // No scroll, no settle: what a visitor has on arrival.
     const heading = page.getByRole("heading", { level: 1 });
     await expect(heading).toBeVisible({ timeout: 5_000 });
-    await expect(heading).toContainText("Your AI needs more than searchable files.");
+    await expect(heading).toContainText("Give your AI knowledge you can check.");
 
     const explore = page.locator('main a[href="/explore"]').first();
     await expect(explore).toBeInViewport({ timeout: 5_000 });
