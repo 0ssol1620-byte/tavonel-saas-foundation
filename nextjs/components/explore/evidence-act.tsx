@@ -197,7 +197,7 @@ export default function EvidenceAct({
       <ProvenanceTether
         hostRef={hostRef}
         from="[data-object-card]"
-        to="[data-active-region]"
+        to={'[data-source-sheet][data-source-view="original"] [data-original-region], [data-source-sheet][data-source-view="text"] [data-active-region]'}
         activeKey={`${node.id}:${active?.id ?? ""}:${step}`}
         reduced={reduced}
       />

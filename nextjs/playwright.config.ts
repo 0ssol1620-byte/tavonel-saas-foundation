@@ -86,6 +86,12 @@ export default defineConfig({
       use: {
         browserName,
         viewport: { width: 1440, height: 900 },
+        // Playwright 1.62's Windows WebKit port can deadlock while recording a trace for native
+        // <details> interactions even when the same assertions finish immediately with tracing
+        // disabled. Chromium/Firefox retain failure traces; WebKit keeps failure screenshots and
+        // all assertions, but skips the instrumentation that can turn a passing browser flow into
+        // a runner timeout. CI's browser coverage is unchanged.
+        trace: browserName === "webkit" ? "off" as const : "retain-on-failure" as const,
       },
     })),
   ],

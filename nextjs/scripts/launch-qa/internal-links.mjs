@@ -21,8 +21,18 @@ const MAX_PAGES = 200;
 
 async function text(path) {
   const response = await fetch(`${baseUrl}${path}`, { redirect: "manual" });
-  const body = response.headers.get("content-type")?.includes("text/html") ? await response.text() : "";
+  const contentType = response.headers.get("content-type") ?? "";
+  const body = contentType.includes("text/html") || contentType.includes("application/json") ? await response.text() : "";
   return { status: response.status, location: response.headers.get("location"), body };
+}
+
+function expectedFailClosed(path, status, body) {
+  if (path !== "/api/export/trust" || status !== 503) return false;
+  try {
+    return JSON.parse(body).code === "EXPORT_SIGNER_NOT_CONFIGURED";
+  } catch {
+    return false;
+  }
 }
 
 function hrefsIn(html) {
@@ -53,10 +63,11 @@ while (queue.length > 0 && seen.size < MAX_PAGES) {
 
   const { status, location, body } = await text(path);
   checked.set(path, status);
-  if (status >= 400) {
+  if (status >= 400 && !expectedFailClosed(path, status, body)) {
     failures.push(`${path} -> HTTP ${status}`);
     continue;
   }
+  if (expectedFailClosed(path, status, body)) continue;
   if (status >= 300 && location) {
     // A redirect is fine; a redirect to something broken is not.
     const target = location.startsWith("/") ? location : new URL(location, baseUrl).pathname;

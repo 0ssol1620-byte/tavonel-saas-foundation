@@ -192,10 +192,10 @@ for (const route of CONTRAST_ROUTES) {
 
 /*
   200% zoom, as a browser applies it: the CSS viewport halves and the device pixel ratio doubles.
-  The assertion is reflow -- the page must not need sideways scrolling -- plus the one control
-  the page exists to offer. The hero's primary action is the Explore link, which is the same
-  control in pilot and live posture; the access button beside it changes label with
-  COMMERCIAL_MODE and is deliberately not the anchor of this assertion.
+  The assertion is reflow -- the page must not need sideways scrolling -- plus the stable public
+  evidence action. One-Path no longer links to bare `/explore`: Proof opens the exact compiled
+  evidence region through an `/explore?...` deep link. That evidence action is stable in pilot
+  and live posture, unlike the access CTA whose label/destination can change.
 */
 for (const route of ["/", "/pricing", "/docs"] as const) {
   test(`${route} reflows at 200% zoom without sideways scrolling`, async ({ browser }) => {
@@ -212,12 +212,12 @@ for (const route of ["/", "/pricing", "/docs"] as const) {
       );
       expect(overflow, `${route} scrolls ${overflow}px sideways at 200% zoom`).toBeLessThanOrEqual(1);
       if (route === "/") {
-        const explore = page.locator('main a[href="/explore"]').first();
+        const explore = page.locator('main a[href^="/explore?"]').first();
         await expect(explore).toBeVisible();
         const box = await explore.boundingBox();
-        expect(box, "the primary action has no box at 200% zoom").not.toBeNull();
-        expect(box!.x, "the primary action starts off the left edge").toBeGreaterThanOrEqual(-1);
-        expect(box!.x + box!.width, "the primary action is cut off on the right").toBeLessThanOrEqual(641);
+        expect(box, "the public evidence action has no box at 200% zoom").not.toBeNull();
+        expect(box!.x, "the public evidence action starts off the left edge").toBeGreaterThanOrEqual(-1);
+        expect(box!.x + box!.width, "the public evidence action is cut off on the right").toBeLessThanOrEqual(641);
       }
     } finally {
       await context.close();

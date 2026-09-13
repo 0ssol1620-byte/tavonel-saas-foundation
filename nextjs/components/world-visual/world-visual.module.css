@@ -197,16 +197,28 @@
 
 .sheet {
   display: grid;
-  /* header · page · region map · provenance · footer */
-  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
-  /* The growing child of a bounded pane: the sheet takes the room that is left and the page
-     inside it scrolls, so the region map, the provenance table and the footer links stay on
-     screen instead of sitting a filing's worth of text below the fold. */
+  /* header · representation tabs · active representation · provenance · footer.
+
+     SourceSheet gained a tablist plus two mutually-exclusive tabpanels. The old five-row grid
+     still treated row 2 as the flexible page row, so the tablist consumed the bounded row and
+     the visible PDF panel auto-expanded underneath it. Keep both tabpanels in the same bounded
+     content row so region navigation below the sheet cannot be covered. */
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  /* The growing child of a bounded pane: the sheet takes the room that is left and the active
+     representation inside it scrolls, so provenance/footer and the region switch remain on
+     screen instead of sitting a filing's worth of pixels below the fold. */
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
   background: var(--g1);
   border: 1px solid var(--hairline-hi);
+}
+
+.sheet > [role="tabpanel"] {
+  grid-row: 3;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
 }
 
 /*
@@ -298,7 +310,13 @@
 
 .sheet > header b { color: var(--verified); }
 
-.sourceLink { color: var(--verified); }
+.sourceLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline: 4px;
+  color: var(--verified);
+}
 
 .paper {
   /* `position: relative` makes this the offset parent the active region is scrolled against in

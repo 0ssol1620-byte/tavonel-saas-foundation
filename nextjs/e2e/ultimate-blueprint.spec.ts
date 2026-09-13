@@ -14,13 +14,14 @@ const { expect, test } = "test" in playwrightModule ? playwrightModule : playwri
   stacked phone flow and the drawer's coordinates are checked in the new file, against the new
   page, rather than restated here against a page that no longer exists.
 */
-test("homepage opens the no-login Compiled World sample", async ({ page }) => {
+test("homepage Proof opens the no-login Compiled World sample on its real evidence", async ({ page }) => {
   await page.goto("/");
-  const cta = page.getByRole("link", { name: "Explore a Compiled World" }).first();
+  const cta = page.locator("#proof .solution-proof-sample").getByRole("link", { name: "Inspect the evidence" });
+  await cta.scrollIntoViewIfNeeded();
   await expect(cta).toBeVisible();
   await cta.click();
-  await expect(page).toHaveURL(/\/explore$/);
-  await expect(page.getByRole("heading", { name: "Step inside a Compiled World." })).toBeVisible();
+  await expect(page).toHaveURL(url => url.pathname === "/explore" && url.searchParams.get("act") === "evidence");
+  await expect(page.locator('[data-visual-world="explore"]')).toHaveAttribute("data-world-act", "evidence");
   // The sample declares itself once, in the header badge. It used to say "DETERMINISTIC
   // PRODUCT SAMPLE" here and "not customer proof" further down, which is two answers to an
   // accusation nobody browsing a demo has made. The label has to survive; the arguing does not.
@@ -65,6 +66,8 @@ test("the sample opens onto real provenance and claims nothing it has not compil
   */
   const sheet = page.locator("[data-source-sheet]");
   await expect(sheet.getByText(/^apple-[\w-]+\.pdf$/i).first()).toBeVisible();
+  await expect(sheet.locator("[data-original-source]")).toBeVisible();
+  await sheet.getByRole("tab", { name: "Parsed text" }).click();
   await expect(page.getByText(/^REGION ON PAGE \d+ OF \d+$/)).toBeVisible();
   // The footer names the bytes it opens: the committed PDF of the annual filing, or the
   // reference render of a 2026 filing. It may never offer one under the other's name.

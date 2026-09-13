@@ -4,23 +4,34 @@ const { expect, test } = "test" in playwrightModule ? playwrightModule : playwri
 
 const routes = ["/", "/privacy", "/security", "/login"] as const;
 
-test("renders launch-critical public routes without browser errors", async ({ page }, testInfo) => {
+test("renders launch-critical public routes without browser errors", async ({ context }, testInfo) => {
   const errors: string[] = [];
-  await page.route(/^https:\/\/(?:.*\.)?(?:supabase\.co|paddle\.com)\//, route =>
+  await context.route(/^https:\/\/(?:.*\.)?(?:supabase\.co|paddle\.com)\//, route =>
     route.fulfill({ status: 204, body: "" }),
   );
-  page.on("console", message => {
-    if (message.type() === "error") errors.push(message.text());
-  });
-  page.on("pageerror", error => errors.push(error.message));
 
   for (const route of routes) {
-    // WebKit can report the DOM as ready before the linked stylesheet has finished applying.
-    // Measuring geometry in that window sees the browser-default 8px body margin and the
-    // poster's intrinsic 1440px width, which is not the rendered product state. The launch
-    // contract is the fully styled page, so wait for the load event before taking geometry.
-    const response = await page.goto(route, { waitUntil: "load" });
+    // Each route gets a fresh page. This is both closer to a direct-entry launch check and avoids
+    // coupling the next route to media/prefetch work left behind by the previous page. The latter
+    // can keep Windows WebKit's navigation lifecycle pending even though the destination itself is
+    // healthy; a fresh page makes the contract route-local and deterministic.
+    const page = await context.newPage();
+    page.on("console", message => {
+      if (message.type() === "error") errors.push(message.text());
+    });
+    page.on("pageerror", error => errors.push(error.message));
+
+    // WebKit on Windows can keep the top-level `load` event pending on a non-critical image even
+    // after the document and all launch CSS are usable. Waiting on that event made this test judge
+    // an image-loading quirk instead of the product. Navigate to DOMContentLoaded, then prove the
+    // actual global stylesheet has applied before taking geometry. These three values come from
+    // tavonel.css's body contract and distinguish the shipped page from browser defaults.
+    const response = await page.goto(route, { waitUntil: "domcontentloaded" });
     expect(response?.status(), `${route} should be available`).toBe(200);
+    await page.waitForFunction(() => {
+      const body = getComputedStyle(document.body);
+      return body.marginTop === "0px" && body.overflowX === "hidden" && body.fontSize === "15px";
+    });
     await expect(page.locator("main")).toBeVisible();
     const geometry = await page.evaluate(() => {
       const viewport = document.documentElement.clientWidth;
@@ -49,22 +60,11 @@ test("renders launch-critical public routes without browser errors", async ({ pa
       geometry.overflow,
       `${route} should not scroll horizontally; viewport=${geometry.viewport}; offenders=${JSON.stringify(geometry.offenders)}`,
     ).toBeLessThanOrEqual(1);
-    /*
-      Let the router's prefetches finish before navigating on.
-
-      This test was flaky in Firefox on "Failed to fetch RSC payload ... Falling back to browser
-      navigation", and the first explanation -- contention in the parallel matrix -- was wrong.
-      `scripts/rsc-prefetch-probe.mjs` measured it against a Preview: no prefetch ever returned
-      a non-200, and the failing requests are NS_BINDING_ABORTED, which is Firefox cancelling an
-      in-flight request because the page navigated away. Leaving each page alone for 200 ms
-      reproduces it in three runs out of four; 400 ms and above, never.
-
-      So the loop was the cause. It moved on roughly 200 ms after `main` appeared, which is
-      after the prefetches start and before they finish. Waiting for the network to settle
-      removes the cause; filtering the message would have hidden it and left the assertion
-      unable to tell a cancelled prefetch from a broken one.
-    */
-    await page.waitForLoadState("networkidle").catch(() => {});
+    // Let Next's route prefetches settle before closing this independent page. A bounded wait
+    // preserves the old Firefox cancellation protection without making a third-party connection
+    // capable of holding the launch gate open indefinitely.
+    await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => {});
+    await page.close();
   }
 
   const localWebKitUpgradeErrors = testInfo.project.name === "launch-webkit"
@@ -137,7 +137,7 @@ test("ships launch security headers in every browser engine", async ({ request }
   const response = await request.get("/");
   expect(response.status()).toBe(200);
   expect(response.headers()["content-security-policy"]).toContain("frame-ancestors 'none'");
-  if (process.env.PLAYWRIGHT_BASE_URL) {
+  if (process.env.PLAYWRIGHT_BASE_URL?.startsWith("https://")) {
     // External Preview/Production runs are HTTPS and must exercise the complete transport CSP.
     expect(response.headers()["content-security-policy"]).toContain("upgrade-insecure-requests");
   }

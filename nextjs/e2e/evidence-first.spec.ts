@@ -1,76 +1,88 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
-test("the first screen offers a real published sample without promising open customer intake", async ({ page }) => {
+async function dismissOptionalAnalytics(page: Page) {
+  const decline = page.getByRole("button", { name: "No thanks" });
+  if (await decline.isVisible().catch(() => false)) await decline.click();
+}
+
+test("the hero explains the value while the published sample remains a separate proof surface", async ({ page }) => {
   await page.goto("/");
-  await expect(page.locator("h1")).toHaveText("Give your AI knowledge you can check.");
-  await expect(page.locator(".hero .lede")).toContainText("Explore a published sample.");
-  const panel = page.locator('.home-evidence-preview[aria-label="Published sample and its source"]');
-  await expect(panel).toBeVisible();
-  await expect(panel.locator(".solution-proof-sample")).toHaveCount(1);
-  await expect(panel.locator(".solution-proof-sample")).toHaveAttribute("data-proof-kind", "source-passage");
-  await expect(panel).toContainText("Apple SEC corpus");
-  await expect(panel).toContainText("Source passage");
-  const activeRegion = panel.locator("[data-active-region]");
-  await expect(activeRegion).toHaveCount(1);
-  const regionId = await activeRegion.getAttribute("data-region-id");
+  await expect(page.locator("#one-path-title")).toContainText("ready for AI.");
+  await expect(page.locator("#s1 .one-path-source-proof")).toHaveCount(0);
+
+  const proof = page.locator('#proof .one-path-source-proof[aria-label="Published sample and its source"]');
+  await proof.scrollIntoViewIfNeeded();
+  await expect(proof).toBeVisible();
+  const sample = proof.locator(".solution-proof-sample");
+  await expect(sample).toHaveCount(1);
+  await expect(sample).toHaveAttribute("data-proof-kind", "source-passage");
+  await expect(sample).toContainText("Public compiled World · Apple SEC corpus");
+  await expect(sample).toContainText("Source passage · excerpt");
+  await expect(sample.locator("[data-original-source]")).toBeVisible();
+
+  const claim = sample.locator(".solution-proof-claim");
+  const regionId = await claim.getAttribute("data-evidence-id");
   expect(regionId).toBeTruthy();
-  await expect(panel.locator(".solution-proof-claim")).toHaveAttribute("data-evidence-id", regionId!);
-  const passage = (await activeRegion.innerText()).replace(/\s+/g, " ").trim();
-  expect(passage.length).toBeGreaterThan(80);
-  await expect(panel.locator(".solution-proof-claim")).toContainText(passage.slice(0, 80));
-  const href = await panel.getByRole("link", { name: "Inspect the evidence" }).getAttribute("href");
+  const href = await sample.getByRole("link", { name: "Inspect the evidence" }).getAttribute("href");
   const destination = new URL(href!, page.url());
   expect(destination.pathname).toBe("/explore");
   expect(destination.searchParams.get("act")).toBe("evidence");
   expect(destination.searchParams.get("evidence")).toBe(regionId);
-  await expect(page.locator(".hero .tiles .tile")).toHaveCount(3);
-  await expect(page.locator(".hero .tiles")).toContainText("AI APPLICATIONS");
 });
 
-test("the source panel and readable headline fit the viewport", async ({ page }) => {
+test("the hero and source proof each fit the viewport at the active product-QA width", async ({ page }) => {
   await page.goto("/");
-  const measurements = await page.evaluate(() => {
-    const width = window.innerWidth;
-    const selectors = [".hero h1", ".hero .lede", ".home-evidence-preview", ".hero .tiles"];
-    return { width, height: window.innerHeight, scrollWidth: document.documentElement.scrollWidth,
-      actionsBottom: document.querySelector(".hero .actions")!.getBoundingClientRect().bottom,
-      elements: selectors.map(selector => {
-        const element = document.querySelector(selector)!;
-        const rect = element.getBoundingClientRect();
-        return {selector, left:rect.left, right:rect.right, width:rect.width, fontSize:parseFloat(getComputedStyle(element).fontSize)};
-      })};
-  });
-  expect(measurements.scrollWidth).toBeLessThanOrEqual(measurements.width + 1);
-  expect(measurements.actionsBottom, "the source preview must not push the first actions below the fold")
-    .toBeLessThanOrEqual(measurements.height - 100);
-  for (const element of measurements.elements) {
-    expect(element.left, element.selector).toBeGreaterThanOrEqual(-1);
-    expect(element.right, element.selector).toBeLessThanOrEqual(measurements.width + 1);
-    expect(element.width, element.selector).toBeGreaterThan(200);
-  }
-  expect(measurements.elements[0].fontSize).toBeGreaterThanOrEqual(36);
-  expect(measurements.elements[1].fontSize).toBeGreaterThanOrEqual(17);
-  await test.info().attach("evidence-first-home", { body: await page.screenshot({ animations: "disabled" }), contentType: "image/png" });
+  const width = page.viewportSize()?.width ?? 1440;
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+
+  const hero = page.locator("#s1");
+  const title = page.locator("#one-path-title");
+  const film = page.getByTestId("one-path-hero-film");
+  await expect(hero).toBeVisible();
+  await expect(title).toBeVisible();
+  await expect(film).toBeVisible();
+  const heroFilm = await film.boundingBox();
+  expect(heroFilm).not.toBeNull();
+  expect(heroFilm!.x).toBeGreaterThanOrEqual(-1);
+  expect(heroFilm!.x + heroFilm!.width).toBeLessThanOrEqual(width + 1);
+  expect(heroFilm!.y).toBeLessThan(page.viewportSize()?.height ?? 900);
+
+  const proof = page.locator("#proof .one-path-source-proof");
+  await proof.scrollIntoViewIfNeeded();
+  await expect(proof).toBeVisible();
+  const proofBox = await proof.boundingBox();
+  expect(proofBox).not.toBeNull();
+  expect(proofBox!.x).toBeGreaterThanOrEqual(-1);
+  expect(proofBox!.x + proofBox!.width).toBeLessThanOrEqual(width + 1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
 });
 
-test("the displayed proof opens the same source region in Explore", async ({ page }) => {
+test("the proof opens Explore on the same source region and both representations remain inspectable", async ({ page }) => {
   await page.goto("/");
-  const panel = page.locator(".home-evidence-preview");
-  const regionId = await panel.locator(".solution-proof-claim").getAttribute("data-evidence-id");
+  await dismissOptionalAnalytics(page);
+  const proof = page.locator("#proof .solution-proof-sample");
+  await proof.scrollIntoViewIfNeeded();
+  const regionId = await proof.locator(".solution-proof-claim").getAttribute("data-evidence-id");
   expect(regionId).toBeTruthy();
-  await panel.getByRole("link", { name: "Inspect the evidence" }).click();
+  await proof.getByRole("link", { name: "Inspect the evidence" }).click();
   await expect(page).toHaveURL(url => url.pathname === "/explore"
     && url.searchParams.get("act") === "evidence" && url.searchParams.get("evidence") === regionId);
-  await expect(page.locator('[data-visual-world="explore"]')).toHaveAttribute("data-world-act", /^evidence$/i);
-  await expect(page.locator("[data-source-sheet] [data-active-region]")).toHaveAttribute("data-region-id", regionId!);
+  await expect(page.locator('[data-visual-world="explore"]')).toHaveAttribute("data-world-act", "evidence");
+  const sheet = page.locator("[data-source-sheet]");
+  await expect(sheet.locator("[data-original-source]")).toBeVisible();
+  await sheet.getByRole("tab", { name: "Parsed text" }).click();
+  await expect(sheet.locator("[data-active-region]")).toHaveAttribute("data-region-id", regionId!);
 });
 
-test("Korean visitors can inspect the same sample before making an inquiry", async ({ page }) => {
+test("Korean visitors get the same one-path story and the same real public proof", async ({ page }) => {
   await page.goto("/ko");
-  await expect(page.locator("h1")).toContainText("AI가 쓰는 지식,");
-  await expect(page.locator("h1")).toContainText("근거까지 확인하세요.");
-  await expect(page.locator(".actions .btn").first()).toHaveText("공개 샘플 열기");
-  await expect(page.locator(".ko-published-proof .solution-proof-sample")).toHaveCount(1);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1);
-  await test.info().attach("evidence-first-korean-entry", { body: await page.screenshot({ animations: "disabled" }), contentType: "image/png" });
+  await expect(page.locator("#ko-one-path-title")).toContainText("내 자료를,");
+  await expect(page.locator("#ko-one-path-title")).toContainText("AI가 쓰는 지식으로.");
+  await expect(page.locator(".one-path-hero .one-path-source-proof")).toHaveCount(0);
+  const proof = page.locator('.one-path-source-proof[aria-label="공개 샘플과 원문"]');
+  await proof.scrollIntoViewIfNeeded();
+  await expect(proof.locator(".solution-proof-sample")).toHaveCount(1);
+  await expect(proof).toContainText("Apple SEC corpus");
+  await expect(page.getByRole("link", { name: "공개 샘플 열기" })).toHaveAttribute("href", "/explore");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
 });

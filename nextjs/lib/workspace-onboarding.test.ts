@@ -56,14 +56,14 @@ describe("workspace mode", () => {
 describe("workspace state", () => {
   it("offers no action while the state is still being read", () => {
     const state = deriveWorkspaceState(input({ inventoryState: "loading" }));
-    expect(state.stateTitle).toBe("Reading your workspace state.");
+    expect(state.stateTitle).toBe("Loading your knowledge.");
     expect(state.nextAction.surface).toBeUndefined();
     expect(state.nextAction.intent).toBeUndefined();
   });
 
   it("says so, and offers a retry, when the inventory could not be read", () => {
     const state = deriveWorkspaceState(input({ inventoryState: "unavailable" }));
-    expect(state.stateTitle).toBe("Workspace state could not be read.");
+    expect(state.stateTitle).toBe("Your knowledge could not be loaded.");
     expect(state.stateDescription).toContain("not described as empty or as populated");
     expect(state.nextAction).toEqual({ label: "Retry loading sources", intent: "refresh" });
   });
@@ -72,15 +72,15 @@ describe("workspace state", () => {
     expect(deriveWorkspaceState(input()).nextAction).toEqual({ label: "Choose sources", intent: "upload" });
     expect(deriveWorkspaceState(input({ documentCount: 2, readyDocumentCount: 2 })).nextAction.surface).toBe("sources");
     expect(deriveWorkspaceState(input({ hasCandidate: true, candidateNeedsDecision: true })).nextAction)
-      .toEqual({ label: "Review candidate", surface: "review" });
+      .toEqual({ label: "Review & activate", surface: "review" });
     expect(deriveWorkspaceState(input({ hasCandidate: true, activeRevision: 1 })).nextAction)
-      .toEqual({ label: "Ask active World", surface: "ask" });
+      .toEqual({ label: "Use with AI", surface: "ask" });
   });
 
   it("prefers a live run over every other next action", () => {
     const state = deriveWorkspaceState(input({ documentCount: 3, activityCount: 2, activeRevision: 1 }));
-    expect(state.stateTitle).toBe("2 sources are becoming a world.");
-    expect(state.stateDescription).toContain("does not estimate progress");
+    expect(state.stateTitle).toBe("Preparing your knowledge.");
+    expect(state.stateDescription).toContain("latest recorded progress");
   });
 
   it("does not invite a re-compile without saying the last one stopped", () => {
@@ -111,9 +111,9 @@ describe("workspace state", () => {
     const withFailure = (state: Partial<WorkspaceStateInput>) =>
       deriveWorkspaceState(input({ documentCount: 4, compileErrorCode: "COMPILE_CORE_UNAVAILABLE", ...state })).stateTitle;
 
-    expect(withFailure({ activityCount: 1 })).toBe("1 source is becoming a world.");
-    expect(withFailure({ hasCandidate: true, candidateNeedsDecision: true })).toBe("Candidate World ready for review.");
-    expect(withFailure({ activeRevision: 2 })).toBe("World v2 is active and source-grounded.");
+    expect(withFailure({ activityCount: 1 })).toBe("Preparing your knowledge.");
+    expect(withFailure({ hasCandidate: true, candidateNeedsDecision: true })).toBe("Ready for your review.");
+    expect(withFailure({ activeRevision: 2 })).toBe("Your published knowledge · v2");
     // And it is never lost: the attention queue still carries it in all three.
     expect(deriveAttentionItems(input({ activeRevision: 2, compileErrorCode: "COMPILE_CORE_UNAVAILABLE" }))
       .map((item) => item.id)).toEqual(["compile-failed"]);
@@ -121,7 +121,7 @@ describe("workspace state", () => {
 
   it("does not tell a returning user with nothing readable to build their first World", () => {
     const state = deriveWorkspaceState(input({ documentCount: 2, operatorReviewCount: 2 }));
-    expect(state.stateTitle).toBe("No source is ready to compile yet.");
+    expect(state.stateTitle).toBe("Your files are being prepared.");
     expect(state.nextAction).toEqual({ label: "Open sources", surface: "sources" });
   });
 });

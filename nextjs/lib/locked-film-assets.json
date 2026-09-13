@@ -1,0 +1,25 @@
+{
+  "sourceCommit": "f100dce",
+  "files": [
+    {
+      "file": "compile-cut.mp4",
+      "bytes": 5122050,
+      "sha256": "1406a9a8d6e537eadd97012c94c89ffc792276628f30fa8313ea892c8dd169b9"
+    },
+    {
+      "file": "compile-cut-2.mp4",
+      "bytes": 5592444,
+      "sha256": "d0496e6e80f83b9a11ccb647c1b23de54d7ad22d7163f2ddd4f0ae58d7152c6d"
+    },
+    {
+      "file": "compile-cut-3.mp4",
+      "bytes": 1924413,
+      "sha256": "c6d35a3a43f08e54381e7e15cb86908a70184d51726baebc52b766ac9d7f54a0"
+    },
+    {
+      "file": "compile-cut-4.mp4",
+      "bytes": 622213,
+      "sha256": "65a835a6896fbb300f71eae8829837cbadd7f6939db4d8e6e3741a0c513bd7bf"
+    }
+  ]
+}

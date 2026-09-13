@@ -74,9 +74,21 @@ export default function ProvenanceTether({
     if (!host || typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(() => measure());
     observer.observe(host);
+    // Switching Original/Parsed can change the visible region anchor without resizing the pane.
+    // Follow those DOM/attribute changes as well so the tether stays bound to what is on screen.
+    const mutations = typeof MutationObserver === "undefined"
+      ? null
+      : new MutationObserver(() => measure());
+    mutations?.observe(host, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ["data-source-view", "data-render-state", "hidden", "style"],
+    });
     window.addEventListener("resize", measure);
     return () => {
       observer.disconnect();
+      mutations?.disconnect();
       window.removeEventListener("resize", measure);
     };
   }, [hostRef, measure, activeKey]);

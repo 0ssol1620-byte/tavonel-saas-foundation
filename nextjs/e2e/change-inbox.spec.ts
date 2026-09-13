@@ -239,24 +239,29 @@ test("Changes says what it does not know instead of showing an empty count", asy
   await expect(page.locator("#workspace-changes").getByRole("listitem")).toHaveCount(0);
 });
 
-test("Changes is reachable from the workspace rail and by keyboard", async ({ page }, testInfo) => {
+test("Changes is reachable through More and the primary rail remains keyboard navigable", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "1440" && testInfo.project.name !== "reduced-motion");
   await installSession(page);
   await mockWorkspace(page);
   await page.goto(`/workspace?collection=${collectionId}`);
 
   const rail = page.getByRole("complementary", { name: "Workspace navigation" });
-  const changes = rail.getByRole("button", { name: "Changes", exact: true });
-  await expect(changes).toBeVisible();
+  const more = rail.locator("summary[aria-label='More workspace tools']");
+  await expect(more).toBeVisible();
 
   // The rail moves focus with the arrow keys; the new row has to take part in that. Changes
   // follows Review, so one step down from Review has to land on it.
-  await rail.getByRole("button", { name: "Review", exact: true }).focus();
+  await rail.getByRole("button", { name: "Use with AI", exact: true }).focus();
   await page.keyboard.press("ArrowDown");
-  await expect(changes).toBeFocused();
+  await expect(more).toBeFocused();
   await page.keyboard.press("Enter");
 
+  const changes = rail.getByRole("button", { name: "Changes", exact: true });
+  await expect(changes).toBeVisible();
+  await changes.click();
+
   await expect(page).toHaveURL(/\/workspace\/changes/);
+  await more.click();
   await expect(changes).toHaveAttribute("aria-current", "page");
   await expect(page.getByRole("heading", { name: "What changed, and what it changed." })).toBeVisible();
 });
@@ -270,13 +275,18 @@ test("mobile Changes stacks the inbox above the impact it opens", async ({ page 
   const surface = page.locator("#workspace-changes");
   await expect(page.getByRole("heading", { name: "What changed, and what it changed." })).toBeVisible();
 
-  // Adding Changes next to Review must not change who gets one of the five mobile rail slots.
+  // One-Path keeps the mobile rail to four primary destinations; Changes lives in More.
   const rail = page.getByRole("complementary", { name: "Workspace navigation" });
-  await expect(rail.locator("button[data-rail-item]:visible")).toHaveCount(5);
-  for (const label of ["Home", "Sources", "World", "Ask"]) {
+  await expect(rail.locator("[data-rail-item]:visible")).toHaveCount(4);
+  for (const label of ["Home", "Knowledge", "Use with AI"]) {
     await expect(rail.getByRole("button", { name: label, exact: true })).toBeVisible();
   }
-  await expect(rail.getByRole("button", { name: "Changes", exact: true })).toBeHidden();
+  const more = rail.locator("summary[aria-label='More workspace tools']");
+  await expect(more).toBeVisible();
+  await more.click();
+  await expect(rail.getByRole("button", { name: "Changes", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(rail.locator(".one-path-more-panel")).toBeHidden();
 
   const record = surface.getByRole("button", { name: /world-revision-b.*world-revision-c/s });
   const inspect = surface.getByRole("button", { name: "Inspect impact" });
