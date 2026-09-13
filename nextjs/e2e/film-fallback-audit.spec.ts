@@ -20,7 +20,7 @@ test("the approved Hero V2 stays on the encoded-film path across the former canv
       await expect(video).toBeVisible();
       await expect(video.locator("source")).toHaveCount(1);
       await expect(video.locator("source")).toHaveAttribute("src", "/film/compile-cut.mp4");
-      await expect(video).toHaveAttribute("poster", "/film/poster-1.webp");
+      await expect(video).toHaveAttribute("poster", "/film/poster-1-hero.webp");
     } finally {
       await context.close();
     }

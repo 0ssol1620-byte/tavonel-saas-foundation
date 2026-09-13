@@ -1,9 +1,9 @@
 {
   "status": "LOCAL_RELEASE_QUALIFIED_NOT_DEPLOYED",
-  "verifiedAt": "2026-09-13T16:49:41.5033392+09:00",
+  "verifiedAt": "2026-09-13T21:18:00+09:00",
   "branch": "agent/one-path-product-ux-20260912",
   "finalBuild": {
-    "buildId": "d1LyLoftS-z5Or_MQc2_w",
+    "buildId": "TNj5EdqN1HQn3-HagM3sY",
     "mode": "production",
     "localHttpQaException": false,
     "health": "PASS_HTTP_200",
@@ -21,21 +21,67 @@
     },
     "productionBuild": "PASS",
     "launchBrowsers": {
-      "chromium": { "passed": 31, "failed": 0, "skipped": 0, "retries": 0 },
-      "firefox": { "passed": 30, "failed": 0, "skipped": 1, "retries": 0 },
-      "webkit": { "passed": 29, "failed": 0, "skipped": 2, "retries": 0 }
+      "chromium": {
+        "passed": 31,
+        "failed": 0,
+        "skipped": 0,
+        "retries": 0
+      },
+      "firefox": {
+        "passed": 30,
+        "failed": 0,
+        "skipped": 1,
+        "retries": 0
+      },
+      "webkit": {
+        "passed": 29,
+        "failed": 0,
+        "skipped": 2,
+        "retries": 0
+      }
     },
-    "marketingConsent": { "passed": 32, "failed": 0 },
-    "workspaceFocused": { "passed": 32, "failed": 0, "skipped": 2 },
-    "filmAudit": { "passed": 4, "failed": 0 },
-    "publicModernizedMatrix": { "total": 252, "passed": 191, "failed": 0, "skipped": 61 },
+    "marketingConsent": {
+      "passed": 32,
+      "failed": 0
+    },
+    "workspaceFocused": {
+      "passed": 32,
+      "failed": 0,
+      "skipped": 2
+    },
+    "filmAudit": {
+      "passed": 4,
+      "failed": 0
+    },
+    "publicModernizedMatrix": {
+      "total": 252,
+      "passed": 191,
+      "failed": 0,
+      "skipped": 61
+    },
     "liveProductQa": {
-      "initialFinalRun": { "passed": 674, "failed": 3, "skipped": 162 },
+      "initialFinalRun": {
+        "passed": 674,
+        "failed": 3,
+        "skipped": 162
+      },
       "failureClassification": "All three failures were the same obsolete homepage /explore exact-href expectation repeated in audit, audit-768 and audit-1280 after Proof moved to a source-specific /explore?act=evidence deep link.",
-      "correctedAuditRerun": { "passed": 42, "failed": 0, "projects": ["audit", "audit-768", "audit-1280"] },
+      "correctedAuditRerun": {
+        "passed": 42,
+        "failed": 0,
+        "projects": [
+          "audit",
+          "audit-768",
+          "audit-1280"
+        ]
+      },
       "closure": "PASS_BY_EXACT_FAILURE_RERUN"
     },
-    "internalLinks": { "checked": 142, "broken": 0, "status": "PASS" },
+    "internalLinks": {
+      "checked": 142,
+      "broken": 0,
+      "status": "PASS"
+    },
     "gitDiffCheck": "PASS",
     "developerCleanInstall": "PASS",
     "developerRecipeSmoke": "PASS",
@@ -44,7 +90,13 @@
     "lighthouse": {
       "status": "PASS",
       "runsPerRoute": 3,
-      "enforcedRoutes": ["/", "/privacy", "/security", "/pricing", "/explore"],
+      "enforcedRoutes": [
+        "/",
+        "/privacy",
+        "/security",
+        "/pricing",
+        "/explore"
+      ],
       "budgets": {
         "performanceMin": 0.8,
         "accessibilityMin": 0.95,
@@ -57,8 +109,8 @@
       "observedTail": {
         "/pricing": {
           "performance": 0.96,
-          "accessibility": 1.0,
-          "bestPractices": 1.0,
+          "accessibility": 1,
+          "bestPractices": 1,
           "seo": 0.91,
           "lcpMs": 2229.805,
           "cls": 0.000217159296051035,
@@ -68,7 +120,7 @@
           "performance": 0.96,
           "accessibility": 0.98,
           "bestPractices": 0.96,
-          "seo": 1.0,
+          "seo": 1,
           "lcpMs": 2170.316,
           "cls": 0.0006442348104140125,
           "tbtMs": 101.51299999999992
@@ -76,7 +128,7 @@
         "/login": {
           "enforced": false,
           "performance": 0.98,
-          "accessibility": 1.0,
+          "accessibility": 1,
           "bestPractices": 0.96,
           "seo": 0.66,
           "lcpMs": 1872.649,
@@ -87,28 +139,66 @@
         "/auth/callback": {
           "enforced": false,
           "performance": 0.98,
-          "accessibility": 1.0,
+          "accessibility": 1,
           "bestPractices": 0.96,
           "seo": 0.66,
           "lcpMs": 1866.146,
           "cls": 0.02859527180557176,
           "tbtMs": 42.123999992370955,
           "knownMeasureOnlyMiss": "SEO 0.66 < 0.90"
+        },
+        "/": {
+          "performanceNote": "Targeted post-fix home probe on exact final production build",
+          "lcpMs": 2143.115,
+          "lcpRunsMs": [
+            2159.011,
+            2143.115,
+            2138.028
+          ],
+          "priorityHinted": true
         }
       }
+    },
+    "heroPerformanceClosure": {
+      "posterOriginalPreserved": "/film/poster-1.webp",
+      "heroDerivative": "/film/poster-1-hero.webp",
+      "heroDerivativeBytes": 45314,
+      "heroDerivativeDimensions": "960x600",
+      "fetchPriorityHigh": true,
+      "preloaded": true,
+      "focusedHeroE2e": {
+        "passed": 3,
+        "failed": 0
+      },
+      "filmAudit": {
+        "passed": 4,
+        "failed": 0
+      },
+      "homeLighthouseLcpMsRuns": [
+        2159.011,
+        2143.115,
+        2138.028
+      ],
+      "homeLighthouseLcpMedianMs": 2143.115,
+      "budgetMs": 3000,
+      "priorityHinted": true
     }
   },
   "release": {
     "localReleaseQualified": true,
-    "committed": false,
-    "pushed": false,
-    "pullRequestCreatedForThisBranch": false,
+    "committed": true,
+    "pushed": true,
+    "pullRequestCreatedForThisBranch": true,
     "deployed": false,
     "productionPublished": false,
-    "remoteCiOnTheseExactUncommittedChanges": false
+    "remoteCiOnTheseExactUncommittedChanges": false,
+    "pullRequestNumber": 66
   },
   "knownNonBlockingOrExternalFollowups": {
-    "authSeoMeasureOnly": ["/login", "/auth/callback"],
+    "authSeoMeasureOnly": [
+      "/login",
+      "/auth/callback"
+    ],
     "physicalMobileDevices": "NOT_TESTED",
     "realAuthenticatedCustomerIntake": "NOT_RUN",
     "realProviderPermissionAndRevisionLifecycle": "NOT_RUN",

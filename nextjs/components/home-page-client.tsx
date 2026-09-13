@@ -19,7 +19,7 @@ const HERO_STAGE = [{
   label: "READY FOR AI",
   line: "Files become organized, source-linked knowledge your AI can use.",
   src: "/film/compile-cut.mp4",
-  poster: "/film/poster-1.webp",
+  poster: "/film/poster-1-hero.webp",
 }] as const;
 
 const WORK_STAGES = [COMPILE_STAGES[1]!, COMPILE_STAGES[2]!] as const;
@@ -62,7 +62,7 @@ export default function HomePageClient({ liveCommerce, proof }: { liveCommerce: 
             </div>
             <div className="one-path-hero-film one-path-hero-film-v2" data-testid="one-path-hero-film">
               <div className="one-path-hero-film-steps" aria-hidden="true"><span>SOURCE</span><span>READ</span><span>ORGANIZE</span><span>READY FOR AI</span></div>
-              <CompileStagePlayer stages={HERO_STAGE} preferVideo playbackRate={1.5} compact />
+              <CompileStagePlayer stages={HERO_STAGE} preferVideo playbackRate={1.5} compact priorityPoster />
             </div>
             <p className="one-path-film-note">Hero V2 presentation — the approved source film is preserved and presented at a faster 12-second pace. The public sample below is the evidence surface.</p>
           </div>

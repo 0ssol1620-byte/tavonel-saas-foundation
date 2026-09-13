@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { preload } from "react-dom";
 import HomePageClient from "@/components/home-page-client";
 import SolutionProofSample from "@/components/solution-proof-sample";
 import { isLiveCommerce } from "@/lib/commercial-state";
@@ -45,5 +46,9 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default function HomePage() {
+  // The hero poster is the homepage LCP resource. Declare it before the client boundary so
+  // throttled browsers do not discover a 90 KB above-the-fold image only after other requests
+  // have already claimed the connection. The locked poster bytes are unchanged.
+  preload("/film/poster-1-hero.webp", { as: "image", fetchPriority: "high" });
   return <HomePageClient liveCommerce={isLiveCommerce()} proof={<SolutionProofSample />} />;
 }

@@ -120,6 +120,7 @@ export default function CompileStagePlayer({
   preferVideo = false,
   playbackRate = 1,
   compact = false,
+  priorityPoster = false,
 }: {
   stages?: readonly CompileStage[];
   onStageChange?: (stage: CompileStage, index: number) => void;
@@ -129,6 +130,8 @@ export default function CompileStagePlayer({
   playbackRate?: number;
   /** Hide chapter navigation/caption for a single-purpose hero presentation. */
   compact?: boolean;
+  /** Mark an above-the-fold poster as the page's priority image without changing its bytes. */
+  priorityPoster?: boolean;
 }) {
   const instanceId = useId().replaceAll(":", "");
   const panelId = `${instanceId}-compile-stage-panel`;
@@ -324,7 +327,15 @@ export default function CompileStagePlayer({
       <div className="compile-film-viewport" role={compact ? undefined : "tabpanel"} id={panelId} tabIndex={compact ? -1 : 0} aria-labelledby={compact ? undefined : tabId(active.id)}>
         {still ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img className="compile-film-still" src={active.poster} width={1440} height={900} alt={`${active.label} — ${active.line}`} />
+          <img
+            className="compile-film-still"
+            src={active.poster}
+            width={1440}
+            height={900}
+            alt={`${active.label} — ${active.line}`}
+            fetchPriority={priorityPoster ? "high" : undefined}
+            loading={priorityPoster ? "eager" : undefined}
+          />
         ) : live ? (
           <div className="compile-film-live" aria-hidden="true"><LiveFilm /></div>
         ) : (
