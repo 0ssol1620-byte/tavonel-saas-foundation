@@ -20,17 +20,12 @@ test("mobile public navigation remains reachable", async ({ page }, testInfo) =>
   await page.goto("/");
   const menu = page.locator(".mobile-primary-nav");
   await expect(menu).toBeVisible();
-  await menu.locator("> summary").click();
-  await expect(menu.getByRole("link", { name: "Pricing" })).toBeVisible();
-  /*
-    Developers is a category since the 2026-09-11 IA redesign, not a link.
-
-    The panel was a flat list of the eight top-level links; it is four groups plus Pricing now.
-    What this test is about -- a phone can still reach the site's structure -- did not change, so
-    it is asserted one level down: the category expands and the guide behind it is a real link.
-  */
-  await menu.locator('details.mobile-nav-group[data-section="developers"] > summary').click();
-  await expect(menu.getByRole("link", { name: "Developer guide", exact: true })).toBeVisible();
+  await menu.locator(":scope > summary").click();
+  const direct = menu.locator(":scope > nav a.mobile-nav-direct");
+  await expect(direct).toHaveCount(3);
+  await expect(direct).toHaveText(["How it works", "Connect", "Pricing"]);
+  await expect(menu.locator(":scope > nav a.mobile-nav-cta")).toHaveCount(1);
+  await expect(menu.locator("details.mobile-nav-group")).toHaveCount(0);
 });
 
 test("audited public and docs routes keep horizontal overflow local", async ({ page }, testInfo) => {
@@ -61,28 +56,21 @@ test("odd grids compose the final item instead of painting an empty cell", async
   }
 });
 
-test("short landing scenes no longer create viewport oceans", async ({ page }, testInfo) => {
+test("One-Path landing sections flow continuously without artificial viewport oceans", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "1440");
   await page.goto("/");
-  const geometry = await page.evaluate(() => {
-    const first = document.querySelector<HTMLElement>("#s1 .shell");
-    const second = document.querySelector<HTMLElement>("#s2 .shell");
-    const fourth = document.querySelector<HTMLElement>("#s4");
-    const fifth = document.querySelector<HTMLElement>("#s5");
-    if (!first || !second || !fourth || !fifth) return null;
-    const a = first.getBoundingClientRect();
-    const b = second.getBoundingClientRect();
-    return {
-      gap: b.top - a.bottom,
-      fourthHeight: fourth.getBoundingClientRect().height,
-      fifthHeight: fifth.getBoundingClientRect().height,
-      viewport: window.innerHeight,
-    };
-  });
-  expect(geometry).not.toBeNull();
-  expect(geometry!.gap).toBeLessThan(300);
-  expect(geometry!.fourthHeight).toBeLessThan(geometry!.viewport);
-  expect(geometry!.fifthHeight).toBeLessThan(geometry!.viewport);
+  const geometry = await page.locator('main > section[data-scene]').evaluateAll(sections => sections.map(section => {
+    const rect = section.getBoundingClientRect();
+    return { id: section.id, top: rect.top, bottom: rect.bottom, height: rect.height, minHeight: getComputedStyle(section).minHeight };
+  }));
+  expect(geometry.map(item => item.id)).toEqual(["s1", "how-it-works", "connect", "proof", "stays-current", "ready-for-ai"]);
+  for (let index = 1; index < geometry.length; index += 1) {
+    expect(Math.abs(geometry[index].top - geometry[index - 1].bottom), `${geometry[index - 1].id} → ${geometry[index].id}`).toBeLessThanOrEqual(2);
+  }
+  for (const section of geometry) {
+    expect(section.height, `${section.id} collapsed`).toBeGreaterThan(180);
+    expect(section.minHeight, `${section.id} still carries a viewport-height scene floor`).not.toMatch(/vh|svh|dvh/);
+  }
 });
 
 test("standalone public product surfaces expose one semantic H1", async ({ page }, testInfo) => {

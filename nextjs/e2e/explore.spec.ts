@@ -209,6 +209,12 @@ test("Act 2 opens an object onto the page region it was compiled from", async ({
   // The source sheet names the file, not the relation list that happens to name it too.
   const sheet = page.locator("[data-source-sheet]");
   await expect(sheet.getByText(/^apple-\d{4}(-\d+)?-.*\.pdf$/i).first()).toBeVisible();
+  // Original bytes are the default representation. Parsed text remains one explicit tab away,
+  // so the source is never mistaken for a typeset reconstruction of the filing.
+  const originalTab = sheet.getByRole("tab", { name: /^(Original page|Reference page)$/ });
+  await expect(originalTab).toHaveAttribute("aria-selected", "true");
+  await expect(sheet.locator("[data-original-source]")).toBeVisible();
+  await sheet.getByRole("tab", { name: "Parsed text" }).click();
   await expect(page.getByText(/^REGION ON PAGE \d+ OF \d+$/)).toBeVisible();
   await expect(page.getByText("This object is supported by this exact source region.")).toBeVisible();
   await expect(page.getByRole("link", { name: /Verify on SEC/ })).toBeVisible();
@@ -466,6 +472,10 @@ test("a phone walks World, Object, Source as steps rather than shrinking three p
 
   await page.getByRole("button", { name: /Open the source region/ }).click();
   await expect(page.locator(STAGE)).toHaveAttribute("data-world-act", "evidence");
+  const sheet = page.locator("[data-source-sheet]");
+  await expect(sheet.getByRole("tab", { name: /^(Original page|Reference page)$/ })).toHaveAttribute("aria-selected", "true");
+  await expect(sheet.locator("[data-original-source]")).toBeVisible();
+  await sheet.getByRole("tab", { name: "Parsed text" }).click();
   await expect(page.getByText(/^REGION ON PAGE \d+ OF \d+$/)).toBeVisible();
 
   await page.getByRole("button", { name: "Back to the World" }).click();

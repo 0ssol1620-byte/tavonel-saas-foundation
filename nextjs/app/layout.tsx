@@ -6,6 +6,7 @@ import MarketingConsent from "@/components/marketing-consent";
 import { jsonLdHtml } from "@/lib/structured-data";
 import "./globals.css";
 import "./evidence-first.css";
+import "./one-path.css";
 
 /**
  * SPEC §6.11 — Wanted Sans is the display and text face. It is self-hosted from

@@ -429,15 +429,9 @@ export default function WorkspacePage() {
     return () => controller.abort();
   }, [collectionResult?.collectionId]);
   const [downloading, setDownloading] = useState(false);
-  /*
-    Whether the reader has taken the "Connect to AI" step (§13.3's sixth).
-
-    Set by opening the Use-with-AI guide or by a completed package download -- the two acts the
-    workspace can actually observe. It is not persisted: see the note on `hasAiConnection` in
-    `lib/workspace-onboarding.ts` for why an unfinished row shown twice beats a finished row
-    asserted from a flag nothing can re-check.
-  */
-  const [aiConnectionTaken, setAiConnectionTaken] = useState(false);
+  // A setup guide or downloaded package is not proof of a working external AI connection.
+  // Keep the success state false until an authenticated consumer receipt can establish it.
+  const aiConnectionTaken = false;
   const [billingAccount, setBillingAccount] = useState<BillingAccount | null>(null);
   const [billingBusy, setBillingBusy] = useState(false);
   /**
@@ -1360,9 +1354,7 @@ export default function WorkspacePage() {
       anchor.click();
       anchor.remove();
       URL.revokeObjectURL(url);
-      // The package in the reader's hands is the AI-connection step taken, so §13.3's sixth row
-      // reads done. Set after the bytes arrived, never beside the click.
-      setAiConnectionTaken(true);
+      // Receipt of package bytes is a download, not proof that an external AI consumed them.
       setNotice(`Downloaded the verified knowledge package with ${collectionResult.validation.counts.packageFiles} files.`);
     } finally {
       setDownloading(false);
@@ -2021,7 +2013,7 @@ export default function WorkspacePage() {
     <WorkspaceUltimateShell
       surface={surface}
       activeRevision={activeWorld?.revision ?? null}
-      candidateReady={candidateReady}
+      candidateReady={candidateNeedsDecision}
       reviewCount={candidateReady ? reviewCount : null}
       activityCount={activityCount}
       truthGates={[]}
@@ -2066,15 +2058,9 @@ export default function WorkspacePage() {
             </p>
           ) : null}
 
-          {tab === "overview" && surface === "home" ? (
+          {tab === "overview" && surface === "home" && workspaceStartupReady ? (
             <WorkspaceGettingStarted
-              autoOpenEligible={
-                workspaceStartupReady &&
-                documentInventoryState === "ready" &&
-                documentCount === 0 &&
-                !collectionResult &&
-                !compileJob
-              }
+              autoOpenEligible={false}
               steps={onboardingSteps}
               hasActiveWorld={Boolean(activeWorld)}
               next={{
@@ -2209,7 +2195,6 @@ export default function WorkspacePage() {
               <WorkspaceUseWithAi
                 onOpen={() => {
                   trackFunnel("workspace_ai_connect_opened");
-                  setAiConnectionTaken(true);
                 }}
               />
             </section>
@@ -2261,7 +2246,7 @@ export default function WorkspacePage() {
               ) : (
               <div className="workspace-intake-copy">
                 <p className="eyebrow">
-                  {workspaceState.mode === "new" ? "BUILD YOUR FIRST COMPILED WORLD" : activeWorld ? "ADD SOURCES" : candidateNeedsDecision ? "ADD SOURCES FOR THE NEXT COMPILE" : "ADD SOURCES"}
+                  {workspaceState.mode === "new" ? "ADD KNOWLEDGE" : "ADD MORE KNOWLEDGE"}
                 </p>
                 <h2 id="workspace-intake-title">
                   {workspaceState.mode === "new" ? "Drop files, folders or ZIP here" : "Add files, folders or ZIP"}
@@ -2270,10 +2255,10 @@ export default function WorkspacePage() {
                   {workspaceState.mode === "new"
                     ? "Upload sources or connect the system where your knowledge already lives."
                     : activeWorld
-                      ? "Add more knowledge without losing access to the World you already have."
+                      ? "Add more files while your published knowledge stays available."
                       : candidateNeedsDecision
-                        ? "Add more sources while this candidate waits for review."
-                      : "Add more knowledge to the sources waiting for their first compile."}
+                        ? "Add more files while the prepared version waits for your review."
+                      : "Add more files to the knowledge you are preparing."}
                 </p>
                 <div className="workspace-intake-actions">
                   <button type="button" onClick={() => fileRef.current?.click()}>Choose files</button>
@@ -2873,9 +2858,13 @@ export default function WorkspacePage() {
               </> : null}
               {surface === "ask" ? (
               <section id="workspace-ask" className="card ask-studio" aria-labelledby="ask-title">
+                <div className="one-path-ai-options">
+                  <WorkspaceUseWithAi open onDownload={collectionResult ? () => void downloadCollection() : undefined}
+                    downloading={downloading} onOpen={() => trackFunnel("workspace_ai_connect_opened")} />
+                </div>
                 <div>
-                  <p className="eyebrow">GROUNDED ASK</p>
-                  <h2 id="ask-title">Answers return to exact source regions.</h2>
+                  <p className="eyebrow">TRY A QUESTION</p>
+                  <h2 id="ask-title">Ask your knowledge. Check the source.</h2>
                   <p>Retrieval runs only against the active world. If no page-and-bbox evidence matches, TAVONEL abstains.</p>
                 </div>
                 <form onSubmit={(event) => { event.preventDefault(); void askActiveWorld(); }}>

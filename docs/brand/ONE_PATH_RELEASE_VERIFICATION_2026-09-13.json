@@ -1,0 +1,126 @@
+{
+  "status": "LOCAL_RELEASE_QUALIFIED_NOT_DEPLOYED",
+  "verifiedAt": "2026-09-13T16:49:41.5033392+09:00",
+  "branch": "agent/one-path-product-ux-20260912",
+  "finalBuild": {
+    "buildId": "d1LyLoftS-z5Or_MQc2_w",
+    "mode": "production",
+    "localHttpQaException": false,
+    "health": "PASS_HTTP_200",
+    "productionCsp": "PASS",
+    "upgradeInsecureRequests": true
+  },
+  "verification": {
+    "typescript": "PASS",
+    "eslint": "PASS",
+    "unit": {
+      "files": 264,
+      "total": 3820,
+      "passed": 3820,
+      "failed": 0
+    },
+    "productionBuild": "PASS",
+    "launchBrowsers": {
+      "chromium": { "passed": 31, "failed": 0, "skipped": 0, "retries": 0 },
+      "firefox": { "passed": 30, "failed": 0, "skipped": 1, "retries": 0 },
+      "webkit": { "passed": 29, "failed": 0, "skipped": 2, "retries": 0 }
+    },
+    "marketingConsent": { "passed": 32, "failed": 0 },
+    "workspaceFocused": { "passed": 32, "failed": 0, "skipped": 2 },
+    "filmAudit": { "passed": 4, "failed": 0 },
+    "publicModernizedMatrix": { "total": 252, "passed": 191, "failed": 0, "skipped": 61 },
+    "liveProductQa": {
+      "initialFinalRun": { "passed": 674, "failed": 3, "skipped": 162 },
+      "failureClassification": "All three failures were the same obsolete homepage /explore exact-href expectation repeated in audit, audit-768 and audit-1280 after Proof moved to a source-specific /explore?act=evidence deep link.",
+      "correctedAuditRerun": { "passed": 42, "failed": 0, "projects": ["audit", "audit-768", "audit-1280"] },
+      "closure": "PASS_BY_EXACT_FAILURE_RERUN"
+    },
+    "internalLinks": { "checked": 142, "broken": 0, "status": "PASS" },
+    "gitDiffCheck": "PASS",
+    "developerCleanInstall": "PASS",
+    "developerRecipeSmoke": "PASS",
+    "secretScan": "PASS_CLEAN",
+    "lockedOriginalFilmAssets": "PASS_BY_BYTE_HASH_CONTRACT_AND_VISUAL_CONTINUITY_QA",
+    "lighthouse": {
+      "status": "PASS",
+      "runsPerRoute": 3,
+      "enforcedRoutes": ["/", "/privacy", "/security", "/pricing", "/explore"],
+      "budgets": {
+        "performanceMin": 0.8,
+        "accessibilityMin": 0.95,
+        "bestPracticesMin": 0.9,
+        "seoMin": 0.9,
+        "lcpMaxMs": 3000,
+        "clsMax": 0.1,
+        "tbtMaxMs": 300
+      },
+      "observedTail": {
+        "/pricing": {
+          "performance": 0.96,
+          "accessibility": 1.0,
+          "bestPractices": 1.0,
+          "seo": 0.91,
+          "lcpMs": 2229.805,
+          "cls": 0.000217159296051035,
+          "tbtMs": 0
+        },
+        "/explore": {
+          "performance": 0.96,
+          "accessibility": 0.98,
+          "bestPractices": 0.96,
+          "seo": 1.0,
+          "lcpMs": 2170.316,
+          "cls": 0.0006442348104140125,
+          "tbtMs": 101.51299999999992
+        },
+        "/login": {
+          "enforced": false,
+          "performance": 0.98,
+          "accessibility": 1.0,
+          "bestPractices": 0.96,
+          "seo": 0.66,
+          "lcpMs": 1872.649,
+          "cls": 0.04833579238435518,
+          "tbtMs": 40.68199999999979,
+          "knownMeasureOnlyMiss": "SEO 0.66 < 0.90"
+        },
+        "/auth/callback": {
+          "enforced": false,
+          "performance": 0.98,
+          "accessibility": 1.0,
+          "bestPractices": 0.96,
+          "seo": 0.66,
+          "lcpMs": 1866.146,
+          "cls": 0.02859527180557176,
+          "tbtMs": 42.123999992370955,
+          "knownMeasureOnlyMiss": "SEO 0.66 < 0.90"
+        }
+      }
+    }
+  },
+  "release": {
+    "localReleaseQualified": true,
+    "committed": false,
+    "pushed": false,
+    "pullRequestCreatedForThisBranch": false,
+    "deployed": false,
+    "productionPublished": false,
+    "remoteCiOnTheseExactUncommittedChanges": false
+  },
+  "knownNonBlockingOrExternalFollowups": {
+    "authSeoMeasureOnly": ["/login", "/auth/callback"],
+    "physicalMobileDevices": "NOT_TESTED",
+    "realAuthenticatedCustomerIntake": "NOT_RUN",
+    "realProviderPermissionAndRevisionLifecycle": "NOT_RUN",
+    "externalAiConsumptionWithRealCustomerData": "NOT_RUN",
+    "searchConsoleVerificationAndIndexSubmission": "EXTERNAL_ACCOUNT_ACTION_NOT_DONE",
+    "routerEmpiricalCalibrationShadowCanary": "SEPARATE_P0_TRACK_NOT_COMPLETE",
+    "heroV2PhysicalBakedMp4": "NOT_CREATED_PRESENTATION_LAYER_V2_ONLY"
+  },
+  "repositoryHygiene": {
+    "qaEvidenceDirectories": "PRESERVE_EXCLUDE_FROM_COMMIT",
+    "rootDollarNull": "CONFIRMED_ZERO_BYTE_SHELL_ARTIFACT_DELETE_REQUIRES_LOCAL_DESTRUCTIVE_APPROVAL",
+    "nextjsDollarNull": "CONFIRMED_139_BYTE_RIPGREP_ERROR_REDIRECTION_ARTIFACT_DELETE_REQUIRES_LOCAL_DESTRUCTIVE_APPROVAL"
+  },
+  "claimBoundary": "This receipt qualifies the current local web/product release candidate. It does not claim production deployment, live customer/provider E2E, Search Console completion, or Router P0-B production promotion."
+}

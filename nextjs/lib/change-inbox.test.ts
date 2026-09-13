@@ -296,14 +296,16 @@ describe("where the Change Inbox is wired", () => {
     expect(navRows.indexOf("changes")).toBeLessThan(navRows.indexOf("connections"));
   });
 
-  it("leaves the five mobile rail surfaces exactly as they were", () => {
+  it("keeps three primary mobile surfaces and preserves the other tools in More", () => {
     /*
       The rail used to be filled by counting positions in CSS, so a row inserted before World
       silently dropped Ask from mobile. The five are named now; this pins them so that adding a
       surface still cannot evict one by accident.
     */
     const rail = [...shell.matchAll(/\{ surface: "(\w+)"[^\n]*\brail: true/g)].map((match) => match[1]);
-    expect(rail).toEqual(["home", "sources", "world", "ask", "settings"]);
+    expect(rail).toEqual(["home", "sources", "ask"]);
+    expect(shell).toContain('aria-label="More workspace tools"');
+    expect(shell).toContain("moreItems.map");
     expect(shell).toContain(`data-mobile-rail={item.rail ? "" : undefined}`);
     expect(railCss).toContain(".nav > div[data-mobile-rail] { display: block; }");
     expect(railCss).not.toMatch(/\.nav > div:nth-child/);

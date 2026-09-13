@@ -46,30 +46,18 @@ test("solution workflow is five complete steps with no orphan cell", async ({ pa
 
 test("compilation film is autoplay-first without a blocking play control", async ({ page }) => {
   await page.goto("/");
-  const frame = page.locator(".compile-film-sequence");
-  await frame.scrollIntoViewIfNeeded();
+  const frame = page.getByTestId("one-path-hero-film").locator(".compile-film-sequence");
   await expect(frame).toBeVisible();
-  /*
-    The film has had two renderers since `cc29ecd` ("Film: replace soft landing proof with vector
-    renderer"), and `2e88caf` ("mobile: stop drawing a 1440-wide film into a 350px frame") settled
-    which one runs where: a frame wide enough for the cut's fixed-pixel composition draws it live
-    on a canvas, a narrow or coarse-pointer one plays the recorded mp4. This test predates both
-    and assumed the <video> was the only renderer.
-
-    What it is actually about is unchanged and is asserted for whichever renderer mounted: the
-    film starts on its own, and nothing sits in front of the frame demanding a click first.
-    `CompileStagePlayer` publishes the renderer it chose, so read that rather than re-deriving
-    its media query here.
-  */
-  await expect(frame).toHaveAttribute("data-film-renderer", /live-canvas|video-fallback/);
-  if (await frame.getAttribute("data-film-renderer") === "live-canvas") {
-    await expect(frame.locator(".compile-film-live canvas")).toHaveCount(1);
-  } else {
-    const video = frame.locator("video[data-active='1']");
-    await expect(video).toHaveCount(1);
-    const media = await video.evaluate((element: HTMLVideoElement) => ({ autoplay: element.autoplay, muted: element.muted, inline: element.playsInline, controls: element.controls }));
-    expect(media).toEqual({ autoplay: true, muted: true, inline: true, controls: false });
-  }
+  await expect(frame).toHaveAttribute("data-film-renderer", "video-fallback");
+  await expect(frame.locator(".compile-film-live canvas")).toHaveCount(0);
+  const video = frame.locator("video[data-active='1']");
+  await expect(video).toHaveCount(1);
+  const media = await video.evaluate((element: HTMLVideoElement) => ({ autoplay: element.autoplay, muted: element.muted, inline: element.playsInline, controls: element.controls, rate: element.playbackRate }));
+  expect(media.autoplay).toBe(true);
+  expect(media.muted).toBe(true);
+  expect(media.inline).toBe(true);
+  expect(media.controls).toBe(false);
+  expect(media.rate).toBeGreaterThanOrEqual(1);
   /*
     film-01 -- the control is always rendered now, and says which of three things it does.
 

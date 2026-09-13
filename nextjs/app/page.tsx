@@ -14,19 +14,19 @@ import { isLiveCommerce } from "@/lib/commercial-state";
  * object rather than merging into it.
  */
 export const metadata: Metadata = {
-  title: "TAVONEL — Knowledge you can check",
-  description: "Explore a published Compiled World. Open the source behind a result, inspect its evidence, and see how reviewed knowledge can be used in AI tools.",
+  title: "TAVONEL — Make your knowledge ready for AI",
+  description: "Connect files, cloud and servers. TAVONEL prepares source-traceable, structured knowledge your AI can use, while difficult content is surfaced for verification instead of silently accepted.",
   alternates: { canonical: "/", languages: { en: "/", ko: "/ko", "x-default": "/" } },
   openGraph: {
-    title: "TAVONEL — Knowledge you can check",
-    description: "Explore a published Compiled World. Open the source behind a result and inspect its evidence.",
+    title: "TAVONEL — Make your knowledge ready for AI",
+    description: "Bring your knowledge. TAVONEL handles the processing, keeps a path back to the source, and prepares the reviewed result for your AI.",
     type: "website",
     url: "/",
   },
   twitter: {
     card: "summary_large_image",
-    title: "TAVONEL — Knowledge you can check",
-    description: "Explore a published Compiled World. Open the source behind a result and inspect its evidence.",
+    title: "TAVONEL — Make your knowledge ready for AI",
+    description: "Bring your knowledge. TAVONEL handles the processing, keeps a path back to the source, and prepares the reviewed result for your AI.",
   },
 };
 

@@ -9,24 +9,27 @@ async function dismissConsent(page: import("@playwright/test").Page) {
   await expect(panel).toBeHidden();
 }
 
-test("input routes fill their panels and provide usable next actions", async ({ page }) => {
+test("the One-Path Connect routes fill their cards and provide usable next actions", async ({ page }) => {
   await page.goto("/");
   await dismissConsent(page);
-  const routes = page.locator('.source-routes[aria-label]');
+  const routes = page.locator("#connect .one-path-source-options");
   await expect(routes).toHaveCount(1);
   await routes.scrollIntoViewIfNeeded();
-  const panels = routes.locator(".source-route");
-  await expect(panels).toHaveCount(2);
-  const routeWidth = (await routes.boundingBox())!.width;
+  const panels = routes.locator(":scope > article");
+  await expect(panels).toHaveCount(3);
   for (const panel of await panels.all()) {
-    const panelWidth = (await panel.boundingBox())!.width;
-    expect(routeWidth - panelWidth).toBeLessThanOrEqual(2);
+    const panelBox = await panel.boundingBox();
+    expect(panelBox).not.toBeNull();
+    expect(panelBox!.width).toBeGreaterThan(100);
+    expect(panelBox!.height).toBeGreaterThan(120);
     const action = panel.getByRole("link");
-    await expect(action).toHaveAttribute("href", "/integrations");
     // Reveal transforms can produce 43.999969 for a CSS 44px target.
     // Preserve the 44px threshold at hundredth-pixel measurement precision.
     expect(Math.round((await action.boundingBox())!.height * 100) / 100).toBeGreaterThanOrEqual(44);
   }
+  await expect(panels.nth(0).getByRole("link")).toHaveAttribute("href", /\/(login|contact)$/);
+  await expect(panels.nth(1).getByRole("link")).toHaveAttribute("href", "/integrations");
+  await expect(panels.nth(2).getByRole("link")).toHaveAttribute("href", "/integrations");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
@@ -85,19 +88,21 @@ test("pricing puts catalog-backed choices before detailed explanations", async (
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
-test("phone and tablet scene marks have real pointer targets, not decorative pixels", async ({ page }) => {
+test("phone and tablet use real navigation targets instead of clickable decorative scene marks", async ({ page }) => {
   test.skip((page.viewportSize()?.width ?? 1440) > 900, "Desktop uses the named scene rail.");
   await page.goto("/");
   await dismissConsent(page);
-  const marks = page.locator(".bar-ticks button.bt");
-  await expect(marks.first()).toBeVisible();
-  const targets = await marks.evaluateAll(elements => elements.map(e => {
+  await expect(page.locator(".bar-ticks button.bt")).toHaveCount(0);
+  const menu = page.locator("header.nav details.mobile-primary-nav");
+  await menu.locator(":scope > summary").click();
+  const targets = await menu.locator(":scope > nav a").evaluateAll(elements => elements.map(e => {
     const r = e.getBoundingClientRect();
-    const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2 + 10);
+    const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
     return { width: r.width, height: r.height, inside: hit === e || e.contains(hit) };
   }));
+  expect(targets.length).toBe(4);
   for (const target of targets) {
-    expect(target.width).toBeGreaterThanOrEqual(24);
+    expect(target.width).toBeGreaterThan(44);
     expect(target.height).toBeGreaterThanOrEqual(44);
     expect(target.inside).toBe(true);
   }

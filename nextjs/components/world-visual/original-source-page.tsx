@@ -87,10 +87,12 @@ export default function OriginalSourcePage({ active, regions, onSelectRegion, co
       const pdfjs = await import("pdfjs-dist");
       if (disposed) return;
       pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
-      task = pdfjs.getDocument({ data: bytes, isEvalSupported: false, enableXfa: false, stopAtErrors: true, maxImageSize: 16_000_000 });
+      // PDF.js 6 no longer exposes isEvalSupported or PDFDocumentProxy.destroy.
+      // The loading task owns worker/document teardown. Source identity and bounds stay enforced.
+      task = pdfjs.getDocument({ data: bytes, enableXfa: false, stopAtErrors: true, maxImageSize: 16_000_000 });
       const pdf = await task.promise;
-      if (disposed) { await pdf.destroy(); return; }
-      if (pdf.numPages !== active.pageCount) { await pdf.destroy(); throw new Error("The page count differs from the recorded source."); }
+      if (disposed) { await task.destroy(); return; }
+      if (pdf.numPages !== active.pageCount) { await task.destroy(); throw new Error("The page count differs from the recorded source."); }
       documentRef.current = pdf;
       setLoaded(value => value + 1);
     };
