@@ -65,6 +65,8 @@ test("the sample opens onto real provenance and claims nothing it has not compil
   */
   const sheet = page.locator("[data-source-sheet]");
   await expect(sheet.getByText(/^apple-[\w-]+\.pdf$/i).first()).toBeVisible();
+  await expect(sheet.locator("[data-original-source]")).toBeVisible();
+  await sheet.getByRole("tab", { name: "Parsed text" }).click();
   await expect(page.getByText(/^REGION ON PAGE \d+ OF \d+$/)).toBeVisible();
   // The footer names the bytes it opens: the committed PDF of the annual filing, or the
   // reference render of a 2026 filing. It may never offer one under the other's name.
