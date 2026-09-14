@@ -197,16 +197,25 @@
 
 .sheet {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   /* header · page · region map · provenance · footer */
   grid-template-rows: auto minmax(0, 1fr) auto auto auto;
   /* The growing child of a bounded pane: the sheet takes the room that is left and the page
      inside it scrolls, so the region map, the provenance table and the footer links stay on
      screen instead of sitting a filing's worth of text below the fold. */
   flex: 1 1 auto;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   min-width: 0;
   min-height: 0;
   background: var(--g1);
   border: 1px solid var(--hairline-hi);
+}
+
+.sheet > [role="tabpanel"] {
+  min-width: 0;
+  max-width: 100%;
 }
 
 /*
