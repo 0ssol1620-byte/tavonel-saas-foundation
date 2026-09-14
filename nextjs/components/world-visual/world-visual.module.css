@@ -198,11 +198,15 @@
 .sheet {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  /* header · page · region map · provenance · footer */
-  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
-  /* The growing child of a bounded pane: the sheet takes the room that is left and the page
-     inside it scrolls, so the region map, the provenance table and the footer links stay on
-     screen instead of sitting a filing's worth of text below the fold. */
+  /* header · representation tabs · active representation · provenance · footer.
+
+     Keep the tablist in its own intrinsic row. The active representation is the only flexible
+     row; otherwise the original PDF panel can auto-size underneath the tablist and physically
+     cover the Parsed text control, which makes a visible tab impossible to click. */
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  /* The growing child of a bounded pane: the sheet takes the room that is left and the active
+     representation inside it scrolls, so provenance/footer remain reachable without allowing
+     the PDF canvas or its toolbar to overlap the representation tabs. */
   flex: 1 1 auto;
   width: 100%;
   max-width: 100%;
@@ -214,8 +218,11 @@
 }
 
 .sheet > [role="tabpanel"] {
+  grid-row: 3;
   min-width: 0;
   max-width: 100%;
+  min-height: 0;
+  overflow: auto;
 }
 
 /*
