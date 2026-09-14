@@ -197,17 +197,20 @@
 
 .sheet {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   /* header · representation tabs · active representation · provenance · footer.
 
-     SourceSheet gained a tablist plus two mutually-exclusive tabpanels. The old five-row grid
-     still treated row 2 as the flexible page row, so the tablist consumed the bounded row and
-     the visible PDF panel auto-expanded underneath it. Keep both tabpanels in the same bounded
-     content row so region navigation below the sheet cannot be covered. */
+     Keep the tablist in its own intrinsic row. The active representation is the only flexible
+     row; otherwise the original PDF panel can auto-size underneath the tablist and physically
+     cover the Parsed text control, which makes a visible tab impossible to click. */
   grid-template-rows: auto auto minmax(0, 1fr) auto auto;
   /* The growing child of a bounded pane: the sheet takes the room that is left and the active
-     representation inside it scrolls, so provenance/footer and the region switch remain on
-     screen instead of sitting a filing's worth of pixels below the fold. */
+     representation inside it scrolls, so provenance/footer remain reachable without allowing
+     the PDF canvas or its toolbar to overlap the representation tabs. */
   flex: 1 1 auto;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   min-width: 0;
   min-height: 0;
   background: var(--g1);
@@ -217,6 +220,7 @@
 .sheet > [role="tabpanel"] {
   grid-row: 3;
   min-width: 0;
+  max-width: 100%;
   min-height: 0;
   overflow: auto;
 }

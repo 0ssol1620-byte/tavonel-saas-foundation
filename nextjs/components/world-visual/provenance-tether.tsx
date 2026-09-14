@@ -71,25 +71,41 @@ export default function ProvenanceTether({
   useEffect(() => {
     measure();
     const host = hostRef.current;
-    if (!host || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(() => measure());
-    observer.observe(host);
-    // Switching Original/Parsed can change the visible region anchor without resizing the pane.
-    // Follow those DOM/attribute changes as well so the tether stays bound to what is on screen.
-    const mutations = typeof MutationObserver === "undefined"
+    if (!host) return;
+
+    let frame = 0;
+    const scheduleMeasure = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(measure);
+    };
+
+    const resizeObserver = typeof ResizeObserver === "undefined"
       ? null
-      : new MutationObserver(() => measure());
-    mutations?.observe(host, {
+      : new ResizeObserver(scheduleMeasure);
+    resizeObserver?.observe(host);
+
+    /*
+      The target region does not exist while the Original representation is selected. Switching
+      to Parsed text changes the source sheet DOM without changing activeKey, so a host-only
+      resize observer can leave the path null forever. Re-measure after representation/visibility
+      mutations, on the next frame after layout has settled.
+    */
+    const mutationObserver = typeof MutationObserver === "undefined"
+      ? null
+      : new MutationObserver(scheduleMeasure);
+    mutationObserver?.observe(host, {
       subtree: true,
       childList: true,
       attributes: true,
-      attributeFilter: ["data-source-view", "data-render-state", "hidden", "style"],
+      attributeFilter: ["hidden", "style", "data-source-view", "data-render-state", "data-active-region"],
     });
-    window.addEventListener("resize", measure);
+
+    window.addEventListener("resize", scheduleMeasure);
     return () => {
-      observer.disconnect();
-      mutations?.disconnect();
-      window.removeEventListener("resize", measure);
+      window.cancelAnimationFrame(frame);
+      resizeObserver?.disconnect();
+      mutationObserver?.disconnect();
+      window.removeEventListener("resize", scheduleMeasure);
     };
   }, [hostRef, measure, activeKey]);
 
