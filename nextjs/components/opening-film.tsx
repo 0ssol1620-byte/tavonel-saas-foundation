@@ -664,10 +664,10 @@ export default function OpeningFilm(_props: { onEnded?: () => void }) {
         const rgb = AREA_RGB[node.area % AREA_RGB.length];
         const lit = front > 0 && node.depth >= 0 && front > node.depth;
         const r = (lit ? 3.1 : 2.0) * node.radius * (pop < 1 ? pop * 1.25 : 1);
+        /* No "held" state any more: the published sample this field is built from records no
+           pending review, so there is nothing to hold out of the world (BA-001). */
         context.fillStyle = lit
-          ? node.state === "held"
-            ? "rgb(110,147,184)"
-            : `rgb(${Math.min(255, rgb[0] + 40)},${rgb[1]},${rgb[2]})`
+          ? `rgb(${Math.min(255, rgb[0] + 40)},${rgb[1]},${rgb[2]})`
           : `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${0.55 + pop * 0.45})`;
         context.beginPath();
         context.arc(ox + node.x * gw, oy + node.y * gh, r, 0, Math.PI * 2);

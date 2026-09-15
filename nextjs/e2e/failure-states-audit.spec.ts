@@ -51,6 +51,20 @@ async function refuseIntake(page: import("@playwright/test").Page, code: string)
 
   const preflight = page.getByRole("region", { name: "Compile preflight" });
   await expect(preflight).toBeVisible();
+  /*
+    The dead end this file found at integration, kept as the regression test for it.
+
+    This fixture is a PDF by name whose bytes carry no page tree, which is the same shape as a
+    spreadsheet (counted after conversion) and as a PDF that does not parse. Once nothing is
+    quoted from file size, that set has no estimate -- and the upload button was gated on the
+    estimate existing, so the panel said "pages are counted while the documents are processed"
+    above a control that could never be pressed. Enabled is the assertion; the refusal this file
+    is about cannot even be reached without it.
+  */
+  await expect(
+    preflight.getByRole("button", { name: /Upload & compile/ }),
+    "an uncounted set must still be uploadable -- the quote is information, not authorisation",
+  ).toBeEnabled();
   await preflight.getByRole("button", { name: /Upload & compile/ }).click();
   return () => capabilityCalls;
 }

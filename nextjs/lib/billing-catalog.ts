@@ -63,6 +63,32 @@ export const BILLING_OFFERS = {
   },
 } as const;
 
+/*
+  The refund bright line, as two numbers rather than an adjective.
+
+  `docs/policy/REFUND_THRESHOLD_DRAFT.md` is the decision record: the live template said refunds
+  "may be limited after substantial processing has been consumed", which is a judgement call
+  presented as a rule and cannot be checked by a buyer before they pay. FD-04 settled it at 14
+  days and 10% of the plan's included pages -- a delegated decision, 2026-09-11 (orchestrator,
+  under the founder's delegation), per `D:\CodexProjects\growth-lanes\DECISION_LOG_2026-09-11.md`,
+  and not the founder's own statement -- so both figures live here, beside the `includedPages`
+  they are a fraction of, and /pricing and the billing documentation compute the per-plan page
+  figure rather than restating it. Pricing and refund terms are founder territory under
+  CLAUDE.md, so the lane report makes the founder's direct ratification a merge condition.
+
+  Nothing in the billing code enforces either number today: refunds are issued through Paddle by
+  a person, and the consumed-page share is read from the same usage ledger the invoice is. These
+  constants are what the published terms say, not a gate a route calls. Nothing can be charged
+  yet either -- `liveChargesEnabled` is false -- so no payment exists for the window to run on.
+*/
+export const REFUND_WINDOW_DAYS = 14;
+export const REFUND_MAX_CONSUMED_FRACTION = 0.1;
+
+/** The included pages a plan may consume and still be inside the refund window. */
+export function refundablePageAllowance(offer: { includedPages: number }) {
+  return Math.round(offer.includedPages * REFUND_MAX_CONSUMED_FRACTION);
+}
+
 export type BillingOfferCode = keyof typeof BILLING_OFFERS;
 export type BillingOffer = (typeof BILLING_OFFERS)[BillingOfferCode] & {
   code: BillingOfferCode;

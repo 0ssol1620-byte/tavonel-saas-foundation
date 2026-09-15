@@ -6,6 +6,9 @@ const migration = readFileSync(resolve(import.meta.dirname, "../../supabase/migr
 
 describe("subscription allowance ledger migration", () => {
   it("grants signed subscription transactions once and supports renewal transactions", () => {
+    // 0035's grant, which is still what 0035 says. The live definition is
+    // 20260911130000_included_page_expiry_at_renewal.sql, where the same statement also subtracts
+    // the previous period's expiry -- see lib/included-page-expiry-migration.test.ts.
     expect(migration).toContain("p_event_type <> 'transaction.completed'");
     expect(migration).toContain("foundation_allowance_transaction_idx");
     expect(migration).toContain("kind = 'allowance'");

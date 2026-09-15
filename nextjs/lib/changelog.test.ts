@@ -54,6 +54,40 @@ describe("every entry", () => {
       expect(text, phrase).not.toContain(phrase);
     }
   });
+
+  /*
+    BA-105 / BA-106 / BA-107. A changelog is a record of what someone else can now do, or must
+    now change. Three ways this one stopped being that, each with its own shape:
+
+    An "Added" line ended on a capability that is not built and named the internal subsystem that
+    would provide it. Two "Improved" lines were internal housekeeping -- one told every reader
+    our pages had been misconfigured, the other spoke in search-index vocabulary. And the "Fixed"
+    lines made each defect's implementation the subject, so the line advertised the defect: "no
+    longer freezes the tab" advertises the freeze, and "abandoned with the reading already paid
+    for" told a prospect we once charged for work we lost.
+
+    None of that is catchable by reading the diff twice, so it is a check. Only the bullets are
+    read: "not built" is legitimate in a migration note and "no longer" in a breaking change, and
+    barring them everywhere would teach the next author to reword a true sentence.
+  */
+  it("speaks from the product rather than from the bug tracker", () => {
+    const bullets = CHANGELOG.flatMap((entry) => [
+      ...(entry.added ?? []), ...(entry.improved ?? []), ...(entry.fixed ?? []),
+    ]);
+    expect(bullets.length).toBeGreaterThan(5);
+
+    const BARRED: Array<[string, RegExp]> = [
+      ["an unbuilt capability as the end of an entry", /is not built|not offered|does not exist/i],
+      ["an internal subsystem named as what is missing", /identity resolution|semantic diff|recovery policy/i],
+      ["the defect as the subject", /\bno longer\b|instead of skipping|\bthrew on\b|being abandoned/i],
+      ["our own misconfiguration reported as a feature", /instead of inheriting|declares its own canonical/i],
+      ["search-index vocabulary", /out of the index|\bnoindex\b|\bcanonical\b/i],
+    ];
+    for (const [name, pattern] of BARRED) {
+      const offenders = bullets.filter((bullet) => pattern.test(bullet));
+      expect(offenders, `${name}: ${offenders.join(" | ")}`).toEqual([]);
+    }
+  });
 });
 
 describe("ordering and filtering", () => {

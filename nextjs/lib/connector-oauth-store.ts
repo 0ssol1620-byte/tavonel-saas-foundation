@@ -277,12 +277,19 @@ export async function recordOAuthConnectionSync(input: {
 // A withdrawn grant is not a retryable error. Say so on the connection, once, terminally, so
 // the workspace can ask for re-authorization instead of showing a job that retries forever.
 //
-// No audit event: `foundation_developer_audit_events.action` is a closed check constraint
-// (0019) with no value for this transition, and no lane writes a migration this campaign.
-// The transition is still traceable -- the terminal job row and `foundation_job_events` carry
-// the same error code -- but a proper `oauth_connection_reauthorization_required` action is
-// owed. ponytail: add it with the migration, and fail closed on the audit write like the
-// neighbours here do.
+// Audited like every other connection change, and fail-closed for the same reason: a status a
+// workspace owner is asked to act on with no record of who set it or when is a support argument
+// nobody can settle. The action was not a legal value of the closed
+// `foundation_developer_audit_events.action` check until
+// `20260911120100_oauth_reauthorization_audit_action.sql` added it; before that this function
+// deliberately did not audit, because a refused constraint plus a fail-closed write would have
+// made the flag unreachable again.
+//
+// The write order matters and is the same as `recordOAuthConnectionSync`'s: the status first,
+// the audit second, and a refused audit reported rather than swallowed. It leaves the narrow
+// window that PostgREST cannot close -- the status landed and the audit did not -- as a refusal
+// the caller logs, not as a success. ponytail: an RPC doing both in one transaction is the
+// upgrade, and it is the whole file's shape, not this function's.
 export async function markOAuthConnectionReauthorizationRequired(input: {
   workspaceKey: string;
   userId: string;
@@ -307,6 +314,13 @@ export async function markOAuthConnectionReauthorizationRequired(input: {
     // A revoked connection is excluded by the filter above, so zero rows means there is
     // nothing to flag -- never a silent success.
     if (rows.length !== 1) return { ok: false as const, code: rows.length === 0 ? "OAUTH_CONNECTION_NOT_FOUND" : "OAUTH_CONNECTION_STATUS_WRITE_FAILED" };
+    if (!await insertOAuthAudit(
+      input.workspaceKey,
+      input.userId,
+      "oauth_connection_reauthorization_required",
+      input.oauthConnectionId,
+      { errorCode: input.errorCode },
+    )) return { ok: false as const, code: "DEVELOPER_AUDIT_WRITE_FAILED" };
     return { ok: true as const };
   } catch {
     return { ok: false as const, code: "OAUTH_CONNECTION_STATUS_WRITE_FAILED" };

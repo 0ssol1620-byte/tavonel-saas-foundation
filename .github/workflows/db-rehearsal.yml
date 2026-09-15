@@ -166,10 +166,17 @@ jobs:
       # that is not re-runnable errors here, and one that is re-runnable but changes state turns the
       # suite red on the second pass. Only the repair files are replayed: 0001-0051 predate this
       # rule and several of them are deliberately create-once.
+      #
+      # The 2026-09-11 migrations join the replay (both lanes asked for this, and both argued their
+      # files are idempotent by construction -- `create or replace`, `add column if not exists`,
+      # `drop constraint if exists` + `add`, and no data statement at all). This is what turns that
+      # argument into a measurement. The glob stays `20260911*` and is deliberately not `2026*`:
+      # the four `20260909*` connector migrations are `create table` without `if not exists` and
+      # are correctly create-once.
       - name: Apply the repair migrations a second time and re-run the suite
         run: |
           eval "$(supabase status --output env | grep '^DB_URL=')"
-          for file in supabase/migrations/005[2345]_*.sql; do
+          for file in supabase/migrations/005[2345]_*.sql supabase/migrations/20260911*_*.sql; do
             echo "replaying $file"
             psql "$DB_URL" -v ON_ERROR_STOP=1 -q -f "$file"
           done

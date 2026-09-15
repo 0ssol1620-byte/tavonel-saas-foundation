@@ -72,12 +72,37 @@ describe("2026-09-05 production hardening", () => {
     expect(narrow).toContain(".edges { display: none; }");
   });
 
+  /*
+    The substrings moved with the 2026-09-11 IA redesign, and what they guard did not.
+
+    The check was `PRIMARY_NAV.map` in the phone component, from when the panel was that flat
+    list. The panel is now the four `NAV_GROUPS` as nested disclosures, so the old substring
+    would pass on a component that had stopped rendering any navigation at all -- it is the
+    group source that has to be named. `display: block` at the breakpoint stays: that one rule
+    is the difference between a phone having a menu and a phone having none.
+  */
   it("keeps a reachable mobile primary navigation instead of removing the information architecture", () => {
     const css = read("app/tavonel.css");
     const nav = read("components/mobile-primary-nav.tsx");
     expect(css).toContain(".mobile-primary-nav { display: block; }");
-    expect(nav).toContain("PRIMARY_NAV.map");
+    expect(nav).toContain("NAV_GROUPS.map");
     expect(nav).toContain('aria-label="Mobile sections"');
+    // The accordion is a disclosure, not a dialog: Tab must leave it. A focus trap imported here
+    // would pass every geometry assertion in the suite. The import, not the word: both
+    // components explain in prose why they do not reach for that hook.
+    expect(nav).not.toContain("from \"@/components/world-visual/use-dialog-focus\"");
+  });
+
+  it("keeps the desktop section row as a disclosure with real links behind it", () => {
+    const nav = read("components/site-nav/desktop-primary-nav.tsx");
+    expect(nav).toContain("NAV_GROUPS.map");
+    expect(nav).toContain('aria-label="Sections"');
+    // `aria-expanded`/`aria-controls` on a `<button>`, and no `role="menu"` promising arrow keys
+    // this navigation does not implement.
+    expect(nav).toContain("aria-expanded=");
+    expect(nav).toContain("aria-controls=");
+    expect(nav).not.toContain("role=\"menu\"");
+    expect(nav).not.toContain("from \"@/components/world-visual/use-dialog-focus\"");
   });
 
   /*

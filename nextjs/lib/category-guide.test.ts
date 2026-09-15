@@ -100,11 +100,25 @@ describe("every solution page says where it stops too", () => {
     limit -- rather than a difficulty it happens to solve.
   */
   const solutions = readFileSync(resolve(import.meta.dirname, "../app/solutions/[slug]/page.tsx"), "utf8");
+  /*
+    A negative assertion reads the page with its rationale stripped out, the same way
+    `public-copy-purge.test.ts` does. Several of these comments name a retired phrase in order to
+    record why it went, and a check that could not tell a comment from copy would make the file
+    unable to explain its own history.
+  */
+  const shipped = solutions.replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, " ").replace(/\/\*[\s\S]*?\*\//g, " ");
 
   it("gives all five a limitations list the page renders", () => {
     expect((solutions.match(/limitations: \[/g) ?? [])).toHaveLength(5);
     expect(solutions).toContain("solution.limitations.map");
-    expect(solutions).toContain("WHERE THIS STOPS");
+    /*
+      BA-044 retitled the fold. "WHERE THIS STOPS" is how we describe scope internally and reads
+      as a warning label to a buyer, so the same content is now titled as the decision input it
+      is. The fold is still required here, and the old title is refused so it cannot return.
+    */
+    expect(solutions).toContain("WHAT TO PLAN FOR");
+    expect(solutions).toContain("Before your first compile");
+    expect(shipped).not.toContain("WHERE THIS STOPS");
   });
 
   it("names real limits rather than solved problems", () => {
@@ -114,13 +128,114 @@ describe("every solution page says where it stops too", () => {
       It read "abstains", which the page satisfied with "The World abstains where the sources do
       not support an answer." -- a sentence the evidence lane measured as false: abstention is an
       eligibility test, and both retrieval paths answered every deliberately unanswerable question.
-      So the sentinel is now the narrower claim the page actually keeps, which also means the
-      overclaim cannot come back by rewording: this test needs the limit named, and
+      So the sentinel is the narrower claim the page actually keeps, which also means the overclaim
+      cannot come back by rewording: this test needs the limit named, and
       product-claims-sync.test.ts bans the four assertive forms of the old one.
+
+      Three of the five sentinels moved with BA-042, BA-049 and BA-050, and each is now the fact
+      rather than our internal state of it. The claim each one guards is unchanged:
+
+      - BA-042: "declines when no evidence matched" -> "declines when nothing matched at all". The
+        page had promised "Explicit abstention" as an outcome and then withdrawn it forty lines
+        later; the outcome is now the fact and the limit still says exactly where the decline
+        does and does not happen. The extra sentinel pins the half that used to be missing --
+        that judging whether a match answers the question is the reader's.
+      - BA-049: "Membership is not available" -> the commercial fact it was hiding behind an
+        engineering milestone. `billing-catalog.ts` has Team as `saleChannel: "contact"`, so the
+        sentinel is the sentence that says it is not a checkout -- which is also the rule the
+        entitlements lane requires of every surface.
+      - BA-050: "not calibrated" -> the review behaviour a buyer plans around. The uncalibrated
+        threshold itself is not deleted from the site: `lib/evidence-record.ts` publishes "Most
+        thresholds are uncalibrated" as a first-class row on /evidence, and this asserts that,
+        so the fact cannot leave the site by way of this page being tidied.
     */
-    for (const phrase of ["declines when no evidence matched", "not calibrated", "Membership is not available", "is an estimate", "human decision"]) {
-      expect(solutions, phrase).toContain(phrase);
+    const sentinels = [
+      "declines when nothing matched at all",
+      "is the reader’s call",
+      "rather than bought at a checkout",
+      "held for review with the regions that support each side",
+      "is an estimate",
+      "human decision",
+    ];
+    for (const phrase of sentinels) expect(solutions, phrase).toContain(phrase);
+    for (const retired of ["Explicit abstention", "not calibrated", "Membership is not available"]) {
+      expect(shipped, `${retired} was reframed and must not come back`).not.toContain(retired);
     }
+    expect(
+      readFileSync(resolve(import.meta.dirname, "./evidence-record.ts"), "utf8"),
+      "the uncalibrated-threshold statement stays published on /evidence",
+    ).toContain("Most thresholds are uncalibrated");
+  });
+});
+
+/*
+  The 2026-09-11 brand fix, checked where it can regress silently.
+
+  BA-017, BA-019 and BA-020 are structure rather than sentences: a page that lost the section index,
+  re-split the comparison into three, stopped collapsing the reference sections or rendered both
+  forms of the diagram at once would look fine in a screenshot at one width and be the defect the
+  findings named at another. The diagram's two forms are a render assertion because the list is
+  derived from the same two arrays as the drawing, and a `find` that matched the wrong span would
+  print the wrong category under a stage with nothing else noticing.
+*/
+describe("the brand fix's structure", () => {
+  const diagramCss = readFileSync(
+    resolve(import.meta.dirname, "../components/knowledge-compiler-diagram.module.css"),
+    "utf8",
+  );
+
+  it("renders the drawing and its phone list from the same data, and shows one at a time", async () => {
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { createElement } = await import("react");
+    const { default: Diagram } = await import("../components/knowledge-compiler-diagram");
+    const html = renderToStaticMarkup(createElement(Diagram));
+
+    // Both forms exist in the markup; CSS decides which one a width gets.
+    expect(html).toContain("<svg");
+    expect(html).toContain("<ol");
+    for (const stage of ["SOURCES", "READ", "STRUCTURE", "EVIDENCE", "WORLD", "PROJECTIONS"]) {
+      expect(html, stage).toContain(stage);
+    }
+    // Each single-stage span lands under its own stage, and the whole-line span is its own row.
+    expect(html).toContain("Enterprise search finds the document");
+    expect(html).toContain("Knowledge graph stores objects and relations");
+    expect(html).toContain("RAG retrieves chunks at question time");
+    expect(html).toContain("ALL SIX");
+    expect(html).toContain("Knowledge Compiler compiles, binds evidence to regions, and versions the result");
+
+    /*
+      The swap, and the reason it is `display: none` on both sides: a visually-hidden list would
+      be announced on top of the drawing's own title and description, so the six stages would
+      reach a screen reader twice.
+    */
+    expect(diagramCss).toContain(".stack { display: none; }");
+    expect(diagramCss).toMatch(/@media \(max-width: 640px\) \{\s*\.diagram \{ display: none; \}/);
+    expect(diagramCss, "a hidden-but-rendered list would double-announce the stages")
+      .not.toMatch(/\.stack \{[^}]*clip-path/);
+  });
+
+  it("keeps the section index, one comparison and the reference sections collapsed", () => {
+    expect(page, "the index is what replaced having no way to skip").toContain("<PublicProofRegistry index");
+    // Eight sections: the ten it had, with the three comparisons merged into one. Counted from
+    // `sections={[` so the page's own <title> metadata is not one of them.
+    const sections = page.slice(page.indexOf("sections={["));
+    expect((sections.match(/title: "/g) ?? []).length).toBe(8);
+    expect(page).toContain('title: "Compared with RAG, graphs and search"');
+    expect(rendered(page), "the three separate comparisons must not come back")
+      .not.toContain('title: "Compared with RAG"');
+    expect((page.match(/collapsed: true/g) ?? []).length).toBe(3);
+    for (const key of ["RAG", "KNOWLEDGE GRAPH", "ENTERPRISE SEARCH"]) {
+      expect(page, key).toContain(`key: "${key}"`);
+    }
+  });
+
+  it("ends on one primary and one secondary, with the references as a list", () => {
+    const closing = page.slice(page.indexOf('title: "The package is the contract"'));
+    expect(closing).toContain("readNext: [");
+    expect((closing.match(/label: "/g) ?? []).length).toBe(6);
+    // BA-016: the door describes the protocol behind it rather than announcing an absence.
+    expect(rendered(page)).not.toContain("WHAT WOULD BE MEASURED");
+    expect(closing).toContain('label: "How results are measured"');
   });
 });
 

@@ -82,7 +82,15 @@ export default function TechnicalDetails({
             <div><dt>World id</dt><dd>{record.worldId}</dd></div>
             <div><dt>Status</dt><dd>{record.worldStatus}</dd></div>
             <div><dt>Manifest digest</dt><dd>{record.manifestDigest}</dd></div>
-            <div><dt>Objects</dt><dd>{record.counts.objects}</dd></div>
+            {/*
+              BA-034: the engine is named where the figure is printed, not two pages away. The
+              qualifier is one shared string so the sample's three public points of use cannot
+              drift into three differently-hedged labels.
+            */}
+            <div>
+              <dt>Objects <small>{EXPLORE_COPY.countsQualifier}</small></dt>
+              <dd>{record.counts.objects}</dd>
+            </div>
             <div><dt>Relations</dt><dd>{record.counts.relations}</dd></div>
             <div><dt>Evidence regions</dt><dd>{record.counts.regions}</dd></div>
             <div>

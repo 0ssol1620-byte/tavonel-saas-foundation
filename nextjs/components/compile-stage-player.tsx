@@ -80,6 +80,40 @@ const STAGE_MS = FILM_DURATION * 1_000;
 */
 const NARROW_FRAME = "(max-width: 899px), (pointer: coarse) and (max-width: 1023px)";
 
+/*
+  What the one motion control says, and therefore what it does (film-01, film-02).
+
+  The button was rendered only when reduced motion was *off*, which inverted it: the two states
+  where the frame is a still and nothing will ever start it -- `prefers-reduced-motion` and
+  Save-Data -- were exactly the states with no control at all. A visitor who asked their browser
+  to spend less, or not to animate, was shown a poster of a film with no way to watch it.
+
+  Three states, one button:
+  - "Play" while a still is standing in for an unstarted film. A click starts it, which WCAG
+    2.2.2 allows because the visitor initiated it -- the preference bars *auto*-play, not play.
+  - "Resume" once a playing film has been paused.
+  - "Pause" while it is running.
+
+  Pure, and exported, so both branches are tested without a DOM.
+*/
+export type FilmControl = "play" | "pause" | "resume";
+
+export function filmMotionControl(state: {
+  reducedMotion: boolean;
+  saveData: boolean;
+  paused: boolean;
+  playRequested: boolean;
+}): FilmControl {
+  if ((state.reducedMotion || state.saveData) && !state.playRequested) return "play";
+  return state.paused ? "resume" : "pause";
+}
+
+export const FILM_CONTROL_LABEL: Record<FilmControl, { label: string; glyph: string }> = {
+  play: { label: "Play the compilation film", glyph: "▶" },
+  resume: { label: "Resume the compilation film", glyph: "▶" },
+  pause: { label: "Pause the compilation film", glyph: "Ⅱ" },
+};
+
 export default function CompileStagePlayer({
   stages = COMPILE_STAGES,
   onStageChange,
@@ -107,6 +141,14 @@ export default function CompileStagePlayer({
     the wide-viewport renderer is a canvas rAF loop, not a <video> with a `pause()` to call.
   */
   const [paused, setPaused] = useState(false);
+  /*
+    The visitor pressed Play on a frame that was never going to start by itself.
+
+    This is not the same thing as "not paused": under reduced motion or Save-Data the film is
+    held as a still deliberately, and only an explicit request may lift that. Nothing sets it but
+    the control, so neither preference is ever overridden by the page.
+  */
+  const [playRequested, setPlayRequested] = useState(false);
   /*
     The stage the visitor chose, and which the player may not take back from them.
 
@@ -162,7 +204,9 @@ export default function CompileStagePlayer({
     return () => observer.disconnect();
   }, []);
 
-  const cycling = !reducedMotion && !paused && inView && held !== index;
+  /* A held preference is lifted only by the visitor's own Play, never by the page. */
+  const autoplay = (!reducedMotion && !saveData) || playRequested;
+  const cycling = autoplay && !paused && inView && held !== index;
 
   useEffect(() => {
     if (!cycling) return;
@@ -223,8 +267,17 @@ export default function CompileStagePlayer({
   }, [cycling, go, index]);
 
   const LiveFilm = LIVE_FILMS[index] ?? LIVE_FILMS[0];
-  const live = canvasReady && !narrow;
-  const still = reducedMotion || paused || saveData || !inView;
+  /*
+    A Play under reduced motion gets the recording, not the canvas.
+
+    Each live renderer reads `prefers-reduced-motion` itself and, when it is set, paints one
+    frame and stops -- correct for a film nobody asked to watch, and useless as the answer to a
+    visitor who just pressed Play. The <video> path plays the same cut, so an explicit request
+    is routed there and the button does what it says.
+  */
+  const live = canvasReady && !narrow && !(reducedMotion && playRequested);
+  const still = !autoplay || paused || !inView;
+  const control = filmMotionControl({ reducedMotion, saveData, paused, playRequested });
 
   return (
     <div className="compile-film-sequence rv" ref={frameRef} {...touchHandlers} data-film-renderer={live ? "live-canvas" : "video-fallback"}>
@@ -253,17 +306,21 @@ export default function CompileStagePlayer({
             {stages.map((stage, position) => admitted.has(position) ? <source key={stage.id} src={stage.src} type="video/mp4" /> : null)}
           </video>
         )}
-        {reducedMotion ? null : (
-          <button
-            type="button"
-            className="compile-film-motion-control"
-            aria-label={paused ? "Resume compilation film" : "Pause compilation film"}
-            aria-pressed={paused}
-            onClick={() => setPaused((value) => !value)}
-          >
-            <span aria-hidden="true">{paused ? "▶" : "Ⅱ"}</span>
-          </button>
-        )}
+        {/* Always rendered: the two states that most need it were the two that hid it. */}
+        <button
+          type="button"
+          className="compile-film-motion-control"
+          data-control={control}
+          aria-label={FILM_CONTROL_LABEL[control].label}
+          aria-pressed={control === "pause"}
+          onClick={() => {
+            if (control === "pause") { setPaused(true); return; }
+            setPaused(false);
+            setPlayRequested(true);
+          }}
+        >
+          <span aria-hidden="true">{FILM_CONTROL_LABEL[control].glyph}</span>
+        </button>
       </div>
 
       <div className="compile-film-caption">

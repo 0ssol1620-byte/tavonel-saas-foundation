@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   countDocxPages,
   countPptxSlides,
-  countXlsxPages,
+  countSpreadsheetPages,
   measurePages,
   measureSelection,
 } from "./page-count";
@@ -53,8 +53,8 @@ describe("counting what the format actually states", () => {
     expect(countDocxPages(docx(null))).toEqual({ pages: null, reason: "DOCX_PAGE_COUNT_NOT_DECLARED" });
   });
 
-  it("refuses to decide what a spreadsheet is billed in", () => {
-    expect(countXlsxPages()).toEqual({ pages: null, reason: "XLSX_BILLABLE_UNIT_UNDECIDED" });
+  it("says a spreadsheet is counted after conversion rather than guessing a unit", () => {
+    expect(countSpreadsheetPages()).toEqual({ pages: null, reason: "SPREADSHEET_COUNTED_AFTER_CONVERSION" });
   });
 
   it("treats a corrupt package as unreadable rather than as zero pages", () => {
@@ -92,9 +92,30 @@ describe("measuring one file", () => {
     expect(result).toEqual({ pages: 3, basis: "pptx_slides" });
   });
 
-  it("leaves a format that states no page count to the byte bound", async () => {
+  it("returns a reason and no number for a format that states no page count", async () => {
     const result = await measurePages({ mimeType: "application/vnd.oasis.opendocument.text", name: "notes.odt", bytes: bytesOf(encode("x")) });
     expect(result).toEqual({ pages: null, reason: "FORMAT_DOES_NOT_STATE_PAGES" });
+  });
+
+  /*
+    All three spreadsheet formats answer the same way, by MIME and by extension.
+
+    They reach the reader through the same sanitize-to-PDF step, so the unit and the moment it is
+    counted are identical for all three. Routing only .xlsx here -- which is what happened before
+    -- left an .ods and a .csv answering FORMAT_DOES_NOT_STATE_PAGES, which is true and makes the
+    preflight say the wrong sentence: it is not a format without pages, it is a file whose pages
+    exist after conversion.
+  */
+  it.each([
+    ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "ledger.xlsx"],
+    ["application/vnd.oasis.opendocument.spreadsheet", "ledger.ods"],
+    ["text/csv", "ledger.csv"],
+    ["", "ledger.xlsx"],
+    ["", "ledger.ods"],
+    ["", "ledger.csv"],
+  ])("counts %s named %s after conversion, never from its bytes", async (mimeType, name) => {
+    const result = await measurePages({ mimeType, name, bytes: bytesOf(encode("x")) });
+    expect(result).toEqual({ pages: null, reason: "SPREADSHEET_COUNTED_AFTER_CONVERSION" });
   });
 });
 

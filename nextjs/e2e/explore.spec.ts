@@ -128,8 +128,16 @@ test("Act 1 offers the same composition as an accessible list", async ({ page })
 
   // Every target is a real button; a clickable div would not be in the button role (§20).
   expect(await objects.evaluateAll((nodes) => nodes.every((node) => node.tagName === "BUTTON"))).toBe(true);
-  // State is a word, never colour alone.
-  await expect(objects.first().locator("small")).toHaveText(/^[A-Z]+ · [A-Z]+$/);
+  /*
+    State is a word, never colour alone.
+
+    BA-032 changed which word: every object in this fixture is lifecycle `candidate`, and our own
+    glossary defines a CANDIDATE as something nothing answers from, so the badge contradicted the
+    Ask act beside it. The assertion is tighter than the `[A-Z]+` it replaces -- the state has to
+    be one of the six words `STATE_WORD` publishes, so a seventh cannot appear here unnoticed.
+  */
+  await expect(objects.first().locator("small"))
+    .toHaveText(/^[A-Z]+ · (PUBLISHED SAMPLE|CURRENT|CHANGED|AFFECTED|UNRESOLVED|UNCHANGED)$/);
   // Every relation between two drawn objects is named in text.
   const relations = await list.locator("li li").count();
   expect(relations).toBeGreaterThan(0);
@@ -354,9 +362,21 @@ test("Act 3 reports the arriving filings with derived counts and claims no equiv
   await expect(steps.first().getByText("Recompiled", { exact: true })).toBeVisible();
   await expect(timeline).toContainText("every object in the World is rebuilt at every step");
 
-  await expect(page.getByText("FULL-REBUILD EQUIVALENCE", { exact: true })).toBeVisible();
-  await expect(page.getByText("NOT ESTABLISHED IN THIS DEPLOYMENT", { exact: true })).toBeVisible();
-  await expect(page.getByText(/the comparison is between two complete compiles/)).toBeVisible();
+  /*
+    BA-028. The act used to close on a FULL-REBUILD EQUIVALENCE heading whose state read NOT
+    ESTABLISHED IN THIS DEPLOYMENT, so the last sentence before the sign-up action was a named
+    absence and an internal wiring state. The section is gone; the fact it protected is in the
+    caption, positively, once. These assertions are the inverse of the ones they replace and are
+    strictly narrower: the positive sentence must be on the page and neither the absence nor the
+    equivalence vocabulary may be anywhere in the rendered body.
+  */
+  await expect(page.getByText(/Both snapshots are complete compiles of the corpus as it stood/))
+    .toBeVisible();
+  await expect(page.locator("body")).not.toContainText(/equivalen/i);
+  await expect(page.locator("body")).not.toContainText(/NOT ESTABLISHED/i);
+  await expect(page.locator("body")).not.toContainText(/this deployment/i);
+  // BA-033: the reading leads on the figures, and one filing never reads as "1 filings".
+  await expect(page.getByText(/^\d[\d,]* filings arrived\./)).toBeVisible();
   // No badge for a check that did not run.
   await expect(page.getByText("PASS", { exact: true })).toHaveCount(0);
   await expect(page.locator("body")).not.toContainText(/not_yet/i);
@@ -484,7 +504,8 @@ test("reduced motion removes the transitions and none of the content", async ({ 
 
   await page.goto("/explore?act=change");
   await expect(page.locator(STAGE)).toHaveAttribute("data-world-act", "change_compare");
-  await expect(page.getByText("FULL-REBUILD EQUIVALENCE", { exact: true })).toBeVisible();
+  // BA-028 removed the equivalence section; the act's own timeline is the marker that it rendered.
+  await expect(page.locator("[data-change-timeline]")).toBeVisible();
   await expect(page.locator(`${NODE}[data-node-state="affected"]`).first()).toBeVisible();
   const pulses = await page.$$eval('[data-node-state="affected"]', (elements) =>
     elements.map((element) => getComputedStyle(element).animationName));
@@ -552,5 +573,18 @@ test("the closing action offers the reader their own sources", async ({ page }) 
   await expect(page.getByRole("heading", { name: "Try the same path with your own knowledge." })).toBeVisible();
   await expect(page.getByRole("link", { name: "Start with your files" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Connect a source" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "How compilation works" })).toBeVisible();
+  /*
+    BA-036. Three sibling buttons in one row is the arrangement 3.4 bars, so the reading action
+    became the sentence it always was. This is the same case, tightened: the row is exactly two,
+    and the guide has to still be reachable from here -- a dropped third action must not become a
+    dropped destination.
+  */
+  const actions = page.locator("section", { has: page.getByRole("link", { name: "Connect a source" }) })
+    .last().locator("div > a");
+  await expect(actions).toHaveCount(2);
+  await expect(page.getByRole("link", { name: "Knowledge Compiler guide" })).toBeVisible();
+  // BA-029: the closing column names the filings the sample was compiled from, not nothing.
+  const sources = page.getByRole("list", { name: /filings this sample is compiled from/i });
+  await expect(sources.locator("li")).toHaveCount(5);
+  await expect(sources.locator("li").first()).toContainText(/filed \d{4}-\d{2}-\d{2} · /);
 });

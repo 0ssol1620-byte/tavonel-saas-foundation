@@ -15,6 +15,7 @@ import { useEffect, useState } from "react";
 import Logomark from "@/components/logomark";
 import { takeCheckoutIntent } from "@/lib/checkout-intent";
 import { trackFunnel } from "@/lib/funnel-events";
+import { takeRecipeIntent } from "@/lib/recipe-intent";
 
 type Phase = "working" | "unconfigured" | "session-failed" | "access-failed";
 
@@ -64,11 +65,28 @@ export default function AuthCallbackPage() {
       // that has forgotten it. Owner access never reaches checkout, while an existing paid user
       // can still resume a checkout intent deliberately started before sign-in.
       const resume = takeCheckoutIntent();
+      /*
+        WG-056/084. The same repair for the other thing a reader declares before signing in.
+        Both intents are taken -- consumed once, whichever one wins -- so neither can surface on a
+        later hop, and checkout keeps precedence because it is the narrower, paying one.
+
+        A recipe resumes to its own validated `returnTo`, which is a path from a closed allow-list
+        and never a URL the reader supplied. That is the whole point of carrying it: a reader who
+        clicked from a cookbook sample comes back to that sample rather than to an empty
+        workspace, which is where this hop used to drop them.
+      */
+      const resumeRecipe = takeRecipeIntent();
       // The closing half of the sign-in hop, and the last point at which this page knows which
       // destination it is. `mode` is the destination, not the account: nothing here identifies
       // who signed in, and the event does not fire on any of the three failure phases.
-      trackFunnel("signed_in", { mode: resume ? "resume-checkout" : "workspace" });
-      window.location.replace(resume ? `/workspace?checkout=${resume}` : "/workspace");
+      trackFunnel("signed_in", {
+        mode: resume ? "resume-checkout" : resumeRecipe ? "resume-recipe" : "workspace",
+      });
+      window.location.replace(
+        resume ? `/workspace?checkout=${resume}`
+          : resumeRecipe ? resumeRecipe.returnTo
+            : "/workspace",
+      );
     })();
     return () => { cancelled = true; };
   }, []);

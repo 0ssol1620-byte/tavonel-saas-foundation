@@ -1,0 +1,1057 @@
+{
+  "origin": "https://tavonel.com",
+  "format": "docx",
+  "fileName": "sample.docx",
+  "sha256": "5b48518e71553af04bb464c4a85f84016041e0517797701f3c6b2c68e69ace3a",
+  "bytes": 36894,
+  "declaredMimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "uniqueToken": "TAVONEL-E2E-DOCX-7f3a",
+  "question": "What is the audit token for this document?",
+  "startedAt": "2026-09-06T10:08:08.926Z",
+  "capability": null,
+  "capabilityManifestSha256": null,
+  "capabilityLookup": "GET /api/v1/capabilities 404 -- capability status unavailable from the API",
+  "calls": [
+    {
+      "step": "UPLOAD_CAPABILITY",
+      "method": "POST",
+      "path": "/api/v1/uploads/capability",
+      "status": 200,
+      "code": "QUALIFIED",
+      "latencyMs": 376
+    },
+    {
+      "step": "R2_PUT",
+      "method": "PUT",
+      "path": "https://r2-account-redacted.r2.cloudflarestorage.com/tavonel-saas-foundation-quarantine/quarantine/pilot-969dc192daa24119/c2fa81fb-9c7c-4dd5-933f-382e0516259e/source (presigned query redacted)",
+      "status": 200,
+      "code": null,
+      "latencyMs": 702
+    },
+    {
+      "step": "CONFIRM",
+      "method": "POST",
+      "path": "/api/uploads/confirm",
+      "status": 200,
+      "code": "UPLOAD_CONFIRMED",
+      "latencyMs": 495
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 568
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 735
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 732
+    },
+    {
+      "step": "COMPILE_JOB",
+      "method": "POST",
+      "path": "/api/compile-jobs",
+      "status": 202,
+      "code": "COMPILE_JOB_ACCEPTED",
+      "latencyMs": 440
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-2d603050ae3f5efe493d0cc70ea48627",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 263
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-2d603050ae3f5efe493d0cc70ea48627",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 305
+    },
+    {
+      "step": "COLLECTION",
+      "method": "GET",
+      "path": "/api/v1/collections/collection-fc06ffd37e3538ab5e5ccfc10b282ce6",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 583
+    },
+    {
+      "step": "WORLD",
+      "method": "GET",
+      "path": "/api/v1/collections/collection-fc06ffd37e3538ab5e5ccfc10b282ce6/world",
+      "status": 404,
+      "code": "ACTIVE_WORLD_NOT_FOUND",
+      "latencyMs": 254
+    }
+  ],
+  "documentId": "c2fa81fb-9c7c-4dd5-933f-382e0516259e",
+  "documentProcessingState": "ocr_ready",
+  "compileJobId": "cjob-2d603050ae3f5efe493d0cc70ea48627",
+  "compileJobState": "ready",
+  "collectionId": "collection-fc06ffd37e3538ab5e5ccfc10b282ce6",
+  "readerRouteLabel": "tavonel-python-core-v2",
+  "evidenceLocators": null,
+  "tokenFoundInEvidence": null,
+  "blockedBy": "PROMOTION_IS_BROWSER_SESSION_ONLY (no API-key route to POST /api/collections/{id}/promote)",
+  "documentInventoryRow": {
+    "documentId": "c2fa81fb-9c7c-4dd5-933f-382e0516259e",
+    "versionKey": "b2e95f37a7c9e2e435738951fa9f7b8693f16a511056edeb5db35c32cb698adf",
+    "sanitizedKey": "immutable/pilot-969dc192daa24119/pilot-969dc192daa24119/c2fa81fb-9c7c-4dd5-933f-382e0516259e/b2e95f37a7c9e2e435738951fa9f7b8693f16a511056edeb5db35c32cb698adf/sanitized.pdf",
+    "sanitizedSize": 31569,
+    "ocrJsonKey": "immutable/pilot-969dc192daa24119/pilot-969dc192daa24119/c2fa81fb-9c7c-4dd5-933f-382e0516259e/b2e95f37a7c9e2e435738951fa9f7b8693f16a511056edeb5db35c32cb698adf/ocr.json",
+    "ocrJsonSize": 2444,
+    "hasOcrJson": true,
+    "cdrReceiptKey": "immutable/pilot-969dc192daa24119/pilot-969dc192daa24119/c2fa81fb-9c7c-4dd5-933f-382e0516259e/b2e95f37a7c9e2e435738951fa9f7b8693f16a511056edeb5db35c32cb698adf/cdr-receipt.json",
+    "ocrReviewKey": null,
+    "processingState": "ocr_ready"
+  },
+  "compileJob": {
+    "jobId": "cjob-2d603050ae3f5efe493d0cc70ea48627",
+    "workspaceKey": "pilot-969dc192daa24119",
+    "documentIds": [
+      "c2fa81fb-9c7c-4dd5-933f-382e0516259e"
+    ],
+    "state": "ready",
+    "collectionId": "collection-fc06ffd37e3538ab5e5ccfc10b282ce6",
+    "errorCode": null,
+    "blocked": [],
+    "blockedResolution": null,
+    "documentsTotal": 1,
+    "documentsReady": 1,
+    "corpusId": null,
+    "batchIndex": null,
+    "batchCount": null,
+    "createdAt": "2026-09-06T10:08:23.084742+00:00",
+    "updatedAt": "2026-09-06T10:08:27.850767+00:00",
+    "settledAt": "2026-09-06T10:08:27.850767+00:00"
+  },
+  "collection": {
+    "code": "OK",
+    "artifactKey": "immutable/pilot-969dc192daa24119/pilot-969dc192daa24119/collections/collection-fc06ffd37e3538ab5e5ccfc10b282ce6/9432d14f2f0719fc226b61a00ca4d98eb900a43dc24a65721beca359753c0d7b/candidate-world.json",
+    "candidatePromotion": false,
+    "artifact": {
+      "schemaVersion": "tavonel.collection_candidate.v1",
+      "executionAuthority": "tavonel-foundation-core-runtime-v1",
+      "lifecycle": "candidate",
+      "candidatePromotion": false,
+      "collectionId": "collection-fc06ffd37e3538ab5e5ccfc10b282ce6",
+      "manifestDigest": "sha256:9432d14f2f0719fc226b61a00ca4d98eb900a43dc24a65721beca359753c0d7b",
+      "blueprint": {
+        "id": "generic-mixed-corpus",
+        "version": "1.0.0",
+        "roots": [
+          "Sources",
+          "Topics",
+          "Entities",
+          "Claims",
+          "Evidence",
+          "Assets",
+          "MOCs",
+          "Packages"
+        ],
+        "maximumDepth": 3,
+        "namingPolicy": "stable-id-title",
+        "preserveExistingFolders": true,
+        "ontologyClasses": [
+          "Document",
+          "Topic",
+          "Entity",
+          "Claim",
+          "Evidence",
+          "Asset"
+        ],
+        "ontologyRelations": [
+          "discusses_topic",
+          "mentions_entity",
+          "supported_by"
+        ]
+      },
+      "sourceDocuments": [
+        {
+          "documentId": "c2fa81fb-9c7c-4dd5-933f-382e0516259e",
+          "versionKey": "b2e95f37a7c9e2e435738951fa9f7b8693f16a511056edeb5db35c32cb698adf",
+          "sanitizedKey": "immutable/pilot-969dc192daa24119/pilot-969dc192daa24119/c2fa81fb-9c7c-4dd5-933f-382e0516259e/b2e95f37a7c9e2e435738951fa9f7b8693f16a511056edeb5db35c32cb698adf/sanitized.pdf",
+          "ocrJsonKey": "immutable/pilot-969dc192daa24119/pilot-969dc192daa24119/c2fa81fb-9c7c-4dd5-933f-382e0516259e/b2e95f37a7c9e2e435738951fa9f7b8693f16a511056edeb5db35c32cb698adf/ocr.json",
+          "pageCount": 1,
+          "textCharacters": 225,
+          "inputSha256": "sha256:b2e95f37a7c9e2e435738951fa9f7b8693f16a511056edeb5db35c32cb698adf"
+        }
+      ],
+      "directoryPlan": [
+        {
+          "path": "source",
+          "kind": "root",
+          "sourceIds": []
+        },
+        {
+          "path": "canonical",
+          "kind": "root",
+          "sourceIds": []
+        },
+        {
+          "path": "obsidian",
+          "kind": "root",
+          "sourceIds": []
+        },
+        {
+          "path": "ontology",
+          "kind": "root",
+          "sourceIds": []
+        },
+        {
+          "path": "graph",
+          "kind": "root",
+          "sourceIds": []
+        },
+        {
+          "path": "semantics",
+          "kind": "root",
+          "sourceIds": []
+        },
+        {
+          "path": "rag",
+          "kind": "root",
+          "sourceIds": []
+        },
+        {
+          "path": "provenance",
+          "kind": "root",
+          "sourceIds": []
+        },
+        {
+          "path": "validation",
+          "kind": "root",
+          "sourceIds": []
+        },
+        {
+          "path": "Sources",
+          "kind": "knowledge_view",
+          "sourceIds": [],
+          "blueprint": "corporate-filings"
+        },
+        {
+          "path": "Companies",
+          "kind": "knowledge_view",
+          "sourceIds": [],
+          "blueprint": "corporate-filings"
+        },
+        {
+          "path": "Filings",
+          "kind": "knowledge_view",
+          "sourceIds": [],
+          "blueprint": "corporate-filings"
+        },
+        {
+          "path": "Risks",
+          "kind": "knowledge_view",
+          "sourceIds": [],
+          "blueprint": "corporate-filings"
+        },
+        {
+          "path": "Metrics",
+          "kind": "knowledge_view",
+          "sourceIds": [],
+          "blueprint": "corporate-filings"
+        },
+        {
+          "path": "MOCs",
+          "kind": "knowledge_view",
+          "sourceIds": [],
+          "blueprint": "corporate-filings"
+        },
+        {
+          "path": "Evidence",
+          "kind": "knowledge_view",
+          "sourceIds": [],
+          "blueprint": "corporate-filings"
+        },
+        {
+          "path": "Packages",
+          "kind": "knowledge_view",
+          "sourceIds": [],
+          "blueprint": "corporate-filings"
+        },
+        {
+          "path": "canonical/model.json",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095"
+          ]
+        },
+        {
+          "path": "graph/nodes.csv",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095"
+          ]
+        },
+        {
+          "path": "graph/relationships.csv",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095"
+          ]
+        },
+        {
+          "path": "obsidian/Companies.md",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095"
+          ]
+        },
+        {
+          "path": "obsidian/Filings.md",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095"
+          ]
+        },
+        {
+          "path": "obsidian/Home.md",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095"
+          ]
+        },
+        {
+          "path": "obsidian/MOCs/Companies MOC.md",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095"
+          ]
+        },
+        {
+          "path": "obsidian/MOCs/Metrics MOC.md",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095"
+          ]
+        },
+        {
+          "path": "obsidian/MOCs/Risks MOC.md",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095"
+          ]
+        },
+        {
+          "path": "obsidian/Metrics.md",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095"
+          ]
+        },
+        {
+          "path": "obsidian/Risks.md",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095"
+          ]
+        },
+        {
+          "path": "obsidian/Sources/src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095.md",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095"
+          ]
+        },
+        {
+          "path": "ontology/architecture-plan.json",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095"
+          ]
+        },
+        {
+          "path": "ontology/knowledge.jsonld",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095"
+          ]
+        },
+        {
+          "path": "ontology/knowledge.ttl",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095"
+          ]
+        },
+        {
+          "path": "provenance/activities.jsonl",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095"
+          ]
+        },
+        {
+          "path": "rag/chunks.jsonl",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095"
+          ]
+        },
+        {
+          "path": "rag/documents.jsonl",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095"
+          ]
+        },
+        {
+          "path": "rag/retrieval-profile.json",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095"
+          ]
+        },
+        {
+          "path": "semantics/claims.jsonl",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095"
+          ]
+        },
+        {
+          "path": "semantics/contradictions.jsonl",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095"
+          ]
+        },
+        {
+          "path": "semantics/entities.jsonl",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095"
+          ]
+        },
+        {
+          "path": "semantics/profile.json",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095"
+          ]
+        },
+        {
+          "path": "semantics/relations.jsonl",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095"
+          ]
+        },
+        {
+          "path": "source/collection-files.json",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095"
+          ]
+        },
+        {
+          "path": "validation/report.json",
+          "kind": "artifact",
+          "sourceIds": [
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095"
+          ]
+        }
+      ],
+      "ontology": {
+        "nodes": [
+          {
+            "id": "ko_document_815066b678f725aa7cb47f2b2df6ea5a0fcf5ab009900bf9b0e92e767def989a",
+            "kind": "Document",
+            "label": "Document c2fa81fb",
+            "documentId": "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "evidenceIds": []
+          },
+          {
+            "id": "ko_evidence_ddcdad622406573777c4060094fff46535d9aa403fabf50db418d79c750332a0",
+            "kind": "Evidence",
+            "label": "ev_118e47c1893342c161033bd38ec30e1b713667a3264bf6d64c74a200b853e8cc",
+            "documentId": "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "evidenceIds": [
+              "ev_118e47c1893342c161033bd38ec30e1b713667a3264bf6d64c74a200b853e8cc"
+            ]
+          },
+          {
+            "id": "ko_evidence_d6fd6122742e9394366586bbb2cb91a54e4f13baf1e39a94413ab87f9b908457",
+            "kind": "Evidence",
+            "label": "ev_9c599c91996bfc0583a327ba299757c6684b588349d6a7ac79f58f3218d2d088",
+            "documentId": "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "evidenceIds": [
+              "ev_9c599c91996bfc0583a327ba299757c6684b588349d6a7ac79f58f3218d2d088"
+            ]
+          },
+          {
+            "id": "ko_evidence_dd4c4e7a29169b4082e4e076f6cb64297ca8e1be5392ae07ef3f0b7044f44f72",
+            "kind": "Evidence",
+            "label": "ev_2273e8f67d27a74563b7fa6dfd8436c7834ac97c85a011138a44373caf42ce8d",
+            "documentId": "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "evidenceIds": [
+              "ev_2273e8f67d27a74563b7fa6dfd8436c7834ac97c85a011138a44373caf42ce8d"
+            ]
+          },
+          {
+            "id": "ko_evidence_618cc1aef3c11458628d6f382b6b8b639c3b0abc885dc87cfb14da2f7f71468c",
+            "kind": "Evidence",
+            "label": "ev_81cf0379c39e99bcb9c2d8856c21e13db5e4df4f8c0c295bc44fc923cc278100",
+            "documentId": "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "evidenceIds": [
+              "ev_81cf0379c39e99bcb9c2d8856c21e13db5e4df4f8c0c295bc44fc923cc278100"
+            ]
+          },
+          {
+            "id": "ko_evidence_a2cb816b804a143b09c9ec52d0b622aed53be93cf2277cc0467838dda6561b58",
+            "kind": "Evidence",
+            "label": "ev_661965c768f01769f4a37c3241211d68ee083ad044e2a9b94b29eecd35f0a6d1",
+            "documentId": "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "evidenceIds": [
+              "ev_661965c768f01769f4a37c3241211d68ee083ad044e2a9b94b29eecd35f0a6d1"
+            ]
+          },
+          {
+            "id": "ko_evidence_3f111ee159f0df754a0eaa75b7bc441e87b33f9aa1fb25042dd3d7a607de35d6",
+            "kind": "Evidence",
+            "label": "ev_94f4aed0efd7edd31de65a93dbef26c98d0c3220a9dfd479879a48b84afc0809",
+            "documentId": "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "evidenceIds": [
+              "ev_94f4aed0efd7edd31de65a93dbef26c98d0c3220a9dfd479879a48b84afc0809"
+            ]
+          },
+          {
+            "id": "ko_evidence_c6147f0e8b96eee8d7af47b2c125006214d4552d06577e3e7a83f7e3a3165fa5",
+            "kind": "Evidence",
+            "label": "ev_fabe6c1a99f28a4e125d6fa2fdb5ecf65818bc070ac49504bd1a01a4151e06cf",
+            "documentId": "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "evidenceIds": [
+              "ev_fabe6c1a99f28a4e125d6fa2fdb5ecf65818bc070ac49504bd1a01a4151e06cf"
+            ]
+          },
+          {
+            "id": "ko_evidence_345a1734e806cdba6411aa40261daf7d87a88e537cd17ccacd149b5667e1834c",
+            "kind": "Evidence",
+            "label": "ev_77a42278d198c3b7cac92319e6d254e4a6090a939594cfb1a764808c14e9a25a",
+            "documentId": "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "evidenceIds": [
+              "ev_77a42278d198c3b7cac92319e6d254e4a6090a939594cfb1a764808c14e9a25a"
+            ]
+          },
+          {
+            "id": "ko_evidence_58f904bf3bf8ee9dd7dadfc46308b8a481e866abbe93e8b68be8db28c65a8c74",
+            "kind": "Evidence",
+            "label": "ev_7a91f41858bdea26ac6d2f85fb10894ac6267a05ddada44e5151751bc0793dbf",
+            "documentId": "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "evidenceIds": [
+              "ev_7a91f41858bdea26ac6d2f85fb10894ac6267a05ddada44e5151751bc0793dbf"
+            ]
+          },
+          {
+            "id": "claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c",
+            "kind": "Claim",
+            "label": "The audit token for this document is TAVONEL-E2E-DOCX-7f3a.",
+            "documentId": "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "evidenceIds": []
+          },
+          {
+            "id": "entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a",
+            "kind": "Entity",
+            "label": "entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a",
+            "documentId": "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "evidenceIds": []
+          },
+          {
+            "id": "entity_dd49e5da10b3f29b0692f36debc9a777e2c63324435517988bac59422d6d7504",
+            "kind": "Entity",
+            "label": "entity_dd49e5da10b3f29b0692f36debc9a777e2c63324435517988bac59422d6d7504",
+            "documentId": "src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095",
+            "evidenceIds": []
+          }
+        ],
+        "edges": [
+          {
+            "id": "relation-fe4936e1d596a74c48fc3e5c903d1b2b",
+            "type": "supported_by",
+            "from": "claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c",
+            "to": "ko_evidence_d6fd6122742e9394366586bbb2cb91a54e4f13baf1e39a94413ab87f9b908457",
+            "evidenceIds": [
+              "ev_9c599c91996bfc0583a327ba299757c6684b588349d6a7ac79f58f3218d2d088"
+            ]
+          }
+        ]
+      },
+      "package": {
+        "roots": [
+          "source",
+          "canonical",
+          "obsidian",
+          "ontology",
+          "graph",
+          "semantics",
+          "rag",
+          "provenance",
+          "validation"
+        ],
+        "files": [
+          {
+            "path": "canonical/model.json",
+            "mediaType": "application/json",
+            "sizeBytes": 36101,
+            "sha256": "sha256:c189a7320312732b8e5cf9271da0eb3cec22e7627492ae24120ff1e12a667002",
+            "content": "{\"collectionId\":\"collection-fc06ffd37e3538ab5e5ccfc10b282ce6\",\"objects\":[{\"collectionId\":\"collection-fc06ffd37e3538ab5e5ccfc10b282ce6\",\"createdByActivity\":\"activity_84810af99fe6d7d914b91dda788bf3f69a95076c89b32f5069bbb55f29e03e7e\",\"hash\":\"sha256:544c6e5d1575c755093d9ae500b6f1016c20083ac172e197d85ea4adcba49478\",\"kind\":\"collection\",\"links\":[\"ko_document_815066b678f725aa7cb47f2b2df6ea5a0fcf5ab009900bf9b0e92e767def989a\"],\"origin\":\"structured_derived\",\"payload\":{\"workspaceId\":\"pilot-969dc192daa24119\"},\"sourceRefs\":[{\"bbox1000\":[142,121,667,142],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00001\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null},{\"bbox1000\":[144,143,853,162],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00002\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null},{\"bbox1000\":[142,160,710,181],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00003\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null},{\"bbox1000\":[143,193,201,211],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00004\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null},{\"bbox1000\":[496,192,613,211],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00005\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null},{\"bbox1000\":[143,223,279,244],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00006\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null},{\"bbox1000\":[497,224,608,243],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00007\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null},{\"bbox1000\":[142,254,256,275],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00008\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null},{\"bbox1000\":[496,254,566,274],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00009\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ko_collection_073e51d6ce4d71360111de519e217d69d5834e0ef55a538d63cddb09bf2f5b68\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified\",\"version\":1},{\"collectionId\":\"collection-fc06ffd37e3538ab5e5ccfc10b282ce6\",\"createdByActivity\":\"activity_84810af99fe6d7d914b91dda788bf3f69a95076c89b32f5069bbb55f29e03e7e\",\"hash\":\"sha256:4d63d43bf06763e602e86f6bde49d7d9bc4e5f64175317487f982decc020dafb\",\"kind\":\"document\",\"links\":[\"ko_block_0c7c5433bfd5d49fd708c3976e00c153b107f3e8fcc05a8bff99133d1880fe99\",\"ko_block_18c17e64b6e02d1732754d8f06cdc27837babacba102a96552c764d16a3f0d0e\",\"ko_block_6ff39c98cdd30dc44233ac639cb34f2435fe75fe13c29bf3af8ab82d61840357\",\"ko_block_b2e9d5861fa8baa51ebe09ddd2e450950a43e79f8c563af5655b9e802d101849\",\"ko_block_f1dcc870cbefc3f84a988707dc6eca68325d4c175a9c33fae368222811a3a9d9\",\"ko_block_fbaef29bc08d7ea57e8f7970c7cb8346785b5b20deee28371a9ce6b0120380cf\",\"ko_block_5f7eab6ac8690bcdae1760722a6437487c10d4557a13169eeba3b04618e1486b\",\"ko_block_eae5694e7b0616446f0222b9bf32d5950f085caf0c80285bf01527b413e8706c\",\"ko_block_5bbb089e0c4531e87d66dc2dbddd6971a713bc778fc5047d29a527998b4b6bd3\"],\"origin\":\"native_extracted\",\"payload\":{\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"title\":\"Document c2fa81fb\"},\"sourceRefs\":[{\"bbox1000\":[142,121,667,142],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00001\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null},{\"bbox1000\":[144,143,853,162],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00002\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null},{\"bbox1000\":[142,160,710,181],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00003\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null},{\"bbox1000\":[143,193,201,211],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00004\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null},{\"bbox1000\":[496,192,613,211],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00005\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null},{\"bbox1000\":[143,223,279,244],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00006\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null},{\"bbox1000\":[497,224,608,243],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00007\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null},{\"bbox1000\":[142,254,256,275],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00008\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null},{\"bbox1000\":[496,254,566,274],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00009\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ko_document_815066b678f725aa7cb47f2b2df6ea5a0fcf5ab009900bf9b0e92e767def989a\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified\",\"version\":1},{\"collectionId\":\"collection-fc06ffd37e3538ab5e5ccfc10b282ce6\",\"createdByActivity\":\"activity_84810af99fe6d7d914b91dda788bf3f69a95076c89b32f5069bbb55f29e03e7e\",\"hash\":\"sha256:62d61a453190290d3560b67c6c2451fef699af7b5eeaa0a82b79142b60088ea6\",\"kind\":\"block\",\"links\":[],\"origin\":\"visual_extracted\",\"payload\":{\"blockType\":\"paragraph\",\"text\":\"TAVONEL End-to-End Proving Document\"},\"sourceRefs\":[{\"bbox1000\":[142,121,667,142],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00001\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ko_block_0c7c5433bfd5d49fd708c3976e00c153b107f3e8fcc05a8bff99133d1880fe99\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified_with_warning\",\"version\":1},{\"collectionId\":\"collection-fc06ffd37e3538ab5e5ccfc10b282ce6\",\"createdByActivity\":\"activity_84810af99fe6d7d914b91dda788bf3f69a95076c89b32f5069bbb55f29e03e7e\",\"hash\":\"sha256:dc40a121eb12e0ac8e863bf2b8f916579450cadaea5d4c7f17c3b98d8b066453\",\"kind\":\"block\",\"links\":[],\"origin\":\"visual_extracted\",\"payload\":{\"blockType\":\"paragraph\",\"text\":\"The audit token for this document is TAVONEL-E2E-DOCX-7f3a. Pump P-207\"},\"sourceRefs\":[{\"bbox1000\":[144,143,853,162],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00002\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ko_block_18c17e64b6e02d1732754d8f06cdc27837babacba102a96552c764d16a3f0d0e\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified_with_warning\",\"version\":1},{\"collectionId\":\"collection-fc06ffd37e3538ab5e5ccfc10b282ce6\",\"createdByActivity\":\"activity_84810af99fe6d7d914b91dda788bf3f69a95076c89b32f5069bbb55f29e03e7e\",\"hash\":\"sha256:699fb9495e9971efe39f90d2d581398cdf2150c79a0f1c997da0875ef7685d06\",\"kind\":\"block\",\"links\":[],\"origin\":\"visual_extracted\",\"payload\":{\"blockType\":\"paragraph\",\"text\":\"was overhauled on 2026-05-02 by technician Devin Oyelaran.\"},\"sourceRefs\":[{\"bbox1000\":[142,160,710,181],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00003\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ko_block_6ff39c98cdd30dc44233ac639cb34f2435fe75fe13c29bf3af8ab82d61840357\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified_with_warning\",\"version\":1},{\"collectionId\":\"collection-fc06ffd37e3538ab5e5ccfc10b282ce6\",\"createdByActivity\":\"activity_84810af99fe6d7d914b91dda788bf3f69a95076c89b32f5069bbb55f29e03e7e\",\"hash\":\"sha256:f4adb603f39086d680b76a8d2e9155757a332c6ea984c6b08381ebf840d4da31\",\"kind\":\"block\",\"links\":[],\"origin\":\"visual_extracted\",\"payload\":{\"blockType\":\"paragraph\",\"text\":\"Asset\"},\"sourceRefs\":[{\"bbox1000\":[143,193,201,211],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00004\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ko_block_b2e9d5861fa8baa51ebe09ddd2e450950a43e79f8c563af5655b9e802d101849\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified_with_warning\",\"version\":1},{\"collectionId\":\"collection-fc06ffd37e3538ab5e5ccfc10b282ce6\",\"createdByActivity\":\"activity_84810af99fe6d7d914b91dda788bf3f69a95076c89b32f5069bbb55f29e03e7e\",\"hash\":\"sha256:9d1a28892b88fb91af6c3df984eaba2dd12cd769d2678312784ec4acdf99e50f\",\"kind\":\"block\",\"links\":[],\"origin\":\"visual_extracted\",\"payload\":{\"blockType\":\"paragraph\",\"text\":\"Pump P-207\"},\"sourceRefs\":[{\"bbox1000\":[496,192,613,211],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00005\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ko_block_f1dcc870cbefc3f84a988707dc6eca68325d4c175a9c33fae368222811a3a9d9\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified_with_warning\",\"version\":1},{\"collectionId\":\"collection-fc06ffd37e3538ab5e5ccfc10b282ce6\",\"createdByActivity\":\"activity_84810af99fe6d7d914b91dda788bf3f69a95076c89b32f5069bbb55f29e03e7e\",\"hash\":\"sha256:f138518022a326d85ef401b1e76cc8c2960b8bed12bfaf9a4c56aa8a2aa618ab\",\"kind\":\"block\",\"links\":[],\"origin\":\"visual_extracted\",\"payload\":{\"blockType\":\"paragraph\",\"text\":\"Overhaul date\"},\"sourceRefs\":[{\"bbox1000\":[143,223,279,244],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00006\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ko_block_fbaef29bc08d7ea57e8f7970c7cb8346785b5b20deee28371a9ce6b0120380cf\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified_with_warning\",\"version\":1},{\"collectionId\":\"collection-fc06ffd37e3538ab5e5ccfc10b282ce6\",\"createdByActivity\":\"activity_84810af99fe6d7d914b91dda788bf3f69a95076c89b32f5069bbb55f29e03e7e\",\"hash\":\"sha256:f444ea2271ced48ccb2a2b0362b48315e3984f6cc04ba590c843043abaf62025\",\"kind\":\"block\",\"links\":[],\"origin\":\"visual_extracted\",\"payload\":{\"blockType\":\"paragraph\",\"text\":\"2026-05-02\"},\"sourceRefs\":[{\"bbox1000\":[497,224,608,243],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00007\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ko_block_5f7eab6ac8690bcdae1760722a6437487c10d4557a13169eeba3b04618e1486b\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified_with_warning\",\"version\":1},{\"collectionId\":\"collection-fc06ffd37e3538ab5e5ccfc10b282ce6\",\"createdByActivity\":\"activity_84810af99fe6d7d914b91dda788bf3f69a95076c89b32f5069bbb55f29e03e7e\",\"hash\":\"sha256:9b76b33998e5dcd1d2014ebab42485a28c975473abc0bf224592930f2b779793\",\"kind\":\"block\",\"links\":[],\"origin\":\"visual_extracted\",\"payload\":{\"blockType\":\"paragraph\",\"text\":\"Seal torque\"},\"sourceRefs\":[{\"bbox1000\":[142,254,256,275],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00008\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ko_block_eae5694e7b0616446f0222b9bf32d5950f085caf0c80285bf01527b413e8706c\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified_with_warning\",\"version\":1},{\"collectionId\":\"collection-fc06ffd37e3538ab5e5ccfc10b282ce6\",\"createdByActivity\":\"activity_84810af99fe6d7d914b91dda788bf3f69a95076c89b32f5069bbb55f29e03e7e\",\"hash\":\"sha256:82336dc97d0001d74375a2d8f25359db6953aaaa8de364dce73fe70c67184c4d\",\"kind\":\"block\",\"links\":[],\"origin\":\"visual_extracted\",\"payload\":{\"blockType\":\"paragraph\",\"text\":\"48 Nm\"},\"sourceRefs\":[{\"bbox1000\":[496,254,566,274],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00009\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ko_block_5bbb089e0c4531e87d66dc2dbddd6971a713bc778fc5047d29a527998b4b6bd3\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified_with_warning\",\"version\":1},{\"collectionId\":\"collection-fc06ffd37e3538ab5e5ccfc10b282ce6\",\"createdByActivity\":\"activity_84810af99fe6d7d914b91dda788bf3f69a95076c89b32f5069bbb55f29e03e7e\",\"hash\":\"sha256:c1fd76578791a41f01ca75179aba7d03afbe861ea1c8f853b383fd64b0c5cf80\",\"kind\":\"evidence\",\"links\":[],\"origin\":\"visual_extracted\",\"payload\":{\"evidenceId\":\"ev_118e47c1893342c161033bd38ec30e1b713667a3264bf6d64c74a200b853e8cc\"},\"sourceRefs\":[{\"bbox1000\":[142,121,667,142],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00001\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ko_evidence_ddcdad622406573777c4060094fff46535d9aa403fabf50db418d79c750332a0\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified_with_warning\",\"version\":1},{\"collectionId\":\"collection-fc06ffd37e3538ab5e5ccfc10b282ce6\",\"createdByActivity\":\"activity_84810af99fe6d7d914b91dda788bf3f69a95076c89b32f5069bbb55f29e03e7e\",\"hash\":\"sha256:f263c0f9ec2c069ecd552495491d4b3751377a5a4cb70437b7bd315c3110c7ef\",\"kind\":\"evidence\",\"links\":[],\"origin\":\"visual_extracted\",\"payload\":{\"evidenceId\":\"ev_9c599c91996bfc0583a327ba299757c6684b588349d6a7ac79f58f3218d2d088\"},\"sourceRefs\":[{\"bbox1000\":[144,143,853,162],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00002\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ko_evidence_d6fd6122742e9394366586bbb2cb91a54e4f13baf1e39a94413ab87f9b908457\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified_with_warning\",\"version\":1},{\"collectionId\":\"collection-fc06ffd37e3538ab5e5ccfc10b282ce6\",\"createdByActivity\":\"activity_84810af99fe6d7d914b91dda788bf3f69a95076c89b32f5069bbb55f29e03e7e\",\"hash\":\"sha256:a838c6886d3cdbe376ce1dc876d4a477941552bd99e712409f3fcd3b24456436\",\"kind\":\"evidence\",\"links\":[],\"origin\":\"visual_extracted\",\"payload\":{\"evidenceId\":\"ev_2273e8f67d27a74563b7fa6dfd8436c7834ac97c85a011138a44373caf42ce8d\"},\"sourceRefs\":[{\"bbox1000\":[142,160,710,181],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00003\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ko_evidence_dd4c4e7a29169b4082e4e076f6cb64297ca8e1be5392ae07ef3f0b7044f44f72\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified_with_warning\",\"version\":1},{\"collectionId\":\"collection-fc06ffd37e3538ab5e5ccfc10b282ce6\",\"createdByActivity\":\"activity_84810af99fe6d7d914b91dda788bf3f69a95076c89b32f5069bbb55f29e03e7e\",\"hash\":\"sha256:6dc3295e1b9fa88ac33e71a1b3ec8fb4ea83563e80469cd61720ae086a6dab53\",\"kind\":\"evidence\",\"links\":[],\"origin\":\"visual_extracted\",\"payload\":{\"evidenceId\":\"ev_81cf0379c39e99bcb9c2d8856c21e13db5e4df4f8c0c295bc44fc923cc278100\"},\"sourceRefs\":[{\"bbox1000\":[143,193,201,211],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00004\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ko_evidence_618cc1aef3c11458628d6f382b6b8b639c3b0abc885dc87cfb14da2f7f71468c\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified_with_warning\",\"version\":1},{\"collectionId\":\"collection-fc06ffd37e3538ab5e5ccfc10b282ce6\",\"createdByActivity\":\"activity_84810af99fe6d7d914b91dda788bf3f69a95076c89b32f5069bbb55f29e03e7e\",\"hash\":\"sha256:c41f9550462747a0eff6885ab30eaae92701ec68ec5b8043c98c109bd1c45bce\",\"kind\":\"evidence\",\"links\":[],\"origin\":\"visual_extracted\",\"payload\":{\"evidenceId\":\"ev_661965c768f01769f4a37c3241211d68ee083ad044e2a9b94b29eecd35f0a6d1\"},\"sourceRefs\":[{\"bbox1000\":[496,192,613,211],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00005\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ko_evidence_a2cb816b804a143b09c9ec52d0b622aed53be93cf2277cc0467838dda6561b58\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified_with_warning\",\"version\":1},{\"collectionId\":\"collection-fc06ffd37e3538ab5e5ccfc10b282ce6\",\"createdByActivity\":\"activity_84810af99fe6d7d914b91dda788bf3f69a95076c89b32f5069bbb55f29e03e7e\",\"hash\":\"sha256:ad4dfbb2ce310119be199b6f432d8b8db973a72619567c4014e2eb690c543ca8\",\"kind\":\"evidence\",\"links\":[],\"origin\":\"visual_extracted\",\"payload\":{\"evidenceId\":\"ev_94f4aed0efd7edd31de65a93dbef26c98d0c3220a9dfd479879a48b84afc0809\"},\"sourceRefs\":[{\"bbox1000\":[143,223,279,244],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00006\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ko_evidence_3f111ee159f0df754a0eaa75b7bc441e87b33f9aa1fb25042dd3d7a607de35d6\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified_with_warning\",\"version\":1},{\"collectionId\":\"collection-fc06ffd37e3538ab5e5ccfc10b282ce6\",\"createdByActivity\":\"activity_84810af99fe6d7d914b91dda788bf3f69a95076c89b32f5069bbb55f29e03e7e\",\"hash\":\"sha256:0ba331ed3e0868dfb0117ca28b885b52ca7d11524a14a7dc5fd3075166abca25\",\"kind\":\"evidence\",\"links\":[],\"origin\":\"visual_extracted\",\"payload\":{\"evidenceId\":\"ev_fabe6c1a99f28a4e125d6fa2fdb5ecf65818bc070ac49504bd1a01a4151e06cf\"},\"sourceRefs\":[{\"bbox1000\":[497,224,608,243],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00007\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ko_evidence_c6147f0e8b96eee8d7af47b2c125006214d4552d06577e3e7a83f7e3a3165fa5\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified_with_warning\",\"version\":1},{\"collectionId\":\"collection-fc06ffd37e3538ab5e5ccfc10b282ce6\",\"createdByActivity\":\"activity_84810af99fe6d7d914b91dda788bf3f69a95076c89b32f5069bbb55f29e03e7e\",\"hash\":\"sha256:ce72687aab88989ce4a41cc3d95fe0cc3ce054e72a97c2b21a5ae3f6ff6a5ae9\",\"kind\":\"evidence\",\"links\":[],\"origin\":\"visual_extracted\",\"payload\":{\"evidenceId\":\"ev_77a42278d198c3b7cac92319e6d254e4a6090a939594cfb1a764808c14e9a25a\"},\"sourceRefs\":[{\"bbox1000\":[142,254,256,275],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00008\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ko_evidence_345a1734e806cdba6411aa40261daf7d87a88e537cd17ccacd149b5667e1834c\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified_with_warning\",\"version\":1},{\"collectionId\":\"collection-fc06ffd37e3538ab5e5ccfc10b282ce6\",\"createdByActivity\":\"activity_84810af99fe6d7d914b91dda788bf3f69a95076c89b32f5069bbb55f29e03e7e\",\"hash\":\"sha256:bc89d399c0283fa26d815bb687b11845e516347171ae95af149cb50333336547\",\"kind\":\"evidence\",\"links\":[],\"origin\":\"visual_extracted\",\"payload\":{\"evidenceId\":\"ev_7a91f41858bdea26ac6d2f85fb10894ac6267a05ddada44e5151751bc0793dbf\"},\"sourceRefs\":[{\"bbox1000\":[496,254,566,274],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00009\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ko_evidence_58f904bf3bf8ee9dd7dadfc46308b8a481e866abbe93e8b68be8db28c65a8c74\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified_with_warning\",\"version\":1},{\"collectionId\":\"collection-fc06ffd37e3538ab5e5ccfc10b282ce6\",\"createdByActivity\":\"activity_84810af99fe6d7d914b91dda788bf3f69a95076c89b32f5069bbb55f29e03e7e\",\"hash\":\"sha256:caa2e4694d8c26d29f9eca5e6d3ec8e489ca87894308b78bd086e6dc3ea2e387\",\"kind\":\"claim\",\"links\":[\"ko_evidence_d6fd6122742e9394366586bbb2cb91a54e4f13baf1e39a94413ab87f9b908457\",\"entity_dd49e5da10b3f29b0692f36debc9a777e2c63324435517988bac59422d6d7504\",\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\"],\"origin\":\"rule_derived\",\"payload\":{\"authority\":\"informal\",\"authorityScore\":0.4,\"authorityTier\":\"informal\",\"claimId\":\"claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c\",\"entityIds\":[\"entity_dd49e5da10b3f29b0692f36debc9a777e2c63324435517988bac59422d6d7504\",\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\"],\"evidenceId\":\"ev_9c599c91996bfc0583a327ba299757c6684b588349d6a7ac79f58f3218d2d088\",\"language\":\"en\",\"logicalId\":\"ku_55322d78b9c3d7279683e176f739c7a2dc51c0ba415bb0f89d325c9e2063a7a5\",\"modality\":\"asserted\",\"numericValues\":[\"7\"],\"polarity\":\"positive\",\"retrievalTerms\":[\"audit\",\"token\",\"document\",\"tavonel-e2e-docx-7f3a.\"],\"sourceId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"sourceVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"temporalRefs\":[],\"text\":\"The audit token for this document is TAVONEL-E2E-DOCX-7f3a.\",\"topicKey\":\"audit token document tavonel-e2e-docx- f3a.\"},\"sourceRefs\":[{\"bbox1000\":[144,143,853,162],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00002\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified_with_warning\",\"version\":1},{\"collectionId\":\"collection-fc06ffd37e3538ab5e5ccfc10b282ce6\",\"createdByActivity\":\"activity_84810af99fe6d7d914b91dda788bf3f69a95076c89b32f5069bbb55f29e03e7e\",\"hash\":\"sha256:a98cd012ac0c4ecd18aacde00f1756a3ab3c848130fb9be1c9e685884cbba8fa\",\"kind\":\"entity\",\"links\":[],\"origin\":\"rule_derived\",\"payload\":{\"canonicalName\":\"TAVONEL-E2E-\",\"claimIds\":[\"claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c\"],\"entityId\":\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\",\"entityType\":\"acronym\",\"evidenceIds\":[\"ev_9c599c91996bfc0583a327ba299757c6684b588349d6a7ac79f58f3218d2d088\"]},\"sourceRefs\":[{\"bbox1000\":[144,143,853,162],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00002\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified_with_warning\",\"version\":1},{\"collectionId\":\"collection-fc06ffd37e3538ab5e5ccfc10b282ce6\",\"createdByActivity\":\"activity_84810af99fe6d7d914b91dda788bf3f69a95076c89b32f5069bbb55f29e03e7e\",\"hash\":\"sha256:4dfe0d00b3164fa4564fb1dbbdaf645b93f271ee3da734682911d703ddc78d52\",\"kind\":\"entity\",\"links\":[],\"origin\":\"rule_derived\",\"payload\":{\"canonicalName\":\"DOCX-\",\"claimIds\":[\"claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c\"],\"entityId\":\"entity_dd49e5da10b3f29b0692f36debc9a777e2c63324435517988bac59422d6d7504\",\"entityType\":\"acronym\",\"evidenceIds\":[\"ev_9c599c91996bfc0583a327ba299757c6684b588349d6a7ac79f58f3218d2d088\"]},\"sourceRefs\":[{\"bbox1000\":[144,143,853,162],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00002\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"entity_dd49e5da10b3f29b0692f36debc9a777e2c63324435517988bac59422d6d7504\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified_with_warning\",\"version\":1},{\"collectionId\":\"collection-fc06ffd37e3538ab5e5ccfc10b282ce6\",\"createdByActivity\":\"activity_84810af99fe6d7d914b91dda788bf3f69a95076c89b32f5069bbb55f29e03e7e\",\"hash\":\"sha256:9ab9f8a47602ddb07d6e63fa7dd2b48b1d94eb6122a8d33e19c001fafcfed88f\",\"kind\":\"relation\",\"links\":[\"claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c\",\"entity_dd49e5da10b3f29b0692f36debc9a777e2c63324435517988bac59422d6d7504\"],\"origin\":\"rule_derived\",\"payload\":{\"evidenceId\":\"ev_9c599c91996bfc0583a327ba299757c6684b588349d6a7ac79f58f3218d2d088\",\"objectId\":\"entity_dd49e5da10b3f29b0692f36debc9a777e2c63324435517988bac59422d6d7504\",\"predicate\":\"mentions\",\"relationId\":\"relation_94ab7cf90b6687108b2df995cad9b07798a2758160f32db55a6ebea6009bc536\",\"subjectId\":\"claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c\"},\"sourceRefs\":[{\"bbox1000\":[144,143,853,162],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00002\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"relation_94ab7cf90b6687108b2df995cad9b07798a2758160f32db55a6ebea6009bc536\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified_with_warning\",\"version\":1},{\"collectionId\":\"collection-fc06ffd37e3538ab5e5ccfc10b282ce6\",\"createdByActivity\":\"activity_84810af99fe6d7d914b91dda788bf3f69a95076c89b32f5069bbb55f29e03e7e\",\"hash\":\"sha256:961e8a2dbc7cca98110d8d5476b4aea3c9824fa409bb47033e2be4534182f154\",\"kind\":\"relation\",\"links\":[\"claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c\",\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\"],\"origin\":\"rule_derived\",\"payload\":{\"evidenceId\":\"ev_9c599c91996bfc0583a327ba299757c6684b588349d6a7ac79f58f3218d2d088\",\"objectId\":\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\",\"predicate\":\"mentions\",\"relationId\":\"relation_deb80a554d20ba9a0dfe10e10eb1b4e42221d6a968ef473ba2d919ba817d14d4\",\"subjectId\":\"claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c\"},\"sourceRefs\":[{\"bbox1000\":[144,143,853,162],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00002\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"relation_deb80a554d20ba9a0dfe10e10eb1b4e42221d6a968ef473ba2d919ba817d14d4\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified_with_warning\",\"version\":1},{\"collectionId\":\"collection-fc06ffd37e3538ab5e5ccfc10b282ce6\",\"createdByActivity\":\"activity_84810af99fe6d7d914b91dda788bf3f69a95076c89b32f5069bbb55f29e03e7e\",\"hash\":\"sha256:343d7bd4c63f87dc1a5296ef9ec4d11585cdac2d62656d5cd908edd811b8efb2\",\"kind\":\"ontology_term\",\"links\":[],\"origin\":\"structured_derived\",\"payload\":{\"blueprint\":\"corporate-filings\",\"blueprintVersion\":\"1.0.0\",\"moduleSha256\":\"sha256:f229ba9ac433e255659a06ecc73364a51f429054550f6075d6259cf44431b654\",\"term\":\"company\"},\"sourceRefs\":[{\"bbox1000\":[142,121,667,142],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00001\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ontology_term_d006183b3661e531aff2834191a912e34cc397c8dfc86f5a240c4edc5960cfc6\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified\",\"version\":1},{\"collectionId\":\"collection-fc06ffd37e3538ab5e5ccfc10b282ce6\",\"createdByActivity\":\"activity_84810af99fe6d7d914b91dda788bf3f69a95076c89b32f5069bbb55f29e03e7e\",\"hash\":\"sha256:c357a9e7da0933c42cd1afd390cafa524dab08dea710b954decefa57e0fc7ed2\",\"kind\":\"ontology_term\",\"links\":[],\"origin\":\"structured_derived\",\"payload\":{\"blueprint\":\"corporate-filings\",\"blueprintVersion\":\"1.0.0\",\"moduleSha256\":\"sha256:f229ba9ac433e255659a06ecc73364a51f429054550f6075d6259cf44431b654\",\"term\":\"filing\"},\"sourceRefs\":[{\"bbox1000\":[142,121,667,142],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00001\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ontology_term_4ea38ad20734b2d3e089a553e66a780df978a7abdebb6fbd7a180e9798fff02c\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified\",\"version\":1},{\"collectionId\":\"collection-fc06ffd37e3538ab5e5ccfc10b282ce6\",\"createdByActivity\":\"activity_84810af99fe6d7d914b91dda788bf3f69a95076c89b32f5069bbb55f29e03e7e\",\"hash\":\"sha256:9ad680cb15de56ae8180798fe1f28290535d06109bd20b992d69a570a439d450\",\"kind\":\"ontology_term\",\"links\":[],\"origin\":\"structured_derived\",\"payload\":{\"blueprint\":\"corporate-filings\",\"blueprintVersion\":\"1.0.0\",\"moduleSha256\":\"sha256:f229ba9ac433e255659a06ecc73364a51f429054550f6075d6259cf44431b654\",\"term\":\"statement\"},\"sourceRefs\":[{\"bbox1000\":[142,121,667,142],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00001\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ontology_term_78d94e725a7069c213adaef9f9633f4dd6e2ef50b383f3a775d873961fa86d65\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified\",\"version\":1},{\"collectionId\":\"collection-fc06ffd37e3538ab5e5ccfc10b282ce6\",\"createdByActivity\":\"activity_84810af99fe6d7d914b91dda788bf3f69a95076c89b32f5069bbb55f29e03e7e\",\"hash\":\"sha256:14ef31712a11fadc6cabadbd4fb413841851d83ade1877f8bc7121440ed8684d\",\"kind\":\"ontology_term\",\"links\":[],\"origin\":\"structured_derived\",\"payload\":{\"blueprint\":\"corporate-filings\",\"blueprintVersion\":\"1.0.0\",\"moduleSha256\":\"sha256:f229ba9ac433e255659a06ecc73364a51f429054550f6075d6259cf44431b654\",\"term\":\"metric\"},\"sourceRefs\":[{\"bbox1000\":[142,121,667,142],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00001\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ontology_term_ee55ca3501a733c5dc2a7adb3e54c8d5eb290bbbecdea27dbc18488dad1a9179\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified\",\"version\":1},{\"collectionId\":\"collection-fc06ffd37e3538ab5e5ccfc10b282ce6\",\"createdByActivity\":\"activity_84810af99fe6d7d914b91dda788bf3f69a95076c89b32f5069bbb55f29e03e7e\",\"hash\":\"sha256:bc34562ef16698b99de2a5e1799079b514bd02f9d8686aea87ea9c845615f80d\",\"kind\":\"ontology_term\",\"links\":[],\"origin\":\"structured_derived\",\"payload\":{\"blueprint\":\"corporate-filings\",\"blueprintVersion\":\"1.0.0\",\"moduleSha256\":\"sha256:f229ba9ac433e255659a06ecc73364a51f429054550f6075d6259cf44431b654\",\"term\":\"risk\"},\"sourceRefs\":[{\"bbox1000\":[142,121,667,142],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00001\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"stableId\":\"ontology_term_dc9c3d28af574f5eae2640eece7e2366ed09e3e6f83e3ce2757e31e90463c356\",\"tenantId\":\"pilot-969dc192daa24119\",\"verificationState\":\"verified\",\"version\":1}],\"schemaVersion\":\"canonical-knowledge-1.0.0\",\"tenantId\":\"pilot-969dc192daa24119\"}\n"
+          },
+          {
+            "path": "graph/nodes.csv",
+            "mediaType": "text/csv; charset=utf-8",
+            "sizeBytes": 8334,
+            "sha256": "sha256:844f27aaa02cad061603e5e40c5fe78c415d0f7513ee9c4942daa847992e1eca",
+            "content": "id,kind,payload,verification_state\n\"ko_collection_073e51d6ce4d71360111de519e217d69d5834e0ef55a538d63cddb09bf2f5b68\",\"collection\",\"{\"\"workspaceId\"\":\"\"pilot-969dc192daa24119\"\"}\",\"verified\"\n\"ko_document_815066b678f725aa7cb47f2b2df6ea5a0fcf5ab009900bf9b0e92e767def989a\",\"document\",\"{\"\"documentVersionId\"\":\"\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\"\",\"\"title\"\":\"\"Document c2fa81fb\"\"}\",\"verified\"\n\"ko_block_0c7c5433bfd5d49fd708c3976e00c153b107f3e8fcc05a8bff99133d1880fe99\",\"block\",\"{\"\"blockType\"\":\"\"paragraph\"\",\"\"text\"\":\"\"TAVONEL End-to-End Proving Document\"\"}\",\"verified_with_warning\"\n\"ko_block_18c17e64b6e02d1732754d8f06cdc27837babacba102a96552c764d16a3f0d0e\",\"block\",\"{\"\"blockType\"\":\"\"paragraph\"\",\"\"text\"\":\"\"The audit token for this document is TAVONEL-E2E-DOCX-7f3a. Pump P-207\"\"}\",\"verified_with_warning\"\n\"ko_block_6ff39c98cdd30dc44233ac639cb34f2435fe75fe13c29bf3af8ab82d61840357\",\"block\",\"{\"\"blockType\"\":\"\"paragraph\"\",\"\"text\"\":\"\"was overhauled on 2026-05-02 by technician Devin Oyelaran.\"\"}\",\"verified_with_warning\"\n\"ko_block_b2e9d5861fa8baa51ebe09ddd2e450950a43e79f8c563af5655b9e802d101849\",\"block\",\"{\"\"blockType\"\":\"\"paragraph\"\",\"\"text\"\":\"\"Asset\"\"}\",\"verified_with_warning\"\n\"ko_block_f1dcc870cbefc3f84a988707dc6eca68325d4c175a9c33fae368222811a3a9d9\",\"block\",\"{\"\"blockType\"\":\"\"paragraph\"\",\"\"text\"\":\"\"Pump P-207\"\"}\",\"verified_with_warning\"\n\"ko_block_fbaef29bc08d7ea57e8f7970c7cb8346785b5b20deee28371a9ce6b0120380cf\",\"block\",\"{\"\"blockType\"\":\"\"paragraph\"\",\"\"text\"\":\"\"Overhaul date\"\"}\",\"verified_with_warning\"\n\"ko_block_5f7eab6ac8690bcdae1760722a6437487c10d4557a13169eeba3b04618e1486b\",\"block\",\"{\"\"blockType\"\":\"\"paragraph\"\",\"\"text\"\":\"\"2026-05-02\"\"}\",\"verified_with_warning\"\n\"ko_block_eae5694e7b0616446f0222b9bf32d5950f085caf0c80285bf01527b413e8706c\",\"block\",\"{\"\"blockType\"\":\"\"paragraph\"\",\"\"text\"\":\"\"Seal torque\"\"}\",\"verified_with_warning\"\n\"ko_block_5bbb089e0c4531e87d66dc2dbddd6971a713bc778fc5047d29a527998b4b6bd3\",\"block\",\"{\"\"blockType\"\":\"\"paragraph\"\",\"\"text\"\":\"\"48 Nm\"\"}\",\"verified_with_warning\"\n\"ko_evidence_ddcdad622406573777c4060094fff46535d9aa403fabf50db418d79c750332a0\",\"evidence\",\"{\"\"evidenceId\"\":\"\"ev_118e47c1893342c161033bd38ec30e1b713667a3264bf6d64c74a200b853e8cc\"\"}\",\"verified_with_warning\"\n\"ko_evidence_d6fd6122742e9394366586bbb2cb91a54e4f13baf1e39a94413ab87f9b908457\",\"evidence\",\"{\"\"evidenceId\"\":\"\"ev_9c599c91996bfc0583a327ba299757c6684b588349d6a7ac79f58f3218d2d088\"\"}\",\"verified_with_warning\"\n\"ko_evidence_dd4c4e7a29169b4082e4e076f6cb64297ca8e1be5392ae07ef3f0b7044f44f72\",\"evidence\",\"{\"\"evidenceId\"\":\"\"ev_2273e8f67d27a74563b7fa6dfd8436c7834ac97c85a011138a44373caf42ce8d\"\"}\",\"verified_with_warning\"\n\"ko_evidence_618cc1aef3c11458628d6f382b6b8b639c3b0abc885dc87cfb14da2f7f71468c\",\"evidence\",\"{\"\"evidenceId\"\":\"\"ev_81cf0379c39e99bcb9c2d8856c21e13db5e4df4f8c0c295bc44fc923cc278100\"\"}\",\"verified_with_warning\"\n\"ko_evidence_a2cb816b804a143b09c9ec52d0b622aed53be93cf2277cc0467838dda6561b58\",\"evidence\",\"{\"\"evidenceId\"\":\"\"ev_661965c768f01769f4a37c3241211d68ee083ad044e2a9b94b29eecd35f0a6d1\"\"}\",\"verified_with_warning\"\n\"ko_evidence_3f111ee159f0df754a0eaa75b7bc441e87b33f9aa1fb25042dd3d7a607de35d6\",\"evidence\",\"{\"\"evidenceId\"\":\"\"ev_94f4aed0efd7edd31de65a93dbef26c98d0c3220a9dfd479879a48b84afc0809\"\"}\",\"verified_with_warning\"\n\"ko_evidence_c6147f0e8b96eee8d7af47b2c125006214d4552d06577e3e7a83f7e3a3165fa5\",\"evidence\",\"{\"\"evidenceId\"\":\"\"ev_fabe6c1a99f28a4e125d6fa2fdb5ecf65818bc070ac49504bd1a01a4151e06cf\"\"}\",\"verified_with_warning\"\n\"ko_evidence_345a1734e806cdba6411aa40261daf7d87a88e537cd17ccacd149b5667e1834c\",\"evidence\",\"{\"\"evidenceId\"\":\"\"ev_77a42278d198c3b7cac92319e6d254e4a6090a939594cfb1a764808c14e9a25a\"\"}\",\"verified_with_warning\"\n\"ko_evidence_58f904bf3bf8ee9dd7dadfc46308b8a481e866abbe93e8b68be8db28c65a8c74\",\"evidence\",\"{\"\"evidenceId\"\":\"\"ev_7a91f41858bdea26ac6d2f85fb10894ac6267a05ddada44e5151751bc0793dbf\"\"}\",\"verified_with_warning\"\n\"claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c\",\"claim\",\"{\"\"authority\"\":\"\"informal\"\",\"\"authorityScore\"\":0.4,\"\"authorityTier\"\":\"\"informal\"\",\"\"claimId\"\":\"\"claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c\"\",\"\"entityIds\"\":[\"\"entity_dd49e5da10b3f29b0692f36debc9a777e2c63324435517988bac59422d6d7504\"\",\"\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\"\"],\"\"evidenceId\"\":\"\"ev_9c599c91996bfc0583a327ba299757c6684b588349d6a7ac79f58f3218d2d088\"\",\"\"language\"\":\"\"en\"\",\"\"logicalId\"\":\"\"ku_55322d78b9c3d7279683e176f739c7a2dc51c0ba415bb0f89d325c9e2063a7a5\"\",\"\"modality\"\":\"\"asserted\"\",\"\"numericValues\"\":[\"\"7\"\"],\"\"polarity\"\":\"\"positive\"\",\"\"retrievalTerms\"\":[\"\"audit\"\",\"\"token\"\",\"\"document\"\",\"\"tavonel-e2e-docx-7f3a.\"\"],\"\"sourceId\"\":\"\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\"\",\"\"sourceVersionId\"\":\"\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\"\",\"\"temporalRefs\"\":[],\"\"text\"\":\"\"The audit token for this document is TAVONEL-E2E-DOCX-7f3a.\"\",\"\"topicKey\"\":\"\"audit token document tavonel-e2e-docx- f3a.\"\"}\",\"verified_with_warning\"\n\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\",\"entity\",\"{\"\"canonicalName\"\":\"\"TAVONEL-E2E-\"\",\"\"claimIds\"\":[\"\"claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c\"\"],\"\"entityId\"\":\"\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\"\",\"\"entityType\"\":\"\"acronym\"\",\"\"evidenceIds\"\":[\"\"ev_9c599c91996bfc0583a327ba299757c6684b588349d6a7ac79f58f3218d2d088\"\"]}\",\"verified_with_warning\"\n\"entity_dd49e5da10b3f29b0692f36debc9a777e2c63324435517988bac59422d6d7504\",\"entity\",\"{\"\"canonicalName\"\":\"\"DOCX-\"\",\"\"claimIds\"\":[\"\"claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c\"\"],\"\"entityId\"\":\"\"entity_dd49e5da10b3f29b0692f36debc9a777e2c63324435517988bac59422d6d7504\"\",\"\"entityType\"\":\"\"acronym\"\",\"\"evidenceIds\"\":[\"\"ev_9c599c91996bfc0583a327ba299757c6684b588349d6a7ac79f58f3218d2d088\"\"]}\",\"verified_with_warning\"\n\"relation_94ab7cf90b6687108b2df995cad9b07798a2758160f32db55a6ebea6009bc536\",\"relation\",\"{\"\"evidenceId\"\":\"\"ev_9c599c91996bfc0583a327ba299757c6684b588349d6a7ac79f58f3218d2d088\"\",\"\"objectId\"\":\"\"entity_dd49e5da10b3f29b0692f36debc9a777e2c63324435517988bac59422d6d7504\"\",\"\"predicate\"\":\"\"mentions\"\",\"\"relationId\"\":\"\"relation_94ab7cf90b6687108b2df995cad9b07798a2758160f32db55a6ebea6009bc536\"\",\"\"subjectId\"\":\"\"claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c\"\"}\",\"verified_with_warning\"\n\"relation_deb80a554d20ba9a0dfe10e10eb1b4e42221d6a968ef473ba2d919ba817d14d4\",\"relation\",\"{\"\"evidenceId\"\":\"\"ev_9c599c91996bfc0583a327ba299757c6684b588349d6a7ac79f58f3218d2d088\"\",\"\"objectId\"\":\"\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\"\",\"\"predicate\"\":\"\"mentions\"\",\"\"relationId\"\":\"\"relation_deb80a554d20ba9a0dfe10e10eb1b4e42221d6a968ef473ba2d919ba817d14d4\"\",\"\"subjectId\"\":\"\"claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c\"\"}\",\"verified_with_warning\"\n\"ontology_term_d006183b3661e531aff2834191a912e34cc397c8dfc86f5a240c4edc5960cfc6\",\"ontology_term\",\"{\"\"blueprint\"\":\"\"corporate-filings\"\",\"\"blueprintVersion\"\":\"\"1.0.0\"\",\"\"moduleSha256\"\":\"\"sha256:f229ba9ac433e255659a06ecc73364a51f429054550f6075d6259cf44431b654\"\",\"\"term\"\":\"\"company\"\"}\",\"verified\"\n\"ontology_term_4ea38ad20734b2d3e089a553e66a780df978a7abdebb6fbd7a180e9798fff02c\",\"ontology_term\",\"{\"\"blueprint\"\":\"\"corporate-filings\"\",\"\"blueprintVersion\"\":\"\"1.0.0\"\",\"\"moduleSha256\"\":\"\"sha256:f229ba9ac433e255659a06ecc73364a51f429054550f6075d6259cf44431b654\"\",\"\"term\"\":\"\"filing\"\"}\",\"verified\"\n\"ontology_term_78d94e725a7069c213adaef9f9633f4dd6e2ef50b383f3a775d873961fa86d65\",\"ontology_term\",\"{\"\"blueprint\"\":\"\"corporate-filings\"\",\"\"blueprintVersion\"\":\"\"1.0.0\"\",\"\"moduleSha256\"\":\"\"sha256:f229ba9ac433e255659a06ecc73364a51f429054550f6075d6259cf44431b654\"\",\"\"term\"\":\"\"statement\"\"}\",\"verified\"\n\"ontology_term_ee55ca3501a733c5dc2a7adb3e54c8d5eb290bbbecdea27dbc18488dad1a9179\",\"ontology_term\",\"{\"\"blueprint\"\":\"\"corporate-filings\"\",\"\"blueprintVersion\"\":\"\"1.0.0\"\",\"\"moduleSha256\"\":\"\"sha256:f229ba9ac433e255659a06ecc73364a51f429054550f6075d6259cf44431b654\"\",\"\"term\"\":\"\"metric\"\"}\",\"verified\"\n\"ontology_term_dc9c3d28af574f5eae2640eece7e2366ed09e3e6f83e3ce2757e31e90463c356\",\"ontology_term\",\"{\"\"blueprint\"\":\"\"corporate-filings\"\",\"\"blueprintVersion\"\":\"\"1.0.0\"\",\"\"moduleSha256\"\":\"\"sha256:f229ba9ac433e255659a06ecc73364a51f429054550f6075d6259cf44431b654\"\",\"\"term\"\":\"\"risk\"\"}\",\"verified\"\n"
+          },
+          {
+            "path": "graph/relationships.csv",
+            "mediaType": "text/csv; charset=utf-8",
+            "sizeBytes": 4058,
+            "sha256": "sha256:c23244be6f04b1c37ae2dff28da371c2090bfb81e17fc9609b43e678c00a315e",
+            "content": "id,subject_id,predicate,object_id\n\"edge_e229722040b0889d9ab17a9cceee8e29d03f1b5af3ae32caffe6c210652440b9\",\"ko_collection_073e51d6ce4d71360111de519e217d69d5834e0ef55a538d63cddb09bf2f5b68\",\"links_to\",\"ko_document_815066b678f725aa7cb47f2b2df6ea5a0fcf5ab009900bf9b0e92e767def989a\"\n\"edge_7664d45b0833c2513df909c9c54259c70fb5ce4e77b50025563a80a8c5d7d4ed\",\"ko_document_815066b678f725aa7cb47f2b2df6ea5a0fcf5ab009900bf9b0e92e767def989a\",\"contains\",\"ko_block_0c7c5433bfd5d49fd708c3976e00c153b107f3e8fcc05a8bff99133d1880fe99\"\n\"edge_50ac26315a2fb706cd25dae50ba848b72ee2558224d68178d5a83e62668732fa\",\"ko_document_815066b678f725aa7cb47f2b2df6ea5a0fcf5ab009900bf9b0e92e767def989a\",\"contains\",\"ko_block_18c17e64b6e02d1732754d8f06cdc27837babacba102a96552c764d16a3f0d0e\"\n\"edge_623e039b3fbeca187a037d106e9f655e0b42fa7bb192ef6b851a798d4622cff6\",\"ko_document_815066b678f725aa7cb47f2b2df6ea5a0fcf5ab009900bf9b0e92e767def989a\",\"contains\",\"ko_block_6ff39c98cdd30dc44233ac639cb34f2435fe75fe13c29bf3af8ab82d61840357\"\n\"edge_868b73d452766e8188d06a191a2e4292843e7b51d4745132407e2c89ac52d149\",\"ko_document_815066b678f725aa7cb47f2b2df6ea5a0fcf5ab009900bf9b0e92e767def989a\",\"contains\",\"ko_block_b2e9d5861fa8baa51ebe09ddd2e450950a43e79f8c563af5655b9e802d101849\"\n\"edge_7301beb1c7d20752ed31e292783c0cfc8536e24c216efb967b5a80f2ccc2c828\",\"ko_document_815066b678f725aa7cb47f2b2df6ea5a0fcf5ab009900bf9b0e92e767def989a\",\"contains\",\"ko_block_f1dcc870cbefc3f84a988707dc6eca68325d4c175a9c33fae368222811a3a9d9\"\n\"edge_1973cde1cfbdba631c2128c8297d7d16d76255bf1439bcfe3101aa091e9b9095\",\"ko_document_815066b678f725aa7cb47f2b2df6ea5a0fcf5ab009900bf9b0e92e767def989a\",\"contains\",\"ko_block_fbaef29bc08d7ea57e8f7970c7cb8346785b5b20deee28371a9ce6b0120380cf\"\n\"edge_8487431e102ddea627ec563e1e3bb0954aa3887ec2d91a8349b8e292259eaded\",\"ko_document_815066b678f725aa7cb47f2b2df6ea5a0fcf5ab009900bf9b0e92e767def989a\",\"contains\",\"ko_block_5f7eab6ac8690bcdae1760722a6437487c10d4557a13169eeba3b04618e1486b\"\n\"edge_e851c34d8ba8348075ec86f261a5ee4a35e101abe133543c48d7c0307890eb2e\",\"ko_document_815066b678f725aa7cb47f2b2df6ea5a0fcf5ab009900bf9b0e92e767def989a\",\"contains\",\"ko_block_eae5694e7b0616446f0222b9bf32d5950f085caf0c80285bf01527b413e8706c\"\n\"edge_334951c7fd567844d389f6b91c5451f8c9eef214956395748d443e1277ef7b28\",\"ko_document_815066b678f725aa7cb47f2b2df6ea5a0fcf5ab009900bf9b0e92e767def989a\",\"contains\",\"ko_block_5bbb089e0c4531e87d66dc2dbddd6971a713bc778fc5047d29a527998b4b6bd3\"\n\"edge_6e3cf5a6cdb492a86500f34ff4df575f6d810a20ccf70bd541c6829300f5285e\",\"claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c\",\"supported_by\",\"ko_evidence_d6fd6122742e9394366586bbb2cb91a54e4f13baf1e39a94413ab87f9b908457\"\n\"edge_94ab7cf90b6687108b2df995cad9b07798a2758160f32db55a6ebea6009bc536\",\"claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c\",\"mentions\",\"entity_dd49e5da10b3f29b0692f36debc9a777e2c63324435517988bac59422d6d7504\"\n\"edge_deb80a554d20ba9a0dfe10e10eb1b4e42221d6a968ef473ba2d919ba817d14d4\",\"claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c\",\"mentions\",\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\"\n\"edge_d09b4a3a689b8324abc96c4489e86638b5137d3c755218808f0e1280dd83db89\",\"relation_94ab7cf90b6687108b2df995cad9b07798a2758160f32db55a6ebea6009bc536\",\"has_subject\",\"claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c\"\n\"edge_c5f060d1e5570559c7e02b943492567126245a9c486ae242c274ae8764a8221a\",\"relation_94ab7cf90b6687108b2df995cad9b07798a2758160f32db55a6ebea6009bc536\",\"has_object\",\"entity_dd49e5da10b3f29b0692f36debc9a777e2c63324435517988bac59422d6d7504\"\n\"edge_7fa5fca4b5e86b983ae0e770e91321a89813bc3e40324b277e666ce44af122cb\",\"relation_deb80a554d20ba9a0dfe10e10eb1b4e42221d6a968ef473ba2d919ba817d14d4\",\"has_subject\",\"claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c\"\n\"edge_8ddfa508565cbb7291380a081b1ddae7935cdd18e99490299bd2235a7d174f68\",\"relation_deb80a554d20ba9a0dfe10e10eb1b4e42221d6a968ef473ba2d919ba817d14d4\",\"has_object\",\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\"\n"
+          },
+          {
+            "path": "obsidian/Companies.md",
+            "mediaType": "text/markdown; charset=utf-8",
+            "sizeBytes": 421,
+            "sha256": "sha256:139f275cb14027e9798d8350d614325351806693eac075e3c2d3f82c2677d23b",
+            "content": "# Companies\n\nBlueprint: `corporate-filings`\n\n## Evidence-bound entities\n\n- **TAVONEL-E2E-** (`acronym`)\n- **DOCX-** (`acronym`)\n\n## Evidence-bound claims\n\n- The audit token for this document is TAVONEL-E2E-DOCX-7f3a. ([[Sources/src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095|source]])\n\n## Sources\n\n- [[Sources/src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095|Document c2fa81fb]]\n"
+          },
+          {
+            "path": "obsidian/Filings.md",
+            "mediaType": "text/markdown; charset=utf-8",
+            "sizeBytes": 419,
+            "sha256": "sha256:d1dddbbdd1f202a2393a26a1bacb7c3fb09bc32612b00c4a0ea0759c968723b6",
+            "content": "# Filings\n\nBlueprint: `corporate-filings`\n\n## Evidence-bound entities\n\n- **TAVONEL-E2E-** (`acronym`)\n- **DOCX-** (`acronym`)\n\n## Evidence-bound claims\n\n- The audit token for this document is TAVONEL-E2E-DOCX-7f3a. ([[Sources/src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095|source]])\n\n## Sources\n\n- [[Sources/src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095|Document c2fa81fb]]\n"
+          },
+          {
+            "path": "obsidian/Home.md",
+            "mediaType": "text/markdown; charset=utf-8",
+            "sizeBytes": 268,
+            "sha256": "sha256:f4058e31e43d8ecad4303ea8f07897e3113087b918fe28c5c1a6ee1d7b61f5d6",
+            "content": "# TAVONEL Candidate Knowledge Package\n\nBlueprint: `corporate-filings` v1.0.0\n\n## Knowledge views\n\n- [[Companies]]\n- [[Filings]]\n- [[Risks]]\n- [[Metrics]]\n\n## Sources\n\n- [[Sources/src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095|Document c2fa81fb]]\n"
+          },
+          {
+            "path": "obsidian/MOCs/Companies MOC.md",
+            "mediaType": "text/markdown; charset=utf-8",
+            "sizeBytes": 212,
+            "sha256": "sha256:e1d15899b7e8d6d60a7274fa24fd5743c87a51e82d6d7e1428d1103afd1ba375",
+            "content": "# Companies MOC MOC\n\n- [[../Companies MOC|Companies MOC view]]\n- [[../Home|Package home]]\n\n## Source index\n\n- [[../Sources/src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095|Document c2fa81fb]]\n"
+          },
+          {
+            "path": "obsidian/MOCs/Metrics MOC.md",
+            "mediaType": "text/markdown; charset=utf-8",
+            "sizeBytes": 206,
+            "sha256": "sha256:41f1693a48dc8fa634453d779913fcc0be4d0f90710a877f45f376585ed133a5",
+            "content": "# Metrics MOC MOC\n\n- [[../Metrics MOC|Metrics MOC view]]\n- [[../Home|Package home]]\n\n## Source index\n\n- [[../Sources/src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095|Document c2fa81fb]]\n"
+          },
+          {
+            "path": "obsidian/MOCs/Risks MOC.md",
+            "mediaType": "text/markdown; charset=utf-8",
+            "sizeBytes": 200,
+            "sha256": "sha256:525dad4d5722bc4307177961e35840554a573c0ee6ef519614af694ed6d454dc",
+            "content": "# Risks MOC MOC\n\n- [[../Risks MOC|Risks MOC view]]\n- [[../Home|Package home]]\n\n## Source index\n\n- [[../Sources/src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095|Document c2fa81fb]]\n"
+          },
+          {
+            "path": "obsidian/Metrics.md",
+            "mediaType": "text/markdown; charset=utf-8",
+            "sizeBytes": 419,
+            "sha256": "sha256:75af6e0d38ee3db1a79f041c02d80dee4ea0d16b17245d022f87ede8dddbf9b9",
+            "content": "# Metrics\n\nBlueprint: `corporate-filings`\n\n## Evidence-bound entities\n\n- **TAVONEL-E2E-** (`acronym`)\n- **DOCX-** (`acronym`)\n\n## Evidence-bound claims\n\n- The audit token for this document is TAVONEL-E2E-DOCX-7f3a. ([[Sources/src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095|source]])\n\n## Sources\n\n- [[Sources/src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095|Document c2fa81fb]]\n"
+          },
+          {
+            "path": "obsidian/Risks.md",
+            "mediaType": "text/markdown; charset=utf-8",
+            "sizeBytes": 417,
+            "sha256": "sha256:c83d901000b4895d6e92eeb61b85b6a38a0d3c646294aff69f14bb5c72cc0956",
+            "content": "# Risks\n\nBlueprint: `corporate-filings`\n\n## Evidence-bound entities\n\n- **TAVONEL-E2E-** (`acronym`)\n- **DOCX-** (`acronym`)\n\n## Evidence-bound claims\n\n- The audit token for this document is TAVONEL-E2E-DOCX-7f3a. ([[Sources/src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095|source]])\n\n## Sources\n\n- [[Sources/src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095|Document c2fa81fb]]\n"
+          },
+          {
+            "path": "obsidian/Sources/src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095.md",
+            "mediaType": "text/markdown; charset=utf-8",
+            "sizeBytes": 435,
+            "sha256": "sha256:68e6f5e8ba1d798da2a8306e1cea85918d6ee41cc7e2f5275164b33ac5b728a4",
+            "content": "---\ndocument_id: src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\ndocument_version_id: dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\n---\n\n# Document c2fa81fb\n\nTAVONEL End-to-End Proving Document\n\nThe audit token for this document is TAVONEL-E2E-DOCX-7f3a. Pump P-207\n\nwas overhauled on 2026-05-02 by technician Devin Oyelaran.\n\nAsset\n\nPump P-207\n\nOverhaul date\n\n2026-05-02\n\nSeal torque\n\n48 Nm\n"
+          },
+          {
+            "path": "ontology/architecture-plan.json",
+            "mediaType": "application/json",
+            "sizeBytes": 643,
+            "sha256": "sha256:537063df9a084821543e34fab4f9ed3999d300236b23b363f52187dd14c76c85",
+            "content": "{\"blueprint\":\"corporate-filings\",\"blueprint_version\":\"1.0.0\",\"folder_depth\":3,\"folder_paths\":[\"Sources\",\"Companies\",\"Filings\",\"Risks\",\"Metrics\",\"MOCs\",\"Evidence\",\"Packages\"],\"mocs\":[\"Companies MOC\",\"Risks MOC\",\"Metrics MOC\"],\"module_sha256\":\"sha256:f229ba9ac433e255659a06ecc73364a51f429054550f6075d6259cf44431b654\",\"naming_policy\":\"stable-id-title\",\"plan_sha256\":\"sha256:891fd10b03706f606979c13b76bc7f0755107e4c76435d95a6aa74a7c206891b\",\"preserved_existing_folders\":false,\"relation_policy\":[\"source_explicit\",\"structured_derived\",\"rule_derived\"],\"root_views\":[\"Companies\",\"Filings\",\"Risks\",\"Metrics\"],\"source_preservation\":true,\"warnings\":[]}\n"
+          },
+          {
+            "path": "ontology/knowledge.jsonld",
+            "mediaType": "application/ld+json",
+            "sizeBytes": 18698,
+            "sha256": "sha256:228de2d69632249ff3daab91ffb43cea0a0c7545e71ec4ee027e1cd390855ce3",
+            "content": "{\"@context\":{\"@vocab\":\"urn:tavonel:\",\"evidence\":\"http://www.w3.org/ns/prov#wasDerivedFrom\"},\"@graph\":[{\"@id\":\"urn:tavonel:ko_collection_073e51d6ce4d71360111de519e217d69d5834e0ef55a538d63cddb09bf2f5b68\",\"@type\":\"collection\",\"evidence\":[{\"bbox1000\":[142,121,667,142],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1},{\"bbox1000\":[144,143,853,162],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1},{\"bbox1000\":[142,160,710,181],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1},{\"bbox1000\":[143,193,201,211],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1},{\"bbox1000\":[496,192,613,211],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1},{\"bbox1000\":[143,223,279,244],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1},{\"bbox1000\":[497,224,608,243],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1},{\"bbox1000\":[142,254,256,275],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1},{\"bbox1000\":[496,254,566,274],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1}],\"workspaceId\":\"pilot-969dc192daa24119\"},{\"@id\":\"urn:tavonel:ko_document_815066b678f725aa7cb47f2b2df6ea5a0fcf5ab009900bf9b0e92e767def989a\",\"@type\":\"document\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"evidence\":[{\"bbox1000\":[142,121,667,142],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1},{\"bbox1000\":[144,143,853,162],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1},{\"bbox1000\":[142,160,710,181],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1},{\"bbox1000\":[143,193,201,211],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1},{\"bbox1000\":[496,192,613,211],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1},{\"bbox1000\":[143,223,279,244],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1},{\"bbox1000\":[497,224,608,243],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1},{\"bbox1000\":[142,254,256,275],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1},{\"bbox1000\":[496,254,566,274],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1}],\"title\":\"Document c2fa81fb\"},{\"@id\":\"urn:tavonel:ko_block_0c7c5433bfd5d49fd708c3976e00c153b107f3e8fcc05a8bff99133d1880fe99\",\"@type\":\"block\",\"blockType\":\"paragraph\",\"evidence\":[{\"bbox1000\":[142,121,667,142],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1}],\"text\":\"TAVONEL End-to-End Proving Document\"},{\"@id\":\"urn:tavonel:ko_block_18c17e64b6e02d1732754d8f06cdc27837babacba102a96552c764d16a3f0d0e\",\"@type\":\"block\",\"blockType\":\"paragraph\",\"evidence\":[{\"bbox1000\":[144,143,853,162],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1}],\"text\":\"The audit token for this document is TAVONEL-E2E-DOCX-7f3a. Pump P-207\"},{\"@id\":\"urn:tavonel:ko_block_6ff39c98cdd30dc44233ac639cb34f2435fe75fe13c29bf3af8ab82d61840357\",\"@type\":\"block\",\"blockType\":\"paragraph\",\"evidence\":[{\"bbox1000\":[142,160,710,181],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1}],\"text\":\"was overhauled on 2026-05-02 by technician Devin Oyelaran.\"},{\"@id\":\"urn:tavonel:ko_block_b2e9d5861fa8baa51ebe09ddd2e450950a43e79f8c563af5655b9e802d101849\",\"@type\":\"block\",\"blockType\":\"paragraph\",\"evidence\":[{\"bbox1000\":[143,193,201,211],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1}],\"text\":\"Asset\"},{\"@id\":\"urn:tavonel:ko_block_f1dcc870cbefc3f84a988707dc6eca68325d4c175a9c33fae368222811a3a9d9\",\"@type\":\"block\",\"blockType\":\"paragraph\",\"evidence\":[{\"bbox1000\":[496,192,613,211],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1}],\"text\":\"Pump P-207\"},{\"@id\":\"urn:tavonel:ko_block_fbaef29bc08d7ea57e8f7970c7cb8346785b5b20deee28371a9ce6b0120380cf\",\"@type\":\"block\",\"blockType\":\"paragraph\",\"evidence\":[{\"bbox1000\":[143,223,279,244],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1}],\"text\":\"Overhaul date\"},{\"@id\":\"urn:tavonel:ko_block_5f7eab6ac8690bcdae1760722a6437487c10d4557a13169eeba3b04618e1486b\",\"@type\":\"block\",\"blockType\":\"paragraph\",\"evidence\":[{\"bbox1000\":[497,224,608,243],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1}],\"text\":\"2026-05-02\"},{\"@id\":\"urn:tavonel:ko_block_eae5694e7b0616446f0222b9bf32d5950f085caf0c80285bf01527b413e8706c\",\"@type\":\"block\",\"blockType\":\"paragraph\",\"evidence\":[{\"bbox1000\":[142,254,256,275],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1}],\"text\":\"Seal torque\"},{\"@id\":\"urn:tavonel:ko_block_5bbb089e0c4531e87d66dc2dbddd6971a713bc778fc5047d29a527998b4b6bd3\",\"@type\":\"block\",\"blockType\":\"paragraph\",\"evidence\":[{\"bbox1000\":[496,254,566,274],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1}],\"text\":\"48 Nm\"},{\"@id\":\"urn:tavonel:ko_evidence_ddcdad622406573777c4060094fff46535d9aa403fabf50db418d79c750332a0\",\"@type\":\"evidence\",\"evidence\":[{\"bbox1000\":[142,121,667,142],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1}],\"evidenceId\":\"ev_118e47c1893342c161033bd38ec30e1b713667a3264bf6d64c74a200b853e8cc\"},{\"@id\":\"urn:tavonel:ko_evidence_d6fd6122742e9394366586bbb2cb91a54e4f13baf1e39a94413ab87f9b908457\",\"@type\":\"evidence\",\"evidence\":[{\"bbox1000\":[144,143,853,162],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1}],\"evidenceId\":\"ev_9c599c91996bfc0583a327ba299757c6684b588349d6a7ac79f58f3218d2d088\"},{\"@id\":\"urn:tavonel:ko_evidence_dd4c4e7a29169b4082e4e076f6cb64297ca8e1be5392ae07ef3f0b7044f44f72\",\"@type\":\"evidence\",\"evidence\":[{\"bbox1000\":[142,160,710,181],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1}],\"evidenceId\":\"ev_2273e8f67d27a74563b7fa6dfd8436c7834ac97c85a011138a44373caf42ce8d\"},{\"@id\":\"urn:tavonel:ko_evidence_618cc1aef3c11458628d6f382b6b8b639c3b0abc885dc87cfb14da2f7f71468c\",\"@type\":\"evidence\",\"evidence\":[{\"bbox1000\":[143,193,201,211],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1}],\"evidenceId\":\"ev_81cf0379c39e99bcb9c2d8856c21e13db5e4df4f8c0c295bc44fc923cc278100\"},{\"@id\":\"urn:tavonel:ko_evidence_a2cb816b804a143b09c9ec52d0b622aed53be93cf2277cc0467838dda6561b58\",\"@type\":\"evidence\",\"evidence\":[{\"bbox1000\":[496,192,613,211],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1}],\"evidenceId\":\"ev_661965c768f01769f4a37c3241211d68ee083ad044e2a9b94b29eecd35f0a6d1\"},{\"@id\":\"urn:tavonel:ko_evidence_3f111ee159f0df754a0eaa75b7bc441e87b33f9aa1fb25042dd3d7a607de35d6\",\"@type\":\"evidence\",\"evidence\":[{\"bbox1000\":[143,223,279,244],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1}],\"evidenceId\":\"ev_94f4aed0efd7edd31de65a93dbef26c98d0c3220a9dfd479879a48b84afc0809\"},{\"@id\":\"urn:tavonel:ko_evidence_c6147f0e8b96eee8d7af47b2c125006214d4552d06577e3e7a83f7e3a3165fa5\",\"@type\":\"evidence\",\"evidence\":[{\"bbox1000\":[497,224,608,243],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1}],\"evidenceId\":\"ev_fabe6c1a99f28a4e125d6fa2fdb5ecf65818bc070ac49504bd1a01a4151e06cf\"},{\"@id\":\"urn:tavonel:ko_evidence_345a1734e806cdba6411aa40261daf7d87a88e537cd17ccacd149b5667e1834c\",\"@type\":\"evidence\",\"evidence\":[{\"bbox1000\":[142,254,256,275],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1}],\"evidenceId\":\"ev_77a42278d198c3b7cac92319e6d254e4a6090a939594cfb1a764808c14e9a25a\"},{\"@id\":\"urn:tavonel:ko_evidence_58f904bf3bf8ee9dd7dadfc46308b8a481e866abbe93e8b68be8db28c65a8c74\",\"@type\":\"evidence\",\"evidence\":[{\"bbox1000\":[496,254,566,274],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1}],\"evidenceId\":\"ev_7a91f41858bdea26ac6d2f85fb10894ac6267a05ddada44e5151751bc0793dbf\"},{\"@id\":\"urn:tavonel:claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c\",\"@type\":\"claim\",\"authority\":\"informal\",\"authorityScore\":0.4,\"authorityTier\":\"informal\",\"claimId\":\"claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c\",\"entityIds\":[\"entity_dd49e5da10b3f29b0692f36debc9a777e2c63324435517988bac59422d6d7504\",\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\"],\"evidence\":[{\"bbox1000\":[144,143,853,162],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1}],\"evidenceId\":\"ev_9c599c91996bfc0583a327ba299757c6684b588349d6a7ac79f58f3218d2d088\",\"language\":\"en\",\"logicalId\":\"ku_55322d78b9c3d7279683e176f739c7a2dc51c0ba415bb0f89d325c9e2063a7a5\",\"modality\":\"asserted\",\"numericValues\":[\"7\"],\"polarity\":\"positive\",\"retrievalTerms\":[\"audit\",\"token\",\"document\",\"tavonel-e2e-docx-7f3a.\"],\"sourceId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"sourceVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"temporalRefs\":[],\"text\":\"The audit token for this document is TAVONEL-E2E-DOCX-7f3a.\",\"topicKey\":\"audit token document tavonel-e2e-docx- f3a.\"},{\"@id\":\"urn:tavonel:entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\",\"@type\":\"entity\",\"canonicalName\":\"TAVONEL-E2E-\",\"claimIds\":[\"claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c\"],\"entityId\":\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\",\"entityType\":\"acronym\",\"evidence\":[{\"bbox1000\":[144,143,853,162],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1}],\"evidenceIds\":[\"ev_9c599c91996bfc0583a327ba299757c6684b588349d6a7ac79f58f3218d2d088\"]},{\"@id\":\"urn:tavonel:entity_dd49e5da10b3f29b0692f36debc9a777e2c63324435517988bac59422d6d7504\",\"@type\":\"entity\",\"canonicalName\":\"DOCX-\",\"claimIds\":[\"claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c\"],\"entityId\":\"entity_dd49e5da10b3f29b0692f36debc9a777e2c63324435517988bac59422d6d7504\",\"entityType\":\"acronym\",\"evidence\":[{\"bbox1000\":[144,143,853,162],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1}],\"evidenceIds\":[\"ev_9c599c91996bfc0583a327ba299757c6684b588349d6a7ac79f58f3218d2d088\"]},{\"@id\":\"urn:tavonel:relation_94ab7cf90b6687108b2df995cad9b07798a2758160f32db55a6ebea6009bc536\",\"@type\":\"relation\",\"evidence\":[{\"bbox1000\":[144,143,853,162],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1}],\"evidenceId\":\"ev_9c599c91996bfc0583a327ba299757c6684b588349d6a7ac79f58f3218d2d088\",\"objectId\":\"entity_dd49e5da10b3f29b0692f36debc9a777e2c63324435517988bac59422d6d7504\",\"predicate\":\"mentions\",\"relationId\":\"relation_94ab7cf90b6687108b2df995cad9b07798a2758160f32db55a6ebea6009bc536\",\"subjectId\":\"claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c\"},{\"@id\":\"urn:tavonel:relation_deb80a554d20ba9a0dfe10e10eb1b4e42221d6a968ef473ba2d919ba817d14d4\",\"@type\":\"relation\",\"evidence\":[{\"bbox1000\":[144,143,853,162],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1}],\"evidenceId\":\"ev_9c599c91996bfc0583a327ba299757c6684b588349d6a7ac79f58f3218d2d088\",\"objectId\":\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\",\"predicate\":\"mentions\",\"relationId\":\"relation_deb80a554d20ba9a0dfe10e10eb1b4e42221d6a968ef473ba2d919ba817d14d4\",\"subjectId\":\"claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c\"},{\"@id\":\"urn:tavonel:ontology_term_d006183b3661e531aff2834191a912e34cc397c8dfc86f5a240c4edc5960cfc6\",\"@type\":\"ontology_term\",\"blueprint\":\"corporate-filings\",\"blueprintVersion\":\"1.0.0\",\"evidence\":[{\"bbox1000\":[142,121,667,142],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1}],\"moduleSha256\":\"sha256:f229ba9ac433e255659a06ecc73364a51f429054550f6075d6259cf44431b654\",\"term\":\"company\"},{\"@id\":\"urn:tavonel:ontology_term_4ea38ad20734b2d3e089a553e66a780df978a7abdebb6fbd7a180e9798fff02c\",\"@type\":\"ontology_term\",\"blueprint\":\"corporate-filings\",\"blueprintVersion\":\"1.0.0\",\"evidence\":[{\"bbox1000\":[142,121,667,142],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1}],\"moduleSha256\":\"sha256:f229ba9ac433e255659a06ecc73364a51f429054550f6075d6259cf44431b654\",\"term\":\"filing\"},{\"@id\":\"urn:tavonel:ontology_term_78d94e725a7069c213adaef9f9633f4dd6e2ef50b383f3a775d873961fa86d65\",\"@type\":\"ontology_term\",\"blueprint\":\"corporate-filings\",\"blueprintVersion\":\"1.0.0\",\"evidence\":[{\"bbox1000\":[142,121,667,142],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1}],\"moduleSha256\":\"sha256:f229ba9ac433e255659a06ecc73364a51f429054550f6075d6259cf44431b654\",\"term\":\"statement\"},{\"@id\":\"urn:tavonel:ontology_term_ee55ca3501a733c5dc2a7adb3e54c8d5eb290bbbecdea27dbc18488dad1a9179\",\"@type\":\"ontology_term\",\"blueprint\":\"corporate-filings\",\"blueprintVersion\":\"1.0.0\",\"evidence\":[{\"bbox1000\":[142,121,667,142],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1}],\"moduleSha256\":\"sha256:f229ba9ac433e255659a06ecc73364a51f429054550f6075d6259cf44431b654\",\"term\":\"metric\"},{\"@id\":\"urn:tavonel:ontology_term_dc9c3d28af574f5eae2640eece7e2366ed09e3e6f83e3ce2757e31e90463c356\",\"@type\":\"ontology_term\",\"blueprint\":\"corporate-filings\",\"blueprintVersion\":\"1.0.0\",\"evidence\":[{\"bbox1000\":[142,121,667,142],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"pageNumber1\":1}],\"moduleSha256\":\"sha256:f229ba9ac433e255659a06ecc73364a51f429054550f6075d6259cf44431b654\",\"term\":\"risk\"}]}\n"
+          },
+          {
+            "path": "ontology/knowledge.ttl",
+            "mediaType": "text/turtle; charset=utf-8",
+            "sizeBytes": 6548,
+            "sha256": "sha256:d9b8fb7398c796af330b4fe1d3b773b0b70f4a3073d617d4c7c823965ceed6e7",
+            "content": "@prefix tav: <urn:tavonel:> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n\n<urn:tavonel:ko_collection_073e51d6ce4d71360111de519e217d69d5834e0ef55a538d63cddb09bf2f5b68> a tav:collection .\n<urn:tavonel:ko_collection_073e51d6ce4d71360111de519e217d69d5834e0ef55a538d63cddb09bf2f5b68> tav:links_to <urn:tavonel:ko_document_815066b678f725aa7cb47f2b2df6ea5a0fcf5ab009900bf9b0e92e767def989a> .\n<urn:tavonel:ko_document_815066b678f725aa7cb47f2b2df6ea5a0fcf5ab009900bf9b0e92e767def989a> a tav:document .\n<urn:tavonel:ko_document_815066b678f725aa7cb47f2b2df6ea5a0fcf5ab009900bf9b0e92e767def989a> tav:contains <urn:tavonel:ko_block_0c7c5433bfd5d49fd708c3976e00c153b107f3e8fcc05a8bff99133d1880fe99> .\n<urn:tavonel:ko_document_815066b678f725aa7cb47f2b2df6ea5a0fcf5ab009900bf9b0e92e767def989a> tav:contains <urn:tavonel:ko_block_18c17e64b6e02d1732754d8f06cdc27837babacba102a96552c764d16a3f0d0e> .\n<urn:tavonel:ko_document_815066b678f725aa7cb47f2b2df6ea5a0fcf5ab009900bf9b0e92e767def989a> tav:contains <urn:tavonel:ko_block_6ff39c98cdd30dc44233ac639cb34f2435fe75fe13c29bf3af8ab82d61840357> .\n<urn:tavonel:ko_document_815066b678f725aa7cb47f2b2df6ea5a0fcf5ab009900bf9b0e92e767def989a> tav:contains <urn:tavonel:ko_block_b2e9d5861fa8baa51ebe09ddd2e450950a43e79f8c563af5655b9e802d101849> .\n<urn:tavonel:ko_document_815066b678f725aa7cb47f2b2df6ea5a0fcf5ab009900bf9b0e92e767def989a> tav:contains <urn:tavonel:ko_block_f1dcc870cbefc3f84a988707dc6eca68325d4c175a9c33fae368222811a3a9d9> .\n<urn:tavonel:ko_document_815066b678f725aa7cb47f2b2df6ea5a0fcf5ab009900bf9b0e92e767def989a> tav:contains <urn:tavonel:ko_block_fbaef29bc08d7ea57e8f7970c7cb8346785b5b20deee28371a9ce6b0120380cf> .\n<urn:tavonel:ko_document_815066b678f725aa7cb47f2b2df6ea5a0fcf5ab009900bf9b0e92e767def989a> tav:contains <urn:tavonel:ko_block_5f7eab6ac8690bcdae1760722a6437487c10d4557a13169eeba3b04618e1486b> .\n<urn:tavonel:ko_document_815066b678f725aa7cb47f2b2df6ea5a0fcf5ab009900bf9b0e92e767def989a> tav:contains <urn:tavonel:ko_block_eae5694e7b0616446f0222b9bf32d5950f085caf0c80285bf01527b413e8706c> .\n<urn:tavonel:ko_document_815066b678f725aa7cb47f2b2df6ea5a0fcf5ab009900bf9b0e92e767def989a> tav:contains <urn:tavonel:ko_block_5bbb089e0c4531e87d66dc2dbddd6971a713bc778fc5047d29a527998b4b6bd3> .\n<urn:tavonel:ko_block_0c7c5433bfd5d49fd708c3976e00c153b107f3e8fcc05a8bff99133d1880fe99> a tav:block .\n<urn:tavonel:ko_block_18c17e64b6e02d1732754d8f06cdc27837babacba102a96552c764d16a3f0d0e> a tav:block .\n<urn:tavonel:ko_block_6ff39c98cdd30dc44233ac639cb34f2435fe75fe13c29bf3af8ab82d61840357> a tav:block .\n<urn:tavonel:ko_block_b2e9d5861fa8baa51ebe09ddd2e450950a43e79f8c563af5655b9e802d101849> a tav:block .\n<urn:tavonel:ko_block_f1dcc870cbefc3f84a988707dc6eca68325d4c175a9c33fae368222811a3a9d9> a tav:block .\n<urn:tavonel:ko_block_fbaef29bc08d7ea57e8f7970c7cb8346785b5b20deee28371a9ce6b0120380cf> a tav:block .\n<urn:tavonel:ko_block_5f7eab6ac8690bcdae1760722a6437487c10d4557a13169eeba3b04618e1486b> a tav:block .\n<urn:tavonel:ko_block_eae5694e7b0616446f0222b9bf32d5950f085caf0c80285bf01527b413e8706c> a tav:block .\n<urn:tavonel:ko_block_5bbb089e0c4531e87d66dc2dbddd6971a713bc778fc5047d29a527998b4b6bd3> a tav:block .\n<urn:tavonel:ko_evidence_ddcdad622406573777c4060094fff46535d9aa403fabf50db418d79c750332a0> a tav:evidence .\n<urn:tavonel:ko_evidence_d6fd6122742e9394366586bbb2cb91a54e4f13baf1e39a94413ab87f9b908457> a tav:evidence .\n<urn:tavonel:ko_evidence_dd4c4e7a29169b4082e4e076f6cb64297ca8e1be5392ae07ef3f0b7044f44f72> a tav:evidence .\n<urn:tavonel:ko_evidence_618cc1aef3c11458628d6f382b6b8b639c3b0abc885dc87cfb14da2f7f71468c> a tav:evidence .\n<urn:tavonel:ko_evidence_a2cb816b804a143b09c9ec52d0b622aed53be93cf2277cc0467838dda6561b58> a tav:evidence .\n<urn:tavonel:ko_evidence_3f111ee159f0df754a0eaa75b7bc441e87b33f9aa1fb25042dd3d7a607de35d6> a tav:evidence .\n<urn:tavonel:ko_evidence_c6147f0e8b96eee8d7af47b2c125006214d4552d06577e3e7a83f7e3a3165fa5> a tav:evidence .\n<urn:tavonel:ko_evidence_345a1734e806cdba6411aa40261daf7d87a88e537cd17ccacd149b5667e1834c> a tav:evidence .\n<urn:tavonel:ko_evidence_58f904bf3bf8ee9dd7dadfc46308b8a481e866abbe93e8b68be8db28c65a8c74> a tav:evidence .\n<urn:tavonel:claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c> a tav:claim .\n<urn:tavonel:claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c> tav:supported_by <urn:tavonel:ko_evidence_d6fd6122742e9394366586bbb2cb91a54e4f13baf1e39a94413ab87f9b908457> .\n<urn:tavonel:claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c> tav:mentions <urn:tavonel:entity_dd49e5da10b3f29b0692f36debc9a777e2c63324435517988bac59422d6d7504> .\n<urn:tavonel:claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c> tav:mentions <urn:tavonel:entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a> .\n<urn:tavonel:entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a> a tav:entity .\n<urn:tavonel:entity_dd49e5da10b3f29b0692f36debc9a777e2c63324435517988bac59422d6d7504> a tav:entity .\n<urn:tavonel:relation_94ab7cf90b6687108b2df995cad9b07798a2758160f32db55a6ebea6009bc536> a tav:relation .\n<urn:tavonel:relation_94ab7cf90b6687108b2df995cad9b07798a2758160f32db55a6ebea6009bc536> tav:has_subject <urn:tavonel:claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c> .\n<urn:tavonel:relation_94ab7cf90b6687108b2df995cad9b07798a2758160f32db55a6ebea6009bc536> tav:has_object <urn:tavonel:entity_dd49e5da10b3f29b0692f36debc9a777e2c63324435517988bac59422d6d7504> .\n<urn:tavonel:relation_deb80a554d20ba9a0dfe10e10eb1b4e42221d6a968ef473ba2d919ba817d14d4> a tav:relation .\n<urn:tavonel:relation_deb80a554d20ba9a0dfe10e10eb1b4e42221d6a968ef473ba2d919ba817d14d4> tav:has_subject <urn:tavonel:claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c> .\n<urn:tavonel:relation_deb80a554d20ba9a0dfe10e10eb1b4e42221d6a968ef473ba2d919ba817d14d4> tav:has_object <urn:tavonel:entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a> .\n<urn:tavonel:ontology_term_d006183b3661e531aff2834191a912e34cc397c8dfc86f5a240c4edc5960cfc6> a tav:ontology_term .\n<urn:tavonel:ontology_term_4ea38ad20734b2d3e089a553e66a780df978a7abdebb6fbd7a180e9798fff02c> a tav:ontology_term .\n<urn:tavonel:ontology_term_78d94e725a7069c213adaef9f9633f4dd6e2ef50b383f3a775d873961fa86d65> a tav:ontology_term .\n<urn:tavonel:ontology_term_ee55ca3501a733c5dc2a7adb3e54c8d5eb290bbbecdea27dbc18488dad1a9179> a tav:ontology_term .\n<urn:tavonel:ontology_term_dc9c3d28af574f5eae2640eece7e2366ed09e3e6f83e3ce2757e31e90463c356> a tav:ontology_term .\n"
+          },
+          {
+            "path": "provenance/activities.jsonl",
+            "mediaType": "application/x-ndjson",
+            "sizeBytes": 2502,
+            "sha256": "sha256:1b117e0f9f682c8b82b6db7d462b8dfa257828b4b33567739936197d1d1aed1b",
+            "content": "{\"evidenceId\":\"ev_118e47c1893342c161033bd38ec30e1b713667a3264bf6d64c74a200b853e8cc\",\"identityState\":\"new\",\"logicalId\":\"ku_959b870452a8f8d4856c39d7919d2407f403ff85ce3cee60d3a1413c687be17b\",\"requestId\":\"core-6ddfc1a5-3881-4985-bb00-48cc87ba8e49\",\"type\":\"core.region.compiled.v2\"}\n{\"evidenceId\":\"ev_9c599c91996bfc0583a327ba299757c6684b588349d6a7ac79f58f3218d2d088\",\"identityState\":\"new\",\"logicalId\":\"ku_55322d78b9c3d7279683e176f739c7a2dc51c0ba415bb0f89d325c9e2063a7a5\",\"requestId\":\"core-6ddfc1a5-3881-4985-bb00-48cc87ba8e49\",\"type\":\"core.region.compiled.v2\"}\n{\"evidenceId\":\"ev_2273e8f67d27a74563b7fa6dfd8436c7834ac97c85a011138a44373caf42ce8d\",\"identityState\":\"new\",\"logicalId\":\"ku_38c95ea3e4f35ba4c74503e8c485ad6dcb644620d9d4e62b9bd506c7b7eaebc1\",\"requestId\":\"core-6ddfc1a5-3881-4985-bb00-48cc87ba8e49\",\"type\":\"core.region.compiled.v2\"}\n{\"evidenceId\":\"ev_81cf0379c39e99bcb9c2d8856c21e13db5e4df4f8c0c295bc44fc923cc278100\",\"identityState\":\"new\",\"logicalId\":\"ku_18ec3a5bcab06b605ef963a2f750bf3317a1441da3470a6a62f7522dde751e5c\",\"requestId\":\"core-6ddfc1a5-3881-4985-bb00-48cc87ba8e49\",\"type\":\"core.region.compiled.v2\"}\n{\"evidenceId\":\"ev_661965c768f01769f4a37c3241211d68ee083ad044e2a9b94b29eecd35f0a6d1\",\"identityState\":\"new\",\"logicalId\":\"ku_1c789e1f92925e0fb5504b6ee929308aec8e89a30398fd122322c67a85e6a93c\",\"requestId\":\"core-6ddfc1a5-3881-4985-bb00-48cc87ba8e49\",\"type\":\"core.region.compiled.v2\"}\n{\"evidenceId\":\"ev_94f4aed0efd7edd31de65a93dbef26c98d0c3220a9dfd479879a48b84afc0809\",\"identityState\":\"new\",\"logicalId\":\"ku_489576548c70c739ddd3d2b28cd0f177f64f93cb02ad7018506c6fa1aa4338f9\",\"requestId\":\"core-6ddfc1a5-3881-4985-bb00-48cc87ba8e49\",\"type\":\"core.region.compiled.v2\"}\n{\"evidenceId\":\"ev_fabe6c1a99f28a4e125d6fa2fdb5ecf65818bc070ac49504bd1a01a4151e06cf\",\"identityState\":\"new\",\"logicalId\":\"ku_aca5e0941d02d261d57de1d805f532ec49174d56f7630d694919d2346c83db54\",\"requestId\":\"core-6ddfc1a5-3881-4985-bb00-48cc87ba8e49\",\"type\":\"core.region.compiled.v2\"}\n{\"evidenceId\":\"ev_77a42278d198c3b7cac92319e6d254e4a6090a939594cfb1a764808c14e9a25a\",\"identityState\":\"new\",\"logicalId\":\"ku_46e997c2a37837efe80123962a5a5a2073264dc0d0ef612fdf9da596d26bfa9b\",\"requestId\":\"core-6ddfc1a5-3881-4985-bb00-48cc87ba8e49\",\"type\":\"core.region.compiled.v2\"}\n{\"evidenceId\":\"ev_7a91f41858bdea26ac6d2f85fb10894ac6267a05ddada44e5151751bc0793dbf\",\"identityState\":\"new\",\"logicalId\":\"ku_9f76e126fec693ea15f43d2e56287d353cc7bedf481896bc27e2bdcb8854b62e\",\"requestId\":\"core-6ddfc1a5-3881-4985-bb00-48cc87ba8e49\",\"type\":\"core.region.compiled.v2\"}\n"
+          },
+          {
+            "path": "rag/chunks.jsonl",
+            "mediaType": "application/x-ndjson",
+            "sizeBytes": 5597,
+            "sha256": "sha256:88d06ab3411301411c69f131818d2a4fb73969e364c68e00468b08cbc81b80b2",
+            "content": "{\"authority\":\"informal\",\"authorityScore\":0.4,\"authorityTier\":\"informal\",\"bbox1000\":[142,121,853,275],\"chunkId\":\"chunk_fe20d77e8cd77eff5d3cc9f515652331e0e2ae26d6881fcd8eb71b292628dc7d\",\"claimIds\":[\"claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c\"],\"entityIds\":[\"entity_dd49e5da10b3f29b0692f36debc9a777e2c63324435517988bac59422d6d7504\",\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\"],\"entityNames\":[\"DOCX-\",\"TAVONEL-E2E-\"],\"evidenceId\":\"ev_118e47c1893342c161033bd38ec30e1b713667a3264bf6d64c74a200b853e8cc\",\"evidenceIds\":[\"ev_118e47c1893342c161033bd38ec30e1b713667a3264bf6d64c74a200b853e8cc\",\"ev_9c599c91996bfc0583a327ba299757c6684b588349d6a7ac79f58f3218d2d088\",\"ev_2273e8f67d27a74563b7fa6dfd8436c7834ac97c85a011138a44373caf42ce8d\",\"ev_81cf0379c39e99bcb9c2d8856c21e13db5e4df4f8c0c295bc44fc923cc278100\",\"ev_661965c768f01769f4a37c3241211d68ee083ad044e2a9b94b29eecd35f0a6d1\",\"ev_94f4aed0efd7edd31de65a93dbef26c98d0c3220a9dfd479879a48b84afc0809\",\"ev_fabe6c1a99f28a4e125d6fa2fdb5ecf65818bc070ac49504bd1a01a4151e06cf\",\"ev_77a42278d198c3b7cac92319e6d254e4a6090a939594cfb1a764808c14e9a25a\",\"ev_7a91f41858bdea26ac6d2f85fb10894ac6267a05ddada44e5151751bc0793dbf\"],\"evidenceRefs\":[{\"bbox1000\":[142,121,667,142],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00001\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null},{\"bbox1000\":[144,143,853,162],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00002\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null},{\"bbox1000\":[142,160,710,181],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00003\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null},{\"bbox1000\":[143,193,201,211],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00004\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null},{\"bbox1000\":[496,192,613,211],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00005\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null},{\"bbox1000\":[143,223,279,244],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00006\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null},{\"bbox1000\":[497,224,608,243],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00007\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null},{\"bbox1000\":[142,254,256,275],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00008\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null},{\"bbox1000\":[496,254,566,274],\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"imageAssetId\":null,\"nativeObjectId\":\"ocr-p0001-l00009\",\"pageIndex0\":0,\"pageNumber1\":1,\"timeEndMs\":null,\"timeStartMs\":null}],\"languages\":[\"en\"],\"logicalId\":\"ku_959b870452a8f8d4856c39d7919d2407f403ff85ce3cee60d3a1413c687be17b\",\"logicalIds\":[\"ku_959b870452a8f8d4856c39d7919d2407f403ff85ce3cee60d3a1413c687be17b\",\"ku_55322d78b9c3d7279683e176f739c7a2dc51c0ba415bb0f89d325c9e2063a7a5\",\"ku_38c95ea3e4f35ba4c74503e8c485ad6dcb644620d9d4e62b9bd506c7b7eaebc1\",\"ku_18ec3a5bcab06b605ef963a2f750bf3317a1441da3470a6a62f7522dde751e5c\",\"ku_1c789e1f92925e0fb5504b6ee929308aec8e89a30398fd122322c67a85e6a93c\",\"ku_489576548c70c739ddd3d2b28cd0f177f64f93cb02ad7018506c6fa1aa4338f9\",\"ku_aca5e0941d02d261d57de1d805f532ec49174d56f7630d694919d2346c83db54\",\"ku_46e997c2a37837efe80123962a5a5a2073264dc0d0ef612fdf9da596d26bfa9b\",\"ku_9f76e126fec693ea15f43d2e56287d353cc7bedf481896bc27e2bdcb8854b62e\"],\"pageNumber1\":1,\"retrievalTerms\":[\"tavonel\",\"end-to-end\",\"proving\",\"document\",\"audit\",\"token\",\"tavonel-e2e-docx-7f3a.\",\"pump\",\"p-207\",\"overhauled\",\"2026\",\"05\",\"02\",\"technician\",\"devin\",\"oyelaran.\",\"asset\",\"overhaul\",\"date\",\"seal\",\"torque\",\"48\",\"nm\"],\"sourceId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"sourceVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"temporalRefs\":[],\"text\":\"TAVONEL End-to-End Proving Document\\nThe audit token for this document is TAVONEL-E2E-DOCX-7f3a. Pump P-207\\nwas overhauled on 2026-05-02 by technician Devin Oyelaran.\\nAsset\\nPump P-207\\nOverhaul date\\n2026-05-02\\nSeal torque\\n48 Nm\"}\n"
+          },
+          {
+            "path": "rag/documents.jsonl",
+            "mediaType": "application/x-ndjson",
+            "sizeBytes": 293,
+            "sha256": "sha256:0124a16197f06f6bf82d1cd2596319a683cd3c2aacb52cef6996b1279aedc9d6",
+            "content": "{\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"sourceSha256\":\"sha256:b2e95f37a7c9e2e435738951fa9f7b8693f16a511056edeb5db35c32cb698adf\",\"title\":\"Document c2fa81fb\"}\n"
+          },
+          {
+            "path": "rag/retrieval-profile.json",
+            "mediaType": "application/json",
+            "sizeBytes": 333,
+            "sha256": "sha256:6cd0d1041fac3ceccecbfb20ec9ab004f7353ad57e435923dd6ca680698f42fa",
+            "content": "{\"candidateK\":30,\"materializedSignals\":[\"multilingual_lexical\",\"entity_graph\",\"authority_prior\"],\"schemaVersion\":\"tavonel.adaptive_hybrid_profile.v1\",\"tokenization\":\"unicode-script-aware-v1\",\"topK\":8,\"vectorMaterialization\":\"external_embedding_provider_required\",\"weights\":{\"authority\":0.1,\"graph\":0.2,\"lexical\":0.35,\"vector\":0.35}}\n"
+          },
+          {
+            "path": "semantics/claims.jsonl",
+            "mediaType": "application/x-ndjson",
+            "sizeBytes": 950,
+            "sha256": "sha256:77eafe86e4a64be71a712d24e7c2bd2e2968e950c35a4d520371242ce4bd61e1",
+            "content": "{\"authority\":\"informal\",\"authorityScore\":0.4,\"authorityTier\":\"informal\",\"claimId\":\"claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c\",\"entityIds\":[\"entity_dd49e5da10b3f29b0692f36debc9a777e2c63324435517988bac59422d6d7504\",\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\"],\"evidenceId\":\"ev_9c599c91996bfc0583a327ba299757c6684b588349d6a7ac79f58f3218d2d088\",\"language\":\"en\",\"logicalId\":\"ku_55322d78b9c3d7279683e176f739c7a2dc51c0ba415bb0f89d325c9e2063a7a5\",\"modality\":\"asserted\",\"numericValues\":[\"7\"],\"polarity\":\"positive\",\"retrievalTerms\":[\"audit\",\"token\",\"document\",\"tavonel-e2e-docx-7f3a.\"],\"sourceId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"sourceVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"temporalRefs\":[],\"text\":\"The audit token for this document is TAVONEL-E2E-DOCX-7f3a.\",\"topicKey\":\"audit token document tavonel-e2e-docx- f3a.\"}\n"
+          },
+          {
+            "path": "semantics/contradictions.jsonl",
+            "mediaType": "application/x-ndjson",
+            "sizeBytes": 0,
+            "sha256": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "content": ""
+          },
+          {
+            "path": "semantics/entities.jsonl",
+            "mediaType": "application/x-ndjson",
+            "sizeBytes": 619,
+            "sha256": "sha256:12ef5f4112e45f9e8556047ccf36e467bda30f5a6fb51cdaf77a83b8c7fe24b7",
+            "content": "{\"canonicalName\":\"TAVONEL-E2E-\",\"claimIds\":[\"claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c\"],\"entityId\":\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\",\"entityType\":\"acronym\",\"evidenceIds\":[\"ev_9c599c91996bfc0583a327ba299757c6684b588349d6a7ac79f58f3218d2d088\"]}\n{\"canonicalName\":\"DOCX-\",\"claimIds\":[\"claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c\"],\"entityId\":\"entity_dd49e5da10b3f29b0692f36debc9a777e2c63324435517988bac59422d6d7504\",\"entityType\":\"acronym\",\"evidenceIds\":[\"ev_9c599c91996bfc0583a327ba299757c6684b588349d6a7ac79f58f3218d2d088\"]}\n"
+          },
+          {
+            "path": "semantics/profile.json",
+            "mediaType": "application/json",
+            "sizeBytes": 607,
+            "sha256": "sha256:c6cfc48c63b48b3e4e5a57e6c981dc0dd14b3d63410ddf5cf4a0595e0877f1b3",
+            "content": "{\"claimCount\":1,\"contradictionCandidateCount\":0,\"domain\":\"finance\",\"entityCount\":2,\"languages\":{\"en\":1},\"objectTypes\":[\"company\",\"filing\",\"statement\",\"metric\",\"risk\"],\"relationCount\":2,\"retrieval\":{\"candidateK\":30,\"materializedSignals\":[\"multilingual_lexical\",\"entity_graph\",\"authority_prior\"],\"schemaVersion\":\"tavonel.adaptive_hybrid_profile.v1\",\"tokenization\":\"unicode-script-aware-v1\",\"topK\":8,\"vectorMaterialization\":\"external_embedding_provider_required\",\"weights\":{\"authority\":0.1,\"graph\":0.2,\"lexical\":0.35,\"vector\":0.35}},\"schemaVersion\":\"tavonel.semantic_profile.v1\",\"temporalStructure\":\"undated\"}\n"
+          },
+          {
+            "path": "semantics/relations.jsonl",
+            "mediaType": "application/x-ndjson",
+            "sizeBytes": 734,
+            "sha256": "sha256:2840223969a6d0045cbbe00299fd5ab2d32173c81f4d0952b55859db7b65c60b",
+            "content": "{\"evidenceId\":\"ev_9c599c91996bfc0583a327ba299757c6684b588349d6a7ac79f58f3218d2d088\",\"objectId\":\"entity_dd49e5da10b3f29b0692f36debc9a777e2c63324435517988bac59422d6d7504\",\"predicate\":\"mentions\",\"relationId\":\"relation_94ab7cf90b6687108b2df995cad9b07798a2758160f32db55a6ebea6009bc536\",\"subjectId\":\"claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c\"}\n{\"evidenceId\":\"ev_9c599c91996bfc0583a327ba299757c6684b588349d6a7ac79f58f3218d2d088\",\"objectId\":\"entity_245d9c5bfcaaaef19f62ae717bd1559a5e32e3431e431705a4af35bd7627b16a\",\"predicate\":\"mentions\",\"relationId\":\"relation_deb80a554d20ba9a0dfe10e10eb1b4e42221d6a968ef473ba2d919ba817d14d4\",\"subjectId\":\"claim_507218a6507972a93e0f7751a39e41bcb5e308c9c37c724dd7994e4d63f2ce5c\"}\n"
+          },
+          {
+            "path": "source/collection-files.json",
+            "mediaType": "application/json",
+            "sizeBytes": 267,
+            "sha256": "sha256:d12214f74b59c620d4076d4baff923dc52c26cb7547b0c86ed130400b86a41c4",
+            "content": "[{\"documentId\":\"src_f6dfd2e7717bcf81035b563577be53033e392bbd3c5334ddf2fec17680f06095\",\"documentVersionId\":\"dv_6eda6cf0891ac9feda4636d1439102f3943b35904d270f4d7088db19b8e7bb82\",\"sourceSha256\":\"sha256:b2e95f37a7c9e2e435738951fa9f7b8693f16a511056edeb5db35c32cb698adf\"}]\n"
+          },
+          {
+            "path": "validation/report.json",
+            "mediaType": "application/json",
+            "sizeBytes": 530,
+            "sha256": "sha256:cbbaf8e13c63c86462009996dcfdf69bcf6f02287865706d3071978f60c9d7bc",
+            "content": "{\"architecturePlanSha256\":\"sha256:891fd10b03706f606979c13b76bc7f0755107e4c76435d95a6aa74a7c206891b\",\"blueprint\":\"corporate-filings\",\"candidatePromotion\":false,\"claimCount\":1,\"contradictionCandidateCount\":0,\"documentCount\":1,\"entityCount\":2,\"knowledgeObjectCount\":30,\"languages\":{\"en\":1},\"matchingPolicy\":\"legacy\",\"relationCount\":2,\"retrievalChunkCount\":1,\"retrievalEvidenceCoverage\":1.0,\"retrievalMeanCharacters\":225.0,\"retrievalTinyChunkCount\":0,\"reviewReasons\":[],\"semanticEvidenceCoverage\":1.0,\"status\":\"passed\",\"unitCount\":9}\n"
+          }
+        ],
+        "signatureStatus": "external_signer_required"
+      },
+      "validation": {
+        "status": "passed",
+        "deterministicMaterialization": true,
+        "sourceCoverage": true,
+        "evidenceCoverage": true,
+        "immutableInputsOnly": true,
+        "fullRebuildEquivalence": "not_run",
+        "reviewReasons": [],
+        "counts": {
+          "documents": 1,
+          "topics": 0,
+          "entities": 2,
+          "claims": 1,
+          "evidence": 9,
+          "relations": 1,
+          "packageFiles": 26
+        }
+      },
+      "reviewReasons": [],
+      "coreExecution": {
+        "status": "completed",
+        "runtime": "tavonel-python-core-v2",
+        "worldStateId": "ws_869d78a6a005074b51e7dc761951785da0a02d12115ed782bd94d6f31f53ad9e",
+        "receipt": {
+          "requestId": "core-6ddfc1a5-3881-4985-bb00-48cc87ba8e49",
+          "inputSha256": "sha256:eed57c6d37625c6d3685d2fd4ce6815c461050d7649d1ccb01016b9db3484297",
+          "outputSha256": "sha256:82305c971dedcb7075396c36b46eb4d74e766f9903d30557e97cdf7115694491",
+          "coreReleaseDigest": "sha256:26903719e1bbcabada67a15b659d392b3b9c9d0159abdcf74dc5260a50a11f31",
+          "matchingPolicy": "legacy",
+          "candidatePromotion": false,
+          "equivalence": "not_run",
+          "totalArtifacts": 31,
+          "rebuiltArtifacts": 31,
+          "workAvoidedArtifacts": 0
+        }
+      }
+    }
+  },
+  "finishedAt": "2026-09-06T10:08:29.404Z",
+  "reachedStep": "COLLECTION",
+  "stepChain": [
+    "CAPABILITIES",
+    "UPLOAD_CAPABILITY",
+    "R2_PUT",
+    "CONFIRM",
+    "DOCUMENT_TERMINAL",
+    "COMPILE_JOB",
+    "COMPILE_TERMINAL",
+    "COLLECTION",
+    "WORLD",
+    "ASK"
+  ],
+  "verdict": "REACHED_COLLECTION"
+}

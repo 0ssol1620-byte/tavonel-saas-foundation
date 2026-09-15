@@ -16,6 +16,25 @@ export type BreadcrumbStep = { name: string; path: string };
 
 const ORIGIN = "https://tavonel.com";
 
+/**
+ * The serializer for every JSON-LD block this site emits.
+ *
+ * `JSON.stringify` escapes nothing HTML cares about, and both blocks reach the page through
+ * `dangerouslySetInnerHTML`. Inside a `<script>` element the HTML parser is looking for exactly
+ * one thing -- `</script` -- so one string value containing it ends the element early and
+ * everything after it is markup on the page. `<` is the same character to a JSON parser and
+ * is not `<` to the HTML parser, which is why escaping that one character is the whole fix.
+ *
+ * Nothing exploitable exists today: every value in either block is an authored literal and every
+ * breadcrumb trail is a page-declared string. That is a property of today's callers, not of the
+ * sink -- and the sink is what the next caller reaches for, with a cookbook title out of a
+ * customer document or a connector's folder name. So the escaping is here, once, instead of at
+ * whichever call site remembers it.
+ */
+export function jsonLdHtml(value: unknown): string {
+  return JSON.stringify(value).replace(/</g, "\\u003c");
+}
+
 /*
   Home is prepended rather than repeated at nine call sites -- a trail that skips the root is a
   trail whose first item is not the first item, and that is exactly the sort of thing that is

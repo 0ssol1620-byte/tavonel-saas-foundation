@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { BILLING_OFFERS } from "./billing-catalog";
 import { CLAIM_STATE } from "./claim-state";
@@ -65,6 +65,13 @@ const CLAIM_SURFACES = [
   "app/explore/page.tsx",
   "components/explore/explore-stage.tsx",
   "lib/docs-content.ts",
+  /*
+    The cookbooks, 2026-09-11. Six drafts whose ready sections describe what the product does
+    today -- what the reader preserves, which plan activates a World, what Ask does when nothing
+    matched. That is the present tense this file exists to keep honest, and the route that
+    arranges them holds no copy of its own.
+  */
+  "lib/cookbook-content.ts",
 ] as const;
 
 /*
@@ -195,8 +202,24 @@ describe("product claims sync", () => {
       .toContain('from "@/lib/compiler-contract"');
     expect(page).toContain('clause("stable-semantic-identity")');
     expect(page).toContain('clause("typed-dependencies")');
-    expect(page, "the card prints the registry's state word, not a word chosen in the markup")
-      .toContain("CONTRACT_STATE[part.clause.state].label");
+    /*
+      BA-013 took the readiness ladder off the card -- the state word and "Not offered as a
+      shipped capability in this deployment" printed under two of six product cards -- and left
+      the pointer to the clause. So the tie to the registry is no longer a rendered label, and
+      this pins the thing that replaced it, which fails harder: the page declares the two states
+      its copy was written against and throws at module scope if either moves, so a clause that
+      flips stops the build instead of relabelling a sentence that has become false. The
+      assertion below on "are not merged automatically" is the other half of the same tie and is
+      unchanged.
+    */
+    expect(page, "the page names the clause states its copy was written against")
+      .toContain('IDENTITY.state !== "direction" || RELATIONS.state !== "demonstrated"');
+    expect(page, "and a state change stops the build rather than relabelling stale copy")
+      .toContain("re-derive the OBJECTS and RELATIONS cards");
+    expect(clause("stable-semantic-identity").state).toBe("direction");
+    expect(clause("typed-dependencies").state).toBe("demonstrated");
+    expect(page, "the ladder vocabulary belongs to /product/continuous-knowledge, not to a card")
+      .not.toContain("CONTRACT_STATE");
   });
 
   /*
@@ -281,15 +304,23 @@ describe("product claims sync", () => {
     drift is the level written on each row, so each named route is grepped for the level it
     demands -- a route that tightens its gate fails here rather than leaving the table promising
     the old one.
+
+    `activation` joined the two plan-only levels when World activation stopped being a plan-only
+    question. A row advertised at that level has to be enforced by a route that asks for
+    `activation` *and hands over a role*: the level on its own would admit a Developer-plan
+    member, which is the row this table would then be promising wrongly.
   */
   it("states a plan capability at the level the route enforcing it demands", () => {
     const page = read("app/pricing/page.tsx");
-    const rows = [...page.matchAll(/route: "([^"]+)", level: "(observer|studio)"/g)];
+    const rows = [...page.matchAll(/route: "([^"]+)", level: "(observer|studio|activation)"/g)];
     expect(rows.length, "the capability table is still declared on the pricing page")
       .toBeGreaterThanOrEqual(5);
     for (const [, route, level] of rows) {
       const source = read(route!);
-      if (level === "studio") {
+      if (level === "activation") {
+        expect(source, `${route} is advertised as World activation and does not require it`)
+          .toMatch(/authorizeFoundationProduct\([^)]*"activation",\s*\w+(?:\.\w+)*\.role\s*\)/s);
+      } else if (level === "studio") {
         expect(source, `${route} is advertised as Team-only and does not require it`)
           .toMatch(/(?:authorizeFoundationProduct|authorizeFoundationRequest|requireFoundationSession)\([^)]*"studio"/s);
       } else {
@@ -298,7 +329,7 @@ describe("product claims sync", () => {
       }
     }
     expect(page, "the cells are decided by the function the API calls")
-      .toContain("billingProductDecision(account(code), row.level).ok");
+      .toContain("billingProductDecision(account(code), row.level, TABLE_ROLE).ok");
   });
 
   /*
@@ -333,17 +364,98 @@ describe("product claims sync", () => {
 
   /*
     Audit P06 and P08: two facts a buyer could only find by reading SQL, and a link.
+
+    P06 used to be pinned as *behaviour read out of the billing code* -- "nothing in the billing
+    code removes a balance you already hold", which was true of `apply_foundation_billing_event_v4`
+    as 0035 wrote it and said nothing about what the customer had bought. FD-03 settled the term:
+    included pages belong to their billing month, do not roll over, and are not refunded on
+    cancellation. So this pins the published term instead, and the rate beside it stays derived
+    from the constants the reservation code charges against rather than typed.
+
+    The term is no longer ahead of its enforcement:
+    `supabase/migrations/20260911130000_included_page_expiry_at_renewal.sql` expires the previous
+    month's remainder when the next month's grant lands, as a ledger row, and
+    `lib/included-page-expiry-migration.test.ts` guards that. So these assertions pin the moment
+    the code actually keeps -- *at the next grant* -- and not "at the end of each billing month",
+    which is a boundary no column records and no job enforces. If a later edit puts the stronger
+    sentence back on the page, this test is what fails.
+
+    Stage-B integration: `lib/docs-content.ts`'s billing block carried the entitlements lane's
+    behaviour sentence ("nothing in the billing code removes a balance you already hold"), which
+    this merge made false -- git auto-merged that file because the ledger lane never touched it.
+    Both buyer surfaces now state the same moment and both are pinned here, so they cannot drift
+    apart again in one direction. The FD-03 hold test below releases itself on this tree, because
+    a migration now writes `allowance_expired`; it stays because it is the rule, not the state.
   */
-  it("states the cancellation balance behaviour and points Enterprise at the trust index", () => {
+  it("states the page-expiry term and points Enterprise at the trust index", () => {
     const pricing = read("components/pricing-page-client.tsx");
-    expect(pricing, "P06: what happens to a balance on cancellation")
-      .toContain("nothing in the billing code removes a balance you already hold");
-    expect(pricing, "P06: and that it is only spendable while a plan is active")
-      .toContain("only be spent while a plan is active");
+    expect(pricing, "P06: the expiry moment is the next grant, not a period-end clock")
+      .toContain("when the next month's pages are granted, whatever is left of the previous month expires");
+    expect(pricing, "P06: unused included pages do not roll over, and are not refunded on cancellation")
+      .toContain("do not roll over and are not refunded if you cancel");
+    expect(pricing, "P06: the page does not promise a period-end boundary the schema has no column for")
+      .not.toContain("expire at the end of each billing month");
+    expect(read("lib/docs-content.ts"), "P06: the billing docs state the same expiry moment as the page")
+      .toContain("when the next month's pages are granted, whatever is left of the previous month expires");
+    expect(pricing, "P06: the overage rate is derived, not typed")
+      .toContain("published rate of ${formatUsd(STANDARD_PAGE_USD)} per standard page");
     expect(pricing, "P03: whether Ask and search consume pages")
       .toContain("What does not consume pages");
     expect(pricing, "P08: the Enterprise card reaches the trust index")
       .toContain('href: "/trust" as Route');
+  });
+
+  /*
+    FD-03's hold, as a test. `allowance_expired` is the ledger `kind` an expiry has to write --
+    the balance is a scalar and an expiry that is not a ledger row is a silent UPDATE -- so the
+    presence of that token in a migration is the enforcement existing, and its absence is the
+    enforcement not existing. Failure path: publish the term with no migration and this fails;
+    land the migration and the copy becomes sayable without touching this file.
+  */
+  /*
+    FD-04's line on `/refunds`, which was the one buyer surface that did not draw it.
+
+    The live template said eligibility "may be limited after substantial processing has been
+    consumed" -- a sentence a reader cannot apply to themselves and support cannot apply either.
+    The entitlements lane published the derived line on `/pricing` and in the billing docs and
+    could not reach this file; it also recorded that nothing pinned the rendered threshold. This
+    is that pin, and it is on the derivation rather than on the numbers: a typed "14 days" or
+    "10%" here would be a second source for a money term the catalog already holds.
+
+    The template renders only when `liveChargesEnabled` is true. That is the gate, not this
+    test -- §5 of `docs/policy/REFUND_THRESHOLD_DRAFT.md` is unanswered legal work, and the lane
+    report makes answering it a precondition for opening checkout.
+  */
+  it("draws the refund line on /refunds from the catalog, not from a typed number", () => {
+    const refunds = read("app/refunds/page.tsx");
+    expect(refunds, "the window is the catalog's").toContain("{REFUND_WINDOW_DAYS}");
+    expect(refunds, "the share is the catalog's").toContain("Math.round(REFUND_MAX_CONSUMED_FRACTION * 100)");
+    for (const offer of ["observer_access", "studio_access"] as const) {
+      expect(refunds, `${offer}'s page allowance is derived`).toContain(`refundablePageAllowance(BILLING_OFFERS.${offer})`);
+    }
+    const copy = strip(refunds);
+    expect(copy, "the sentence that drew no line at all is gone").not.toContain("substantial processing");
+    expect(copy, "statutory rights are assessed separately from the voluntary window")
+      .toContain("regardless of how much of it you processed");
+    /*
+      The heading and the window paragraph above it typed "14" three times, which is the same
+      term from a second source -- and the one that would have been missed when the window moved,
+      because nothing rendered the two side by side. They are derived now, so the only literal
+      day count left on the page is the payment provider's 3-5 working days, which is not ours.
+    */
+    expect(copy, "no day count typed beside the derived one").not.toMatch(/\b14[- ](calendar )?days?\b/);
+    expect(copy, "no percentage typed beside the derived one").not.toMatch(/\b\d{1,3}%/);
+  });
+
+  it("does not publish the page-expiry term until a migration enforces it", () => {
+    const migrations = new URL("../supabase/migrations/", root);
+    const enforced = readdirSync(migrations)
+      .some((file) => file.endsWith(".sql") && readFileSync(new URL(file, migrations), "utf8").includes("allowance_expired"));
+    if (enforced) return;
+    for (const surface of ["components/pricing-page-client.tsx", "lib/docs-content.ts"] as const) {
+      expect(strip(read(surface)), `${surface}: FD-03 holds the expiry copy until LEDGER-EXPIRY lands`)
+        .not.toMatch(/do not roll over|expires? at the end of each billing month/i);
+    }
   });
 
   /*

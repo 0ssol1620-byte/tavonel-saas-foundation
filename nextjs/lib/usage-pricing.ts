@@ -1,3 +1,5 @@
+import { PROCESSING_CEILING } from "../../shared/intakeCeiling";
+
 export const PROCESSING_UNIT_USD = 0.01;
 export const STANDARD_UNITS_PER_PAGE = 4;
 export const MAX_UNITS_PER_PAGE = 6;
@@ -14,13 +16,17 @@ export type CompileQuote = {
 /**
  * How a page count was arrived at, and therefore what may be said about it.
  *
- * A PDF that does not declare a page count falls back to `ceil(bytes / 65,536)`. That number is
- * a defensible spend ceiling and a terrible fact: it is derived from file size and has no
- * relationship to how many pages the document has. It was reaching the customer under the
- * heading "Pages", next to a dollar figure they were being asked to authorise.
+ * There used to be a fourth basis: `ceil(bytes / 65,536)`, for a file whose format states no page
+ * count. It was a defensible spend ceiling and a terrible fact -- derived from file size, with no
+ * relationship to how many pages the document has -- and it was reaching the customer under the
+ * heading "Pages", next to a dollar figure they were being asked to authorise. Labelling it an
+ * estimate made the label honest and left the number invented, which this repository forbids
+ * outright, so it is gone: a file nobody can count yet has no page number at all, and the
+ * spreadsheet whose count it mostly served is now billed on the pages of the sanitized PDF,
+ * counted after conversion.
  *
- * A byte-derived count is `provisional` and must be labelled as an estimate wherever it is
- * shown.
+ * `provisional` therefore no longer describes a basis. It survives as the confidence of a set
+ * with nothing counted in it, which is what `canReserveAgainst` has to refuse.
  *
  * "Read out of the document" is not one thing, and treating it as one is how a Word file's
  * stale metadata came to be shown as "Verified pages":
@@ -45,8 +51,7 @@ export type PageEstimateBasis =
   | "pdf_page_tree"
   | "image"
   | "pptx_slides"
-  | "docx_declared"
-  | "byte_upper_bound";
+  | "docx_declared";
 export type PageEstimateConfidence = "provisional" | "declared" | "verified";
 
 export type PageEstimate = {
@@ -56,7 +61,6 @@ export type PageEstimate = {
 };
 
 export function pageEstimateConfidence(basis: PageEstimateBasis): PageEstimateConfidence {
-  if (basis === "byte_upper_bound") return "provisional";
   if (basis === "docx_declared") return "declared";
   return "verified";
 }
@@ -65,7 +69,7 @@ export function pageEstimateConfidence(basis: PageEstimateBasis): PageEstimateCo
 export function pageCountLabel(confidence: PageEstimateConfidence) {
   if (confidence === "verified") return "Verified pages";
   if (confidence === "declared") return "Declared pages";
-  return "Estimated page-equivalents";
+  return "Pages not counted yet";
 }
 
 /**
@@ -145,10 +149,31 @@ export function estimateBillablePages(value: {
   if (value.mimeType.toLowerCase().startsWith("image/")) {
     return { pages: 1, basis: "image", confidence: "verified" };
   }
-  return {
-    pages: Math.min(MAX_QUOTED_PAGES, Math.max(1, Math.ceil(value.bytes / 65_536))),
-    basis: "byte_upper_bound",
-    confidence: "provisional",
-  };
+  // No count, and no invented one. A spreadsheet is counted on the sanitized PDF after
+  // conversion; any other format that states no page count is counted when it is read. Callers
+  // show the absence -- they never fill it in from the file size.
+  return null;
 }
 
+
+/**
+ * The pages to *reserve* for a source nobody has counted yet -- never a page count to show.
+ *
+ * `estimateBillablePages` returns `null` for a file whose format states no page count, which is
+ * the correct answer to "how many pages is this" and a dangerous one to reserve against. Both
+ * server call sites used to write `?? 1`: before the byte-derived fallback was removed they
+ * reserved a byte-derived ceiling, and afterwards they reserved **one page** for a spreadsheet
+ * that can settle at up to `PROCESSING_CEILING.maxSourcePages`. Bounded, because nothing in the
+ * chain reads more than that ceiling and settlement bills the pages actually produced -- but the
+ * gap between the hold and the settlement is credit an untruthful client can spend twice.
+ *
+ * So the fallback is the deployment's own documented page ceiling: the most a rasterizer will
+ * ever render for one source, which is the most a settlement for one source can ever charge.
+ * It over-reserves, deliberately and in the customer's favour on refusal, and it is never
+ * rendered: `pageCountLabel("provisional")` is what a reader sees for an uncounted file, and it
+ * says the pages are not counted yet. A number chosen to hold credit is not a fact about a
+ * document, and this function returns the first and never the second.
+ */
+export function reservationPageCeiling(value: Parameters<typeof estimateBillablePages>[0]): number {
+  return estimateBillablePages(value)?.pages ?? PROCESSING_CEILING.maxSourcePages;
+}

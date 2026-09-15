@@ -1,0 +1,203 @@
+# SOURCE_RIGHTS_MANIFEST.yaml — what this project may compile in public, and on whose word
+#
+# Written 2026-09-11 by the website-growth campaign's keyword-claims-data lane (WG-013 support).
+# Every path was opened in the site repository at HEAD 38d957d before its row was written.
+#
+# Why this file exists. The growth plan needs a corpus it can compile, screenshot and publish,
+# and the cheapest-looking corpora are the ones already in `nextjs/public/`. "Already in the repo"
+# is not a right to republish, and three of CLAUDE.md's rules are the reason this file is a
+# manifest rather than a sentence:
+#
+#   - an OSS licence is copyright permission from that contributor and settles nothing else;
+#   - readable is not reusable — a document being publicly fetchable grants no redistribution
+#     right, and a filing being on EDGAR does not put it in the public domain;
+#   - code, model weights, dataset and hosted-API terms are four separate licences, and clearing
+#     one clears none of the others.
+#
+# ---------------------------------------------------------------------------------------------
+# Fields
+#
+#   id                  Stable handle for the material.
+#   kind                `file` — specific bytes in this repository.
+#                       `class` — a category of material a future decision would cover.
+#   paths               Where the bytes are, repo-relative. Empty for a `class` row.
+#   pages               Page count where it is known from a committed fixture, else null.
+#   origin              Where the bytes came from, as the repository itself records it.
+#   rights_status       `unverified` — nobody has established the right. The default.
+#                       `cleared`    — a named person signed off, citing a licence or ownership.
+#                       `restricted` — a known restriction blocks this use until it is resolved.
+#   rights_basis        The kind of right that would have to hold: `licence`, `own_work`,
+#                       `permission`, or `none_identified`.
+#   rights_evidence     The artifact an auditor reads. A commit, a licence file, a written
+#                       permission. `none` where there is none.
+#   cleared_by          The person who signed. `null` on every row below, and that is the point:
+#                       a row cannot be `cleared` while this is null.
+#   restrictions        What is known to be forbidden or unresolved.
+#   intended_use        What the growth campaign would use it for.
+#   blocking_artifact   The one thing that would move this row off `unverified`.
+#
+# THE RULE THIS FILE IS FOR: no row is `cleared` without both a cited right in `rights_evidence`
+# and a person in `cleared_by`. Every row below is `unverified` or `restricted`. That is the
+# accurate state, not an omission — under CLAUDE.md, whether evidence supports a public claim is
+# always the founder's call, and an agent marking its own corpus cleared would be the
+# self-approval the constitution bars. WG-013 is a founder decision for the same reason.
+# ---------------------------------------------------------------------------------------------
+
+sources:
+
+  - id: fp200-synthetic-maintenance-corpus
+    kind: file
+    paths:
+      - "nextjs/public/explore-sample/fp-200-maintenance-manual-revB.pdf"
+      - "nextjs/public/explore-sample/fp-200-maintenance-manual-revC.pdf"
+      - "nextjs/public/explore-sample/fp-200-change-notice-CN-2026-03.pdf"
+      - "nextjs/public/explore-sample/fp-200-service-log-2026.pdf"
+    pages: 4
+    origin: >-
+      Generated inside this repository. Commit ec27cf0 ("fixture: compile the /explore corpus at
+      both revisions of its manual", 2026-09-05) describes the generator gaining a revision-B
+      manual so both states of one document could be compiled and compared. The text is a
+      fictional feedwater pump FP-200 with a service interval, a seal procedure and a pressure
+      rating. Revision C is one page (`pageCount: 1` in
+      nextjs/lib/entity-extraction-eval.inputs.json); the other three are 965-1,287 bytes each,
+      so one page apiece is the reasonable reading and not a measured count.
+    rights_status: unverified
+    rights_basis: own_work
+    rights_evidence: "commit ec27cf0; nextjs/lib/entity-extraction-eval.inputs.json carries the extracted text of revision C"
+    cleared_by: null
+    restrictions: >-
+      No third-party material has been identified in them, and no third-party material is
+      expected in generated text — but "expected" is not a check, and `package.json` declares
+      `"license": "MIT"` while no LICENSE file exists at the repository root, so the repository's
+      own licence position is not something this lane can read off a file.
+    intended_use: >-
+      The J1 first-run corpus and the J3 revision demonstration: revision B and revision C of one
+      manual are exactly the "source changed, what did that cost" shape J3 needs, and the four
+      files together are four pages against a 50-standard-page trial ceiling.
+    blocking_artifact: >-
+      One line from the founder: that the generated FP-200 fixture is TAVONEL's own work,
+      contains no third-party material, and may be used and shown in public content.
+
+  - id: apple-2025-form-10-k-pdf
+    kind: file
+    paths: ["nextjs/public/explore-sample/apple-2025-form-10-k.pdf"]
+    pages: 80
+    origin: >-
+      "Apple Investor Relations official PDF, cross-checkable in SEC EDGAR" — the fixture's own
+      `acquiredFrom` (nextjs/lib/explore-sample.sources.json), with accession
+      0000320193-25-000079 and sha256 1085900...ab7d1aab recorded beside it.
+    rights_status: unverified
+    rights_basis: none_identified
+    rights_evidence: "none — the fixture records acquisition and a digest, which is provenance, not permission"
+    cleared_by: null
+    restrictions: >-
+      The filing is Apple Inc.'s own text and carries Apple's copyright; being filed with the SEC
+      and fetchable from EDGAR is access, not a redistribution licence, and blueprint §16.1 names
+      this exact assumption as one not to make. These bytes are already served from
+      `nextjs/public/` on this deployment, which is an owner decision already taken and still not
+      a licence. A page that discusses the filing and links to the official source raises a much
+      smaller question than one that offers the bytes as a download.
+    intended_use: "The /explore read-only snapshot it already backs, and an SEC write-up that links out rather than redistributing."
+    blocking_artifact: "A rights read of Apple IR / SEC EDGAR terms for redistribution of the filing PDF, and a founder decision on whether the site hosts the bytes or links to them."
+
+  - id: apple-sec-reference-renders
+    kind: file
+    paths:
+      - "nextjs/public/explore-sample/apple-2026-q1-10-q-reference.pdf"
+      - "nextjs/public/explore-sample/apple-2026-q2-10-q-reference.pdf"
+      - "nextjs/public/explore-sample/apple-2026-q3-10-q-reference.pdf"
+      - "nextjs/public/explore-sample/apple-2026-proxy-def14a-reference.pdf"
+    pages: 210
+    origin: >-
+      EDGAR primary HTML documents, rendered here: `renderProfile:
+      "chromium-print-letter-v1; scripts/links/iframes/images removed; inline filing content
+      retained"`, each with its own digest separate from the original HTML's.
+    rights_status: unverified
+    rights_basis: none_identified
+    rights_evidence: "none"
+    cleared_by: null
+    restrictions: >-
+      Two rights questions, not one: the underlying filing (as above) and our own render of it.
+      A locator into a reference render points at a page this project laid out, which /explore
+      already distinguishes from an original and any content built on it must keep distinguishing.
+      Page counts from the fixture: Q1 30, Q2 37, Q3 40, DEF 14A 103 — the proxy is past the
+      80-page per-file intake ceiling on its own, and the four together are far past a 50-page
+      trial.
+    intended_use: "The existing /explore change story only. Not a trial corpus and not a download."
+    blocking_artifact: "The same rights read as the 10-K, plus a decision on whether a self-made render may be published at all."
+
+  - id: dart-jtc-derivative-pages
+    kind: file
+    paths:
+      - "nextjs/public/proof-collection/dart-jtc-page-1.pdf"
+      - "nextjs/public/proof-collection/dart-jtc-page-2.pdf"
+      - "nextjs/public/proof-collection/dart-jtc-page-3.pdf"
+    pages: 3
+    origin: >-
+      `nextjs/public/proof-collection/PROVENANCE.md`: one-page derivatives of a public DART
+      fixture `dart-jtc-2026-q1.pdf` held by the TAVONEL Core repository (source 2,276,931 bytes,
+      sha256 fb998430...1c6a32ee, 121 pages), copied with pdf-lib, used only when
+      `?foundation-proof=1` is present.
+    rights_status: unverified
+    rights_basis: none_identified
+    rights_evidence: "nextjs/public/proof-collection/PROVENANCE.md — records method, digests and that no private customer material is included; says nothing about rights"
+    cleared_by: null
+    restrictions: >-
+      A Korean regulatory filing is the filer's text under the filer's rights, and DART's own
+      terms have not been read by this lane. "No private customer material" answers a different
+      question from "may we republish this".
+    intended_use: "The Foundation upload/CDR/OCR proof path it already serves. A Korean-language cookbook would be the tempting second use and is not cleared for it."
+    blocking_artifact: "A rights read of DART's terms and of the filer's material, and a founder decision."
+
+  - id: tavonel-enterprise-pricing-pdf
+    kind: file
+    paths: ["nextjs/public/legal/TAVONEL_ENTERPRISE_PRICING_2026-08-30.pdf"]
+    pages: null
+    origin: "Authored by this project and already served from nextjs/public/legal."
+    rights_status: restricted
+    rights_basis: own_work
+    rights_evidence: "the repository's own history"
+    cleared_by: null
+    restrictions: >-
+      Ownership is not the problem; the content is. Compiling a pricing document into a public
+      cookbook would put its terms on screen as compiled fact, and `WORLD_BUILD_OFFER.md` records
+      that price, minimum corpus size and whether a pilot fee credits to an annual contract are
+      all still FOUNDER DECISION. A demonstration corpus must not be the mechanism by which an
+      unsettled commercial term becomes a published one.
+    intended_use: "None in growth content while any commercial term in it is undecided."
+    blocking_artifact: "Settled commercial terms (founder), after which this becomes an ordinary own-work document."
+
+  - id: customer-documents
+    kind: class
+    paths: []
+    pages: null
+    origin: "Any document belonging to a customer or a pilot participant."
+    rights_status: restricted
+    rights_basis: permission
+    rights_evidence: "nextjs/lib/activation-policy.ts:44 — activationPolicy.customerData.enabled = false; docs/CUSTOMER_DATA_GATE_2026-09-06.md"
+    cleared_by: null
+    restrictions: >-
+      The gate is closed in code, not by policy alone: the compile-request builder writes
+      `foundation_synthetic_only` as a literal and several of the gate document's seventeen
+      preconditions are MISSING, so no evidence set that exists today can produce an allowed
+      decision. Consent, logos and customer quotes are separately founder-owned and are not
+      implied by a signed pilot.
+    intended_use: "None until the gate opens and consent exists in writing, per document."
+    blocking_artifact: "The customer-data gate passing, plus written consent naming the documents and the surfaces they may appear on."
+
+  - id: public-benchmark-and-dataset-samples
+    kind: class
+    paths: []
+    pages: null
+    origin: "Documents drawn from a published benchmark, evaluation set or research dataset."
+    rights_status: unverified
+    rights_basis: licence
+    rights_evidence: "none — no dataset licence has been read or recorded by this lane"
+    cleared_by: null
+    restrictions: >-
+      Download availability and redistribution permission are different things, and a dataset's
+      licence is separate from the licence on the code that produced it, the weights it was used
+      to train, and the terms of any API that served it. A benchmark sample reproduced in public
+      content is a redistribution of that sample.
+    intended_use: "None in public content without a named licence recorded in this file."
+    blocking_artifact: "The specific dataset's licence text, read and quoted in this row, plus a founder signature."

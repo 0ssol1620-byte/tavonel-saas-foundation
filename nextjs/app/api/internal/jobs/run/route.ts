@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { runCompileJobBatch } from "@/lib/compile-job-worker";
+import { recordServerFunnel } from "@/lib/funnel-events";
 import { claimJob } from "@/lib/job-store";
 import { runSourceImportBatch } from "@/lib/sync-worker";
 
@@ -71,6 +72,17 @@ async function runOneBatch(request: Request) {
     and takes its own lease, so two invocations overlapping does not compile anything twice.
   */
   const compiles = await runCompileJobBatch();
+
+  /*
+    The durable path's `candidate_ready`, fired from the turn that produced the package.
+
+    `note === "compiled"` is a transition, not a state: the next turn over the same job reads
+    `isRestingCompileState` and answers "resting", so the event fires once per job however often
+    the cron runs. The status endpoint a browser polls while it waits deliberately fires nothing.
+  */
+  for (const turn of compiles) {
+    if (turn.note === "compiled") recordServerFunnel("candidate_ready", { mode: "durable", status: turn.state });
+  }
 
   // The lease outlives this invocation's own budget so a batch that runs long still owns its
   // job when it reports; the queue reclaims it if this invocation dies outright.

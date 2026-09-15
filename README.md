@@ -316,21 +316,35 @@ See [`RELEASE_POLICY.md`](RELEASE_POLICY.md).
 
 ## License
 
-Two facts about this repository's licensing disagree, and this section states both rather than
-resolving one in the other's favor:
+**Proprietary. All rights reserved.** See [`LICENSE`](LICENSE).
 
-1. **No LICENSE file is published.** `git ls-files | grep -i '^LICENSE'` returns nothing, in this
-   repository and on the public GitHub mirror. Absent a LICENSE file, the default under copyright
-   law is all rights reserved — reading this code, including the parts that are public, would not
-   by itself grant a right to copy, modify, redistribute or commercially reuse it.
-2. **The repository's own tracked root `package.json` declares `"license": "MIT"`** (line 5) — a
-   permissive grant, committed on `origin/main` and shipped with every clone, every
-   `npm install`/`pnpm install`, and every dependency-graph or license scanner that reads this
-   repository (this repository is public: `visibility: public`).
+This repository is published so that it can be read and evaluated. It is not open source. You may
+read the source; you may not copy, modify, redistribute or commercially reuse it without written
+permission, and third-party components stay under their own licences.
 
-Those are not the same claim, and a visitor who checks only one of them will reach the wrong
-answer about the other. This file does not pick a side: whether the correct fix is to add a
-LICENSE file that matches `package.json`, to correct `package.json` to have no declared license,
-or to publish a different license entirely, is an owner decision that has not been made
-(`.github/CODEOWNERS`). Do not add a LICENSE file and do not edit `package.json` to resolve this
-disagreement until that decision is made.
+**How long it stands.** This section used to say that no LICENSE file should be added until the
+owner decided. The licence above was settled on 2026-09-11; its provenance is recorded in
+[`docs/policy/DECISION_LOG_2026-09-11.md`](docs/policy/DECISION_LOG_2026-09-11.md) (FD-10), which
+is also where a change to it is recorded. The owner may replace it with a different licence,
+including a permissive one; doing so is a new entry in that log, a new `LICENSE`, and the matching
+edit to both manifests. Until then the licence above is what governs, and **readable is not
+reusable**: a public repository you can read grants no right to reuse what you read.
+
+The two facts this section used to report as disagreeing were resolved by that decision:
+
+1. **There was no LICENSE file.** Absent one, the default under copyright law is all rights
+   reserved — which is what the repository actually intended, and nothing published said so.
+2. **The root `package.json` declared `"license": "MIT"`** — a permissive grant shipped with every
+   clone and read by every dependency-graph and licence scanner. It now declares
+   `"license": "SEE LICENSE IN LICENSE"`, as does `nextjs/package.json`, which declared nothing.
+
+Do not edit `LICENSE` or either manifest to resolve a disagreement about the licence. The three
+say the same thing now; a change to one of them alone reintroduces exactly the contradiction this
+section used to report.
+
+A permissive licence on a dependency is copyright permission from that contributor and settles
+nothing about any third party's patents; clearing a dependency's code licence clears neither its
+model weights, its dataset, nor a hosted API's terms. The crawler policy that follows from the
+licence — search crawlers allowed, training crawlers refused — is
+[`docs/policy/CRAWLER_POLICY.md`](docs/policy/CRAWLER_POLICY.md), implemented in
+`nextjs/app/robots.ts`.

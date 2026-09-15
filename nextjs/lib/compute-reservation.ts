@@ -21,6 +21,13 @@ function errorCode(message: string) {
     ["foundation_compute_reservation_not_found", "COMPUTE_RESERVATION_NOT_FOUND"],
     ["foundation_compute_settlement_conflict", "COMPUTE_SETTLEMENT_CONFLICT"],
     /*
+      The reservation lapsed and the expiry sweep already returned its hold (20260911120000).
+      Terminal, like a conflict, and never retryable -- but a different fact, and the operator
+      reading a 503 needs to see which one it was. Unmapped it becomes COMPUTE_LEDGER_FAILED,
+      i.e. "the ledger is unreachable", which is the one class a caller is right to retry.
+    */
+    ["foundation_compute_settlement_expired", "COMPUTE_SETTLEMENT_EXPIRED"],
+    /*
       A malformed settlement is a bad request, not an infrastructure fault.
 
       `settle_foundation_compute_v3` raises this for a settlement whose shape the ledger refuses

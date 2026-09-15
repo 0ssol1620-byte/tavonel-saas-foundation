@@ -6,7 +6,13 @@ import {
   exploreChangeStory,
   exploreChangeTimeline,
 } from "./explore-change";
-import { exploreSampleAnswers, exploreSampleDocuments, exploreSampleWorld } from "./explore-sample";
+import {
+  exploreSampleAnswers,
+  exploreSampleArtifact,
+  exploreSampleDocuments,
+  exploreSampleWorld,
+} from "./explore-sample";
+import { STATE_WORD } from "../components/explore/parallel-view";
 import {
   DEEP_LINK_ACTS,
   EXPLORE_ACTS,
@@ -146,7 +152,7 @@ describe("the Change act's numbers are the diff's numbers", () => {
     if (change.untouchedNodeIds.length === 0) expect(change.counts.untouched).toBe(0);
   });
 
-  it("claims no equivalence and shows no PASS", () => {
+  it("claims no equivalence, shows no PASS and names no absence", () => {
     expect(change.equivalence.state).toBe("not_yet");
     // Comments in the act discuss the badge by name in order to say why it is absent, so the
     // check runs against the source with its own rationale stripped out.
@@ -155,7 +161,46 @@ describe("the Change act's numbers are the diff's numbers", () => {
       .replace(/^\s*\/\/.*$/gm, " ");
     expect(rendered).not.toMatch(/\bPASS\b/);
     expect(rendered).not.toContain("not_yet");
-    expect(EXPLORE_COPY.equivalenceLead).toContain("two complete compiles");
+    /*
+      BA-028 tightened this case rather than replacing it. The old assertion let the act publish
+      a FULL-REBUILD EQUIVALENCE heading over a NOT ESTABLISHED IN THIS DEPLOYMENT state as long
+      as a copy constant said "two complete compiles" somewhere. Now the positive fact has to be
+      in the caption, and the named absence and the equivalence vocabulary must not be on the act
+      at all -- including through a constant the act could reach for again.
+    */
+    expect(EXPLORE_COPY.changeCaption).toContain("complete compiles");
+    expect(EXPLORE_COPY.changeCaption).toContain("measured");
+    expect(EXPLORE_COPY).not.toHaveProperty("equivalenceHeading");
+    expect(EXPLORE_COPY).not.toHaveProperty("equivalenceLead");
+    for (const phrase of ["EQUIVALEN", "NOT ESTABLISHED", "THIS DEPLOYMENT"]) {
+      expect(rendered.toUpperCase(), phrase).not.toContain(phrase);
+    }
+    for (const surface of ["lib/explore-story.ts", "components/explore/change-act.tsx"]) {
+      const copy = read(surface).replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^\s*\/\/.*$/gm, " ");
+      expect(copy.toLowerCase(), `${surface} still names the deployment`).not.toContain("this deployment");
+    }
+  });
+
+  it("leads the act with the three measured figures rather than with a limitation", () => {
+    /*
+      BA-033. The lead is rendered from props, so this asserts the shape -- that the act reads
+      the counts it prints -- rather than the numbers. The numbers are pinned to the two frozen
+      compiles by `explore-change.test.ts`; restating them here would be a second source for them.
+    */
+    const act = read("components/explore/change-act.tsx");
+    expect(act).toContain("styles.changeLead");
+    expect(act).toContain('count(change.arrivals.length, "filing")');
+    expect(act).toContain('count(change.counts.rebuilt, "object")');
+    expect(act).toContain("change.counts.untouched.toLocaleString");
+    // "1 filings" and "1 retain" were the grammar BA-033 named. Both now branch on the count.
+    expect(act).toContain('change.counts.rebuilt === 1 ? "was" : "were"');
+    expect(act).toContain('shownUntouched === 1 ? "retains" : "retain"');
+    // The word the act may not use about the one real compiled artifact on the site.
+    expect(EXPLORE_COPY.changeTimelineNote).not.toMatch(/\bdemo\b/i);
+    expect(EXPLORE_COPY.changeCaption).not.toMatch(/\bdemo\b/i);
+    // The positive statement of the same fact the removed clause carried.
+    expect(EXPLORE_COPY.changeTimelineNote)
+      .toContain("every object in the World is rebuilt at every step");
   });
 });
 
@@ -220,5 +265,37 @@ describe("public copy on this lane's surfaces", () => {
     expect(EXPLORE_COPY.enter).toBe("ENTER WORLD");
     expect(EXPLORE_COPY.worldHint).toBe("SELECT AN OBJECT");
     expect(EXPLORE_COPY.endHeading).toBe("Try the same path with your own knowledge.");
+  });
+
+  /*
+    BA-032. /knowledge-compiler publishes the glossary entry: a CANDIDATE is "a compiled result
+    that has not been promoted ... nothing answers from it". Every object in this fixture is one,
+    so the badge told a reader in our own words that the Ask act beside it answers from a World
+    that answers nothing. The lifecycle is deliberately unchanged -- that is a product decision,
+    not a copy one -- so this asserts both halves: the visitor-facing word changed and the
+    artifact's own lifecycle did not.
+  */
+  it("labels the sample's objects for a visitor, not with the lifecycle enum", () => {
+    expect(STATE_WORD.candidate).toBe("PUBLISHED SAMPLE");
+    expect(exploreSampleArtifact.lifecycle, "the lifecycle itself is untouched").toBe("candidate");
+    for (const surface of ["components/explore/parallel-view.tsx", "components/explore/evidence-act.tsx"]) {
+      const rendered = read(surface).replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^\s*\/\/.*$/gm, " ");
+      expect(rendered, `${surface} prints the enum at a visitor`).not.toContain('"CANDIDATE"');
+    }
+  });
+
+  /*
+    BA-034. /explore is compiled by this repository's TypeScript collection compiler and the Core
+    a customer's compile is dispatched to does not emit the same object count over the same bytes.
+    The figure may be published; it may not be published bare, as though it were what a customer's
+    compile would report. The qualifier is one shared string so that the three public points of
+    use cannot drift into three differently-hedged labels, or into two and one unlabelled.
+  */
+  it("labels the sample's object count with the engine that produced it", () => {
+    expect(EXPLORE_COPY.countsQualifier).toContain("TypeScript collection compiler");
+    const drawer = read("components/explore/technical-details.tsx");
+    expect(drawer).toContain("EXPLORE_COPY.countsQualifier");
+    // Named beside the count, not in a paragraph somewhere under it.
+    expect(drawer).toMatch(/<dt>Objects[^<]*<small>\{EXPLORE_COPY\.countsQualifier\}<\/small><\/dt>/);
   });
 });

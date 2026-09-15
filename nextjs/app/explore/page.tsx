@@ -23,6 +23,7 @@ import {
   layoutVisualWorld,
   toVisualWorldModel,
 } from "@/lib/visual-world-model";
+import secCorpusManifest from "@/public/explore-sample/sec-corpus-manifest.json";
 
 export const metadata: Metadata = {
   title: "Explore a Compiled World | TAVONEL",
@@ -54,6 +55,17 @@ export const metadata: Metadata = {
   composition can open. `model.totals` carries the compiled figures across the boundary, so a
   smaller payload never becomes a smaller published number.
 */
+
+/*
+  WG-034: the capture date, read off the acquisition record rather than typed into copy.
+
+  `scripts/fetch-explore-sec-corpus.mjs` stamps `generatedAt` when it acquires the filings and
+  writes the manifest; `scripts/build-explore-sample.mjs` compiles the World from exactly those
+  files. So this is the day the sample's sources were captured, and it moves only when somebody
+  re-acquires them. A per-document `filingDate` is not this date and cannot stand in for it: a
+  filing is dated when the issuer filed it, not when we read it.
+*/
+const capturedOn = secCorpusManifest.generatedAt.slice(0, 10);
 
 const world = toVisualWorldModel(exploreSampleWorld, exploreSampleDocuments);
 const layout = layoutVisualWorld(world);
@@ -102,6 +114,7 @@ export default function ExplorePage() {
       change={change}
       answers={answers}
       technical={technical}
+      capturedOn={capturedOn}
     />
   );
 }

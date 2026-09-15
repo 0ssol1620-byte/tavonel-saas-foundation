@@ -58,13 +58,21 @@ const AREAS = [
     them this way. The one measurement that exists for either is not flattering, and the previous
     phrasing implied a capability the measurement does not support.
   */
+  /*
+    BA-087. Both of these ended on a disclaimer about our own position -- "an open question
+    here, not a settled one", "a problem we work on rather than a property we assume". Naming an
+    open problem on a research page is the point; apologising for not having solved it is a
+    different act, and both phrasings were written to pre-empt an objection nobody had made.
+    Each now states the problem and what solving it is worth, and stops there. Nothing about the
+    depth changes: still no mechanism, still no capability implied.
+  */
   [
     "Cost of staying current",
-    "Sources keep arriving, and a world nobody can afford to update stops being worth having. What it should cost to keep a compiled world faithful to changing sources is an open question here, not a settled one.",
+    "Sources keep arriving, and a world nobody can afford to update stops being worth having. What it costs to keep a compiled world faithful to changing sources is the question this work is aimed at.",
   ],
   [
     "Model independence",
-    "The worth of a compiled world should not rest on which model happened to produce it. Keeping what the product guarantees stable while the models underneath it change is a problem we work on rather than a property we assume.",
+    "The worth of a compiled world should not rest on which model produced it. Holding the product's guarantees stable while the models underneath change is what this work is for.",
   ],
 ] as const;
 
@@ -86,25 +94,23 @@ export default function ResearchPage() {
               <h1 className="document-title">The hard parts of turning<br />documents into knowledge.</h1>
             </div>
             <div className="stack">
+              {/*
+                B04 asked each of the five hubs to say which question it answers, and it was
+                right to. BA-088 is about how it was done: the same 11px mono template sentence
+                opened five consecutive pages, each followed by the same four cross-links in the
+                same order, which reads as scaffolding the author left in and puts a navigation
+                paragraph where the page's argument should start.
+
+                So the role is part of the lede -- this page is about which problems are still
+                open -- and the cross-links are one labelled row at the foot of the page.
+              */}
               <p className="lede">
                 Parsing a document is a solved-enough problem. Deciding what the document is
                 about, which of its statements are the same statement as one in another document,
                 what supports them, and what a change to page 40 invalidates three files away — is
-                not. These are the problems we work on.
-              </p>
-
-              {/*
-                B04. Five hubs answered five different questions with nothing saying which was
-                which, so a reader looking for one of them read parts of three. One line, the
-                same shape on each: what this page answers, and where the next question goes.
-              */}
-              <p className="fine">
-                <b>This page answers one question:</b> which problems are still open, and how we
-                work on them. The results themselves — measured, unproven and the one that failed
-                — are on <Link href={"/research/notes" as Route}>Research notes</Link>; how a
-                citation stays bound to its source is on <Link href={"/evidence" as Route}>Evidence</Link>;
-                the protocol a published number has to satisfy is on <Link href={"/benchmarks" as Route}>Benchmarks</Link>;
-                the security and compliance status is on <Link href={"/trust" as Route}>Trust</Link>.
+                not. This page is <b>which problems are still open, and how we work on them</b>;
+                the results themselves are on{" "}
+                <Link href={"/research/notes" as Route}>Research notes</Link>.
               </p>
 
               <p className="slate"><span />RESEARCH AREAS</p>
@@ -127,11 +133,25 @@ export default function ResearchPage() {
                 ))}
               </div>
 
-              <div className="actions">
-                <Link className="btn ghost" href={"/research/notes" as Route}>Notes and findings</Link>
-                <Link className="btn ghost" href={"/benchmarks" as Route}>Benchmark protocol</Link>
-                <Link className="btn ghost" href="/evidence">How evidence is bound</Link>
-              </div>
+              {/*
+                BA-086. Three equal ghosts with no primary, immediately above a TrustNext that
+                renders the page's only filled button: a reader saw three equivalent choices and
+                then a fourth, more prominent one. TrustNext is this page's next step; the other
+                two destinations belong in the closing cross-link row.
+              */}
+
+              {/*
+                BA-088. The cross-links the deleted template sentence carried, as one labelled
+                row at the foot.
+              */}
+              <p className="fine">
+                <b>Also in the trust case:</b>{" "}
+                <Link href={"/research/notes" as Route}>Research notes</Link> ·{" "}
+                <Link href={"/evidence" as Route}>Evidence</Link> ·{" "}
+                <Link href={"/benchmarks" as Route}>Benchmarks</Link> ·{" "}
+                <Link href={"/reproducibility" as Route}>Reproducibility</Link> ·{" "}
+                <Link href={"/trust" as Route}>Trust</Link>
+              </p>
             </div>
             <TrustNext from="/research" />
           </div>

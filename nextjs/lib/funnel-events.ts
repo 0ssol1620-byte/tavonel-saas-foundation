@@ -90,6 +90,49 @@ export type FunnelEvent =
   | "workspace_ai_connect_opened";
 
 /*
+  §15.2's product events, which the client half above cannot honestly carry.
+
+  Everything in `FunnelEvent` fires from a control in a browser, and §15.2's rule is that a
+  product event is a server state or a real consumer receipt -- "an export click is not a
+  package verified". A click and the server's own record of what happened are two different
+  measurements, so they are two different unions with two different sinks rather than one name
+  fired from whichever side happened to notice. None of the twenty-nine names above changes
+  meaning, and none of the nine below duplicates one: `workspace_compile_started` counts a
+  reader pressing Compile, `compile_started` counts the server accepting the work.
+
+  The sink is one structured line per event on the server log -- the same shape
+  `app/api/csp-report/route.ts` and `app/api/paddle/webhook/route.ts` already emit, read by the
+  platform's log drain. Deliberately not the web analytics collector `trackFunnel` posts to:
+  consent is a browser fact (`lib/marketing-analytics.ts` reads it out of localStorage), a route
+  handler has no way to ask, and a server that posted a signed-in customer's activity to an
+  external collector on nobody's consent would be the exact thing §15.1 forbids. Deliberately
+  not a table either: a new one needs a migration, and these events carry no identifier worth
+  storing -- the cohort work in `lib/activation-cohorts.ts` reads the records the product
+  already keeps instead.
+
+  Five of §15.2's seventeen are missing on purpose, and the sixth is renamed. `content_view`,
+  `sample_opened`, `recipe_start_clicked`, `auth_completed`, `recipe_resumed` and
+  `preflight_confirmed` are browser facts on public pages -- the first two are already
+  `explore_entered` and `explore_evidence_opened`, `auth_completed` is already `signed_in`, and
+  the last three have no control in this deployment yet. `package_verified` is not observable
+  here at all: `verifyExportSignature` has no route that calls it, so the server can say it
+  signed a package and cannot say anyone verified one -- `export_package_signed` is what is
+  actually measured, under the name of what is actually measured. `repeat_task_completed` and
+  `subscription_retained` both need per-workspace history that no single request has; they are
+  cohort readings, and `lib/activation-cohorts.ts` computes them as R1.
+*/
+export type ServerFunnelEvent =
+  | "compile_started"
+  | "candidate_ready"
+  | "review_completed"
+  | "world_activated"
+  | "source_revision_applied"
+  | "grounded_task_completed"
+  | "external_consumer_succeeded"
+  | "export_package_signed"
+  | "subscription_started";
+
+/*
   The property allowlist -- the enforced half of the sentence at the top of this file.
 
   Instrumenting a signed-in workspace is where a comment stops being enough. The values that
@@ -113,6 +156,35 @@ export function allowedDetail(detail?: FunnelDetail): Record<string, string> | u
   if (!detail) return undefined;
   const kept = Object.entries(detail).filter(([key, value]) => ALLOWED.has(key) && typeof value === "string");
   return kept.length > 0 ? Object.fromEntries(kept) : undefined;
+}
+
+/*
+  One structured line per server event, on the process log.
+
+  It takes the same `FunnelDetail` the browser half takes and runs it through the same
+  `allowedDetail`, so the key allowlist is one list rather than two that drift: a route that
+  wants to attach a collection id, a filename or the question a customer typed finds the key
+  rejected by the type and dropped at runtime, exactly as a component does.
+
+  There is no `once` variant. Each caller fires on a server state transition that happens once
+  per job, per World or per decision -- not on a poll, which is why `candidate_ready` fires from
+  the worker turn that compiled the package and not from the status endpoint a browser calls
+  every few seconds while it waits.
+
+  Delivery into this deployment is at-least-once, so every caller closes the redelivery case
+  with the record it already has rather than firing on a 200: the compile routes fire only when
+  `enqueueCompileJob` reports `created`, the ask route skips an idempotent replay, and the
+  Paddle handler skips an event the billing projection answered as a `duplicate`. A retried
+  request that changed nothing is not a second start.
+
+  One key to read carefully in the log: `plan` on a server event carries the request's
+  `SessionAccessSource` -- "owner" | "paid" | "trial" | "unknown", an access tier -- and not a
+  billing plan name such as Developer or Team.
+*/
+export function recordServerFunnel(event: ServerFunnelEvent, detail?: FunnelDetail) {
+  try {
+    console.info(JSON.stringify({ event, ...allowedDetail(detail) }));
+  } catch { /* logging must never break an action that already succeeded */ }
 }
 
 const LOG_KEY = "tavonel.funnel-log";

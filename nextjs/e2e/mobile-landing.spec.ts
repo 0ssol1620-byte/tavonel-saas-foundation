@@ -214,9 +214,9 @@ test("the mobile menu opens inside the viewport and closes the way a menu closes
   test.skip(!NARROW.includes(testInfo.project.name), "the menu only exists below 1080px");
   await page.goto("/");
   const menu = page.locator("header.nav details.mobile-primary-nav");
-  await menu.locator("summary").click();
+  await menu.locator("> summary").click();
 
-  const panel = page.locator("header.nav details.mobile-primary-nav nav");
+  const panel = page.locator("header.nav details.mobile-primary-nav > nav");
   await expect(panel).toBeVisible();
   const geometry = await panel.evaluate((element) => {
     const rect = element.getBoundingClientRect();
@@ -225,34 +225,76 @@ test("the mobile menu opens inside the viewport and closes the way a menu closes
   expect(geometry.left, `panel starts at x=${geometry.left}`).toBeGreaterThanOrEqual(0);
   expect(geometry.right).toBeLessThanOrEqual(geometry.viewport);
 
-  // Every section is reachable and every row is inside the viewport, not just the panel box.
-  //
-  // Eight since /sources joined PRIMARY_NAV (USKC P0 lane D, founder RESOLVED A-3: the support
-  // matrix is a primary product surface, not a resources link). The count stays a literal rather
-  // than PRIMARY_NAV.length: a spec that reads the same constant as the header agrees with it
-  // whatever it says, and this one exists to notice when the header list changes.
-  const links = panel.getByRole("link");
-  await expect(links).toHaveCount(8);
-  for (const label of ["Product", "Solutions", "Integrations", "Developers", "Security", "Pricing", "Sources", "Resources"]) {
-    await expect(panel.getByRole("link", { name: label, exact: true })).toBeVisible();
+  /*
+    The four categories and the one direct destination, collapsed.
+
+    This was eight flat links asserted by an exact count and an exact label set. The 2026-09-11
+    IA redesign replaced that list with the same four groups the desktop panels use, because
+    eight top-level rows on a phone are the site's folder layout rather than a way to choose. The
+    count stays a literal rather than reading `NAV_GROUPS.length`: a spec that reads the same
+    constant as the component agrees with it whatever it says, and this one exists to notice when
+    the top level changes. Pricing is the only row that is a link at this level -- a category is
+    a disclosure, never also a navigation, so a reader never has to guess which one a tap does.
+  */
+  await expect(panel.locator("details.mobile-nav-group")).toHaveCount(4);
+  for (const label of ["Product", "Solutions", "Developers", "Resources"]) {
+    await expect(panel.locator("details.mobile-nav-group > summary").filter({ hasText: label })).toBeVisible();
   }
+  /*
+    Two direct links now: Pricing, and the sheet's closing action (BA-232 / BA-245).
+
+    The action is the header's own `cta` object handed down, which is the whole point of it --
+    the desktop bar said "Contact" while this header said "Request access", from two different
+    constants. It ends the sheet because a reader who opened the menu can then reach it without
+    closing the menu first. A category is still never also a link: these two are the only `> a`
+    rows, and the count stays a literal for the reason the paragraph above gives.
+  */
+  await expect(panel.locator("> a")).toHaveCount(2);
+  await expect(panel.getByRole("link", { name: "Pricing", exact: true })).toBeVisible();
+  const sheetAction = panel.locator("> a.mobile-nav-cta");
+  await expect(sheetAction).toBeVisible();
+  expect(
+    (await sheetAction.innerText()).trim(),
+    "the sheet's action is the header's own, not a second label for the same thing",
+  ).toBe((await page.locator("header.nav .nav-actions .btn").innerText()).trim());
+  // Nothing is expanded until a reader chooses one; `/` belongs to no section.
+  expect(await panel.locator("details.mobile-nav-group[open]").count()).toBe(0);
 
   await page.keyboard.press("Escape");
   await expect(panel).toBeHidden();
   // Escape hands the reader back the control they opened rather than the top of the document.
-  await expect(menu.locator("summary")).toBeFocused();
+  await expect(menu.locator("> summary")).toBeFocused();
 });
 
 test("the mobile menu closes when it is used", async ({ page }, testInfo) => {
   test.skip(!NARROW.includes(testInfo.project.name), "the menu only exists below 1080px");
   await page.goto("/");
   const menu = page.locator("header.nav details.mobile-primary-nav");
-  await menu.locator("summary").click();
+  await menu.locator("> summary").click();
   await menu.getByRole("link", { name: "Pricing", exact: true }).click();
   await page.waitForURL(/\/pricing$/);
   // The header is shared across routes, so the panel survives the navigation unless it is told
   // not to: after the first tap it used to stay open over the page just asked for.
-  await expect(page.locator("header.nav details.mobile-primary-nav nav")).toBeHidden();
+  await expect(page.locator("header.nav details.mobile-primary-nav > nav")).toBeHidden();
+});
+
+/*
+  The group a reader is already inside opens itself.
+
+  The flat list could not say where you were, which is the half of the redesign that is easy to
+  implement as a decoration and hard to keep working: the current section is derived from the
+  pathname, and `/docs/mcp` has to resolve to Developers even though no bar item carries that
+  page's name.
+*/
+test("the mobile menu opens the group that owns the page being read", async ({ page }, testInfo) => {
+  test.skip(!NARROW.includes(testInfo.project.name), "the menu only exists below 1080px");
+  await page.goto("/docs/mcp");
+  const menu = page.locator("header.nav details.mobile-primary-nav");
+  await menu.locator("> summary").click();
+  const developers = menu.locator('details.mobile-nav-group[data-section="developers"]');
+  expect(await developers.evaluate((element: HTMLDetailsElement) => element.open)).toBe(true);
+  await expect(developers.locator("> summary")).toHaveAttribute("aria-current", "true");
+  expect(await menu.locator("details.mobile-nav-group[open]").count(), "more than one group opened").toBe(1);
 });
 
 /*

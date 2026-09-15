@@ -40,12 +40,26 @@ const PRODUCT_FLOW = [
   position, not a shortfall, and a page that states the position does not have to answer for every
   write workflow it never offered.
 */
+/*
+  BA-022. Every row says what the layer gets, and the boundary is where that sentence stops.
+
+  Three of the five opened with "There is no ...", on the page that answers "what is this". None
+  of the three facts changed: exports are files a graph database or an ontology tool imports, so
+  modelling stays in that tool; the MCP surface is read-only, so an action stays in the
+  orchestrator that took it. Those are the same boundaries, written as where the work happens
+  rather than as something missing here. The one limit that is a *gap* rather than a division of
+  labour -- no live connector into a graph database yet -- is published on
+  /solutions/knowledge-graph, which is the page a reader comparing graph platforms is already on.
+
+  "Connected to" became "Connects to" so the column reads as one two-word phrase at every width:
+  it was wrapping as "Connected / to" at 1280.
+*/
 const LAYERS = [
   ["Document parsing and OCR", "Replaced", "Reading is a compile step here: sanitize, read, keep the location and the uncertainty, and carry both into review."],
-  ["Ingestion and cleanup scripts", "Replaced", "One compile over a collection, versioned, producing a candidate a person promotes — not a pipeline that overwrites what was there."],
-  ["Enterprise search", "Connected to", "The package carries a retrieval corpus, and the API and MCP are read-only. An existing search product keeps its index; what changes is that a result can name the source version behind it."],
-  ["Ontology and knowledge platforms", "Connected to", "Turtle, JSON-LD and CSV leave in a signed package. There is no live connector into a graph database, and no modelling or business-rule editor here."],
-  ["Agent and workflow orchestration", "Connected to", "Eight read-only MCP tools and an HTTP API. There is no write tool and no operational action: an agent reads a World, it does not act through one."],
+  ["Ingestion and cleanup scripts", "Replaced", "One compile over a collection, versioned, producing a candidate a person promotes, with the revision it replaces still readable."],
+  ["Enterprise search", "Connects to", "The package carries a retrieval corpus, and the API and MCP are read-only. An existing search product keeps its index; what changes is that a result can name the source version behind it."],
+  ["Ontology and knowledge platforms", "Connects to", "Turtle, JSON-LD and CSV leave in a signed package that a graph database or an ontology tool imports, so modelling and business rules stay in the tool your team already runs."],
+  ["Agent and workflow orchestration", "Connects to", "Eight read-only MCP tools and an HTTP API: an agent reads a World, and the actions it takes stay in the orchestrator that took them."],
 ] as const;
 
 export default function ProductPage() {
@@ -56,7 +70,12 @@ export default function ProductPage() {
           <div className="body product-hero">
             <div className="stack">
               <p className="slate"><b>PRODUCT</b><span />KNOWLEDGE COMPILER</p>
-              <h1 className="document-title">Compile documents into a World an AI can actually use.</h1>
+              {/*
+                BA-023. "actually" was doing the reader's arguing for them -- it concedes that
+                they arrived expecting the opposite. The home page's headline already carries the
+                contrast; this page does not have to win it a second time.
+              */}
+              <h1 className="document-title">Compile documents into a World your AI can use.</h1>
             </div>
             <div className="stack">
               <p className="lede">Documents, scans and connected systems go in. A source-grounded, versioned Compiled World comes out — with evidence still attached.</p>
@@ -84,9 +103,15 @@ export default function ProductPage() {
             ))}
           </div>
 
-          <section aria-labelledby="product-layers-title">
+          <section className="product-boundary" aria-labelledby="product-layers-title">
             <p className="slate"><b>BOUNDARY</b><span />WHAT THIS REPLACES, WHAT IT CONNECTS TO</p>
-            <h2 id="product-layers-title">Two of these layers are ours. Three of them are yours.</h2>
+            {/*
+              BA-027. "Two of these layers are ours. Three of them are yours." was a riddle whose
+              answer was the table under it, and on the page where the other question a buyer
+              brings is who holds their data, ours-versus-yours is the wrong axis to be ambiguous
+              about. The eyebrow above already says it; this says it in a sentence.
+            */}
+            <h2 id="product-layers-title">What we replace, and what we plug into.</h2>
             <table className="docs-table">
               <thead>
                 <tr>
@@ -99,12 +124,27 @@ export default function ProductPage() {
                 {LAYERS.map(([layer, position, meaning]) => (
                   <tr key={layer}>
                     <th scope="row">{layer}</th>
-                    <td>{position}</td>
+                    <td className="product-boundary-position">{position}</td>
                     <td>{meaning}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </section>
+
+          {/*
+            BA-018. The page the navigation sends every buyer to ended on a five-row table and
+            about 150px of empty floor, with its only actions 2,000px above in the hero. This is
+            the closing pattern the other product pages already use: one line, one primary, one
+            secondary. Neither is `PublicPrimaryCta` -- the hero's is the page's access action
+            and a second copy of it would be the same button twice.
+          */}
+          <section className="product-close">
+            <h2>Four surfaces, one compiled World.</h2>
+            <div className="actions">
+              <Link className="btn" href="/explore">Explore a Compiled World</Link>
+              <Link className="btn ghost" href="/sources">See supported sources</Link>
+            </div>
           </section>
         </div>
       </section>

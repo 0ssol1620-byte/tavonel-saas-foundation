@@ -3,6 +3,7 @@ import { runCollectionCompile } from "@/lib/collection-compile-run";
 import { COMPILE_MAX_DOCUMENTS, judgeCompileSet } from "@/lib/compile-limits";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { readBoundedJson } from "@/lib/enterprise-http";
+import { recordServerFunnel } from "@/lib/funnel-events";
 import { DOCUMENT_ID_PATTERN } from "@/lib/immutable-keys";
 
 export const dynamic = "force-dynamic";
@@ -49,11 +50,23 @@ export async function POST(request: Request) {
     );
   }
 
+  /*
+    The synchronous primitive both starts the compile and finishes it, so it fires both events
+    -- `compile_started` before the work, because a run that dies is still a run that started,
+    and `candidate_ready` only on a package that exists. `review_required` is a candidate too:
+    it is the state that asks for a person, not a failed compile.
+  */
+  recordServerFunnel("compile_started", {
+    mode: "sync",
+    plan: auth.principal.accessSource ?? "unknown",
+    sources: String(documentIds.length),
+  });
   const run = await runCollectionCompile(auth.principal.workspaceKey, documentIds);
   if (!run.ok) {
     const headers: Record<string, string> = { "Cache-Control": "no-store" };
     if (run.retryAfterSeconds) headers["Retry-After"] = String(run.retryAfterSeconds);
     return NextResponse.json({ code: run.code, ...run.payload }, { status: run.status, headers });
   }
+  recordServerFunnel("candidate_ready", { mode: "sync", status: run.payload.coreExecution.status });
   return NextResponse.json(run.payload, { headers: { "Cache-Control": "no-store" } });
 }

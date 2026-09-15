@@ -63,6 +63,62 @@ const QUALIFICATION = [
   ],
 ] as const;
 
+/*
+  BA-093. The five things that have to be true of a record before its figure may be read as a
+  result -- which is what a buyer needs from this section. The twenty-one-field schema behind
+  them is still published, one click down, because a protocol page that hides its own contract
+  is worth less than one that prints it; what changed is which of the two is the section and
+  which is the detail.
+
+  Each of these is a group of `RECEIPT_FIELDS` rather than a new claim, so the fold below is the
+  same list stated field by field.
+*/
+const READING_A_NUMBER = [
+  [
+    "A configuration nobody could edit mid-run",
+    "The model, its revision, the input mode, the prompt and the run configuration are recorded as digests taken before the run started.",
+  ],
+  [
+    "A denominator",
+    "The record names the population the run covered, and so does every individual metric on it.",
+  ],
+  [
+    "The raw predictions",
+    "The corpus and the run's own output are bound by digest, so the scoring can be repeated by someone who does not trust ours.",
+  ],
+  [
+    "A price snapshot",
+    "Cost per page means nothing without the prices it was computed at, on the date it was computed.",
+  ],
+  [
+    "The failures the run produced",
+    "Published with the run, not summarised out of it. A table that survives only because its worst row was left out is worth less than no table.",
+  ],
+] as const;
+
+/*
+  BA-094. Our internal metric identifiers, normalised for a reader.
+
+  The chip rows printed the registry's own strings, which put four casings in one line -- VRAM
+  shouting, `bbox` an internal coordinate name, the rest lowercase words -- used a slash for both
+  "per" and "or", and left p50 / p95 as percentiles of nothing stated. Only the identifiers are
+  mapped; a metric already written in English passes through, so the registry stays the one list
+  and this is a rendering decision rather than a second vocabulary.
+*/
+const METRIC_LABEL: Record<string, string> = {
+  bbox: "region accuracy",
+  "bbox correctness": "region correctness",
+  VRAM: "GPU memory",
+  "hallucination / omission": "hallucinated and omitted content",
+  "source change → active world p50 / p95": "median and 95th-percentile time from source change to Active World",
+  "cost / 1,000 pages": "cost per 1,000 pages",
+  "cost / changed semantic unit": "cost per changed semantic unit",
+  "selective vs full equivalence": "equivalence with a full rebuild",
+  "Source change → Active World p95": "95th-percentile time from source change to Active World",
+};
+
+const metricLabel = (metric: string) => METRIC_LABEL[metric] ?? metric;
+
 export default function BenchmarksPage() {
   const records = qualifiedBenchmarkRecords();
 
@@ -87,63 +143,103 @@ export default function BenchmarksPage() {
               </p>
 
               {/*
-                B04. Five hubs answered five different questions with nothing saying which was
-                which, so a reader looking for one of them read parts of three. One line, the
-                same shape on each: what this page answers, and where the next question goes.
-              */}
-              <p className="fine">
-                <b>This page answers one question:</b> what a knowledge-compilation result has to
-                carry before it may be published as a number. The numbers we already have, with
-                their denominators and their receipts, are on <Link href={"/research/notes" as Route}>Research notes</Link>;
-                how a citation stays bound to its source is on <Link href={"/evidence" as Route}>Evidence</Link>;
-                the frozen fixtures you can rerun are on <Link href={"/reproducibility" as Route}>Reproducibility</Link>;
-                the security and compliance status is on <Link href={"/trust" as Route}>Trust</Link>.
-              </p>
+                B04 asked each of the five hubs to say which question it answers, and it was
+                right to. BA-088 is about how it was done.
 
+                The role sentence went into the lede above -- "the protocol for measuring
+                all of it" -- and the four cross-links are one labelled row at the foot, because
+                the same 11px mono template opened five consecutive pages in the same order and
+                put a navigation paragraph where the argument should start.
+
+                BA-076. What sat here was a bordered state block announcing, three paragraphs
+                under a headline promising "Measure the compile", that this page has no
+                benchmark results. Nothing about being a protocol needs a score, and the
+                condition for a row arriving is a forward statement rather than a confession.
+              */}
               <p className={styles.state}>
-                <b>No run on this deployment carries every field of the receipt below.</b> So this
-                page publishes the protocol and no table. A row arrives here when there is a
-                receipt behind it: the digests, the denominator, and the failures the run produced.
+                <b>This page is the protocol, not a scoreboard.</b> It defines
+                what a knowledge-compilation result has to carry before anyone — including us —
+                may publish it as a number. A result appears here with its digests, its
+                denominator and the failures the run produced, or it does not appear.
               </p>
               {/*
-                B07. The audit's point is that the trust case is made of architecture rather than
-                of customer outcomes, and it is right. The honest fix is not a case study; it is
-                saying why there is none, in the place a reader looks for one. There are no
-                consented customer cases, so there is no section — and an absence with no label
-                reads as an oversight rather than as a state.
-              */}
-              <p className="fine">Customer results are published only with written consent, and no customer has given it, so there is no customer case on this site and no operating figure taken from one. A named customer, a before-and-after time or a logo appears here when a customer has signed off on the wording, and not before.</p>
+                B07's label is right that an absence with nothing said about it reads as an
+                oversight. BA-072 is about how many times it was said: this exact sentence,
+                ending on "no customer has given it", was printed on /benchmarks, /evidence and
+                /reproducibility -- three pages volunteering that we have no customers, to a
+                reader who had not asked and to no legal requirement.
 
-              <h2 className={`slate ${styles.sectionTitle}`}><span />THE EIGHT METRIC FAMILIES</h2>
+                The policy stays, once, on /trust, written as a policy: customer names, figures
+                and logos appear on this site only with that customer's written sign-off on the
+                exact wording. What is gone is the count.
+              */}
+
+              <h2 className={`slate ${styles.sectionTitle}`}><span />The eight metric families</h2>
               <div className="tiles">
                 {BENCHMARK_FAMILIES.map((family) => (
                   <article className="tile" key={family.id}>
                     <h3>{family.label}</h3>
                     <p>{family.definition}</p>
-                    <p className={styles.taxonomy}>{family.metrics.join(" · ")}</p>
+                    {/*
+                      BA-094. The chip row printed our internal metric identifiers: four casings
+                      in one line (VRAM shouting, bbox an internal coordinate name, the rest
+                      lowercase words), a slash doing duty as both "per" and "or", and p50 / p95
+                      with nothing saying what they are percentiles of. `METRIC_LABEL` normalises
+                      the ones that were identifiers and leaves the ones that were already
+                      English alone.
+                    */}
+                    <p className={styles.taxonomy}>{family.metrics.map(metricLabel).join(" · ")}</p>
                   </article>
                 ))}
               </div>
 
-              <h2 className={`slate ${styles.sectionTitle}`}><span />WHAT A RESULT HAS TO CARRY</h2>
-              <p className={styles.para}>
-                Every figure published here binds to a record carrying all of these fields. A
-                record missing a digest, or missing the population a rate was measured over, is
-                refused by the build rather than rendered with a blank cell.
-              </p>
-              <dl className={styles.receipt}>
-                {RECEIPT_FIELDS.map((field) => (
-                  <div className={styles.receiptRow} key={field.key}>
-                    <dt>
-                      {field.label}
-                      {field.kind === "digest" ? <em>sha256</em> : null}
-                    </dt>
-                    <dd>{field.pins}</dd>
-                  </div>
-                ))}
-              </dl>
+              <h2 className={`slate ${styles.sectionTitle}`}><span />What a result has to carry</h2>
+              {/*
+                BA-093. Twenty-one rows of our internal receipt schema, field by field, in
+                tracked uppercase mono, as the largest section of the page. A buyer arriving
+                where they expected results read a process vocabulary instead, and a competitor
+                read exactly how we structure evidence.
 
-              <h2 className={`slate ${styles.sectionTitle}`}><span />QUALIFICATION RULES</h2>
+                What a reader needs is the rule, so the five rules are the section. The field
+                list is not deleted -- it is the checkable half, and a protocol page that hides
+                its own contract is worth less -- it is folded, for the reader who came to hold
+                us to it. The audit proposed moving the full list to /docs; there is no receipt
+                schema section in `lib/docs-content.ts` to move it to, so it stays here behind
+                one click and the move is a cross-lane request to docs-developers-ko.
+              */}
+              <p className={styles.para}>
+                Every figure published here binds to a record, and five things have to be true of
+                it before the figure may be read as a result.
+              </p>
+              <div className="chain">
+                {READING_A_NUMBER.map(([title, body]) => (
+                  <article className="link" key={title}>
+                    <h3>{title}</h3>
+                    <p>{body}</p>
+                  </article>
+                ))}
+              </div>
+              <details className="status-fold">
+                <summary>The complete receipt schema</summary>
+                <p className={styles.para}>
+                  A record missing a digest, or missing the population a rate was measured over,
+                  is refused by the build rather than rendered with a blank cell. These are the
+                  fields the validator checks.
+                </p>
+                <dl className={styles.receipt}>
+                  {RECEIPT_FIELDS.map((field) => (
+                    <div className={styles.receiptRow} key={field.key}>
+                      <dt>
+                        {field.label}
+                        {field.kind === "digest" ? <em>sha256</em> : null}
+                      </dt>
+                      <dd>{field.pins}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </details>
+
+              <h2 className={`slate ${styles.sectionTitle}`}><span />Qualification rules</h2>
               <div className="chain">
                 {QUALIFICATION.map(([title, body]) => (
                   <article className="link" key={title}>
@@ -153,14 +249,22 @@ export default function BenchmarksPage() {
                 ))}
               </div>
 
-              <h2 className={`slate ${styles.sectionTitle}`}><span />NORTH STAR METRIC</h2>
+              <h2 className={`slate ${styles.sectionTitle}`}><span />North Star metric</h2>
               <div className={styles.north}>
-                <p className={styles.northMark}>DEFINITION · NO VALUE PUBLISHED ON THIS DEPLOYMENT</p>
+                {/*
+                  BA-077. The label read "DEFINITION · NO VALUE PUBLISHED ON THIS DEPLOYMENT",
+                  so the closing statement of the page that says what we optimise for carried a
+                  notice, in tracked uppercase, that we have no number for it -- and brought
+                  back "this deployment" while doing it. The label's job is to say that this is
+                  a definition, which "DEFINITION" does. An absent value is already evident from
+                  the absence of a value.
+                */}
+                <p className={styles.northMark}>DEFINITION</p>
                 <h3>{NORTH_STAR.name}</h3>
                 <p>{NORTH_STAR.definition}</p>
                 <p className={styles.northMark}>SUPPORTING METRICS</p>
                 <ul className={styles.supporting}>
-                  {NORTH_STAR.supporting.map((metric) => <li key={metric}>{metric}</li>)}
+                  {NORTH_STAR.supporting.map((metric) => <li key={metric}>{metricLabel(metric)}</li>)}
                 </ul>
               </div>
 
@@ -170,7 +274,7 @@ export default function BenchmarksPage() {
               */}
               {records.length > 0 ? (
                 <>
-                  <h2 className={`slate ${styles.sectionTitle}`}><span />RESULTS</h2>
+                  <h2 className={`slate ${styles.sectionTitle}`}><span />Results</h2>
                   {records.map((record) => (
                     <div className={styles.resultsScroll} key={record.runReceiptDigest}>
                       <table className={styles.results}>
@@ -204,10 +308,21 @@ export default function BenchmarksPage() {
                 </>
               ) : null}
 
-              <div className="actions">
-                <Link className="btn ghost" href={"/research" as Route}>How we report research</Link>
-                <Link className="btn ghost" href="/evidence">How evidence is bound</Link>
-              </div>
+              {/*
+                BA-095. Two ghosts in their own mono-labelled row, immediately above a TrustNext
+                rendering the page's only filled button: three buttons where there is one next
+                step. Both destinations are in the cross-link row below.
+
+                BA-088. The four cross-links the deleted template sentence carried.
+              */}
+              <p className="fine">
+                <b>Also in the trust case:</b>{" "}
+                <Link href={"/research/notes" as Route}>Research notes</Link> ·{" "}
+                <Link href={"/evidence" as Route}>Evidence</Link> ·{" "}
+                <Link href={"/reproducibility" as Route}>Reproducibility</Link> ·{" "}
+                <Link href={"/research" as Route}>Research</Link> ·{" "}
+                <Link href={"/trust" as Route}>Trust</Link>
+              </p>
             </div>
             <TrustNext from="/benchmarks" />
           </div>

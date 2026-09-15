@@ -38,8 +38,23 @@ test("publishes the compilation benchmark protocol and no results table", async 
 
   await expect(page.getByRole("heading", { name: "Verified Fresh Knowledge Coverage" })).toBeVisible();
 
-  // The absence, stated once and legible, rather than an empty table.
-  await expect(page.locator("main")).toContainText("No run on this deployment carries every field of the receipt below.");
+  /*
+    BA-076 / BA-077. The page states what it is, rather than what it has not got.
+
+    The sentence that used to be here announced, three paragraphs under a headline promising
+    "Measure the compile", that no run carries every receipt field -- and the North Star label
+    carried "NO VALUE PUBLISHED ON THIS DEPLOYMENT" beside the metric it defines. Both are gone;
+    the table is still absent, which a reader can see without being told.
+
+    Pinned in both directions: the protocol claim and the condition for a row arriving are
+    required, and neither the old notice nor "this deployment" may come back.
+  */
+  const stated = page.locator("main");
+  await expect(stated).toContainText("This page is the protocol, not a scoreboard.");
+  await expect(stated).toContainText("or it does not appear");
+  await expect(stated).not.toContainText("No run on this deployment");
+  await expect(stated).not.toContainText("NO VALUE PUBLISHED");
+  await expect(stated, "our operations vocabulary on a buyer's page").not.toContainText("this deployment");
   await expect(page.locator("table")).toHaveCount(0);
 
   const body = (await page.locator("main").innerText()).replace(/\s+/g, " ");
@@ -64,9 +79,24 @@ test("carries no empty structural cell and never overflows its viewport", async 
   expect(result.empty, "/benchmarks contains an empty structural cell").toBe(0);
 });
 
+/*
+  BA-086 / BA-088 changed how /research gets a reader here, not whether it does.
+
+  It used to be a "Benchmark protocol" ghost, one of three equal ghosts sitting directly above a
+  TrustNext that rendered the page's only filled button -- so a reader saw three equivalent
+  choices and then a fourth, more prominent one. The row went; the destination is in the closing
+  cross-link row, named the same word the page is called everywhere else.
+
+  So what is asserted is reachability rather than a button: /research links here, and so does the
+  hub. A page that loses its way in fails; a page that changes the shape of the link does not.
+*/
 test("is reachable from research and from the resources hub", async ({ page }) => {
   await page.goto("/research");
-  await expect(page.getByRole("link", { name: "Benchmark protocol" })).toHaveAttribute("href", "/benchmarks");
+  await expect(page.locator('main a[href="/benchmarks"]').first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "Benchmarks", exact: true }).first())
+    .toHaveAttribute("href", "/benchmarks");
+  // And the ghost row it replaced does not come back beside the page's single next step.
+  await expect(page.locator("main .actions .btn.ghost")).toHaveCount(0);
 
   await page.goto("/resources");
   await expect(page.getByRole("link", { name: "Benchmarks", exact: true }).first()).toHaveAttribute("href", "/benchmarks");
@@ -93,11 +123,33 @@ test("is a real page, in the sitemap, and offered to crawlers", async ({ page })
   const robotsText = await robots.text();
   expect(robotsText).not.toContain("Disallow: /benchmarks");
   expect(robotsText).not.toContain("Disallow: /product/continuous-knowledge");
-  // Named search crawlers are declared; training crawlers stay a founder decision (Blueprint 8.4).
+  /*
+    Named search crawlers are declared, and the training block is no longer silence.
+
+    This asserted that no training token appeared at all, which was right while the policy was
+    undecided -- naming one would have been deciding it in a commit about SEO. FD-61 decided it
+    (a delegated decision, 2026-09-11, reversible by the founder; the reasoning is in
+    `docs/policy/CRAWLER_POLICY.md`), so the assertion is inverted rather than dropped, and it
+    now pins the served file to the whole list *and* its refusal -- which a single negative on one
+    token could not do. `lib/seo-surface.test.ts` holds the same rule on the source.
+  */
   expect(robotsText).toContain("User-Agent: OAI-SearchBot");
   expect(robotsText).toContain("User-Agent: PerplexityBot");
-  expect(robotsText).not.toContain("Google-Extended");
-  // Private surfaces are still withheld from every one of them, named or not.
+  for (const token of [
+    "GPTBot", "CCBot", "ClaudeBot", "anthropic-ai",
+    "Google-Extended", "Applebot-Extended", "Bytespider", "Meta-ExternalAgent",
+  ]) {
+    expect(robotsText, `${token} must be refused at the root`).toContain(
+      `User-Agent: ${token}\nDisallow: /\n`,
+    );
+  }
+  // A fetch a person asked for is a visit, not a corpus crawl: those tokens are not in the block
+  // at all, so they fall to `*`, which allows them. A copy-paste into the list would remove a
+  // reader's own assistant from the site, and this is what notices.
+  for (const token of ["Claude-User", "Claude-SearchBot", "ChatGPT-User"]) {
+    expect(robotsText, `${token} is a person's own fetch, not a training crawl`).not.toContain(`User-Agent: ${token}\n`);
+  }
+  // Private surfaces are still withheld from every named search crawler and from `*`.
   expect(robotsText.match(/Disallow: \/workspace/g)?.length).toBe(4);
 
   await page.goto("/benchmarks");

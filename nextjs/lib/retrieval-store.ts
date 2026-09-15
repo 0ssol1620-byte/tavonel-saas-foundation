@@ -175,6 +175,17 @@ export async function createCompileRun(record: {
   collectionId: string;
   worldManifestDigest: string;
   retrievalProfileId: string;
+  /**
+   * Set when the compile was refused before it ever started, so the row is written straight to
+   * `failed` carrying that class instead of to `running`.
+   *
+   * A refusal that writes nothing is indistinguishable later from a world nobody has compiled:
+   * `findLatestRun` reads an empty table, answers RETRIEVAL_RUN_NOT_FOUND, and
+   * `readRetrievalIndexState` correctly reports `missing`. 0020's CHECK requires `completed_at`
+   * and `error_reason` on a failed row, so both are written here; no unit, embedding or count
+   * is written, because none was produced.
+   */
+  refusedReason?: string;
 }): Promise<StoreResult<string>> {
   if (
     !validScope(record.workspaceKey, record.collectionId) ||
@@ -197,7 +208,10 @@ export async function createCompileRun(record: {
         collection_id: record.collectionId,
         world_manifest_digest: record.worldManifestDigest,
         retrieval_profile_id: record.retrievalProfileId,
-        status: "running",
+        status: record.refusedReason ? "failed" : "running",
+        ...(record.refusedReason
+          ? { error_reason: record.refusedReason.slice(0, 200), completed_at: new Date().toISOString() }
+          : {}),
       }),
     });
   } catch {

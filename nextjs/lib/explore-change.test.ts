@@ -119,6 +119,56 @@ describe("each arrival is a filing, opened on a region of itself", () => {
       expect(baselineText.includes(arrival.excerpt), arrival.documentId).toBe(false);
     }
   });
+
+  /*
+    BA-031. Three of the four cards quoted the identical Section 12(b) registration block, because
+    the rule was "longest new region on the first new page" and an SEC filing's first new page is
+    its cover. The page whose whole purpose is to show a claim resolving to a meaningful region
+    was proving it with the least meaningful text in the corpus.
+
+    What follows asserts the properties the new rule buys rather than the four strings it happens
+    to produce today: pinning the quotes would freeze a presentation rule into four sentences, and
+    a fixture that legitimately changes must still land on readable regions.
+  */
+  it("quotes each filing on text only that filing carries", () => {
+    const excerpts = story.arrivals.map((arrival) => arrival.excerpt);
+    expect(new Set(excerpts).size, "two cards quote the same text").toBe(excerpts.length);
+    for (const arrival of story.arrivals) {
+      const others = exploreSampleInputs
+        .filter((input) => input.documentId !== arrival.documentId)
+        .map((input) => input.text)
+        .join("\n");
+      expect(others.includes(arrival.excerpt), arrival.documentId).toBe(false);
+    }
+  });
+
+  it("quotes a statement the reader can check, not the filing's cover", () => {
+    for (const arrival of story.arrivals) {
+      expect(arrival.excerpt, arrival.documentId).not.toMatch(
+        /[☒☐]|PURSUANT TO SECTION|Check the appropriate box|Commission File|IRS Employer|Securities registered pursuant/i,
+      );
+      // Three figures a reader can carry back to the filing and check against it.
+      const figures = arrival.excerpt.match(/\$\s?[0-9][0-9,]{2,}|[0-9]{1,3}(?:,[0-9]{3})+/g) ?? [];
+      expect(figures.length, `${arrival.documentId}: ${arrival.excerpt.slice(0, 80)}`)
+        .toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it("still selects by structure alone, with no phrase in the rule", () => {
+    /*
+      The failure path this file most needs after BA-031. A selector that looked for "Net sales"
+      or "Operating income" would produce good-looking cards on this corpus and the wrong region
+      on any other, and it would turn a presentation choice into a claim about which paragraph
+      matters. The cover-sheet and figure filters are document structure; nothing else here may be
+      a content test.
+    */
+    const source = readFileSync(fileURLToPath(new URL("./explore-change.ts", import.meta.url)), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, " ")
+      .replace(/^\s*\/\/.*$/gm, " ");
+    for (const phrase of ["Net sales", "Operating income", "Total net sales", "Risk Factor"]) {
+      expect(source, `the selector reads "${phrase}" out of the filing`).not.toContain(phrase);
+    }
+  });
 });
 
 describe("the counts are derived from the diff", () => {

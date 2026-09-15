@@ -34,6 +34,14 @@ const CONTRAST_ROUTES = [
   "/product/document-understanding",
   "/docs",
   "/sources",
+  /*
+    Added at stage-B integration (ia-hubs CROSS-LANE 5, which probed both and reverted the probe).
+    `/docs/[section]` was in no contrast list at all, although it is the template with the most
+    text on the site -- prose, code samples, endpoint tables, and since 2026-09-11 an index
+    column beside them -- and `/solutions` is a new route. Both pass the AA floor as measured.
+  */
+  "/solutions",
+  "/docs/quickstart",
 ] as const;
 
 type ContrastFinding = {

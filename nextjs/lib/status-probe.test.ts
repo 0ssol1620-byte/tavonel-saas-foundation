@@ -54,12 +54,12 @@ describe("the /status synthetic probe section", () => {
     });
   });
 
-  it("renders an empty history as NOT RUN on every row, never as blank", () => {
+  it("renders an empty history as the not-yet-reported badge on every row, never as blank", () => {
     const section = buildProbeSection(stored([]));
     expect(section.lastSuccessfulAt).toBeNull();
     expect(section.lastRunAt).toBeNull();
     expect(section.lastRunOk).toBeNull();
-    expect(section.window).toEqual({ runs: 0, failed: 0, sentence: "No synthetic probe run has been stored yet." });
+    expect(section.window).toEqual({ runs: 0, failed: 0, sentence: "No scheduled check has been stored yet." });
     expect(section.rows).toHaveLength(6);
     for (const row of section.rows) {
       expect(row.state).toBe(NOT_RUN);
@@ -68,14 +68,37 @@ describe("the /status synthetic probe section", () => {
     }
   });
 
+  /*
+    BA-134. The distinction this case protects is unchanged -- "we could not find out" is not "it
+    has not run", and neither is green -- and it gained one: the reason may not reach the page as
+    the raw constant it is inside the store. It used to be asserted the other way round, which is
+    how `(PROBE_STORE_NOT_CONFIGURED)` came to be printed in body copy on /status.
+  */
+  const NO_RAW_ENUM = /[A-Z][A-Z0-9]*_[A-Z0-9_]+/;
+
   it("says a read failed rather than saying the probe has not run", () => {
     const section = buildProbeSection({ ok: false, code: "PROBE_HISTORY_READ_FAILED" });
-    expect(section.unavailable).toBe("PROBE_HISTORY_READ_FAILED");
-    expect(section.window.sentence).toContain("PROBE_HISTORY_READ_FAILED");
-    // The distinction: "we could not find out" is not "it has not run", and neither is green.
+    expect(section.unavailable).toContain("could not be read");
+    expect(section.window.sentence).toContain("could not be read");
     expect(section.window.sentence).not.toContain("has been stored yet");
+    expect(section.window.sentence, "an internal constant is not customer copy").not.toMatch(NO_RAW_ENUM);
+    expect(section.unavailable).not.toMatch(NO_RAW_ENUM);
     expect(section.rows.every((row) => row.state === NOT_RUN)).toBe(true);
     expect(section.fixtureE2E).toContain("could not be read");
+  });
+
+  it("says an unconfigured store is not reporting, and does not say a check failed", () => {
+    const section = buildProbeSection({ ok: false, code: "PROBE_STORE_NOT_CONFIGURED" });
+    expect(section.window.sentence).toBe("Scheduled dependency checks are not reporting to this page yet.");
+    expect(section.window.sentence).not.toMatch(NO_RAW_ENUM);
+    expect(section.unavailable).not.toMatch(NO_RAW_ENUM);
+    expect(section.rows.every((row) => row.state === NOT_RUN)).toBe(true);
+  });
+
+  it("falls back to the honest sentence for a code it does not recognise", () => {
+    const section = buildProbeSection({ ok: false, code: "SOMETHING_NEW_AND_UNMAPPED" });
+    expect(section.window.sentence).toContain("could not be read");
+    expect(section.window.sentence, "an unmapped code must not print itself").not.toMatch(NO_RAW_ENUM);
   });
 
   it("never lets a configuration row read as a request that succeeded", () => {
@@ -92,17 +115,26 @@ describe("the /status synthetic probe section", () => {
     });
   });
 
-  it("names the fixture end-to-end run as refused when it was switched on", () => {
+  /*
+    BA-134(b). The row still refuses to read as a pass, which is the whole point of it. What it no
+    longer does is print our word "fixture" and the raw refusal constant on a public page: the
+    reader is told the check reported a failure, and the constant stays in the stored run.
+  */
+  it("reports the end-to-end check as a failure when it was switched on, without a raw code", () => {
     const section = buildProbeSection(stored([
       run({ ok: false, fixtureE2E: { enabled: true, status: "refused", code: "PROBE_FIXTURE_E2E_NOT_IMPLEMENTED" } }),
     ]));
-    expect(section.fixtureE2E).toContain("PROBE_FIXTURE_E2E_NOT_IMPLEMENTED");
-    expect(section.fixtureE2E).toContain("not implemented");
+    expect(section.fixtureE2E).toContain("Reported a failure");
+    expect(section.fixtureE2E).not.toContain("PROBE_FIXTURE_E2E_NOT_IMPLEMENTED");
+    expect(section.fixtureE2E.toLowerCase(), "our word, not the customer's").not.toContain("fixture");
+    expect(section.fixtureE2E.toLowerCase(), "and it may never read as a pass").not.toContain("passed");
     expect(section.lastSuccessfulAt).toBeNull();
   });
 
-  it("says plainly that nothing here proves sanitization or OCR read a document", () => {
-    expect(buildProbeSection(stored([run()])).fixtureE2E).toContain("nothing here proves sanitization");
+  it("says plainly that nothing here reports on sanitization or document reading", () => {
+    const sentence = buildProbeSection(stored([run()])).fixtureE2E;
+    expect(sentence).toContain("nothing here reports on sanitization or document reading");
+    expect(sentence.toLowerCase()).not.toContain("fixture");
   });
 
   /*

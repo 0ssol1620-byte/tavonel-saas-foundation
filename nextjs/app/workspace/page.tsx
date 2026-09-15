@@ -18,6 +18,7 @@ import {
   pageCountLabel,
   quoteCompilePages,
   weakestConfidence,
+  type PageEstimate,
   type PageEstimateConfidence,
 } from "@/lib/usage-pricing";
 import { collectDroppedWorkspaceFiles, prepareWorkspaceSelection, type WorkspaceSelection, type WorkspaceUploadFile } from "@/lib/workspace-intake";
@@ -1459,7 +1460,18 @@ export default function WorkspacePage() {
       declaredBasis: measured && "basis" in measured ? measured.basis : null,
     });
   }) ?? [];
-  const stagedPages = stagedEstimates.reduce((sum, estimate) => sum + (estimate?.pages ?? 0), 0);
+  /*
+    Files with a page count, and files that do not have one yet, kept apart.
+
+    They used to be one list, because every file had a number: anything the format did not state
+    was quoted from its size. Nothing is quoted from its size any more, so a staged selection now
+    splits -- what is counted goes into the total the customer authorises against, and what is
+    not counted is named underneath with the reason. Folding the second group in as zero would be
+    the old bug upside down: a total that looks complete and is not.
+  */
+  const stagedCounted = stagedEstimates.filter((estimate): estimate is PageEstimate => estimate !== null);
+  const stagedUncounted = stagedEstimates.length - stagedCounted.length;
+  const stagedPages = stagedCounted.reduce((sum, estimate) => sum + estimate.pages, 0);
   const stagedQuote = quoteCompilePages(stagedPages);
   /*
     Audit D10. The counts above say how many files there are; this says what each one loses.
@@ -1480,35 +1492,37 @@ export default function WorkspacePage() {
     })) ?? [],
   );
   /*
-    The set is as strong as its weakest file. One PDF without a page count drags the preflight
-    back to an estimate; one Word file drags it to "declared", because the total the customer
-    authorises against is then partly a number Word wrote rather than one anything counted.
+    The counted set is as strong as its weakest counted file. One Word file drags the label to
+    "declared", because the total the customer authorises against is then partly a number Word
+    wrote rather than one anything counted. Files with no count at all are not in this set: they
+    are not a weaker version of the total, they are outside it.
   */
   const stagedConfidence: PageEstimateConfidence = weakestConfidence(
-    stagedEstimates.map((estimate) => estimate?.confidence ?? "provisional"),
+    stagedCounted.map((estimate) => estimate.confidence),
   );
   /*
     Spreadsheets, named rather than folded into the estimate.
 
-    A sheet is not a page and a print area is not a page, and nobody has decided what a
-    spreadsheet is billed in. Quoting one from its file size and saying nothing would make that
-    undecided number the number a customer was charged, which is exactly the kind of invention
-    this repository forbids. So it is disclosed, in the panel, before they press Compile.
+    A sheet is not a page and a print area is not a page. What a spreadsheet is billed in is now
+    settled -- the pages of the sanitized PDF it is converted to -- and that number does not
+    exist until the conversion has run. So the panel says that, before they press Compile,
+    instead of quoting the file's size as if it were a page count.
   */
-  const stagedUndecided = stagedPageCounts?.filter((entry) => entry.pages === null
-    && entry.reason === "XLSX_BILLABLE_UNIT_UNDECIDED").length ?? 0;
+  const stagedSpreadsheets = stagedPageCounts?.filter((entry) => entry.pages === null
+    && entry.reason === "SPREADSHEET_COUNTED_AFTER_CONVERSION").length ?? 0;
 
   /*
     Read the page counts out of the files themselves.
 
-    A quote derived from file size is an upper bound, and it was labelled as one, but a 40MB
-    scan and a 40MB text-layer report are not the same purchase. This runs once per staged
-    selection, off the render path, bounded so a 128-file folder does not lock the tab, and it
-    abandons its result if the selection changed underneath it.
+    A quote derived from file size is an invented number, and it is no longer produced anywhere:
+    a 40MB scan and a 40MB text-layer report are not the same purchase and must not carry the
+    same quote. This runs once per staged selection, off the render path, bounded so a 128-file
+    folder does not lock the tab, and it abandons its result if the selection changed underneath
+    it.
 
-    Formats that do not state a page count -- ODF, plain text, and spreadsheets, whose billable
-    unit is still the founder's to decide -- fall back to the byte bound and say so through the
-    Verified/Estimated label. They are not guessed at.
+    Formats that do not state a page count -- ODT, plain text, and spreadsheets, counted on the
+    sanitized PDF after conversion -- come back with a reason and no number. They are not guessed
+    at, and nothing downstream fills the gap in.
   */
   useEffect(() => {
     if (!stagedSelection || stagedSelection.files.length === 0) {
@@ -2318,24 +2332,38 @@ export default function WorkspacePage() {
                   </p>
                   <dl>
                     <div><dt>Files</dt><dd>{stagedSelection.files.length}</dd></div>
-                    <div><dt>{pageCountLabel(stagedConfidence)}</dt><dd>{stagedPages}</dd></div>
+                    <div>
+                      <dt>{stagedCounted.length > 0 ? pageCountLabel(stagedConfidence) : "Pages"}</dt>
+                      <dd>{stagedCounted.length > 0 ? stagedPages : !stagedPageCounts ? "Counting…" : "Counted when read"}</dd>
+                    </div>
                     <div><dt>Archives</dt><dd>{stagedSelection.archiveCount}</dd></div>
                     <div><dt>Warnings</dt><dd>{stagedSelection.unsupported.length}</dd></div>
                     <div><dt>Estimated</dt><dd>{stagedQuote ? formatUsd(stagedQuote.estimatedUsd) : "—"}</dd></div>
                     <div><dt>Maximum</dt><dd>{stagedQuote ? formatUsd(stagedQuote.maximumUsd) : "—"}</dd></div>
                   </dl>
-                  <p className="fine">
-                    {stagedConfidence === "verified"
-                      ? "Page counts were counted from the documents themselves. You will never be charged above the maximum shown."
-                      : stagedConfidence === "declared"
-                        ? "Some files state their own page count rather than being counted — Word records the number it last saved, which can be out of date. The billed page count is confirmed once the documents are processed, and never exceeds the maximum shown."
-                        : "Some files do not state a page count, so this is an upper-bound estimate from file size. The billed page count is confirmed after the documents are read, and never exceeds the maximum shown."}
+                  <p className="fine" aria-live="polite">
+                    {!stagedPageCounts
+                      ? "Counting the pages in these files. Nothing has been uploaded."
+                      : stagedCounted.length === 0
+                        ? "None of these files states a page count before it is read. Pages are counted while the documents are processed, and the estimate appears once there is a number to show."
+                        : stagedConfidence === "verified"
+                          ? "Page counts were counted from the documents themselves. You will never be charged above the maximum shown."
+                          : "Some files state their own page count rather than being counted — Word records the number it last saved, which can be out of date. The billed page count is confirmed once the documents are processed, and never exceeds the maximum shown."}
                   </p>
-                  {stagedUndecided > 0 ? (
+                  {stagedSpreadsheets > 0 ? (
                     <p className="fine">
-                      {stagedUndecided === 1 ? "One spreadsheet is" : `${stagedUndecided} spreadsheets are`} quoted from
-                      file size. A spreadsheet has no page count, and what it is billed in is not settled — so this part
-                      of the estimate is an upper bound and nothing more.
+                      {stagedSpreadsheets === 1 ? "One spreadsheet is" : `${stagedSpreadsheets} spreadsheets are`} not in
+                      the page total. A spreadsheet is billed on the pages of the sanitized PDF it is converted to,
+                      counted after that conversion — so there is no number to show for it yet, and none is guessed from
+                      the file size.
+                    </p>
+                  ) : null}
+                  {stagedPageCounts && stagedUncounted > stagedSpreadsheets ? (
+                    <p className="fine">
+                      {stagedUncounted - stagedSpreadsheets === 1
+                        ? "One other file states no page count"
+                        : `${stagedUncounted - stagedSpreadsheets} other files state no page count`} before being read,
+                      so they are not in the total either. Their pages are counted while the documents are processed.
                     </p>
                   ) : null}
                   {stagedPreflight.files.length > 0 ? (
@@ -2359,7 +2387,24 @@ export default function WorkspacePage() {
                   )}
                   {stagedSelection.warnings.map((warning) => <p className="fine" key={warning}>{warning}</p>)}
                   <div className="workspace-intake-actions">
-                    <button type="button" disabled={busy || !stagedQuote || !stagedVerdict.ok} onClick={() => void startStagedCompile()}>{busy ? "Uploading & compiling…" : "Upload & compile"}</button>
+                    {/*
+                      The gate is "we have finished trying to count", not "we got a number".
+
+                      It was `!stagedQuote`, which was the same thing while every file had a page
+                      count: anything a format did not state was quoted from its size. Nothing is
+                      quoted from size any more, so a staged set of spreadsheets -- or of PDFs
+                      whose page tree does not parse -- produces no quote at all, and this button
+                      stayed disabled forever while the paragraph above it said the pages are
+                      counted while the documents are processed. The panel promised the upload and
+                      the button refused it.
+
+                      The quote is information, not authorisation: `startStagedCompile` never
+                      reads it, the server reserves `reservationPageCeiling` for a source it
+                      cannot count, and settlement bills the pages actually produced. What still
+                      blocks is a corpus the compile step would refuse and a count still in
+                      flight, both of which are answers rather than the absence of one.
+                    */}
+                    <button type="button" disabled={busy || !stagedPageCounts || !stagedVerdict.ok} onClick={() => void startStagedCompile()}>{busy ? "Uploading & compiling…" : "Upload & compile"}</button>
                     <button type="button" onClick={() => setStagedSelection(null)}>Clear</button>
                   </div>
                 </div>

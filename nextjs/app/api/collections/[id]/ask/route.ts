@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { authorizeFoundationRequest, revalidateFoundationAuthorization } from "@/lib/developer-auth";
 import { readBoundedJson } from "@/lib/enterprise-http";
+import { recordServerFunnel } from "@/lib/funnel-events";
 import { validatePromotableCollectionArtifact } from "@/lib/collection-download";
 import { answerFromContextPacket, answerGroundedQuestion } from "@/lib/grounded-ask";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
@@ -279,6 +280,28 @@ export async function POST(
     if (!sourceAccess.ok) return NextResponse.json({ code: sourceAccess.code }, {
       status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503, headers: NO_STORE,
     });
+  }
+  /*
+    A2's other half: the approved World answered a question with its evidence attached.
+
+    The condition is the answer's own code, not the 200 -- an abstention is also a 200, and
+    counting it as a grounded task is the claim the World Gate exists to prevent. A replay is
+    skipped because the idempotency key served an answer that was already counted, and the
+    `mode` says which retrieval path produced it, so a funnel reading cannot silently mix the
+    compiled pipeline with the excerpt fallback.
+
+    An API key is not a browser. Whoever holds one is an MCP client, a script or an agent, which
+    is A3's "the same result used by an external consumer" -- the only external-consumption
+    signal a request carries, and it carries no consumer identity with it.
+  */
+  if (answered.status === 200 && !lease.replay && answered.body.code === "GROUNDED_ANSWER") {
+    recordServerFunnel("grounded_task_completed", {
+      kind: auth.principal.kind,
+      mode: answered.body.retrievalPath === "compiled-retrieval-v1" ? "compiled" : "fallback",
+    });
+    if (auth.principal.kind === "api-key") {
+      recordServerFunnel("external_consumer_succeeded", { from: "ask" });
+    }
   }
   return NextResponse.json(answered.body, { status: answered.status, headers: lease.replay
     ? { ...NO_STORE, "X-Tavonel-Idempotent-Replay": "true" } : NO_STORE });

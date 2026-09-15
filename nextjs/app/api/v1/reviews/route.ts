@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { applyCandidatePatch } from "@/lib/collection-patch";
 import { loadPreferredCollectionCandidate } from "@/lib/collection-storage";
 import { requireFoundationSession } from "@/lib/developer-auth";
+import { recordServerFunnel } from "@/lib/funnel-events";
 import { collectionCandidateKey, COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
 import { putWorkspaceCollectionCandidate } from "@/lib/r2-objects";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
@@ -154,6 +155,10 @@ export async function POST(request: Request) {
     patch,
   });
   if (!recorded.ok) return refuse(recorded.code, 503);
+  // §15.2: the decision is recorded, so a person has reviewed. `act` carries the decision and
+  // `mode` says whether it also corrected the candidate; the reason a reviewer typed does not
+  // leave this route.
+  recordServerFunnel("review_completed", { act: action, mode: patch ? "patched" : "decision" });
   return NextResponse.json({ code: "RECORDED", ...recorded.receipt }, { status: 201, headers: NO_STORE });
 }
 

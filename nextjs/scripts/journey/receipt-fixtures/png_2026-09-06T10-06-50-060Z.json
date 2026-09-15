@@ -1,0 +1,212 @@
+{
+  "origin": "https://tavonel.com",
+  "format": "png",
+  "fileName": "sample.png",
+  "sha256": "87c8a504835775678e83baaf37d3afdd5e043dc3e0fd2ddbf8123d737179f649",
+  "bytes": 11017,
+  "declaredMimeType": "image/png",
+  "uniqueToken": "TAVONEL-E2E-PNG-7f3a",
+  "question": "What is the audit token for this image?",
+  "startedAt": "2026-09-06T10:25:37.731Z",
+  "capability": null,
+  "capabilityManifestSha256": null,
+  "capabilityLookup": "GET /api/v1/capabilities 404 -- capability status unavailable from the API",
+  "calls": [
+    {
+      "step": "UPLOAD_CAPABILITY",
+      "method": "POST",
+      "path": "/api/v1/uploads/capability",
+      "status": 200,
+      "code": "QUALIFIED",
+      "latencyMs": 366
+    },
+    {
+      "step": "R2_PUT",
+      "method": "PUT",
+      "path": "https://r2-account-redacted.r2.cloudflarestorage.com/tavonel-saas-foundation-quarantine/quarantine/pilot-969dc192daa24119/a60d9817-5b1d-4c10-9548-a14159ec6252/source (presigned query redacted)",
+      "status": 200,
+      "code": null,
+      "latencyMs": 599
+    },
+    {
+      "step": "CONFIRM",
+      "method": "POST",
+      "path": "/api/uploads/confirm",
+      "status": 200,
+      "code": "UPLOAD_CONFIRMED",
+      "latencyMs": 485
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 596
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 715
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 656
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 636
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 625
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 744
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 660
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 659
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 684
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 728
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 656
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 655
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 623
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 651
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 712
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 729
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 1045
+    }
+  ],
+  "documentId": "a60d9817-5b1d-4c10-9548-a14159ec6252",
+  "documentProcessingState": "operator_review",
+  "compileJobId": null,
+  "compileJobState": null,
+  "collectionId": null,
+  "readerRouteLabel": null,
+  "evidenceLocators": null,
+  "tokenFoundInEvidence": null,
+  "blockedBy": "OPERATOR_REVIEW_REQUIRED:unspecified",
+  "documentInventoryRow": {
+    "documentId": "a60d9817-5b1d-4c10-9548-a14159ec6252",
+    "versionKey": "dc43bed2b901290380f89f00bf6108b2a83229362630378abab7af8e339a7e57",
+    "sanitizedKey": "immutable/pilot-969dc192daa24119/pilot-969dc192daa24119/a60d9817-5b1d-4c10-9548-a14159ec6252/dc43bed2b901290380f89f00bf6108b2a83229362630378abab7af8e339a7e57/sanitized.pdf",
+    "sanitizedSize": 23680,
+    "ocrJsonKey": null,
+    "ocrJsonSize": null,
+    "hasOcrJson": false,
+    "cdrReceiptKey": "immutable/pilot-969dc192daa24119/pilot-969dc192daa24119/a60d9817-5b1d-4c10-9548-a14159ec6252/dc43bed2b901290380f89f00bf6108b2a83229362630378abab7af8e339a7e57/cdr-receipt.json",
+    "ocrReviewKey": "immutable/pilot-969dc192daa24119/pilot-969dc192daa24119/a60d9817-5b1d-4c10-9548-a14159ec6252/dc43bed2b901290380f89f00bf6108b2a83229362630378abab7af8e339a7e57/ocr-review.json",
+    "processingState": "operator_review"
+  },
+  "finishedAt": "2026-09-06T10:27:11.059Z",
+  "reachedStep": "DOCUMENT_TERMINAL",
+  "stepChain": [
+    "CAPABILITIES",
+    "UPLOAD_CAPABILITY",
+    "R2_PUT",
+    "CONFIRM",
+    "DOCUMENT_TERMINAL",
+    "COMPILE_JOB",
+    "COMPILE_TERMINAL",
+    "COLLECTION",
+    "WORLD",
+    "ASK"
+  ],
+  "verdict": "REACHED_DOCUMENT_TERMINAL"
+}

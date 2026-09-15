@@ -58,11 +58,22 @@ describe("the Ask page documents both retrieval paths", () => {
   });
 
   it("does not claim a measured quality difference between the two paths", () => {
-    // The comparison has not been run. Naming a winner here would be a number without a
-    // receipt, which is the one thing the docs may never do.
+    /*
+      The comparison has not been run. Naming a winner here would be a number without a receipt,
+      which is the one thing the docs may never do.
+
+      BA-193. This used to pin the sentence that said so out loud -- "that comparison is an open
+      evidence item, and no number is claimed here in its place" -- which published our evidence
+      backlog on a reference page. What the page owed the reader was the field to check, and that
+      is what it now says. The guard moved to the thing it was protecting: no figure, no ranking,
+      and the field named.
+    */
     const { text } = block("ask");
-    expect(text).toContain("no published measurement yet");
     expect(text).not.toMatch(/\d+(\.\d+)?\s*%/);
+    expect(text, "the field a reader checks instead of a claim").toContain("retrievalPath");
+    for (const claim of [/\bmore accurate\b/i, /\bbetter (?:than|quality)\b/i, /\boutperform/i, /\bworse than\b/i]) {
+      expect(text, String(claim) + ": a ranking between the two paths needs a same-condition measurement").not.toMatch(claim);
+    }
   });
 
   it("documents each freshness clock separately, including the one that is narrower than its name", () => {
@@ -112,9 +123,19 @@ describe("the Search page describes the pipeline that runs", () => {
     expect(text).toContain("retrievalPath");
   });
 
-  it("says the old description was wrong instead of quietly replacing it", () => {
-    // A limit is layered, never deleted: a reader who chose Search on the stale description
-    // deserves to know it changed.
-    expect(block("search").text).toContain("used to describe Search as lexical");
+  it("describes the hybrid pipeline that runs, and never lexical retrieval alone", () => {
+    /*
+      BA-191. This pinned a paragraph apologising for an earlier revision of the page: "This page
+      used to describe Search as lexical retrieval ... a reader who chose Search over Ask on the
+      old description made that choice on the wrong information." The correction a reader needs is
+      the correct description, and the change belongs in the changelog, not in the reference page
+      forever. So the guard pins the property the apology was standing in for: the three sources
+      and the fusion are named, and no sentence describes Search as lexical-only.
+    */
+    const { text } = block("search");
+    for (const part of ["lexical full-text", "dense vectors", "structure", "reciprocal rank fusion", "reranked"]) {
+      expect(text, part + " is missing: the stale lexical-only description must not come back").toContain(part);
+    }
+    expect(text).not.toMatch(/Search is lexical|lexical retrieval only|only lexical/i);
   });
 });

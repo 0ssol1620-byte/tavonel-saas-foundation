@@ -1,30 +1,141 @@
-@layer components {
-  .panel, .settings {
-    color: var(--text-hi);
-    background: var(--g1);
-    border: 1px solid var(--hairline-hi);
-    font: inherit;
+/*
+  The first surface every visitor sees, and it was the least considered one (BA-231, BA-234).
+
+  It was a square matte slab pinned across the left half of the viewport -- no radius, no
+  elevation, 640x132 at 1280 and 374x166 at 390, a third of a phone screen -- laid over whatever
+  the page most wanted read: security@tavonel.com on /contact, the Evaluation price and the
+  Developer action on /pricing, both buttons on /api, the hero action row on /explore. It also had
+  no affordances at all: the whole file sat inside `@layer components`, and tavonel.css's
+  unlayered `button { background: none; border: 0 }` and `a { text-decoration: none }` beat any
+  layer, so the two choices rendered as bare text and the privacy link lost its underline.
+
+  So: no layer, a narrow sheet docked bottom-right on the desktop and full-width on a phone, and
+  `body` given room underneath it while it is up, so it covers nothing. Consent is two equal
+  choices, so neither is a filled primary: Allow carries the panel's own surface and a hairline,
+  No thanks is quiet, and both sit on the same left edge as the sentence above them.
+*/
+.panel, .settings {
+  color: var(--text-hi);
+  background: var(--g1);
+  border: 1px solid var(--hairline-hi);
+  font: inherit;
+}
+
+.panel {
+  position: fixed;
+  /* Bottom-right, out of the reading column, above the page and below the nav and the
+     landing page's instrument bar -- which is fixed at `--bar` tall, so the sheet clears it
+     rather than sitting on top of the one row that reports the product's state. */
+  inset: auto 1rem calc(var(--bar) + 12px) auto;
+  z-index: 55;
+  max-width: 30rem;
+  padding: 20px;
+  border-radius: 6px;
+  /* Depth is luminance and a hairline; this is the one surface that floats, so it gets one. */
+  box-shadow: 0 18px 44px rgb(0 0 0 / 0.55);
+}
+
+/*
+  Nothing on the page hides behind the sheet while it is up.
+
+  `:has()` rather than a class toggled from the component: the banner's own markup is the only
+  signal, so the padding cannot outlive it or be forgotten when the choice is made. The sheet is
+  about 150px tall at its widest wrap, and every page this appears on ends in a footer or a
+  closing action row rather than in content that has to be flush to the bottom.
+*/
+:global(body):has(.panel) { padding-bottom: calc(var(--bar) + 184px); }
+
+.panel p {
+  margin: 0 0 14px;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+/*
+  The one control in this banner that was not thumb-sized.
+
+  `.actions button` and `.settings` both carry the 44px floor already; the "Privacy notice" link
+  inside the sentence was 19px. `e2e/mobile-landing.spec.ts:330` measures every `a` and `button`
+  on a coarse pointer against that floor, and it fails at 360 and 390 in both commercial
+  postures -- but no CI job has ever run those projects, so nothing said so. That is the
+  evidence hole the `product-qa` job in this same change closes, and this is the first thing it
+  found.
+
+  Padding grows the hit area to 44px; the equal negative block margin holds the line box at its
+  text height, so the paragraph does not reflow and the sentence still reads as a sentence. The
+  underline and the colour are what a layered rule could not give it.
+*/
+.panel p a {
+  display: inline-block;
+  padding-block: 12.5px;
+  margin-block: -12.5px;
+  color: var(--verified);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.actions button {
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid var(--hairline-hi);
+  border-radius: 3px;
+  background: var(--g2);
+  color: var(--text-hi);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+/* Refusing is as easy as allowing, and quieter only in weight -- never in reach. */
+.actions button:first-child {
+  border-color: transparent;
+  background: none;
+  color: var(--text-mid);
+}
+.actions button:hover { color: var(--text-hi); border-color: var(--hairline-hi); }
+
+/*
+  Once the choice is made, the reminder docks with the chrome instead of being left in the page.
+
+  It used to be a bare text button with a 5rem bottom margin, sitting under the closing action of
+  pages that have no footer -- 250px of empty floor and then an unexplained control, which reads
+  as debug UI somebody forgot to remove (BA-038).
+*/
+.settings {
+  position: fixed;
+  inset: auto auto calc(var(--bar) + 12px) 1rem;
+  z-index: 54;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 12px;
+  border-radius: 3px;
+  color: var(--text-lo);
+  font-size: 13px;
+  opacity: 0.6;
+  cursor: pointer;
+}
+.settings:hover, .settings:focus-visible { opacity: 1; color: var(--text-hi); }
+
+.panel button:focus-visible, .panel a:focus-visible, .settings:focus-visible {
+  outline: 2px solid var(--text-hi);
+  outline-offset: 3px;
+}
+
+@media (max-width: 720px) {
+  /* Full width, opaque and shallow: a phone gives this a strip, not a third of the screen. */
+  .panel {
+    inset: auto 0 var(--bar) 0;
+    max-width: none;
+    max-height: 45vh;
+    overflow-y: auto;
+    padding: 14px clamp(16px, 4vw, 24px);
+    border-width: 1px 0 0;
+    border-radius: 0;
+    background: var(--ground);
   }
-  .panel { position: fixed; inset: auto 1rem 1rem; z-index: 100; max-width: 40rem; padding: 1rem; }
-  .panel p { margin: 0 0 .75rem; font-size: .875rem; line-height: 1.5; }
-  .panel a { color: inherit; text-decoration: underline; }
-  /*
-    The one control in this banner that was not thumb-sized.
-
-    `.actions button` and `.settings` both carry the 44px floor already; the "Privacy notice" link
-    inside the sentence was 19px. `e2e/mobile-landing.spec.ts:330` measures every `a` and `button`
-    on a coarse pointer against that floor, and it fails at 360 and 390 in both commercial
-    postures -- but no CI job has ever run those projects, so nothing said so. That is the
-    evidence hole the `product-qa` job in this same change closes, and this is the first thing it
-    found.
-
-    Padding grows the hit area to 44px; the equal negative block margin holds the line box at its
-    text height, so the paragraph does not reflow and the sentence still reads as a sentence.
-  */
-  .panel p a { display: inline-block; padding-block: 12.5px; margin-block: -12.5px; }
-  .actions { display: flex; flex-wrap: wrap; gap: .75rem; }
-  .actions button { min-height: 44px; padding: .5rem 1rem; border: 1px solid var(--text-mid); color: var(--text-hi); background: var(--g2); font: inherit; cursor: pointer; }
-  .settings { position: relative; z-index: 100; display: block; margin: 1rem 1rem 5rem; padding: .5rem .75rem; min-height: 44px; font-size: .8125rem; cursor: pointer; }
-  .panel button:focus-visible, .panel a:focus-visible, .settings:focus-visible { outline: 2px solid var(--text-hi); outline-offset: 3px; }
-  @media (max-width: 390px) { .panel { inset-inline: .5rem; bottom: .5rem; padding: .75rem; } }
+  .panel p { margin-bottom: 12px; font-size: 13px; }
+  :global(body):has(.panel) { padding-bottom: calc(var(--bar) + 220px); }
+  .settings { inset: auto auto calc(var(--bar) + 8px) 0.5rem; }
 }

@@ -1,5 +1,20 @@
+import type { Metadata } from "next";
 import HomePageClient from "@/components/home-page-client";
 import { isLiveCommerce } from "@/lib/commercial-state";
+
+/**
+ * The English entry point, and one half of the site's only hreflang pair.
+ *
+ * `/` and `/ko` are each the site's entry point in their own language, so each names the other and
+ * `x-default` is the English one, which has the whole site behind it. The pair lives here rather
+ * than on the root layout because layout metadata is inherited by every page that declares no
+ * `alternates`, which put the annotation on seven retired-URL stubs -- see the comment in
+ * `app/layout.tsx`. `canonical` is restated because declaring `alternates` replaces the inherited
+ * object rather than merging into it.
+ */
+export const metadata: Metadata = {
+  alternates: { canonical: "/", languages: { en: "/", ko: "/ko", "x-default": "/" } },
+};
 
 /**
  * The landing CTA is commercial state, not static content.

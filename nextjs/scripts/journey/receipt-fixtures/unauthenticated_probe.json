@@ -1,0 +1,84 @@
+{
+  "origin": "https://tavonel.com",
+  "ranAt": "2026-09-06T09:29:28.336Z",
+  "note": "No Authorization header sent. Every route that carries tenant data must refuse. /api/v1/capabilities is unauthenticated by design, so it is reported separately and does not decide the verdict.",
+  "calls": [
+    {
+      "step": "CAPABILITIES",
+      "method": "GET",
+      "path": "/api/v1/capabilities",
+      "status": 404,
+      "code": null,
+      "latencyMs": 98
+    },
+    {
+      "step": "UPLOAD_CAPABILITY",
+      "method": "POST",
+      "path": "/api/v1/uploads/capability",
+      "status": 401,
+      "code": "AUTH_REQUIRED",
+      "latencyMs": 31
+    },
+    {
+      "step": "CONFIRM",
+      "method": "POST",
+      "path": "/api/uploads/confirm",
+      "status": 401,
+      "code": "AUTH_REQUIRED",
+      "latencyMs": 51
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 401,
+      "code": "AUTH_REQUIRED",
+      "latencyMs": 40
+    },
+    {
+      "step": "COMPILE_JOB",
+      "method": "POST",
+      "path": "/api/compile-jobs",
+      "status": 401,
+      "code": "AUTH_REQUIRED",
+      "latencyMs": 40
+    },
+    {
+      "step": "COLLECTION",
+      "method": "GET",
+      "path": "/api/v1/collections/collection-00000000000000000000000000000000",
+      "status": 401,
+      "code": "AUTH_REQUIRED",
+      "latencyMs": 37
+    },
+    {
+      "step": "WORLD",
+      "method": "GET",
+      "path": "/api/v1/collections/collection-00000000000000000000000000000000/world",
+      "status": 401,
+      "code": "AUTH_REQUIRED",
+      "latencyMs": 38
+    },
+    {
+      "step": "ASK",
+      "method": "POST",
+      "path": "/api/v1/collections/collection-00000000000000000000000000000000/ask",
+      "status": 401,
+      "code": "AUTH_REQUIRED",
+      "latencyMs": 49
+    }
+  ],
+  "capabilitiesStatus": 404,
+  "capabilitiesPublic": false,
+  "allGuardedRoutesRefused": true,
+  "guardedStatuses": {
+    "/api/v1/uploads/capability": "401 AUTH_REQUIRED",
+    "/api/uploads/confirm": "401 AUTH_REQUIRED",
+    "/api/v1/documents": "401 AUTH_REQUIRED",
+    "/api/compile-jobs": "401 AUTH_REQUIRED",
+    "/api/v1/collections/collection-00000000000000000000000000000000": "401 AUTH_REQUIRED",
+    "/api/v1/collections/collection-00000000000000000000000000000000/world": "401 AUTH_REQUIRED",
+    "/api/v1/collections/collection-00000000000000000000000000000000/ask": "401 AUTH_REQUIRED"
+  },
+  "verdict": "UNAUTHENTICATED_SURFACE_REFUSES"
+}

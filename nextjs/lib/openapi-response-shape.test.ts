@@ -415,6 +415,56 @@ describe("documented response shapes", () => {
   against the published document -- including the `servers` override for the compile-jobs family,
   which really does sit at /api rather than /api/v1.
 */
+/*
+  BA-197. The published contract described "compiled world", "active world" and "a world" in its
+  own prose, and those descriptions render inside `.docs-endpoint` blocks directly beneath
+  paragraphs that capitalise World every time -- so one page spelled the product's central noun
+  two ways, four lines apart.
+
+  The pair the audit asked for is here rather than in `lib/product-claims-sync.test.ts`: this
+  file already reads the served document, and product-claims-sync is a shared surface two other
+  lanes are editing in this campaign. Same protection, no merge conflict.
+
+  Identifiers are exempt and have to be. `world` inside `{ code: OK, world, ... }` is a response
+  field, `/world/{id}` is a path, and `worlds:read` is a scope: those are what the API spells,
+  and capitalising one would document a field that does not exist. So the scan strips anything
+  in braces, in backticks, after a slash, or followed by a colon before it looks.
+*/
+describe("the contract writes the product's nouns the way the site does", () => {
+  const prose = (document: { paths: Record<string, unknown>; [key: string]: unknown }): string[] => {
+    const found: string[] = [];
+    const walk = (node: unknown) => {
+      if (Array.isArray(node)) { node.forEach(walk); return; }
+      if (node === null || typeof node !== "object") return;
+      for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+        if ((key === "description" || key === "summary") && typeof value === "string") found.push(value);
+        else walk(value);
+      }
+    };
+    walk(document);
+    return found;
+  };
+
+  const withoutIdentifiers = (text: string) => text
+    .replace(/`[^`]*`/g, " ")
+    .replace(/\{[^}]*\}/g, " ")
+    .replace(/\/[A-Za-z0-9_{}/-]+/g, " ")
+    .replace(/\bworlds?:[a-z]+/g, " ");
+
+  it("capitalises World in every description and summary it publishes", async () => {
+    const document = await spec();
+    const strings = prose(document as never);
+    expect(strings.length, "no descriptions found -- the walk has gone blind").toBeGreaterThan(20);
+    expect(strings.some((text) => /\bWorld\b/.test(text)), "the contract never names a World at all").toBe(true);
+    for (const text of strings) {
+      expect(
+        withoutIdentifiers(text),
+        `a lowercase world in a published description: ${text.slice(0, 120)}`,
+      ).not.toMatch(/\bworlds?\b/);
+    }
+  });
+});
+
 describe("the quickstart names only endpoints the contract publishes", () => {
   it("resolves every /api path in the quickstart code blocks", async () => {
     const document = await spec();
@@ -422,9 +472,13 @@ describe("the quickstart names only endpoints the contract publishes", () => {
     expect(quickstart, "the quickstart section is gone").toBeTruthy();
 
     const bodies = quickstart!.blocks
-      .filter((block): block is Extract<typeof block, { kind: "code" }> => block.kind === "code")
-      .map((block) => block.body)
+      .flatMap((block) =>
+        block.kind === "code" ? [block.body]
+        : block.kind === "snippets" ? block.items.map((item) => item.body)
+        : [],
+      )
       .join("\n");
+    expect(bodies.length, "the quickstart carries no code at all").toBeGreaterThan(500);
 
     /*
       Compare shapes, not parameter names.
@@ -496,7 +550,13 @@ describe("the quickstart names only endpoints the contract publishes", () => {
     const prose = quickstart.blocks
       .flatMap((block) => block.kind === "steps" ? block.items : block.kind === "prose" || block.kind === "note" ? [block.text] : [])
       .join("\n");
-    expect(prose).toContain("A PERSON ACTIVATES THE WORLD");
+    /*
+      BA-190. This pinned the step in capitals, which is how it was written -- a shouted line
+      inside a numbered list. The fact the guard exists for is that the step is there and says a
+      person takes it; the case-insensitive match is the same protection without the shouting.
+    */
+    expect(prose).toMatch(/a person activates the World/i);
+    expect(prose, "the step is a sentence in the list, not a shouted one").not.toContain("A PERSON ACTIVATES THE WORLD");
     expect(prose, "the quickstart no longer says promotion is a browser-session action by a human")
       .toMatch(/browser-session action by a human/);
     expect(prose, "the quickstart no longer names the plan activation actually requires")
@@ -505,7 +565,11 @@ describe("the quickstart names only endpoints the contract publishes", () => {
 
     // Parity in the languages the audit asked for, asserted rather than trusted.
     const languages = new Set(
-      quickstart.blocks.filter((block) => block.kind === "code").map((block) => block.language),
+      quickstart.blocks.flatMap((block) =>
+        block.kind === "code" ? [block.language]
+        : block.kind === "snippets" ? block.items.map((item) => item.language)
+        : [],
+      ),
     );
     for (const language of ["bash", "python", "typescript"]) {
       expect(languages, `the quickstart has no ${language} example`).toContain(language);

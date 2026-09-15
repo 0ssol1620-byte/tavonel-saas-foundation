@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { authorizeFoundationRequest, revalidateFoundationAuthorization } from "@/lib/developer-auth";
 import { buildSignedCollectionZip, validateReviewableCollectionArtifact } from "@/lib/collection-download";
 import { readExportSignerEnv } from "@/lib/export-signing";
+import { recordServerFunnel } from "@/lib/funnel-events";
 import { loadPreferredCollectionCandidate } from "@/lib/collection-storage";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
@@ -100,6 +101,19 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   if (!sourceAccessNow.ok) return NextResponse.json({ code: sourceAccessNow.code }, {
     status: sourceAccessNow.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503, headers: NO_STORE,
   });
+  /*
+    §15.2 names this one explicitly: an export click is not a package verified.
+
+    So the event is `export_package_signed`, which is what this route can actually witness --
+    the artifact validated, the zip built, the signature made, every authorization rechecked.
+    `package_verified` would need a consumer telling us it checked the signature, and nothing
+    in this deployment calls `verifyExportSignature` on a consumer's behalf, so that name is
+    deliberately absent rather than attached to this moment.
+  */
+  recordServerFunnel("export_package_signed", { sources: String(documentIds.length) });
+  if (auth.principal.kind === "api-key") {
+    recordServerFunnel("external_consumer_succeeded", { from: "download" });
+  }
   return new Response(signed.archive, {
       status: 200,
       headers: {

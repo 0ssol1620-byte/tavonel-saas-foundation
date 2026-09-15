@@ -1,0 +1,63 @@
+/*
+  Local to /evidence, and only for BA-078.
+
+  The page needed two shapes the shared stylesheet does not have: a full-width lead panel for the
+  one locator that exists today, and a quiet status line inside a tile for the seven that do not.
+  Both are built from `app/tavonel.css` tokens -- no new colour, no new radius -- because the
+  audit's complaint about this page was never the styling, it was that eight capability-shaped
+  tiles all spoke in the present tense while one of them was implemented.
+
+  The lead panel deliberately reuses the same ground step and hairline as `.tile`, so it reads as
+  the first member of the set rather than as a callout about the set.
+*/
+
+.leadLocator {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 18px 20px;
+  border: 1px solid var(--hairline-hi);
+  border-left: 2px solid var(--verified);
+  background: var(--g1);
+  border-radius: 4px;
+}
+
+.leadLocator h3 {
+  margin: 0;
+  font-size: 19px;
+  letter-spacing: -0.014em;
+  font-variation-settings: "wght" 580;
+  color: var(--text-hi);
+}
+
+.leadLocator > p {
+  margin: 0;
+  max-width: 68ch;
+  font-size: 13.5px;
+  line-height: 1.66;
+  color: var(--text-mid);
+}
+
+.leadMark {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--verified);
+}
+
+/*
+  The status a tile carries. 12px is the type floor, and the colour is a neutral rather than one
+  of the four status hues: "no reader yet" is not a warning, a change or a review -- it is the
+  absence of a thing, and giving it a hue would teach the reader a fifth meaning for a colour the
+  product already uses for something else.
+*/
+.locatorState {
+  margin: auto 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--hairline);
+  font-family: var(--f-mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--text-xlo);
+}

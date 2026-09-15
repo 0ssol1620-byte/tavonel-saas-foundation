@@ -1,12 +1,68 @@
-.product-overview { min-height: auto; justify-content: flex-start; padding-top: clamp(110px, 12vw, 168px); }
+/*
+  BA-021. One vertical scale for the page, instead of a per-block margin each time.
+
+  Measured on this branch at 1280 before the change: 95px between the lede and the buttons that
+  belong to it, 77px and 90px between blocks, and 0px between the surface cards and the BOUNDARY
+  eyebrow -- the boundary <section> had no margin at all, so a heading sat on the card above it.
+  §6.4 asks for a section rhythm, not a set of ad-hoc numbers, so the gaps come from two custom
+  properties here and every block reads them.
+*/
+.product-overview {
+  --product-gap: clamp(72px, 7vw, 128px);
+  --product-inner: 20px;
+  min-height: auto;
+  justify-content: flex-start;
+  padding-top: clamp(110px, 12vw, 168px);
+}
 .product-overview .shell { max-width: 1280px; }
+.product-overview .stack { gap: var(--product-inner); }
 .product-hero { align-items: end; padding-bottom: clamp(54px, 7vw, 96px); border-bottom: 1px solid var(--hairline); }
-.product-hero .actions { margin-top: 26px; }
+/*
+  The CTA row is the one place that takes more than the inner step: 20 + 28 = 48px.
+
+  Written at `.public-page .scene.doc.product-overview` because that is what it takes to win:
+  `ux-120-final.css` sets `.public-page .scene.doc .actions { margin-top: clamp(56px, 6vw, 88px) }`
+  for every editorial page, which computed to 76.8px here and is the 95px hole between the lede
+  and its own buttons. The site-wide rule is left alone -- it is every other public page's
+  spacing and not this lane's to move -- and overridden for this page only.
+*/
+.public-page .scene.doc.product-overview .actions { margin-top: 28px; }
+.public-page .scene.doc.product-overview .product-close .actions { margin-top: 0; }
+.product-overview .shell > section { margin-top: var(--product-gap); }
+
+/*
+  BA-018's closing block, and BA-022's row heading.
+
+  The layer name was a 9px mono cap in a table of sentence-case prose -- three casings in one
+  table, and the one column a reader scans first set in the smallest type on the page. It is the
+  row's subject, so it is sentence-case body type; `white-space: nowrap` on the position column
+  stops "Connects to" breaking across two lines while the meaning column takes the rest.
+*/
+.product-boundary .docs-table th[scope="row"] {
+  color: var(--text-hi);
+  font: 500 13px/1.5 var(--f-sans);
+  letter-spacing: -.005em;
+  text-transform: none;
+}
+.product-boundary-position { white-space: nowrap; }
+
+/*
+  BA-026. The trail `BreadcrumbJsonLd` already declares, rendered.
+
+  12px sans rather than the 9px mono the eyebrow under it uses: this is a navigation a reader
+  taps, not a label. Its own line above the eyebrow, so the eyebrow still introduces the title.
+*/
+.doc-breadcrumb { margin: 0; color: var(--text-xlo); font-size: 12px; letter-spacing: -.005em; }
+.doc-breadcrumb a { color: var(--text-mid); }
+.doc-breadcrumb a:hover { color: var(--text-hi); }
+.doc-breadcrumb span { margin: 0 6px; color: var(--decor); }
+.product-close { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 24px; }
+.product-close h2 { margin: 0; color: var(--text-hi); font-size: clamp(22px, 2.4vw, 34px); letter-spacing: -.03em; }
 .product-flow {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1px;
-  margin-top: clamp(48px, 6vw, 82px);
+  margin-top: var(--product-gap);
   border: 1px solid var(--hairline-hi);
   border-radius: 6px;
   overflow: hidden;
@@ -18,7 +74,7 @@
 .product-flow strong { max-width: 20ch; color: var(--text-hi); font-size: 16px; font-weight: 540; line-height: 1.35; }
 /* Four surfaces; every column count below divides four, so the last row is never a card beside
    empty tracks. Three columns left exactly that orphan slot when the fourth card was added. */
-.product-surface-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: clamp(54px, 7vw, 96px); }
+.product-surface-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: var(--product-gap); }
 @media (max-width: 1240px) { .product-surface-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .product-surface { min-height: 260px; display: flex; flex-direction: column; padding: 24px; border: 1px solid var(--hairline); border-radius: 6px; background: var(--g1); transition: border-color 160ms ease, transform 160ms ease, background 160ms ease; }
 .product-surface:hover { border-color: var(--hairline-hi); background: var(--g2); transform: translateY(-2px); }

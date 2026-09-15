@@ -36,7 +36,25 @@ const serverMode = process.env.QA_SERVER_MODE ?? "production";
   build the day the shift is fixed and it is moved into `routes`.
 */
 const routes = ["/", "/privacy", "/security", "/pricing", "/explore"];
-const measureOnlyRoutes = [];
+/*
+  `/login` and `/auth/callback` are here because of a regression that nothing caught.
+
+  Stage-A integration gave `lib/recipe-intent.ts` the six cookbook slugs from
+  `lib/cookbook-content.ts`, which reads the documentation library and the capability manifest at
+  module scope. Both sign-in pages are client components, so `next build` put 72 KB of docs source
+  into both bundles for a six-string array: `/login` 112 -> 124 kB and `/auth/callback`
+  110 -> 123 kB of first-load JS. `/login` is where a conversion happens, and this list watched
+  neither route, so the build stayed green. The cause is now guarded statically by
+  `nextjs/lib/client-route-weight.test.ts` (the import graph, which is what actually regressed);
+  these two lines are the runtime half.
+
+  They are measure-only rather than gating for one reason, stated rather than hidden: no
+  Lighthouse run against these two routes exists yet on any build, so a ceiling for them would be
+  a number nobody has measured. Their summary lines print on every run like the others, and they
+  move into `routes` above with the first run that shows they clear the budgets -- which is the
+  same discipline `/explore` is held to below, and not a ceiling bent to fit.
+*/
+const measureOnlyRoutes = ["/login", "/auth/callback"];
 const runsPerRoute = 3;
 const maxAttemptsPerRoute = 6;
 const budgets = {
@@ -113,7 +131,8 @@ try {
       A measure-only route reports the same numbers and the same misses; it just does not fail the
       build on them. The miss is printed as `over` on its summary line so a run that ignores it
       still says out loud which budget it is ignoring and by how much -- see the note beside
-      `measureOnlyRoutes` for why /explore is on that footing and what ends it.
+      `measureOnlyRoutes` for which routes are on that footing and what ends it. (/explore was,
+      and is enforced above; the two sign-in routes are, until a run shows they clear.)
     */
     const enforced = !measureOnlyRoutes.includes(route);
     const summary = { route, runs: runsPerRoute, enforced, categories: {}, audits: {}, over: [] };

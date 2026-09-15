@@ -9,8 +9,9 @@ import { unzipSync } from "fflate";
   like the same. Masterplan 4 asks for the real count where the format states one.
 
   The rule this module follows is the repository's, not a convenience: never invent data to
-  satisfy a schema. Where a format does not state a page count, this returns null with a
-  reason, and the caller falls back to the byte bound and says so. It does not guess.
+  satisfy a schema. Where a format does not state a page count, this returns null with a reason,
+  and the caller shows the absence. It does not guess, and there is no byte bound behind it any
+  more: `estimateBillablePages` returns null for the same file rather than dividing by 64KB.
 */
 
 export type MeasuredPages = {
@@ -23,7 +24,7 @@ export type UnmeasuredPages = {
   pages: null;
   reason:
     | "DOCX_PAGE_COUNT_NOT_DECLARED"
-    | "XLSX_BILLABLE_UNIT_UNDECIDED"
+    | "SPREADSHEET_COUNTED_AFTER_CONVERSION"
     | "FORMAT_DOES_NOT_STATE_PAGES"
     | "FILE_UNREADABLE";
 };
@@ -34,15 +35,20 @@ export type PageCountResult = MeasuredPages | UnmeasuredPages;
 const MAX_OOXML_BYTES = 64 * 1024 * 1024;
 
 /*
-  A spreadsheet has no pages, and nobody has decided what it is billed in.
+  A spreadsheet has no pages of its own, and the unit it is billed in is now settled: the pages
+  of the sanitized PDF it is converted to, counted after that conversion.
 
-  A sheet is not a page, a print area is not a page, and the rendered pagination depends on
-  settings the file may not carry. Masterplan 4 leaves the billable unit for XLSX to the
-  founder, so this refuses to produce a number rather than picking one that would immediately
-  become the number customers were charged.
+  Which is a number this module cannot produce. A sheet is not a page, a print area is not a
+  page, and the rendered pagination depends on settings the file may not carry -- so nothing here
+  opens the file hoping to guess the renderer's answer. It reports *why* there is no number yet,
+  and the preflight says "counted after conversion" instead of quoting a file size.
+
+  ODS and CSV answer the same way as XLSX. All three reach the reader through the same sanitize-
+  to-PDF step, so the unit and the moment it is counted are the same for all three; separating
+  them would only produce a second sentence saying the same thing.
 */
-export function countXlsxPages(): UnmeasuredPages {
-  return { pages: null, reason: "XLSX_BILLABLE_UNIT_UNDECIDED" };
+export function countSpreadsheetPages(): UnmeasuredPages {
+  return { pages: null, reason: "SPREADSHEET_COUNTED_AFTER_CONVERSION" };
 }
 
 /** Slides, counted from the package rather than inferred. */
@@ -111,8 +117,12 @@ export const readPdfPageCount: PdfPageReader = async (bytes) => {
 const OOXML = {
   "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "spreadsheet",
+  "application/vnd.oasis.opendocument.spreadsheet": "spreadsheet",
+  "text/csv": "spreadsheet",
 } as const;
+
+const SPREADSHEET_NAME = /\.(?:xlsx|ods|csv)$/;
 
 export type PageCountInput = {
   mimeType: string;
@@ -143,13 +153,16 @@ export async function measurePages(
   }
 
   const kind = OOXML[mime as keyof typeof OOXML]
-    ?? (name.endsWith(".pptx") ? "pptx" : name.endsWith(".docx") ? "docx" : name.endsWith(".xlsx") ? "xlsx" : null);
-  if (kind === "xlsx") return countXlsxPages();
+    ?? (name.endsWith(".pptx") ? "pptx"
+      : name.endsWith(".docx") ? "docx"
+        : SPREADSHEET_NAME.test(name) ? "spreadsheet" : null);
+  if (kind === "spreadsheet") return countSpreadsheetPages();
   if (kind === "pptx") return countPptxSlides(await input.bytes());
   if (kind === "docx") return countDocxPages(await input.bytes());
 
-  // ODF, plain text and anything else. A format that does not state a page count gets the
-  // byte bound from the pricing module, clearly labelled as an upper bound.
+  // ODT, plain text and anything else. A format that does not state a page count has no page
+  // count here: nothing downstream turns this into a number, and the preflight shows its
+  // absence rather than a figure derived from the file's size.
   return { pages: null, reason: "FORMAT_DOES_NOT_STATE_PAGES" };
 }
 
@@ -158,8 +171,8 @@ export async function measurePages(
  *
  * Bounded because each PDF costs a page-tree parse and a folder drop can be 128 of them, and
  * yielding between batches because a preflight that locks the UI for six seconds reads as a
- * crash. Nothing here fails the selection: a file that cannot be measured is quoted from its
- * size, which is what happened to every file before this existed.
+ * crash. Nothing here fails the selection: a file that cannot be measured carries its reason,
+ * and the panel shows that reason instead of a page number.
  */
 export async function measureSelection(
   inputs: readonly PageCountInput[],

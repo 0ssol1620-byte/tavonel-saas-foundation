@@ -1,0 +1,1464 @@
+{
+  "origin": "https://tavonel.com",
+  "format": "xlsx",
+  "fileName": "sample.xlsx",
+  "sha256": "6acac2dd644c84a2c94739fc6e78c9c16830c9d01fe577832fe70d8945276036",
+  "bytes": 4972,
+  "declaredMimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "uniqueToken": "TAVONEL-E2E-XLSX-7f3a",
+  "question": "What is the audit token in the calibration sheet?",
+  "startedAt": "2026-09-06T10:08:33.549Z",
+  "capability": null,
+  "capabilityManifestSha256": null,
+  "capabilityLookup": "GET /api/v1/capabilities 404 -- capability status unavailable from the API",
+  "calls": [
+    {
+      "step": "UPLOAD_CAPABILITY",
+      "method": "POST",
+      "path": "/api/v1/uploads/capability",
+      "status": 200,
+      "code": "QUALIFIED",
+      "latencyMs": 328
+    },
+    {
+      "step": "R2_PUT",
+      "method": "PUT",
+      "path": "https://r2-account-redacted.r2.cloudflarestorage.com/tavonel-saas-foundation-quarantine/quarantine/pilot-969dc192daa24119/6d0b724d-9f77-4e0c-b2a3-c7c21b2369f3/source (presigned query redacted)",
+      "status": 200,
+      "code": null,
+      "latencyMs": 643
+    },
+    {
+      "step": "CONFIRM",
+      "method": "POST",
+      "path": "/api/uploads/confirm",
+      "status": 200,
+      "code": "UPLOAD_CONFIRMED",
+      "latencyMs": 378
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 621
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 650
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 606
+    },
+    {
+      "step": "COMPILE_JOB",
+      "method": "POST",
+      "path": "/api/compile-jobs",
+      "status": 202,
+      "code": "COMPILE_JOB_ACCEPTED",
+      "latencyMs": 290
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 282
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 304
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 327
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 306
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 309
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 290
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 291
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 283
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 311
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 315
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 299
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 325
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 341
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 327
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 277
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 292
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 348
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 326
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 312
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 336
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 321
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 320
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 312
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 298
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 320
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 299
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 323
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 337
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 326
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 296
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 310
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 295
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 350
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 307
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 323
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 289
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 301
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 332
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 328
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 294
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 321
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 332
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 365
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 326
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 306
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 320
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 317
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 317
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 322
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 320
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 358
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 436
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 366
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 337
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 296
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 520
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 340
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 386
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 489
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 399
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 306
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 364
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 284
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 325
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 304
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 495
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 562
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 343
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 345
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 306
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 299
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 297
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 308
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 305
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 324
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 316
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 302
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 278
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 306
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 310
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 298
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 298
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 295
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 333
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 391
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 293
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 307
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 326
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 296
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 291
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 289
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 399
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 307
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 326
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 307
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 327
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 328
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 411
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 305
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 293
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 296
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 455
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 328
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 340
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 299
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 456
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 289
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 306
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 293
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 320
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 326
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 344
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 295
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 302
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 293
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 348
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 306
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 320
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 296
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 357
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 292
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 329
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 307
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 319
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 316
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 308
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 299
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 297
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 318
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 307
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 296
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 317
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 302
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 319
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 293
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 304
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 305
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 390
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 302
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 312
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 317
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 302
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 365
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 309
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 281
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 291
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 305
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 326
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 302
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 319
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 306
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 294
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 296
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 342
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 325
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 340
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 330
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 522
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 294
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 307
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 297
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 314
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 323
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 291
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 442
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 308
+    },
+    {
+      "step": "COMPILE_TERMINAL",
+      "method": "GET",
+      "path": "/api/compile-jobs/cjob-073a5878bde81ebf4bbe55821d4fd662",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 321
+    }
+  ],
+  "documentId": "6d0b724d-9f77-4e0c-b2a3-c7c21b2369f3",
+  "documentProcessingState": "ocr_ready",
+  "compileJobId": "cjob-073a5878bde81ebf4bbe55821d4fd662",
+  "compileJobState": "review_required",
+  "collectionId": null,
+  "readerRouteLabel": null,
+  "evidenceLocators": null,
+  "tokenFoundInEvidence": null,
+  "blockedBy": "COMPILE_NOT_READY:review_required",
+  "documentInventoryRow": {
+    "documentId": "6d0b724d-9f77-4e0c-b2a3-c7c21b2369f3",
+    "versionKey": "392c9f54e8671448f4c01bf67ce73a7918834a7bc6d33bdbdd7f28de06007153",
+    "sanitizedKey": "immutable/pilot-969dc192daa24119/pilot-969dc192daa24119/6d0b724d-9f77-4e0c-b2a3-c7c21b2369f3/392c9f54e8671448f4c01bf67ce73a7918834a7bc6d33bdbdd7f28de06007153/sanitized.pdf",
+    "sanitizedSize": 19045,
+    "ocrJsonKey": "immutable/pilot-969dc192daa24119/pilot-969dc192daa24119/6d0b724d-9f77-4e0c-b2a3-c7c21b2369f3/392c9f54e8671448f4c01bf67ce73a7918834a7bc6d33bdbdd7f28de06007153/ocr.json",
+    "ocrJsonSize": 1665,
+    "hasOcrJson": true,
+    "cdrReceiptKey": "immutable/pilot-969dc192daa24119/pilot-969dc192daa24119/6d0b724d-9f77-4e0c-b2a3-c7c21b2369f3/392c9f54e8671448f4c01bf67ce73a7918834a7bc6d33bdbdd7f28de06007153/cdr-receipt.json",
+    "ocrReviewKey": null,
+    "processingState": "ocr_ready"
+  },
+  "compileJob": {
+    "jobId": "cjob-073a5878bde81ebf4bbe55821d4fd662",
+    "workspaceKey": "pilot-969dc192daa24119",
+    "documentIds": [
+      "6d0b724d-9f77-4e0c-b2a3-c7c21b2369f3"
+    ],
+    "state": "review_required",
+    "collectionId": "collection-73e6d4a5f8249979f03bca1c3476b454",
+    "errorCode": null,
+    "blocked": [],
+    "blockedResolution": null,
+    "documentsTotal": 1,
+    "documentsReady": 1,
+    "corpusId": null,
+    "batchIndex": null,
+    "batchCount": null,
+    "createdAt": "2026-09-06T10:08:47.161794+00:00",
+    "updatedAt": "2026-09-06T10:09:01.370799+00:00",
+    "settledAt": null
+  },
+  "finishedAt": "2026-09-06T10:23:37.908Z",
+  "reachedStep": "COMPILE_JOB",
+  "stepChain": [
+    "CAPABILITIES",
+    "UPLOAD_CAPABILITY",
+    "R2_PUT",
+    "CONFIRM",
+    "DOCUMENT_TERMINAL",
+    "COMPILE_JOB",
+    "COMPILE_TERMINAL",
+    "COLLECTION",
+    "WORLD",
+    "ASK"
+  ],
+  "verdict": "FAILED_COMPILE_TERMINAL"
+}

@@ -23,6 +23,8 @@
  * ever leaking "live" into published copy.
  */
 
+import { ACCESS_CTA, SELF_SERVE_CTA, type SiteLink } from "./site-navigation";
+
 export type CommercialMode = "pilot" | "live";
 export type PaymentProvider = "sandbox" | "production";
 
@@ -73,9 +75,13 @@ export function isLiveCommerce(env: Environment = process.env) {
   return readCommercialState(env).liveChargesEnabled;
 }
 
-/** The primary call to action, which changes with commercial posture and nothing else. */
-export function primaryCallToAction(env: Environment = process.env) {
-  return isLiveCommerce(env)
-    ? { label: "Start with your files", href: "/login" as const }
-    : { label: "Request access", href: "/contact" as const };
+/**
+ * The primary call to action, which changes with commercial posture and nothing else.
+ *
+ * BA-232: the two labels moved to `lib/site-navigation.ts`, which the header, the phone sheet and
+ * the page-level actions already read. This function still owns *which* of the two applies; it no
+ * longer owns their words, so a bar and a hero cannot spell one action two ways.
+ */
+export function primaryCallToAction(env: Environment = process.env): SiteLink {
+  return isLiveCommerce(env) ? SELF_SERVE_CTA : ACCESS_CTA;
 }

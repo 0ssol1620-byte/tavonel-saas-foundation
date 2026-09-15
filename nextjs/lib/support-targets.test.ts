@@ -1,0 +1,99 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+import { SUPPORT_ACKNOWLEDGEMENT } from "./support-targets";
+
+/*
+  O06. The first published support target, and the two ways it can go wrong.
+
+  It can go wrong by drifting: the sentence lands on `/status` and on `/contact`, and the day one
+  of them is edited by hand the site publishes two different targets and nobody finds out from a
+  failing build. So both pages have to render the constant, not a copy of its words.
+
+  It can go wrong by growing. An acknowledgement target is a thing one person can keep; a
+  resolution time depends on the bug, and "we will fix it within N hours" is the sentence a lane
+  writes when it wants the page to sound stronger. The second half of this file is a ban list on
+  exactly that edit -- see `docs/policy/SUPPORT_TARGETS.md` for why an unmet published target is
+  worse than a published absence.
+*/
+const read = (path: string) => readFileSync(resolve(import.meta.dirname, "..", path), "utf8");
+const SURFACES = ["app/status/page.tsx", "app/contact/page.tsx"] as const;
+
+describe("the published support target", () => {
+  it("is an acknowledgement within one business day, KST", () => {
+    expect(SUPPORT_ACKNOWLEDGEMENT).toContain("within 1 business day (KST)");
+    expect(SUPPORT_ACKNOWLEDGEMENT).toContain("support@tavonel.com");
+  });
+
+  /*
+    The customer wording, pinned where the old process label was pinned.
+
+    This assertion used to require "a delegated decision pending the founder's confirmation" in the
+    sentence. The "Public wording of delegated values" section of
+    `docs/policy/DECISION_LOG_2026-09-11.md` settles it the other way: a stated commitment carries
+    no process label on a public page, the provenance stays in the log (FD-09) and in the comment
+    above the constant, and the founder's merge of the pull request carrying that log is the
+    confirmation. So the pin is inverted rather than deleted -- the sentence is the target and the
+    two bans it always carried, and none of the process vocabulary.
+
+    The wrong attribution is still barred in both directions: the copy may not say the founder
+    decided this, and it may not print the paperwork either.
+  */
+  it("states the target as a commitment, with no process vocabulary and no false attribution", () => {
+    expect(SUPPORT_ACKNOWLEDGEMENT).toContain(
+      "That is an acknowledgement target and not a resolution time",
+    );
+    for (const process of ["delegated decision", "pending the founder", "FD-09", "decision log"]) {
+      expect(SUPPORT_ACKNOWLEDGEMENT, `"${process}" is process vocabulary, not customer copy`)
+        .not.toContain(process);
+    }
+    expect(SUPPORT_ACKNOWLEDGEMENT, "and never the phrasing the decision log bans")
+      .not.toMatch(/the founder (decided|has decided|set)/i);
+  });
+
+  /*
+    The provenance is a comment, and the comment is the thing a reviewer follows back to the log.
+    Asserted on the module source because a comment nobody can find is the same as no provenance.
+  */
+  it("keeps the provenance in the source, pointing at the log row", () => {
+    const source = read("lib/support-targets.ts");
+    expect(source).toContain("docs/policy/DECISION_LOG_2026-09-11.md");
+    expect(source).toContain("FD-09");
+  });
+
+  it.each(SURFACES)("%s renders the constant", (surface) => {
+    const source = read(surface);
+    expect(source, `${surface} must import the target`).toContain('from "@/lib/support-targets"');
+    expect(source, `${surface} must render it`).toContain("{SUPPORT_ACKNOWLEDGEMENT}");
+  });
+
+  /*
+    The failure path that matters. A page that pastes the words instead of importing them passes
+    the check above as long as the import is still there for something else, so the words
+    themselves are barred from the page source.
+  */
+  it.each(SURFACES)("%s does not carry a second copy of the wording", (surface) => {
+    expect(read(surface)).not.toContain("1 business day");
+  });
+
+  it("commits to no resolution time, and to no clock it has no rota for", () => {
+    const copy = SUPPORT_ACKNOWLEDGEMENT.toLowerCase();
+    expect(copy).toContain("no resolution time is committed");
+    for (const overclaim of [
+      "resolved within",
+      "resolution within",
+      "24/7",
+      "around the clock",
+      "guaranteed",
+      "priority support",
+      "dedicated",
+      "sla",
+    ]) {
+      expect(copy, `"${overclaim}" is a commitment one person with no rota cannot keep`)
+        .not.toContain(overclaim);
+    }
+    // One business day and 24 hours differ by a weekend, and the weekend is when the promise breaks.
+    expect(copy, "an hour count is the version of this target that fails on a Saturday")
+      .not.toMatch(/\b\d+\s*hours?\b/);
+  });
+});

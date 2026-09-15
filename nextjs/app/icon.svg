@@ -2,20 +2,15 @@
   <!--
     The logomark, redrawn for 16px.
 
-    The component version draws the eight unlit cells as hollow strokes at 0.42 opacity, which is
-    right at nav size and disappears entirely in a browser tab. Here every cell is filled and the
-    contrast is carried by fill alone, so the one lit cell still reads at favicon scale.
+    Decision A-06's geometry from components/logomark.tsx, scaled 24 -> 32 and drawn a little
+    heavier: a tab favicon is rendered at 16px, so the two pages take 2.5 and the thread 2.1
+    rather than the 1.9 / 1.6 the nav uses, and the contrast is carried by one light neutral on
+    the dark ground instead of by opacity.
   -->
   <rect width="32" height="32" rx="6" fill="#08090A"/>
-  <g fill="#697278">
-    <rect x="6"  y="6"  width="6" height="6" rx="1"/>
-    <rect x="13" y="6"  width="6" height="6" rx="1"/>
-    <rect x="20" y="6"  width="6" height="6" rx="1"/>
-    <rect x="6"  y="13" width="6" height="6" rx="1"/>
-    <rect x="20" y="13" width="6" height="6" rx="1"/>
-    <rect x="6"  y="20" width="6" height="6" rx="1"/>
-    <rect x="13" y="20" width="6" height="6" rx="1"/>
-    <rect x="20" y="20" width="6" height="6" rx="1"/>
+  <g fill="none" stroke="#C8CED2" stroke-linecap="square">
+    <path d="M3.3 7.3H9.9L12.7 10.1V24.7H3.3Z" stroke-width="2.5" opacity="0.72"/>
+    <path d="M19.3 10.9H28.7V24.7H19.3Z" stroke-width="2.5" opacity="0.72"/>
+    <path d="M12.7 20.7L19.3 16.1" stroke-width="2.1"/>
   </g>
-  <rect x="13" y="13" width="6" height="6" rx="1" fill="#7BE0BE"/>
 </svg>

@@ -18,7 +18,12 @@ const routes = [
   "/pricing",
   "/product",
   "/solutions/ai-ready-knowledge",
+  // The hub and one section page: both are templates rather than single pages, and the section
+  // template now renders the documentation index twice (a column and a disclosure) so that a
+  // duplicate id or a second landmark would be a defect on all twenty-two of them.
+  "/solutions",
   "/docs",
+  "/docs/quickstart",
   "/developers",
   "/explore",
 ] as const;

@@ -122,6 +122,30 @@ describe("Foundation compute ledger", () => {
     })).resolves.toEqual({ ok: false, code: "COMPUTE_SETTLEMENT_INVALID" });
   });
 
+  /*
+    Same rule, the other terminal refusal (migrations CROSS-LANE 4).
+
+    `20260911120000` made `expired` terminal and refuses a late settlement under its own error
+    name, precisely so an operator can tell a lapsed capability from a contested charge. Unmapped
+    it became COMPUTE_LEDGER_FAILED -- the one class a caller is right to retry -- so the retry
+    loop would have run against a refusal the ledger will never accept, and the log line would
+    have said the ledger was unreachable when it was answering correctly.
+  */
+  it("classifies a settlement for a lapsed capability as its own terminal refusal", async () => {
+    configure();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ message: 'raise exception "foundation_compute_settlement_expired"' }),
+      { status: 400 },
+    )));
+    await expect(settleFoundationCompute({
+      workspaceKey: base.workspaceKey,
+      documentId: base.documentId,
+      outcome: "released",
+      actualCredits: 0,
+      reasonCode: "CDR_LATE_RELEASE",
+    })).resolves.toEqual({ ok: false, code: "COMPUTE_SETTLEMENT_EXPIRED" });
+  });
+
   it("refuses a settlement receipt that claims neither processed nor duplicate", async () => {
     configure();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({

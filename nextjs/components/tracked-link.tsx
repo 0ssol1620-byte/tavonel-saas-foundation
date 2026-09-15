@@ -18,15 +18,18 @@ export function TrackedLink({
   event,
   href,
   download,
+  className,
   children,
 }: {
   event: FunnelEvent;
   href: string;
   download?: boolean;
+  /* BA-205: a tracked link is sometimes the page's primary action and needs to look like one. */
+  className?: string;
   children: React.ReactNode;
 }) {
   return (
-    <a href={href} download={download} onClick={() => trackFunnel(event)}>
+    <a className={className} href={href} download={download} onClick={() => trackFunnel(event)}>
       {children}
     </a>
   );

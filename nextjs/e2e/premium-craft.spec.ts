@@ -54,11 +54,30 @@ test("pricing puts catalog-backed choices before detailed explanations", async (
   const plans = page.locator(".pricing-page .plans");
   await expect(plans.locator(".plan")).toHaveCount(4);
   await expect(page.locator(".pricing-faq details")).toHaveCount(17);
-  // Eight since the truth lane added the two disclosure rows the audit asked for -- "What does
-  // not consume pages" and "Spreadsheets". Still an exact count, not a floor: this glance is the
-  // summary a buyer reads instead of the detail, so a row appearing has to be a decision someone
-  // made rather than something that accumulated.
-  await expect(page.locator(".pricing-glance .tile")).toHaveCount(8);
+  /*
+    Ten with the explicit human-promotion policy beside the nine plan details. Refunds states
+    the window and consumed share here rather than only in the FAQ below it.
+
+    Still an exact count, not a floor -- this glance is the summary a buyer reads instead of the
+    detail, so a row appearing has to be a decision someone made rather than something that
+    accumulated -- and now the titles as well, in order, because a count alone cannot tell a
+    renamed tile from a replaced one and three of these titles are the ones a claims guard in
+    `lib/product-claims-sync.test.ts` reads the body of.
+  */
+  await expect(page.locator(".pricing-glance .tile h3")).toHaveText([
+    "Base subscription",
+    "Included pages",
+    "Past the included pages",
+    "Unused pages",
+    "What differs by plan",
+    "What does not consume pages",
+    "Spreadsheets",
+    "Refunds",
+    "How to start",
+    "Human promotion",
+  ]);
+  await expect(page.locator('[data-purchase-gate="candidatePromotion"]'))
+    .toContainText("Promotion is always an explicit human decision.");
   const choice = await plans.boundingBox();
   const details = await page.locator(".pricing-details").boundingBox();
   expect(choice!.y + choice!.height).toBeLessThan(details!.y);

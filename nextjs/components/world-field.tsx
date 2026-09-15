@@ -19,9 +19,23 @@
  * and one back out, not a loop: it does not breathe, pulse or drift once it arrives.
  */
 
-import { useEffect, useRef } from "react";
-import { AREAS } from "@/lib/demo-world";
+import { useEffect, useRef, useState } from "react";
 import { type WorldGraph, buildWorldGraph, nodeBudget } from "@/lib/world-graph";
+
+/*
+  Where the field is allowed to exist at all (BA-005).
+
+  The site's own rule is no live canvas under ~900px -- the same boundary the rail and the
+  full-height scenes already use -- and this one was running full-viewport at 390, behind every
+  scene, on the device most visitors arrive on. Hiding it in CSS would leave the animation-frame
+  loop running for nothing, so below the boundary the canvas is not rendered and the loop is
+  never started. Above it nothing changes.
+
+  The coarse-pointer arm is not a duplicate of the first: a phone in landscape is 844-932 CSS px
+  wide, so a plain max-width rule would hand the canvas straight back to the same phone the
+  moment it was rotated.
+*/
+const LIVE_FRAME = "(min-width: 900px) and (not ((pointer: coarse) and (max-width: 1023px)))";
 
 export type WorldMode =
   | "scatter"
@@ -49,7 +63,6 @@ const INK = {
   kept: "rgba(105,114,120,",
   changed: "rgba(242,166,90,",
   affected: "rgba(123,224,190,",
-  held: "rgba(110,147,184,",
   edge: "rgba(46,53,59,",
   label: "rgba(76,86,92,",
 } as const;
@@ -58,6 +71,16 @@ export default function WorldField({ mode }: { mode: WorldMode }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const modeRef = useRef<WorldMode>(mode);
   modeRef.current = mode;
+  /* False on the server and on the first client paint, so a phone never mounts the canvas. */
+  const [live, setLive] = useState(false);
+
+  useEffect(() => {
+    const frame = window.matchMedia(LIVE_FRAME);
+    const apply = () => setLive(frame.matches);
+    apply();
+    frame.addEventListener("change", apply);
+    return () => frame.removeEventListener("change", apply);
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -151,7 +174,7 @@ export default function WorldField({ mode }: { mode: WorldMode }) {
       for (let i = 0; i < graph.nodes.length; i += 1) {
         const node = graph.nodes[i];
         const point = at(i);
-        const revealed = node.depth >= 0 || node.state === "held";
+        const revealed = node.depth >= 0;
         const ink = revealed && current.reveal > 0.05 ? INK[node.state] : INK.kept;
         const alpha = (revealed && current.reveal > 0.05
           ? 0.30 + 0.55 * current.reveal
@@ -163,7 +186,8 @@ export default function WorldField({ mode }: { mode: WorldMode }) {
       }
 
       if (current.labels > 0.03) {
-        context.font = '9px var(--f-mono), ui-monospace, monospace';
+        /* 12px is the design system's own floor (BA-236), and these labels name real filings. */
+        context.font = '12px var(--f-mono), ui-monospace, monospace';
         context.fillStyle = `${INK.label}${(0.9 * current.labels * current.idle).toFixed(3)})`;
         context.textAlign = "center";
         graph.byArea.forEach((members, area) => {
@@ -175,7 +199,7 @@ export default function WorldField({ mode }: { mode: WorldMode }) {
             x += point.x;
             y += point.y;
           }
-          context.fillText(AREAS[area].name.toUpperCase(), x / members.length, y / members.length - 26);
+          context.fillText(graph!.labels[area].toUpperCase(), x / members.length, y / members.length - 26);
         });
       }
     };
@@ -205,13 +229,15 @@ export default function WorldField({ mode }: { mode: WorldMode }) {
       window.removeEventListener("scroll", markActive, true);
       if (frame) window.cancelAnimationFrame(frame);
     };
-  }, []);
+  }, [live]);
 
   // Reduced motion never enters the rAF loop, so a mode change has to repaint explicitly.
   useEffect(() => {
+    if (!live) return;
     if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     window.dispatchEvent(new Event("resize"));
-  }, [mode]);
+  }, [live, mode]);
 
+  if (!live) return null;
   return <canvas ref={canvasRef} className="world-field" aria-hidden="true" />;
 }

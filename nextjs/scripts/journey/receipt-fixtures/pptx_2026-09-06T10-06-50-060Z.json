@@ -1,0 +1,221 @@
+{
+  "origin": "https://tavonel.com",
+  "format": "pptx",
+  "fileName": "sample.pptx",
+  "sha256": "bdb28f02289299ae2be07d30f0c860518f3d48c2d67bb4c80c43e633ff983fe6",
+  "bytes": 29263,
+  "declaredMimeType": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "uniqueToken": "TAVONEL-E2E-PPTX-7f3a",
+  "question": "What is the audit token for this deck?",
+  "startedAt": "2026-09-06T10:23:51.291Z",
+  "capability": null,
+  "capabilityManifestSha256": null,
+  "capabilityLookup": "GET /api/v1/capabilities 404 -- capability status unavailable from the API",
+  "calls": [
+    {
+      "step": "UPLOAD_CAPABILITY",
+      "method": "POST",
+      "path": "/api/v1/uploads/capability",
+      "status": 200,
+      "code": "QUALIFIED",
+      "latencyMs": 712
+    },
+    {
+      "step": "R2_PUT",
+      "method": "PUT",
+      "path": "https://r2-account-redacted.r2.cloudflarestorage.com/tavonel-saas-foundation-quarantine/quarantine/pilot-969dc192daa24119/62981d10-9855-43c9-8851-33491266c14a/source (presigned query redacted)",
+      "status": 200,
+      "code": null,
+      "latencyMs": 2492
+    },
+    {
+      "step": "CONFIRM",
+      "method": "POST",
+      "path": "/api/uploads/confirm",
+      "status": 200,
+      "code": "UPLOAD_CONFIRMED",
+      "latencyMs": 518
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 614
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 712
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 810
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 924
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 963
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 734
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 682
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 706
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 1252
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 937
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 836
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 614
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 734
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 860
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 624
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 871
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 764
+    },
+    {
+      "step": "DOCUMENT_TERMINAL",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "status": 200,
+      "code": "OK",
+      "latencyMs": 693
+    }
+  ],
+  "documentId": "62981d10-9855-43c9-8851-33491266c14a",
+  "documentProcessingState": "operator_review",
+  "compileJobId": null,
+  "compileJobState": null,
+  "collectionId": null,
+  "readerRouteLabel": null,
+  "evidenceLocators": null,
+  "tokenFoundInEvidence": null,
+  "blockedBy": "OPERATOR_REVIEW_REQUIRED:OCR_TIMEOUT_OR_NETWORK",
+  "documentInventoryRow": {
+    "documentId": "62981d10-9855-43c9-8851-33491266c14a",
+    "versionKey": "cd801fb241007a5d34beee46a73fc6b5eb2d42796637f933b7623841573eb5bd",
+    "sanitizedKey": "immutable/pilot-969dc192daa24119/pilot-969dc192daa24119/62981d10-9855-43c9-8851-33491266c14a/cd801fb241007a5d34beee46a73fc6b5eb2d42796637f933b7623841573eb5bd/sanitized.pdf",
+    "sanitizedSize": 35383,
+    "ocrJsonKey": null,
+    "ocrJsonSize": null,
+    "hasOcrJson": false,
+    "cdrReceiptKey": "immutable/pilot-969dc192daa24119/pilot-969dc192daa24119/62981d10-9855-43c9-8851-33491266c14a/cd801fb241007a5d34beee46a73fc6b5eb2d42796637f933b7623841573eb5bd/cdr-receipt.json",
+    "ocrReviewKey": "immutable/pilot-969dc192daa24119/pilot-969dc192daa24119/62981d10-9855-43c9-8851-33491266c14a/cd801fb241007a5d34beee46a73fc6b5eb2d42796637f933b7623841573eb5bd/ocr-review.json",
+    "processingState": "operator_review",
+    "ocrReviewReasonCode": "OCR_TIMEOUT_OR_NETWORK"
+  },
+  "finishedAt": "2026-09-06T10:25:34.484Z",
+  "reachedStep": "DOCUMENT_TERMINAL",
+  "stepChain": [
+    "CAPABILITIES",
+    "UPLOAD_CAPABILITY",
+    "R2_PUT",
+    "CONFIRM",
+    "DOCUMENT_TERMINAL",
+    "COMPILE_JOB",
+    "COMPILE_TERMINAL",
+    "COLLECTION",
+    "WORLD",
+    "ASK"
+  ],
+  "verdict": "REACHED_DOCUMENT_TERMINAL"
+}

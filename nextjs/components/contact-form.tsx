@@ -97,7 +97,8 @@ export default function ContactForm() {
         </fieldset>
       </details>
       <label className="contact-field">
-        <span>What should we understand?</span>
+        {/* BA-141. The abstract question asked for an essay; the concrete one gets an answer. */}
+        <span>What are you trying to do?</span>
         <textarea
           name="message"
           rows={8}

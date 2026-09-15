@@ -18,6 +18,7 @@ import { useRef } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import ProvenanceTether from "@/components/world-visual/provenance-tether";
 import SourceSheet from "@/components/world-visual/source-sheet";
+import { chooseExploreEntryProof } from "@/lib/explore-entry-proof";
 import { STATE_WORD } from "./parallel-view";
 import styles from "./explore-stage.module.css";
 import { EXPLORE_COPY } from "@/lib/explore-story";
@@ -58,7 +59,20 @@ export default function EvidenceAct({
   if (!node) return null;
 
   const regions: VisualEvidence[] = model.evidence.filter((item) => node.evidenceRefs.includes(item.id));
-  const active = regions.find((item) => item.id === evidenceId) ?? regions[0];
+  /*
+    BA-035 -- the proof is only proof if the words in the box can be read.
+
+    The fallback was `regions[0]`, the object's first region in compiled order, which for a
+    filing is its cover: the audit's screenshot of this pane is a highlight box over "Table of
+    Contents" with the phrase itself clipped. When the reader has not chosen a region, the
+    opening one is now picked the way /explore picks its entry proof -- past the cover pages,
+    long enough to be a quotation -- and `regions[0]` remains the last resort for an object
+    whose every region is a cover line. Presentation selection only: no excerpt, locator or
+    coordinate is rewritten, and the reader can still step to any region in the set.
+  */
+  const active = regions.find((item) => item.id === evidenceId)
+    ?? chooseExploreEntryProof(regions, [])
+    ?? regions[0];
   const activeIndex = active ? regions.findIndex((item) => item.id === active.id) : -1;
 
   const neighbours = model.edges

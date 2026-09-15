@@ -2,6 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { primaryCallToAction } from "./commercial-state";
+import { ACCESS_CTA, EXPLORE_CTA, PRODUCT_NOUNS, SELF_SERVE_CTA } from "./site-navigation";
 
 /**
  * SPEC 13.3 -- phrases the product may not use, enforced.
@@ -41,6 +43,13 @@ const COPY_SURFACES = [
   "app/error.tsx",
   "lib/capabilities.ts",
   "lib/checkout-intent.ts",
+  /*
+    The recipe hop, registered with the checkout hop it copies. `read` takes a literal path and
+    never follows an import, so the preflight the sign-in page renders is unguarded until its own
+    row is here -- and the preflight is where a cost sentence and an entitlement sentence live.
+  */
+  "lib/recipe-intent.ts",
+  "components/recipe-preflight.tsx",
   "lib/funnel-events.ts",
   "lib/demo-world.ts",
   "lib/film-script.ts",
@@ -144,6 +153,10 @@ const COPY_SURFACES = [
   */
   "app/solutions/[slug]/page.tsx",
   "app/api/page.tsx",
+  // The /solutions hub, added with the route. Its cards are read from the record on the detail
+  // page above, so the only copy of its own it carries is the title, the intro and the closing
+  // pointer -- which is exactly the kind of sentence this file exists to hold to the rules.
+  "app/solutions/page.tsx",
   /*
     The conversion pass, 2026-09-08. Three surfaces a buyer reads in order, none of which had a
     row. The pricing client is the one that matters: the plan cards, the six §12.1 answers and
@@ -155,6 +168,59 @@ const COPY_SURFACES = [
   "components/trust-next.tsx",
   // `/trust` stopped being a redirect and became a page, which makes it a copy surface.
   "app/trust/page.tsx",
+  /*
+    The cookbooks, 2026-09-11. Six drafts, and almost every word of them is in the library rather
+    than in the one route that arranges them -- the same shape as /docs, and the same reason both
+    files are listed: `read` takes a literal path and never follows an import.
+  */
+  "lib/cookbook-content.ts",
+  "app/cookbooks/[slug]/page.tsx",
+  // The cookbook index, 2026-09-11 (BA-210). Its lede and card copy are written on the page.
+  "app/cookbooks/page.tsx",
+  /*
+    The §12.4 Korean entry page. A barred phrase does not stop being barred in translation, and
+    the list below is matched against source text, so the row is here for the English words this
+    page does carry -- the plan label it reads from `billing-catalog.ts`, the page names it links
+    to, and its own comments. What it cannot check is a Korean sentence that means one of these
+    things; that is a review, and it is why this page states no claim it does not link to.
+  */
+  "app/ko/page.tsx",
+  /*
+    `llms.txt` is public copy that no guard read.
+
+    It is prose, it is served verbatim to crawlers and AI tools, and it was the one public surface
+    here checked by nothing -- which is how it came to carry a dated, attributed claim about how
+    Google treats AI discovery files, with no receipt behind it. The claim is gone; the reason it
+    survived was the missing row, so the row is here. A barred phrase or a readiness overclaim in
+    it now fails the same way it does on a page.
+  */
+  "public/llms.txt",
+  /*
+    The published support target. It is one exported string rendered on `/status` and `/contact`,
+    and neither page's own source contains the words -- so without a row here the only support
+    commitment on the site would be guarded by nothing in this file.
+  */
+  "lib/support-targets.ts",
+  // `/contact` carries three addresses and the support target, and had no row.
+  "app/contact/page.tsx",
+  /*
+    The navigation, 2026-09-11. The menu became prose.
+
+    A flat bar was eight one-word labels with nothing to guard. The IA redesign's panels carry
+    column titles, link labels and audience lines -- "Supported files and what is preserved",
+    "Trust center", "AI and platform engineers" -- written in the nav data and rendered by both
+    chromes, which makes them public copy on every page of the site, checked by nothing. The
+    components are listed alongside the data because a label written straight into the JSX would
+    otherwise slip past a guard that only reads the array.
+  */
+  "lib/site-navigation.ts",
+  "components/site-nav/desktop-primary-nav.tsx",
+  "components/mobile-primary-nav.tsx",
+  "components/public-site-chrome.tsx",
+  "components/policy-layout.tsx",
+  // BA-232: the header's action is a rendered button on every public page, so it is a copy
+  // surface. It wrote three labels of its own; it reads the shared two now.
+  "components/public-primary-cta.tsx",
 ];
 
 const BARRED = [
@@ -484,7 +550,16 @@ describe("public copy", () => {
     expect(source).not.toContain('<span className="st">ENTERPRISE-ASSISTED</span>');
     expect(source).not.toContain("Provider qualification and last-tested evidence stay visible on Integrations.");
     expect(source).not.toContain("The ZIP archive itself is never compiled");
-    expect(source).toContain("Only supported files inside are uploaded.");
+    /*
+      BA-009 turned "ZIPs open locally. Only supported files inside are uploaded." around, so the
+      scene where a visitor decides to hand over their own material leads with what happens
+      rather than with what is refused. Both facts stay pinned, and now separately: the archive
+      is expanded in the browser, and the manifest's formats are what leaves the machine. Two
+      substrings rather than one, because either half going missing is the defect this line
+      exists for -- copy that says only "supported files" has stopped saying where the ZIP opened.
+    */
+    expect(source).toContain("ZIPs open on your machine");
+    expect(source).toContain("the supported files inside compile straight into your World.");
     expect(source).toContain('className="intake-flow rv"');
     expect(source).toContain('href="/integrations"');
     expect(workspace).not.toContain('{ name: "Google Drive", availability: "Beta" }');
@@ -497,8 +572,26 @@ describe("public copy", () => {
     for (const word of A4_WORDS) expect(source.toUpperCase()).not.toContain(`>${word}<`);
     expect(source).not.toContain("SUPPORT_LEVELS");
     expect(source).toContain('access: "Read-only"');
-    expect(source).toContain("Security & sync details");
+    // BA-071: "and", like every other fold label on the site.
+    expect(source).toContain("Security and sync details");
     expect(source).toContain("Verify the provider account in Workspace before the first sync.");
+
+    /*
+      BA-061 / BA-065. This test's own subject, pinned the other way round.
+
+      Every connector's Deletion row ended on our internal qualification state, and the page's
+      last paragraph before "Connect a source" said no customer install had ever been qualified
+      end to end. Each row now states what the adapter does at that event; the monitoring fact
+      -- a real buying input -- moved into the fold as "Monitoring", written as where a failed
+      run surfaces. So: none of that vocabulary comes back, and the behaviour it displaced is
+      still on the page.
+    */
+    expect(source).not.toMatch(/qualification is still required/);
+    expect(source).not.toContain("No customer-run install of this agent has been qualified");
+    expect(source.match(/nothing compiles from a source we can no longer read/g), "one per connector")
+      .toHaveLength(3);
+    expect(source).toContain("your scheduler is where a failed run surfaces");
+    expect(source).toContain("no inbound port");
   });
 
   /*
@@ -544,6 +637,56 @@ describe("public copy", () => {
     const copy = read(surface).replace(/\/\*[\s\S]*?\*\//g, " ").toLowerCase();
     for (const phrase of RETIRED_LOCATOR_WORDING) {
       expect(copy, `RESOLVED A-1 retires "${phrase}"`).not.toContain(phrase);
+    }
+  });
+
+  /*
+    BA-078, the other half of A-1, and the most expensive contradiction the 2026-09-11 audit found.
+
+    A-1 stopped one locator shape being published as the shape of all evidence, and /evidence
+    answered it with a model: eight locator families, one tile each. Every tile then stated its
+    locator in the present tense, eight capability-shaped panels as the page's largest visual
+    element, while exactly one of the eight has a reader -- and /sources says so in as many words,
+    because every accepted format there preserves page, paragraph text and region. A buyer who
+    read both pages caught the brand contradicting itself on the subject the brand is built on.
+
+    The model is not the fix and is not what this checks. What it checks is that the two pages
+    cannot drift apart again: /evidence may lead with exactly one locator, it must be the one
+    /sources actually preserves a region for, and every other family must carry a state chip in
+    the grid rather than a correction folded underneath it.
+  */
+  it("marks one shipped locator on /evidence, and states the rest as unshipped", () => {
+    const page = read("app/evidence/page.tsx");
+    const shipped = page.match(/const READING_TODAY = \["([^"]+)"/);
+    expect(shipped, "/evidence no longer names the locator that reads today").not.toBeNull();
+    expect(shipped![1]).toBe("PDF");
+
+    // Every other family is in the contracted list, and none of them is the shipped one.
+    const contracted = page.match(/const CONTRACTED_LOCATORS = \[([\s\S]*?)\n\] as const;/);
+    expect(contracted, "the evidence model is no longer published").not.toBeNull();
+    const families = [...contracted![1]!.matchAll(/\["([^"]+)",/g)].map((match) => match[1]!);
+    expect(families.length, "the model is eight families: one shipped, seven contracted").toBe(7);
+    expect(families).not.toContain(shipped![1]);
+
+    // The status is in the grid, not folded under it, and it says what it is.
+    expect(page, "an unshipped locator needs its state on its own tile")
+      .toContain("Reading today");
+    expect(page).toContain("Reader not shipped");
+    expect(page, "the correction may not go back into a fold")
+      .not.toContain("See current locator coverage");
+
+    /*
+      And the claim is the one `/sources` supports. `LIVE_PRESERVED` is the manifest's own list,
+      so a day when the pipeline starts preserving a spreadsheet cell fails here instead of
+      leaving /evidence understating what it does.
+    */
+    const manifest = read("../shared/capabilityManifest.ts");
+    expect(manifest).toContain('const LIVE_PRESERVED = ["page", "paragraph_text", "bbox1000"]');
+
+    // BA-099: one casing rule across the grid -- the site writes "and", never a spaced slash.
+    for (const family of families) {
+      expect(family, "a space-slash pair in a name the site would write with 'and'")
+        .not.toContain(" / ");
     }
   });
 
@@ -777,10 +920,125 @@ describe("public copy", () => {
   */
   it("states what the Apple sample does not represent, next to the sample", () => {
     const stage = read("components/explore/explore-stage.tsx");
-    expect(stage).toContain("Apple&apos;s own public SEC filings");
-    expect(stage, "the limit names the four things it does not represent")
+    /*
+      BA-037 rewrote the note this guards: six scoping clauses at 11px sitting under the page's
+      central promise became three sentences at 15px, and "Apple&apos;s" became U+2019. The fact
+      is unchanged and the case is tighter rather than looser -- the limit is still required
+      here, the corpus is still named, both documents are still reachable, and the note may no
+      longer be typeset below the 12px floor it was under.
+    */
+    expect(stage).toContain("compiled from Apple’s public SEC filings");
+    expect(stage, "no straight apostrophe between letters in this note")
+      .not.toContain("Apple&apos;s own public SEC filings");
+    expect(stage, "the limit still names what the corpus does not represent")
       .toContain("not a claim about a mixed internal corpus");
-    expect(stage, "and the reproducible asset is reachable from the demo")
+    expect(stage, "and the reproducible asset is reachable from the sample")
       .toContain('href="/reproducibility"');
+    expect(stage, "and what the read does not recover is still one link away")
+      .toContain('href="/sources"');
+    expect(read("components/explore/explore-stage.module.css"))
+      .toMatch(/\.entryNote \{[^}]*font-size: 1[5-9]px/);
+  });
+});
+
+/* ============================================================ BA-232 / BA-252: one verb, one name
+
+  The site-wide vocabulary rules, owned here because this file is where the naming rules that
+  apply to every surface already live (audit §5 rule 1: other lanes send their additions here
+  rather than editing the shared lists in parallel).
+
+  These assertions are scoped to the chrome -- the navigation data, the two nav components, the
+  shared header and footer, the header's action and the policy layout. That is where the same
+  action was spelled two ways at two widths, and it is the whole of what this lane can make true:
+  the page-level strings the audit lists (`app/product/page.tsx`, `app/login/page.tsx`,
+  `lib/explore-story.ts`, `app/trust/page.tsx`, `app/solutions/[slug]/page.tsx`) belong to four
+  other lanes and arrive as cross-lane patches. The list widens to `CONVERSION_SURFACES` in the
+  commit that lands the last of them; widening it before is a red suite, not a stricter rule.
+*/
+
+/** Spellings that were in use for one of `PRODUCT_NOUNS` and are retired. */
+const RETIRED_NAMES = [
+  "Trust center",
+  "Technical evidence",
+  "Explore a World",
+  "Explore the public World",
+  "Explore a public sample",
+  "ENTER WORLD",
+  "Get started",
+  "Start with the data path",
+  "Start free",
+] as const;
+
+/** The chrome: rendered on every public page, and the only surfaces this lane owns. */
+const CHROME_SURFACES = [
+  "lib/site-navigation.ts",
+  "components/site-nav/desktop-primary-nav.tsx",
+  "components/mobile-primary-nav.tsx",
+  "components/public-site-chrome.tsx",
+  "components/public-primary-cta.tsx",
+  "components/policy-layout.tsx",
+] as const;
+
+/** Comments explain what a name replaced and must not count as the name. */
+const prose = (surface: string) =>
+  read(surface)
+    .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, " ")
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/^[ \t]*\/\/.*$/gm, " ");
+
+describe("the site's own vocabulary", () => {
+  it("declares two access actions and one Explore action, and no more", () => {
+    expect(ACCESS_CTA).toEqual({ href: "/contact", label: "Request access" });
+    expect(SELF_SERVE_CTA).toEqual({ href: "/login", label: "Start with your files" });
+    expect(EXPLORE_CTA).toEqual({ href: "/explore", label: "Explore a Compiled World" });
+    // The two names the audit found spelled four ways between them, in the table every surface
+    // is held to. `RETIRED_NAMES` below is the other half of the same rule.
+    expect(PRODUCT_NOUNS).toContain("Compiled World");
+    expect(PRODUCT_NOUNS).toContain("Trust Center");
+    // The commercial posture chooses between the two; it does not write a third.
+    expect(primaryCallToAction({})).toEqual(ACCESS_CTA);
+    expect(primaryCallToAction({ COMMERCIAL_MODE: "live", TAVONEL_BILLING_LAUNCH_APPROVED: "true", VERCEL_ENV: "production" }))
+      .toEqual(SELF_SERVE_CTA);
+  });
+
+  it.each(CHROME_SURFACES)("publishes no retired name in %s", (surface) => {
+    const source = prose(surface);
+    for (const name of RETIRED_NAMES) {
+      expect(source, `"${name}" is a retired spelling; the table is PRODUCT_NOUNS`).not.toContain(name);
+    }
+  });
+
+  /*
+    The failure the audit measured: the desktop bar said "Contact" and the 390 header said
+    "Request access", because the two chromes read two different constants. One object reaches
+    both now, so neither may carry a label of its own.
+  */
+  it("gives the two widths one action, from one object", () => {
+    const chrome = prose("components/public-site-chrome.tsx");
+    expect(chrome, "the header renders the action it was given").toContain("{cta.label}");
+    expect(chrome, "and hands the same object to the phone sheet").toContain("<MobilePrimaryNav cta={cta} />");
+    const sheet = prose("components/mobile-primary-nav.tsx");
+    expect(sheet, "the sheet renders the object, not a label of its own").toContain("{cta.label}");
+    for (const literal of ["Contact<", "Request access", "Start with your files"]) {
+      expect(sheet, `the phone sheet writes "${literal}" instead of reading it`).not.toContain(literal);
+    }
+  });
+
+  /*
+    BA-232's other half: no page paints a placeholder action and then replaces it.
+
+    `PublicPrimaryCta` painted "Get started", asked `/api/status` from the browser and swapped the
+    label -- on the most prominent control of every page that used the header's fallback. The
+    commercial state is read where it lives instead, which is also why this component must stay
+    off the client: `process.env` flags without the public prefix inline as `undefined` there.
+  */
+  it("resolves the access action on the server, with no placeholder to replace", () => {
+    const cta = read("components/public-primary-cta.tsx");
+    expect(cta, "a client component cannot read the commercial flags").not.toContain('"use client"');
+    expect(cta, "and must not ask the browser for them").not.toContain("fetch(");
+    expect(cta).toContain("primaryCallToAction()");
+    const chrome = prose("components/public-site-chrome.tsx");
+    expect(chrome, "the header takes the resolved action rather than a component that guesses it")
+      .not.toContain("PublicPrimaryCta");
   });
 });

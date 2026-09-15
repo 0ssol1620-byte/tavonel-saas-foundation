@@ -9,6 +9,17 @@ import { readSupabaseAdminConfig } from "@/lib/supabase-admin";
 
 export const LEGAL_EFFECTIVE_DATE = "2026-08-30";
 
+/*
+  BA-167. When each legal document was last changed, which is not when it took effect.
+
+  Four documents printed `LEGAL_EFFECTIVE_DATE` and nothing else, so a reader comparing /privacy
+  against the DPA found a notice dated 2026-08-30 describing work recorded on 2026-09-10 beside a
+  contract dated 2026-09-11, with no way to tell which was current. The effective date is the day
+  the terms began to apply and does not move when wording changes; this is the day the wording
+  last changed, and it is the date of the commit that changed it.
+*/
+export const LEGAL_LAST_UPDATED = "2026-09-12";
+
 export function readPublicOperations() {
   const commercial = readCommercialState();
   const sandbox = commercial.provider === "sandbox";

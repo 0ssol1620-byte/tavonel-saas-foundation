@@ -19,10 +19,12 @@
       as SQL text, asserted on the files rather than on a running database, so a CI run without
       Docker still fails when one of them is deleted.
 
-  Nothing here changes billing behaviour. One real discrepancy was found while writing it and is
-  NOT fixed here because fixing it needs a migration this lane may not write: settling a
-  reservation the expiry sweep has already refunded credits the held units a second time. It is
-  recorded in `billing_reconciliation.sql` under FINDING O04-1 and in the lane report.
+  Nothing here changes billing behaviour. One real discrepancy was found while writing it --
+  settling a reservation the expiry sweep has already refunded credited the held units a second
+  time -- and it is **fixed**, by
+  `supabase/migrations/20260911120000_compute_settlement_expired_terminal.sql`. FINDING O04-1 is
+  closed in that migration, in `billing_reconciliation.sql` and in the assertion at the end of
+  this file, which now guards the fix rather than marking the gap.
 */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -275,6 +277,10 @@ describe("O04 ledger guards that live only in SQL", () => {
     resolve(import.meta.dirname, "../../supabase/migrations/0045_self_service_trial_and_owner_access.sql"),
     "utf8",
   ).toLowerCase();
+  const settlementFix = readFileSync(
+    resolve(import.meta.dirname, "../../supabase/migrations/20260911120000_compute_settlement_expired_terminal.sql"),
+    "utf8",
+  ).toLowerCase();
 
   it("serializes each billing event by id and answers a redelivery with `duplicate`", () => {
     expect(allowance).toContain("pg_advisory_xact_lock(hashtextextended('foundation-billing-event:' || p_event_id, 0))");
@@ -302,17 +308,21 @@ describe("O04 ledger guards that live only in SQL", () => {
     expect(compute).toContain("raise exception 'foundation_compute_settlement_conflict'");
     expect(compute).toContain("released_units := greatest(0, reservation.reserved_credits - p_actual_credits)");
     /*
-      FINDING O04-1, asserted as it stands rather than as it should be.
+      FINDING O04-1, closed by `20260911120000_compute_settlement_expired_terminal.sql`.
 
-      `expired` is missing from that terminal list, and the expiry sweep at the top of
-      `reserve_foundation_compute_v3` has already returned the held units to `credit_balance`.
-      A settlement arriving after the sweep therefore runs the paid branch again and adds
-      `reserved - actual` a second time. The direction is over-credit, not double-charge, so it
-      is not the audit's question — but it is a reconciliation break, and the fix is a migration
-      no lane in this campaign may write. This assertion exists so that the day someone adds
-      `'expired'` to the list, this test fails and points at the report entry.
+      `expired` was missing from 0045's terminal list, and the expiry sweep at the top of
+      `reserve_foundation_compute_v3` had already returned the held units to `credit_balance`, so
+      a settlement arriving after the sweep ran the paid branch again and added
+      `reserved - actual` a second time. The direction was over-credit, not double-charge.
+
+      0045 above is left exactly as it was — history is not rewritten, and the assertions on it
+      still describe what it says. The current definition lives in the later migration, and that
+      is what is asserted here, inverted: the terminal list includes `expired` and the refusal
+      has its own error name, so a revert cannot pass quietly. The marker that used to say the
+      finding was open is gone because it was: as of this branch the assertion guards the fix.
     */
-    expect(compute).not.toContain("in ('settled', 'released', 'operator_review', 'expired')");
+    expect(settlementFix).toContain("in ('settled', 'released', 'operator_review', 'expired')");
+    expect(settlementFix).toContain("raise exception 'foundation_compute_settlement_expired'");
   });
 
   /*

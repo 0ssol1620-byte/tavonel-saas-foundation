@@ -14,7 +14,7 @@ import {
 } from "@/lib/r2-presign";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
 import { deterministicSourceDocumentId, validSourceIdempotencyKey } from "@/lib/source-intake";
-import { estimateBillablePages } from "@/lib/usage-pricing";
+import { reservationPageCeiling } from "@/lib/usage-pricing";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -78,10 +78,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ code: qualified.code }, { status: 400, headers: NO_STORE });
   }
 
-  const serverEstimate = estimateBillablePages({
+  /*
+    The reservation, not a page count. `reservationPageCeiling` falls back to the deployment's
+    documented page ceiling for a file whose format states no count -- a spreadsheet, which is
+    counted on the sanitized PDF after conversion -- instead of the `?? 1` that was here, which
+    held one page of credit against work that can settle at eighty. Nothing renders this number:
+    the client sends `?.pages` and shows the absence.
+  */
+  const serverEstimate = reservationPageCeiling({
     bytes: requestedBytes,
     mimeType: qualified.normalizedMimeType,
-  })?.pages ?? 1;
+  });
   const clientEstimate = typeof body.estimatedPages === "number" && Number.isSafeInteger(body.estimatedPages)
     && body.estimatedPages >= 1 ? body.estimatedPages : serverEstimate;
   const reservationPages = Math.max(serverEstimate, clientEstimate);

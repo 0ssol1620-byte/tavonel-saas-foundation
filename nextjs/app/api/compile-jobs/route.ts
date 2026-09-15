@@ -10,6 +10,7 @@ import {
 import { CORPUS_MAX_DOCUMENTS, judgeCorpusSet, needsCorpusCompile } from "@/lib/corpus-batching";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { readBoundedJson } from "@/lib/enterprise-http";
+import { recordServerFunnel } from "@/lib/funnel-events";
 import { DOCUMENT_ID_PATTERN } from "@/lib/immutable-keys";
 import { checkTrialCompileCapacity } from "@/lib/self-service-trial";
 
@@ -91,6 +92,24 @@ export async function POST(request: Request) {
       const status = enqueueFailureStatus(corpus.code);
       return NextResponse.json({ code: corpus.code }, { status, headers: HEADERS });
     }
+    /*
+      §15.2: the server accepting and enqueueing the work, which is what `compile_started`
+      means here. `workspace_compile_started` is the button; this is the job.
+
+      Only when a part was actually enqueued. `enqueueCompileJob` returns `created: false` for a
+      retry of the same document set -- the idempotency the capacity check above is handed the
+      same key to preserve -- so a redelivered POST (client timeout, double submit, at-least-once
+      redelivery) starts nothing a second time, and a second `compile_started` for it would
+      inflate the numerator of `starts_without_candidate_or_approval` in the direction that
+      looks like a product failure.
+    */
+    if (corpus.value.parts.some((part) => part.created)) {
+      recordServerFunnel("compile_started", {
+        mode: "corpus",
+        plan: auth.principal.accessSource ?? "unknown",
+        sources: String(documentIds.length),
+      });
+    }
     return NextResponse.json({
       code: "COMPILE_CORPUS_ACCEPTED",
       corpusId: corpus.value.corpusId,
@@ -114,6 +133,14 @@ export async function POST(request: Request) {
   if (!enqueued.ok) {
     const status = enqueueFailureStatus(enqueued.code);
     return NextResponse.json({ code: enqueued.code }, { status, headers: HEADERS });
+  }
+  // Same rule on the single-job path: `created: false` is the already-enqueued job coming back.
+  if (enqueued.value.created) {
+    recordServerFunnel("compile_started", {
+      mode: "durable",
+      plan: auth.principal.accessSource ?? "unknown",
+      sources: String(documentIds.length),
+    });
   }
 
   return NextResponse.json({

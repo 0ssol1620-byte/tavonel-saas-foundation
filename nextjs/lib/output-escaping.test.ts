@@ -3,6 +3,7 @@ import { join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { csvCell } from "@/lib/csv-cell";
 import { serializeAuditExport } from "@/lib/enterprise-http";
+import { breadcrumbList, jsonLdHtml } from "@/lib/structured-data";
 
 /*
   §42. Everything TAVONEL renders is untrusted: extracted document text, model output, source
@@ -41,8 +42,44 @@ describe("raw HTML injection", () => {
     // literal and whose origin/root come from lib/structured-data.ts. No value reaches either sink
     // from a request, a document or a model.
     const byPath = new Map(users.map((file) => [file.path, file.text]));
-    expect(byPath.get("app/layout.tsx")).toMatch(/__html: JSON\.stringify\(\{\s*\n\s*"@context": "https:\/\/schema\.org"/);
-    expect(byPath.get("components/breadcrumb-json-ld.tsx")).toMatch(/__html: JSON\.stringify\(breadcrumbList\(trail\)\)/);
+    expect(byPath.get("app/layout.tsx")).toMatch(/__html: jsonLdHtml\(\{\s*\n\s*"@context": "https:\/\/schema\.org"/);
+    expect(byPath.get("components/breadcrumb-json-ld.tsx")).toMatch(/__html: jsonLdHtml\(breadcrumbList\(trail\)\)/);
+    // And neither may go back to the bare serializer, which is what they both did until B7.
+    for (const [path, text] of byPath) {
+      expect(text, `${path}: __html must go through jsonLdHtml`).not.toMatch(/__html:\s*JSON\.stringify/);
+    }
+  });
+
+  /*
+    The one character `JSON.stringify` does not escape, in the one place it cannot be survived.
+
+    Both blocks above serialised with a bare `JSON.stringify`. Inside a `<script>` element the HTML
+    parser is looking for `</script` and nothing else, so a single string value carrying it ends
+    the element early and everything after it is markup on the page. Nothing exploitable existed --
+    every value in either block is an authored literal, breadcrumb trails included -- but that is a
+    fact about today's callers and not about the sink, and the sink is what the next caller reaches
+    for with a title out of a customer document.
+
+    So both go through `jsonLdHtml` in `lib/structured-data.ts`, and the assertion is on its output
+    rather than on a spelling: no `<` leaves the serializer, whatever a value holds.
+  */
+  it("emits no raw < from the JSON-LD serializer, whatever a value holds", () => {
+    const hostile = "</script><img src=x onerror=alert(1)>";
+    const html = jsonLdHtml({ name: hostile, nested: [{ item: hostile }] });
+    expect(html).not.toContain("<");
+    // `>` needs no escaping -- the parser's end-tag search starts at `<`, so that is the one
+    // character the serializer has to take away.
+    expect(html).toContain("\\u003c/script>");
+    // Still JSON, and still the same string after parsing. An escape that changed the value would
+    // be a different defect: a breadcrumb whose name is not the name the page passed.
+    expect((JSON.parse(html) as { name: string }).name).toBe(hostile);
+  });
+
+  it("escapes a trail of the shape a page actually passes", () => {
+    const html = jsonLdHtml(breadcrumbList([{ name: "</script>Q3 revenue", path: "/cookbooks/source-revision-reuse" }]));
+    expect(html).not.toContain("<");
+    expect(html).toContain("BreadcrumbList");
+    expect((JSON.parse(html) as { itemListElement: { name: string }[] }).itemListElement[1]!.name).toBe("</script>Q3 revenue");
   });
 });
 

@@ -102,29 +102,59 @@ export const EXPLORE_COPY = {
   evidenceLead: "This object is supported by this exact source region.",
   evidenceHint: "The page, the region and the version this object was compiled from.",
   changeHint: "Apple's 2025 Form 10-K, then the same World after the four 2026 filings arrived.",
-  /* The public SEC sample is a full-world diff, not an incremental-recompile receipt. */
+  /*
+    The public SEC sample is a full-world diff, not an incremental-recompile receipt.
+
+    BA-028: this caption is now the only place the act describes the comparison. The act used to
+    close on a FULL-REBUILD EQUIVALENCE heading whose state read NOT ESTABLISHED IN THIS
+    DEPLOYMENT, so the last thing a reader met before the sign-up action was a named absence and
+    the wiring state of an internal check. The fact it protected -- that both sides are complete
+    compiles and nothing selective is implied -- is said here once, positively, and the
+    equivalence check itself stays where it is already published: /product/continuous-knowledge
+    and the receipt inside a downloaded package.
+  */
   changeCaption:
-    "Both snapshots are compiled independently and compared as two complete Worlds. Added, removed and in-place changes are measured from that diff; no selective carry-over is implied.",
+    "Both snapshots are complete compiles of the corpus as it stood, compared object by object. Every count below is measured from that comparison.",
   changeCountsNote:
     "A content-addressed object keeps its identity while its compiled fields hold and gets a new one when they do not, so an arriving filing both adds objects and rebuilds objects the annual filing already carried. All four counts are shown as measured.",
   changeArrivalsHeading: "FILINGS THAT ARRIVED",
   changeTimelineHeading: "HOW THIS WORLD WAS REACHED",
   /*
-    The sentence that stops the timeline from implying a capability this deployment does not have.
+    The sentence that keeps the timeline from implying selective recompilation.
 
     A five-step temporal view is exactly the shape a reader expects incremental compilation to
     have, so the step that says otherwise has to be on the same screen as the steps. The Core's
-    selective recompilation is a different execution with its own receipt (§25.3); this page has
-    none, and a timeline that quietly let the reader assume one would be the most convenient
+    selective recompilation is a different execution with its own receipt (§25.3) and this page
+    has none, so a timeline that quietly let the reader assume one would be the most convenient
     untruth available in this act.
+
+    BA-033 rewrote the opening: the fact now leads with what the steps are ("every object in the
+    World is rebuilt at every step") rather than with the internal wiring state it used to lead
+    with, and it no longer names the deployment.
   */
   changeTimelineNote:
-    "Each step is a complete compile of the corpus as it stood, compared with the complete compile before it. This deployment's compiler has no incremental path: every object in the World is rebuilt at every step, so the recompiled figure is the whole World and not a selectively rebuilt subset. Rebuilt in place counts objects the previous World already carried whose compiled fields moved — the arriving filing's dependency impact, as measured, not as modelled. The steps run in reporting-period order, which is not filing order here: Apple filed the 2026 proxy statement three weeks before the first-quarter report it follows above.",
-  equivalenceHeading: "FULL-REBUILD EQUIVALENCE",
-  equivalenceLead: "Both snapshots were fully compiled from the selected source pages; the comparison is between two complete compiles in this demo.",
+    "Each step is a complete compile of the corpus as it stood, compared with the complete compile before it: every object in the World is rebuilt at every step, so the recompiled figure is the whole World rather than a selectively rebuilt subset. Rebuilt in place counts objects the previous World already carried whose compiled fields moved — the arriving filing's dependency impact, as measured. The steps run in reporting-period order, which is not filing order here: Apple filed the 2026 proxy statement three weeks before the first-quarter report it follows above.",
   askPlaceholder: "Ask this World…",
   askNote:
     "This sample answers four prepared questions. Each answer is the source text the retriever scored, not a rewrite of it.",
+  /*
+    BA-034. What the object, relation and region counts of this sample are counts *of*.
+
+    The gap is real and is recorded in `explore-sample.ts`: /explore is compiled by
+    `compileCollectionCandidate` in this repository, and the Core a customer's compile is
+    dispatched to does not emit the same number of objects over the same bytes. Until the sample
+    is recompiled by the customer engine -- a run, not a copy edit -- the figure must not be
+    published as though it were what a customer's own compile would report, so the qualifier
+    travels with the figure instead of sitting two clicks away on /product/compiled-world.
+
+    One string, because the figure has three points of use on public surfaces and three
+    separately-worded labels is how one of them ends up unlabelled: the technical drawer here,
+    `components/solution-proof-sample.tsx` (design-assets) and
+    `app/product/compiled-world/page.tsx` (copy-home-product). It lives in this file rather than
+    in `explore-sample.ts` because that module pulls the compiler and `node:crypto` with it and
+    two of the three consumers are reachable from a client bundle.
+  */
+  countsQualifier: "as this repository’s TypeScript collection compiler emits them",
   technical: "TECHNICAL DETAILS",
   /*
     The Entity qualifier, moved here from the object list by §49.
@@ -141,12 +171,21 @@ export const EXPLORE_COPY = {
   */
   entityDisclaimer:
     "Entity labels in this fixed sample come from a simple capitalised-token heuristic, not by a resolver. In the recorded evaluation, 3 of 16 baseline labels were true positives. Unreviewed entities are shown only as sample structure; Claims and page-bound evidence are the parts to judge here.",
-  closeLabel: "Leave the sample",
+  /* BA-029: the exit names where it goes. It was an unlabelled X with this only as an aria-label. */
+  closeLabel: "Back to TAVONEL",
   endHeading: "Try the same path with your own knowledge.",
+  /*
+    BA-036: two, not three. "How compilation works" was a third sibling button in one row -- the
+    arrangement 3.4 bars -- and it is the one of the three that is reading rather than doing, so
+    it moved into the sentence under the row and takes the global label for its destination.
+
+    Both labels that remain are the site's own: "Start with your files" is what
+    `lib/commercial-state.ts` calls the primary action and what /pricing and /trust render, and
+    "Connect a source" is /integrations' own button. Neither is /explore vocabulary.
+  */
   endActions: [
     { label: "Start with your files", href: "/login", primary: true },
     { label: "Connect a source", href: "/integrations", primary: false },
-    { label: "How compilation works", href: "/knowledge-compiler", primary: false },
   ],
 } as const;
 

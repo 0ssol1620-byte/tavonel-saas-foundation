@@ -136,7 +136,17 @@ export type CompileJobFailure =
     taken -- this is about how much of the deployment one tenant may be using at once, and it
     clears on its own as the running jobs finish.
   */
-  | "COMPILE_JOB_WORKSPACE_LIMIT_REACHED";
+  | "COMPILE_JOB_WORKSPACE_LIMIT_REACHED"
+  /*
+    PostgREST could not find the function with the arguments this call named (PGRST202).
+
+    Distinct from a write failure because it is not a transport problem and a retry of the same
+    body can only fail the same way: the database does not have the function this code expects.
+    The one case that actually happens is a deploy in the wrong order -- the worker ships before
+    the migration that adds a parameter -- and it is recoverable by sending the call the deployed
+    function does have, which is what `lib/compile-job-worker.ts` does once, loudly.
+  */
+  | "COMPILE_JOB_RPC_UNDEFINED";
 
 export type CompileJobResult<T> = { ok: true; value: T } | { ok: false; code: CompileJobFailure };
 
@@ -216,6 +226,16 @@ async function rpc(name: string, body: unknown): Promise<CompileJobResult<unknow
     can only fail the same way.
   */
   if (response.status === 409) return fail("COMPILE_JOB_SLOT_CONFLICT");
+  /*
+    404 + PGRST202 is "no function of that name takes these arguments", which on this deployment
+    means the migration that added an argument has not been applied yet. Reported as its own code
+    so the caller can send the older call rather than retrying the same one forever; every other
+    404 stays a write failure.
+  */
+  if (response.status === 404) {
+    const body = (await response.json().catch(() => null)) as { code?: unknown } | null;
+    return fail(body?.code === "PGRST202" ? "COMPILE_JOB_RPC_UNDEFINED" : "COMPILE_JOB_STORE_WRITE_FAILED");
+  }
   if (!response.ok) return fail("COMPILE_JOB_STORE_WRITE_FAILED");
   const payload = await response.json().catch(() => null);
   return { ok: true as const, value: payload };
@@ -571,6 +591,20 @@ export async function advanceCompileJob(input: {
   errorCode?: string | null;
   blocked?: CompileBlocker[] | null;
   queueJobId?: string | null;
+  /**
+   * The digest of the candidate artifact this compile produced, once it has produced one.
+   *
+   * Recorded so `candidateAwaitingActivation` is a fact in the database rather than something
+   * only the request that already loaded the candidate can see: `foundation_world_versions`
+   * learns a digest at promotion, which is the event that flag exists to wait for. The RPC
+   * coalesces, so an advance that omits it does not erase what an earlier one recorded.
+   *
+   * `undefined` and `null` are different here, and the difference is the deploy-order fallback:
+   * `undefined` omits the argument from the request body entirely, which is the eight-argument
+   * call a database without migration 20260911120200 still has a function for. A `null` still
+   * names the ninth argument and would still answer PGRST202 there.
+   */
+  candidateManifestDigest?: string | null;
 }): Promise<CompileJobResult<{ state: CompileState; changed: boolean }>> {
   if (!WORKSPACE_KEY.test(input.workspaceKey) || !COMPILE_JOB_ID.test(input.jobId)) {
     return fail("COMPILE_JOB_SCOPE_INVALID");
@@ -584,6 +618,10 @@ export async function advanceCompileJob(input: {
     p_error_code: input.errorCode ?? null,
     p_blocked: input.blocked ?? null,
     p_queue_job_id: input.queueJobId ?? null,
+    // Omitted, not nulled, when the caller passes nothing: see the field's own note above.
+    ...(input.candidateManifestDigest === undefined
+      ? {}
+      : { p_candidate_manifest_digest: input.candidateManifestDigest }),
   });
   if (!result.ok) return result;
   const row = Array.isArray(result.value) ? result.value[0] : result.value;

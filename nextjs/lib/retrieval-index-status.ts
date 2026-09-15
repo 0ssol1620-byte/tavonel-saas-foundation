@@ -1,7 +1,9 @@
+import { randomBytes } from "node:crypto";
 import type { CollectionCandidateArtifact } from "./collection-compiler";
 import { compileRetrievalArtifacts } from "./retrieval-compile";
+import type { RetrievalProfile } from "./retrieval-profile";
 import { buildProductionRetrievalProfile, createProductionEmbedderAdapter, readRetrievalRuntimeEnv } from "./retrieval-runtime-config";
-import { findLatestRun } from "./retrieval-store";
+import { createCompileRun, ensureRetrievalProfile, findLatestRun } from "./retrieval-store";
 
 /*
   The retrieval index's observable state, and the one place that puts it there.
@@ -78,6 +80,42 @@ export async function readRetrievalIndexState(scope: IndexScope): Promise<Retrie
   return { ...base, status: "missing", errorClass: RUN_INCOMPLETE, runId: run.runId };
 }
 
+/*
+  Write a refusal that never reached the compiler's own run row, so a later reader sees it.
+
+  Every refusal below `createCompileRun` used to leave nothing durable behind: the promotion
+  response was the only place it appeared, and the next /ask read an empty run table and
+  answered `missing` -- a world nobody has compiled and a world whose compile was refused
+  looked identical. The runs table already models exactly this (`failed` plus a machine
+  `error_reason`, and service_role may already insert), so the refusal is written there rather
+  than into a new column: nothing here needs a schema change.
+
+  Two honest limits. The row's foreign key needs the retrieval profile, which does not exist
+  on a workspace's first promotion, so the profile is registered first -- lazily, only on the
+  refusal path, never on the path that is about to compile anyway. And if the store itself
+  refuses the insert (0021's trigger on a superseded world, a write outage), there is nowhere
+  to write and the state stays `runId: null`, reported to the promoter and to nobody later.
+  That case is asserted, unchanged, in retrieval-compile-wiring.test.ts.
+*/
+async function recordRefusal(
+  scope: IndexScope,
+  profile: RetrievalProfile,
+  actorUserId: string,
+  errorClass: string,
+): Promise<RetrievalIndexState> {
+  const state = { status: "failed" as const, errorClass, retrievalProfileId: profile.id };
+  const registered = await ensureRetrievalProfile(profile, actorUserId);
+  if (!registered.ok) return { ...state, runId: null };
+  const runId = `retrieval-run-${randomBytes(16).toString("hex")}`;
+  const written = await createCompileRun({
+    ...scope,
+    runId,
+    retrievalProfileId: profile.id,
+    refusedReason: errorClass,
+  });
+  return { ...state, runId: written.ok ? runId : null };
+}
+
 export type EnsureRetrievalIndexInput = IndexScope & {
   /**
    * The promoted candidate artifact as it was read back from object storage. Typed `unknown`
@@ -128,7 +166,7 @@ export async function ensureRetrievalIndexForActiveWorld(
   const base = { runId: null as string | null, retrievalProfileId: profile.id };
   const artifact = indexableArtifact(input.artifact);
   if (!artifact || artifact.manifestDigest !== input.worldManifestDigest) {
-    return { ...base, status: "failed", errorClass: ARTIFACT_UNREADABLE };
+    return recordRefusal(input, profile, input.actorUserId, ARTIFACT_UNREADABLE);
   }
 
   const runtimeEnv = readRetrievalRuntimeEnv();
@@ -147,10 +185,14 @@ export async function ensureRetrievalIndexForActiveWorld(
     // A throw here is a malformed artifact reaching a pure compiler, or a transport that did
     // not fail the way the store expects. Either way the promotion already happened, so the
     // only correct move is to record the failure class and let the request succeed.
-    return { ...base, status: "failed", errorClass: ARTIFACT_UNREADABLE };
+    return recordRefusal(input, profile, input.actorUserId, ARTIFACT_UNREADABLE);
   }
   if (!result.ok) {
-    return { ...base, status: "failed", errorClass: result.code, runId: result.runId };
+    // A refusal the compiler took before its own run row exists carries `runId: null`; that is
+    // the one that would otherwise vanish, so it is written as a failed run instead.
+    return result.runId === null
+      ? recordRefusal(input, profile, input.actorUserId, result.code)
+      : { ...base, status: "failed", errorClass: result.code, runId: result.runId };
   }
   return { ...base, status: "compiled", errorClass: null, runId: result.runId };
 }

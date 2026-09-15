@@ -556,10 +556,11 @@ function firstTimestamp(rows: Array<Record<string, unknown>> | null, column: str
  * One freshness block for one World.
  *
  * `candidateManifestDigest` is supplied by callers that have already read the preferred
- * candidate artifact (the World read model does). The database alone can only see versions
- * that were promoted at least once, so without that hint a compiled-but-never-promoted
- * candidate is invisible here and the flag stays false. That limit is real, and it is written
- * down rather than papered over with a guess.
+ * candidate artifact (the World read model does). Without that hint the answer now comes from
+ * the digest the compile job recorded (`20260911120200`), and only then from the newest
+ * promoted version -- so the remaining blind spot is narrow and named: a candidate compiled
+ * before that column existed recorded no digest, and for those the flag still reads false.
+ * That limit is real, and it is written down rather than papered over with a guess.
  */
 export async function getWorldFreshness(
   workspaceKey: string,
@@ -603,7 +604,7 @@ export async function getWorldFreshness(
     readFreshnessRows(
       config,
       `/rest/v1/foundation_compile_jobs?${new URLSearchParams({
-        select: "settled_at,blocked_resolved_at,document_ids",
+        select: "settled_at,blocked_resolved_at,document_ids,candidate_manifest_digest",
         workspace_key: `eq.${workspaceKey}`,
         collection_id: `eq.${collectionId}`,
         order: "settled_at.desc.nullslast",
@@ -646,12 +647,24 @@ export async function getWorldFreshness(
   const hinted = options.candidateManifestDigest ?? null;
   const hintedCandidate =
     hinted !== null && SHA256.test(hinted) && hinted !== activeManifestDigest ? hinted : null;
+  /*
+    The digest the newest compile recorded (20260911120200). This is what closes the gap the
+    docstring above names: a candidate that was compiled and never promoted is invisible to
+    `foundation_world_versions`, which only learns a digest at promotion -- the event this flag
+    exists to wait for. Null on every job that predates the column, so the answer degrades to
+    what it was rather than guessing.
+  */
+  const recordedDigest = String(jobRows?.[0]?.candidate_manifest_digest ?? "");
+  const recordedCandidate =
+    SHA256.test(recordedDigest) && recordedDigest !== activeManifestDigest ? recordedDigest : null;
   const newestVersionDigest = String(versionRows?.[0]?.manifest_digest ?? "");
   const newerPromotedVersion =
     SHA256.test(newestVersionDigest) && newestVersionDigest !== activeManifestDigest
       ? newestVersionDigest
       : null;
-  const candidateManifestDigest = hintedCandidate ?? newerPromotedVersion;
+  // Precedence: the candidate this request already loaded, then the one the newest compile
+  // recorded, then the newest promoted-but-not-active version. Most specific first.
+  const candidateManifestDigest = hintedCandidate ?? recordedCandidate ?? newerPromotedVersion;
 
   return {
     observedAt,

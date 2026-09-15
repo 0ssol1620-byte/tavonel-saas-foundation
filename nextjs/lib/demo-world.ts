@@ -40,17 +40,15 @@ export const WORLD = {
   versionAfter: 185,
 } as const;
 
-/** Facts per area. The list is the tree in scene 05 and the cluster set in the canvas field. */
-export const AREAS = [
-  { name: "Contracts & Policy", facts: 1_240 },
-  { name: "Finance", facts: 18_406 },
-  { name: "Operations", facts: 12_204 },
-  { name: "Legal", facts: 9_830 },
-  { name: "Support", facts: 14_760 },
-  { name: "Engineering", facts: 17_560 },
-  { name: "Product", facts: 31_552 },
-  { name: "Customers", facts: 22_918 },
-] as const;
+/*
+  The per-area fact table is gone (BA-001).
+
+  `AREAS` was eight business-area names with a fact count each -- Contracts & Policy 1,240,
+  Finance 18,406, Product 31,552 -- and its only consumer was the landing page's background
+  canvas, which painted those names over the largest visual element on the site. Labelled
+  fiction, at hero scale, reading as a customer's knowledge graph. The field now draws the five
+  committed Apple SEC filings that /explore publishes; see `lib/world-graph.ts`.
+*/
 
 /* -------------------------------------------------------------------- the change (06--08) */
 
