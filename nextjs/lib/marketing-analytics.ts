@@ -91,10 +91,22 @@ export type ConsentCopy = {
   "and the interactions on them" is kept: `MARKETING_EVENTS` above is a list of click events. And
   it dropped the vendor's name, which `lib/marketing-analytics.test.ts` pins in both languages --
   the reader is being asked about a third party and gets to know which one.
+
+  G1-024 shortened it, and the four facts it may not drop are the four the test pins: the vendor's
+  name, that these are cookies, what is measured, and what is excluded. "visits to public pages
+  and the interactions on them" became "visits and clicks on public pages" -- the same two things
+  `MARKETING_EVENTS` records, in six fewer words. Nothing was dropped to make it fit; the phrasing
+  was.
+
+  The length is a layout constraint and it is worth writing down rather than leaving as a mystery
+  for the next editor: the banner is a 56px bar on a phone, the buttons beside the sentence take
+  ~190px of a 412px viewport and may not shrink below the 44px touch floor, and the sentence has
+  three 11px lines to live in. A sentence added here comes out of nothing else -- it comes out of
+  the bar's height.
 */
 const CONSENT_COPY_EN: ConsentCopy = {
   region: "Optional analytics",
-  prompt: "Google Analytics cookies measure visits to public pages and the interactions on them. Workspace content is never included.",
+  prompt: "Google Analytics cookies measure visits and clicks on public pages. Workspace content is never included.",
   privacy: "Privacy notice",
   refuse: "No thanks",
   allow: "Allow analytics",
@@ -103,7 +115,7 @@ const CONSENT_COPY_EN: ConsentCopy = {
 
 const CONSENT_COPY_KO: ConsentCopy = {
   region: "선택 분석",
-  prompt: "Google Analytics 쿠키는 공개 페이지 방문과 그 페이지에서의 상호작용을 측정합니다. 워크스페이스 내용은 포함되지 않습니다.",
+  prompt: "Google Analytics 쿠키는 공개 페이지의 방문과 클릭을 측정합니다. 워크스페이스 내용은 포함되지 않습니다.",
   privacy: "개인정보 처리방침",
   refuse: "허용하지 않음",
   allow: "분석 허용",
@@ -132,6 +144,21 @@ export function consentCopy(path: string): ConsentCopy {
   is exactly how that connection breaks silently.
 */
 export const NAV_OPEN_EVENT = "tavonel:nav";
+
+/*
+  G1-033: the reopen control moved into the footer, and this is how it reaches the banner.
+
+  The footer is rendered by `components/public-site-chrome.tsx` and the banner is mounted once in
+  the root layout, so the two have no common ancestor below it -- the same situation as
+  `NAV_OPEN_EVENT` above, solved the same way and for the same reason. A constant, rather than two
+  files spelling one string.
+
+  `CONSENT_ANCHOR_ATTRIBUTE` is the other direction. The banner looks for a footer link before it
+  decides whether to draw its own floating fallback, so a page that renders no site footer still
+  has a withdrawal path, and a page that renders one never shows two controls for one choice.
+*/
+export const CONSENT_EDIT_EVENT = "tavonel:consent-edit";
+export const CONSENT_ANCHOR_ATTRIBUTE = "data-consent-anchor";
 
 /** What the consent surface shows: nothing at all, the prompt, or the reopen control. */
 export type ConsentSurface = "nothing" | "prompt" | "settings";
