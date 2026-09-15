@@ -1015,3 +1015,67 @@ describe("SD-11 the processing-region table", () => {
     expect(table, "the R2 hint is a placement, not a guarantee").toContain("best-effort placement");
   });
 });
+
+/*
+  G2-012 / SD-04. A page called Benchmarks with nothing to compare.
+
+  The protocol was the honest thing to publish and it is not the thing a reader arrived for:
+  "Verify and compare" led to rules for comparison and no measured result anywhere on the site.
+  What may fill that gap is fixed -- the two research findings already published with their
+  denominators and their receipts -- and what may not is an internal comparison measured under
+  conditions this protocol does not pin.
+
+  So the block is derived from the same record /research/notes renders, and the guard is that a
+  score cannot be typed into it. A figure that arrives as a literal on this page is a figure with
+  no receipt behind it, which is the one thing this page exists to refuse.
+*/
+describe("G2-012 /benchmarks says what exists today", () => {
+  const page = read("app/benchmarks/page.tsx");
+  const block = withoutComments(
+    page.slice(page.indexOf("What exists today"), page.indexOf("The eight metric families")),
+  );
+
+  it("links the published receipts rather than describing them", () => {
+    expect(page).toContain('import { EVIDENCE } from "@/lib/evidence-record"');
+    expect(block).toContain("entry.receipt!.url");
+    expect(block).toContain("Download the receipt");
+  });
+
+  it("says the results table is empty because nothing has qualified", () => {
+    expect(block).toContain("No run has yet qualified under the protocol above");
+  });
+
+  it("publishes no figure that is not on a receipt", () => {
+    expect(block, "a score typed onto this page has no receipt behind it").not.toMatch(/\b\d+\.\d+\b/);
+    expect(block.toLowerCase(), "an internal comparison is not a published result").not.toContain("arena");
+  });
+});
+
+/*
+  G2-043. The step after /research was /pricing, so the page that lists seven unsolved problems
+  asked the reader to buy. /research/notes answers what /research raises and was reachable only
+  from one inline link in a lede.
+
+  It is an override rather than a sixth entry in TRUST_SEQUENCE: the sequence is the §17 order of
+  the five hub pages and notes is a leaf of one of them. `brand-copy.test.ts` pairs every href in
+  that file with an action, which is why the override names its destination `to`.
+*/
+describe("G2-043 the research page's next step is its results", () => {
+  const component = read("components/trust-next.tsx");
+
+  it("sends /research to /research/notes", () => {
+    expect(component).toContain('"/research": {');
+    expect(component).toContain('to: "/research/notes" as Route');
+    expect(component).toContain('"/research": "Read what was measured"');
+  });
+
+  it("leaves the five-hub order alone", () => {
+    expect(TRUST_SEQUENCE.map((step) => step.href)).toEqual([
+      "/security", "/evidence", "/benchmarks", "/reproducibility", "/research", "/pricing",
+    ]);
+  });
+
+  it("ends the chain at the price question rather than looping", () => {
+    expect(read("app/research/notes/page.tsx")).toContain("Understand what it costs");
+  });
+});

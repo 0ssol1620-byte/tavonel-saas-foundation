@@ -139,6 +139,11 @@ export default function ResearchNotesPage() {
               <div className="actions">
                 <Link className="btn" href={"/benchmarks" as Route}>See the benchmark protocol</Link>
                 <Link className="btn ghost" href={"/reproducibility" as Route}>Rerun a published sample</Link>
+                {/*
+                  G2-043. /research now sends its reader here rather than to /pricing, so this is
+                  where the trust chain ends and the price question is asked.
+                */}
+                <Link className="btn ghost" href={"/pricing" as Route}>Understand what it costs</Link>
               </div>
 
               {/*

@@ -123,7 +123,19 @@ export default function ResearchPage() {
                 ))}
               </div>
 
+              {/*
+                G2-043's second half. These four are the same four /benchmarks states, and the
+                duplication is deliberate rather than accidental: here they are how the work is
+                done, there each one is a branch in the validator that refuses a record. What was
+                missing was the sentence saying so, which is why a reader met the same four rules
+                twice and could not tell which page enforced them.
+              */}
               <p className="slate"><span />HOW WE REPORT</p>
+              <p className="fine">
+                Each rule below is enforced on a published figure by the validator described on{" "}
+                <Link href={"/benchmarks" as Route}>Benchmarks</Link>, which refuses a record that
+                breaks one.
+              </p>
               <div className="chain">
                 {METHOD.map(([title, body]) => (
                   <article className="link" key={title}>
