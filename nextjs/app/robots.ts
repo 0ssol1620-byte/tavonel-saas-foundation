@@ -28,9 +28,17 @@ const PRIVATE_PATHS = ["/api/", "/auth/", "/login", "/workspace", "/customers", 
 /*
   §88 -- search discovery is named explicitly, and so is model training, in the opposite direction.
 
-  OAI-SearchBot, PerplexityBot and Googlebot are the retrieval crawlers whose operators document
-  a user-agent for search appearance, and each gets the same public/private split as `*`. Being
-  findable is the point of this site; nothing here withholds a public page from a search crawler.
+  OAI-SearchBot, PerplexityBot, ClaudeBot and Googlebot are the retrieval crawlers whose operators
+  document a user-agent for search appearance, and each gets the same public/private split as `*`.
+  Being findable is the point of this site; nothing here withholds a public page from a search
+  crawler.
+
+  ClaudeBot moved into this group on 2026-09-16, superseding the ClaudeBot half of FD-61. It is the
+  token the operator's fetch-time agent sends when a person asks a question and the answer is
+  retrieved live, which is the same act as the three tokens beside it and a different act from the
+  corpus crawl the block below refuses. Answer-engine citation is this category's discovery path,
+  and refusing it cost a citation without preserving anything: `anthropic-ai` stays disallowed, so
+  the training position is unchanged.
 
   §12.5 asked for the two policies to be separated rather than decided, and the separation now
   carries a decision: `docs/policy/CRAWLER_POLICY.md` lists each token, what allowing or refusing
@@ -38,7 +46,7 @@ const PRIVATE_PATHS = ["/api/", "/auth/", "/login", "/workspace", "/customers", 
   that is authorization, not this file). The training half is the block below; this group is the
   search half, and `lib/seo-surface.test.ts` fails if a token crosses from one list to the other.
 */
-const SEARCH_CRAWLERS = ["OAI-SearchBot", "PerplexityBot", "Googlebot"];
+const SEARCH_CRAWLERS = ["OAI-SearchBot", "PerplexityBot", "ClaudeBot", "Googlebot"];
 
 /* ─── TRAINING-CRAWLER BLOCK — begin (trust-policy lane; self-contained) ──────────────────────
 
@@ -57,18 +65,20 @@ const SEARCH_CRAWLERS = ["OAI-SearchBot", "PerplexityBot", "Googlebot"];
     adding one costs nothing in search. `lib/seo-surface.test.ts` pins both groups so neither
     drifts into the other, and so a search crawler cannot arrive in this list by copy-paste.
 
-  The list is exactly the eight tokens FD-61 names, and it carries both of Anthropic's: `ClaudeBot`
-  is what the current crawler sends and `anthropic-ai` is the older one, so listing only the retired
-  token would have left the one in use allowed by the `*` group below.
+  The list is seven of the eight tokens FD-61 named. `ClaudeBot` is the one that left, and it left
+  by a decision rather than by drift: it is the operator's fetch-time token, so it is named in
+  `SEARCH_CRAWLERS` above. `anthropic-ai` stays here. It is the older token and nothing says a
+  corpus crawl stopped sending it, so moving both would have been a different decision than the one
+  that was made -- and that split is exactly what `lib/seo-surface.test.ts` now pins.
 
   Deliberately absent, and not an oversight: the user-triggered fetchers -- `Claude-User`,
-  `Claude-SearchBot`, `ChatGPT-User`, and the two named in `SEARCH_CRAWLERS` above. A fetch a person
-  asked for is a visit, not a corpus crawl, so the three unnamed ones are allowed by `*` and
-  `lib/seo-surface.test.ts` fails if any of the five arrives in this list. Tokens nobody has ruled
+  `Claude-SearchBot`, `ChatGPT-User`, and the three named in `SEARCH_CRAWLERS` above. A fetch a
+  person asked for is a visit, not a corpus crawl, so the two unnamed ones are allowed by `*` and
+  `lib/seo-surface.test.ts` fails if any of the six arrives in this list. Tokens nobody has ruled
   on yet (`Amazonbot`, `Diffbot`, `Omgilibot`, `Timpibot`, `PanguBot`) stay open in the crawler
   policy rather than being defaulted here.
 */
-const TRAINING_CRAWLERS = ["GPTBot", "CCBot", "ClaudeBot", "anthropic-ai", "Google-Extended", "Applebot-Extended", "Bytespider", "Meta-ExternalAgent"];
+const TRAINING_CRAWLERS = ["GPTBot", "CCBot", "anthropic-ai", "Google-Extended", "Applebot-Extended", "Bytespider", "Meta-ExternalAgent"];
 /* ─── TRAINING-CRAWLER BLOCK — end ────────────────────────────────────────────────────────────── */
 
 export default function robots(): MetadataRoute.Robots {
