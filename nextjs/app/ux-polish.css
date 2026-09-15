@@ -99,6 +99,31 @@
 }
 .solution-proof-digest { color: var(--text-xlo); }
 
+/*
+  G1-037. Three things in this panel were too small to be evidence.
+
+  The page render was fitted into a 420px frame inside a ~690px panel, so the page itself came out
+  about 145px wide -- a reader could see that something was highlighted and nothing else, which is
+  the opposite of what an evidence surface is for. The frame is taller now and the region overlay
+  is legible at arm's length. The provenance list was 9px mono at the dimmest text token on the
+  scale; 11px and one step up in contrast is still quiet and is now readable. The sha256 already
+  wraps (`.digest`), so it no longer runs off as one line.
+*/
+.solution-proof-sample [data-source-viewport] { height: clamp(460px, 44vw, 620px); }
+.solution-proof-sample [data-source-provenance] { font-size: 11px; line-height: 1.6; }
+.solution-proof-sample [data-source-provenance] dt { color: var(--text-lo); }
+.solution-proof-sample [data-source-provenance] dd { color: var(--text-hi); }
+
+/* G1-016. Why this page opens on this filing rather than on the same one five times. */
+.solution-proof-framing {
+  margin: 0;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--hairline);
+  color: var(--text-mid);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
 .solution-section {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -106,8 +131,14 @@
   align-items: start;
   margin-top: var(--space-section);
 }
-.solution-section-heading { position: static; display: grid; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); gap: clamp(36px, 4vw, 64px); align-items: end; }
-.solution-section-heading h2 { margin: 0; max-width: 20ch; }
+/*
+  G1-038. The eyebrow held a 360px left column and the heading began after it, so the page's only
+  two H2s were the only headings on the site that did not start at the text edge -- they read as
+  centred against an H1, a lede, a proof panel and two grids that all start at the left. The
+  eyebrow sits above the heading now and both begin where everything else does.
+*/
+.solution-section-heading { position: static; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; }
+.solution-section-heading h2 { margin: 0; max-width: 26ch; }
 .solution-flow {
   list-style: none;
   margin: 0;
@@ -128,7 +159,7 @@
   justify-content: space-between;
   background: var(--g1);
 }
-.solution-flow li:last-child { background: color-mix(in srgb, var(--verified-deep) 28%, var(--g1)); }
+/* G1-049's sibling. Same reason: five steps of one kind, and colour here reports state. */
 .solution-flow li > span { color: var(--text-xlo); font: 9px var(--f-mono); letter-spacing: .16em; }
 .solution-flow h3 { margin: 0; color: var(--text-hi); font-size: clamp(14px, 1.4vw, 18px); line-height: 1.35; }
 
@@ -613,3 +644,81 @@
   uses for its own last odd item.
 */
 .dev-paths > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+
+/*
+  G2-040 / G2-041 -- the document index that fills the template's empty left column.
+
+  Sticky at the width where the two columns exist, because that is the whole point of a pinned
+  title column: the map stays on screen while the document scrolls past it. Below 1320px the
+  template is one column and the index becomes what a phone needs instead -- a short list at the
+  top of the document, before the first section rather than beside it.
+*/
+.policy-jump { margin-top: 26px; border-top: 1px solid var(--hairline-hi); padding-top: 16px; }
+.policy-jump-title { margin: 0 0 10px; color: var(--text-xlo); font: 10px var(--f-mono); letter-spacing: .16em; text-transform: uppercase; }
+.policy-jump ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 0; counter-reset: policy-jump; }
+.policy-jump li { counter-increment: policy-jump; border-bottom: 1px solid var(--hairline); }
+.policy-jump a {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  min-height: 44px;
+  padding: 11px 0;
+  color: var(--text-mid);
+  font-size: 13px;
+  line-height: 1.45;
+  text-decoration: none;
+}
+.policy-jump a::before { content: counter(policy-jump, decimal-leading-zero); flex: none; color: var(--text-xlo); font: 10px var(--f-mono); }
+.policy-jump a:hover { color: var(--text-hi); }
+.policy-jump a:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+@media (min-width: 1321px) {
+  /* `.body > .stack:first-child` is already sticky at this width; the index rides with it and
+     scrolls on its own if the document has more sections than the viewport has room for. */
+  .policy-jump ol { max-height: calc(100svh - 320px); overflow-y: auto; }
+}
+@media (max-width: 1320px) {
+  .policy-jump { margin-top: 20px; }
+}
+
+/*
+  G1-019 -- the change surface on /product/compiled-world, filling a column that held nothing.
+  Figures come from two frozen compiles; this file only frames them.
+*/
+.world-diff-sample {
+  margin: 28px 0 0;
+  border: 1px solid var(--hairline-hi);
+  border-radius: var(--panel-radius);
+  overflow: hidden;
+  background: var(--ground);
+}
+.world-diff-sample-head {
+  min-height: 44px;
+  padding: 10px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 18px;
+  border-bottom: 1px solid var(--hairline);
+  color: var(--text-lo);
+  font-size: 12px;
+}
+.world-diff-sample-head a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--verified);
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.world-diff-sample-arrival { margin: 0; padding: 14px 16px; display: grid; gap: 5px; border-bottom: 1px solid var(--hairline); background: var(--g1); }
+.world-diff-sample-arrival b { color: var(--text-hi); font-size: 14px; font-weight: 540; }
+.world-diff-sample-arrival span { color: var(--text-lo); font: 11px/1.6 var(--f-mono); overflow-wrap: anywhere; }
+.world-diff-sample-rows { margin: 0; padding: 0; background: var(--g1); }
+.world-diff-sample-rows > div { display: grid; grid-template-columns: minmax(118px, 40%) minmax(0, 1fr); gap: 12px; padding: 11px 16px; border-bottom: 1px solid var(--hairline); }
+.world-diff-sample-rows dt { color: var(--text-lo); font-size: 12px; }
+.world-diff-sample-rows dd { margin: 0; color: var(--text-hi); font: 12px/1.55 var(--f-mono); overflow-wrap: anywhere; }
+.world-diff-sample-digests { margin: 0; padding: 11px 16px; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: baseline; border-bottom: 1px solid var(--hairline); color: var(--text-xlo); font: 11px/1.6 var(--f-mono); background: var(--g1); }
+.world-diff-sample-fine { margin: 0; padding: 12px 16px; color: var(--text-lo); font-size: 12px; line-height: 1.6; }
+.world-diff-sample-fine a { color: var(--text-mid); text-decoration: underline; text-underline-offset: 3px; }

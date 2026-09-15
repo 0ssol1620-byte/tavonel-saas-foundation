@@ -76,6 +76,17 @@
   color: var(--text-mid);
 }
 
+/*
+  G2-025. `flex-basis: 100%` was doing nothing here, because a paragraph on this page inherits a
+  reading measure from `app/tavonel.css` and `max-width` beats `flex-basis`: each label resolved
+  to 408px inside an 802px row, which left room for "Everything" to sit 400px away from "SHOW" and
+  for "BY WORKFLOW" to land inline between two chips. `max-width: none` gives the labels back the
+  full-width row the grouping was always built on -- through three classes, because the rule it
+  has to beat (`.public-page .body p`) is two classes and an element and a bare module class
+  loses to it.
+*/
+.hub .filters .groupLabel { max-width: none; }
+
 .groupLabel {
   flex-basis: 100%;
   margin: 10px 0 0;
