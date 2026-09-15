@@ -10,6 +10,7 @@ import { PublicSiteHeader } from "@/components/public-site-chrome";
 import Logomark from "@/components/logomark";
 import { FOOTER_GROUPS, ACCESS_CTA, SELF_SERVE_CTA } from "@/lib/site-navigation";
 import { convertedToPdfFormats, sourceFamilyChips, sourceSupportTier } from "@/lib/qualified-input";
+import { activationPolicy } from "@/lib/activation-policy";
 import { trackFunnel } from "@/lib/funnel-events";
 
 /** One customer journey. Existing films illustrate it; the published sample supplies evidence.
@@ -113,9 +114,9 @@ export default function HomePageClient({ liveCommerce, proof }: { liveCommerce: 
           <div className="one-path-wrap">
             <div className="one-path-section-heading"><p className="one-path-eyebrow">02 / CONNECT</p><h2 id="one-path-input">Bring what you already have.</h2><p>No parser settings. No model selection. Choose what to bring and let the processing policy handle the route.</p></div>
             <div className="one-path-source-options">
-              <article><Files aria-hidden="true" size={26} /><h3>Files, folders & ZIP</h3><p>Choose a batch from your computer. Review the selection and cost before processing.</p><Link href={startHref}>Start with files <ArrowUpRight size={16} aria-hidden="true" /></Link></article>
-              <article><Cloud aria-hidden="true" size={26} /><h3>Connected sources</h3><p>See the available cloud connections and choose the files you allow TAVONEL to read.</p><Link href="/integrations">Choose a connection <ArrowUpRight size={16} aria-hidden="true" /></Link></article>
-              <article><Server aria-hidden="true" size={26} /><h3>Private infrastructure</h3><p>For object storage or mounted shares, plan an assisted, customer-run connection.</p><Link href="/integrations">Plan a private connection <ArrowUpRight size={16} aria-hidden="true" /></Link></article>
+              <article><Files aria-hidden="true" size={26} /><h3>Files, folders & ZIP</h3><p>Choose a batch from your computer. Review the selection and cost before processing.</p><Link href={startHref} prefetch={false}>Start with files <ArrowUpRight size={16} aria-hidden="true" /></Link></article>
+              <article><Cloud aria-hidden="true" size={26} /><h3>Connected sources</h3><p>See the available cloud connections and choose the files you allow TAVONEL to read.</p><Link href="/integrations" prefetch={false}>Choose a connection <ArrowUpRight size={16} aria-hidden="true" /></Link></article>
+              <article><Server aria-hidden="true" size={26} /><h3>Private infrastructure</h3><p>For object storage or mounted shares, plan an assisted, customer-run connection.</p><Link href="/integrations" prefetch={false}>Plan a private connection <ArrowUpRight size={16} aria-hidden="true" /></Link></article>
             </div>
             {/*
               G1-007. The chips listed spreadsheets and decks beside PDFs as peers. Both sentences
@@ -123,7 +124,7 @@ export default function HomePageClient({ liveCommerce, proof }: { liveCommerce: 
               holds, and the formats that reach the reader as PDF -- so a chip can never outrun
               what the upload route validates against.
             */}
-            <details className="one-path-details"><summary>Supported files and connection details</summary><p>{sourceFamilyChips.join(" · ")}</p>{sourceSupportTier ? <p className="one-path-tier-note">Every format above is read at the <code>{sourceSupportTier}</code> tier{convertedToPdfFormats.length > 0 ? <> — {convertedToPdfFormats.join(", ")} are converted to PDF and read as PDF</> : null}. The per-format list, with the limits each one carries, is on <Link href="/sources">supported formats</Link>.</p> : null}<p>ZIPs open on your device. Only supported files are selected for upload; skipped files remain visible in the selection report.</p><div className="one-path-links"><Link href="/sources">Supported formats</Link><Link href="/integrations">Availability and permissions</Link></div></details>
+            <details className="one-path-details"><summary>Supported files and connection details</summary><p>{sourceFamilyChips.join(" · ")}</p>{sourceSupportTier ? <p className="one-path-tier-note">Every format above is read at the <code>{sourceSupportTier}</code> tier{convertedToPdfFormats.length > 0 ? <> — {convertedToPdfFormats.join(", ")} are converted to PDF and read as PDF</> : null}. The per-format list, with the limits each one carries, is on <Link href="/sources" prefetch={false}>supported formats</Link>.</p> : null}<p>ZIPs open on your device. Only supported files are selected for upload; skipped files remain visible in the selection report.</p><div className="one-path-links"><Link href="/sources" prefetch={false}>Supported formats</Link><Link href="/integrations" prefetch={false}>Availability and permissions</Link></div></details>
           </div>
         </section>
 
@@ -131,7 +132,7 @@ export default function HomePageClient({ liveCommerce, proof }: { liveCommerce: 
           <div className="one-path-wrap">
             <div className="one-path-section-heading"><p className="one-path-eyebrow">03 / PROOF</p><h2 id="one-path-proof-title">Every result keeps a path back to the source.</h2><p>Open the original page beside the extracted passage. Check what survived instead of trusting a marketing claim.</p></div>
             {proof ? <div className="one-path-source-proof" aria-label="Published sample and its source"><p className="one-path-eyebrow">PUBLIC APPLE SEC SAMPLE · SOURCE INCLUDED</p>{proof}</div> : null}
-            <div className="one-path-links"><Link href={"/explore?act=source" as Route}>Inspect the public source <ArrowUpRight size={16} aria-hidden="true" /></Link><Link href="/sources">What is preserved</Link></div>
+            <div className="one-path-links"><Link href={"/explore?act=source" as Route} prefetch={false}>Inspect the public source <ArrowUpRight size={16} aria-hidden="true" /></Link><Link href="/sources" prefetch={false}>What is preserved</Link></div>
             {/* SD-10. Where a logo wall would go on a page like this one. */}
             <DesignPartners className="one-path-design-partners" />
           </div>
@@ -144,7 +145,7 @@ export default function HomePageClient({ liveCommerce, proof }: { liveCommerce: 
               <div><span>01</span><h3>Prepare the update</h3><p>Keep the current result available while a new candidate is prepared.</p></div>
               <div><span>02</span><h3>Check what needs attention</h3><p>Open the source and review the items that need a decision.</p></div>
               <div><span>03</span><h3>Approve it for use</h3><p>Your approval changes the active version. Previous versions remain traceable.</p></div>
-              <Link className="one-path-text-link" href={"/product/continuous-knowledge" as Route}>How source updates work <ArrowUpRight size={16} aria-hidden="true" /></Link>
+              <Link className="one-path-text-link" href={"/product/continuous-knowledge" as Route} prefetch={false}>How source updates work <ArrowUpRight size={16} aria-hidden="true" /></Link>
             </div>
           </div>
         </section>
@@ -152,14 +153,24 @@ export default function HomePageClient({ liveCommerce, proof }: { liveCommerce: 
         <section className="one-path-section one-path-output" id="ready-for-ai" data-scene="6" aria-labelledby="one-path-output-title">
           <div className="one-path-wrap">
             <div className="one-path-section-heading"><p className="one-path-eyebrow">05 / READY FOR AI</p><h2 id="one-path-output-title">Ready for your AI.</h2><p>Use the same reviewed, source-traceable knowledge from an assistant, agent, application or portable workflow.</p></div>
-            <div className="one-path-output-options"><Link href="/docs/use-with-ai"><strong>AI assistant</strong><span>Set up a supported connection ↗</span></Link><Link href="/docs/quickstart"><strong>Your application</strong><span>Build with the API ↗</span></Link><Link href="/docs/cli"><strong>Portable files</strong><span>Use and verify the package ↗</span></Link></div>
-            <div className="one-path-actions actions"><Link className="btn" href={startHref} onClick={() => trackFunnel("cta_clicked", { cta: "closing_start", scene: "6" })}>{signedIn ? "Use with AI" : access.label}<ArrowUpRight size={17} aria-hidden="true" /></Link><Link className="one-path-text-link" href="/pricing">See pricing</Link></div>
+            <div className="one-path-output-options"><Link href="/docs/use-with-ai" prefetch={false}><strong>AI assistant</strong><span>Set up a supported connection ↗</span></Link><Link href="/docs/quickstart" prefetch={false}><strong>Your application</strong><span>Build with the API ↗</span></Link><Link href="/docs/cli" prefetch={false}><strong>Portable files</strong><span>Use and verify the package ↗</span></Link></div>
+            <div className="one-path-actions actions"><Link className="btn" href={startHref} onClick={() => trackFunnel("cta_clicked", { cta: "closing_start", scene: "6" })}>{signedIn ? "Use with AI" : access.label}<ArrowUpRight size={17} aria-hidden="true" /></Link><Link className="one-path-text-link" href="/pricing" prefetch={false}>See pricing</Link></div>
             <p className="one-path-trust"><ShieldCheck size={16} aria-hidden="true" /> You choose the source access and approve what becomes active.</p>
-            <details className="one-path-details"><summary>Setup and availability</summary><p>Live AI access requires an activated version and the appropriate account access. A package download or opening the setup guide does not verify an external AI connection.</p><div className="one-path-links"><Link href="/docs/use-with-ai">Integration guide</Link><Link href="/pricing">Plan limits</Link><Link href="/trust">Trust Center</Link></div></details>
+            {/*
+              Cross-lane from `truth`: the closing scene states what is open today.
+
+              The sentence is `activationPolicy.customerData.reason` verbatim rather than a
+              shortened badge written here. The header, /pricing, /security, /status, /login and
+              /workspace all render that one string, and a second wording of the same gate on the
+              page that asks for the click is exactly where the two would drift apart. It is a
+              module constant, so it costs the client bundle a string and nothing else.
+            */}
+            <p className="one-path-state" data-customer-data={activationPolicy.customerData.enabled ? "open" : "arranged"}>{activationPolicy.customerData.reason}</p>
+            <details className="one-path-details"><summary>Setup and availability</summary><p>Live AI access requires an activated version and the appropriate account access. A package download or opening the setup guide does not verify an external AI connection.</p><div className="one-path-links"><Link href="/docs/use-with-ai" prefetch={false}>Integration guide</Link><Link href="/pricing" prefetch={false}>Plan limits</Link><Link href="/trust" prefetch={false}>Trust Center</Link></div></details>
           </div>
         </section>
       </main>
-      <footer className="site one-path-footer"><div className="one-path-wrap"><span className="wordmark"><Logomark /><b>TAVONEL</b></span><div className="site-footer-groups">{FOOTER_GROUPS.map((group) => <nav key={group.title} aria-label={group.title}><p className="site-footer-title">{group.title}</p>{group.links.map((link) => <Link key={link.href} href={link.href as Route}>{link.label}</Link>)}</nav>)}</div><p className="fine">Your knowledge, with a path back to the source.</p></div></footer>
+      <footer className="site one-path-footer"><div className="one-path-wrap"><span className="wordmark"><Logomark /><b>TAVONEL</b></span><div className="site-footer-groups">{FOOTER_GROUPS.map((group) => <nav key={group.title} aria-label={group.title}><p className="site-footer-title">{group.title}</p>{group.links.map((link) => <Link key={link.href} href={link.href as Route} prefetch={false}>{link.label}</Link>)}</nav>)}</div><p className="fine">Your knowledge, with a path back to the source.</p></div></footer>
     </div>
   );
 }
