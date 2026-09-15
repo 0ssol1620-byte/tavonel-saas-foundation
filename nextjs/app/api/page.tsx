@@ -1,26 +1,228 @@
-import { permanentRedirect } from "next/navigation";
+import type { Metadata } from "next";
+import Link from "next/link";
+import type { Route } from "next";
+import { PublicPageShell } from "@/components/public-page-shell";
+import { DocsCopyButton } from "@/components/docs-copy-button";
+import { DocsSnippet } from "@/components/docs-snippet";
+import { ApiTryIt, type TryItRoute } from "@/components/docs/api-try-it";
+import { API_VERSION } from "@/lib/api-version";
+import { readApiReference, type ReferenceEndpoint } from "@/lib/api-reference";
+import { snippetFor, SNIPPET_LANGUAGES } from "@/lib/docs-endpoints";
+import styles from "@/components/docs/api-reference.module.css";
 
-/**
- * BA-184. The reference is /docs; this was a stub the whole site linked to as "API reference".
- *
- * What stood here was thirty-eight lines: a hero, four one-line tiles, one curl command and two
- * buttons. No endpoint, no authentication detail, no error code, no response shape -- and the page
- * ended at y~800 of a 1,300px viewport. Meanwhile the twenty-two-section reference that answers
- * all four of those questions is at /docs, which the nav, the footer, /developers and /docs itself
- * were all calling "API reference" while pointing here. Two developer landings with opposite
- * information architectures, and the stub was winning the links.
- *
- * So the page is retired rather than grown. Growing it would have produced a second reference to
- * keep in step with the contract, which is the defect /docs was built to end. The 308 keeps every
- * inbound link -- ours and anyone else's -- arriving somewhere that answers the question.
- *
- * `permanentRedirect` is the pattern `app/product/knowledge-compiler/page.tsx` already uses, for
- * the same reason: a 308 rather than a `notFound()` stub, because this URL was published and is
- * linked from outside this repository, and no metadata of its own, because a redirect has no head
- * to declare. The in-repo links that pointed here are changed in this commit where this lane owns
- * them (/developers, /docs) and listed for the integrator where it does not (/sources,
- * /resources, and the `ROUTES` array in `app/sitemap.ts`).
- */
-export default function ApiReferenceRedirect() {
-  permanentRedirect("/docs");
+/*
+  BA-184 retired this route to a 308, because what stood here was a stub: a hero, four one-line
+  tiles, one curl command and two buttons, linked from the primary nav, the footer and
+  /developers as "API reference". Growing a stub into a second reference would have produced two
+  things to keep in step with one contract, so it was retired instead.
+
+  G3-004 and G3-008 are the other half of that argument, and they change the answer. The
+  objection was never "a reference page is wrong" -- it was "a hand-written second reference is
+  wrong". This page is generated: every operation, parameter, schema, example and error code
+  below is read out of /api/openapi in the same process, through the same route handler
+  `lib/docs-endpoints.ts` already calls. There is no second copy to go stale, and
+  `lib/openapi-completeness.test.ts` fails the build if the contract stops carrying what this
+  page renders.
+
+  Why not Scalar, Redoc or Stoplight: each is a dependency measured in hundreds of kilobytes of
+  client JavaScript for a page whose content is static, and the script budget is a measurement
+  rather than a number to raise. Plain React over the parsed JSON renders on the server, ships
+  almost nothing, and inherits the site's own type and colour instead of arriving with its own.
+
+  The try-it is deliberately small: the three routes that take no key. A console that asks a
+  reader to paste a live credential into a public page is a credential-handling surface, and
+  building one to demonstrate an API is a poor trade. These three prove the thing an evaluator
+  actually wants proven -- that the deployment answers, and what it says about itself.
+*/
+
+export const metadata: Metadata = {
+  title: "API reference — TAVONEL",
+  description: "Every operation in the TAVONEL API, generated from the published OpenAPI contract: parameters, request and response schemas, examples, and the error codes each one returns.",
+  alternates: { canonical: "/api" },
+  openGraph: { url: "/api" },
+};
+
+/*
+  The unauthenticated routes, and nothing else.
+
+  Each is a GET carrying no tenant, no document and no credential, which is why it can be called
+  from a browser at all. /reproducibility/sample-world is included because it is the one that
+  shows the shape of an answer -- object, evidence, source version, page, region -- without
+  anyone having compiled anything.
+*/
+const TRY_IT: TryItRoute[] = [
+  {
+    path: "/api/v1/capabilities",
+    label: "What this deployment can read",
+    note: "The same list the upload route validates against. A format absent from it is refused at upload rather than accepted and dropped.",
+  },
+  {
+    path: "/api/status",
+    label: "What is open right now",
+    note: "The deployment's own state, including whether compiling your own files is open here.",
+  },
+  {
+    path: "/reproducibility/sample-world",
+    label: "The shape of an answer",
+    note: "A deterministic product fixture, unsigned and labelled as such in its own disclosure field. Build against the shape; do not judge extraction from it.",
+  },
+];
+
+const LANGUAGE_LABELS = { curl: "cURL", python: "Python", typescript: "TypeScript" } as const;
+
+function Operation({ endpoint }: { endpoint: ReferenceEndpoint }) {
+  return (
+    <article className={styles.operation} id={endpoint.operationId}>
+      <header className={styles.signature}>
+        <b data-method={endpoint.method}>{endpoint.method}</b>
+        <code>{endpoint.path}</code>
+        {endpoint.scope
+          ? <em>Scope <code>{endpoint.scope}</code></em>
+          : <em>{endpoint.browserSession ? "Browser session only" : "No key required"}</em>}
+      </header>
+      <h3 className={styles.summary}>{endpoint.summary}</h3>
+      {endpoint.description ? <p className={styles.prose}>{endpoint.description}</p> : null}
+
+      {endpoint.parameters.length > 0 ? (
+        <>
+          <p className={styles.label}>Parameters</p>
+          <table className="docs-table">
+            <thead><tr><th>Name</th><th>In</th><th>Required</th><th>Shape</th></tr></thead>
+            <tbody>
+              {endpoint.parameters.map((parameter) => (
+                <tr key={`${parameter.in}-${parameter.name}`}>
+                  <td data-label="Name"><code>{parameter.name}</code></td>
+                  <td data-label="In">{parameter.in}</td>
+                  <td data-label="Required">{parameter.required ? "yes" : "no"}</td>
+                  <td data-label="Shape">
+                    <code>{parameter.shape}</code>
+                    {parameter.description ? ` ${parameter.description}` : ""}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      ) : null}
+
+      <p className={styles.label}>Request</p>
+      <DocsSnippet
+        snippets={SNIPPET_LANGUAGES.map((language) => ({
+          language,
+          label: LANGUAGE_LABELS[language],
+          body: snippetFor(endpoint, language),
+        }))}
+      />
+
+      <p className={styles.label}>Responses</p>
+      {endpoint.responses.map((response) => (
+        <div className={styles.response} key={response.status}>
+          <p className={styles.status}>
+            <code data-kind={response.status.startsWith("2") ? "ok" : "error"}>{response.status}</code>
+            <span>{response.description}</span>
+          </p>
+          {response.codes.length > 0 ? (
+            <p className={styles.codes}>
+              {response.codes.map((code) => <code key={code}>{code}</code>)}
+            </p>
+          ) : null}
+          {response.example ? (
+            <figure className="docs-code">
+              <figcaption><span>Example response</span><DocsCopyButton value={response.example} /></figcaption>
+              <pre><code>{response.example}</code></pre>
+            </figure>
+          ) : null}
+          {response.bestEffort ? (
+            <p className="fine">
+              This schema names the fields a caller can rely on and is not closed. The handler
+              composes the payload from a store row the contract does not own, so listing every
+              field here would be transcribing a shape that can move — it is marked{" "}
+              <code>x-tavonel-status: best-effort</code> in the document rather than closed on
+              fields nobody verified.
+            </p>
+          ) : null}
+        </div>
+      ))}
+    </article>
+  );
+}
+
+export default async function ApiReferencePage() {
+  const reference = await readApiReference();
+
+  return (
+    <PublicPageShell>
+      <section className="scene doc"><div className="shell"><div className="body">
+        <div className="stack">
+          <p className="slate"><b>API REFERENCE</b><span aria-hidden="true" />· {API_VERSION}</p>
+          <h1 className="document-title">Every operation, from the contract itself.</h1>
+        </div>
+        <div className="stack">
+          <p className="lede">
+            {reference.operationCount} operations in {reference.groups.length} groups, rendered
+            from the OpenAPI document this deployment serves at{" "}
+            <a href="/api/openapi">/api/openapi</a>. Nothing here is written beside the contract:
+            if an operation is on this page, the contract publishes it, and a build where the two
+            disagree does not ship.
+          </p>
+
+          <p className="fine">
+            Base URL <code>{reference.server}</code>. The compile routes carry their own,{" "}
+            <code>{reference.unversionedServer}</code>, declared per path in the document so a
+            generated client resolves each operation against the right one. Send a key as{" "}
+            <code>Authorization: Bearer tvnl_live_…</code>; keys are created in the workspace
+            under Developers and the plaintext is shown once. Promotion and rollback are absent
+            from this page because they are absent from the contract — they are browser-session
+            decisions, and no scope grants them.
+          </p>
+
+          <ApiTryIt routes={TRY_IT} />
+
+          <nav className={styles.index} aria-label="Operations by group">
+            {reference.groups.map((group) => (
+              <div key={group.name}>
+                <p className={styles.groupName}>{group.name}</p>
+                <ul>
+                  {group.endpoints.map((endpoint) => (
+                    <li key={endpoint.operationId}>
+                      <a href={`#${endpoint.operationId}`}>
+                        <b data-method={endpoint.method}>{endpoint.method}</b>
+                        <span>{endpoint.summary}</span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </nav>
+
+          {reference.groups.map((group) => (
+            <div className={styles.group} key={group.name}>
+              <h2>{group.name}</h2>
+              <p className={styles.prose}>{group.description}</p>
+              {group.endpoints.map((endpoint) => (
+                <Operation endpoint={endpoint} key={endpoint.operationId} />
+              ))}
+            </div>
+          ))}
+
+          <h2>Error codes</h2>
+          <p className={styles.prose}>
+            Every failure carries a stable machine code alongside the status. Branch on the code:
+            the status says what kind of problem it is, and the code says which one. Each response
+            above names the codes it can carry; the full catalogue, with what to do about every
+            one of them, is on <Link href={"/docs/errors" as Route}>the Errors page</Link> and in
+            the contract under <code>x-tavonel-error-catalogue</code>.
+          </p>
+
+          <p className="fine">
+            Concepts, worked flows and the quickstart are in{" "}
+            <Link href="/docs">the documentation</Link>; this page is the operation-by-operation
+            reference. API version {API_VERSION} · support window and deprecation policy on{" "}
+            <Link href={"/docs/changelog" as Route}>Versioning and changes</Link>.
+          </p>
+        </div>
+      </div></div></section>
+    </PublicPageShell>
+  );
 }

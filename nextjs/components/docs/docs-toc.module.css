@@ -1,8 +1,20 @@
 /* Documentation is a reading surface, not a second marketing split hero.
    Below 1080px the chapter index becomes a disclosure; above it the article keeps one column. */
+/*
+  The rail is the search box plus the index (G3-009). It is one grid child of `.layout`, so the
+  article still sits in the second column and the search box does not push the index down on a
+  phone -- below 1080px the index is a closed disclosure and the search field sits above it,
+  which is the order a reader reaches for.
+*/
+.rail { display: grid; gap: 14px; align-content: start; min-width: 0; }
+@media (min-width: 1080px) {
+  .rail { position: sticky; top: 96px; max-height: calc(100vh - 128px); overflow-y: auto; padding-right: 10px; border-right: 1px solid var(--hairline); }
+}
+
 .column { display: none; }
 @media (min-width: 1080px) {
-  .column { display: block; position: sticky; top: 96px; max-height: calc(100vh - 128px); overflow-y: auto; padding-right: 10px; border-right: 1px solid var(--hairline); }
+  /* The sticky frame moved up to .rail so the search box scrolls with the index, not past it. */
+  .column { display: block; }
   .disclosure { display: none; }
 }
 .disclosure { margin: 0; border: 1px solid var(--hairline); border-radius: 4px; background: var(--g1); }
@@ -27,6 +39,32 @@
    sat between the index and 540px of prose. Keep the existing two DOM children and anchors;
    change their reading order in layout, never their keyboard/document order. */
 .layout > :global(.body) { display: flex; flex-direction: column; align-items: stretch; gap: 28px; min-width: 0; width: 100%; max-width: min(82ch, 100%); font-size: 17px; }
+/*
+  G3-024: `overflow-x: auto` scrolls and says nothing about it, so a 100-character shell line on
+  a 412px screen looks truncated rather than scrollable. A thin permanent track is the smallest
+  honest affordance -- it is visible when there is overflow and absent when there is not, which
+  an edge fade cannot manage without measuring.
+
+  Scoped to the docs layout because that is where the finding is and because `app/tavonel.css`,
+  which owns `.docs-code` and `.docs-table` globally, belongs to another lane this cycle. The
+  root rule is in the lane report as a cross-lane request.
+*/
+.layout :global(.docs-code pre),
+.layout :global(.docs-table) {
+  scrollbar-width: thin;
+  scrollbar-color: var(--hairline-hi) transparent;
+}
+.layout :global(.docs-code pre)::-webkit-scrollbar,
+.layout :global(.docs-table)::-webkit-scrollbar { height: 8px; }
+.layout :global(.docs-code pre)::-webkit-scrollbar-thumb,
+.layout :global(.docs-table)::-webkit-scrollbar-thumb { background: var(--hairline-hi); border-radius: 4px; }
+.layout :global(.docs-code pre)::-webkit-scrollbar-track,
+.layout :global(.docs-table)::-webkit-scrollbar-track { background: transparent; }
+/* The search box in the rail is narrower than the one on the index, so the count must not wrap. */
+.rail :global(.docs-search-field) { padding: 8px 10px; }
+.rail :global(.docs-search-count) { white-space: nowrap; }
+/* A result excerpt is prose, not a title: let it use the two lines it needs. */
+.rail :global(.docs-search-results span) { display: block; }
 .layout > :global(.body) > :global(.stack) { min-width: 0; width: 100%; }
 .layout :global(.document-title) { width: 100%; max-width: 100%; font-size: clamp(34px, 3.5vw, 50px); line-height: 1.08; }
 .layout :global(.docs-body) { max-width: 100%; width: 100%; }

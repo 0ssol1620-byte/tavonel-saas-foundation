@@ -14,6 +14,14 @@ import { DocsCopyButton } from "@/components/docs-copy-button";
  * build time, not fetched -- so switching is a state change over content that is already here,
  * and a reader with no JavaScript still has the first one.
  *
+ * G3-032: "rendered from the server" was true of the generation and not of the markup. Only the
+ * chosen panel was in the HTML, so a crawler, an agent reading the raw page, or a reader with
+ * JavaScript off saw one language of three on a page whose whole point is that it has three.
+ * Every panel is in the document now and the inactive ones are hidden with the `hidden`
+ * attribute, which removes them from the accessibility tree and from the rendered text while
+ * leaving them in the source. The cost is two extra <pre> elements per block; the alternative
+ * was a page that told two thirds of its readers less than it had.
+ *
  * BA-189: the choice is remembered, per reader, across every snippet on the page and the next.
  * A quickstart with two tab groups and a reference page with one per endpoint would otherwise ask
  * a TypeScript reader to pick TypeScript once per block. It is a per-browser convenience and
@@ -47,7 +55,7 @@ export function DocsSnippet({ snippets }: { snippets: Array<{ language: string; 
     }
   };
 
-  const chosen = snippets[active] ?? snippets[0];
+  const chosen = snippets[active] ?? snippets[0]!;
 
   return (
     <figure className="docs-code">
@@ -59,6 +67,7 @@ export function DocsSnippet({ snippets }: { snippets: Array<{ language: string; 
               type="button"
               role="tab"
               aria-selected={index === active}
+              aria-controls={`snippet-${snippet.language}`}
               onClick={() => choose(index)}
             >
               {snippet.label}
@@ -67,7 +76,17 @@ export function DocsSnippet({ snippets }: { snippets: Array<{ language: string; 
         </span>
         <DocsCopyButton value={chosen.body} />
       </figcaption>
-      <pre><code>{chosen.body}</code></pre>
+      {snippets.map((snippet, index) => (
+        <pre
+          key={snippet.language}
+          id={`snippet-${snippet.language}`}
+          role="tabpanel"
+          aria-label={snippet.label}
+          hidden={index !== active}
+        >
+          <code>{snippet.body}</code>
+        </pre>
+      ))}
     </figure>
   );
 }

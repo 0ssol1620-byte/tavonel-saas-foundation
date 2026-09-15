@@ -1,0 +1,13 @@
+/*
+  The matched term inside a result excerpt.
+
+  A bare <mark> is yellow on black in every browser default, which on this palette reads as an
+  error state rather than as "this is the bit you searched for". Background stays out of it
+  entirely: the weight and the foreground colour are enough to find a phrase in two lines of
+  grey, and they survive a forced-colors mode that would drop a background anyway.
+*/
+.mark {
+  background: none;
+  color: var(--text-hi);
+  font-weight: 500;
+}
