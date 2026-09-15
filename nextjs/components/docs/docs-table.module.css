@@ -1,0 +1,58 @@
+/*
+  G3-024. Below 760px a documentation table stops being a table.
+
+  The error catalogue is four columns — code, status, meaning, what to do — and two of them are
+  sentences. On a 412px phone that is a horizontally scrolled table whose third and fourth columns
+  are off-screen, which is the same as not publishing them: the reader sees a code and a status
+  and cannot reach the half that tells them what to do about it.
+
+  So each row becomes a stacked card and each cell prints its own column name, read from the
+  `data-label` the renderer already writes. The pattern and the 760px breakpoint are the ones
+  `.src-matrix` on /sources already uses, rather than a second answer to the same question.
+
+  The class is doubled in every selector on purpose. `.docs-table td` in the global sheet has the
+  same specificity as a single module class, so a tie would be decided by stylesheet order, which
+  is not something this file can see.
+*/
+@media (max-width: 760px) {
+  .stacked.stacked {
+    display: block;
+    overflow-x: visible;
+  }
+  .stacked.stacked thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .stacked.stacked tr {
+    display: block;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--hairline-hi);
+  }
+  .stacked.stacked td {
+    display: block;
+    padding: 0;
+    border: 0;
+    max-width: 100%;
+  }
+  .stacked.stacked td + td {
+    margin-top: 10px;
+  }
+  .stacked.stacked td::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 4px;
+    font-family: var(--f-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-xlo);
+  }
+  /* An empty cell with only its label reads as a bug. `varies` is what the catalogue means. */
+  .stacked.stacked td:empty::after {
+    content: "—";
+    color: var(--text-xlo);
+  }
+}

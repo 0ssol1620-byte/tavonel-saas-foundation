@@ -5,6 +5,8 @@ import { PublicPageShell } from "@/components/public-page-shell";
 import { DocsCopyButton } from "@/components/docs-copy-button";
 import { DocsSnippet } from "@/components/docs-snippet";
 import { ApiTryIt, type TryItRoute } from "@/components/docs/api-try-it";
+import { withMarks } from "@/components/docs/marks";
+import tableStyles from "@/components/docs/docs-table.module.css";
 import { API_VERSION } from "@/lib/api-version";
 import { readApiReference, type ReferenceEndpoint } from "@/lib/api-reference";
 import { snippetFor, SNIPPET_LANGUAGES } from "@/lib/docs-endpoints";
@@ -81,12 +83,12 @@ function Operation({ endpoint }: { endpoint: ReferenceEndpoint }) {
           : <em>{endpoint.auth === "session" ? "Browser session only" : "No key required"}</em>}
       </header>
       <h3 className={styles.summary}>{endpoint.summary}</h3>
-      {endpoint.description ? <p className={styles.prose}>{endpoint.description}</p> : null}
+      {endpoint.description ? <p className={styles.prose}>{withMarks(endpoint.description)}</p> : null}
 
       {endpoint.parameters.length > 0 ? (
         <>
           <p className={styles.label}>Parameters</p>
-          <table className="docs-table">
+          <table className={`docs-table ${tableStyles.stacked}`}>
             <thead><tr><th>Name</th><th>In</th><th>Required</th><th>Shape</th></tr></thead>
             <tbody>
               {endpoint.parameters.map((parameter) => (
@@ -96,7 +98,7 @@ function Operation({ endpoint }: { endpoint: ReferenceEndpoint }) {
                   <td data-label="Required">{parameter.required ? "yes" : "no"}</td>
                   <td data-label="Shape">
                     <code>{parameter.shape}</code>
-                    {parameter.description ? ` ${parameter.description}` : ""}
+                    {parameter.description ? <> {withMarks(parameter.description)}</> : null}
                   </td>
                 </tr>
               ))}
@@ -119,7 +121,7 @@ function Operation({ endpoint }: { endpoint: ReferenceEndpoint }) {
         <div className={styles.response} key={response.status}>
           <p className={styles.status}>
             <code data-kind={response.status.startsWith("2") ? "ok" : "error"}>{response.status}</code>
-            <span>{response.description}</span>
+            <span>{withMarks(response.description)}</span>
           </p>
           {response.codes.length > 0 ? (
             <p className={styles.codes}>

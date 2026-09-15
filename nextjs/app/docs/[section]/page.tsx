@@ -6,6 +6,8 @@ import { PublicPageShell } from "@/components/public-page-shell";
 import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
 import { DocsCopyButton } from "@/components/docs-copy-button";
 import { DocsSnippet } from "@/components/docs-snippet";
+import { withMarks } from "@/components/docs/marks";
+import tableStyles from "@/components/docs/docs-table.module.css";
 import {
   DOCS_REVIEWED,
   DOCS_SECTIONS,
@@ -37,20 +39,6 @@ export async function generateMetadata({ params }: { params: Promise<{ section: 
   };
 }
 
-/**
- * Emphasis only, and only the pair the source actually uses.
- *
- * The content is data rather than MDX on purpose -- a markdown pipeline would let a section
- * carry a heading level, a link or a script that nothing here checks. `**bold**` is the one
- * mark the prose needs, so it is the one mark that renders.
- */
-function withEmphasis(text: string) {
-  return text.split(/(\*\*[^*]+\*\*)/g).map((part, index) => (
-    part.startsWith("**") && part.endsWith("**")
-      ? <strong key={index}>{part.slice(2, -2)}</strong>
-      : <span key={index}>{part}</span>
-  ));
-}
 
 function CodeBlock({ label, body, id }: { label: string; body: string; id?: string }) {
   return (
@@ -88,13 +76,13 @@ function Endpoint({ endpoint, id }: { endpoint: DocsEndpoint; id?: string }) {
         }))}
       />
       {endpoint.requestExample ? <CodeBlock label="Request body" body={endpoint.requestExample} /> : null}
-      <table className="docs-table">
+      <table className={`docs-table ${tableStyles.stacked}`}>
         <thead><tr><th>Status</th><th>Response</th></tr></thead>
         <tbody>
           {endpoint.responses.map((response) => (
             <tr key={response.status}>
               <td data-label="Status"><code>{response.status}</code></td>
-              <td data-label="Response">{response.description}</td>
+              <td data-label="Response">{withMarks(response.description)}</td>
             </tr>
           ))}
         </tbody>
@@ -124,14 +112,14 @@ function Block({ block, endpoints, id }: { block: DocsBlock; endpoints: Map<stri
     case "heading":
       return <h2 id={id} className={anchor.anchor}>{block.text}</h2>;
     case "prose":
-      return <p>{withEmphasis(block.text)}</p>;
+      return <p>{withMarks(block.text)}</p>;
     case "note":
       /*
         BA-217. The accent bar was doing two opposite jobs across the site -- real guidance here,
         and "this section has not been run" on every cookbook. The cookbook use is gone
         (BA-178); the label is what keeps this one legible without relying on the colour.
       */
-      return <p className="docs-note"><strong>Note</strong> {withEmphasis(block.text)}</p>;
+      return <p className="docs-note"><strong>Note</strong> {withMarks(block.text)}</p>;
     case "steps":
       return <ol className="docs-steps">{block.items.map((item) => <li key={item}>{item}</li>)}</ol>;
     case "code":
@@ -141,13 +129,13 @@ function Block({ block, endpoints, id }: { block: DocsBlock; endpoints: Map<stri
       return <DocsSnippet snippets={block.items.map((item) => ({ ...item }))} />;
     case "table":
       return (
-        <table className="docs-table">
+        <table className={`docs-table ${tableStyles.stacked}`}>
           <thead><tr>{block.head.map((cell) => <th key={cell}>{cell}</th>)}</tr></thead>
           <tbody>
             {block.rows.map((row) => (
               <tr key={row.join("|")}>
                 {row.map((cell, index) => (
-                  <td key={index} data-label={block.head[index]}>{withEmphasis(cell)}</td>
+                  <td key={index} data-label={block.head[index]}>{withMarks(cell)}</td>
                 ))}
               </tr>
             ))}
