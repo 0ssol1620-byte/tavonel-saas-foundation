@@ -144,7 +144,9 @@ export default async function StatusPage() {
     <p>
       No incident has been recorded since {DAY.format(new Date(`${RECORD_STARTS}T00:00:00+09:00`))},
       the first release recorded in the changelog. When one occurs it is published here with what
-      happened, what it affected and what changed afterwards, and it stays published.
+      happened, what it affected and what changed afterwards, and it stays published. What is
+      published is a customer-facing record: never a log location, a request id, a digest or
+      another customer&rsquo;s name.
     </p>
     <p>
       This page is served by the same deployment it reports on, so an outage that takes the site
