@@ -1,8 +1,24 @@
 import { ACTIVATION_RATE_LIMIT } from "./activation-rate-limit";
+import { activationPolicy } from "./activation-policy";
 import { API_VERSION } from "./api-version";
 import { COMPILE_MAX_DOCUMENTS, COMPILE_MIN_DOCUMENTS, CORPUS_MAX_DOCUMENTS } from "./compile-limits";
 import { MAX_FILES, MAX_SYNC_ARCHIVE_BYTES, MAX_WORKER_ARCHIVE_BYTES } from "./archive-expand";
 import { DEVELOPER_SCOPES } from "./developer-contracts";
+import { SCOPE_RATE_LIMITS } from "./developer-auth";
+import { API_ERROR_GROUPS } from "./api-error-codes";
+import { PACKAGE_CONTENTS } from "./package-contents";
+import {
+  DEVELOPER_FILES,
+  DEVELOPER_FILE_COUNT_WORD,
+  MCP_TOOLS,
+  MCP_TOOL_COUNT_WORD,
+} from "./mcp-tools";
+import {
+  PROCESSING_CEILING,
+  PROCESSING_CEILING_LIMITATIONS,
+  PROCESSING_CEILING_MIB,
+  PROCESSING_CEILING_SENTENCE,
+} from "../../shared/intakeCeiling";
 import { CAPABILITY_MANIFEST, describeAcceptedFormats } from "../../shared/capabilityManifest";
 import {
   BILLING_OFFERS,
@@ -78,6 +94,15 @@ export type DocsBlock =
   | { kind: "snippets"; label: string; items: ReadonlyArray<{ label: string; language: DocsLanguage; body: string }> }
   | { kind: "table"; head: string[]; rows: string[][] }
   | { kind: "endpoint"; operationId: string }
+  /*
+    The one diagram in the documentation (G3-011).
+
+    A block kind rather than a generic image slot: there is exactly one picture here, it is drawn
+    from data in `components/docs/world-lifecycle.tsx`, and a slot that took a URL would invite
+    a second picture nobody derives from anything. `caption` is what the search index sees,
+    because an SVG's text nodes are not in the flattened section text.
+  */
+  | { kind: "diagram"; name: "world-lifecycle"; caption: string }
   | { kind: "note"; text: string };
 
 export type DocsLanguage = "bash" | "powershell" | "python" | "typescript" | "json" | "text";
@@ -106,7 +131,10 @@ const SCOPE_COPY: Record<string, string> = {
   "collections:compile": "Start compiles, answer blockers, cancel a run.",
   "collections:download": "Download the signed knowledge package.",
   "worlds:read": "Read the active World, its objects, relations and evidence.",
-  "ask:read": "Grounded answers and lexical retrieval over the active World.",
+  // G3-012. This said "lexical retrieval" while /docs/search documented the same scope's
+  // endpoint as hybrid lexical + dense + structure, RRF-fused and reranked. The description was
+  // left behind when the pipeline changed, so the two pages disagreed about one scope.
+  "ask:read": "Grounded answers and hybrid retrieval over the active World.",
   "connections:read": "Read connection state and cursors.",
   "connections:write": "Create and revoke connections.",
   "connections:sync": "Advance a connection cursor and collect what changed.",
@@ -119,6 +147,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
     group: "Getting started",
     summary: "From an API key to a verified evidence-bound answer, with the one step no key can take.",
     blocks: [
+      { kind: "note", text: `**Before you start.** ${activationPolicy.customerData.reason} So steps 1 to 5 below are the contract you will call once intake is arranged with us, not a request this deployment will accept from you today. Steps 6 and 7 read a World that already exists, and the completed public Compiled World is readable in full right now — including from the unauthenticated reads the API reference at /api will run for you.` },
       { kind: "prose", text: "Every request is tenant-scoped by the key it carries. There is no account switch and no impersonation header: a key belongs to one workspace and reaches nothing else." },
       { kind: "heading", text: "The seven steps" },
       {
@@ -138,7 +167,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
       { kind: "heading", text: "Why step 5 stops a script" },
       {
         kind: "note",
-        text: "Step 5 is the one that stops a script, and it stops for two separate reasons. Promotion is human-only by design — a candidate is not organizational truth until a person says so, and no API key of any plan has a promote or rollback path to call. Separately, the activation surface is plan-gated: it runs on the **Developer** plan held by the workspace **owner**, or on the **Team** plan under its usual workspace roles, so steps 1-4 and 6-7 work on Developer today and step 5 does too when you own the workspace. Any other caller is refused with `STUDIO_SUBSCRIPTION_REQUIRED`, and an evaluation trial with `SUBSCRIPTION_REQUIRED`; branch on those two codes. Team is arranged with us rather than bought at a checkout.",
+        text: "Step 5 is the one that stops a script, and it stops for two separate reasons. Promotion is human-only by design — a candidate is not organizational truth until a person says so, and no API key of any plan has a promote or rollback path to call. Separately, the activation surface is plan-gated: it runs on the **Developer** plan held by the workspace **owner**, or on the **Team** plan under its usual workspace roles, so steps 1-4 and 6-7 are what a Developer key is scoped for, and step 5 is open to you as well when you own the workspace. Any other caller is refused with `STUDIO_SUBSCRIPTION_REQUIRED`, and an evaluation trial with `SUBSCRIPTION_REQUIRED`; branch on those two codes. Team is arranged with us rather than bought at a checkout. That is the plan gate, and it is not the only one: the deployment-wide intake gate at the top of this page stops steps 1 to 4 on every plan until intake is arranged, so a Developer key passing the plan check still will not compile your files here today.",
       },
       { kind: "heading", text: "Compile a document set" },
       {
@@ -463,6 +492,20 @@ export const DOCS_SECTIONS: DocsSection[] = [
       { kind: "prose", text: "A **candidate** version is a compile result nobody has accepted yet. An **active** version is the one answers are served from. Promotion is an explicit human action in a signed-in session — no API key can promote, and no compile promotes itself." },
       { kind: "heading", text: "Evidence" },
       { kind: "prose", text: "**Evidence** is a page and a region on that page, bound to a source version by digest. An object with no evidence is not published, and an answer that cannot cite one abstains rather than guessing." },
+      { kind: "heading", text: "Objects, and what an Object is not" },
+      { kind: "prose", text: "An **Object** is one thing the compiler found in your sources — a policy, an obligation, a party, a figure — with a stable key derived from its content rather than from where it appeared, and with the evidence it rests on underneath it. The key is what a later compile of the same content resolves to, which is why an object id is worth storing. What the key does not do is reach across separate compiles: two parts of one run compile to two Worlds, and deciding that an entity in one and an entity in the other are the same thing is identity resolution with its own evidence requirements. Nothing here does that on your behalf, and joining them without it would manufacture duplicates." },
+      { kind: "heading", text: "Promotion, and the World Gate" },
+      { kind: "prose", text: "**Promotion** is the act of making a candidate version the active one. It happens in a signed-in browser session, by a person holding the workspace owner or admin role, and there is no scope that grants it — you will not find one in the scope table, because none exists. The **World Gate** is the filter every retrieved region passes before it can reach an answer: it admits a region only if the region belongs to your tenant, belongs to the active World version, and is bound to evidence. A region that fails any of the three is reported in retrieval.gateRejections with its reason rather than quietly dropped." },
+      { kind: "heading", text: "Manifest digest, lens, ContextPacket" },
+      { kind: "prose", text: "A **manifest digest** is the sha256 over the whole compiled artifact, written sha256: followed by 64 hex characters. It is the version identifier: two Worlds with the same digest are the same World, and a digest is what you pass to read a specific version or to ask whether the copy you hold is still current. A **lens** is one slice of the World read model — objects, relations, evidence, history, files or review — readable on its own so a consumer that needs one does not fetch the whole graph. A **ContextPacket** is what retrieval returns: the evidence-bound regions it selected, each with its source version, page and region, plus the ranks and the reranker score that put it there. It is the same runtime contract Ask, Search, the MCP server and the CLI all share, which is why an answer and a search result cite the same way." },
+      { kind: "heading", text: "Ontology output" },
+      { kind: "prose", text: "The **Ontology output** is the RDF and JSON-LD projection of a compiled World, shipped in the signed package as ontology/knowledge.ttl and ontology/knowledge.jsonld. It is a projection of the objects and relations that were compiled, not a hand-authored schema: a predicate is in it because an engine emitted it, and predicates the vocabulary could express and no engine emits are published as absent, so a query for one returns empty rather than wrong." },
+      { kind: "heading", text: "The life of a Compiled World" },
+      {
+        kind: "diagram",
+        name: "world-lifecycle",
+        caption: "Source, candidate, active, evidence. The two transitions that are not automatic are the two that matter: a compile turns sources into a candidate, and a person turns a candidate into the active version. Nothing is served from a candidate, and no key can promote one.",
+      },
       { kind: "heading", text: "What each identifier changes with" },
       {
         kind: "table",
@@ -482,8 +525,10 @@ export const DOCS_SECTIONS: DocsSection[] = [
     group: "Getting started",
     summary: "Bearer keys, the scopes they carry, and what no key can do.",
     blocks: [
+      { kind: "heading", text: "Getting a key" },
+      { kind: "prose", text: "Keys are created in the workspace, under **Developers**. The plaintext is shown once, at creation, and is not recoverable afterwards — store it before you close the dialog. Creating, rotating and revoking a key each write an audit row, readable through the audit endpoint below. A request with no key, or with a key this deployment did not issue, is refused with 401 and the code **AUTH_REQUIRED**: that is the first error most integrations see, and it means the credential rather than the request." },
       { kind: "heading", text: "Sending the key" },
-      { kind: "prose", text: "Send the key as a bearer token. Keys are workspace-scoped and carry an explicit scope set; a request outside its scopes is refused with 403 rather than silently returning less." },
+      { kind: "prose", text: "Send the key as a bearer token. Keys are workspace-scoped and carry an explicit scope set; a request outside its scopes is refused with 403 and API_SCOPE_REQUIRED rather than silently returning less." },
       { kind: "code", label: "Every request", language: "bash", body: `curl -sS https://tavonel.com/api/v1/documents -H "${KEY_HEADER}"` },
       { kind: "heading", text: "The scopes a key can hold" },
       {
@@ -491,6 +536,13 @@ export const DOCS_SECTIONS: DocsSection[] = [
         head: ["Scope", "Grants"],
         rows: DEVELOPER_SCOPES.map((scope) => [scope, SCOPE_COPY[scope] ?? "See the endpoint reference."]),
       },
+      { kind: "heading", text: "How often you may call" },
+      { kind: "prose", text: "Every scoped request consumes one unit of a per-minute allowance held per key and per scope. The window is a clock minute rather than a rolling one, so an allowance that is spent is free again at the top of the next minute. The per-scope numbers are on the Billing and limits page, printed from the same values the authorizer enforces." },
+      { kind: "note", text: "Over the allowance the answer is 429 with **API_RATE_LIMITED**. No Retry-After header is sent on that code today and no X-RateLimit-* headers are published — waiting for the next clock minute is sufficient by construction, and documenting a header we do not send would be worse than documenting the window. The separate hourly allowance on World activation, rollback and retrieval-index rebuild answers ACTIVATION_RATE_LIMITED and does carry Retry-After." },
+      { kind: "heading", text: "Rotating a key, and reading the audit trail" },
+      { kind: "prose", text: "Rotation is atomic: a replacement key is created, the source key is revoked and an audit event is written, or none of the three happened. There is no window in which the old key is dead and no replacement exists. Both operations take a signed-in browser session — a developer API key cannot call them, which is the same boundary promotion sits behind." },
+      { kind: "endpoint", operationId: "rotateDeveloperApiKey" },
+      { kind: "endpoint", operationId: "listDeveloperAuditEvents" },
       { kind: "heading", text: "What no key can do" },
       { kind: "note", text: "Promotion, rollback and destructive workspace actions are human-session-only. There is no scope that grants them, which is why you will not find one in this table." },
     ],
@@ -524,16 +576,35 @@ export const DOCS_SECTIONS: DocsSection[] = [
         ]),
       },
       { kind: "note", text: "Every format above is read through the same sanitize-to-PDF and OCR path, and the table states exactly what each one preserves. A format is promoted above its tier only with a published qualification result and the date it was produced. The Sources page prints the same manifest with every limitation attached." },
+      /*
+        G3-002, the P0 on this page.
+
+        "The ceilings, and why they are those numbers" listed three browser-side archive limits
+        and neither of the two the deployment actually refuses on. A developer read a section
+        promising the ceilings and learned neither of the ones that would stop them -- and the
+        quickstart's example requests 180 KB, comfortably under the cap, so substituting a real
+        manual.pdf was the first thing that failed. Both rows come from shared/intakeCeiling.ts,
+        the module the capability route, the CDR worker, the rasterizer and migration 0051's
+        CHECK constraint all read.
+      */
+      { kind: "heading", text: "What is not extracted" },
+      { kind: "note", text: "**Tables and formulas are not extracted.** Every format in the table above is read through the same sanitize-to-PDF and OCR path, so a price table arrives as the paragraphs it was printed as and the grid that arranged them is not recovered. A spreadsheet's cells and formulas survive nothing on this deployment. The capability manifest carries no_table_or_formula_extraction on every entry; this is that token in a sentence, on the page a developer reads to decide whether their documents will work." },
       { kind: "heading", text: "The ceilings, and why they are those numbers" },
       {
         kind: "table",
         head: ["Limit", "Value", "Why it is that number"],
         rows: [
+          ["**Bytes per source**", `${PROCESSING_CEILING_MIB} MB`, "No processor in the chain reads more, so nothing above it can ever be compiled. Refused at the capability call with 413 and SOURCE_EXCEEDS_PROCESSING_CEILING, before any byte is stored."],
+          ["**Pages per source**", String(PROCESSING_CEILING.maxSourcePages), "The most the rasterizer renders. It cannot be checked at intake, because intake deliberately never decodes the document, so it is disclosed here and refused after the bytes are read rather than at the door."],
           ["Files in one archive", String(MAX_FILES), "The largest expansion a browser tab performs without becoming unresponsive."],
           ["Archive size, no worker", `${MAX_SYNC_ARCHIVE_BYTES / 1_048_576} MB`, "Expansion on the main thread; larger would block the tab."],
-          ["Archive size, with a worker", `${MAX_WORKER_ARCHIVE_BYTES / 1_048_576} MB`, "Expansion off-thread, where the ceiling is memory rather than responsiveness."],
+          ["Archive size, with a worker", `${MAX_WORKER_ARCHIVE_BYTES / 1_048_576} MB`, "Expansion off-thread, where the ceiling is memory rather than responsiveness. The manifest's at_most_128_files_and_500_mb_expanded is the expanded total, not the size of the archive you select."],
         ],
       },
+      { kind: "note", text: `${PROCESSING_CEILING_SENTENCE} Both numbers are in the capability manifest as ${PROCESSING_CEILING_LIMITATIONS.join(" and ")}, so a client can read them before it uploads instead of learning them from a refusal.` },
+      { kind: "heading", text: "Reading the manifest yourself" },
+      { kind: "prose", text: "The support table above is this endpoint, rendered. It needs no key, and it is the same list the upload route validates against — a format absent from it is refused at upload rather than accepted and dropped." },
+      { kind: "endpoint", operationId: "getCapabilityManifest" },
       /*
         R9 finding #4. This note used to say a spreadsheet's billable unit "is not decided, so
         page counts for spreadsheets are reported as unknown rather than estimated", while
@@ -552,11 +623,69 @@ export const DOCS_SECTIONS: DocsSection[] = [
     group: "Input and compile",
     summary: "Direct-to-storage upload, and why bytes never reach the application server.",
     blocks: [
+      { kind: "note", text: `**Before you start.** ${activationPolicy.customerData.reason} Everything on this page is the contract the capability endpoint serves once intake is arranged; it is not a request this deployment will accept from you today.` },
       { kind: "heading", text: "Why bytes never reach our server" },
       { kind: "prose", text: "Uploads are direct. The capability endpoint returns a short-lived URL to object storage; you PUT the bytes there. The application server sees the request for permission and the receipt afterwards, and never the document." },
       { kind: "heading", text: "Requesting a capability and listing documents" },
+      { kind: "note", text: `requestedBytes is the field the per-source byte ceiling acts on. Above ${PROCESSING_CEILING_MIB} MB the answer is **413 SOURCE_EXCEEDS_PROCESSING_CEILING**, carrying maxBytes, maxPages and a sentence you can show a person — before any byte is stored, because admitting the file would only move the refusal somewhere you cannot see it. A free evaluation has its own lower bound and answers TRIAL_FILE_TOO_LARGE with its own maxBytes.` },
       { kind: "endpoint", operationId: "createDirectUploadCapability" },
       { kind: "endpoint", operationId: "listDocuments" },
+      /*
+        G3-013. Step 2 of the quickstart is the PUT, and this page documented the two calls on
+        either side of it: no example, no header list, no TTL, no expiry behaviour. The actual
+        upload was the one step with nothing written about it.
+      */
+      { kind: "heading", text: "The PUT itself" },
+      { kind: "prose", text: "The capability response carries url, method, headers and expiresAt. Send exactly the headers it lists and no others: the URL is signed over that header set, so an extra header, a different content-type or a content-length that does not match the bytes makes the signature invalid and object storage refuses the PUT. Do not send your API key to this URL — the capability is the credential, and the storage host has no use for a TAVONEL key." },
+      {
+        kind: "snippets",
+        label: "Upload the bytes",
+        items: [
+          {
+            label: "cURL", language: "bash",
+            body: [
+              "# URL, TYPE and SIZE are capability.url, capability.headers and requestedBytes.",
+              "curl -sS -X PUT \"$URL\" \\",
+              "  -H \"content-type: $TYPE\" \\",
+              "  -H \"content-length: $SIZE\" \\",
+              "  --data-binary @manual.pdf",
+              "# 200 with an empty body. A 403 naming an expired request means the capability",
+              "# window closed: ask for a new one rather than retrying this URL.",
+            ].join("\n"),
+          },
+          {
+            label: "Python", language: "python",
+            body: [
+              "import pathlib, urllib.request",
+              "",
+              "body = pathlib.Path(\"manual.pdf\").read_bytes()",
+              "put = urllib.request.Request(capability[\"url\"], data=body, method=\"PUT\")",
+              "for name, value in capability[\"headers\"].items():",
+              "    put.add_header(name, value)",
+              "# The PUT is unauthenticated: the capability URL is the credential, and it is short-lived.",
+              "with urllib.request.urlopen(put, timeout=120) as response:",
+              "    assert response.status == 200, response.status",
+            ].join("\n"),
+          },
+          {
+            label: "TypeScript", language: "typescript",
+            body: [
+              "const bytes = await readFile(\"manual.pdf\");",
+              "const put = await fetch(capability.url, {",
+              "  method: capability.method,",
+              "  headers: capability.headers,",
+              "  body: bytes,",
+              "});",
+              "// No Authorization header here. The signed URL is the credential.",
+              "if (!put.ok) throw new Error(`upload failed: ${put.status}`);",
+            ].join("\n"),
+          },
+        ],
+      },
+      { kind: "heading", text: "How long the URL lives, and what happens when it does not" },
+      { kind: "note", text: "expiresAt in the capability response is the authority, and it is an absolute instant rather than a duration — read it, do not assume a number. The window is deliberately short: a signed URL is a credential that travels, and a long-lived one is a long-lived credential. After it passes, object storage refuses the PUT with its own expiry error and nothing was written; request a fresh capability for the same file. A document id issued for a capability that was never used carries no bytes, is never compiled, and needs no cleaning up." },
+      { kind: "heading", text: "The codes these endpoints return" },
+      { kind: "note", text: "**402** on the capability call is a plan or balance refusal — STUDIO_SUBSCRIPTION_REQUIRED, GPU_CREDITS_REQUIRED, or one of the TRIAL_ codes on a free evaluation. **429** is INTAKE_RATE_LIMITED (honour Retry-After: 60), INTAKE_DAILY_QUOTA_EXCEEDED (Retry-After: 3600), or API_RATE_LIMITED for the per-minute scope allowance. Every code named here is in the Errors catalogue with what to do about it." },
     ],
   },
   {
@@ -572,8 +701,11 @@ export const DOCS_SECTIONS: DocsSection[] = [
       { kind: "endpoint", operationId: "startCompileJob" },
       { kind: "endpoint", operationId: "getCompileCorpus" },
       { kind: "endpoint", operationId: "compileCollection" },
+      { kind: "heading", text: "Picking a run back up" },
+      { kind: "prose", text: "A client that lost its job id does not have to start again: the workspace's recent compiles are listable, newest first." },
+      { kind: "endpoint", operationId: "listCompileJobs" },
       { kind: "heading", text: "Submitting the same set twice" },
-      { kind: "note", text: "Submitting the same document set again returns the job that already exists. A retried request, a double-clicked button and an at-least-once redelivery converge on one compile." },
+      { kind: "note", text: "Submitting the same document set again returns the job that already exists. A retried request, a double-clicked button and an at-least-once redelivery converge on one compile. Idempotency here is derived from the document set rather than from an Idempotency-Key header: there is no such header on this API, and a client expecting the Stripe convention should send the same set rather than a key." },
     ],
   },
   {
@@ -595,6 +727,13 @@ export const DOCS_SECTIONS: DocsSection[] = [
       },
       { kind: "heading", text: "Reconnecting is the normal case" },
       { kind: "note", text: "The server closes the stream on its own clock. Reconnecting is the normal case, not an error path — every frame carries the sequence to resume from." },
+      /*
+        G3-031. Two event streams exist and one was documented. This is the other: observed runs
+        -- a connector sync, an intake -- rather than a compile's own transitions.
+      */
+      { kind: "heading", text: "The other stream: observed runs" },
+      { kind: "prose", text: "A compile has its own transitions, above. A connector sync or an intake is an observed run, with its own append-only event ledger and its own stream. Both resume the same way, from Last-Event-ID; this one also accepts an after query parameter for clients that cannot set the header, and sends a bounded heartbeat so an intermediary does not close an idle connection." },
+      { kind: "endpoint", operationId: "streamRunEvents" },
     ],
   },
   {
@@ -619,6 +758,10 @@ export const DOCS_SECTIONS: DocsSection[] = [
       { kind: "heading", text: "Answering blockers, or cancelling" },
       { kind: "endpoint", operationId: "resolveCompileJobBlockers" },
       { kind: "endpoint", operationId: "cancelCompileJob" },
+      { kind: "heading", text: "Recording a decision over evidence" },
+      { kind: "prose", text: "Blockers are one half of review. The other is the append-only record of what a person decided about a piece of evidence: Accept, Edit or Reject, each with a reason of at least eight characters, because a decision with no reason is a decision nobody can audit." },
+      { kind: "prose", text: "The request carries the manifest digest you read the evidence at, and the server revalidates the evidence against the persisted World before it writes. If the World moved in between, the answer is 409 REVIEW_WORLD_CHANGED and nothing is recorded — a decision written against a version it does not describe is worse than no decision. Re-read at the current digest and decide again. This route takes a signed-in browser session; no API key records a review." },
+      { kind: "endpoint", operationId: "recordEvidenceReview" },
       { kind: "heading", text: "What continue will not do" },
       { kind: "note", text: "A file stopped by a safety check leaves the set only through an explicit removal. `continue` will not step over it, because a pipeline that learns to skip security stops has stopped being one." },
     ],
@@ -641,9 +784,32 @@ export const DOCS_SECTIONS: DocsSection[] = [
         "the active World, its objects, relations and evidence". Both World operations are named
         now, because the per-lens read is how anyone consuming one lens at a time uses this page.
       */
+      { kind: "heading", text: "Finding a World to read" },
+      { kind: "prose", text: "An agent holding only an API key needs a way to find out which collection ids exist without a person pasting one in. Only active Worlds are listed: a candidate nobody promoted is not what the workspace answers from, and a list mixing the two would present unaccepted output as organizational truth." },
+      { kind: "endpoint", operationId: "listActiveWorlds" },
+      { kind: "endpoint", operationId: "getActiveWorld" },
+      { kind: "heading", text: "The six lenses" },
+      {
+        kind: "table",
+        head: ["Lens", "What it holds", "Pages"],
+        rows: [
+          ["objects", "Every Object, with its stable key and label.", "limit and cursor"],
+          ["relations", "Every relation, with the objects it joins.", "limit and cursor"],
+          ["evidence", "Every region, with its source version, page and bbox in the 0-1000 frame.", "limit and cursor"],
+          ["history", "The version history of this collection.", "no — answers WORLD_LENS_NOT_PAGEABLE"],
+          ["files", "The sources this World was compiled from.", "no — answers WORLD_LENS_NOT_PAGEABLE"],
+          ["review", "Recorded human decisions over evidence.", "no — answers WORLD_LENS_NOT_PAGEABLE"],
+        ],
+      },
       { kind: "heading", text: "The whole read model, or one lens" },
       { kind: "endpoint", operationId: "getWorldReadModel" },
       { kind: "endpoint", operationId: "getWorldLens" },
+      { kind: "heading", text: "The candidate behind a version" },
+      { kind: "prose", text: "The reviewable candidate artifact is a different read from the World read model: it is the raw compile package, before anyone promoted it, and it is what a review surface works against. A World read is what answers come from." },
+      { kind: "endpoint", operationId: "getCollection" },
+      { kind: "heading", text: "Is the copy I hold still current?" },
+      { kind: "prose", text: "A signed package you downloaded verifies offline and cannot be recalled remotely, and a rollback restores a prior revision without undoing anyone's use of an older answer. Neither of those changes here. What this does is let a holder check, live, whether the digest they hold is still the one the workspace answers from — active: false means a different version is active now, not that the copy was withdrawn, and knownToWorkspace: false is a different answer again: no record of ever promoting that digest." },
+      { kind: "endpoint", operationId: "getManifestStatus" },
       { kind: "heading", text: "What is never in a response" },
       { kind: "note", text: "Route features, scores, thresholds and the cost matrix are not in any public response. They are internal, and a public DTO that filtered them would be one refactor away from leaking them." },
     ],
@@ -673,8 +839,11 @@ export const DOCS_SECTIONS: DocsSection[] = [
       },
       { kind: "prose", text: "A degradation is reported, never hidden. `dense retrieval skipped: no embedder configured` means the answer came from lexical and structure alone; a reranker outage returns the fused order and says so. Reading `degradations` is how you tell a full-pipeline result from a partial one — the two otherwise look identical." },
       { kind: "heading", text: "When there is no compiled index" },
-      { kind: "note", text: "Search requires a compiled retrieval index for the active World. Without one the response is 409 with the code RETRIEVAL_RUN_NOT_FOUND (or RETRIEVAL_PROFILE_NOT_FOUND), carrying `retrievalIndex` and `retrievalNotice` to say which state the index is in. It is not a 200 with fewer results: Search has no fallback, and a weaker answer presented as the real one is worse than a refusal you can act on. POST /v1/collections/{id}/retrieval-index rebuilds the index. It takes the collections:compile scope, the owner or admin role, and the same plan bar activating a World takes: **Team**, or **Developer** held by the workspace owner. The two bars are identical on purpose — this endpoint is the recovery path for a promote whose index did not compile, so a plan that may promote and may not rebuild would leave its own Worlds answering from the fallback with nothing to call. Naming the plan here at all is R9 finding #2: this sentence used to give the scope and the role and leave the plan out." },
+      { kind: "note", text: "Search requires a compiled retrieval index for the active World. Without one the response is 409 with the code RETRIEVAL_RUN_NOT_FOUND (or RETRIEVAL_PROFILE_NOT_FOUND), carrying `retrievalIndex` and `retrievalNotice` to say which state the index is in. It is not a 200 with fewer results: Search has no fallback, and a weaker answer presented as the real one is worse than a refusal you can act on. POST /v1/collections/{id}/retrieval-index rebuilds the index. It takes the collections:compile scope, the owner or admin role, and the same plan bar activating a World takes: **Team**, or **Developer** held by the workspace owner. The two bars are identical on purpose — this endpoint is the recovery path for a promote whose index did not compile, so a plan that may promote and may not rebuild would leave its own Worlds answering from the fallback with nothing to call." },
       { kind: "endpoint", operationId: "searchActiveWorld" },
+      { kind: "heading", text: "Rebuilding the index" },
+      { kind: "prose", text: "Rebuilding is a no-op that returns alreadyCompiled: true when a completed run for that World version already exists, so it is safe to call before a search rather than only after one fails. The manifest comes from the active pointer, which is why this cannot index an unpromoted candidate. A rebuild that does not reach a queryable index answers 503 with RETRIEVAL_INDEX_NOT_COMPILED and the failure class in retrievalIndex.errorClass — never a 200 over a half-built index, because half an index is not a smaller index." },
+      { kind: "endpoint", operationId: "recompileRetrievalIndex" },
     ],
   },
   {
@@ -721,12 +890,47 @@ export const DOCS_SECTIONS: DocsSection[] = [
     slug: "connections",
     title: "Connections",
     group: "Operations and errors",
-    summary: "Connected sources, their cursors, and what a revoke does immediately.",
+    summary: "Connected sources, their cursors, the sync batch contract, and what a revoke does immediately.",
+    /*
+      G3-015. This page was two paragraphs and a note, and seven API operations have it as their
+      only plausible home: list, create, revoke, sync, and the three OAuth connector routes. It
+      documented none of them, and the three richest schemas in the contract --
+      ConnectionInput, ConnectionEvent and ConnectionBatch -- were unexplained, with a cursor
+      described as "durable" and given no format, no example and no advance semantics.
+    */
     blocks: [
-      { kind: "heading", text: "Cursors, and what a revoke does" },
-      { kind: "prose", text: "A connection carries a durable cursor, so a re-sync collects what changed rather than everything. Access removal takes effect on the next request rather than waiting for a background reindex." },
+      { kind: "heading", text: "What a connection is" },
+      { kind: "prose", text: "A connection is a durable record of a source you run: a file server, an S3, R2 or MinIO bucket. The mode is always local_agent, and that word carries the whole security posture — **the agent runs in your environment and pushes outward; TAVONEL reaches into nothing.** secretReference must be null, because a local agent uses its own workload credentials and we never hold them. configuration carries only non-secret selectors: a bucket, a prefix, a region, a root label." },
+      { kind: "endpoint", operationId: "listConnections" },
+      { kind: "endpoint", operationId: "createConnection" },
+      { kind: "heading", text: "The cursor, and what it is made of" },
+      { kind: "prose", text: "Each connection carries one committed cursor, published as cursorSha256 and written sha256: followed by 64 hex characters. It is opaque: it is a digest over the collector's own position, not a timestamp, a page number or an offset you can construct. A connection that has never synced carries null." },
+      { kind: "prose", text: "The only way to move it is to send a batch whose previousCursorSha256 equals the committed value. That is an optimistic lock, and it is what stops two collectors from both advancing one connection: the second one's batch does not match, the whole batch is refused with 409 CONNECTION_BATCH_CONFLICT, and nothing is applied. Re-read the cursor and rebuild from it — never retry the same batch against a moved cursor." },
+      { kind: "heading", text: "The sync batch contract" },
+      {
+        kind: "table",
+        head: ["Field", "What it carries"],
+        rows: [
+          ["batchId", "A UUID you choose. Replaying the identical batchId is idempotent — delivery is at-least-once and this is the consumer that makes it exactly-once. The response says which happened: status is applied or replayed."],
+          ["previousCursorSha256", "The cursor as you last read it, or null for a connection that has never synced. The optimistic lock."],
+          ["nextCursorSha256", "Where the collector stands after this batch. Committed only if every event in the batch is accepted."],
+          ["manifestSha256", "A digest over the event set, so a truncated or reordered batch is refused rather than half-applied."],
+          ["events", "Up to 5,000 ConnectionEvent objects."],
+        ],
+      },
+      { kind: "prose", text: "A **ConnectionEvent** is one observed change at the source. kind is added, changed or deleted. nativeId is the source's own identifier, stable across revisions — an object key, a path, a file id. revision is the source's own version marker: an ETag, an mtime, a version id. Every field is required and several are explicitly nullable, which is the point: a collector that cannot compute a digest sends contentSha256: null rather than omitting the field, so \"not known\" and \"not sent\" are different states the server can tell apart." },
+      { kind: "prose", text: "documentId and sourceIdempotencyKey travel together. Where the source type is qualified, the agent first requests an upload capability with x-tavonel-source-idempotency-key set to a sha256 over the source event, which makes the document id deterministic — a retried collection converges on one document instead of two. The sync batch then names that same pair, and the server revalidates it rather than trusting it." },
+      { kind: "endpoint", operationId: "applyConnectionBatch" },
+      { kind: "heading", text: "Revoking, and what survives it" },
+      { kind: "prose", text: "A revoke takes effect on the next request rather than waiting for a background reindex. Immutable outputs already compiled are retained: a revoke stops future reads, it does not rewrite history, and a World compiled from that source keeps citing the source version it actually read. A revoke that the store could not record answers 503 rather than 204 — it is reported only when it is written." },
+      { kind: "endpoint", operationId: "revokeConnection" },
+      { kind: "heading", text: "OAuth connectors" },
+      { kind: "prose", text: "Where a provider is configured on this deployment, a connection can be created through OAuth instead of a local agent. The authorization is single-use and PKCE, and it fails closed: unless both the provider client and the managed secret broker are configured, no authorization is started, because an authorization that cannot store a refresh secret is an authorization that ends in a broken connection. A revoke deletes the stored refresh secret and is reported as done only when the secret is actually gone." },
+      { kind: "endpoint", operationId: "listOAuthConnectors" },
+      { kind: "endpoint", operationId: "startOAuthConnectorAuthorization" },
+      { kind: "endpoint", operationId: "revokeOAuthConnector" },
       { kind: "heading", text: "Availability by provider" },
-      { kind: "note", text: "Connector availability differs by provider and by workspace. The Integrations page states which are live; this page does not restate it, because two pages saying different things about the same connector is how that goes wrong." },
+      { kind: "note", text: "Connector availability differs by provider and by workspace, and listOAuthConnectors reports configured: false for a provider whose client this deployment does not hold rather than hiding it. The Integrations page states which are live; this page does not restate it, because two pages saying different things about the same connector is how that goes wrong." },
     ],
   },
   {
@@ -737,22 +941,13 @@ export const DOCS_SECTIONS: DocsSection[] = [
     blocks: [
       { kind: "heading", text: "What a package contains" },
       { kind: "prose", text: "A compiled World exports as a package containing the canonical model, the ontology in Turtle and JSON-LD, the graph as CSV, the retrieval chunks, the evidence and a validation report. Every file carries its own sha256 and the manifest digest covers the set." },
-      {
-        kind: "table",
-        head: ["Path", "What it is"],
-        rows: [
-          ["canonical/model.json", "Objects and relations, canonically ordered."],
-          ["ontology/knowledge.ttl", "The same graph as Turtle."],
-          ["ontology/knowledge.jsonld", "The same graph as JSON-LD."],
-          ["graph/nodes.csv, graph/relationships.csv", "Tabular form for spreadsheet and BI tools."],
-          ["rag/chunks.jsonl", "Retrieval chunks, each bound to a page and region."],
-          // Both are in `REQUIRED_PACKAGE_PATHS` and were listed on the use-with-ai page but not
-          // here, so this table described a package smaller than the one that ships (R9).
-          ["rag/documents.jsonl", "Document-level retrieval records."],
-          ["provenance/activities.jsonl", "Lineage for every compiled artifact."],
-          ["validation/report.json", "The validation status and any review reasons."],
-        ],
-      },
+      /*
+        G3-007. This table listed 9 paths, /developers listed 14 and /docs/use-with-ai 11, and
+        the only page that named canonical/model.json was this one -- for a file the exporter
+        does not write. All three render PACKAGE_CONTENTS now, which is the exporter's own
+        REQUIRED_PACKAGE_PATHS plus the six the same function adds on the way out.
+      */
+      { kind: "table", head: ["Path", "What it is"], rows: PACKAGE_CONTENTS.map(([path, purpose]) => [path, purpose]) },
       { kind: "heading", text: "Signature states a caller can observe" },
       {
         kind: "table",
@@ -762,34 +957,56 @@ export const DOCS_SECTIONS: DocsSection[] = [
           ["Public sample World", "Deliberately unsigned", "The sample on the Reproducibility page is a fixture, labelled unsigned, and is not a promoted customer World. Do not use it to test the signature path."],
         ],
       },
+      { kind: "heading", text: "Downloading it, and fetching the key to check it with" },
+      { kind: "prose", text: "The download signs the manifest at request time or refuses; there is no candidate archive to receive by accident. The trust record is the other half and is deliberately a separate, unauthenticated call." },
+      { kind: "endpoint", operationId: "downloadCollection" },
+      { kind: "endpoint", operationId: "getExportTrustRecord" },
       { kind: "heading", text: "Verifying against a fingerprint you fetch separately" },
-      { kind: "note", text: "The signing key lives with an external signer, so a deployment without one cannot hand out an archive at all. `GET /api/export/trust` publishes the public key and its sha256 fingerprint, and returns `EXPORT_SIGNER_NOT_CONFIGURED` by the same rule. Verify against the fingerprint from that endpoint, never against the one inside the archive you are checking." },
+      { kind: "note", text: "The signing key lives with an external signer, so a deployment without one cannot hand out an archive at all. GET /api/export/trust publishes the public key and its sha256 fingerprint, and returns EXPORT_SIGNER_NOT_CONFIGURED by the same rule. Verify against the fingerprint from that endpoint, never against the one inside the archive you are checking." },
     ],
   },
   {
     slug: "mcp",
     title: "MCP",
     group: "External AI",
-    summary: "The read-only tools an agent gets, and the two the server deliberately does not offer.",
+    summary: `The ${MCP_TOOL_COUNT_WORD} read-only tools an agent gets, and the two the server deliberately does not offer.`,
     blocks: [
       { kind: "heading", text: "The server, and how to pin it" },
       { kind: "prose", text: "A read-only MCP server is published on the Developers page as tavonel-mcp.mjs, pinned by sha256 in the channel manifest. It speaks JSON-RPC over stdio with no dependency and no build step, so it can be read before it is pointed at anything. Set TAVONEL_API_KEY and register it; TAVONEL_BASE_URL defaults to https://tavonel.com. Run `node tavonel-mcp.mjs --doctor` first: it checks the key, the channel pin and one real read, so a failure names which of the three is wrong instead of surfacing as a silent agent." },
-      { kind: "heading", text: "The tools it exposes" },
+      /*
+        G3-005. There is no npm package. Saying so here, in the place a reader goes looking for
+        one, is cheaper than letting them find out from "npm ERR! 404". The rationale for the
+        file distribution is good and publishing would not weaken it -- so the honest line is
+        that publishing is pending, not that it was rejected.
+      */
+      { kind: "heading", text: "Installing it" },
+      { kind: "note", text: "**There is no npm or PyPI package yet.** npx @tavonel/mcp does not resolve, and neither does pip install tavonel: npm and PyPI publishing is pending and needs registry credentials nobody has issued. Install it the way this page describes — download tavonel-mcp.mjs, check it against the digest in /developer/channel.json, and point your client at the absolute path. That path is the audited one and stays supported after a package exists." },
+      { kind: "heading", text: "Registering it with a client" },
+      { kind: "prose", text: "The config below is the same object every stdio MCP client accepts, under its own path. Claude Desktop reads %APPDATA%\\\\Claude\\\\claude_desktop_config.json on Windows and ~/Library/Application Support/Claude/claude_desktop_config.json on macOS, and reads it at launch — restart after editing. Claude Code reads .mcp.json at the root of the project you open. The Integration recipes page carries the same block with the platform notes." },
       {
-        kind: "table",
-        head: ["Tool", "What it returns"],
-        rows: [
-          ["list_sources", "The workspace's documents, with processing state and version key."],
-          ["list_worlds", "The workspace's active Compiled Worlds, with manifest digest and revision. Pages with limit and cursor."],
-          ["get_world", "One Compiled World: status, contract, freshness, objects, relations, evidence, history."],
-          ["search_world", "Retrieved regions with provenance and ranks. No generated prose."],
-          ["ask_world", "A grounded answer with citations, or an abstention."],
-          ["get_object", "The objects lens, or one object by stable id. Pages with limit and cursor."],
-          ["get_relation", "The relations lens, or one relation by stable id. Pages the same way."],
-          ["get_evidence", "Every region with its source version, page and bbox in the 0-1000 page frame. Pages the same way."],
-          ["download_package", "Where the signed package is, how large, and what its manifest hashes to."],
-        ],
+        kind: "code",
+        label: "claude_desktop_config.json / .mcp.json",
+        language: "json",
+        body: [
+          "{",
+          "  \"mcpServers\": {",
+          "    \"tavonel\": {",
+          "      \"command\": \"node\",",
+          "      \"args\": [\"C:/absolute/path/tavonel-mcp.mjs\"],",
+          "      \"env\": {",
+          "        \"TAVONEL_API_KEY\": \"tvnl_live_...\",",
+          "        \"TAVONEL_BASE_URL\": \"https://tavonel.com\"",
+          "      }",
+          "    }",
+          "  }",
+          "}",
+        ].join("\n"),
       },
+      { kind: "note", text: "The key lives in the client's env block or its secret facility, never in args — arguments show up in process listings. Give it a key scoped to reads and nothing else." },
+      { kind: "heading", text: "The tools it exposes" },
+      // G3-006: this table was right and the count beside it was not, on three other surfaces.
+      // Both come from lib/mcp-tools.ts now, pinned against the shipped server by a test.
+      { kind: "table", head: ["Tool", "What it returns"], rows: MCP_TOOLS.map(([name, returns]) => [name, returns]) },
       { kind: "heading", text: "The tools it deliberately does not offer" },
       { kind: "note", text: "There is no write tool and there is no promotion tool. Promotion is the moment a candidate becomes the World an organisation answers from, and it stays with a person in a browser; the server refuses to start if a tool that writes is ever added to it." },
       { kind: "note", text: "list_worlds lists only active Worlds, over `GET /v1/collections`. Candidates are excluded: a discovery list mixing accepted and unaccepted output would present both as organizational truth." },
@@ -800,11 +1017,22 @@ export const DOCS_SECTIONS: DocsSection[] = [
     slug: "cli",
     title: "CLI",
     group: "External AI",
-    summary: "The five published files, how to pin them, and how to verify an export with nothing but a download.",
+    summary: `The ${DEVELOPER_FILE_COUNT_WORD} published files, how to pin them, and how to verify an export with nothing but a download.`,
     blocks: [
       { kind: "heading", text: "What the distribution is" },
-      { kind: "prose", text: "The developer distribution is published on the Developers page and pinned by sha256 in `/developer/channel.json`. Six files: `tavonel-cli.mjs` covers the upload and compile path from a terminal, `tavonel-mcp.mjs` is the read-only MCP bridge, `tavonel-source-agent.py` walks a folder or bucket, and `tavonel-verify-export.mjs`, `tavonel-verify-package.mjs` and `tavonel-verify-roundtrip.py` check an export offline." },
-      { kind: "note", text: "It is a distribution rather than a package-manager release: there is no npm, pip or Homebrew package. The manifest names the exact bytes, and you check them before anything runs. Each file imports nothing — Node 20+ for the four `.mjs` files, Python 3.12+ for the agent — so there is no install step, no lockfile and no transitive dependency to audit. Reading a file before you run it is the intended workflow, not a fallback." },
+      /*
+        G3-016. The body said "Six files", this summary and the /docs index card said "five",
+        and channel.json had six. Both numbers and the list itself come from lib/mcp-tools.ts
+        now, which lib/developer-distribution.test.ts pins against channel.json with digests.
+      */
+      { kind: "prose", text: `The developer distribution is published on the Developers page and pinned by sha256 in /developer/channel.json. ${DEVELOPER_FILES.length} files, each one listed below with what it is for.` },
+      { kind: "table", head: ["File", "What it is for"], rows: DEVELOPER_FILES.map((entry) => [entry.file, entry.purpose]) },
+      /*
+        G3-005. "There is no npm package" was true and was framed as a decision, which reads as
+        a refusal. It is a decision about the audited path and a pending step about the
+        convenience one, and a reader deciding whether to wait deserves both halves.
+      */
+      { kind: "note", text: "**npm and PyPI publishing is pending; install from the digest-pinned files today.** No package exists on either registry — npx @tavonel/mcp and pip install tavonel do not resolve, and publishing needs registry credentials that have not been issued. What is here is a distribution rather than a package-manager release: the manifest names the exact bytes and you check them before anything runs. Each file imports nothing — Node 20+ for the .mjs files, Python 3.12+ for the .py ones — so there is no install step, no lockfile and no transitive dependency to audit. Reading a file before you run it is the intended workflow, not a fallback, and it stays the audited path after a package exists." },
       { kind: "heading", text: "Fetching and verifying it" },
       {
         kind: "code",
@@ -889,12 +1117,19 @@ export const DOCS_SECTIONS: DocsSection[] = [
     summary: "Three paths pinned to a specific tool, each with a smoke script that runs them.",
     blocks: [
       { kind: "heading", text: "Why three pinned recipes" },
-      { kind: "prose", text: "A general integration guide ages badly and cannot be checked. These three are pinned to a named tool, and each one is executed by `scripts/developer-recipes/smoke.mjs` in this repository, so a recipe that has drifted from the product fails a check rather than a customer's afternoon. Three is the number on purpose: two or three verified recipes are worth more than a dozen plausible ones." },
+      /*
+        G3-017. The premise was right and the proof was unreachable: the smoke harness and
+        Recipe 2's script lived in a private repository, so the sentence that made this page
+        credible -- "a recipe that has drifted from the product fails a check rather than a
+        customer's afternoon" -- was something the reader had to take on trust. Both scripts are
+        published under /developer/ now, pinned by sha256 in channel.json like every other file.
+      */
+      { kind: "prose", text: "A general integration guide ages badly and cannot be checked. These three are pinned to a named tool, and both scripts this page runs are published and digest-pinned, so you can run the same checks we do rather than take the claim on trust. Three is the number on purpose: two or three verified recipes are worth more than a dozen plausible ones." },
       {
         kind: "table",
         head: ["Recipe", "What it needs", "What it proves"],
         rows: [
-          ["Claude Desktop / Claude Code over MCP", "Node 20+, `tavonel-mcp.mjs`, a key scoped `worlds:read` + `ask:read`", "A real MCP handshake and eight read-only tools, with no write, promote or rollback tool present."],
+          ["Claude Desktop / Claude Code over MCP", "Node 20+, tavonel-mcp.mjs, a key scoped worlds:read + ask:read", `A real MCP handshake and ${MCP_TOOL_COUNT_WORD} read-only tools, with no write, promote or rollback tool present.`],
           ["Python over the public sample World", "Python 3.12+, no key at all", "The shape of a TAVONEL answer — object, evidence, source version, page, region — and that its bytes match the published digest."],
           ["curl before you have a key", "curl and jq, no key", "What this deployment can read, what its contract publishes, and who signs its exports."],
         ],
@@ -922,13 +1157,14 @@ export const DOCS_SECTIONS: DocsSection[] = [
       },
       { kind: "note", text: "The key lives in the client's `env` block or its secret facility, never in `args` — arguments show up in process listings. The server refuses to start if a tool that writes is ever added to it, so an agent holding this config cannot promote a candidate, revoke a connection or spend anything. Give it a key scoped to reads and nothing else." },
       { kind: "heading", text: "Recipe 2 — Python over the public sample World" },
-      { kind: "prose", text: "`GET /reproducibility/sample-world` needs no key and returns a deterministic sample: three objects, two evidence records, one source version, page and region. Its response carries a `Content-Digest: sha-256=:…:` header over the exact bytes, so the same verification habit the signed package asks for works here first. `scripts/developer-recipes/public-sample.py` is the recipe: it recomputes that digest, resolves every object's evidence, checks each region against the 0-1000 page frame, and asserts the object marked `research_frontier` cites no evidence at all." },
+      { kind: "prose", text: "`GET /reproducibility/sample-world` needs no key and returns a deterministic sample: three objects, two evidence records, one source version, page and region. Its response carries a `Content-Digest: sha-256=:…:` header over the exact bytes, so the same verification habit the signed package asks for works here first. The published script tavonel-public-sample.py is the recipe: it recomputes that digest, resolves every object's evidence, checks each region against the 0-1000 page frame, and asserts the object marked research_frontier cites no evidence at all. Python 3.12 and the standard library, nothing else — download it, check it against the digest in /developer/channel.json, and read it before you run it." },
       {
         kind: "code",
         label: "Read the sample and follow one claim to its evidence",
         language: "bash",
         body: [
-          `python public-sample.py --base-url https://tavonel.com`,
+          `curl -fsSO https://tavonel.com/developer/tavonel-public-sample.py`,
+          `python tavonel-public-sample.py --base-url https://tavonel.com`,
           `# sample: 3 objects, 2 evidence records, ... bytes`,
           `# digest: sha-256=:...:`,
           `#   ev-01 -> src_v_01 page 4 bbox [118, 214, 886, 374]`,
@@ -959,9 +1195,26 @@ export const DOCS_SECTIONS: DocsSection[] = [
           `curl -fsS https://tavonel.com/api/export/trust | jq '{keyId, publicKeySpkiSha256}'`,
         ].join("\n"),
       },
-      { kind: "note", text: "The digest line above is a shape, not a one-liner to trust blindly: `jq -S` reorders keys and the published digest is taken over the manifest's own key order, so the value it prints will not match unless your jq preserves that order. The procedure that does reproduce it is the one on the capabilities route — delete `contentSha256`, re-serialize with the key order unchanged — and `scripts/developer-recipes/smoke.mjs` performs exactly that and fails when it disagrees." },
+      { kind: "note", text: "The digest line above is a shape, not a one-liner to trust blindly: `jq -S` reorders keys and the published digest is taken over the manifest's own key order, so the value it prints will not match unless your jq preserves that order. The procedure that does reproduce it is the one on the capabilities route — delete `contentSha256`, re-serialize with the key order unchanged — and the published smoke script performs exactly that and fails when it disagrees." },
       { kind: "heading", text: "Running all three" },
-      { kind: "prose", text: "Run all three with `node scripts/developer-recipes/smoke.mjs`, or one at a time with `mcp`, `public-sample` or `curl`. It targets `http://127.0.0.1:3207` by default and takes `TAVONEL_RECIPE_BASE_URL` for a real deployment. Every request it makes is an unauthenticated GET: no key, no upload, no compile, nothing that spends." },
+      { kind: "prose", text: "Download tavonel-recipe-smoke.mjs, check it against its digest, and run all three with node tavonel-recipe-smoke.mjs, or one at a time with mcp, public-sample or curl. It takes --base-url (or TAVONEL_RECIPE_BASE_URL) and defaults to https://tavonel.com. Every request it makes is an unauthenticated GET: no key, no upload, no compile, nothing that spends. It also re-checks every asset in channel.json against its published digest, which is the check the CLI page teaches by hand." },
+      {
+        kind: "code",
+        label: "Fetch, pin and run the three recipes",
+        language: "bash",
+        body: [
+          "curl -fsSO https://tavonel.com/developer/tavonel-recipe-smoke.mjs",
+          "# Check it before you run it, the same way you check everything else in the channel.",
+          "curl -fsS https://tavonel.com/developer/channel.json \\",
+          "  | jq -r '.assets.recipeSmoke.sha256'",
+          "sha256sum tavonel-recipe-smoke.mjs",
+          "",
+          "node tavonel-recipe-smoke.mjs --base-url https://tavonel.com",
+          "# ok  capabilities — 12 formats, defaultStatus UNSUPPORTED",
+          "# ok  contract — 33 operations, no promote or rollback path",
+          "# RECIPES OK",
+        ].join("\n"),
+      },
     ],
   },
   {
@@ -1013,46 +1266,80 @@ export const DOCS_SECTIONS: DocsSection[] = [
         kind: "table",
         head: ["Limit", "Value"],
         rows: [
+          // G3-002: the two the deployment actually refuses on, first, because they are the two
+          // that stop a first integration. shared/intakeCeiling.ts is the module that enforces them.
+          ["**Bytes per source**", `${PROCESSING_CEILING_MIB} MB`],
+          ["**Pages per source**", String(PROCESSING_CEILING.maxSourcePages)],
           ["Documents per compile", `${COMPILE_MIN_DOCUMENTS}–${COMPILE_MAX_DOCUMENTS}`],
           ["Documents per run", String(CORPUS_MAX_DOCUMENTS)],
           ["Files per archive", String(MAX_FILES)],
+          ["World activations, rollbacks or index rebuilds", `${ACTIVATION_RATE_LIMIT} of each per hour, per workspace`],
           ["Refund window", `${REFUND_WINDOW_DAYS} days from payment`],
           ["Refundable if consumed under", `${Math.round(REFUND_MAX_CONSUMED_FRACTION * 100)}% of included pages`],
         ],
       },
+      { kind: "note", text: `${PROCESSING_CEILING_SENTENCE} A source above either is refused rather than accepted and dropped: the byte ceiling at the capability call with 413 SOURCE_EXCEEDS_PROCESSING_CEILING, the page ceiling after the document is decoded, because intake never decodes it.` },
+      /*
+        G3-018. "No API rate limits documented anywhere, zero X-RateLimit-* in the spec, and a
+        429 on /uploads/capability whose triggering limit is documented nowhere." The limits were
+        real -- consume_foundation_api_rate_limit has enforced them per key, per scope, per clock
+        minute since migration 0012 -- and unpublished. The numbers below are SCOPE_RATE_LIMITS
+        from lib/developer-auth.ts, which is the table the authorizer passes to that function.
+
+        What is deliberately NOT here: an X-RateLimit-Limit/Remaining/Reset triplet and a
+        Retry-After on API_RATE_LIMITED. The API does not send them. Documenting headers we do
+        not emit would be a worse defect than the one this fixes.
+      */
+      { kind: "heading", text: "How often you may call the API" },
+      { kind: "prose", text: "Every scoped request consumes one unit of a per-minute allowance held per key and per scope, so a key reading documents and asking questions does not spend one budget on both. The window is a clock minute rather than a rolling one: an allowance that is spent is free again at the top of the next minute." },
+      {
+        kind: "table",
+        head: ["Scope", "Requests per minute, per key"],
+        rows: DEVELOPER_SCOPES.map((scope) => [scope, String(SCOPE_RATE_LIMITS[scope])]),
+      },
+      { kind: "note", text: "Over the allowance the answer is **429 API_RATE_LIMITED**. There is no Retry-After header on that code and no X-RateLimit- headers anywhere in the API today — waiting for the next clock minute is sufficient by construction, and publishing a header we do not send would be worse than publishing the window. If the allowance itself cannot be read the request is refused with 503 API_RATE_LIMIT_UNAVAILABLE rather than run unbounded; that is fail-closed behaviour, not a limit you hit. The hourly activation allowance in the table above is separate, answers ACTIVATION_RATE_LIMITED, and does carry Retry-After." },
     ],
   },
   {
     slug: "errors",
     title: "Errors",
     group: "Operations and errors",
-    summary: "The codes a client has to branch on, and what each one means.",
+    summary: "Every code the API can return, what it means, and what to do about it.",
+    /*
+      G3-019 and G3-020.
+
+      Twelve codes were catalogued here against at least twenty-one the API returns, and
+      AUTH_REQUIRED -- what a missing or wrong key gets, which is the first error most
+      integrations ever see -- was in neither this page nor the OpenAPI document. There was also
+      no remediation column, so a reader who found their code learned what it meant and not what
+      to do, which is where a catalogue stops being useful.
+
+      Both are structural now. The rows below are lib/api-error-codes.ts, which the OpenAPI
+      document also builds its Error enum and every per-operation error description from, and
+      lib/api-error-codes.test.ts scans the handler files that serve the published surface and
+      fails on a code the catalogue has never heard of. The page cannot fall behind the API
+      without the build saying so.
+    */
     blocks: [
       { kind: "heading", text: "Branch on the code, not the status" },
-      { kind: "prose", text: "Failures return a machine code alongside the HTTP status. Branch on the code: the status says what kind of problem it is, and the code says which one." },
-      { kind: "heading", text: "The catalogue" },
-      {
-        kind: "table",
-        head: ["Code", "Status", "Meaning"],
-        rows: [
-          ["DOCUMENT_IDS_REQUIRED", "400", "The request carried no document id array."],
-          ["DOCUMENT_SET_UNQUALIFIED", "400", "A document id was not a document id."],
-          ["DOCUMENT_SET_EMPTY", "400", "Nothing was selected to compile."],
-          ["CORPUS_TOO_LARGE", "400", `More than ${CORPUS_MAX_DOCUMENTS} documents in one run.`],
-          ["DOCUMENT_SET_TOO_LARGE", "400", `More than ${COMPILE_MAX_DOCUMENTS} documents sent to the single-compile route.`],
-          ["OCR_NOT_READY", "409", "The sources have not finished being read. Retry rather than fail."],
-          ["SECURITY_BLOCKER_REQUIRES_EXPLICIT_REMOVAL", "409", "`continue` was sent while a source was held by a safety check."],
-          ["COMPILE_JOB_ALREADY_SETTLED", "409", "The job had already finished. Nothing was discarded."],
-          ["COMPILE_JOB_NOT_FOUND", "404", "No such job in this workspace."],
-          ["CORE_NOT_CONFIGURED", "503", "The compile runtime is unavailable. The request was not charged."],
-          // The FD-02 ceiling. Documented here because a client has to branch on it, and the
-          // number is imported so the page cannot quote a limit the code does not enforce.
-          ["ACTIVATION_RATE_LIMITED", "429", `The workspace has used its hour's allowance of World activations, rollbacks or retrieval-index rebuilds (${ACTIVATION_RATE_LIMIT} of each per hour). The Retry-After header carries the seconds until the oldest one leaves the window. Nothing was charged.`],
-          ["ACTIVATION_RATE_LIMIT_UNAVAILABLE", "503", "That allowance could not be read, so the request was refused rather than run unbounded. Retry."],
-        ],
-      },
-      { kind: "heading", text: "503 and 409 are different problems" },
-      { kind: "note", text: "A 503 means the work did not start. A 409 means the request was understood and the state refused it — those are different retries. A 429 means the work is allowed and the hour is full: honour the Retry-After header rather than retrying immediately." },
+      { kind: "prose", text: "Failures return a machine code alongside the HTTP status. Branch on the code: the status says what kind of problem it is, and the code says which one. The Status column below is filled where one route owns a code; where it is blank the same code is returned with different statuses by different operations, and the authoritative status per operation is in the OpenAPI document under the response it sits in." },
+      { kind: "note", text: "A 503 means the work did not start. A 409 means the request was understood and the state refused it — those are different retries. A 429 means the work is allowed and the window is full: honour Retry-After where it is sent, and otherwise wait for the next clock minute rather than retrying immediately." },
+      ...API_ERROR_GROUPS.flatMap((group) => [
+        { kind: "heading" as const, text: group.title },
+        { kind: "prose" as const, text: group.summary },
+        {
+          kind: "table" as const,
+          head: ["Code", "Status", "Meaning", "What to do"],
+          rows: group.codes.map((entry) => [
+            entry.code,
+            entry.status ? String(entry.status) : "varies",
+            entry.meaning,
+            entry.whatToDo,
+          ]),
+        },
+      ]),
+      { kind: "heading", text: "Two numbers a client branches on" },
+      { kind: "note", text: `Two numbers this page used to state in prose, for anyone who arrived looking for them: a run carries at most ${CORPUS_MAX_DOCUMENTS} documents and one compile at most ${COMPILE_MAX_DOCUMENTS}, and the hourly allowance on World activations, rollbacks and retrieval-index rebuilds is ${ACTIVATION_RATE_LIMIT} of each. Both are imported from the modules that enforce them, so the page cannot quote a limit the code does not hold.` },
     ],
   },
   {
@@ -1070,11 +1357,39 @@ export const DOCS_SECTIONS: DocsSection[] = [
   },
   {
     slug: "changelog",
-    title: "Changelog",
+    title: "Versioning and changes",
     group: "Operations and errors",
-    summary: "What changed in the product and the public interfaces.",
+    summary: "How long a version is supported, how a breaking change is announced, and where to read what changed.",
+    /*
+      G3-021. "deprecat", "sunset" and "version policy" returned zero matches across all 25
+      pages, on a product with a versioned API whose contract already carried an
+      x-tavonel-version-policy extension. A reader could see the version and could not find out
+      how long it lasts, what counts as breaking, or how much notice they would get. This page
+      was two sentences pointing at /changelog.
+
+      The three commitments below are also in the contract, under x-tavonel-version-policy, so a
+      machine and a person read one policy rather than two.
+    */
     blocks: [
-      { kind: "prose", text: "Product changes are listed on the Changelog page, linked from the footer of every page on this site. The API contract carries its own version, shown in the footer of each documentation section, and the machine-readable contract is the authority for what a version contains." },
+      { kind: "heading", text: "How the API is versioned" },
+      { kind: "prose", text: `The major version is in the path: /api/v1. Every response carries X-TAVONEL-API-Version, and a client that wants to pin can send Accept: application/vnd.tavonel.v1+json. The dated version beside it — ${API_VERSION} in the footer of every page here — names the contract build, not a second axis to negotiate: it moves when the document changes and it never changes what /api/v1 accepts.` },
+      { kind: "heading", text: "What can change without notice" },
+      { kind: "prose", text: "**Additive changes ship in any release.** New fields on a response, new optional parameters, new endpoints, and new members of a response enum. Ignore fields you do not recognise, and do not switch on an exhaustive match over a response enum — that is the one client habit an additive change breaks." },
+      { kind: "heading", text: "What counts as breaking, and what you are owed" },
+      {
+        kind: "table",
+        head: ["Commitment", "What it is"],
+        rows: [
+          ["What is breaking", "Removing or renaming a published field, parameter, error code or endpoint; narrowing what a field accepts; changing the meaning of a value. Anything in that list takes a new path major."],
+          ["How you hear", "The current major is announced as deprecated in the API changelog below and in the Atom feed, before the new major becomes the default. Nothing is removed in place."],
+          ["Support window", "A deprecated path major keeps answering for at least 180 days from the announcement."],
+          ["Migration", "A breaking entry carries the migration beside it, not in a separate document. An entry that names a breaking change and no migration is a bug in this page."],
+        ],
+      },
+      { kind: "note", text: "**No version has been deprecated.** v1 is the only major, it is current, and no sunset date exists for it. This section states the policy that will apply when one does — it is not a notice that one has started." },
+      { kind: "heading", text: "The API changelog" },
+      { kind: "prose", text: "Changes are published on the Changelog page, filterable by surface: choose **API** for the contract and **Developer tools** for the CLI, the MCP server and the published files. Both feed the same Atom feed at /changelog/feed.xml, which is the one to subscribe to if you maintain an integration. The machine-readable contract at /api/openapi remains the authority for what a version contains — the changelog says what moved, the contract says what is there." },
+      { kind: "note", text: "The contract publishes this same policy under x-tavonel-version-policy, and the whole error catalogue under x-tavonel-error-catalogue, so a generated client can carry both without scraping this page." },
     ],
   },
 ];
@@ -1155,5 +1470,7 @@ function blockText(block: DocsBlock): string[] {
       return [...block.head, ...block.rows.flat()];
     case "endpoint":
       return [block.operationId];
+    case "diagram":
+      return [block.caption];
   }
 }

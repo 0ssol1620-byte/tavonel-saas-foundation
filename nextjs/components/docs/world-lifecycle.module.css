@@ -1,0 +1,84 @@
+/*
+  The diagram's own tokens, so it reads as part of the page rather than as an embedded picture.
+
+  Every colour is a site variable. A diagram with its own palette is the thing that looks pasted
+  in, and it is also the thing that stops matching when the palette moves.
+*/
+
+.figure {
+  margin: 0;
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* The SVG scrolls inside its own container rather than widening the page (the rule every table
+   and code block on this site already follows). Below ~560px the four boxes stop fitting. */
+.svg {
+  display: block;
+  width: 100%;
+  min-width: 520px;
+  height: auto;
+}
+
+.figure > .svg {
+  /* The scroll container is the figure; without this the min-width above pushes the page. */
+  max-width: 100%;
+}
+
+@media (max-width: 620px) {
+  .figure {
+    overflow-x: auto;
+    /* A visible track, so a reader can tell the diagram scrolls rather than ends (G3-024). */
+    scrollbar-width: thin;
+    scrollbar-color: var(--hairline-hi) transparent;
+    padding-bottom: 6px;
+  }
+}
+
+.box {
+  fill: var(--g1);
+  stroke: var(--hairline-hi);
+  stroke-width: 1;
+}
+
+.name {
+  fill: var(--text-hi);
+  font-family: var(--f-mono);
+  font-size: 13px;
+}
+
+.gloss {
+  fill: var(--text-lo);
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+}
+
+.edge {
+  fill: var(--text-xlo);
+  font-family: var(--f-mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+}
+
+.arrow {
+  stroke: var(--hairline-hi);
+  stroke-width: 1;
+}
+
+.head {
+  fill: var(--hairline-hi);
+}
+
+.list {
+  margin: 0;
+  padding-left: 1.2em;
+  display: grid;
+  gap: 8px;
+  color: var(--text-lo);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.list b { color: var(--text-hi); font-weight: 500; }
+.list i { color: var(--text-mid); font-style: normal; }

@@ -38,13 +38,72 @@ export type ChangelogEntry = {
 };
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
+  /*
+    G2-014. The newest entry was twelve days old at audit time and the production redeploy of
+    15 September was unrecorded, so a buyer checking whether the product is alive got the wrong
+    answer from the one page built to tell them. The rule this sets: every production release is
+    recorded, infrastructure-only ones included.
+
+    The three release-candidate entries below say "release candidate, pending merge" in their own
+    text rather than being dated as live. They describe work that is reviewed and not yet merged,
+    and a changelog that announces unmerged work as shipped is the same defect as one that omits
+    shipped work, in the other direction.
+  */
+  {
+    date: "2026-09-16",
+    title: "A rendered API reference, published error codes, and the limits that were already enforced",
+    surfaces: ["API", "Developer tools", "Website", "Billing"],
+    added: [
+      "Release candidate, pending merge. Everything in this entry is reviewed and not yet merged, so it is not live on tavonel.com today. It is recorded here before it lands rather than after, because a changelog that only appears after the fact is the one nobody can plan against — and dating it as shipped would be the same defect in the other direction.",
+      "An API reference at /api: every operation in the contract with its parameters, request and response schemas, a worked example, and the error codes it can return. It is generated from the OpenAPI document rather than written beside it.",
+      "A try-it on that page for the three reads that need no key — the capability manifest, the deployment status, and the public sample World.",
+      "The full error catalogue on /docs/errors: every code the API can return, what it means and what to do about it, including AUTH_REQUIRED, which is what a missing or wrong key gets.",
+      "A version lifecycle and deprecation policy on /docs/changelog: what can change without notice, what counts as breaking, and the 180-day support window a deprecated version keeps.",
+      "The two integration-recipe scripts are published under /developer/ and pinned by sha256 in the distribution channel, so the recipes on /docs/integration-recipes can be run rather than read.",
+      "Endpoint documentation for the thirteen operations that had none: the World lenses' companions, run events, reviews, manifest status, connections, OAuth connectors, key rotation and the audit trail.",
+      "The research receipts behind the published figures are downloadable, each with its full sha256, so a number on this site can be checked against the artifact it came from rather than taken on trust.",
+    ],
+    improved: [
+      "The two per-source ceilings this deployment enforces — 5 MB and 80 pages — are published on the pages that promise the ceilings, with the code a refusal carries.",
+      "API rate limits are published per scope on /docs/billing-and-limits, taken from the values the authorizer enforces.",
+      "Documentation search is on every page rather than only the index, and a result shows the matched phrase in context.",
+      "Every request example renders in all three languages in the page source, so a crawler or an agent reading raw HTML sees cURL, Python and TypeScript rather than one of them.",
+    ],
+    fixed: [
+      "The OpenAPI document resolved the seven compile-job operations against a base URL that returns 404. They carry their own server entry now, and a test resolves every path in the contract against a route handler so the contract cannot describe a URL the API does not serve.",
+      "The MCP server's tool count is nine everywhere. list_worlds shipped on 3 September and was never announced, so three pages and that entry said eight.",
+      "The signed package's file list was three different lists on three pages, one of them naming a file the exporter does not write. All three read the exporter's own list now.",
+      "The scope description for ask:read said lexical retrieval while the Search page documented the same endpoint as hybrid retrieval.",
+      "Internal review shorthand was published verbatim in a sentence on /docs/search.",
+    ],
+  },
+  {
+    date: "2026-09-14",
+    title: "Pricing, legal texts and trust surfaces — release candidate, pending merge",
+    surfaces: ["Website", "Billing"],
+    added: [
+      "Release candidate, pending merge, and not live today. The pricing page separates plans that can be paid for now from those that start with a conversation; the terms gain governing law, a limitation of liability and a notice period; refunds are stated as one rule rather than two that disagreed; and the privacy text names the regimes it is written against. Dated by the day the work was completed, not by a release that has not happened.",
+    ],
+  },
+  {
+    date: "2026-09-15",
+    title: "Website and workspace release",
+    surfaces: ["Website", "Workspace"],
+    improved: [
+      "A production release covering the public site and the workspace shell. No API contract, limit or price changed, and no action is needed from an integration.",
+    ],
+  },
   {
     date: "2026-09-03",
     title: "Read-only MCP, a package validator, and the documentation to use them",
     version: "2026.9.3.1",
     surfaces: ["Developer tools", "API"],
     added: [
-      "The MCP server exposes eight read-only tools: list_sources, get_world, search_world, ask_world, get_object, get_relation, get_evidence and download_package.",
+      // G3-006's root cause: this line said eight and omitted list_worlds, and "eight" then
+      // propagated to /developers, /docs/integration-recipes and the MCP download tile. The
+      // count is generated everywhere else now; here it is corrected in place, because a
+      // changelog entry is a record of what was said on a date and the record was wrong.
+      "The MCP server exposes nine read-only tools: list_sources, list_worlds, get_world, search_world, ask_world, get_object, get_relation, get_evidence and download_package.",
       "A Compiled World Package validator checks what is inside an export: that relations resolve, that every region sits inside its page, that the Turtle, JSON-LD and CSV describe the same graph, and that the package's own report counts what the package holds.",
       "Documentation covering the endpoint reference, the error catalogue, run events and the package format, with each request in cURL, Python and TypeScript.",
       /*

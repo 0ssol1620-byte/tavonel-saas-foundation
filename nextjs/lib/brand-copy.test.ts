@@ -729,18 +729,23 @@ describe("public copy", () => {
     the way out, and this checks each of those strings against the module that writes them. A
     file renamed in the exporter fails here instead of on a customer's `unzip`.
   */
-  it("names only files the exporter actually writes on /developers", () => {
+  it("names only files the exporter actually writes, on every page that lists them", () => {
     const page = read("app/developers/page.tsx");
+    const contents = read("lib/package-contents.ts");
     const exporter = read("lib/collection-download.ts");
-    const extras = page.match(/const PACKAGE_EXTRAS = \[([\s\S]*?)\n\] as const;/);
-    expect(extras, "the extra-file list is still declared on the page").not.toBeNull();
+    const extras = contents.match(/const PACKAGE_EXTRAS = \[([\s\S]*?)\n\] as const;/);
+    expect(extras, "the extra-file list is still declared in lib/package-contents.ts").not.toBeNull();
     const paths = [...extras![1]!.matchAll(/"([^"]+)"/g)].map((match) => match[1]!);
     expect(paths.length).toBeGreaterThan(0);
     for (const path of paths) {
       expect(exporter, `lib/collection-download.ts never writes ${path}`).toContain(`"${path}"`);
     }
-    expect(page, "the required paths come from the exporter, not a second list")
+    expect(contents, "the required paths come from the exporter, not a second list")
       .toContain("REQUIRED_PACKAGE_PATHS");
+    // G3-007: the three surfaces render the one list rather than each keeping their own.
+    expect(page, "/developers went back to its own file list").toContain("PACKAGE_CONTENTS");
+    expect(read("lib/docs-content.ts"), "the docs tables went back to their own file lists")
+      .toContain("PACKAGE_CONTENTS");
     // §16.4: the export is a semantic projection, never a claimed OWL ontology.
     expect(page.toLowerCase()).not.toContain("complete owl");
     expect(page).toContain("semantic projection");

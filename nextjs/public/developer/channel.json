@@ -29,6 +29,14 @@
     "verifyRoundtrip": {
       "url": "https://tavonel.com/developer/tavonel-verify-roundtrip.py",
       "sha256": "sha256:dc3bfbe7fda4526b54e3ef8642dbb9134f8bb1baff8b58bccefceeeb80897756"
+    },
+    "recipePublicSample": {
+      "url": "https://tavonel.com/developer/tavonel-public-sample.py",
+      "sha256": "sha256:e5ffd0ef8e0a69e4cfeb9edc3d0652c11950c3a914695a00bc3ac45edd6d4b86"
+    },
+    "recipeSmoke": {
+      "url": "https://tavonel.com/developer/tavonel-recipe-smoke.mjs",
+      "sha256": "sha256:2606b56aaf0699ca8e20a72f2e1bee0d918af9c13d1ad3bb433dc431effcc0ef"
     }
   }
 }

@@ -122,14 +122,27 @@ describe("the information architecture", () => {
     The two sections under four blocks are the ones BA-187 says should be merged into a
     neighbour. Headings would not fix a 44-word page, so they are not required to carry three.
   */
-  it("divides every substantial section into three to six subheadings", () => {
+  it("divides every substantial section into subheadings that each carry something", () => {
     for (const section of DOCS_SECTIONS) {
       const headings = section.blocks.filter((block) => block.kind === "heading");
       const texts = headings.map((block) => (block.kind === "heading" ? block.text : ""));
       expect(new Set(texts).size, `${section.slug}: two subheadings with the same text collide on one anchor`)
         .toBe(texts.length);
-      expect(headings.length, `${section.slug}: more than six subheadings is an outline, not a page`)
-        .toBeLessThanOrEqual(6);
+      /*
+        Was a flat ceiling of six, which is the right idea measured against the wrong thing.
+
+        The defect it was written for is a page that is all headings -- an outline someone
+        stopped writing. Six was a good proxy while every section was prose. It stopped being
+        one when the G3 remediation turned Errors into eleven grouped tables, Connections into
+        seven documented operations and Concepts into ten defined terms: those pages are longer
+        because they answer more, not because they were left as a skeleton.
+
+        So the rule is the property rather than the proxy. Every heading has to carry at least
+        one block on average; a page whose headings outnumber its content is still an outline
+        and still fails.
+      */
+      expect(headings.length * 2, `${section.slug}: more headings than content is an outline, not a page`)
+        .toBeLessThanOrEqual(section.blocks.length);
       expect(section.blocks.at(-1)?.kind, `${section.slug}: a heading with nothing under it`).not.toBe("heading");
       if (section.blocks.length - headings.length < 4) continue;
       expect(headings.length, `${section.slug}: a section this long needs at least three subheadings`)
@@ -225,7 +238,7 @@ describe("every endpoint block resolves to a published operation", () => {
     // `true`, `null` and the trailing shape are all syntax errors.
     const listed: DocsEndpointLike = {
       operationId: "example", method: "POST", path: "/example", server: "https://tavonel.com/api",
-      scope: null, description: "",
+      scope: null, auth: "key", description: "",
       requestExample: JSON.stringify({ ids: ["<ids>"], strict: true, cursor: null, limit: 12 }, null, 2),
       responses: [],
     };
