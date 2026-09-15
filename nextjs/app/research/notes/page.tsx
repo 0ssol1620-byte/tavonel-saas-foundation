@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { Route } from "next";
 import { PublicSitePage } from "@/components/public-site-chrome";
-import { EVIDENCE, EVIDENCE_STATE, shortDigest } from "@/lib/evidence-record";
+import { EVIDENCE, EVIDENCE_STATE } from "@/lib/evidence-record";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/research/notes" },
@@ -68,6 +68,12 @@ export default function ResearchNotesPage() {
                   <article className="tile" key={entry.title} data-state={entry.state}>
                     <span className="n">{EVIDENCE_STATE[entry.state]}</span>
                     <h3>{entry.title}</h3>
+                    {/*
+                      G2-045. The plain-language line first, then the paragraph a researcher came
+                      for. Every figure stays where it was; this adds no number the receipt does
+                      not carry.
+                    */}
+                    <p><b>{entry.takeaway}</b></p>
                     <p>{entry.body}</p>
                     {/*
                       BA-073 / BA-092. The receipt as a footer line rather than the last clause
@@ -77,13 +83,28 @@ export default function ResearchNotesPage() {
                       someone who asks for the file, and renaming the artifact would break the
                       reproducibility the hash exists for.
                     */}
+                    {/*
+                      G2-011. The receipt, downloadable, with the whole digest printed.
+
+                      The shortened digest was the right call while the artifact could only be
+                      requested by email: eight characters and an ellipsis are enough to
+                      recognise a file somebody sends you. They are not enough to verify one, and
+                      a hash you cannot check against a file you cannot fetch verifies nothing at
+                      all -- which is what this page was asking its reader to accept.
+
+                      So the file is served from `public/research/receipts/`, byte-identical to
+                      the artifact the figure came from, and the full 64 characters are on the
+                      page beside the link that fetches the bytes they are of. The internal
+                      filename is still not rendered; `.scene.doc code` already wraps a long
+                      string, so no new CSS is needed to print one.
+                    */}
                     {entry.receipt ? (
                       <p className="fine">
                         <b>Receipt {entry.receipt.id}</b> · {entry.receipt.of} ·{" "}
                         {entry.receipt.date} ·{" "}
-                        <code title={`sha256 ${entry.receipt.digest}`}>
-                          sha256 {shortDigest(entry.receipt.digest)}
-                        </code>
+                        <a href={entry.receipt.url} download>Download the receipt</a>
+                        <br />
+                        sha256 <code>{entry.receipt.digest}</code>
                       </p>
                     ) : null}
                   </article>
@@ -91,14 +112,17 @@ export default function ResearchNotesPage() {
               </div>
 
               {/*
-                BA-074. What is left of a paragraph that published a repository path, two
-                internal words, a confession and a request for an attachment: the two facts a
-                reader can act on.
+                BA-074 removed the repository path, the internal vocabulary and the confession
+                from this paragraph, and left the email request because there was nothing else to
+                offer. G2-011 removes the email request too: every receipt named above is now a
+                file you can fetch, so the sentence says how to check one instead of who to ask.
               */}
               <p className="fine">
-                Every receipt above is bound by sha256. Request any receipt named here at{" "}
-                <a href="mailto:hello@tavonel.com">hello@tavonel.com</a> and check the hash
-                yourself.
+                Every receipt above is bound by sha256, and every one of them is published here.
+                Download the file, hash it yourself, and compare it with the digest printed beside
+                it — <code>shasum -a 256 &lt;file&gt;</code> on macOS or Linux,{" "}
+                <code>Get-FileHash &lt;file&gt;</code> on Windows. A receipt that is named on this
+                page and not published beside it says so in its own row.
               </p>
 
               <p className="fine">
@@ -115,6 +139,11 @@ export default function ResearchNotesPage() {
               <div className="actions">
                 <Link className="btn" href={"/benchmarks" as Route}>See the benchmark protocol</Link>
                 <Link className="btn ghost" href={"/reproducibility" as Route}>Rerun a published sample</Link>
+                {/*
+                  G2-043. /research now sends its reader here rather than to /pricing, so this is
+                  where the trust chain ends and the price question is asked.
+                */}
+                <Link className="btn ghost" href={"/pricing" as Route}>Understand what it costs</Link>
               </div>
 
               {/*

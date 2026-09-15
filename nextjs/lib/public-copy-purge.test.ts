@@ -176,6 +176,21 @@ describe("public copy purge", () => {
     expect(found, `/${route} metadata carries: ${found.join(", ")}`).toEqual([]);
   });
 
+  /*
+    The disclosure module is copy on three sales surfaces, and `shippedSourceFor` cannot see it.
+
+    It follows `@/components` imports, which is where page copy normally lives; the disclosures
+    are data in `lib/` precisely so /trust, /security and /enterprise cannot each carry their own
+    version. Widening the walk to every `@/lib` import would sweep in modules that legitimately
+    carry this register -- `evidence-record.ts` publishes a failed hypothesis with the words for
+    it -- so the one module that is customer copy is checked by name instead.
+  */
+  it("keeps defensive phrasing out of the shared trust disclosures", () => {
+    const source = strip(readFileSync(new URL("./trust-disclosures.ts", import.meta.url), "utf8")).toLowerCase();
+    const found = DEFENSIVE_PHRASES.filter((phrase) => source.includes(phrase));
+    expect(found, `the disclosures render defensive phrasing: ${found.join(", ")}`).toEqual([]);
+  });
+
   it("exempts only routes that are legal text or actually noindex", () => {
     for (const [route, reason] of Object.entries(EXEMPT)) {
       const url = new URL(`../app/${route}/page.tsx`, import.meta.url);

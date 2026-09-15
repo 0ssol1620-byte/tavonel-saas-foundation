@@ -44,8 +44,28 @@ const NEXT_ACTION: Record<TrustStep, string> = {
   "/evidence": "See what was measured",
   "/benchmarks": "Rerun the public sample",
   "/reproducibility": "Read the open questions",
-  "/research": "Understand what it costs",
+  "/research": "Read what was measured",
   "/pricing": "Start with your files",
+};
+
+/*
+  G2-043. The one step whose next page is not the page after it in the order.
+
+  /research ended on /pricing, so a reader who had just been shown seven unsolved problems was
+  asked to buy. The page that answers what /research raises is /research/notes -- the two
+  measurements, the hypothesis that failed, the thresholds nobody has calibrated -- and it was
+  reachable only from a small inline link in the lede.
+
+  It is an override rather than a sixth entry in TRUST_SEQUENCE because the sequence is the §17
+  order of the five hub pages, and notes is a leaf of one of them rather than a sixth hub. The
+  chain still ends at /pricing: the notes page offers it as its closing ghost.
+*/
+const INSTEAD_OF_THE_NEXT_STEP: Partial<Record<TrustStep, { to: Route; label: string; question: string }>> = {
+  "/research": {
+    to: "/research/notes" as Route,
+    label: "Research notes",
+    question: "What has actually been measured?",
+  },
 };
 
 /**
@@ -62,7 +82,8 @@ const NEXT_ACTION: Record<TrustStep, string> = {
  */
 export function TrustNext({ from, emphasis = "primary" }: { from: TrustStep; emphasis?: "primary" | "quiet" }) {
   const index = TRUST_SEQUENCE.findIndex((step) => step.href === from);
-  const next = TRUST_SEQUENCE[index + 1];
+  const override = INSTEAD_OF_THE_NEXT_STEP[from];
+  const next = override ? { href: override.to, label: override.label, question: override.question } : TRUST_SEQUENCE[index + 1];
   if (!next) return null;
   return (
     <div className="stack trust-next">

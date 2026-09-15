@@ -172,19 +172,39 @@ export default function SourceCapabilityTable({ rows: all }: { rows: readonly Pu
         the tier name, so nothing is hidden -- what folds is the paragraph explaining it, for
         the reader who wants it.
       */}
+      {/*
+        G2-036. Six tiers are defined and two are occupied.
+
+        The two "Verified" tiers are the ones a buyer is actually reading for, and they described
+        capability no format in this deployment has -- with nothing on the page saying so, so the
+        legend read as a menu rather than as a scale. The page already explains how a tier is
+        earned ("a native reader exists and a qualification run produces a receipt"); what it did
+        not say is that nothing has earned one yet.
+
+        Occupancy is counted from the rows being rendered rather than declared, so a format that
+        reaches a tier removes its own notice.
+      */}
       <details className="status-fold">
         <summary>What each support tier means</summary>
         <dl className="src-legend">
-          {capabilityStatuses.map((status) => (
-            <div key={status}>
-              <dt>
-                <span className="src-tier" data-token={CAPABILITY_TIER_TOKEN[status]}>
-                  {CAPABILITY_TIER_LABEL[status]}
-                </span>
-              </dt>
-              <dd>{TIER_MEANING[status]}</dd>
-            </div>
-          ))}
+          {capabilityStatuses.map((status) => {
+            const held = all.filter((entry) => entry.tier === CAPABILITY_TIER_LABEL[status]).length;
+            return (
+              <div key={status}>
+                <dt>
+                  <span className="src-tier" data-token={CAPABILITY_TIER_TOKEN[status]}>
+                    {CAPABILITY_TIER_LABEL[status]}
+                  </span>
+                </dt>
+                <dd>
+                  {TIER_MEANING[status]}{" "}
+                  {held === 0
+                    ? <b>No format has reached this tier yet.</b>
+                    : <i>{held === 1 ? "One format" : `${held} formats`} here today.</i>}
+                </dd>
+              </div>
+            );
+          })}
         </dl>
       </details>
     </>

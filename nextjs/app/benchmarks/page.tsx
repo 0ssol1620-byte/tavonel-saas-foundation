@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { Route } from "next";
 import { PublicSitePage } from "@/components/public-site-chrome";
+import { EVIDENCE } from "@/lib/evidence-record";
 import { TrustNext } from "@/components/trust-next";
 import {
   BENCHMARK_FAMILIES,
@@ -173,6 +174,43 @@ export default function BenchmarksPage() {
                 and logos appear on this site only with that customer's written sign-off on the
                 exact wording. What is gone is the count.
               */}
+
+              {/*
+                G2-012. A page called Benchmarks, reached from "Verify and compare", contained
+                rules for comparison and nothing to compare, and there was nowhere on this site a
+                prospect could see a measured result. The protocol is right and stays; what was
+                missing is the answer to the question the reader arrived with.
+
+                What this block may contain is fixed by SD-04: the two research measurements that
+                are already published with their denominators and their receipts, each linked to
+                the bytes its digest is of. An internal comparison measured under conditions this
+                protocol does not pin is not a result and does not appear here.
+
+                Dates come from the receipts rather than from a constant somebody has to
+                remember to move.
+              */}
+              <h2 className={`slate ${styles.sectionTitle}`}><span />What exists today</h2>
+              <p className={styles.para}>
+                No run has yet qualified under the protocol above, so the Results table below is
+                empty and says so by being absent. What has been measured and published is two
+                research findings, each with the population it was measured over and a receipt you
+                can download and hash. A figure produced under conditions this protocol does not
+                pin is not a result, and it is not published as one.
+              </p>
+              <div className="chain">
+                {EVIDENCE.filter((entry) => entry.receipt).map((entry) => (
+                  <article className="link" key={entry.title}>
+                    <span className="st">{entry.receipt!.date}</span>
+                    <h3>{entry.title}</h3>
+                    <p>{entry.takeaway}</p>
+                    <p className="fine">
+                      <b>Receipt {entry.receipt!.id}</b> · {entry.receipt!.of} ·{" "}
+                      <a href={entry.receipt!.url} download>Download the receipt</a> ·{" "}
+                      <Link href={"/research/notes" as Route}>Read the finding in full</Link>
+                    </p>
+                  </article>
+                ))}
+              </div>
 
               <h2 className={`slate ${styles.sectionTitle}`}><span />The eight metric families</h2>
               <div className="tiles">
