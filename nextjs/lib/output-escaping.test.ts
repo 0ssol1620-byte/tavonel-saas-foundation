@@ -31,19 +31,35 @@ const SOURCES = [...sourceFiles("app"), ...sourceFiles("components")].map((path)
 }));
 
 describe("raw HTML injection", () => {
-  it("has exactly two dangerouslySetInnerHTML sinks, and both render JSON-LD from literals", () => {
+  it("has exactly three dangerouslySetInnerHTML sinks, and all render JSON-LD from literals", () => {
     const users = SOURCES.filter((file) => file.text.includes("dangerouslySetInnerHTML"));
     expect(
       users.map((file) => file.path).sort(),
       "a further raw-HTML sink is a design decision, not a refactor: justify it here or do not add it",
-    ).toEqual(["app/layout.tsx", "components/breadcrumb-json-ld.tsx"]);
-    // Both serialise JSON-LD only. layout.tsx inlines an object literal; the breadcrumb component
-    // (2026-09-08 exposure lane) serialises `breadcrumbList(trail)`, whose trail is a page-declared
-    // literal and whose origin/root come from lib/structured-data.ts. No value reaches either sink
-    // from a request, a document or a model.
+    ).toEqual(["app/layout.tsx", "components/breadcrumb-json-ld.tsx", "components/pricing-page-client.tsx"]);
+    /*
+      All three serialise JSON-LD only. layout.tsx inlines an object literal; the breadcrumb
+      component (2026-09-08 exposure lane) serialises `breadcrumbList(trail)`, whose trail is a
+      page-declared literal and whose origin and root come from lib/structured-data.ts.
+
+      The third arrived on 2026-09-16 with G2-032, from the commerce-legal lane, and this is the
+      justification the message above asks for. /pricing publishes four prices and seventeen
+      questions and emitted no Offer, PriceSpecification or FAQPage, so a crawler and an answer
+      engine read the page as prose. The block is a module-scope constant built by mapping over
+      `BILLING_OFFERS` and `PURCHASE_FAQ` -- both authored literals in this repository, both
+      already rendered as visible text on the same page -- which puts the sink's input in the same
+      class as the other two: nothing from a request, a document, a connector or a model, and
+      nothing a visitor can influence. It goes through `jsonLdHtml` like the others, which is the
+      property that contains the risk if the first sentence ever stops being true.
+    */
     const byPath = new Map(users.map((file) => [file.path, file.text]));
     expect(byPath.get("app/layout.tsx")).toMatch(/__html: jsonLdHtml\(\{\s*\n\s*"@context": "https:\/\/schema\.org"/);
     expect(byPath.get("components/breadcrumb-json-ld.tsx")).toMatch(/__html: jsonLdHtml\(breadcrumbList\(trail\)\)/);
+    expect(byPath.get("components/pricing-page-client.tsx")).toMatch(/__html: jsonLdHtml\(PRICING_JSON_LD\)/);
+    expect(
+      byPath.get("components/pricing-page-client.tsx"),
+      "the pricing block is a module constant over the catalog, never assembled from a prop or a fetch",
+    ).toMatch(/const PRICING_JSON_LD = \{\s*\n\s*"@context": "https:\/\/schema\.org"/);
     // And neither may go back to the bare serializer, which is what they both did until B7.
     for (const [path, text] of byPath) {
       expect(text, `${path}: __html must go through jsonLdHtml`).not.toMatch(/__html:\s*JSON\.stringify/);

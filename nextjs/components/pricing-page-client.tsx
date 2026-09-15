@@ -17,6 +17,7 @@ import {
 import { COMPILE_MAX_DOCUMENTS, CORPUS_MAX_DOCUMENTS } from "@/lib/compile-limits";
 import { trackFunnel } from "@/lib/funnel-events";
 import { FOOTER_GROUPS } from "@/lib/site-navigation";
+import { jsonLdHtml } from "@/lib/structured-data";
 import {
   MAX_UNITS_PER_PAGE,
   PROCESSING_UNIT_USD,
@@ -497,12 +498,7 @@ export type PlanCapabilityRow = {
   closed bars. `brand-copy.test.ts` still counts seventeen rows and still requires each to carry
   the page that maintains its answer.
 */
-/*
-  G2-032. Exported so `app/pricing/page.tsx` can emit the FAQPage block from the same rows the
-  page renders. A second copy of seventeen questions written for a crawler is a second copy that
-  will drift, and the one a crawler reads is the one nobody proofreads.
-*/
-export const PURCHASE_FAQ: Array<[string, string, Route, string, string]> = [
+const PURCHASE_FAQ: Array<[string, string, Route, string, string]> = [
   ["Is this just OCR?", "Reading the page is one step of the compile. What you keep is a Compiled World: objects, relations and claims that each carry the source region behind them, under a version you can go back to.", "/knowledge-compiler" as Route, "What a Knowledge Compiler is", "What it is"],
   ["Why not a parser plus a vector database?", "That is a way to build the retrieval layer, and the package ships one. What a parser and an index do not give you is the reviewed structure underneath, the evidence binding, or a version history when the sources change.", "/knowledge-compiler" as Route, "Where each category acts", "What it is"],
   ["What exactly is a World?", "The output of one compile: objects, relations, evidence, retrieval material and a validation report, addressed by a digest. Two Worlds with the same digest are the same World.", "/knowledge-compiler" as Route, "Glossary", "What it is"],
@@ -536,6 +532,59 @@ export const PURCHASE_FAQ: Array<[string, string, Route, string, string]> = [
 
 /** The order the groups are shown in. Declared rather than derived, because it is an argument. */
 const FAQ_GROUPS = ["What it is", "What it costs", "What happens to my data", "What a review will find"] as const;
+
+/*
+  G2-032. The prices and the questions on this page, in the markup a search or answer engine reads.
+
+  The site's global JSON-LD is Organization + SoftwareApplication and stops there, on the stated
+  ground that a private pilot has no public catalogue. That ground no longer holds for this page
+  and only for this page: `BILLING_OFFERS` is a catalogue, both plans are rendered with real
+  prices, and a buyer can reach a checkout for one of them. So the block is built by mapping over
+  the two modules the page already renders -- a price change moves the markup instead of leaving a
+  crawler with a stale `Offer`.
+
+  Only the two catalogued subscriptions are described. The free evaluation has no `priceUsd` to
+  cite and Enterprise has no agreed price at all, and an `Offer` for either would be the invented
+  fact the evidence rule bars. `availability` follows `saleChannel`, so the plan sold through a
+  conversation is not advertised to a crawler as a checkout.
+
+  It is emitted from this client component rather than from `app/pricing/page.tsx` because a
+  "use client" module's non-component exports are client references in the server bundle, so the
+  server component cannot read `PURCHASE_FAQ`. Next server-renders this into the HTML either way.
+*/
+const PRICING_JSON_LD = {
+  "@context": "https://schema.org",
+  "@graph": [
+    ...Object.values(BILLING_OFFERS).map((offer) => ({
+      "@type": "Offer",
+      name: offer.label,
+      description: offer.description,
+      url: "https://tavonel.com/pricing",
+      category: "subscription",
+      availability:
+        offer.saleChannel === "self_serve"
+          ? "https://schema.org/InStock"
+          : "https://schema.org/LimitedAvailability",
+      priceSpecification: {
+        "@type": "UnitPriceSpecification",
+        price: offer.priceUsd,
+        priceCurrency: "USD",
+        valueAddedTaxIncluded: false,
+        unitText: "month",
+        billingDuration: 1,
+        billingIncrement: 1,
+      },
+    })),
+    {
+      "@type": "FAQPage",
+      mainEntity: PURCHASE_FAQ.map(([question, answer]) => ({
+        "@type": "Question",
+        name: question,
+        acceptedAnswer: { "@type": "Answer", text: answer },
+      })),
+    },
+  ],
+};
 
 export default function PricingPageClient({
   initialLiveCheckout,
@@ -642,6 +691,10 @@ export default function PricingPageClient({
 
   return (
     <div className="page pricing-page">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonLdHtml(PRICING_JSON_LD) }}
+      />
       <PublicSiteHeader
         cta={{
           href: liveCheckout || selfService ? "/login" : "/contact",

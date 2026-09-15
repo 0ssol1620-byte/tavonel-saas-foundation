@@ -1,15 +1,10 @@
-import PricingPageClient, {
-  PURCHASE_FAQ,
-  type PlanCapabilityRow,
-  type PurchaseGate,
-} from "@/components/pricing-page-client";
+import PricingPageClient, { type PlanCapabilityRow, type PurchaseGate } from "@/components/pricing-page-client";
 import { activationPolicy } from "@/lib/activation-policy";
 import { BILLING_OFFERS, type BillingOfferCode } from "@/lib/billing-catalog";
 import { billingProductDecision, type ProductAccessLevel, type ProductAccessRole } from "@/lib/billing-product-access";
 import type { FoundationBillingAccount } from "@/lib/billing-store";
 import { readCommercialState } from "@/lib/commercial-state";
 import { readAccessMode } from "@/lib/foundation-pilot";
-import { jsonLdHtml } from "@/lib/structured-data";
 
 export const dynamic = "force-dynamic";
 
@@ -91,69 +86,27 @@ const PLAN_CAPABILITIES: PlanCapabilityRow[] = CAPABILITIES.map((row) => ({
 }));
 
 /*
-  G2-032. The two prices on this page, and its seventeen questions, in the markup a search or
-  answer engine reads.
+  G2-032's JSON-LD is not here, and that is a runtime constraint rather than a preference.
 
-  The site's global JSON-LD is Organization + SoftwareApplication and stops there, on the stated
-  ground that a private pilot has no public catalogue -- but this page publishes four public
-  prices and a sixteen-question accordion, so the ground no longer holds for `/pricing` and only
-  for `/pricing`. Both blocks are built from the same modules the page renders: `BILLING_OFFERS`
-  for the prices and the offers' availability, `PURCHASE_FAQ` for the questions. Nothing is typed
-  here, so a price change cannot leave a stale `Offer` behind for a crawler.
+  The obvious home for an Offer and a FAQPage block is this server component. It cannot be: the
+  seventeen FAQ rows live in the client component, and a "use client" module's non-component
+  exports are replaced by client references in the server bundle, so importing the array here
+  builds and then fails at page-data collection with `PURCHASE_FAQ.map is not a function`.
 
-  Only the two catalogued subscriptions are described. The free evaluation has no `priceUsd` to
-  cite and Enterprise has no agreed price at all; an `Offer` for either would be the invented
-  fact the evidence rule bars. `availability` follows `saleChannel`, so the plan that is sold
-  through a conversation is not advertised to a crawler as a checkout.
+  Moving the rows into a lib module would work and costs three claim guards their reader. Emitting
+  the block from the client component costs nothing: Next server-renders it into the HTML a
+  crawler reads, and because the array is already in that chunk for the visible accordion, the
+  serialized block adds no duplicated strings to the client bundle. So it is emitted there, beside
+  the data, and `lib/output-escaping.test.ts` carries the justification for the sink.
 */
-const PRICING_JSON_LD = {
-  "@context": "https://schema.org",
-  "@graph": [
-    ...(Object.values(BILLING_OFFERS).map((offer) => ({
-      "@type": "Offer",
-      name: offer.label,
-      description: offer.description,
-      url: "https://tavonel.com/pricing",
-      category: "subscription",
-      availability:
-        offer.saleChannel === "self_serve"
-          ? "https://schema.org/InStock"
-          : "https://schema.org/LimitedAvailability",
-      priceSpecification: {
-        "@type": "UnitPriceSpecification",
-        price: offer.priceUsd,
-        priceCurrency: "USD",
-        valueAddedTaxIncluded: false,
-        unitText: "month",
-        billingDuration: 1,
-        billingIncrement: 1,
-      },
-    }))),
-    {
-      "@type": "FAQPage",
-      mainEntity: PURCHASE_FAQ.map(([question, answer]) => ({
-        "@type": "Question",
-        name: question,
-        acceptedAnswer: { "@type": "Answer", text: answer },
-      })),
-    },
-  ],
-};
-
 export default function PricingPage() {
   const commercial = readCommercialState();
   return (
-    <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: jsonLdHtml(PRICING_JSON_LD) }}
-      />
-      <PricingPageClient
-        initialLiveCheckout={commercial.liveChargesEnabled}
-        initialSelfService={readAccessMode() === "self_service"}
-        gates={PURCHASE_GATES}
-        planCapabilities={PLAN_CAPABILITIES}
-      />
-    </>
+    <PricingPageClient
+      initialLiveCheckout={commercial.liveChargesEnabled}
+      initialSelfService={readAccessMode() === "self_service"}
+      gates={PURCHASE_GATES}
+      planCapabilities={PLAN_CAPABILITIES}
+    />
   );
 }
