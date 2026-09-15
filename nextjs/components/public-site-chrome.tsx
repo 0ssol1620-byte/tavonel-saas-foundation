@@ -3,7 +3,7 @@ import type { Route } from "next";
 import Logomark from "@/components/logomark";
 import MobilePrimaryNav from "@/components/mobile-primary-nav";
 import DesktopPrimaryNav from "@/components/site-nav/desktop-primary-nav";
-import { primaryCallToAction } from "@/lib/commercial-state";
+import { deploymentStateLine, primaryCallToAction } from "@/lib/commercial-state";
 import { FOOTER_GROUPS, FOOTER_LEGAL_ROW, type SiteLink } from "@/lib/site-navigation";
 
 /**
@@ -24,6 +24,12 @@ import { FOOTER_GROUPS, FOOTER_LEGAL_ROW, type SiteLink } from "@/lib/site-navig
  * that took the fallback, which was every page but three. The caller resolves the action instead,
  * which every caller can: two of them are client components that already receive the commercial
  * state as a prop, and the rest reach this file through `PublicSitePage` below.
+ *
+ * G1-001 / G2-026: `mode` now falls back to `deploymentStateLine()` rather than to nothing.
+ * What this deployment is -- a finished public World to read, and your own files arranged with
+ * us rather than switched on by a checkout -- was stated on /pricing, /security, /status and
+ * behind the /login click, and nowhere a visitor meets first. It is read off `activationPolicy`,
+ * so it appears wherever the header does and removes itself on the day the gate opens.
  */
 export function PublicSiteHeader({
   cta,
@@ -36,16 +42,18 @@ export function PublicSiteHeader({
   signedIn?: boolean;
   stuck?: boolean;
 }) {
+  // G1-001 / G2-026: see the note above. A caller's own `mode` (the pilot badge) still wins.
+  const state = mode ?? deploymentStateLine();
   return (
     <header className="nav" data-stuck={stuck ? 1 : 0}>
       <Link href="/" className="wordmark" aria-label="TAVONEL home">
         <Logomark />
         <b>TAVONEL</b>
       </Link>
-      {mode ? (
-        <span className="mode" title={mode.title}>
+      {state ? (
+        <span className="mode" title={state.title}>
           <i aria-hidden="true" />
-          {mode.label}
+          {state.label}
         </span>
       ) : null}
       <DesktopPrimaryNav />

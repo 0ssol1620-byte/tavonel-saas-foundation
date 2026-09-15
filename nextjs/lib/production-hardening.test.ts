@@ -158,11 +158,27 @@ describe("2026-09-05 production hardening", () => {
     expect(read("app/film/layout.tsx")).toContain('process.env.VERCEL_ENV === "production"');
   });
 
+  /*
+    Two of the four lines below moved with the facts they pinned, in the 2026-09-16 site review.
+
+    `/product/continuous-knowledge` was barred here because `app/robots.ts` disallowed it while it
+    was a `notFound()` stub. It is a published page in the sitemap now, robots.txt no longer
+    withholds it, and `lib/seo-surface.test.ts` reads the three files against each other -- so
+    keeping the ban would have been this file enforcing the old state against the new one.
+
+    "self-service evaluation" went for the opposite reason. G1-001: `activationPolicy.customerData`
+    is closed, so a line telling a model that TAVONEL offers self-service evaluation described a
+    compile this deployment refuses. What replaces it is the deployment-state sentence the header,
+    /pricing, /security and /status all render, so the file a model reads and the page a person
+    reads say the same thing.
+  */
   it("does not tell language models that the live service is a private pilot", () => {
     const llms = read("public/llms.txt");
     expect(llms).not.toContain("TAVONEL is a private pilot");
-    expect(llms).not.toContain("/product/continuous-knowledge");
     expect(llms).not.toContain("https://tavonel.com/film");
-    expect(llms).toContain("self-service evaluation");
+    expect(llms, "the gate is stated to models in the same words it is stated to readers")
+      .toContain("arranged with us rather than opened by a checkout");
+    expect(llms, "and no self-service compile is offered while it is closed")
+      .not.toContain("self-service evaluation");
   });
 });

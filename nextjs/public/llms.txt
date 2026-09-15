@@ -4,9 +4,11 @@
 
 This file is a curated map of public TAVONEL pages for language models. It does not request preferential indexing.
 
-Role of this file: a reading map for tools. It asks no search engine for anything and no claim is made here about how any search engine treats it — every page listed below is reachable from the sitemap and the site navigation, so deleting this file would change what a tool has to crawl to find them, not whether they can be found. Search-crawler and training-crawler access are separate questions and neither is decided here — robots.txt names the search crawlers it addresses, and the training-crawler policy is unresolved.
+Role of this file: a reading map for tools. It asks no search engine for anything and no claim is made here about how any search engine treats it — every page listed below is reachable from the sitemap and the site navigation, so deleting this file would change what a tool has to crawl to find them, not whether they can be found.
 
-TAVONEL offers self-service evaluation and paid Developer access. Product and research claims should be read from the public pages below; measured evidence and methodology are published separately from product descriptions.
+Crawler policy, as robots.txt enforces it: search and answer-engine crawlers are allowed on every public page — Googlebot, OAI-SearchBot, PerplexityBot and ClaudeBot, which is a fetch-time agent rather than a training crawler. Training-corpus crawlers are disallowed everywhere: GPTBot, CCBot, anthropic-ai, Google-Extended, Applebot-Extended, Bytespider and Meta-ExternalAgent. Authenticated, API-internal and workspace surfaces are excluded from every group. robots.txt is a request an operator chooses to honour, not access control; no crawler of any kind reaches a customer document, and that is authorization rather than this policy.
+
+Deployment state: a completed public Compiled World is open to read in full, and intake for your own sources is arranged with us rather than opened by a checkout. Product and research claims should be read from the public pages below; measured evidence and methodology are published separately from product descriptions, and no number is published here without a receipt behind it.
 
 Indexing: public product, documentation, research and trust pages are indexable. Authenticated, API-internal and workspace surfaces are excluded from search indexing.
 
@@ -21,22 +23,60 @@ Indexing: public product, documentation, research and trust pages are indexable.
 - [Research notes](https://tavonel.com/research/notes): Measurements, limitations and experiment notes.
 - [Evidence](https://tavonel.com/evidence): How claims, source regions, versions and signed packages are bound together.
 - [Developers](https://tavonel.com/developers): API, MCP, retrieval packages and signed exports.
-- [Documentation](https://tavonel.com/docs): Product and developer documentation.
+- [Documentation](https://tavonel.com/docs): Product and developer documentation. Every section is listed under Documentation below.
+- [API reference](https://tavonel.com/api): The HTTP interface — its operations, parameters and error codes. The machine-readable specification it is rendered from is served at /openapi.json.
+- [Changelog](https://tavonel.com/changelog): What changed in the product and the public interfaces. The same entries are served as an Atom feed at /changelog/feed.xml.
 - [Pricing](https://tavonel.com/pricing): Free Evaluation, Developer, Team and Enterprise access.
 - [Sources](https://tavonel.com/sources): The capability manifest this deployment reads — every accepted format, its support tier, what survives into the compiled world, and what does not.
+- [Integrations](https://tavonel.com/integrations): Which source systems connect today, which are not supported, and how the customer-run agent behaves.
+- [Trust Center](https://tavonel.com/trust): The index of what this deployment publishes about itself, and what it does not.
 - [Security](https://tavonel.com/security): Data path, tenant isolation, retention and security controls.
+- [Enterprise](https://tavonel.com/enterprise): What an enterprise engagement covers today, and what is not provided.
 - [Benchmarks](https://tavonel.com/benchmarks): The metric families and receipt fields a knowledge-compilation result must satisfy before a number is published.
+- [Arena](https://tavonel.com/arena): The model-comparison protocol, and its current state.
 - [Reproducibility](https://tavonel.com/reproducibility): Frozen public fixtures and digest-bound sample artifacts.
+- [Resources](https://tavonel.com/resources): The hub over the reading, verification and comparison material.
 - [Status](https://tavonel.com/status): Current service status.
 - [Korean entry page](https://tavonel.com/ko): The site's Korean-language entry point — what is compiled, what activating a reviewed World requires today, and which English page is the single source for pricing, documentation and supported formats. The only Korean URL; every other page is English at its existing address.
 
 ## Product
 
-- [Document understanding](https://tavonel.com/product/document-understanding): Recover text, layout, tables and source geometry from documents and scans.
+- [Document understanding](https://tavonel.com/product/document-understanding): Recover text, reading order and source geometry from documents and scans. A table's grid is not recovered: its figures arrive as the paragraphs they were printed as, each carrying the page and the box it sat in.
 - [Compiled World](https://tavonel.com/product/compiled-world): Structured knowledge with provenance, versions and reusable retrieval artifacts.
-- [Use results with AI](https://tavonel.com/docs/use-with-ai): Choose live MCP/API access or a signed portable knowledge package, with grounding and validation guidance.
-- [Use ontology output](https://tavonel.com/docs/ontology-output): Import JSON-LD, Turtle or graph projections while preserving stable identity, validation and evidence grounding.
-- [Integrations](https://tavonel.com/integrations): Connect supported systems where knowledge already lives.
+- [Continuous recompilation](https://tavonel.com/product/continuous-knowledge): The Compiler Contract — eight clauses, each carrying the state it holds in this deployment.
+
+## Solutions
+
+- [AI-ready knowledge](https://tavonel.com/solutions/ai-ready-knowledge): For AI and platform engineers.
+- [Grounded assistants](https://tavonel.com/solutions/source-grounded-assistants): For application and agent developers.
+- [Knowledge graph](https://tavonel.com/solutions/knowledge-graph): For data and knowledge architects.
+- [Knowledge operations](https://tavonel.com/solutions/knowledge-operations): For knowledge owners and security reviewers.
+- [Document intelligence](https://tavonel.com/solutions/document-intelligence): For document and operations teams.
+
+## Documentation
+
+- [Quickstart](https://tavonel.com/docs/quickstart): From an API key to a verified evidence-bound answer, with the one step no key can take.
+- [Use your results with AI](https://tavonel.com/docs/use-with-ai): Choose live MCP/API access or the signed portable package, and keep answers grounded in the same evidence.
+- [Use the ontology output](https://tavonel.com/docs/ontology-output): Import the Compiled World ontology into RDF, linked-data and graph systems without losing validation, evidence or stable identity.
+- [Concepts](https://tavonel.com/docs/concepts): Sources, Compiled Worlds, candidate and active versions, and evidence.
+- [Authentication](https://tavonel.com/docs/authentication): Bearer keys, the scopes they carry, and what no key can do.
+- [Files and formats](https://tavonel.com/docs/files-and-formats): What can be uploaded, what is expanded in the browser, and the ceilings on both.
+- [Upload](https://tavonel.com/docs/upload): Direct-to-storage upload, and why bytes never reach the application server.
+- [Collections and compile](https://tavonel.com/docs/collections-and-compile): Starting a compile, how many documents one carries, and the ceilings on a run.
+- [Run events](https://tavonel.com/docs/run-events): The persisted transition log, and how to resume it after a disconnect.
+- [Review](https://tavonel.com/docs/review): Partial failures, the four decisions, and the one that cannot be taken casually.
+- [World API](https://tavonel.com/docs/world-api): Reading a compiled World, its objects, relations and evidence.
+- [Search](https://tavonel.com/docs/search): Hybrid retrieval — lexical, dense and structure, RRF-fused and reranked — over the active World.
+- [Ask](https://tavonel.com/docs/ask): Grounded answers, their citations, which retrieval runtime answered, and when the system abstains.
+- [Connections](https://tavonel.com/docs/connections): Connected sources, their cursors, and what a revoke does immediately.
+- [Exports](https://tavonel.com/docs/exports): The signed package: what is in it, and what the signature covers.
+- [MCP](https://tavonel.com/docs/mcp): The read-only tools an agent gets, and the two the server deliberately does not offer.
+- [CLI](https://tavonel.com/docs/cli): The published files, how to pin them, and how to verify an export with nothing but a download.
+- [Integration recipes](https://tavonel.com/docs/integration-recipes): Three paths pinned to a specific tool, each with a smoke script that runs them.
+- [Billing and limits](https://tavonel.com/docs/billing-and-limits): What is counted, how a page is quoted, and the ceilings that apply.
+- [Errors](https://tavonel.com/docs/errors): The codes a client has to branch on, and what each one means.
+- [Security](https://tavonel.com/docs/security): Where bytes live, what the parsing models can reach, and what fails closed.
+- [Documentation changelog](https://tavonel.com/docs/changelog): What changed in the product and the public interfaces.
 
 ## Trust and legal
 

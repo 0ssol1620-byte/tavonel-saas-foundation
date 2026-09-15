@@ -1,3 +1,4 @@
+import { ACCESS_CTA } from "./site-navigation";
 import type { ExploreChangeStep, ExploreChangeStory } from "./explore-change";
 import type { ExploreSampleAnswer } from "./explore-sample";
 import type { ExploreDocument, VisualEvidence, VisualRevision } from "./visual-world-model";
@@ -179,12 +180,18 @@ export const EXPLORE_COPY = {
     arrangement 3.4 bars -- and it is the one of the three that is reading rather than doing, so
     it moved into the sentence under the row and takes the global label for its destination.
 
-    Both labels that remain are the site's own: "Start with your files" is what
-    `lib/commercial-state.ts` calls the primary action and what /pricing and /trust render, and
-    "Connect a source" is /integrations' own button. Neither is /explore vocabulary.
+    Both labels that remain are the site's own. "Connect a source" is /integrations' own button,
+    and the primary one is `ACCESS_CTA` from `lib/site-navigation.ts` -- the same object the header
+    and the phone sheet render -- rather than a third spelling of the site's access action.
+
+    G1-001: it was "Start with your files" pointing at /login, which is `SELF_SERVE_CTA`, and this
+    module is reachable from the client bundle, where the unprefixed commercial flags inline as
+    `undefined` -- so it could not resolve the posture here and hard-coded the open one. It names
+    the closed one instead, and `lib/brand-copy.test.ts` fails if `activationPolicy.customerData`
+    opens while this still points at /contact, which is the day it has to be resolved server-side.
   */
   endActions: [
-    { label: "Start with your files", href: "/login", primary: true },
+    { label: ACCESS_CTA.label, href: ACCESS_CTA.href, primary: true },
     { label: "Connect a source", href: "/integrations", primary: false },
   ],
 } as const;

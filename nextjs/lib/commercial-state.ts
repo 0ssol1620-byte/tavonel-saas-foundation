@@ -23,6 +23,7 @@
  * ever leaking "live" into published copy.
  */
 
+import { activationPolicy } from "./activation-policy";
 import { ACCESS_CTA, SELF_SERVE_CTA, type SiteLink } from "./site-navigation";
 
 export type CommercialMode = "pilot" | "live";
@@ -70,9 +71,38 @@ export function readCommercialState(env: Environment = process.env): CommercialS
   };
 }
 
-/** True when the site should show plans and prices as purchasable rather than "Request access". */
+/**
+ * True when the site should offer "Start with your files" rather than "Request access".
+ *
+ * G1-001 / G1-010 / G2-026: the billing flags are a necessary condition and were being read as a
+ * sufficient one. `/` and `/pricing` are `force-dynamic` and resolved this at request time, while
+ * `/product`, `/solutions` and `/ko` are prerendered and resolved it at build time with the flags
+ * scrubbed -- so the same site offered two different primary actions depending on which page a
+ * visitor landed on, and the louder of the two promised the exact thing the deployment does not do.
+ *
+ * `activationPolicy.customerData` is the fact underneath both: while it is closed, no amount of
+ * billing configuration makes "start with your files" a true sentence. It is a module constant, so
+ * it resolves the same way in a prerender and at request time, which is what makes the action one
+ * action everywhere. Legal and pricing copy keep reading `liveChargesEnabled` directly -- being
+ * able to charge a card and being able to compile a customer's files are still separate facts.
+ */
 export function isLiveCommerce(env: Environment = process.env) {
-  return readCommercialState(env).liveChargesEnabled;
+  return readCommercialState(env).liveChargesEnabled && activationPolicy.customerData.enabled;
+}
+
+/**
+ * The one-line deployment state the public header carries, or null when there is nothing to say.
+ *
+ * Two facts, in the order a reader needs them: what is open now, and what their own files require.
+ * Both are read off `activationPolicy` rather than typed, and the long form -- the sentence
+ * `/api/status`, `/security` and `/pricing` all serve -- is the tooltip.
+ */
+export function deploymentStateLine(): { label: string; title: string } | null {
+  if (activationPolicy.customerData.enabled) return null;
+  return {
+    label: "Public Compiled World: open · Your own files: arranged with us",
+    title: activationPolicy.customerData.reason,
+  };
 }
 
 /**

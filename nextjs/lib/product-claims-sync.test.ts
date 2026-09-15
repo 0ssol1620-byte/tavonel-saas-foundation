@@ -6,6 +6,7 @@ import { readCapabilities } from "./capabilities";
 import { CONTRACT_STATE, clause } from "./compiler-contract";
 import { monthlyTotalUsd } from "../components/pricing-page-client";
 import { PROCESSING_UNIT_USD, STANDARD_UNITS_PER_PAGE } from "./usage-pricing";
+import { DOCS_SECTIONS } from "./docs-content";
 import { CAPABILITY_MANIFEST } from "../../shared/capabilityManifest";
 
 /**
@@ -508,5 +509,44 @@ describe("product claims sync", () => {
     const found = UNREGISTERED_STATUS_WORDS.filter((word) =>
       new RegExp(`(^|[^A-Za-z])${word}([^A-Za-z]|$)`).test(rendered));
     expect(found, `${surface} renders an unregistered status word: ${found.join(", ")}`).toEqual([]);
+  });
+});
+
+/*
+  G3-027 / G3-028. `public/llms.txt` is the site's map for machines, and it was maintained by hand.
+
+  It listed three of the twenty-two documentation sections and none of the five solutions, and it
+  claimed the read recovers "tables" while the capability manifest carries
+  `no_table_or_formula_extraction` on every row and /product/document-understanding derives the
+  honest wording from it. A hand-maintained map fails silently: the page exists, works, and is
+  simply never offered to the tool the file was written for.
+
+  So the file is still hand-written -- it is prose, and a generated one would read like a sitemap --
+  but the two things that go stale are checked against the modules that know: every docs section
+  must appear, and no claim the manifest contradicts may.
+*/
+describe("llms.txt maps what the site actually publishes", () => {
+  const llms = read("public/llms.txt");
+
+  it.each(DOCS_SECTIONS.map((section) => section.slug))("maps /docs/%s", (slug) => {
+    expect(llms, `/docs/${slug} exists and llms.txt does not offer it`).toContain(`https://tavonel.com/docs/${slug})`);
+  });
+
+  it("claims no table extraction, because the manifest carries none", () => {
+    const pdf = CAPABILITY_MANIFEST.entries.find((entry) => entry.mime === "application/pdf");
+    expect(pdf?.knownLimitations, "the limitation this assertion rests on").toContain("no_table_or_formula_extraction");
+    expect(llms, 'llms.txt says the read recovers "tables"')
+      .not.toMatch(/Recover text, layout, tables/i);
+    expect(llms, "and states the limitation positively instead").toContain("A table's grid is not recovered");
+  });
+
+  /*
+    SD-05. The file used to say the training-crawler policy was "unresolved" while robots.txt had
+    resolved it, which is the same class of drift: a machine reading both got two answers.
+  */
+  it("states the crawler policy robots.txt enforces", () => {
+    expect(llms).not.toContain("unresolved");
+    expect(llms).toContain("Training-corpus crawlers are disallowed everywhere");
+    expect(llms).toContain("ClaudeBot, which is a fetch-time agent rather than a training crawler");
   });
 });
