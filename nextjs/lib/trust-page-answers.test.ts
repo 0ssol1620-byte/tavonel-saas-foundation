@@ -370,18 +370,46 @@ describe("/trust indexes the six published surfaces", () => {
       neither can be dropped without a red test, which is tighter than the one substring was.
     */
     expect(document).toContain("## Annex A — clauses completed at signature");
-    for (const clause of ["§1 Governing law", "§9 Recovery objectives", "§10 Transfer mechanism", "§13 Liability and precedence"]) {
+    /*
+      G2-018 and G2-019 (SD-07), 2026-09-16 — edited from the commerce-legal lane, which owns the
+      copy this case pins and not this file. Listed as a cross-lane note in that lane's report.
+
+      Three of the four clauses this case pinned as open are settled in Draft v1, so the markers
+      it looked for are gone by design rather than by accident: governing law and jurisdiction in
+      §1 (Republic of Korea, Seoul Central District Court, the same as /terms), the transfer
+      mechanism in §10 (the Standard Contractual Clauses, the UK Addendum for a transfer from the
+      United Kingdom, and the module mapping), and the liability cap in §13 at the fees of the
+      preceding twelve months, which is the cap /terms states.
+
+      The shape of the guard does not change, and the shape is what matters: a clause still open
+      is listed in Annex A *and* marked in place in the body, and a clause now settled is pinned
+      to the words that settle it. An edit that quietly reopens one, or that states a different
+      cap here than on /terms, fails here instead of shipping two contracts.
+    */
+    for (const clause of ["§9 Recovery objectives", "§10 Transfer annexes", "§13 Signature"]) {
       expect(document, `${clause} has to be listed in the annex`).toContain(clause);
     }
     for (const inPlace of [
-      "| Governing law | To be specified in the executed version",
-      "**Transfer mechanism: to be annexed",
       "Recovery objectives and a drill cadence: to be specified in the executed version",
-      "To be specified in the executed version — see Annex A: the liability cap",
+      "The signature blocks and the parties' registered details are completed in the",
     ]) {
       expect(document, `"${inPlace}" is the marker in place; the annex is not a substitute for it`)
         .toContain(inPlace);
     }
+    for (const settled of [
+      "| Governing law | The Republic of Korea, with the Seoul Central District Court",
+      "**Transfer mechanism: the Standard Contractual Clauses.**",
+      "limited to the fees paid to TAVONEL in the twelve months immediately before the event",
+    ]) {
+      expect(document, `"${settled}" is a Draft v1 term and may not be quietly reopened`)
+        .toContain(settled);
+    }
+    expect(
+      read("app/terms/page.tsx"),
+      "the cap in the DPA and the cap on /terms are one number, not two",
+    ).toContain("fees you paid to TAVONEL in the twelve months");
+    expect(document, "the party block may not deny what the live operator disclosure publishes")
+      .not.toContain("is not published in the pilot deployment");
     expect(document, "and the document may not publish our project plan as a checklist")
       .not.toContain("What has to happen before this is a signable document");
     expect(document, "the deletion clause must not promise a provider's backup expiry").toContain(

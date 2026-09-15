@@ -41,13 +41,35 @@ nobody has tested. What changed is not the argument but who was entitled to sett
 delegated decision was taken, and these are version-1 commitments that move only with a new
 version of the served document or a reversal in the decision log.
 
+## Delegated decision, 2026-09-16 (SD-07), and what it took out of Annex A
+
+**Who decided this.** Not the founder. Four of the five clauses listed as open on 2026-09-11 were
+settled on 2026-09-16 by the orchestrating agent under the delegation recorded in
+`docs/policy/DECISION_LOG_2026-09-16.md` (SD-07). The founder's counsel review is still required
+and is still pending; the served document carries **Draft v1 — under review** and says in its own
+first lines that no lawyer has read it.
+
+| Clause | Draft v1 term | Why this term |
+|---|---|---|
+| §1 Governing law | The Republic of Korea, with the Seoul Central District Court as the court of exclusive jurisdiction | The operator, the entity and the database are in Korea. `/terms` states the same law and the same court as of the same date, so the two documents cannot send one dispute to two places. A consumer's home-court right is preserved in both. |
+| §1 Party block | The registered name, representative, registration number and address are the ones published in the operator disclosure | G2-019. The clause said the operator disclosure "is not published in the pilot deployment" while `/terms`, `/privacy`, `/subprocessors` and every legal footer publish it. Three documents said three different things about one legal fact. |
+| §10 Transfer mechanism | The EU Standard Contractual Clauses of 4 June 2021 — Module Two controller-to-processor, Module Three for onward transfer — with the UK International Data Transfer Addendum for a transfer from the United Kingdom | G2-018. No EEA or UK buyer could sign a DPA whose transfer mechanism was deferred to an annex. The modules are the only ones this relationship can be: the customer is the controller of the personal data in their documents and TAVONEL is the processor. The completed annexes and the transfer impact assessment stay at signature. |
+| §13 Liability | Capped at the fees paid in the twelve months before the event, with the non-excludable carve-outs, and stated as one limit shared with the service terms rather than two | `/terms` gained the same cap on the same day under the same decision. Two caps for one relationship is how a customer recovers twice for one set of facts, or spends the dispute arguing about which applies. |
+
+`nextjs/lib/trust-page-answers.test.ts` was updated in the same commit: the guard pins an open
+clause to its in-place marker and a settled clause to the words that settle it, and it now also
+checks the DPA's cap against the cap rendered on `/terms`. That file belongs to the trust-content
+lane, and the edit is recorded as a cross-lane note in `reports/LANE_commerce-legal.md`.
+
 ## Still open, and still not an agent's call
 
-Governing law and jurisdiction (§1) · transfer mechanism and any Standard Contractual Clauses
-(§10) · recovery objectives (§9) · liability, precedence and signature blocks (§13) · the
-operating entity's registered details (§1). These five are the served document's Annex A, and the
-annex is the list -- adding a sixth open clause means adding a row there, not a sixth notice in
-the body.
+Recovery objectives (§9) · the completed SCC and UK Addendum annexes, including the transfer
+impact assessment (§10) · the signature blocks and the parties' registered details as they appear
+on the executed version (§13). These three are the served document's Annex A, and the annex is the
+list -- adding a fourth open clause means adding a row there, not a fourth notice in the body.
+
+Above all of it: none of the 2026-09-16 wording has been read by a lawyer. The founder's counsel
+review is the gate, and until it returns the served document is a draft that says so.
 
 Two customer-facing disclosures came off the served text on 2026-09-12 and are recorded here
 instead. BA-168: §4's confidentiality clause no longer states that the number of people with
