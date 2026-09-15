@@ -8,6 +8,7 @@ import { COOKBOOKS, COOKBOOK_SLUGS } from "./cookbook-content";
 import { publicPageLocation } from "./marketing-analytics";
 import { pageMetadata } from "./page-seo";
 
+
 /*
   robots.txt, sitemap.xml and llms.txt describe the same public surface, and nothing kept them
   agreeing.
@@ -96,7 +97,19 @@ const pages = findFiles(appDirectory, "page.tsx").map((path) => {
 });
 
 const routeMatchers = pages.map((page) => page.matcher);
-const isRealRoute = (path: string) => path === "/" ? routeMatchers.some((m) => m.test("/")) : routeMatchers.some((m) => m.test(path));
+const resolvesToPage = (path: string) => path === "/" ? routeMatchers.some((m) => m.test("/")) : routeMatchers.some((m) => m.test(path));
+/*
+  T1-013 -- an advertised URL may be served by a route handler rather than by a page.
+
+  The sitemap now carries `/changelog/feed.xml`, which is a `route.ts`. Every assertion that asks
+  "does this exist" has to accept one, and every assertion that reads a page's `<head>` has to
+  skip one, because a feed has no head. Both directions matter, and the lazy repair for either --
+  stop checking -- is how a genuinely dead URL gets in a year later.
+
+  `handlerRoutes` is declared further down and read here at call time, which is after this module
+  finishes evaluating.
+*/
+const isRealRoute = (path: string) => resolvesToPage(path) || handlerRoutes.includes(path);
 
 /*
   robots.txt path semantics: a Disallow value is a prefix match on the path. None of ours use the
@@ -130,7 +143,17 @@ const handlerRoutes = findFiles(appDirectory, "route.ts").map((path) => `/${segm
 const allRoutes = [...pages.map((page) => page.route), ...handlerRoutes];
 const withheldBy = (token: string) => allRoutes.filter((route) => route === token || route.startsWith(token.endsWith("/") ? token : `${token}/`));
 
-const sitemapPaths = sitemap().map((entry) => new URL(entry.url).pathname);
+const sitemapEntries = sitemap();
+const sitemapPaths = sitemapEntries.map((entry) => new URL(entry.url).pathname);
+/*
+  The sitemap paths that are pages, which is every one of them except the feed.
+
+  Split here rather than case-guarded at four call sites: the head reader, the noindex guard and
+  the analytics-coverage guard all mean "page", and the existence guard means "URL". Naming the
+  two sets apart is what keeps a future non-page entry from silently skipping the page checks.
+*/
+const sitemapPagePaths = sitemapPaths.filter((path) => resolvesToPage(path));
+const sitemapHandlerPaths = sitemapPaths.filter((path) => !resolvesToPage(path));
 const llmsPaths = [...readFileSync(resolve(import.meta.dirname, "../public/llms.txt"), "utf8").matchAll(/https:\/\/tavonel\.com(\/[^)\s]*)?/g)].map((match) => (match[1] ?? "/").replace(/\/$/, "") || "/");
 
 /*
@@ -189,7 +212,7 @@ const READER_CONTROLS = [
 ];
 
 const heads = new Map<string, Metadata>();
-for (const path of new Set([...sitemapPaths, ...llmsPaths, ...READER_CONTROLS])) {
+for (const path of new Set([...sitemapPagePaths, ...llmsPaths, ...READER_CONTROLS])) {
   const page = pages.find((candidate) => candidate.matcher.test(path));
   // An advertised path that resolves to no page is its own failure, asserted below. It must not
   // take the whole file down at collect time.
@@ -290,7 +313,7 @@ describe("public surface: robots, sitemap and llms.txt agree", () => {
     as an optimisation.
   */
   it("gives every named search crawler the same private list as *", () => {
-    expect(SEARCH_RULES.map((rule) => rule.userAgent)).toEqual(["OAI-SearchBot", "PerplexityBot", "Googlebot", "*"]);
+    expect(SEARCH_RULES.map((rule) => rule.userAgent)).toEqual(["OAI-SearchBot", "PerplexityBot", "ClaudeBot", "Googlebot", "*"]);
     for (const rule of SEARCH_RULES) expect(rule.disallow, `${String(rule.userAgent)} disagrees with *`).toEqual(genericDisallow);
   });
 
@@ -305,14 +328,14 @@ describe("public surface: robots, sitemap and llms.txt agree", () => {
     crawler that arrives in the training list by copy-paste removes the site from search, and every
     other assertion in this file would still pass.
   */
-  const TRAINING_TOKENS = ["GPTBot", "CCBot", "ClaudeBot", "anthropic-ai", "Google-Extended", "Applebot-Extended", "Bytespider", "Meta-ExternalAgent"];
+  const TRAINING_TOKENS = ["GPTBot", "CCBot", "anthropic-ai", "Google-Extended", "Applebot-Extended", "Bytespider", "Meta-ExternalAgent"];
 
   /*
     A fetch a person asked for is a visit, not a corpus crawl, so these five stay allowed. Two are
     named groups; the other three fall to `*`, which allows them -- and that is the assertion that
     matters, because "allowed by default" is one careless list edit away from "refused".
   */
-  const USER_TRIGGERED_TOKENS = ["Claude-User", "Claude-SearchBot", "ChatGPT-User", "OAI-SearchBot", "PerplexityBot"];
+  const USER_TRIGGERED_TOKENS = ["Claude-User", "Claude-SearchBot", "ChatGPT-User", "OAI-SearchBot", "PerplexityBot", "ClaudeBot"];
 
   it("disallows every training crawler everywhere", () => {
     expect(TRAINING_RULES.map((rule) => rule.userAgent)).toEqual(TRAINING_TOKENS);
@@ -323,7 +346,7 @@ describe("public surface: robots, sitemap and llms.txt agree", () => {
   });
 
   it("keeps the two groups apart, so neither can become the other", () => {
-    for (const search of ["OAI-SearchBot", "PerplexityBot", "Googlebot", "*"]) {
+    for (const search of ["OAI-SearchBot", "PerplexityBot", "ClaudeBot", "Googlebot", "*"]) {
       expect(TRAINING_TOKENS, `${search} in the training block would remove this site from search`)
         .not.toContain(search);
     }
@@ -336,17 +359,23 @@ describe("public surface: robots, sitemap and llms.txt agree", () => {
   });
 
   /*
-    Both of Anthropic's tokens are on the list: `ClaudeBot` is what the current crawler sends and
-    `anthropic-ai` is the older one, so listing only the retired token would leave the one in use
-    allowed by `*`. FD-61 closed that gap, and it closed only the tokens it named -- the rest stay
-    open in the crawler policy, because an open decision that stops being written down is an open
-    decision nobody makes.
+    One operator sends two tokens, and SD-05 (`docs/policy/DECISION_LOG_2026-09-16.md`) put them
+    in different groups, superseding the ClaudeBot half of FD-61: `ClaudeBot` fetches when a
+    person asks a question, `anthropic-ai` is the older corpus token.
+
+    Both halves are pinned, because each drifts back in its own silent way. `anthropic-ai` sliding
+    into the allow-list gives away a licence position in a commit about SEO; `ClaudeBot` sliding
+    back into the training list removes the site from an answer engine, and every other assertion
+    in this file stays green while it does. FD-61's other tokens are unchanged, and the ones it
+    did not rule on stay open in the crawler policy -- an open decision that stops being written
+    down is an open decision nobody makes.
   */
-  it("refuses both of the operator's tokens, not just the retired one", () => {
-    for (const token of ["ClaudeBot", "anthropic-ai"]) {
-      expect(TRAINING_TOKENS, `${token} is named by FD-61`).toContain(token);
-    }
-    expect(crawlerPolicy, "the policy must name what it refuses").toContain("ClaudeBot");
+  it("splits the operator's two tokens the way SD-05 decided, in both files", () => {
+    expect(TRAINING_TOKENS, "anthropic-ai is the corpus token and stays refused").toContain("anthropic-ai");
+    expect(TRAINING_TOKENS, "ClaudeBot fetches because a person asked, and is allowed").not.toContain("ClaudeBot");
+    expect(SEARCH_RULES.map((rule) => String(rule.userAgent)), "and it is allowed by name, not by the * default").toContain("ClaudeBot");
+    expect(crawlerPolicy, "the policy must name what it refuses").toContain("anthropic-ai");
+    expect(crawlerPolicy, "and must say which token it now allows, and on whose decision").toContain("SD-05");
     expect(crawlerPolicy, "robots.txt is a request, not a technical measure").toContain("not access control");
   });
 
@@ -424,7 +453,7 @@ describe("public surface: every disallowed path is deliberate", () => {
 */
 describe("public surface: the sitemap advertises only approved pages", () => {
   it("lists no page that declares itself noindex", () => {
-    const contradictions = sitemapPaths.filter((path) => isNoindex(path));
+    const contradictions = sitemapPagePaths.filter((path) => isNoindex(path));
     expect(contradictions, "in the sitemap and noindex: the site asks a crawler to index a page whose own head refuses").toEqual([]);
   });
 
@@ -514,7 +543,7 @@ describe("public surface: the Korean subtree", () => {
 */
 describe("public surface: what is advertised is what is measured", () => {
   it("has every sitemap path on the consented analytics set", () => {
-    const unmeasured = sitemapPaths.filter((path) => publicPageLocation(path) === null);
+    const unmeasured = sitemapPagePaths.filter((path) => publicPageLocation(path) === null);
     expect(unmeasured, "advertised in the sitemap and measured nowhere").toEqual([]);
   });
 
@@ -740,5 +769,173 @@ describe("public surface: no process vocabulary in published copy", () => {
         .toContain("docs/policy/DECISION_LOG_2026-09-11.md");
       expect(source, `${path} must name the row it came from`).toMatch(/FD-\d\d/);
     }
+  });
+});
+
+/*
+  The three facts this campaign added to the sitemap, each checked as the thing that would be
+  wrong if it regressed rather than as a copy of the file that produces it.
+*/
+describe("public surface: the sitemap says when, and names the feed", () => {
+  /*
+    G2-046. The entries carried `changefreq` and `priority` -- both ignored by Google -- and no
+    `lastmod`, which is the one it reads.
+
+    Not asserted: that the dates differ from one another. `app/sitemap.ts` reads them from
+    `git log -1` per route file, and a shallow clone (which is what `actions/checkout` produces by
+    default) legitimately answers with the tip commit for every path. All-or-nothing plus "not in
+    the future" is what is true in a full clone and a shallow one alike, and a date in the future
+    is the actual failure mode of a hand-written or clock-derived value.
+  */
+  it("gives every entry a real modification date, or none of them one", () => {
+    const dated = sitemapEntries.filter((entry) => entry.lastModified !== undefined);
+    expect(
+      dated.length === 0 || dated.length === sitemapEntries.length,
+      "some entries carry lastmod and some do not, which is a partial read rather than a policy",
+    ).toBe(true);
+    const now = Date.now();
+    for (const entry of dated) {
+      expect(entry.lastModified, `${entry.url} has a lastmod that is not a date`).toBeInstanceOf(Date);
+      expect(new Date(entry.lastModified as Date).getTime(), `${entry.url} was modified in the future`).toBeLessThanOrEqual(now);
+    }
+  });
+
+  /*
+    T1-013. The Atom feed was reachable only from a `<link rel="alternate">` in one page's head,
+    which is how a browser finds it and not how an indexer does.
+  */
+  it("advertises the changelog feed, and it resolves to a handler rather than a page", () => {
+    expect(sitemapPaths).toContain("/changelog/feed.xml");
+    expect(handlerRoutes, "the feed is a route.ts, and the sitemap may not point at a missing one").toContain("/changelog/feed.xml");
+    expect(sitemapHandlerPaths, "a new non-page sitemap entry skips every head check above -- add it deliberately or not at all").toEqual(["/changelog/feed.xml"]);
+  });
+
+  /*
+    T1-008 / G1-028 / G2-027 -- every advertised page has a share card, checked as a file beside
+    the page rather than by parsing a rendered head.
+
+    The mechanism is why that is the right check. A page's own `openGraph` object replaces the
+    inherited one rather than merging into it, so the root `app/opengraph-image.tsx` reached `/`
+    and nothing else, and the only thing that puts an image back is a metadata file in the page's
+    own route segment. A page added without one unfurls as a bare line of text in Slack, which
+    nobody notices until someone shares it.
+  */
+  it("has an opengraph-image beside every page the sitemap advertises", () => {
+    const missing = sitemapPagePaths.filter((path) => {
+      const page = pages.find((candidate) => candidate.matcher.test(path));
+      if (!page) return true;
+      return !readdirSync(resolve(page.file, "..")).includes("opengraph-image.tsx");
+    });
+    expect(missing, "advertised in the sitemap and shares with no card").toEqual([]);
+  });
+});
+
+/*
+  The head facts this campaign fixed, read from the files that decide them.
+
+  Each is a value that renders, looks right in a browser, and is wrong -- the class of defect a
+  rendering check cannot see, which is why they are pinned as source.
+*/
+describe("public surface: the head is in the head, and says its own address", () => {
+  const nextConfigSource = readFileSync(resolve(import.meta.dirname, "../next.config.mjs"), "utf8");
+
+  /*
+    T1-002 / G2-033. Next streams `metadata` into the body after `</head>` on a dynamically
+    rendered route unless the user agent matches `htmlLimitedBots`. `/` and `/pricing` are both
+    `force-dynamic`, so title, description, canonical, the hreflang pair and every og:* tag
+    arrived ~20KB into the body for every browser, unfurler and simple parser -- measured on
+    production 2026-09-15 as the head ending at byte 2,113 and <title> appearing at byte 22,911.
+
+    A match-all regex is the whole fix, and there is no other switch in 15.5.24. The assertion is
+    that the regex matches an ordinary browser rather than that the key is present, because
+    `htmlLimitedBots` narrowed to a list of bots is the default behaviour wearing a config line.
+  */
+  it("serves blocking metadata to every user agent, not only to bots", () => {
+    const declared = /htmlLimitedBots:\s*\/(.*?)\/([a-z]*),/.exec(nextConfigSource);
+    expect(declared, "next.config.mjs must declare htmlLimitedBots as a RegExp literal").toBeTruthy();
+    const pattern = new RegExp(declared![1], "i");
+    for (const ua of [
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/126.0.0.0 Safari/537.36",
+      "Googlebot",
+      "Slackbot-LinkExpanding 1.0",
+      "facebookexternalhit/1.1",
+    ]) {
+      expect(pattern.test(ua), `${ua} would still be served its metadata after </head>`).toBe(true);
+    }
+  });
+
+  /*
+    T1-009. `preload` is what hstspreload.org requires a header to say before the domain may be
+    submitted at all; the submission itself is the founder's action and is not automated here.
+  */
+  it("states the preload directive on HSTS", () => {
+    expect(nextConfigSource).toContain('value: "max-age=31536000; includeSubDomains; preload"');
+  });
+
+  /*
+    G2-029. The root layout declares `canonical: "/"` as the safety net for pages that declare
+    none, and the 404 declared none -- so every junk URL anyone had ever linked was telling a
+    crawler its content is the homepage's, with the homepage's title and description on the share
+    card. `null` removes the tag rather than pointing it elsewhere: one component answers for
+    every unmatched path, so there is no address to prefer.
+  */
+  it("gives the 404 its own head and no canonical at all", async () => {
+    const head = (await import("@/app/not-found")).metadata;
+    expect(head.alternates?.canonical, "a 404 that canonicalises to the homepage lends it every junk URL").toBeNull();
+    expect(String(head.title)).toMatch(/not found/i);
+    expect(head.description, "the 404 must not inherit the homepage's description").toBeTruthy();
+    // Read as source rather than imported: `app/layout.tsx` calls next/font at module scope, which
+    // has no loader under vitest.
+    expect(readFileSync(resolve(appDirectory, "layout.tsx"), "utf8"), "the 404 is printing the layout's description").not.toContain(String(head.description));
+  });
+
+  /*
+    G2-030. The 404 used to be the auth shell -- no nav, no footer, and "Open your workspace" as
+    the way out of a mistyped URL, offered to a visitor who has no account. The header and footer
+    are the recovery; the assertion is on the chrome, because that is the part a redesign drops
+    quietly.
+  */
+  it("renders the site chrome on the 404, not the auth shell", () => {
+    const source = readFileSync(resolve(appDirectory, "not-found.tsx"), "utf8");
+    expect(source).toContain("PublicSitePage");
+    expect(source, "a sign-in wall is not a recovery destination for an anonymous visitor").not.toContain('"/workspace"');
+    for (const href of ["/docs", "/pricing", "/trust", "/contact"]) {
+      expect(source, `${href} is one of the recovery links`).toContain(`"${href}"`);
+    }
+  });
+
+  /*
+    G1-031. `WebSite` is the one node this graph could add honestly. The assertions that matter
+    are that it is there, that the three nodes are one linked entity, and that no `potentialAction`
+    came with it: a SearchAction declares a URL template a search engine may send a query to, and
+    this site has none -- the documentation search is a client-side filter with no query in the
+    address.
+  */
+  it("emits Organization, WebSite and SoftwareApplication as one linked graph", () => {
+    const layout = readFileSync(resolve(appDirectory, "layout.tsx"), "utf8")
+      // The comment above the graph names the schemas this file deliberately does not emit, so
+      // a substring test over the raw source finds every one of them. Comments out, then read.
+      .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, " ")
+      .replace(/\/\*[\s\S]*?\*\//g, " ");
+    for (const type of ['"@type": "Organization"', '"@type": "WebSite"', '"@type": "SoftwareApplication"']) {
+      expect(layout).toContain(type);
+    }
+    expect(layout, "the three nodes are one entity, linked by @id").toContain('"@id": "https://tavonel.com/#organization"');
+    expect(layout, "a SearchAction advertises a query endpoint this site does not have").not.toContain("potentialAction");
+  });
+
+  /*
+    G1-046's `Dataset` half is refused rather than built, and the refusal is the assertion.
+
+    `lib/structured-data.test.ts` bans the word across every JSON-LD emitter because a `Dataset`
+    needs a `distribution` at an address and a `license`, and this deployment has neither for the
+    `/explore` sample. This checks that the reason is still written where the next person to read
+    the finding will look, instead of the guard being a bare refusal somebody deletes.
+  */
+  it("says why there is no Dataset helper, where the next reader will look", () => {
+    const source = readFileSync(resolve(import.meta.dirname, "structured-data.ts"), "utf8");
+    expect(source, "G1-046 has to be answered in the file that would carry the answer").toContain("G1-046");
+    expect(source).toContain("license");
+    expect(source).toContain("distribution");
   });
 });
