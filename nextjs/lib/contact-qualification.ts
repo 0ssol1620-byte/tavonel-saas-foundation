@@ -63,14 +63,29 @@ export const QUALIFICATION: readonly QualificationField[] = [
     label: "Timeline",
     options: ["Exploring", "Within a quarter", "Within a month", "Already committed"],
   },
+  /*
+    G2-024, 2026-09-16. A form field is a promise, and these two were promising twice.
+
+    "Deployment requirement: Air-gapped or on-premise" and "Data region requirement: Korea / EU /
+    UK / US" read as a menu of things we can deliver. Nothing on the site supports either: there
+    is one managed deployment, `/security` says no data residency is guaranteed, and
+    `/subprocessors` publishes the region each service is configured for rather than a region a
+    customer may pick. A visitor ticking "Air-gapped" was being told we have one.
+
+    The questions stay, because the answers are genuinely useful to whoever replies: knowing that
+    a prospect needs EU residency is how the first reply says so honestly, instead of two rounds
+    later. What changed is the word. They ask what you would prefer, and each label states that
+    not every answer is available today. The `name` values are untouched --
+    `contact-qualification.test.ts` pins them and the server's allow-list is keyed on them.
+  */
   {
     name: "deployment",
-    label: "Deployment requirement",
+    label: "Deployment preference (one managed deployment is offered today)",
     options: ["Not decided", "Managed by TAVONEL", "Our own cloud account", "Air-gapped or on-premise"],
   },
   {
     name: "region",
-    label: "Data region requirement",
+    label: "Data region preference (not all regions are offered today)",
     options: ["Not decided", "Korea", "European Union", "United Kingdom", "United States", "Elsewhere"],
   },
 ] as const;

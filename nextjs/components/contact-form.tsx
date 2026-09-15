@@ -46,6 +46,15 @@ export default function ContactForm() {
 
   return (
     <form className="contact-form" onSubmit={(event) => void submit(event)}>
+      {/*
+        G2-034. Which fields are required, before the submit rather than after it.
+
+        Three fields are required and none of them said so, so a visitor discovered it from a
+        browser validation bubble on whichever one the browser reached first. The mark is rendered
+        inside the label beside the field name, and the word is spelled out for a screen reader
+        rather than left as a bare asterisk.
+      */}
+      <p className="fine">Three fields are needed for a reply. They are marked Required.</p>
       <div className="contact-pair">
         <Field label="Name" name="name" autoComplete="name" minLength={2} maxLength={80} required />
         <Field label="Work email" name="email" type="email" autoComplete="email" maxLength={254} required />
@@ -98,7 +107,7 @@ export default function ContactForm() {
       </details>
       <label className="contact-field">
         {/* BA-141. The abstract question asked for an essay; the concrete one gets an answer. */}
-        <span>What are you trying to do?</span>
+        <span>What are you trying to do? <RequiredMark /></span>
         <textarea
           name="message"
           rows={8}
@@ -136,10 +145,15 @@ function collect(data: FormData) {
   return body;
 }
 
+/** Announced as a word, not as an asterisk a screen reader may skip or read as "star". */
+function RequiredMark() {
+  return <small className="fine">Required</small>;
+}
+
 function Field({ label, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) {
   return (
     <label className="contact-field">
-      <span>{label}</span>
+      <span>{label} {props.required ? <RequiredMark /> : null}</span>
       <input {...props} />
     </label>
   );

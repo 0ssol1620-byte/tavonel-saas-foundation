@@ -18,7 +18,25 @@ export const LEGAL_EFFECTIVE_DATE = "2026-08-30";
   the terms began to apply and does not move when wording changes; this is the day the wording
   last changed, and it is the date of the commit that changed it.
 */
-export const LEGAL_LAST_UPDATED = "2026-09-12";
+export const LEGAL_LAST_UPDATED = "2026-09-16";
+
+/*
+  SD-07. One draft label, on every legal document, until counsel signs it off.
+
+  /terms gained governing law, a liability cap, a warranty disclaimer, an indemnity and a
+  change-notice clause on 2026-09-16; /privacy gained the framework names, a legal basis per
+  purpose and a cookie table; /refunds collapsed two conflicting rules into one. None of it has
+  been read by a lawyer, and a document governing live paid subscriptions that says nothing about
+  its own review status invites a reader to assume it has had one.
+
+  The wording is the customer's, per the "Public wording of delegated values" section of
+  `docs/policy/DECISION_LOG_2026-09-11.md`: a document under review says that it is under review,
+  and the process vocabulary stays in the log. It is one constant so the four documents cannot
+  end up carrying three different disclaimers, and so that removing it after a legal review is
+  one edit in one place.
+*/
+export const LEGAL_DRAFT_NOTICE =
+  "Draft v1 — under review. This text is published so you can read the terms before asking for them. It has not yet been reviewed by a lawyer, and it is revised in place when that review returns; the last-updated date above is the day it last changed.";
 
 export function readPublicOperations() {
   const commercial = readCommercialState();
