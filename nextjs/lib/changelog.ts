@@ -61,6 +61,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
       "A version lifecycle and deprecation policy on /docs/changelog: what can change without notice, what counts as breaking, and the 180-day support window a deprecated version keeps.",
       "The two integration-recipe scripts are published under /developer/ and pinned by sha256 in the distribution channel, so the recipes on /docs/integration-recipes can be run rather than read.",
       "Endpoint documentation for the thirteen operations that had none: the World lenses' companions, run events, reviews, manifest status, connections, OAuth connectors, key rotation and the audit trail.",
+      "The research receipts behind the published figures are downloadable, each with its full sha256, so a number on this site can be checked against the artifact it came from rather than taken on trust.",
     ],
     improved: [
       "The two per-source ceilings this deployment enforces — 5 MB and 80 pages — are published on the pages that promise the ceilings, with the code a refusal carries.",

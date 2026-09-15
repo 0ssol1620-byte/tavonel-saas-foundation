@@ -1,4 +1,5 @@
 import { ACTIVATION_RATE_LIMIT } from "./activation-rate-limit";
+import { activationPolicy } from "./activation-policy";
 import { API_VERSION } from "./api-version";
 import { COMPILE_MAX_DOCUMENTS, COMPILE_MIN_DOCUMENTS, CORPUS_MAX_DOCUMENTS } from "./compile-limits";
 import { MAX_FILES, MAX_SYNC_ARCHIVE_BYTES, MAX_WORKER_ARCHIVE_BYTES } from "./archive-expand";
@@ -146,6 +147,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
     group: "Getting started",
     summary: "From an API key to a verified evidence-bound answer, with the one step no key can take.",
     blocks: [
+      { kind: "note", text: `**Before you start.** ${activationPolicy.customerData.reason} So steps 1 to 5 below are the contract you will call once intake is arranged with us, not a request this deployment will accept from you today. Steps 6 and 7 read a World that already exists, and the completed public Compiled World is readable in full right now — including from the unauthenticated reads the API reference at /api will run for you.` },
       { kind: "prose", text: "Every request is tenant-scoped by the key it carries. There is no account switch and no impersonation header: a key belongs to one workspace and reaches nothing else." },
       { kind: "heading", text: "The seven steps" },
       {
@@ -165,7 +167,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
       { kind: "heading", text: "Why step 5 stops a script" },
       {
         kind: "note",
-        text: "Step 5 is the one that stops a script, and it stops for two separate reasons. Promotion is human-only by design — a candidate is not organizational truth until a person says so, and no API key of any plan has a promote or rollback path to call. Separately, the activation surface is plan-gated: it runs on the **Developer** plan held by the workspace **owner**, or on the **Team** plan under its usual workspace roles, so steps 1-4 and 6-7 work on Developer today and step 5 does too when you own the workspace. Any other caller is refused with `STUDIO_SUBSCRIPTION_REQUIRED`, and an evaluation trial with `SUBSCRIPTION_REQUIRED`; branch on those two codes. Team is arranged with us rather than bought at a checkout.",
+        text: "Step 5 is the one that stops a script, and it stops for two separate reasons. Promotion is human-only by design — a candidate is not organizational truth until a person says so, and no API key of any plan has a promote or rollback path to call. Separately, the activation surface is plan-gated: it runs on the **Developer** plan held by the workspace **owner**, or on the **Team** plan under its usual workspace roles, so steps 1-4 and 6-7 are what a Developer key is scoped for, and step 5 is open to you as well when you own the workspace. Any other caller is refused with `STUDIO_SUBSCRIPTION_REQUIRED`, and an evaluation trial with `SUBSCRIPTION_REQUIRED`; branch on those two codes. Team is arranged with us rather than bought at a checkout. That is the plan gate, and it is not the only one: the deployment-wide intake gate at the top of this page stops steps 1 to 4 on every plan until intake is arranged, so a Developer key passing the plan check still will not compile your files here today.",
       },
       { kind: "heading", text: "Compile a document set" },
       {
@@ -621,6 +623,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
     group: "Input and compile",
     summary: "Direct-to-storage upload, and why bytes never reach the application server.",
     blocks: [
+      { kind: "note", text: `**Before you start.** ${activationPolicy.customerData.reason} Everything on this page is the contract the capability endpoint serves once intake is arranged; it is not a request this deployment will accept from you today.` },
       { kind: "heading", text: "Why bytes never reach our server" },
       { kind: "prose", text: "Uploads are direct. The capability endpoint returns a short-lived URL to object storage; you PUT the bytes there. The application server sees the request for permission and the receipt afterwards, and never the document." },
       { kind: "heading", text: "Requesting a capability and listing documents" },
