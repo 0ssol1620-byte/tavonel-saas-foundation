@@ -29,7 +29,19 @@ export default function MobilePrimaryNav({ cta }: { cta?: SiteLink }) {
   return (
     <details className="mobile-primary-nav one-path-mobile-nav" ref={ref}
       onToggle={(event) => window.dispatchEvent(new CustomEvent(NAV_OPEN_EVENT, { detail: { open: event.currentTarget.open } }))}>
-      <summary aria-label="Open site navigation">Menu</summary>
+      {/*
+        T1-006 -- no `aria-label`, on purpose.
+
+        It read "Open site navigation" while the control reads MENU, so the accessible name did
+        not contain the visible text: WCAG 2.5.3, and a real failure rather than a lint opinion --
+        a voice-control user says "click menu" and nothing happens, because the name the assistive
+        layer matches against is the label, not the word on screen. Native `<summary>` takes its
+        name from its own text, and the text is the better name, so the fix is to delete the
+        attribute rather than to rewrite it. Open/closed state is announced by the `<details>`
+        element itself, which is what the label was trying to add and what it broke the name to
+        say.
+      */}
+      <summary>Menu</summary>
       <nav aria-label="Mobile sections">
         {CUSTOMER_NAV.map((item) => (
           <a key={item.href} className="mobile-nav-direct" href={item.href}
