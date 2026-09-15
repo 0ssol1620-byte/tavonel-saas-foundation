@@ -1006,7 +1006,18 @@ describe("the site's own vocabulary", () => {
   */
   it("gives the two widths one action, from one object", () => {
     const chrome = prose("components/public-site-chrome.tsx");
-    expect(chrome, "the header renders the action it was given").toContain("{cta.label}");
+    /*
+      G1-043. The header renders `ctaLabel`, not `cta.label`, and the two lines below are why that
+      is still one action from one object rather than a label of the header's own: `ctaLabel` is
+      `cta.label` unless the page is /ko, where it is that action's Korean name keyed by the same
+      destination. The chrome may still write neither English literal itself.
+    */
+    expect(chrome, "the header derives its label from the action it was given")
+      .toContain("const ctaLabel = korean ? KO_CHROME.cta[cta.href] ?? cta.label : cta.label;");
+    expect(chrome, "and renders that").toContain("{ctaLabel}");
+    for (const literal of ["Request access", "Start with your files"]) {
+      expect(chrome, `the header writes "${literal}" instead of reading it`).not.toContain(literal);
+    }
     expect(chrome, "and hands the same object to the phone sheet").toContain("<MobilePrimaryNav cta={cta} />");
     const sheet = prose("components/mobile-primary-nav.tsx");
     expect(sheet, "the sheet renders the object, not a label of its own").toContain("{cta.label}");

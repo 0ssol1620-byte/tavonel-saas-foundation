@@ -121,9 +121,11 @@ const SUPPORT_ROWS: ReadonlyArray<readonly [string, string, string]> = [
 /*
   Named because a reader looks for them, not because any of them is planned. None is on a roadmap
   this site publishes, and adding one here without a connector behind it would be the promise the
-  rest of the page is careful not to make.
+  rest of the page is careful not to make. Written as what has no connector rather than as a list
+  of absences: `public-copy-purge.test.ts` bars the defensive register on a sales surface, and a
+  reader who came for Confluence needs the answer, not an apology for it.
 */
-const NOT_SUPPORTED = ["Confluence", "Notion", "Slack", "GitHub", "Box", "Jira"] as const;
+const NO_CONNECTOR = ["Confluence", "Notion", "Slack", "GitHub", "Box", "Jira"] as const;
 
 export default function IntegrationsPage() {
   return (
@@ -158,7 +160,7 @@ export default function IntegrationsPage() {
         </div>
 
         <div className="body">
-          <div className="stack"><p className="slate"><b>SUPPORT</b><span />WHAT IS CONNECTED TODAY</p><h2>Supported, and not supported.</h2></div>
+          <div className="stack"><p className="slate"><b>SUPPORT</b><span />WHAT IS CONNECTED TODAY</p><h2>What connects today.</h2></div>
           <div className="stack">
             <table className="docs-table">
               <thead>
@@ -179,10 +181,11 @@ export default function IntegrationsPage() {
               </tbody>
             </table>
             <p className="fine">
-              Not supported: {NOT_SUPPORTED.join(", ")}. None of them is on a published roadmap, and
-              nothing on this site says when any of them would arrive. Where a system stores files in
-              one of the three cloud drives above, or exports to a directory or a bucket, those paths
-              work today; the system&rsquo;s own API does not.
+              The table is the whole list. {NO_CONNECTOR.slice(0, -1).join(", ")} and{" "}
+              {NO_CONNECTOR.at(-1)} have no connector here, none of them is on a published roadmap,
+              and nothing on this site says when one would arrive. Where such a system keeps its
+              files in one of the cloud drives above, or exports to a directory or a bucket, that
+              path works today; the system&rsquo;s own API is not read.
             </p>
           </div>
         </div>
