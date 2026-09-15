@@ -25,7 +25,29 @@ const STATE_TOKEN = {
   not_provided: "not_configured",
 } as const;
 
-export function TrustDisclosures({ heading = "WHAT A SECURITY REVIEW WILL FIND" }: { heading?: string }) {
+/*
+  The row's link names where it goes, and a row never links to the page it is on.
+
+  Fourteen identical "Where this is maintained" lines is a footer repeated fourteen times, and on
+  /security six of them pointed at /security. The Trust Center's own rule applies: a link to where
+  you already are is worse than no link.
+*/
+const DESTINATION: Record<string, string> = {
+  "/trust": "More on Trust",
+  "/security": "More on Security",
+  "/status": "More on Status",
+  "/terms": "More in the terms",
+  "/contact": "Ask us directly",
+};
+
+export function TrustDisclosures({
+  heading = "WHAT A SECURITY REVIEW WILL FIND",
+  on,
+}: {
+  heading?: string;
+  /** The page rendering the list, so a row does not link to where the reader already is. */
+  on?: string;
+}) {
   return (
     <>
       <p className="slate"><span />{heading}</p>
@@ -35,8 +57,8 @@ export function TrustDisclosures({ heading = "WHAT A SECURITY REVIEW WILL FIND" 
             <span>{DISCLOSURE_STATUS_LABEL[row.status]}</span>
             <h3>{row.subject}</h3>
             <p>{row.line}</p>
-            {row.href ? (
-              <p className="fine"><Link href={row.href as Route}>Where this is maintained</Link></p>
+            {row.href && row.href !== on ? (
+              <p className="fine"><Link href={row.href as Route}>{DESTINATION[row.href]}</Link></p>
             ) : null}
           </article>
         ))}

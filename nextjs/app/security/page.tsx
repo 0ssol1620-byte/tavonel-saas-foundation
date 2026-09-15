@@ -313,9 +313,23 @@ export default function SecurityPage() {
                 G2-004 / G2-023 / G2-028. The same checklist /trust and /enterprise render, from
                 one module, so a reviewer who starts on any of the three reads the same answers.
               */}
-              <div id="review">
-                <TrustDisclosures />
-              </div>
+              {/*
+                It folds here and nowhere else, and G2-041 is the reason. This page was already
+                8,007 CSS px on a phone, the controls and the two record rows above it already
+                state seven of these sixteen answers in full, and adding the list open took it
+                past thirty phone screens. `status-fold` is the pattern this site uses for a long
+                technical list a reader either wants in full or does not want at all -- /sources
+                folds its tier legend, /benchmarks folds its receipt schema.
+
+                What may not happen is the summary hiding what is inside it. It names all three
+                states, so a reader who never opens it has still been told that some of these
+                answers are "not in place".
+              */}
+              <p className="slate" id="review"><span />WHAT A SECURITY REVIEW WILL FIND</p>
+              <details className="status-fold">
+                <summary>The full checklist: what is in place, what is planned, and what is not in place</summary>
+                <TrustDisclosures on="/security" heading="IN THE ORDER A REVIEW ASKS THEM" />
+              </details>
 
               <p className="slate" id="deployment"><span />CURRENT DEPLOYMENT CONTROLS</p>
               <div className="status-list">

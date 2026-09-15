@@ -892,6 +892,19 @@ describe("the trust disclosures are one list on three pages", () => {
   const module_ = read("lib/trust-disclosures.ts");
   const rows = (source: string) => (source.match(/^ {4}subject: "/gm) ?? []).length;
 
+  it("keeps the /security copy of the list behind a fold, and says so in the summary", () => {
+    // G2-041: /security was already 8,007 CSS px on a phone and states seven of these answers in
+    // full above the list. The fold is the site's pattern for a long technical list (/sources'
+    // tier legend, /benchmarks' receipt schema), and the summary may not hide what is inside it.
+    const page = read("app/security/page.tsx");
+    const fold = page.slice(page.indexOf("<details"), page.indexOf("</details>"));
+    expect(fold).toContain("<TrustDisclosures");
+    expect(fold, "the summary names all three states").toContain("what is in place, what is planned, and what is not in place");
+    for (const open of ["app/trust/page.tsx", "app/enterprise/page.tsx"]) {
+      expect(read(open), `${open} renders the same list open`).not.toContain("<details");
+    }
+  });
+
   it.each(["app/trust/page.tsx", "app/security/page.tsx", "app/enterprise/page.tsx"])(
     "%s renders the shared list rather than its own copy",
     (page) => {
