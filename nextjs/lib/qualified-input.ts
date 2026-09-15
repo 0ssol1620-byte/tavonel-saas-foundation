@@ -3,6 +3,7 @@ import {
   describeAcceptedFormats,
   deriveSourceFamilyChips,
   deriveUploadAccept,
+  offeredAtUpload,
 } from "../../shared/capabilityManifest";
 
 /*
@@ -40,3 +41,25 @@ export const acceptedFormatSentence = describeAcceptedFormats(CAPABILITY_MANIFES
 
 /** One chip per source family for the landing page's input list. */
 export const sourceFamilyChips = deriveSourceFamilyChips(CAPABILITY_MANIFEST);
+
+/*
+  G1-007. The landing page listed spreadsheets and decks beside PDFs as if the four were peers.
+
+  They are not, and the manifest already says so twice: every accepted entry carries the same
+  support tier, and the Office/OpenDocument ones carry `converted_to_pdf_before_reading`. Both
+  facts are read off the manifest here rather than typed beside the chips, so a format that is
+  ever qualified to a higher tier, or ever reads natively, changes this sentence in the same
+  commit that changes the manifest.
+
+  `null` when the tiers ever stop being uniform: a single sentence would then be false, and the
+  landing page renders nothing rather than the wrong summary. /sources prints the full per-format
+  table either way.
+*/
+const OFFERED = offeredAtUpload(CAPABILITY_MANIFEST);
+const TIERS = new Set(OFFERED.filter((entry) => entry.sourceFamily !== "archive").map((entry) => entry.status));
+
+export const sourceSupportTier: string | null = TIERS.size === 1 ? [...TIERS][0]! : null;
+
+export const convertedToPdfFormats: string[] = OFFERED
+  .filter((entry) => (entry.knownLimitations as readonly string[]).includes("converted_to_pdf_before_reading"))
+  .map((entry) => (entry.extensions[0] ?? "").toUpperCase());

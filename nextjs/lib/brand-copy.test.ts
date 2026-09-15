@@ -857,7 +857,16 @@ describe("public copy", () => {
   */
   it("discloses the directed film next to it and keeps the real sample control usable", () => {
     const page = read("components/home-page-client.tsx");
-    expect(page).toContain("approved source film is preserved");
+    /*
+      G1-003 / G1-004. Same note, stronger sentence. The old one disclosed that the cut had been
+      sped up; it did not say the cut draws an extracted table as a ruled grid, labels a result
+      with a section and line number, and lists `.csv` among the sources -- three things the
+      capability manifest and the evidence locator contradict, in bytes that are locked and
+      cannot be re-cut. The note now separates the recreation from the product and states what a
+      compile emits, and this asserts both halves.
+    */
+    expect(page).toContain("A directed film, not a screen recording");
+    expect(page).toContain("the page it was read from");
     expect(page).toContain('className="one-path-film-note"');
     expect(page).toContain("Inspect the public source");
     expect(page).toContain('href={"/explore?act=source" as Route}');

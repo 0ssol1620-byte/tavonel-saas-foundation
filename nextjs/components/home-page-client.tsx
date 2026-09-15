@@ -5,10 +5,11 @@ import type { Route } from "next";
 import { useEffect, useState, type ReactNode } from "react";
 import { ArrowUpRight, Cloud, Files, Server, ShieldCheck } from "lucide-react";
 import CompileStagePlayer, { COMPILE_STAGES } from "@/components/compile-stage-player";
+import DesignPartners from "@/components/design-partners";
 import { PublicSiteHeader } from "@/components/public-site-chrome";
 import Logomark from "@/components/logomark";
 import { FOOTER_GROUPS, ACCESS_CTA, SELF_SERVE_CTA } from "@/lib/site-navigation";
-import { sourceFamilyChips } from "@/lib/qualified-input";
+import { convertedToPdfFormats, sourceFamilyChips, sourceSupportTier } from "@/lib/qualified-input";
 import { trackFunnel } from "@/lib/funnel-events";
 
 /** One customer journey. Existing films illustrate it; the published sample supplies evidence.
@@ -64,7 +65,24 @@ export default function HomePageClient({ liveCommerce, proof }: { liveCommerce: 
               <div className="one-path-hero-film-steps" aria-hidden="true"><span>SOURCE</span><span>READ</span><span>ORGANIZE</span><span>READY FOR AI</span></div>
               <CompileStagePlayer stages={HERO_STAGE} preferVideo playbackRate={1.5} compact priorityPoster />
             </div>
-            <p className="one-path-film-note">Hero V2 presentation — the approved source film is preserved and presented at a faster 12-second pace. The public sample below is the evidence surface.</p>
+            {/*
+              G1-003 / G1-004. The four cuts are locked bytes (`lib/locked-film-assets.json`), and
+              three things drawn inside them are ahead of this deployment: the EXTRACT pane draws a
+              recovered table as a ruled grid, the working copy labels a result with a section and
+              line number, and the source list includes `.csv` files the upload route refuses.
+
+              The frames cannot be edited, so the page stops asserting them. This note names all
+              three and states what a compile emits instead, so a reader is never left inferring a
+              capability from a picture. The remainder that lives only in the pixels is recorded in
+              the lane report; the public sample two scrolls down is the unedited output.
+            */}
+            <p className="one-path-film-note">
+              A directed film, not a screen recording — and three things in it run ahead of this
+              deployment: it draws an extracted table as a ruled grid, labels a result with a
+              section and line number, and lists <code>.csv</code> files among the sources. What a
+              compile emits today is the paragraph as it was printed, the page it was read from and
+              the box it sat in. The public sample below is that output, unedited.
+            </p>
           </div>
         </section>
 
@@ -74,7 +92,15 @@ export default function HomePageClient({ liveCommerce, proof }: { liveCommerce: 
             <div className="one-path-workflow" aria-label="How TAVONEL prepares knowledge">
               <div><span>01</span><strong>Checking files</strong><p>Identify format, integrity and what can be read natively.</p></div>
               <div><span>02</span><strong>Reading content</strong><p>Use structured extraction first and specialized processing where needed.</p></div>
-              <div><span>03</span><strong>Recovering structure</strong><p>Preserve tables, layout, figures and document hierarchy.</p></div>
+              {/*
+                G1-008, on the landing page this time. "Recovering structure — Preserve tables,
+                layout, figures and document hierarchy" is exactly the claim the capability
+                manifest carries `no_table_or_formula_extraction` and `no_native_structure_reader_yet`
+                against, and /product/document-understanding already says the opposite in full
+                paragraphs. The step now names what the read leaves behind, which is also the part
+                a reviewer can check.
+              */}
+              <div><span>03</span><strong>Keeping the place</strong><p>Read every region in the order it was printed and keep the page and the box it sat in.</p></div>
               <div><span>04</span><strong>Connecting knowledge</strong><p>Organize related information without detaching it from its sources.</p></div>
               <div><span>05</span><strong>Checking sources</strong><p>Verify evidence and surface exceptions before activation.</p></div>
               <div><span>06</span><strong>Ready</strong><p>Make the reviewed result available to your AI.</p></div>
@@ -91,7 +117,13 @@ export default function HomePageClient({ liveCommerce, proof }: { liveCommerce: 
               <article><Cloud aria-hidden="true" size={26} /><h3>Connected sources</h3><p>See the available cloud connections and choose the files you allow TAVONEL to read.</p><Link href="/integrations">Choose a connection <ArrowUpRight size={16} aria-hidden="true" /></Link></article>
               <article><Server aria-hidden="true" size={26} /><h3>Private infrastructure</h3><p>For object storage or mounted shares, plan an assisted, customer-run connection.</p><Link href="/integrations">Plan a private connection <ArrowUpRight size={16} aria-hidden="true" /></Link></article>
             </div>
-            <details className="one-path-details"><summary>Supported files and connection details</summary><p>{sourceFamilyChips.join(" · ")}</p><p>ZIPs open on your device. Only supported files are selected for upload; skipped files remain visible in the selection report.</p><div className="one-path-links"><Link href="/sources">Supported formats</Link><Link href="/integrations">Availability and permissions</Link></div></details>
+            {/*
+              G1-007. The chips listed spreadsheets and decks beside PDFs as peers. Both sentences
+              under them are read off the capability manifest -- the one tier every accepted format
+              holds, and the formats that reach the reader as PDF -- so a chip can never outrun
+              what the upload route validates against.
+            */}
+            <details className="one-path-details"><summary>Supported files and connection details</summary><p>{sourceFamilyChips.join(" · ")}</p>{sourceSupportTier ? <p className="one-path-tier-note">Every format above is read at the <code>{sourceSupportTier}</code> tier{convertedToPdfFormats.length > 0 ? <> — {convertedToPdfFormats.join(", ")} are converted to PDF and read as PDF</> : null}. The per-format list, with the limits each one carries, is on <Link href="/sources">supported formats</Link>.</p> : null}<p>ZIPs open on your device. Only supported files are selected for upload; skipped files remain visible in the selection report.</p><div className="one-path-links"><Link href="/sources">Supported formats</Link><Link href="/integrations">Availability and permissions</Link></div></details>
           </div>
         </section>
 
@@ -100,6 +132,8 @@ export default function HomePageClient({ liveCommerce, proof }: { liveCommerce: 
             <div className="one-path-section-heading"><p className="one-path-eyebrow">03 / PROOF</p><h2 id="one-path-proof-title">Every result keeps a path back to the source.</h2><p>Open the original page beside the extracted passage. Check what survived instead of trusting a marketing claim.</p></div>
             {proof ? <div className="one-path-source-proof" aria-label="Published sample and its source"><p className="one-path-eyebrow">PUBLIC APPLE SEC SAMPLE · SOURCE INCLUDED</p>{proof}</div> : null}
             <div className="one-path-links"><Link href={"/explore?act=source" as Route}>Inspect the public source <ArrowUpRight size={16} aria-hidden="true" /></Link><Link href="/sources">What is preserved</Link></div>
+            {/* SD-10. Where a logo wall would go on a page like this one. */}
+            <DesignPartners className="one-path-design-partners" />
           </div>
         </section>
 

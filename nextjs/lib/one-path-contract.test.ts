@@ -44,7 +44,17 @@ describe("approved one-path experience", () => {
     expect(proof).toBeLessThan(current);
     expect(current).toBeLessThan(ready);
     expect(page.indexOf("<CompileStagePlayer")).toBeLessThan(proof);
-    expect(page).toContain("approved source film is preserved");
+    /*
+      G1-003 / G1-004. The note this used to pin -- "the approved source film is preserved and
+      presented at a faster 12-second pace" -- disclosed the *edit* and not the thing a visitor
+      could mistake the film for. The cuts draw an extracted table as a ruled grid, a
+      section-and-line locator and `.csv` sources, none of which this deployment produces, and the
+      bytes are locked, so the note names the recreation and says what a compile emits instead.
+      The guard follows the fact rather than the sentence: a landing page that stops separating
+      the film from the product still fails here.
+    */
+    expect(page).toContain("A directed film, not a screen recording");
+    expect(page).toContain("the page it was read from");
     expect(page).toContain("/explore?act=source");
   });
   it("preserves state-controlled entry and actual public proof", () => {
