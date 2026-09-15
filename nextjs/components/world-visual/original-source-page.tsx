@@ -147,7 +147,9 @@ export default function OriginalSourcePage({ active, regions, onSelectRegion, co
         <button type="button" aria-pressed={overlay} onClick={() => setOverlay(value => !value)}>Highlight</button>
       </div>
     </div>
-    <div ref={viewport} className={styles.viewport} data-compact={compact ? "1" : "0"} tabIndex={0} aria-label="Original document page; use the zoom controls to read and the parsed-text view to select a passage">
+    {/* G1-037: a stable hook so a host surface can size this frame without depending on a hashed
+        CSS-module class name. Layout only -- nothing about the render changes. */}
+    <div ref={viewport} className={styles.viewport} data-source-viewport="" data-compact={compact ? "1" : "0"} tabIndex={0} aria-label="Original document page; use the zoom controls to read and the parsed-text view to select a passage">
       {!ready ? <div className={styles.message} role="status">
         {phase === "error" ? <><strong>Original preview unavailable</strong><span>{error}</span><button type="button" onClick={() => setGeneration(value => value + 1)}>Retry preview</button></> : <span>Loading the source page…</span>}
       </div> : null}

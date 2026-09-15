@@ -3,7 +3,21 @@ import Link from "next/link";
 import type { Route } from "next";
 import { PublicSitePage } from "@/components/public-site-chrome";
 import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
+import SolutionProofSample, { type ProofPick } from "@/components/solution-proof-sample";
 import { CAPABILITY_MANIFEST, isAcceptedAtUpload } from "../../../../shared/capabilityManifest";
+
+/*
+  G1-019. The region this page opens on, selected out of the published corpus rather than written.
+
+  A printed financial statement is the honest choice for the page whose READ card says a price
+  table arrives as the paragraphs it was printed as: the reader can see the grid on the page
+  render and the paragraphs beside it, which is the claim, demonstrated.
+*/
+const READ_PROOF: ProofPick = {
+  form: "10-Q",
+  match: /CONDENSED CONSOLIDATED STATEMENTS OF OPERATIONS/,
+  framing: "A printed statement and what the read left behind: the paragraphs it was printed as, each carrying the page and the box it sat in.",
+};
 
 export const metadata: Metadata = {
   // Each page declares its own address. Without this every route inherited the root
@@ -147,6 +161,14 @@ export default function DocumentUnderstandingPage() {
               <p className="doc-breadcrumb"><Link href={"/product" as Route}>Product</Link> <span aria-hidden="true">/</span> Document understanding</p>
               <p className="slate"><b>PRODUCT</b><span />DOCUMENT UNDERSTANDING</p>
               <h1 className="document-title">Reading is the first compile step.</h1>
+              {/*
+                G1-019 / G1-020 (marketing-visual). The page about reading documents had no
+                document on it, and this column was blank for about 1,000px below the H1. The
+                surface here is /explore's own source sheet over the published Apple corpus: a
+                real page render with the compiled region drawn on it, the parsed text beside it
+                and the digests underneath. No copy on this page changes.
+              */}
+              <SolutionProofSample pick={READ_PROOF} />
             </div>
             <div className="stack">
               <p className="lede">
