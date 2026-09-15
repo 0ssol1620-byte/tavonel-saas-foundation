@@ -1,6 +1,7 @@
 import Link from "next/link";
 import LegalOperatorDisclosure from "@/components/legal-operator-disclosure";
 import Logomark from "@/components/logomark";
+import PolicyJumpIndex from "@/components/policy-jump-index";
 import { PublicSiteHeader } from "@/components/public-site-chrome";
 import { primaryCallToAction } from "@/lib/commercial-state";
 
@@ -55,6 +56,13 @@ export default function PolicyLayout({
               {effective ? (
                 <p className="fine">Effective {effective}{lastUpdated ? <> &middot; Last updated {lastUpdated}</> : null}</p>
               ) : null}
+              {/*
+                G2-040 / G2-041. This column was empty from the H1 to the footer -- 2,300px of it
+                on /status -- and on a phone the document below it had no way in at all. The index
+                is read from the rendered `<h2>`s, so the five pages using this layout declare
+                nothing and cannot fall out of step with it.
+              */}
+              <PolicyJumpIndex />
             </div>
             <div className="stack">
               <p className="lede">{intro}</p>
