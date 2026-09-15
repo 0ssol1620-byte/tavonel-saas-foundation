@@ -238,7 +238,7 @@ describe("every endpoint block resolves to a published operation", () => {
     // `true`, `null` and the trailing shape are all syntax errors.
     const listed: DocsEndpointLike = {
       operationId: "example", method: "POST", path: "/example", server: "https://tavonel.com/api",
-      scope: null, description: "",
+      scope: null, auth: "key", description: "",
       requestExample: JSON.stringify({ ids: ["<ids>"], strict: true, cursor: null, limit: 12 }, null, 2),
       responses: [],
     };

@@ -40,7 +40,7 @@ export type ReferenceResponse = {
 export type ReferenceEndpoint = Omit<DocsEndpoint, "responses"> & {
   summary: string;
   tag: string;
-  browserSession: boolean;
+
   parameters: ReferenceParameter[];
   responses: ReferenceResponse[];
 };
@@ -61,6 +61,7 @@ type Operation = {
   tags?: string[];
   "x-tavonel-scope"?: string;
   "x-tavonel-auth"?: string;
+  security?: unknown[];
   parameters?: Array<Record<string, unknown>>;
   requestBody?: { content?: Record<string, { schema?: SchemaNode; examples?: Record<string, { value?: unknown }> }> };
   responses?: Record<string, {
@@ -184,7 +185,9 @@ export async function readApiReference() {
         description: operation.description ?? "",
         summary: operation.summary ?? operation.operationId,
         tag: operation.tags?.[0] ?? "Other",
-        browserSession: operation["x-tavonel-auth"] === "browser-session",
+        auth: operation.security?.length === 0
+          ? "none"
+          : operation["x-tavonel-auth"] === "browser-session" ? "session" : "key",
         requestExample: requestExample(operation),
         parameters: (operation.parameters ?? []).map((raw) => {
           const parameter = resolve(document, raw);

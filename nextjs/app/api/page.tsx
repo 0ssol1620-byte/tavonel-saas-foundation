@@ -78,7 +78,7 @@ function Operation({ endpoint }: { endpoint: ReferenceEndpoint }) {
         <code>{endpoint.path}</code>
         {endpoint.scope
           ? <em>Scope <code>{endpoint.scope}</code></em>
-          : <em>{endpoint.browserSession ? "Browser session only" : "No key required"}</em>}
+          : <em>{endpoint.auth === "session" ? "Browser session only" : "No key required"}</em>}
       </header>
       <h3 className={styles.summary}>{endpoint.summary}</h3>
       {endpoint.description ? <p className={styles.prose}>{endpoint.description}</p> : null}
