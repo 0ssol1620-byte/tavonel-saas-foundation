@@ -90,7 +90,12 @@
 
 .response { display: grid; gap: 8px; min-width: 0; padding-top: 10px; border-top: 1px solid var(--hairline); }
 
-.status { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 10px; margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-lo); }
+/*
+  A response description is mostly error codes, and an error code is one 28-character word with no
+  break opportunity in it. At 390px `RETRIEVAL_INDEX_NOT_COMPILED` pushed the document 17px wider
+  than the viewport -- a horizontal scroll on the whole page, caused by a word.
+*/
+.status { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 10px; margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-lo); overflow-wrap: anywhere; }
 
 /* The number is the signal; the treatment is emphasis, never the only carrier of meaning. */
 .status code[data-kind="ok"] { color: var(--text-hi); font: 12px var(--f-mono); }
