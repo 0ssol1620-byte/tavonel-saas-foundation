@@ -5,8 +5,17 @@ import { CSP_REPORT_PATH, cspReportOnly, generateCspNonce, summarizeCspReport } 
 
 const NONCE = /script-src 'nonce-([A-Za-z0-9+/=]{24})' 'strict-dynamic'/;
 
-/* The handler reads the pathname, because the S10 nonce flag covers only some routes. */
-const request = (path = "/") =>
+/*
+  The handler reads the pathname, because the S10 nonce flag covers only some routes -- and since
+  T1-004 so does the Report-Only header itself.
+
+  The default is a workspace surface for that reason. A nonce policy on a prerendered document is
+  a policy that page cannot pass: its HTML was written at build time and carries no nonce, so the
+  framework's own inline scripts violated it on every view -- which is what the 2026-09-15 audit
+  found on all seven pages it opened. `middleware.ts` now sends the header only where
+  `cspNonceEnforcedPath` is true, and that scope is asserted in `lib/security-headers.test.ts`.
+*/
+const request = (path = "/workspace/sources") =>
   ({ nextUrl: new URL(`https://tavonel.com${path}`) }) as Request & { nextUrl: URL };
 
 describe("§41 Phase 1 report-only CSP", () => {

@@ -30,6 +30,15 @@
     is supposed to find out what is inline, not pay for the fix before the answer is in. The
     report for this lane lists the inline sources by hand; the nonce here is what makes the
     report-only policy strict enough for those reports to be produced at all.
+
+  T1-004 amends the first sentence of this comment: the header is no longer on "every response".
+
+  `middleware.ts` now sends it only where `cspNonceEnforcedPath` is true, because a nonce policy
+  on a prerendered document is a policy that page cannot pass -- its HTML was written at build
+  time and carries no nonce, so all ~26 of the framework's inline scripts violate it on every
+  view. Chrome logged that as a "serious" issue on every public page the 2026-09-15 audit opened,
+  and the reports it produced said nothing except which pages are prerendered. The measurement is
+  unchanged in kind; it is now taken where a promotion could actually follow from it.
 */
 
 export const CSP_REPORT_PATH = "/api/csp-report";

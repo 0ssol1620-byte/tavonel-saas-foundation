@@ -12,15 +12,44 @@ import { cspEnforcedWithNonce, cspNonceEnforcedPath, readCspNonceEnforcement } f
   One nonce per response, shared by both policies. A second mint for the enforced header would
   enforce a policy nobody observed, which is the one thing the Report-Only window exists to
   prevent (audit S10).
+
+  The matcher below stays wide even though only the workspace surfaces now receive a header. One
+  predicate decides the scope, and it is `cspNonceEnforcedPath`; a matcher that had to agree with
+  it would be a second copy of the same list, and the two would disagree the first time one of
+  them was widened.
 */
 export function middleware(request: Request & { nextUrl: URL }) {
-  const nonce = generateCspNonce();
+  /*
+    T1-004 -- the Report-Only policy goes exactly where it can be satisfied, and nowhere else.
+
+    It used to go on every document. On a prerendered page that is a policy nothing can pass:
+    the HTML was written at build time, it carries no nonce, and every one of the framework's
+    ~26 inline `<script>` elements violates `script-src 'nonce-...'` on every single page view.
+    Chrome logged it as a "serious" issue on all seven pages the 2026-09-15 audit opened, and the
+    reports it produced said one thing over and over -- *this page is prerendered* -- while
+    burying the rows that would have meant something.
+
+    Deleting the header outright was the other option and it throws away a working measurement.
+    `cspNonceEnforcedPath` is the answer instead, because it is already the set of routes the
+    enforced policy may ever be sent to (`lib/csp-policy.ts` §2, derived from the ƒ column of
+    `next build`). Observing exactly where you would enforce is the whole point of a report-only
+    window; observing where you never will is what produced the noise.
+
+    What this gives up, stated rather than glossed: the public dynamic routes -- `/`, `/pricing`,
+    `/status`, `/terms`, `/refunds` -- no longer report. Next stamps its nonce on their inline
+    scripts, so the policy passed there, and a passing check on a route that will not be promoted
+    is not information. It comes back the moment `cspNonceEnforcedPath` widens to include them,
+    which is the same commit that would make promoting them possible.
+  */
+  const observed = cspNonceEnforcedPath(request.nextUrl.pathname);
   const response = NextResponse.next();
+  if (!observed) return response;
+  const nonce = generateCspNonce();
   response.headers.set("Content-Security-Policy-Report-Only", cspReportOnly(nonce));
   response.headers.set("Reporting-Endpoints", CSP_REPORTING_ENDPOINTS);
   // Off unless TAVONEL_CSP_ENFORCE_NONCE=1, and then only on routes the build serves per
   // request. The variable is unset everywhere, so this is a no-op on every response today.
-  if (readCspNonceEnforcement() && cspNonceEnforcedPath(request.nextUrl.pathname)) {
+  if (readCspNonceEnforcement()) {
     const enforced = cspEnforcedWithNonce(nonce);
     // A refusal sets no header and leaves the static enforced policy standing: weaker for one
     // response, and not a blank page. Logged rather than swallowed.

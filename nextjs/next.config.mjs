@@ -92,7 +92,20 @@ const securityHeaders = [
   { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), browsing-topics=()" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+  /*
+    T1-009. `preload` is the directive; the submission is a person's act.
+
+    The header already carried a year and `includeSubDomains`, which are two of the three things
+    hstspreload.org checks -- and the list refuses a domain whose header does not also say
+    `preload`, so without this word the submission cannot be made at all. Adding it submits
+    nothing and changes nothing a browser does today.
+
+    The commitment it prepares is real and is the founder's to make rather than this lane's:
+    every hostname under tavonel.com must serve HTTPS for as long as the domain is on the list,
+    and removal from it takes months. The lane report names the submission as the founder's
+    action.
+  */
+  { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains; preload" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },
 ];
@@ -101,6 +114,36 @@ const securityHeaders = [
 const nextConfig = {
   poweredByHeader: false,
   typedRoutes: true,
+  /*
+    T1-002 / G2-033 -- the <head> is in the <head>, for everyone.
+
+    Next 15 renders `metadata` into a Suspense boundary and resumes it *after* `</head>` when the
+    document is rendered per request, unless the request's user agent is one it classifies as an
+    HTML-limited bot. `/` and `/pricing` are both `export const dynamic = "force-dynamic"` (each
+    for a stated reason -- the landing CTA and the purchase gates are commercial state, and a
+    prerender freezes a build-time answer into a live page), so on those two routes a browser,
+    a link-preview unfurler and every simple HTML parser received a document whose <title>,
+    description, canonical, hreflang pair and og:* tags arrived ~20KB into the body. Measured on
+    production 2026-09-15: head ends at byte 2,113, <title> appears at byte 22,911.
+
+    There is no `streamingMetadata` switch in 15.5.24 -- `htmlLimitedBots` is the only input to
+    `shouldServeStreamingMetadata(ua, htmlLimitedBots)` (`next/dist/server/lib/streaming-metadata.js`),
+    and a user agent that matches it gets blocking metadata. Matching every user agent is
+    therefore the whole fix, and it is the right trade rather than a trick: streaming metadata
+    buys a faster first byte for a page whose head is not ready yet, and every head on this site
+    is a static object or a synchronous read of a module constant. Nothing here is waiting on a
+    fetch, so nothing is being deferred by it.
+
+    Deliberately here rather than in `app/page.tsx` and `app/pricing/page.tsx`: dropping
+    `force-dynamic` would re-introduce the frozen-CTA defect those exports were added to fix, and
+    the defect is not a property of those two routes -- it is a property of every route that is
+    or becomes dynamic. One line covers the two that are dynamic today and the next one added.
+
+    A request with no `user-agent` header at all still streams: `shouldServeStreamingMetadata`
+    returns early on an empty UA before the regex is consulted. Every crawler and unfurler sends
+    one; a header-less request is a curl invocation, not a reader.
+  */
+  htmlLimitedBots: /.*/,
   outputFileTracingRoot: packageRoot,
   async headers() {
     return [
