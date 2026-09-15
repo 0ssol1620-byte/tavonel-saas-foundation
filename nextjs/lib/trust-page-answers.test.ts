@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -665,14 +666,18 @@ describe("CA E02/E05 the measured entries carry their figures and their receipts
     `withoutComments` matters, because the page explains in a comment which words it stopped
     printing.
   */
-  it("says on the page that a receipt is hash-bound and how to get one", () => {
+  /*
+    G2-011. "Request any receipt named here at hello@tavonel.com" was the whole verification
+    path, and it was not one: a digest you cannot check against a file you cannot fetch verifies
+    nothing. The receipts are published now, so what this asserts inverts -- the page has to say
+    how to check a hash, and it may no longer route a reader to an inbox to get one.
+  */
+  it("says on the page that a receipt is hash-bound and how to check one", () => {
     const notes = withoutComments(read("app/research/notes/page.tsx"));
     expect(notes).toContain("bound by sha256");
-    expect(notes).toContain("Request any receipt named here");
-    expect(notes).toContain("check the hash");
-    expect(notes).toContain("hello@tavonel.com");
-    // BA-089: the missing space that rendered as "Askhello@tavonel.com".
-    expect(notes, "a JSX element after a word needs its space").not.toMatch(/[a-z]\s*\n?\s*<a href="mailto/);
+    expect(notes).toContain("published here");
+    expect(notes).toContain("hash it yourself");
+    expect(notes, "an email request is not a verification path").not.toContain("mailto:");
     for (const internal of ["docs/evidence/artifacts/", "claims pack", "campaign", "not published at a public URL"]) {
       expect(notes, `"${internal}" is internal vocabulary on a public page`).not.toContain(internal);
     }
@@ -686,14 +691,35 @@ describe("CA E02/E05 the measured entries carry their figures and their receipts
     internal campaign name may not reach the page, and a 64-character digest may not be typeset
     as body prose. Both are asserted on the page rather than on the record.
   */
-  it("renders a receipt identifier and a shortened digest, not an internal filename", () => {
+  it("renders the whole digest and the file it is of, never the internal filename", () => {
     const notes = withoutComments(read("app/research/notes/page.tsx"));
     expect(notes).toContain("Receipt {entry.receipt.id}");
-    expect(notes).toContain("shortDigest(entry.receipt.digest)");
-    // The whole value stays one hover or one copy away, so nothing is withheld.
-    expect(notes).toContain("title={`sha256 ${entry.receipt.digest}`}");
+    // BA-092's shortened digest was enough to recognise a file and never enough to verify one.
+    expect(notes, "the published digest is the whole value").toContain("<code>{entry.receipt.digest}</code>");
+    expect(notes).toContain("href={entry.receipt.url}");
     expect(notes.toLowerCase(), "the internal campaign name may not be rendered").not.toContain("folynta");
-    expect(notes, "a receipt file name may not be rendered").not.toContain(".json");
+  });
+
+  /*
+    The check that makes a published digest worth printing.
+
+    Every receipt the page cites is hashed here against the file served under `public/`. A copy
+    that drifts from the artifact it was taken from, a digest edited to match a new file, and a
+    citation whose receipt was never published all fail on this run rather than on a reader's.
+
+    The internal filename stays in the record and is asserted absent from the page; what is
+    asserted present is that the public URL resolves to bytes whose sha256 is the printed one.
+  */
+  it("serves every cited receipt, and its bytes hash to the digest the page prints", () => {
+    const record = read("lib/evidence-record.ts");
+    const receipts = [...record.matchAll(/digest: "([0-9a-f]{64})",\s+file: "([^"]+)",\s+url: "([^"]+)",/g)];
+    expect(receipts.length, "both measured entries carry a published receipt").toBe(2);
+    for (const [, digest, file, url] of receipts) {
+      expect(url, "a receipt is served from one directory").toMatch(/^\/research\/receipts\/[\w.-]+\.json$/);
+      expect(url.toLowerCase(), "a retired campaign name may not reach a public URL").not.toContain("folynta");
+      const bytes = readFileSync(resolve(import.meta.dirname, "..", "public", url.slice(1)));
+      expect(createHash("sha256").update(bytes).digest("hex"), `${file} is published at ${url}`).toBe(digest);
+    }
   });
 });
 
