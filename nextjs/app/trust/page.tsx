@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { Route } from "next";
+import PolicyJumpIndex from "@/components/policy-jump-index";
 import { PublicSitePage } from "@/components/public-site-chrome";
 import { TrustDisclosures } from "@/components/trust-disclosures";
 
@@ -183,7 +184,7 @@ export default function TrustCenterPage() {
     <PublicSitePage>
       <section className="scene doc">
         <div className="shell">
-          <div className="body">
+          <div className="body policy-copy">
             <div className="stack">
               {/*
                 BA-150. The eyebrow named this page's two sections. It now names the page's
@@ -195,6 +196,8 @@ export default function TrustCenterPage() {
               */}
               <p className="slate"><b>TRUST CENTER</b><span />SECURITY AND COMPLIANCE</p>
               <h1 className="document-title">{"Everything we publish "}<br />about handling your documents.</h1>
+              {/* G2-040 / G2-041: one jump index for long documents, from the shared component. */}
+              <PolicyJumpIndex />
             </div>
             <div className="stack">
               {/*

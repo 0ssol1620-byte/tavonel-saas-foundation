@@ -63,12 +63,12 @@ export default function KoreanEntryPage() {
             )}
           </div>
           <div className="one-path-hero-film one-path-hero-film-v2"><div className="one-path-hero-film-steps" aria-hidden="true"><span>원문</span><span>읽기</span><span>정리</span><span>AI 활용 준비</span></div><CompileStagePlayer stages={KO_HERO_STAGE} preferVideo playbackRate={1.5} compact /></div>
-          <p className="one-path-film-note">제품 흐름을 설명하는 연출 영상이며 실제 서비스 화면 녹화가 아닙니다. 기존 원본 영상은 보존하고 약 12초 속도로 보여주며, 실제 결과와 원문은 아래 공개 샘플에서 확인할 수 있습니다.</p>
+          <p className="one-path-film-note">제품 흐름을 설명하는 연출 영상이며 실제 서비스 화면 녹화가 아닙니다. 영상 속 세 가지는 현재 배포보다 앞서 있습니다. 추출된 표를 격자로 그리고, 결과에 절·행 번호 위치를 붙이고, 원문 목록에 .csv 파일을 보여줍니다. 현재 컴파일은 문단 단위 텍스트와 페이지·영역(bbox) 위치를 내보내며 표·수식은 추출하지 않고 CSV는 받지 않습니다. 실제 결과와 원문은 아래 공개 샘플에서 확인할 수 있습니다.</p>
         </div>
       </section>
       <section className="one-path-section one-path-works" id="ko-how-it-works" aria-labelledby="ko-works-title"><div className="one-path-wrap">
         <div className="one-path-section-heading"><p className="one-path-eyebrow">01 / TAVONEL WORKS</p><h2 id="ko-works-title">자료만 가져오세요.<br />어려운 처리는 TAVONEL이 맡습니다.</h2><p>정상 문서는 자동으로 처리하고, 어려운 부분은 더 적합한 처리 경로로 보냅니다. 검증할 수 없는 항목은 조용히 통과시키지 않고 검토 대상으로 표시합니다.</p></div>
-        <div className="one-path-workflow" aria-label="TAVONEL 처리 과정"><div><span>01</span><strong>파일 확인</strong><p>형식과 무결성, 네이티브 구조를 먼저 확인합니다.</p></div><div><span>02</span><strong>내용 읽기</strong><p>구조화된 경로를 우선하고 필요한 부분만 전문 처리를 사용합니다.</p></div><div><span>03</span><strong>구조 복원</strong><p>표·레이아웃·그림·문서 계층을 가능한 한 유지합니다.</p></div><div><span>04</span><strong>지식 연결</strong><p>관련 정보를 원문과 분리하지 않고 연결합니다.</p></div><div><span>05</span><strong>출처 확인</strong><p>근거를 점검하고 예외만 검토 대상으로 올립니다.</p></div><div><span>06</span><strong>AI 활용 준비</strong><p>검토·승인된 결과를 AI가 사용할 수 있게 준비합니다.</p></div></div>
+        <div className="one-path-workflow" aria-label="TAVONEL 처리 과정"><div><span>01</span><strong>파일 확인</strong><p>형식과 무결성, 네이티브 구조를 먼저 확인합니다.</p></div><div><span>02</span><strong>내용 읽기</strong><p>구조화된 경로를 우선하고 필요한 부분만 전문 처리를 사용합니다.</p></div><div><span>03</span><strong>자리 유지</strong><p>인쇄된 순서대로 각 영역을 읽고, 그 영역이 있던 페이지와 위치를 함께 보관합니다.</p></div><div><span>04</span><strong>지식 연결</strong><p>관련 정보를 원문과 분리하지 않고 연결합니다.</p></div><div><span>05</span><strong>출처 확인</strong><p>근거를 점검하고 예외만 검토 대상으로 올립니다.</p></div><div><span>06</span><strong>AI 활용 준비</strong><p>검토·승인된 결과를 AI가 사용할 수 있게 준비합니다.</p></div></div>
         <div className="one-path-works-film"><CompileStagePlayer stages={KO_WORK_STAGES} preferVideo /></div>
       </div></section>
       <section className="one-path-section" aria-labelledby="ko-intake-title"><div className="one-path-wrap">

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { Route } from "next";
+import PolicyJumpIndex from "@/components/policy-jump-index";
 import { PublicSitePage } from "@/components/public-site-chrome";
 import { TrustNext } from "@/components/trust-next";
 
@@ -88,10 +89,12 @@ export default function ResearchPage() {
     <PublicSitePage>
       <section className="scene doc">
         <div className="shell">
-          <div className="body">
+          <div className="body policy-copy">
             <div className="stack">
               <p className="slate"><b>RESEARCH</b><span />KNOWLEDGE COMPILATION</p>
               <h1 className="document-title">The hard parts of turning<br />documents into knowledge.</h1>
+              {/* G2-040 / G2-041: one jump index for long documents, from the shared component. */}
+              <PolicyJumpIndex />
             </div>
             <div className="stack">
               {/*

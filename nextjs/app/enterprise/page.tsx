@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { Route } from "next";
+import PolicyJumpIndex from "@/components/policy-jump-index";
 import { PublicSitePage } from "@/components/public-site-chrome";
 import { TrustDisclosures } from "@/components/trust-disclosures";
 
@@ -68,10 +69,12 @@ export default function EnterprisePage() {
     <PublicSitePage>
       <section className="scene doc">
         <div className="shell">
-          <div className="body">
+          <div className="body policy-copy">
             <div className="stack">
               <p className="slate"><b>ENTERPRISE</b><span />KNOWLEDGE COMPILER</p>
               <h1 className="document-title">Compile enterprise knowledge<br />without giving up control.</h1>
+              {/* G2-040 / G2-041: one jump index for long documents, from the shared component. */}
+              <PolicyJumpIndex />
             </div>
             <div className="stack">
               <p className="lede">
