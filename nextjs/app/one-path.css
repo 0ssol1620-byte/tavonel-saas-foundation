@@ -100,7 +100,84 @@
 .one-path-ai-not-connected { color: #acb9ad; margin-top: 18px; }
 .one-path-ai-details { margin-top: 20px; }
 .one-path-ai-details > summary { min-height: 44px; padding: 12px 0; cursor: pointer; }
-.one-path-ko h1, .one-path-ko h2 { word-break: keep-all; }
+/*
+  G1-013. Korean was breaking at the syllable, not at the word.
+
+  `.one-path-home :is(p, h1, h2, h3, span, a) { overflow-wrap: anywhere }` above is the cause: the
+  right rule for a 22-character filename in a narrow card, the wrong one for a language whose
+  words carry no break opportunity of their own. `anywhere` also outranks the `keep-all` this line
+  used to set on headings, so the H1 broke too.
+
+  Korean gets the pair the language needs -- `keep-all` so an eojeol stays whole, `break-word` so
+  a single token wider than its column still cannot push the page sideways. Keyed on `:lang(ko)`
+  as well as the page class, so it follows the `lang="ko"` the /ko page sets rather than needing a
+  new class on every future Korean surface.
+*/
+.one-path-ko,
+.one-path-ko.one-path-home :is(p, h1, h2, h3, h4, span, a, li, strong, b, em, dt, dd, summary, figcaption, label),
+.one-path-ko :is(p, h1, h2, h3, h4, span, a, li, strong, b, em, dt, dd, summary, figcaption, label),
+:lang(ko):is(p, h1, h2, h3, h4, span, a, li, strong, b, em, dt, dd, summary, figcaption, label),
+:lang(ko) :is(p, h1, h2, h3, h4, span, a, li, strong, b, em, dt, dd, summary, figcaption, label) {
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+/* Korean does not need the tracking the Latin display face was given at this size. */
+.one-path-ko h1 { letter-spacing: -0.012em; }
+
+/*
+  G1-012. Below 900px the film pans instead of shrinking. `compile-stage-player.tsx` carries why.
+
+  The recording's width follows the frame's *height* and its own 16:10, so the frame overflows by
+  roughly four column widths and `scroll-snap` stops on one pane at a time.
+  `overscroll-behavior-x: contain` keeps the browser's back-swipe out of it.
+*/
+@media (max-width: 899px), (pointer: coarse) and (max-width: 1023px) {
+  .compile-film-viewport {
+    position: relative;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+  }
+  .compile-film-panes { position: absolute; inset: 0 auto 0 0; display: flex; height: 100%; pointer-events: none; }
+  .compile-film-panes > span { flex: 1 1 0; scroll-snap-align: start; }
+  .one-path-home .compile-film-viewport { aspect-ratio: auto; height: min(68svh, 600px); }
+  .one-path-home .compile-film-panes { width: calc(min(68svh, 600px) * 1.6); }
+  .one-path-home .compile-film-video,
+  .one-path-home .compile-film-still,
+  .one-path-home .compile-film-live {
+    width: auto;
+    height: 100%;
+    max-width: none;
+    aspect-ratio: 16 / 10;
+    object-fit: contain;
+  }
+  /* The one motion control may not scroll out of the frame with the film. */
+  .one-path-home .compile-film-motion-control { position: sticky; left: calc(100% - 56px); }
+}
+@media (min-width: 900px) {
+  .compile-film-panes { display: none; }
+}
+
+/* G1-007. The derived support-tier line under the format chips. */
+.one-path-tier-note { color: #9aaba1; font-size: 13px; line-height: 1.6; }
+.one-path-tier-note code { font-family: var(--f-mono, monospace); font-size: 12px; color: #cfe0d2; }
+.one-path-tier-note a { color: #cfe0d2; }
+
+/* SD-10. The design-partners block, on the landing page and on every solution page. */
+.design-partners { display: grid; gap: 14px; margin-top: 56px; }
+.design-partners h2 { margin: 0; font-size: clamp(22px, 2.1vw, 30px); line-height: 1.2; letter-spacing: -0.02em; }
+.design-partners-lede { margin: 0; max-width: 62ch; line-height: 1.65; }
+.design-partners-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 0 28px; margin: 10px 0 0; padding: 0; list-style: none; }
+.design-partners-list li { display: grid; gap: 6px; align-content: start; padding: 18px 0; border-top: 1px solid var(--hairline, #354139); line-height: 1.6; font-size: 14px; }
+.design-partners-list strong { font-weight: 500; color: var(--text-hi, #e8efe7); }
+.design-partners-fine { margin: 6px 0 0; font-size: 13px; line-height: 1.6; color: var(--text-lo, #9aaba1); }
+.one-path-design-partners { margin-top: 64px; }
+/* The solution pages put the "Next:" line straight after this block; it needs its own air. */
+.design-partners + p { margin-top: 30px; }
+@media (max-width: 800px) {
+  .design-partners-list { grid-template-columns: 1fr; }
+}
 @media (max-width: 1050px) {
   .one-path-wrap { width: calc(100% - 56px); }
   .one-path-hero > .one-path-wrap { gap: 22px; grid-template-columns: minmax(0, .75fr) minmax(0, 1.3fr); }

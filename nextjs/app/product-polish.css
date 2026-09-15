@@ -69,7 +69,12 @@
   background: var(--hairline);
 }
 .product-flow article { min-height: 164px; display: flex; flex-direction: column; justify-content: space-between; padding: 20px; background: var(--g1); }
-.product-flow article:last-child { background: color-mix(in srgb, var(--verified-deep) 30%, var(--g1)); }
+/*
+  G1-049. The fourth step carried a green tint the other three did not, and in this system colour
+  reports state -- so it read as a hover stuck on one tile, or as a status nobody explained, on a
+  strip whose four members are the same kind of thing. The tint is gone; the eyebrow and the copy
+  say which step the page ends on, and a background is not the place to say it twice.
+*/
 .product-flow span { color: var(--text-lo); font: 9px var(--f-mono); letter-spacing: .13em; }
 .product-flow strong { max-width: 20ch; color: var(--text-hi); font-size: 16px; font-weight: 540; line-height: 1.35; }
 /* Four surfaces; every column count below divides four, so the last row is never a card beside

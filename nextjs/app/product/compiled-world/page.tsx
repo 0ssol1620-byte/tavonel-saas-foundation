@@ -4,6 +4,7 @@ import type { Route } from "next";
 import { PublicSitePage } from "@/components/public-site-chrome";
 import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
 import { clause } from "@/lib/compiler-contract";
+import WorldDiffSample from "@/components/world-diff-sample";
 import { CAPABILITY_MANIFEST, isAcceptedAtUpload } from "../../../../shared/capabilityManifest";
 
 /*
@@ -195,6 +196,13 @@ export default function CompiledWorldPage() {
                 make the case; the headline states the claim.
               */}
               <h1 className="document-title">A world your AI can reason about.</h1>
+              {/*
+                G1-019 / G1-020 (marketing-visual). Everything below the H1 in this column was
+                blank for about 900px while six paragraphs about a World ran down the right half.
+                This is /explore's own change surface, reduced to one arriving filing, with every
+                figure read out of two frozen compiles. No copy on this page changes.
+              */}
+              <WorldDiffSample />
             </div>
             <div className="stack">
               <p className="lede">

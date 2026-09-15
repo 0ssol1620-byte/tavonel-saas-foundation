@@ -16,7 +16,14 @@
 
 .who { fill: var(--text-hi); font: 14.5px var(--f-mono); letter-spacing: .04em; text-anchor: end; }
 .bracket { stroke: var(--hairline-hi); fill: none; }
-.what { fill: var(--text-xlo); font: 12px var(--f-mono); letter-spacing: .06em; }
+/*
+  G1-048. The span notes carry half this drawing's argument -- "finds the document", "retrieves
+  chunks at question time" -- and they were set in the smallest size on the scale in the dimmest
+  token, under a 14.5px name at full contrast. The SVG scales with its frame, so inside a 1,100px
+  shell they were already rendering under 11px. One step up in each, which leaves them quieter
+  than the name they belong to and legible on the same screen as it.
+*/
+.what { fill: var(--text-lo); font: 13px var(--f-mono); letter-spacing: .04em; }
 .whatStart { text-anchor: start; }
 .whatMiddle { text-anchor: middle; }
 .whatEnd { text-anchor: end; }

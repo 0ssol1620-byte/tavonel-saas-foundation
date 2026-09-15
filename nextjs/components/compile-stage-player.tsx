@@ -317,14 +317,32 @@ export default function CompileStagePlayer({
   const control = filmMotionControl({ reducedMotion, saveData, paused, playRequested });
 
   return (
-    <div className="compile-film-sequence rv" ref={frameRef} {...touchHandlers} data-film-renderer={live ? "live-canvas" : "video-fallback"} data-compact={compact ? 1 : 0}>
+    /* Below 900px the horizontal gesture pans the film (G1-012), so it may not also change the
+       stage -- the tab strip above stays the way to do that. */
+    <div className="compile-film-sequence rv" ref={frameRef} {...(narrow ? {} : touchHandlers)} data-film-renderer={live ? "live-canvas" : "video-fallback"} data-compact={compact ? 1 : 0} data-narrow={narrow ? 1 : 0}>
       {!compact ? <div className="compile-film-stages" role="tablist" aria-label="Compilation stages" onKeyDown={onKeyDown}>
         {stages.map((stage, position) => (
           <button key={stage.id} type="button" role="tab" id={tabId(stage.id)} aria-selected={position === index} aria-controls={panelId} tabIndex={position === index ? 0 : -1} data-active={position === index ? 1 : 0} onClick={() => chooseStage(position)}>{stage.label}</button>
         ))}
       </div> : null}
 
-      <div className="compile-film-viewport" role={compact ? undefined : "tabpanel"} id={panelId} tabIndex={compact ? -1 : 0} aria-labelledby={compact ? undefined : tabId(active.id)}>
+      {/*
+        G1-012. The live canvas already refuses to mount below 900px (NARROW_FRAME above), but the
+        recording standing in for it is the same four-column composition, and it was being scaled
+        to a ~370px frame: 3-4px type, unreadable, the mobile defect the founder photographs first.
+
+        A phone gets the film at the size it was authored for and moves across it instead. The
+        frame keeps its height, the recording is sized off that height rather than off the frame's
+        width, and `scroll-snap` stops on one pane at a time -- one panel per stage, swipeable, and
+        with the tab strip above it unchanged. The four spans below exist only as snap targets: a
+        <video> is a single element with nothing inside it to align, they carry no text, and they
+        are hidden from assistive technology, which reads the caption instead.
+
+        Above 900px they are `display: none` and the frame does not scroll, so the desktop
+        composition is exactly what it was.
+      */}
+      <div className="compile-film-viewport" role={compact ? undefined : "tabpanel"} id={panelId} tabIndex={compact && !narrow ? -1 : 0} aria-labelledby={compact ? undefined : tabId(active.id)}>
+        <div className="compile-film-panes" aria-hidden="true"><span /><span /><span /><span /></div>
         {still ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img

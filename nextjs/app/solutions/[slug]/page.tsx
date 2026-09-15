@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { PublicPageShell } from "@/components/public-page-shell";
 import PublicPrimaryCta from "@/components/public-primary-cta";
 import SolutionProofSample from "@/components/solution-proof-sample";
+import DesignPartners from "@/components/design-partners";
 import { RESOURCE_TAG_LABELS, resourceFilterHref, type ResourceTag } from "@/lib/site-navigation";
 import styles from "../solutions.module.css";
 
@@ -22,10 +23,25 @@ export const SOLUTIONS = {
     resources: "build",
     audience: "AI and platform engineers",
     eyebrow: "AI-READY KNOWLEDGE",
+    name: "AI-ready knowledge",
     title: "Give every AI project the same grounded knowledge asset.",
     lede: "Compile document collections into a versioned World before retrieval, assistants or agent workflows consume them.",
     problem: "Teams repeatedly clean, chunk and index the same sources for each model or application. Identity, relationships and provenance drift between projects.",
-    flow: ["Connect sources", "Read and reconstruct", "Resolve identity and relations", "Review evidence", "Publish a portable World"],
+    /*
+      G1-009, same class as the knowledge-graph step below. "Resolve identity and relations" is
+      the present tense of a Compiler Contract clause marked DIRECTION: cross-source identity is
+      not merged automatically on this deployment. The step says what a compile does do.
+    */
+    flow: ["Connect sources", "Read and reconstruct", "Bind identity, hold what is uncertain", "Review evidence", "Publish a portable World"],
+    headings: {
+      flow: "From five filings to one portable World.",
+      outcomes: "What every project downstream inherits.",
+    },
+    proof: {
+      form: "10-K",
+      match: /PART I Item 1\. Business Company Background/,
+      framing: "One region out of the annual filing, in the shape every project downstream receives it: the passage, the page it was printed on and the box it sat in.",
+    },
     outcomes: ["One governed source of knowledge", "Retrieval as a World projection", "Citations back to the exact source location", "Signed portable artifacts"],
     limitations: [
       "A compile costs a reading pass and a review. One project over one small corpus is cheaper to do by hand.",
@@ -37,6 +53,7 @@ export const SOLUTIONS = {
     resources: "evaluate",
     audience: "Document and operations teams",
     eyebrow: "DOCUMENT INTELLIGENCE",
+    name: "Document intelligence",
     title: "Read the source before asking AI to reason over it.",
     /*
       BA-048. The lede and the second flow step still published the PDF locator as the general
@@ -48,9 +65,25 @@ export const SOLUTIONS = {
       back (cross-lane, `nav-global`).
     */
     lede: "Move from difficult PDFs and scans to reviewable structure, without losing the exact source location each result came from.",
-    problem: "A clean text dump hides layout, tables, uncertainty and the exact source geometry needed to review an extraction.",
-    flow: ["Quarantine and sanitize", "Read the source and its regions", "Recover document structure", "Route uncertainty to review", "Bind results to evidence"],
-    outcomes: ["Provenance to the exact source location", "Visible confidence and review reasons", "Immutable OCR output", "Structure ready for compilation"],
+    /*
+      G1-008. This sentence named tables as something a text dump hides, which reads as a promise
+      that the compiler does not hide them -- against `no_table_or_formula_extraction` -- and the
+      third flow step promised recovered structure against `no_native_structure_reader_yet`. Both
+      now say what the read actually produces, which is the harder and truer claim: the printed
+      order and the exact place, kept.
+    */
+    problem: "A clean text dump hides the printed order, the uncertainty and the exact source geometry needed to review an extraction.",
+    flow: ["Quarantine and sanitize", "Read the source and its regions", "Read regions in printed order", "Route uncertainty to review", "Bind results to evidence"],
+    headings: {
+      flow: "From a difficult scan to a reviewable read.",
+      outcomes: "What a reviewer gets to check.",
+    },
+    proof: {
+      form: "10-Q",
+      match: /CONDENSED CONSOLIDATED STATEMENTS OF OPERATIONS/,
+      framing: "A printed financial statement, read the way this deployment reads one: every figure stays readable and locatable as the paragraphs it was printed as, while the grid that arranged them is not recovered.",
+    },
+    outcomes: ["Provenance to the exact source location", "Visible confidence and review reasons", "Immutable OCR output", "Regions ready for compilation"],
     limitations: [
       "Where a format does not state a page count, the quote is an estimate and is labelled one. Spreadsheets have no decided billable unit at all.",
       // Nothing detects handwriting, a stamp or scan degradation: review is opened on an OCR
@@ -63,10 +96,26 @@ export const SOLUTIONS = {
     resources: "build",
     audience: "Data and knowledge architects",
     eyebrow: "KNOWLEDGE GRAPH",
+    name: "Knowledge graph",
     title: "Compile a graph people can inspect and machines can reuse.",
     lede: "Turn document facts into stable semantic objects and evidence-bound relations inside a versioned World.",
     problem: "A graph that cannot show why an edge exists is difficult to review, govern or trust downstream.",
-    flow: ["Create semantic objects", "Resolve duplicate identities", "Bind source evidence", "Create actual relations", "Promote a reviewed World"],
+    /*
+      G1-009 and G1-041. Step 02 said "Resolve duplicate identities" in the present tense while
+      Compiler Contract clause 02 is DIRECTION -- merging two strings into one object is the part
+      this deployment does not do automatically -- and step 04's "Create actual relations" was not
+      English anyone writes. Both steps now name the behaviour a buyer plans around.
+    */
+    flow: ["Create semantic objects", "Hold uncertain identities for review", "Bind source evidence", "Emit evidence-bound relations", "Promote a reviewed World"],
+    headings: {
+      flow: "From filing text to objects and edges.",
+      outcomes: "What loads into the store you already run.",
+    },
+    proof: {
+      form: "DEF 14A",
+      match: /Nominees to Apple’s Board of Directors Apple is overseen/,
+      framing: "A proxy passage naming people and roles — the kind of region an object and its relations are compiled from, with the evidence that supports each one still attached.",
+    },
     outcomes: ["Stable object and relation IDs", "Ontology and graph exports", "Version history and rollback", "Evidence for every qualified edge"],
     limitations: [
       "The graph is compiled from documents, so an object exists only where a source region supports it.",
@@ -88,10 +137,20 @@ export const SOLUTIONS = {
     resources: "use-elsewhere",
     audience: "Application and agent developers",
     eyebrow: "GROUNDED ASSISTANTS",
+    name: "Source-grounded assistants",
     title: "Let an answer travel all the way back to the source.",
     lede: "Ask, API and MCP consume the same current World and return evidence from the same version.",
     problem: "An answer can sound confident while depending on stale, conflicting or untraceable source material.",
     flow: ["Ask the active World", "Retrieve qualified objects", "Generate with version context", "Attach evidence", "Decline when nothing matched"],
+    headings: {
+      flow: "From a question to a citation you can open.",
+      outcomes: "What an answer carries with it.",
+    },
+    proof: {
+      form: "10-Q",
+      match: /Segment Operating Performance The following table shows net sales by reportable segment/,
+      framing: "The region behind one of the sample questions on /explore — an answer's citation, opened at the exact place in the filing it was read from.",
+    },
     /*
       BA-042. The outcome read "Explicit abstention" and the limitation forty lines below said
       the World does not abstain in the case that matters -- so a reader who opened the fold
@@ -111,10 +170,20 @@ export const SOLUTIONS = {
     resources: "verify",
     audience: "Knowledge owners and security reviewers",
     eyebrow: "KNOWLEDGE OPERATIONS",
+    name: "Knowledge operations",
     title: "Review, promote and govern knowledge as an operational asset.",
     lede: "Separate candidate compilation from the active World, preserve change history and keep human decisions explicit.",
     problem: "Automated extraction becomes operational risk when updates silently replace the knowledge used by production systems.",
     flow: ["Compile a candidate", "Route review reasons", "Inspect source versus result", "Promote explicitly", "Rollback when needed"],
+    headings: {
+      flow: "From a new filing to an approved revision.",
+      outcomes: "What a reviewer signs, and what stays on record.",
+    },
+    proof: {
+      form: "DEF 14A",
+      match: /Audit Committee Ron Sugar/,
+      framing: "A governance passage from the proxy — the kind of region a reviewer opens beside the compiled result before promoting a candidate to active.",
+    },
     outcomes: ["Candidate-to-active lifecycle", "Human promotion gate", "Activity and audit records", "Budget and retention controls"],
     limitations: [
       "Promotion is a human decision by design.",
@@ -152,7 +221,13 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const solution = SOLUTIONS[slug as SolutionSlug];
   if (!solution) return {};
   return {
-    title: `${solution.eyebrow} — TAVONEL`,
+    /*
+      G1-029. Five titles were all-caps, which a browser tab and a search result render literally.
+      `name` is the sentence-case spelling of the same page rather than a `.toLowerCase()` of the
+      eyebrow, because lower-casing turns "AI-READY" into "Ai-ready" and there is no rule that
+      knows which words are acronyms. Five strings, written once.
+    */
+    title: `${solution.name} — TAVONEL`,
     description: solution.lede,
     alternates: { canonical: `/solutions/${slug}` },
     openGraph: { url: `/solutions/${slug}` },
@@ -185,13 +260,15 @@ export default async function SolutionPage({ params }: { params: Promise<{ slug:
             <p className="lede">{solution.lede}</p>
             <p>{solution.problem}</p>
           </div>
-          <SolutionProofSample />
+          <SolutionProofSample pick={solution.proof} />
         </div>
 
         <section className="solution-section" aria-labelledby="solution-flow-title">
           <div className="solution-section-heading">
             <p className="slate"><b>WORKFLOW</b><span />FROM SOURCE TO WORLD</p>
-            <h2 id="solution-flow-title">A traceable compilation path.</h2>
+            {/* G1-016. Five pages shared these two headings verbatim; each now names its own
+                corpus and audience, so the outline of one page is not the outline of five. */}
+            <h2 id="solution-flow-title">{solution.headings.flow}</h2>
           </div>
           {/*
             BA-045. The five step cards put the number at the top and the title at the bottom of
@@ -215,7 +292,7 @@ export default async function SolutionPage({ params }: { params: Promise<{ slug:
         <section className="solution-section" aria-labelledby="solution-outcomes-title">
           <div className="solution-section-heading">
             <p className="slate"><b>OUTCOMES</b><span />WHAT YOU CAN USE</p>
-            <h2 id="solution-outcomes-title">What the workflow leaves behind.</h2>
+            <h2 id="solution-outcomes-title">{solution.headings.outcomes}</h2>
           </div>
           {/*
             BA-046. This was four 136px cards holding a heading and nothing else, one line
@@ -235,7 +312,13 @@ export default async function SolutionPage({ params }: { params: Promise<{ slug:
           how we talk about scope internally and reads as a warning label to a buyer. Same
           content, stated as an input to a decision.
         */}
-        <details className="solution-notes">
+        {/*
+          G1-017. The index page sells "the limits that come with it" and then every one of the
+          five pages folded them shut, so the site's strongest differentiator rendered as an empty
+          row with a `+` on the right. It opens by default. The `<details>` element stays so a
+          reader who has read them can put them away.
+        */}
+        <details className="solution-notes" open>
           {/*
             No separator between the two halves: `.solution-notes summary` is
             `justify-content: space-between`, so a "·" written between them lands at the start of
@@ -254,6 +337,9 @@ export default async function SolutionPage({ params }: { params: Promise<{ slug:
           sentence ("build on it", "use a world somewhere else") and a 73x14px tap target on a
           phone. It is above the actions now, in the text face, and it names its destinations.
         */}
+        {/* SD-10. What a design partner gets, where a logo wall would otherwise go. */}
+        <DesignPartners className="solution-section" />
+
         <p className={styles.next}>
           Next:{" "}
           <Link href={resourceFilterHref(resourceTagOf(solution)) as Route}>
