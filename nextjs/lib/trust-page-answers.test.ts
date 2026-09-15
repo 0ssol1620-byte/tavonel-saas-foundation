@@ -1079,3 +1079,61 @@ describe("G2-043 the research page's next step is its results", () => {
     expect(read("app/research/notes/page.tsx")).toContain("Understand what it costs");
   });
 });
+
+/*
+  G2-013. What separates a status page from a status claim.
+
+  Three things were missing and one of them may not be supplied. There was no incident record --
+  not even an empty one with a date on it, which is the difference between a record and a
+  reassurance. There was no way to be told without coming back to look. And the page is served by
+  the deployment it reports on, which it did not say.
+
+  What may not be supplied is an uptime percentage. The probe history is twenty stored runs of a
+  check that does not carry a document through the pipeline; a 30- or 90-day figure computed from
+  it would describe the prober rather than the service, and it would be the unsupported number
+  this repository stops the line for.
+*/
+describe("G2-013 /status carries a record, not a reassurance", () => {
+  const page = read("app/status/page.tsx");
+
+  it("bounds the empty incident history by a date it derives", () => {
+    expect(page).toContain("No incident has been recorded since");
+    expect(page, "the date is derived from the changelog, not typed").toContain("RECORD_STARTS");
+    expect(page).toContain("CHANGELOG.reduce");
+    expect(page, "an empty record has to promise what happens when it is not empty")
+      .toContain("published here with what");
+  });
+
+  it("offers a subscribe path that exists", () => {
+    expect(page).toContain("/changelog/feed.xml");
+    expect(page, "an announcement list nobody has built may not be implied")
+      .toContain("there is no announcement list");
+  });
+
+  it("says the page shares the deployment it reports on", () => {
+    expect(page).toContain("served by the same deployment it reports on");
+  });
+
+  it("publishes no uptime percentage", () => {
+    const copy = withoutComments(page);
+    expect(copy, "an uptime figure here would describe the prober, not the service")
+      .not.toMatch(/\d+(?:\.\d+)?\s*%/);
+    expect(copy.toLowerCase()).not.toContain("uptime");
+  });
+});
+
+/*
+  G2-036. Six tiers defined, two occupied, and nothing on the page saying which.
+
+  The two "Verified" tiers are the ones a buyer reads for, and they described capability no
+  format in this deployment has. Counted from the rendered rows rather than declared, so a format
+  that reaches a tier removes its own notice.
+*/
+describe("G2-036 /sources marks the tiers no format occupies", () => {
+  const table = read("components/source-capability-table.tsx");
+
+  it("counts occupancy from the rows it is rendering", () => {
+    expect(table).toContain("all.filter((entry) => entry.tier === CAPABILITY_TIER_LABEL[status])");
+    expect(table).toContain("No format has reached this tier yet.");
+  });
+});
