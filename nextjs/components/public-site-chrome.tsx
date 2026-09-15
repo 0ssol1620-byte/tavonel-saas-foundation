@@ -83,10 +83,18 @@ export function PublicSiteHeader({
   );
 }
 
-export function PublicSiteFooter({ korean = false }: { korean?: boolean } = {}) {
+/**
+ * G1-036 / BA-250 follow-through: the footer, once, for the two pages that hand-rolled their own.
+ *
+ * `home-page-client` and `pricing-page-client` each kept a copy of the groups and the tagline and
+ * neither carried the legal row -- so the copyright, the Korean entry, the security inbox and the
+ * consent-withdrawal link existed on every page except the two a visitor meets first. `onePath`
+ * keeps the landing page's wider measure (`.one-path-wrap`); nothing else differs.
+ */
+export function PublicSiteFooter({ korean = false, onePath = false }: { korean?: boolean; onePath?: boolean } = {}) {
   return (
-    <footer className="site">
-      <div className="shell">
+    <footer className={onePath ? "site one-path-footer" : "site"}>
+      <div className={onePath ? "one-path-wrap" : "shell"}>
         <span className="wordmark"><Logomark /><b>TAVONEL</b></span>
         <div className="site-footer-groups">
           {FOOTER_GROUPS.map((group) => (

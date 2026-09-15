@@ -6,9 +6,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import { ArrowUpRight, Cloud, Files, Server, ShieldCheck } from "lucide-react";
 import CompileStagePlayer, { COMPILE_STAGES } from "@/components/compile-stage-player";
 import DesignPartners from "@/components/design-partners";
-import { PublicSiteHeader } from "@/components/public-site-chrome";
-import Logomark from "@/components/logomark";
-import { FOOTER_GROUPS, ACCESS_CTA, SELF_SERVE_CTA } from "@/lib/site-navigation";
+import { PublicSiteFooter, PublicSiteHeader } from "@/components/public-site-chrome";
+import { ACCESS_CTA, SELF_SERVE_CTA } from "@/lib/site-navigation";
 import { convertedToPdfFormats, sourceFamilyChips, sourceSupportTier } from "@/lib/qualified-input";
 import { activationPolicy } from "@/lib/activation-policy";
 import { trackFunnel } from "@/lib/funnel-events";
@@ -170,7 +169,7 @@ export default function HomePageClient({ liveCommerce, proof }: { liveCommerce: 
           </div>
         </section>
       </main>
-      <footer className="site one-path-footer"><div className="one-path-wrap"><span className="wordmark"><Logomark /><b>TAVONEL</b></span><div className="site-footer-groups">{FOOTER_GROUPS.map((group) => <nav key={group.title} aria-label={group.title}><p className="site-footer-title">{group.title}</p>{group.links.map((link) => <Link key={link.href} href={link.href as Route} prefetch={false}>{link.label}</Link>)}</nav>)}</div><p className="fine">Your knowledge, with a path back to the source.</p></div></footer>
+      <PublicSiteFooter onePath />
     </div>
   );
 }

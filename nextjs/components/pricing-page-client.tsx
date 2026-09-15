@@ -3,8 +3,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { useEffect, useRef, useState } from "react";
-import Logomark from "@/components/logomark";
-import { PublicSiteHeader } from "@/components/public-site-chrome";
+import { PublicSiteFooter, PublicSiteHeader } from "@/components/public-site-chrome";
 import { useCheckout } from "@/lib/use-checkout";
 import { loginUrlForOffer } from "@/lib/checkout-intent";
 import {
@@ -16,7 +15,7 @@ import {
 } from "@/lib/billing-catalog";
 import { COMPILE_MAX_DOCUMENTS, CORPUS_MAX_DOCUMENTS } from "@/lib/compile-limits";
 import { trackFunnel } from "@/lib/funnel-events";
-import { FOOTER_GROUPS, type SiteLink } from "@/lib/site-navigation";
+import type { SiteLink } from "@/lib/site-navigation";
 import { jsonLdHtml } from "@/lib/structured-data";
 import {
   MAX_UNITS_PER_PAGE,
@@ -1167,20 +1166,7 @@ export default function PricingPageClient({
           </div>
         </section>
       </main>
-      <footer className="site">
-        <div className="shell">
-          <span className="wordmark"><Logomark /><b>TAVONEL</b></span>
-          <div className="site-footer-groups">
-            {FOOTER_GROUPS.map((group) => (
-              <nav key={group.title} aria-label={group.title}>
-                <p className="site-footer-title">{group.title}</p>
-                {group.links.map((link) => <Link key={link.href} href={link.href as Route}>{link.label}</Link>)}
-              </nav>
-            ))}
-          </div>
-          <p className="fine">Knowledge compiled with a traceable path back to every source.</p>
-        </div>
-      </footer>
+      <PublicSiteFooter />
     </div>
   );
 }
