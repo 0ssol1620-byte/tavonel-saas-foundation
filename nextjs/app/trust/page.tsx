@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { Route } from "next";
 import { PublicSitePage } from "@/components/public-site-chrome";
+import { TrustDisclosures } from "@/components/trust-disclosures";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/trust" },
@@ -174,7 +175,7 @@ const NOT_PUBLISHED: Array<[string, string, Route | null]> = [
     before meeting a single thing that is true.
   */
   ["Recovery objectives", "One database restore is on record: it was performed and checked, and the security page carries its date, its scope and what it does not commit to. No recovery point objective, no recovery time objective and no backup retention period is published for this deployment. The absence of a target is the state of it; ask before you depend on one.", "/security" as Route],
-  ["Third-party certification and audit", "What exists is on the security page: the controls this deployment enforces, checked by us. No SOC 2 report, no ISO 27001 certificate and no independent penetration-test report exists for this deployment, and no such review has been commissioned — which is why no badge appears anywhere on this site. An external penetration test is planned after the first paying customer; SOC 2 timing is not set.", "/security" as Route],
+  ["Third-party certification and audit", "What exists is on the security page: the controls this deployment enforces, checked by us. No SOC 2 report, no ISO 27001 certificate and no independent penetration-test report exists for this deployment, and no such review has been commissioned — which is why no badge appears anywhere on this site. An external penetration test is planned after the first paying customer, and SOC 2 has not started: it is planned alongside that test.", "/security" as Route],
 ];
 
 export default function TrustCenterPage() {
@@ -322,6 +323,17 @@ export default function TrustCenterPage() {
                   </article>
                 ))}
               </div>
+
+              {/*
+                G2-004. The two cards above are the summary; this is the checklist a procurement
+                reviewer works down, and it is the same list `/enterprise` and `/security` render,
+                from `lib/trust-disclosures.ts`. It is here rather than only there because this is
+                the page that owns the index -- what the finding fixes is that the page an
+                enterprise buyer lands on carried none of it. Two rows a reader met above appear
+                again in their checklist position, which is where somebody comparing vendors goes
+                looking for them.
+              */}
+              <TrustDisclosures heading="THE CHECKLIST, ROW BY ROW" />
 
               {/*
                 BA-173. The first sentence answered an accusation nobody made ("nothing here is a

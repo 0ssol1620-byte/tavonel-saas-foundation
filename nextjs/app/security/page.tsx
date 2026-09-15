@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { PublicSitePage } from "@/components/public-site-chrome";
 import { TrustNext } from "@/components/trust-next";
+import { ProcessingRegionTable, TrustDisclosures } from "@/components/trust-disclosures";
 import { BOUNDARY } from "@/lib/evidence-record";
 import { activationPolicy } from "@/lib/activation-policy";
 
@@ -171,7 +172,7 @@ const UNANSWERED = [
     section keeps process vocabulary off a public page, and the founder's merge of the pull
     request carrying the log is the confirmation.
   */
-  ["Third-party certification and audit — none yet", "Every control above is enforced and checked by us, and that is the whole of what is being claimed. Not yet answered is who else has checked: no SOC 2 report, no ISO 27001 certificate and no independent penetration-test report exists for this deployment, and no such review has been commissioned — which is why no badge appears anywhere on this site. An external penetration test is planned after the first paying customer; SOC 2 timing is not set."],
+  ["Third-party certification and audit — none yet", "Every control above is enforced and checked by us, and that is the whole of what is being claimed. Not yet answered is who else has checked: no SOC 2 report, no ISO 27001 certificate and no independent penetration-test report exists for this deployment, and no such review has been commissioned — which is why no badge appears anywhere on this site. An external penetration test is planned after the first paying customer, and SOC 2 has not started: it is planned alongside that test."],
 ] as const;
 
 export default function SecurityPage() {
@@ -192,7 +193,27 @@ export default function SecurityPage() {
                 <b> Every external operation fails closed.</b>
               </p>
 
-              <p className="slate"><span />THE BOUNDARY, IN THE ORDER IT IS ENFORCED</p>
+              {/*
+                G2-041. This page is 8,007 CSS px on a 412px phone -- roughly 25 screens of
+                near-unbroken prose -- and it had no way to reach any of it but the scrollbar.
+
+                One line of anchors, not a component and not a sticky rail: it costs no new CSS,
+                it is equally useful on a desktop, and a reader who lands here from a security
+                questionnaire is looking for exactly one of these six sections. The longer fix --
+                a sticky index inside the shared policy template -- is marketing-visual's, and
+                this page does not use that template.
+              */}
+              <nav className="fine" aria-label="On this page">
+                <b>On this page:</b>{" "}
+                <a href="#boundary">The enforced boundary</a> ·{" "}
+                <a href="#what-holds-what">What holds what</a> ·{" "}
+                <a href="#controls">Controls</a> ·{" "}
+                <a href="#regions">Where the work happens</a> ·{" "}
+                <a href="#review">What a security review will find</a> ·{" "}
+                <a href="#deployment">Current deployment controls</a>
+              </nav>
+
+              <p className="slate" id="boundary"><span />THE BOUNDARY, IN THE ORDER IT IS ENFORCED</p>
               <div className="chain">
                 {BOUNDARY.map(([num, name, text]) => (
                   <article className="link" key={num}>
@@ -203,7 +224,7 @@ export default function SecurityPage() {
                 ))}
               </div>
 
-              <p className="slate"><span />WHAT HOLDS WHAT</p>
+              <p className="slate" id="what-holds-what"><span />WHAT HOLDS WHAT</p>
               <div className="chain">
                 {PATH.map(([name, text]) => (
                   <article className="link" key={name}>
@@ -229,7 +250,7 @@ export default function SecurityPage() {
                 Two tiles is an even grid. `trust-page-answers.test.ts` still holds both rows'
                 contents, and both `CONTROLS.map` and `UNANSWERED.map` are still what renders.
               */}
-              <p className="slate"><span />CONTROLS</p>
+              <p className="slate" id="controls"><span />CONTROLS</p>
               <div className="tiles">
                 {CONTROLS.map(([title, body]) => (
                   <article className="tile" key={title}>
@@ -268,7 +289,35 @@ export default function SecurityPage() {
                 working is a control that is working, not a degradation; the row that is off is the
                 one in prose, and it says "on request" there in words rather than in a badge.
               */}
-              <p className="slate"><span />CURRENT DEPLOYMENT CONTROLS</p>
+              {/*
+                G2-021 / SD-11. "Global infrastructure; may process outside Korea" was the only
+                answer this page gave about location, and it gave it for every component at once
+                -- including the two that actually touch document bytes, which are the two a
+                reviewer is asking about. "We do not guarantee residency" and "we will not say
+                where" are different statements and only the first is defensible.
+
+                Every value in the table is read from configuration in `lib/trust-disclosures.ts`,
+                and the one component no configuration pins says so rather than being given a
+                plausible region.
+              */}
+              <p className="slate" id="regions"><span />WHERE THE WORK HAPPENS</p>
+              <p>
+                No data residency is guaranteed, and that is a separate statement from where the
+                work is configured to run. Below is the second one. Which provider is permitted to
+                process which class of data is on the{" "}
+                <Link href={"/subprocessors" as Route}>subprocessors page</Link>.
+              </p>
+              <ProcessingRegionTable />
+
+              {/*
+                G2-004 / G2-023 / G2-028. The same checklist /trust and /enterprise render, from
+                one module, so a reviewer who starts on any of the three reads the same answers.
+              */}
+              <div id="review">
+                <TrustDisclosures />
+              </div>
+
+              <p className="slate" id="deployment"><span />CURRENT DEPLOYMENT CONTROLS</p>
               <div className="status-list">
                 {Object.entries(activationPolicy)
                   .filter(([key]) => key !== "customerData")

@@ -181,7 +181,9 @@ describe("/security answers the §17.1 questions", () => {
       read("app/security/page.tsx").match(/const UNANSWERED = \[[\s\S]*?\] as const;/)?.[0] ?? "",
     );
     expect(absent).toContain("An external penetration test is planned after the first paying customer");
-    expect(absent).toContain("SOC 2 timing is not set");
+    // SD-09 (`docs/policy/DECISION_LOG_2026-09-16.md`) replaced "SOC 2 timing is not set" with a
+    // sequence that still carries no date: not started, and planned alongside the external test.
+    expect(absent).toContain("SOC 2 has not started");
     expect(absent, "the sequencing sentence carries no process label on a public page").not.toContain(
       "delegated decision pending the founder's confirmation",
     );
@@ -274,7 +276,9 @@ describe("/trust indexes the six published surfaces", () => {
     }
     // The one authorised sequencing sentence carries no date, on this page as on /security.
     expect(absent).toContain("An external penetration test is planned after the first paying customer");
-    expect(absent).toContain("SOC 2 timing is not set");
+    // SD-09 (`docs/policy/DECISION_LOG_2026-09-16.md`) replaced "SOC 2 timing is not set" with a
+    // sequence that still carries no date: not started, and planned alongside the external test.
+    expect(absent).toContain("SOC 2 has not started");
     for (const schedule of ["q1", "q2", "q3", "q4", "under way", "underway", "by the end of", "scheduled for"]) {
       expect(absent.toLowerCase(), `"${schedule}" turns a sequence into a date`).not.toContain(schedule);
     }
@@ -842,5 +846,146 @@ describe("the security-review answer reconciles across the two pages that state 
     // two not published = the recovery objective and the external audit.
     expect(rows(read("app/trust/page.tsx"), "const PUBLISHED", "const NOT_PUBLISHED")).toBe(13);
     expect(rows(read("app/trust/page.tsx"), "const NOT_PUBLISHED", "export default")).toBe(2);
+  });
+});
+
+/*
+  G2-004 / G2-023 / G2-028. One disclosure list, rendered on all three pages a buyer can land on.
+
+  The failure this guards is not a wrong sentence, it is a page quietly carrying the shorter
+  version of the list. `/trust` published every absence; `/enterprise`, which is where an
+  enterprise reviewer actually arrives and converts, published none of them and said nothing
+  about deployment options, SSO, an SLA, an MSA, a questionnaire or a VPAT -- while `/contact`
+  offered air-gapped deployment and four data regions as selectable requirements.
+
+  So the check is structural: the module is the only place the wording lives, all three pages
+  render it, and the rules that make it publishable (three status words, no date in a plan, no
+  claim vocabulary anywhere) are asserted on the module rather than on any one page.
+*/
+describe("the trust disclosures are one list on three pages", () => {
+  const module_ = read("lib/trust-disclosures.ts");
+  const rows = (source: string) => (source.match(/^ {4}subject: "/gm) ?? []).length;
+
+  it.each(["app/trust/page.tsx", "app/security/page.tsx", "app/enterprise/page.tsx"])(
+    "%s renders the shared list rather than its own copy",
+    (page) => {
+      const source = read(page);
+      expect(source, "the disclosures come from one module").toContain("@/components/trust-disclosures");
+      expect(source).toContain("<TrustDisclosures");
+      // The wording may not be retyped on the page: a second copy is a copy that goes stale.
+      expect(withoutComments(source)).not.toContain("No SOC 2 report exists for this deployment");
+    },
+  );
+
+  it("names every procurement question a review asks, including the ones with no answer", () => {
+    for (const subject of [
+      "SOC 2",
+      "ISO 27001",
+      "Independent penetration test",
+      "Recovery objectives (RPO / RTO)",
+      "Backup and restore",
+      "SSO, SAML and SCIM",
+      "On-call and incident staffing",
+      "Deployment options",
+      "Data residency",
+      "Uptime SLA",
+      "Master services agreement",
+      "Data processing agreement",
+      "Security questionnaire (CAIQ / SIG)",
+      "Accessibility conformance (VPAT)",
+      "HIPAA business associate agreement",
+    ]) {
+      expect(module_, `${subject} is a row a reviewer looks for by name`).toContain(`subject: "${subject}"`);
+    }
+  });
+
+  it("keeps the row count even, so no absence is promoted to a full-width card", () => {
+    // `.status-list > :last-child:nth-child(odd)` stretches a trailing odd card across the
+    // section. The largest object on an enterprise page should not be whichever absence sorts
+    // last, which is the same defect BA-151 fixed one section down /security.
+    expect(rows(module_) % 2).toBe(0);
+  });
+
+  it("uses three status words and never a fourth", () => {
+    const statuses = [...module_.matchAll(/^ {4}status: "([a-z_]+)",$/gm)].map((match) => match[1]);
+    expect(statuses.length).toBe(rows(module_));
+    for (const status of statuses) {
+      expect(["provided", "roadmap", "not_provided"]).toContain(status);
+    }
+  });
+
+  it("states SOC 2, ISO 27001 and a penetration test only as things that do not exist", () => {
+    expect(module_).toMatch(/No SOC 2 report exists/);
+    expect(module_).toContain("No ISO 27001 certificate exists");
+    expect(module_).toContain("Nobody outside this company has tested this deployment");
+    const copy = withoutComments(module_).toLowerCase();
+    for (const claim of ["attestation", "certified", "compliant", "audited by", "independently audited"]) {
+      expect(copy, `"${claim}" is a claim this deployment cannot make`).not.toContain(claim);
+    }
+  });
+
+  it("sequences what is planned without dating it", () => {
+    const copy = withoutComments(module_);
+    expect(copy).toContain("planned after the first paying customer");
+    for (const schedule of ["q1", "q2", "q3", "q4", "under way", "underway", "by the end of", "scheduled for", "this year", "next year"]) {
+      expect(copy.toLowerCase(), `"${schedule}" turns a sequence into a date`).not.toContain(schedule);
+    }
+    // The one date in this file is the restore that happened; a plan may carry none.
+    const plans = [...copy.matchAll(/status: "roadmap",\n\s*line: "([^"]+)"/g)].map((match) => match[1]);
+    expect(plans.length).toBeGreaterThan(0);
+    for (const line of plans) {
+      expect(line, "a planned item with a year in it is a commitment nobody has funded").not.toMatch(/\b20\d\d\b/);
+    }
+  });
+
+  it("carries no process vocabulary onto a public page", () => {
+    const copy = withoutComments(module_);
+    for (const internal of ["SD-0", "SD-1", "delegated decision", "the founder decided", "FD-12"]) {
+      expect(copy, `"${internal}" is internal vocabulary on a public page`).not.toContain(internal);
+    }
+  });
+});
+
+/*
+  SD-11. Where the work happens, read from configuration rather than typed.
+
+  Each region below is fixed by a file in this repository -- `nextjs/vercel.json` for the Vercel
+  region, the Supabase and R2 provisioning record, the Cloud Run service definition -- and the
+  one component nothing pins prints that instead of a plausible region. The failure path this
+  guards is the helpful edit that fills the RunPod row in with "APAC" because the neighbouring
+  rows are in Seoul: a guessed residency answer is worse than a published absence, and it is the
+  component that reads document bytes.
+*/
+describe("SD-11 the processing-region table", () => {
+  const module_ = read("lib/trust-disclosures.ts");
+  const table = module_.slice(module_.indexOf("export const PROCESSING_REGIONS"));
+
+  it("names both components that touch document bytes", () => {
+    expect(table).toContain("Object storage — quarantine and artifacts");
+    expect(table).toContain("Content disarm and reconstruction");
+    expect(table).toContain("GPU document reading");
+  });
+
+  it("matches the regions the deployment configuration actually fixes", () => {
+    expect(JSON.parse(read("vercel.json")).regions, "the Vercel region is read from the deployment config")
+      .toEqual(["icn1"]);
+    expect(table).toContain("Seoul — icn1");
+    expect(table).toContain("Seoul — ap-northeast-2");
+    expect(table).toContain("Seoul — asia-northeast3");
+  });
+
+  it("says a region is not pinned rather than guessing one", () => {
+    expect(table).toContain("region: REGION_NOT_PINNED");
+    expect(module_).toContain('REGION_NOT_PINNED = "Not pinned to one region"');
+    const runpod = table.slice(table.indexOf('provider: "RunPod"'));
+    expect(runpod, "the GPU row may not be given a region no configuration fixes").not.toMatch(/region: "/);
+  });
+
+  it("does not turn a configured region into a residency guarantee", () => {
+    const copy = withoutComments(table).toLowerCase();
+    for (const promise of ["residency is guaranteed", "guaranteed residency", "data stays in korea", "never leaves korea"]) {
+      expect(copy, `"${promise}" is a promise no configuration here makes`).not.toContain(promise);
+    }
+    expect(table, "the R2 hint is a placement, not a guarantee").toContain("best-effort placement");
   });
 });
