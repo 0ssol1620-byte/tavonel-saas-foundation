@@ -1,0 +1,18 @@
+/*
+  The one rule the shared header needs that `app/tavonel.css` does not already have.
+
+  G1-001 / G2-026 put a deployment state line in the header's `.mode` slot -- "Public Compiled
+  World: open · Your own files: arranged with us" -- which is 552px of `white-space: nowrap` mono.
+  The bar fits it from about 990px up. Below that it pushes the access action and the sign-in link
+  off the right edge, and because `header.nav` is `position: fixed` the page does not scroll to
+  reveal them: they are simply gone.
+
+  `.mode` already hides itself at 520px for the same reason at a smaller size. This moves that
+  floor up to where this particular string stops fitting, as its own class rather than by editing
+  the global rule, which another lane owns. A narrow reader is not left without the fact: the pages
+  where it decides something -- /pricing, /login, /integrations, /security, /status, /ko -- each
+  render the full sentence in the body, where it has room to wrap.
+*/
+@media (max-width: 1000px) {
+  .state { display: none; }
+}

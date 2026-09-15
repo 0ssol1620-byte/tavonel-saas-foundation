@@ -5,6 +5,7 @@ import MobilePrimaryNav from "@/components/mobile-primary-nav";
 import DesktopPrimaryNav from "@/components/site-nav/desktop-primary-nav";
 import { deploymentStateLine, primaryCallToAction } from "@/lib/commercial-state";
 import { FOOTER_GROUPS, FOOTER_LEGAL_ROW, KO_CHROME, type SiteLink } from "@/lib/site-navigation";
+import chrome from "./public-site-chrome.module.css";
 
 /**
  * The header, once, for every public surface including the three that used to hand-roll one.
@@ -56,13 +57,17 @@ export function PublicSiteHeader({
         <b>TAVONEL</b>
       </Link>
       {state ? (
-        <span className="mode" title={state.title}>
+        <span className={`mode ${chrome.state}`} title={state.title}>
           <i aria-hidden="true" />
           {state.label}
         </span>
       ) : null}
       <DesktopPrimaryNav />
-      <MobilePrimaryNav cta={cta} />
+      {/*
+        G1-043: the same action, with the label the header is showing beside it. The phone sheet
+        still renders the object it is given and writes no label of its own.
+      */}
+      <MobilePrimaryNav cta={{ ...cta, label: ctaLabel }} />
       <span className="nav-actions">
         {/*
           BA-249: ghost, not filled. On /product and /developers the header's filled button and

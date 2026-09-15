@@ -1018,7 +1018,8 @@ describe("the site's own vocabulary", () => {
     for (const literal of ["Request access", "Start with your files"]) {
       expect(chrome, `the header writes "${literal}" instead of reading it`).not.toContain(literal);
     }
-    expect(chrome, "and hands the same object to the phone sheet").toContain("<MobilePrimaryNav cta={cta} />");
+    expect(chrome, "and hands the same action to the phone sheet, with the label it is showing")
+      .toContain("<MobilePrimaryNav cta={{ ...cta, label: ctaLabel }} />");
     const sheet = prose("components/mobile-primary-nav.tsx");
     expect(sheet, "the sheet renders the object, not a label of its own").toContain("{cta.label}");
     for (const literal of ["Contact<", "Request access", "Start with your files"]) {
