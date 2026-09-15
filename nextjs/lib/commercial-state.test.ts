@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { isLiveCommerce, primaryCallToAction, readCommercialState } from "./commercial-state";
+import { activationPolicy } from "./activation-policy";
+import { deploymentStateLine, isLiveCommerce, primaryCallToAction, readCommercialState } from "./commercial-state";
 
 const LIVE = {
   COMMERCIAL_MODE: "live",
@@ -54,9 +55,26 @@ describe("readCommercialState", () => {
     expect(pending.checkoutEnabled).toBe(false);
   });
 
-  it("derives one call to action from the same state", () => {
+  /*
+    G1-001 / G1-010. The card and the compile are two conditions, and this case used to check one.
+
+    `liveChargesEnabled` still means exactly what it meant -- a real card can be charged -- and
+    legal and pricing copy still read it directly. What changed is that `isLiveCommerce`, which
+    only ever answers "which primary action does the site offer", also requires
+    `activationPolicy.customerData`: while that is closed, "Start with your files" describes a
+    compile this deployment refuses, and a prerendered page and a dynamic one disagreed about it.
+  */
+  it("derives one call to action from the same state, and from the customer-data gate", () => {
+    expect(activationPolicy.customerData.enabled, "this suite's expectations assume the closed gate").toBe(false);
+    expect(readCommercialState({ ...LIVE, VERCEL_ENV: "production" }).liveChargesEnabled).toBe(true);
+    expect(isLiveCommerce({ ...LIVE, VERCEL_ENV: "production" })).toBe(false);
     expect(primaryCallToAction({}).label).toBe("Request access");
-    expect(primaryCallToAction({ ...LIVE, VERCEL_ENV: "production" }).label).toBe("Start with your files");
-    expect(isLiveCommerce({ ...LIVE, VERCEL_ENV: "production" })).toBe(true);
+    expect(primaryCallToAction({ ...LIVE, VERCEL_ENV: "production" }).label).toBe("Request access");
+  });
+
+  it("states the deployment line from the same gate", () => {
+    const line = deploymentStateLine();
+    expect(line?.label).toBe("Public Compiled World: open · Your own files: arranged with us");
+    expect(line?.title).toBe(activationPolicy.customerData.reason);
   });
 });

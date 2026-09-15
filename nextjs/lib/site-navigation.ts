@@ -60,6 +60,39 @@ export const SELF_SERVE_CTA: SiteLink = { href: "/login", label: "Start with you
 /** The one name for the public sample, everywhere it is linked. */
 export const EXPLORE_CTA: SiteLink = { href: "/explore", label: "Explore a Compiled World" };
 
+/* ============================================================ G1-043 / G1-044: the Korean chrome
+
+  One page, one map, and deliberately not an i18n layer.
+
+  `/ko` is the site's only Korean URL (§12.4) and it was rendering an entirely English header and
+  footer around Korean body copy -- the access button, the sign-in link, five footer group titles
+  and the tagline -- so the one page written for a Korean reader asked them to read the navigation
+  in the other language. Installing a locale framework to translate eleven strings is the wrong
+  size of answer; a second page in a third language is when that conversation starts.
+
+  The two CTA labels are keyed by destination rather than written as a list, so this cannot invent
+  a third access action: a label here exists only where `ACCESS_CTA` or `SELF_SERVE_CTA` already
+  points, and `lib/brand-copy.test.ts` fails if one of them loses its Korean counterpart.
+
+  `stateLine` is the Korean form of `deploymentStateLine()`. It says the same two facts -- a
+  finished public World open to read now, your own files arranged with us -- and it is a
+  translation rather than a second policy: it lives beside the English one so the two cannot be
+  edited apart.
+*/
+export const KO_CHROME = {
+  cta: { [ACCESS_CTA.href]: "이용 문의", [SELF_SERVE_CTA.href]: "내 자료로 시작하기" } as Record<string, string>,
+  signIn: "로그인",
+  footerGroups: {
+    Product: "제품",
+    Research: "리서치",
+    Developers: "개발자",
+    Trust: "신뢰와 보안",
+    Legal: "약관",
+  } as Record<string, string>,
+  tagline: "모든 결과에서 원문까지 다시 따라갈 수 있도록 컴파일합니다.",
+  stateLine: "공개 Compiled World: 지금 전체 열람 가능 · 내 자료 컴파일: 협의 후 진행",
+} as const;
+
 /**
  * How the product's own nouns are spelled in public copy.
  *

@@ -78,8 +78,18 @@ describe("what 13.11 asked to be added", () => {
       expect(page).toContain(`/docs/${target}`);
     }
     expect(page).toContain("/explore");
-    expect(page).toContain("/login");
-    expect(page).toContain("START WITH YOUR FILES");
+    /*
+      G1-010. The way onward is still asserted; which way it is stopped being written here.
+
+      This page carried both of the site's access actions at once -- "Start with your files" in the
+      header and again in the closing row, while /product and /solutions offered "Request access"
+      -- so pinning the /login literal held one half of that contradiction in place. What it pins
+      now is that the closing row renders the one resolved action rather than a label of its own,
+      which is the same rule `lib/brand-copy.test.ts` applies to the header.
+    */
+    expect(page, "the closing row reads the resolved access action").toContain("ACCESS.href");
+    expect(page, "and its label, rather than writing one").toContain("ACCESS.label.toUpperCase()");
+    expect(page).toContain("const ACCESS = primaryCallToAction();");
   });
 });
 
@@ -223,7 +233,17 @@ describe("the brand fix's structure", () => {
     expect(page).toContain('title: "Compared with RAG, graphs and search"');
     expect(rendered(page), "the three separate comparisons must not come back")
       .not.toContain('title: "Compared with RAG"');
-    expect((page.match(/collapsed: true/g) ?? []).length).toBe(3);
+    /*
+      G1-018. Three folded sections became one folded and two open.
+
+      The page ended on three headings with nothing under them, which reads as three unfinished
+      sections rather than three folded ones -- and two of the three, "when it is not the right
+      tool" and the FAQ, are what a buyer weighs the category on rather than reference they
+      consult. The glossary genuinely is consulted, so it stays closed. All three are still
+      disclosures, so the skipping BA-020 bought is intact.
+    */
+    expect((page.match(/collapsed: true/g) ?? []).length, "the glossary").toBe(1);
+    expect((page.match(/collapsed: "open"/g) ?? []).length, "not-the-right-tool and the FAQ").toBe(2);
     for (const key of ["RAG", "KNOWLEDGE GRAPH", "ENTERPRISE SEARCH"]) {
       expect(page, key).toContain(`key: "${key}"`);
     }
@@ -232,7 +252,9 @@ describe("the brand fix's structure", () => {
   it("ends on one primary and one secondary, with the references as a list", () => {
     const closing = page.slice(page.indexOf('title: "The package is the contract"'));
     expect(closing).toContain("readNext: [");
-    expect((closing.match(/label: "/g) ?? []).length).toBe(6);
+    // Five written labels and one read from `ACCESS`; see the G1-010 note above.
+    expect((closing.match(/label: "/g) ?? []).length).toBe(5);
+    expect((closing.match(/label: ACCESS.label/g) ?? []).length).toBe(1);
     // BA-016: the door describes the protocol behind it rather than announcing an absence.
     expect(rendered(page)).not.toContain("WHAT WOULD BE MEASURED");
     expect(closing).toContain('label: "How results are measured"');

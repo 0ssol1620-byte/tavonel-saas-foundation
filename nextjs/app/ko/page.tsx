@@ -4,6 +4,8 @@ import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
 import SolutionProofSample from "@/components/solution-proof-sample";
 import CompileStagePlayer, { COMPILE_STAGES } from "@/components/compile-stage-player";
 import { PublicSitePage } from "@/components/public-site-chrome";
+import DocumentLangKo from "./document-lang";
+import { activationPolicy } from "@/lib/activation-policy";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
 import { isLiveCommerce } from "@/lib/commercial-state";
 import { pageMetadata } from "@/lib/page-seo";
@@ -31,16 +33,34 @@ export const metadata: Metadata = pageMetadata({
 /** Korean entry, not a claim that the technical and legal documentation is translated. */
 export default function KoreanEntryPage() {
   const live = isLiveCommerce();
-  return <PublicSitePage>
+  return <PublicSitePage korean>
+    <DocumentLangKo />
     <BreadcrumbJsonLd trail={[{ name: "한국어 안내", path: "/ko" }]} />
     <div className="one-path-home one-path-ko">
       <section className="one-path-hero" aria-labelledby="ko-one-path-title">
         <div className="one-path-wrap">
           <div className="one-path-intro">
             <p className="one-path-eyebrow">AI가 쓰기 좋은 지식으로</p>
-            <h1 id="ko-one-path-title">내 자료를,<br />AI가 쓰는 지식으로.</h1>
+            {/*
+              G1-043. 영문 H1("Bring your knowledge. TAVONEL makes it ready for AI.")과 같은 구조로,
+              웹 헤드라인에 과한 하십시오체 대신 바로 아래 리드 문장과 같은 -하세요 어조를 쓴다.
+            */}
+            <h1 id="ko-one-path-title">자료를 가져오세요.<br />AI가 쓰는 지식으로 만듭니다.</h1>
             <p className="one-path-lede">파일을 올리거나 기존 소스를 연결하세요. 복잡한 처리는 TAVONEL이 맡습니다.</p>
             <div className="one-path-actions actions"><Link className="btn" href={live ? "/login" : "/contact"}>{live ? "내 자료 추가하기" : "이용 문의"}</Link><a className="one-path-text-link" href="#ko-how-it-works">어떻게 처리되는지 보기 ↓</a></div>
+            {/*
+              G1-002. /pricing, /login, /security와 /status가 같은 기록에서 읽어 렌더하는 고지를
+              한국어로 옮긴 문장. 이 페이지에만 없었고, 바로 아래 요금 안내가 무료 평가판에서
+              업로드와 컴파일이 된다고 현재형으로 적고 있었다.
+            */}
+            {activationPolicy.customerData.enabled ? null : (
+              <p className="notice static" role="status">
+                <strong>현재 배포에서는 고객 파일 컴파일이 열려 있지 않습니다.</strong> 완성된 공개
+                Compiled World는 지금 전체를 열람할 수 있고, 내 자료의 처리는 결제가 아니라 협의로
+                진행합니다. <Link href="/contact">이용 문의</Link>로 시작하거나,{" "}
+                <Link href="/explore">공개 샘플</Link>에서 결과와 원문을 먼저 확인하세요.
+              </p>
+            )}
           </div>
           <div className="one-path-hero-film one-path-hero-film-v2"><div className="one-path-hero-film-steps" aria-hidden="true"><span>원문</span><span>읽기</span><span>정리</span><span>AI 활용 준비</span></div><CompileStagePlayer stages={KO_HERO_STAGE} preferVideo playbackRate={1.5} compact /></div>
           <p className="one-path-film-note">제품 흐름을 설명하는 연출 영상이며 실제 서비스 화면 녹화가 아닙니다. 기존 원본 영상은 보존하고 약 12초 속도로 보여주며, 실제 결과와 원문은 아래 공개 샘플에서 확인할 수 있습니다.</p>
@@ -66,7 +86,7 @@ export default function KoreanEntryPage() {
       </div></section>
       <section className="one-path-section" aria-labelledby="ko-use-title"><div className="one-path-wrap">
         <div className="one-path-section-heading"><p className="one-path-eyebrow">05 / READY FOR AI</p><h2 id="ko-use-title">준비된 지식을 내 AI로.</h2><p>지원되는 연결을 설정하거나 지식 패키지를 활용하세요. 활성화는 사람이 승인하며, 연결 설정을 열었다고 실제 연결 성공으로 표시하지 않습니다.</p></div>
-        <details className="one-path-details"><summary>요금과 활성화 조건</summary><p>활성화는 유료 플랜에서 제공됩니다. 워크스페이스 소유자라면 {DEVELOPER_PLAN.label} 플랜에서, 또는 {TEAM_PLAN.label} 플랜에서 활성화할 수 있습니다. {TEAM_PLAN.label} 플랜은 상담을 거쳐 제공됩니다. 무료 평가판은 업로드와 컴파일, 검토, 내보내기까지 가능하며 활성화 요청은 거절됩니다. 각 플랜의 정확한 범위는 Pricing 페이지가 기준입니다.</p><Link className="one-path-text-link" href="/pricing">요금과 플랜 범위</Link></details>
+        <details className="one-path-details"><summary>요금과 활성화 조건</summary><p>활성화는 유료 플랜에서 제공됩니다. 워크스페이스 소유자라면 {DEVELOPER_PLAN.label} 플랜에서, 또는 {TEAM_PLAN.label} 플랜에서 활성화할 수 있습니다. {TEAM_PLAN.label} 플랜은 상담을 거쳐 제공됩니다. 다만 현재 배포에서는 고객 파일의 업로드·컴파일 자체가 열려 있지 않으므로, 플랜과 무관하게 내 자료 처리는 협의를 거쳐 시작합니다. 가격은 미국 달러(USD) 기준이며 세금은 별도입니다. 각 플랜의 정확한 범위는 Pricing 페이지가 기준입니다.</p><Link className="one-path-text-link" href="/pricing">요금과 플랜 범위</Link></details>
         <details className="one-path-details"><summary>기술 문서와 보안 안내</summary><div className="one-path-links"><Link href="/product">Product</Link><Link href="/docs">Documentation</Link><Link href="/sources">Sources</Link><Link href="/security">Security</Link><Link href="/trust">Trust Center</Link></div><p>도입 검토와 기술 문의는 한국어로 받습니다. 제품·문서·요금의 기준 문서는 영문이며, 위 링크는 영문 페이지로 연결됩니다.</p></details>
       </div></section>
     </div>

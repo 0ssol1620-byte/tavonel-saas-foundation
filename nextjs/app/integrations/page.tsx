@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PublicPageShell } from "@/components/public-page-shell";
-import { OAUTH_CONNECTOR_SCOPES } from "@/lib/connector-oauth";
+import PublicPrimaryCta from "@/components/public-primary-cta";
+import { activationPolicy } from "@/lib/activation-policy";
+import { OAUTH_CONNECTOR_PROVIDERS, OAUTH_CONNECTOR_SCOPES } from "@/lib/connector-oauth";
 
 export const metadata: Metadata = {
   title: "Integrations — TAVONEL",
@@ -92,6 +94,39 @@ const AGENT_OPERATIONS: Array<[string, string]> = [
   ["Monitoring", "The agent runs on your host under your scheduler, so your scheduler is where a failed run surfaces: the process exits non-zero and reports there. It has no inbound port, no health endpoint and no callback to us, so its liveness is whatever your scheduler reports. Timings are whatever a run on your own corpus produces."],
 ] as const;
 
+/*
+  G2-015. The support table, generated rather than written, and a named list of what is absent.
+
+  The page described five connectors in the present tense and said nothing about the six systems a
+  reader arrives asking for. A missing row reads as an oversight; a named absence reads as an
+  answer, and the reader who needs Confluence today can stop reading on this screen.
+
+  The supported half is `OAUTH_CONNECTOR_PROVIDERS` -- the same list the OAuth routes and the
+  connection store validate against -- joined to the rows above, so a provider added to the product
+  cannot ship without a row here and a row here cannot describe a provider the product does not
+  have: the throw below is that check. The unsupported half is a list of names with no capability
+  claim attached; nothing here says when, because nothing here knows.
+*/
+const OAUTH_BY_PROVIDER = new Map(OAUTH.map((connector) => [connector.provider, connector] as const));
+const SUPPORTED_ROWS = OAUTH_CONNECTOR_PROVIDERS.map((provider) => {
+  const connector = OAUTH_BY_PROVIDER.get(provider);
+  if (!connector) throw new Error(`/integrations has no row for the OAuth provider "${provider}"`);
+  return [connector.name, "Managed OAuth connection", "Read-only, with revisions tracked"] as const;
+});
+const SUPPORT_ROWS: ReadonlyArray<readonly [string, string, string]> = [
+  ...SUPPORTED_ROWS,
+  ...INFRA.map(([name, , description]) => [name, "Customer-run agent", description.split(".")[0]!] as const),
+];
+
+/*
+  Named because a reader looks for them, not because any of them is planned. None is on a roadmap
+  this site publishes, and adding one here without a connector behind it would be the promise the
+  rest of the page is careful not to make. Written as what has no connector rather than as a list
+  of absences: `public-copy-purge.test.ts` bars the defensive register on a sales surface, and a
+  reader who came for Confluence needs the answer, not an apology for it.
+*/
+const NO_CONNECTOR = ["Confluence", "Notion", "Slack", "GitHub", "Box", "Jira"] as const;
+
 export default function IntegrationsPage() {
   return (
     <PublicPageShell>
@@ -106,6 +141,52 @@ export default function IntegrationsPage() {
               uses a spaced one. Spaced is the site rule; this is it applied.
             */}
             <p className="fine">Connection health — configured, expired or unreachable — is reported in your workspace, where you can act on it.</p>
+            {/*
+              G2-005. The same sentence /pricing, /login, /security and /status carry, on the page
+              that describes connecting a source, read from the same record they read. A page that
+              names five connectors in the present tense and leaves the gate to be discovered after
+              a click is the shape the notice exists to prevent.
+            */}
+            {activationPolicy.customerData.enabled ? null : (
+              <p className="notice static" role="status">
+                <strong>Connecting your own sources is arranged with us.</strong>{" "}
+                {activationPolicy.customerData.reason}{" "}
+                <Link href="/contact">Request access</Link> to arrange it, or{" "}
+                <Link href="/explore">open the public Compiled World</Link> to see what a connected
+                source turns into.
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="body">
+          <div className="stack"><p className="slate"><b>SUPPORT</b><span />WHAT IS CONNECTED TODAY</p><h2>What connects today.</h2></div>
+          <div className="stack">
+            <table className="docs-table">
+              <thead>
+                <tr>
+                  <th scope="col">Source system</th>
+                  <th scope="col">How it connects</th>
+                  <th scope="col">What that means</th>
+                </tr>
+              </thead>
+              <tbody>
+                {SUPPORT_ROWS.map(([name, how, meaning]) => (
+                  <tr key={name}>
+                    <th scope="row">{name}</th>
+                    <td>{how}</td>
+                    <td>{meaning}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="fine">
+              The table is the whole list. {NO_CONNECTOR.slice(0, -1).join(", ")} and{" "}
+              {NO_CONNECTOR.at(-1)} have no connector here, none of them is on a published roadmap,
+              and nothing on this site says when one would arrive. Where such a system keeps its
+              files in one of the cloud drives above, or exports to a directory or a bucket, that
+              path works today; the system&rsquo;s own API is not read.
+            </p>
           </div>
         </div>
 
@@ -148,7 +229,13 @@ export default function IntegrationsPage() {
           </div>
         </div>
 
-        <div className="actions"><Link className="btn" href="/login">Connect a source</Link><Link className="btn ghost" href="/developers">Developer setup</Link></div>
+        {/*
+          G1-010 / G2-005. The primary was "Connect a source" pointing at /login -- the one action
+          the closed gate refuses, offered as the page's loudest control. It is the site's access
+          action now, resolved from the same record as the notice above, so this page cannot end on
+          a promise the notice two screens up has already withdrawn.
+        */}
+        <div className="actions"><PublicPrimaryCta className="btn" /><Link className="btn ghost" href="/developers">Developer setup</Link></div>
       </div></section>
     </PublicPageShell>
   );

@@ -72,8 +72,19 @@ export type ContractClause = {
   body: string;
   state: ContractClauseState;
   /**
-   * Where the reader can check the claim: a file, a route or a package path in this repository.
-   * Present on every clause, because a clause whose state cannot be checked is an opinion.
+   * Where the reader can check the claim, using only things this site publishes.
+   *
+   * G1-025 / SD-06. It used to be "a file, a route or a package path in this repository", and it
+   * was read that way: eight rows of internal module paths under a heading that says WHERE TO
+   * CHECK IT, on a public page, with no public repository anywhere on the site. That is a
+   * verification ritual nobody outside can perform, and it publishes the private tree's shape as
+   * the consolation prize. There is no public repository to open yet -- moving the monorepo is
+   * the founder's account action -- so what a reader is pointed at is what they can actually
+   * reach: a path inside a downloaded package, a public route, a published download and its
+   * sha256 in /developer/channel.json, or the compiled sample at /explore.
+   *
+   * A clause whose state cannot be checked is still an opinion. The rule did not move; the
+   * addressee did.
    */
   evidence: string;
   /**
@@ -100,7 +111,7 @@ export const CONTRACT_CLAUSES: readonly ContractClause[] = [
     body:
       "Every relation is typed and carries the evidence that justifies it, and a claim reaches that evidence through a supported_by relation to one exact document version — identified by the sha256 of the bytes that were read, not by a filename. The coordinates live on the region: each retrieval unit names a bounding box on a numbered page of that version and lists the claims and entities found inside it, so a changed region can be read back to what stands on it. Where an anchor is missing the compiler abstains rather than inventing one — a document version whose regions fail validation stops the compile with OCR_BINDING_INVALID, and a document read without regions emits no retrieval unit rather than a guessed page or box. Resolving every evidence reference in a finished package, and reporting EVIDENCE_DANGLING where one does not, is an offline check anyone holding the package can run — and the compiler runs the same check over the package before it emits, so a package that fails it arrives as review_required with the failing codes named, for a person to look at, rather than as a candidate that could be promoted.",
     state: "demonstrated",
-    evidence: "lib/collection-compiler.ts (rag/chunks.jsonl carries pageNumber1, bbox1000 and sourceVersionId), and scripts/compiled-world/validate.mjs — pnpm verify:package — exercised against the compiled /explore sample in lib/compiled-world-validator.test.ts",
+    evidence: "Open any compiled package: rag/chunks.jsonl carries pageNumber1, bbox1000 and sourceVersionId on every unit, and provenance/evidence.jsonl resolves each one. The compiled sample at /explore publishes the same binding without an account — every region it opens names its page and its box. To check a package yourself, tavonel-verify-package.mjs at /developer/tavonel-verify-package.mjs reports EVIDENCE_DANGLING for a reference that does not resolve; its sha256 is pinned in /developer/channel.json.",
   },
   {
     id: "stable-semantic-identity",
@@ -109,7 +120,7 @@ export const CONTRACT_CLAUSES: readonly ContractClause[] = [
     body:
       "FP-200, Feedwater Pump 200, Pump FP200 and P-200 are one piece of equipment in the plant and four strings in the corpus. An object here carries a stable key derived from content, so recompiling the same source lands on the same object rather than a new one. Merging two different strings into one object is the part this deployment does not do automatically: where the evidence does not settle identity, the compiler is required to leave it unresolved for a person rather than guess, and automatic resolution across sources is a direction.",
     state: "direction",
-    evidence: "lib/world-read-model.ts (stableKey), lib/entity-extraction-quality.test.ts",
+    evidence: "canonical/model.json in a package carries the stable key on every object, so recompiling the same source and diffing the two files shows the key holding. The sample at /explore is the readable version of the same thing. What is not there is an automatic merge across sources, which is why this clause is a direction rather than a demonstration.",
   },
   {
     id: "typed-dependencies",
@@ -118,7 +129,7 @@ export const CONTRACT_CLAUSES: readonly ContractClause[] = [
     body:
       "Every edge is typed and carries the evidence ids that justify it, and which types you get depends on which engine compiled: the fallback compiler emits three — a document discusses_topic, a document mentions_entity, and a claim is supported_by the evidence for one exact document version — while Core V2, the engine this deployment runs, has no topic object at all and emits three of its own: a claim supported_by its evidence, a claim mentions an entity, and one claim contradicts another. They are written as graph/relationships.csv under the header id, subject_id, predicate, object_id, evidence_ids, so a relation naming no evidence is not a row either emitter can produce, and the predicate list an artifact advertises is computed from the edges that artifact contains rather than copied from the blueprint. Where a type is a heuristic rather than read semantics, that is said and not softened: the fallback's topic edge comes from a small set of keyword rules and its entity edge from a capitalised-token scan, which makes those two document-level co-occurrence, and Core V2's entity mention is a regular-expression scan over the same text. A contradicts edge is a candidate, not a verdict — the compiler flags a pair whose numbers or whose polarity disagree inside one topic and one time reference, sends the candidate to review rather than resolving it, and knows nothing about jurisdiction, units or exception clauses; two claims phrased with different dates are never compared. A retrieval unit names the claims and entities found inside its own region, and the gate in front of retrieval rejects a unit with nothing bound to it; the unit carries no relation id. Projecting a relation into the retrieval unit an answer is built from is the rung this deployment does not build.",
     state: "demonstrated",
-    evidence: "lib/collection-compiler.ts (the fallback's three edge types, each carrying evidenceIds, emitted to graph/relationships.csv), lib/core-runtime-v2.ts (projectProductCoreV2Candidate: the Core's relation and contradiction objects projected as mentions and contradicts edges, and advertisedOntologyRelations computed from them), packages/product-core semantics.py (the contradiction detector's numeric/polarity scope), lib/world-gate.ts (NO_EVIDENCE_BOUND)",
+    evidence: "graph/relationships.csv in a package, whose header is id, subject_id, predicate, object_id, evidence_ids: a row with an empty evidence_ids column is one neither emitter can write. The predicate set an artifact advertises is in its own ontology/knowledge.ttl rather than in a blueprint, so the file and the claim are the same file. /docs/ontology-output publishes the per-predicate table with the engine that produced each edge.",
   },
   {
     id: "temporal-integrity",
@@ -127,7 +138,7 @@ export const CONTRACT_CLAUSES: readonly ContractClause[] = [
     body:
       "A compile produces a candidate version. A person activates it, and the version it replaced stays intact and readable rather than being overwritten. The gate in front of retrieval rejects any unit belonging to a superseded world version, so a superseded fact cannot reach an answer even if it is the closest match. Reading the world as it stood on a past date, and classifying which authority governed a fact at that date, are directions: the gate checks the active version, not a point in time.",
     state: "demonstrated",
-    evidence: "lib/world-gate.ts (SUPERSEDED_WORLD_VERSION), WorldHistoryEntry in lib/world-read-model.ts",
+    evidence: "Every World revision keeps its own manifest digest, and the Change act at /explore compares two of them side by side. In the API, a read of a superseded revision answers SUPERSEDED_WORLD_VERSION rather than returning the unit — /docs/world-api and /docs/errors document the code and when it is returned.",
   },
   {
     id: "selective-recompilation",
@@ -136,7 +147,7 @@ export const CONTRACT_CLAUSES: readonly ContractClause[] = [
     body:
       "Two pages change in a corpus of five thousand documents. The units that depend on those pages are rebuilt and everything else is carried over untouched, which is the economic argument for compiling knowledge rather than re-indexing it. Demonstrated on fixture data. Not offered as a shipped capability in this deployment: a compile here rebuilds the collection it is given. What is built and switched off is the request that would ask for the other thing — the compiler accepts a previous World and the incremental operation class its wire contract defines, behind the environment flag TAVONEL_CORE_V2_REVISION_COMPILE, which is unset in production and has never run a customer compile. Two reasons it stays unset, both named rather than left to be discovered: nothing in the web application verifies that the deployed compiler is built from the revision it is written against, and a collection's identity here is derived from the exact documents and versions it contains, so a source revision produces a new collection rather than a new version of the old one — which is precisely the case selective recompilation exists for.",
     state: "direction",
-    evidence: "lib/capabilities.ts, which labels this row Direction on the live capability grid; lib/core-runtime-v2.ts (CORE_V2_REVISION_COMPILE_FLAG, default off) and lib/collection-compile-run.ts (the prior-World lookup it gates)",
+    evidence: "The live capability grid on /security labels this row Direction, and /api/status serves the same record. No compile receipt this deployment has produced reports an incremental operation, which is the check that costs nothing: a package's provenance/events.jsonl shows a full rebuild of the collection it was given.",
   },
   {
     id: "full-rebuild-equivalence",
@@ -145,7 +156,7 @@ export const CONTRACT_CLAUSES: readonly ContractClause[] = [
     body:
       "An incremental update that is merely fast is dangerous, because nothing announces the moment it starts diverging from what a full rebuild would have produced. The contract is that the two are compared and that a mismatch refuses to publish rather than shipping a world that looks finished. Every compile receipt on this deployment reports its equivalence as not_run, which is the honest value: the comparison runs only on a selective rebuild, selective rebuilds are switched off, and so there is nothing to compare. What exists is the reader — a gate that refuses a receipt reporting a mismatch, refuses one it cannot read at all rather than defaulting to allow, and lets not_run through while saying in words that no comparison was made. Its tolerance is zero unaccounted artifacts and is uncalibrated: no corpus has been measured to set it, and zero is the only value defensible without one. So this clause is the rule the compiler is written to, and a gate with nothing yet to gate — not a result.",
     state: "direction",
-    evidence: "lib/equivalence-gate.ts (assertEquivalenceGate, and EQUIVALENCE_UNACCOUNTED_ARTIFACT_TOLERANCE documented uncalibrated); every receipt this deployment has produced carries equivalence not_run",
+    evidence: "Every compile receipt this deployment has produced reports its equivalence as not_run, and that field is in the package: provenance/events.jsonl carries it, so the honest value is checkable rather than asserted. The tolerance the comparison would use is zero unaccounted artifacts and is uncalibrated, which /benchmarks states as the bar a number has to clear before it is published.",
   },
   {
     id: "multi-model-verification",
@@ -154,7 +165,7 @@ export const CONTRACT_CLAUSES: readonly ContractClause[] = [
     body:
       "A single OCR or vision model grading itself is the failure this clause exists to prevent: it is most confident exactly where a degraded scan has misled it. The contract asks for an independent second read, explicit disagreement detection between the two, escalation to a stronger reader where they disagree, and one canonical result at the end. Reading is single-pass in this deployment; low-confidence regions are carried forward and arrive in review rather than being re-read by a second model.",
     state: "direction",
-    evidence: "lib/pipeline.ts — one read stage per document version, whose held state routes a document to a person rather than to a second reader",
+    evidence: "One read per document version, visible in the package: provenance/events.jsonl records a single read event per version, and a low-confidence region arrives in the review queue rather than in a second read. /docs/review documents the four decisions a person takes there.",
   },
   {
     id: "portable-world",
@@ -163,7 +174,7 @@ export const CONTRACT_CLAUSES: readonly ContractClause[] = [
     body:
       "The canonical model leaves as JSON, the ontology as Turtle and JSON-LD, the graph as CSV, the retrieval corpus and the provenance events as JSON Lines, and the sources as Markdown for reading. The archive carries a signed file inventory — every listed file checked by sha256, then those exact manifest bytes signed with Ed25519 — and the public key the signature was made with, so the check is an offline comparison of two files in the archive against a key fingerprint obtained from somewhere other than the archive: GET /api/export/trust publishes that fingerprint, and a download with no signing key configured refuses with EXPORT_SIGNER_NOT_CONFIGURED rather than handing over an unsigned archive. The package still does not carry the verifier inside itself, because a checker shipped inside the thing it checks proves nothing. What changed is where the reference verifier lives: tavonel-verify-export.mjs and tavonel-verify-package.mjs are published downloads on the Developers page, each pinned by sha256 in the distribution channel, each a single file that imports nothing but the Node standard library. The algorithm and the two files to compare are still named here, so a holder who would rather trust their own program than ours can still write one — and now does not have to in order to check a download at all. Knowledge that can only be read inside the tool that made it is not an asset.",
     state: "demonstrated",
-    evidence: "lib/collection-download.ts (manifest/export-manifest.json and signatures/export-manifest.ed25519.json), lib/export-signing.ts, GET /api/export/trust, app/api/collections/[id]/download/route.ts — 503 rather than an unsigned archive — and public/developer/tavonel-verify-export.mjs + tavonel-verify-package.mjs, pinned in public/developer/channel.json",
+    evidence: "manifest/export-manifest.json and signatures/export-manifest.ed25519.json are in the archive; the public key fingerprint to check them against is served by GET /api/export/trust, which is outside the archive on purpose. The two reference verifiers are downloads — /developer/tavonel-verify-export.mjs and /developer/tavonel-verify-package.mjs — each a single file importing nothing but the Node standard library, each pinned by sha256 in /developer/channel.json. A download with no signing key configured answers EXPORT_SIGNER_NOT_CONFIGURED rather than handing over an unsigned archive.",
   },
 ];
 

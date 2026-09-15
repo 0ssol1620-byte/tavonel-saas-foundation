@@ -2,7 +2,9 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { activationPolicy } from "./activation-policy";
 import { primaryCallToAction } from "./commercial-state";
+import { EXPLORE_COPY } from "./explore-story";
 import { ACCESS_CTA, EXPLORE_CTA, PRODUCT_NOUNS, SELF_SERVE_CTA } from "./site-navigation";
 
 /**
@@ -960,8 +962,34 @@ describe("the site's own vocabulary", () => {
     expect(PRODUCT_NOUNS).toContain("Trust Center");
     // The commercial posture chooses between the two; it does not write a third.
     expect(primaryCallToAction({})).toEqual(ACCESS_CTA);
+    /*
+      G1-001 / G1-010 / G2-026. This used to assert that the three billing flags alone produce
+      "Start with your files", and they did -- on `/` and `/pricing`, which resolve them at request
+      time, while every prerendered page resolved the same call at build time with the flags
+      scrubbed and rendered "Request access". One site, two primary actions, and the louder one
+      promised the compile this deployment does not run.
+
+      The fact being pinned is the same one, with the condition it was missing: the self-serve
+      action requires the customer-data gate as well as the card. The gate is closed, so the
+      billing flags no longer change the answer -- and when it opens, this case is the one that
+      says so out loud rather than a CTA changing under nobody's decision.
+    */
+    expect(activationPolicy.customerData.enabled, "the gate below is what this case turns on").toBe(false);
     expect(primaryCallToAction({ COMMERCIAL_MODE: "live", TAVONEL_BILLING_LAUNCH_APPROVED: "true", VERCEL_ENV: "production" }))
-      .toEqual(SELF_SERVE_CTA);
+      .toEqual(ACCESS_CTA);
+  });
+
+  /*
+    G1-001: /explore's closing action is the site's access action, not a fourth spelling of it.
+
+    `lib/explore-story.ts` is reachable from the client bundle, where the commercial flags inline
+    as `undefined`, so it names `ACCESS_CTA` directly instead of resolving the posture. That is
+    only honest while the gate is closed, which is exactly what this asserts.
+  */
+  it("closes the public sample on the same access action the header offers", () => {
+    expect(activationPolicy.customerData.enabled).toBe(false);
+    const primary = EXPLORE_COPY.endActions.find((action) => action.primary);
+    expect(primary).toEqual({ label: ACCESS_CTA.label, href: ACCESS_CTA.href, primary: true });
   });
 
   it.each(CHROME_SURFACES)("publishes no retired name in %s", (surface) => {
@@ -978,8 +1006,20 @@ describe("the site's own vocabulary", () => {
   */
   it("gives the two widths one action, from one object", () => {
     const chrome = prose("components/public-site-chrome.tsx");
-    expect(chrome, "the header renders the action it was given").toContain("{cta.label}");
-    expect(chrome, "and hands the same object to the phone sheet").toContain("<MobilePrimaryNav cta={cta} />");
+    /*
+      G1-043. The header renders `ctaLabel`, not `cta.label`, and the two lines below are why that
+      is still one action from one object rather than a label of the header's own: `ctaLabel` is
+      `cta.label` unless the page is /ko, where it is that action's Korean name keyed by the same
+      destination. The chrome may still write neither English literal itself.
+    */
+    expect(chrome, "the header derives its label from the action it was given")
+      .toContain("const ctaLabel = korean ? KO_CHROME.cta[cta.href] ?? cta.label : cta.label;");
+    expect(chrome, "and renders that").toContain("{ctaLabel}");
+    for (const literal of ["Request access", "Start with your files"]) {
+      expect(chrome, `the header writes "${literal}" instead of reading it`).not.toContain(literal);
+    }
+    expect(chrome, "and hands the same action to the phone sheet, with the label it is showing")
+      .toContain("<MobilePrimaryNav cta={{ ...cta, label: ctaLabel }} />");
     const sheet = prose("components/mobile-primary-nav.tsx");
     expect(sheet, "the sheet renders the object, not a label of its own").toContain("{cta.label}");
     for (const literal of ["Contact<", "Request access", "Start with your files"]) {

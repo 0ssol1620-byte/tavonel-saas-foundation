@@ -31,12 +31,19 @@ const SOURCES = [...sourceFiles("app"), ...sourceFiles("components")].map((path)
 }));
 
 describe("raw HTML injection", () => {
-  it("has exactly two dangerouslySetInnerHTML sinks, and both render JSON-LD from literals", () => {
+  it("has exactly three dangerouslySetInnerHTML sinks, and all render JSON-LD from literals", () => {
     const users = SOURCES.filter((file) => file.text.includes("dangerouslySetInnerHTML"));
+    /*
+      The third is /knowledge-compiler's FAQPage block (G1-018), and it is justified here as this
+      assertion asks. Its values are the five question-and-answer pairs written in that file --
+      `QUESTIONS`, a module-level literal -- mapped into schema.org shapes and serialised through
+      `jsonLdHtml`. Nothing reaches it from a request, a document or a model, which is the same
+      standing the other two have, and the per-file assertions below apply to it unchanged.
+    */
     expect(
       users.map((file) => file.path).sort(),
       "a further raw-HTML sink is a design decision, not a refactor: justify it here or do not add it",
-    ).toEqual(["app/layout.tsx", "components/breadcrumb-json-ld.tsx"]);
+    ).toEqual(["app/knowledge-compiler/page.tsx", "app/layout.tsx", "components/breadcrumb-json-ld.tsx"]);
     // Both serialise JSON-LD only. layout.tsx inlines an object literal; the breadcrumb component
     // (2026-09-08 exposure lane) serialises `breadcrumbList(trail)`, whose trail is a page-declared
     // literal and whose origin/root come from lib/structured-data.ts. No value reaches either sink
@@ -44,7 +51,10 @@ describe("raw HTML injection", () => {
     const byPath = new Map(users.map((file) => [file.path, file.text]));
     expect(byPath.get("app/layout.tsx")).toMatch(/__html: jsonLdHtml\(\{\s*\n\s*"@context": "https:\/\/schema\.org"/);
     expect(byPath.get("components/breadcrumb-json-ld.tsx")).toMatch(/__html: jsonLdHtml\(breadcrumbList\(trail\)\)/);
-    // And neither may go back to the bare serializer, which is what they both did until B7.
+    expect(byPath.get("app/knowledge-compiler/page.tsx")).toMatch(/__html: jsonLdHtml\(faqPageJsonLd\)/);
+    expect(byPath.get("app/knowledge-compiler/page.tsx"), "built from the page's own literal")
+      .toMatch(/mainEntity: QUESTIONS\.map/);
+    // And none may go back to the bare serializer, which is what the first two did until B7.
     for (const [path, text] of byPath) {
       expect(text, `${path}: __html must go through jsonLdHtml`).not.toMatch(/__html:\s*JSON\.stringify/);
     }

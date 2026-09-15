@@ -3,8 +3,9 @@ import type { Route } from "next";
 import Logomark from "@/components/logomark";
 import MobilePrimaryNav from "@/components/mobile-primary-nav";
 import DesktopPrimaryNav from "@/components/site-nav/desktop-primary-nav";
-import { primaryCallToAction } from "@/lib/commercial-state";
-import { FOOTER_GROUPS, FOOTER_LEGAL_ROW, type SiteLink } from "@/lib/site-navigation";
+import { deploymentStateLine, primaryCallToAction } from "@/lib/commercial-state";
+import { FOOTER_GROUPS, FOOTER_LEGAL_ROW, KO_CHROME, type SiteLink } from "@/lib/site-navigation";
+import chrome from "./public-site-chrome.module.css";
 
 /**
  * The header, once, for every public surface including the three that used to hand-roll one.
@@ -24,32 +25,49 @@ import { FOOTER_GROUPS, FOOTER_LEGAL_ROW, type SiteLink } from "@/lib/site-navig
  * that took the fallback, which was every page but three. The caller resolves the action instead,
  * which every caller can: two of them are client components that already receive the commercial
  * state as a prop, and the rest reach this file through `PublicSitePage` below.
+ *
+ * G1-001 / G2-026: `mode` now falls back to `deploymentStateLine()` rather than to nothing.
+ * What this deployment is -- a finished public World to read, and your own files arranged with
+ * us rather than switched on by a checkout -- was stated on /pricing, /security, /status and
+ * behind the /login click, and nowhere a visitor meets first. It is read off `activationPolicy`,
+ * so it appears wherever the header does and removes itself on the day the gate opens.
  */
 export function PublicSiteHeader({
   cta,
   mode,
   signedIn,
   stuck = true,
+  korean = false,
 }: {
   cta: SiteLink;
   mode?: { label: string; title: string };
   signedIn?: boolean;
   stuck?: boolean;
+  /** G1-043: /ko is the site's one Korean URL, and it rendered an English header around it. */
+  korean?: boolean;
 }) {
+  // G1-001 / G2-026: see the note above. A caller's own `mode` (the pilot badge) still wins.
+  const english = deploymentStateLine();
+  const state = mode ?? (english && korean ? { ...english, label: KO_CHROME.stateLine } : english);
+  const ctaLabel = korean ? KO_CHROME.cta[cta.href] ?? cta.label : cta.label;
   return (
     <header className="nav" data-stuck={stuck ? 1 : 0}>
       <Link href="/" className="wordmark" aria-label="TAVONEL home">
         <Logomark />
         <b>TAVONEL</b>
       </Link>
-      {mode ? (
-        <span className="mode" title={mode.title}>
+      {state ? (
+        <span className={`mode ${chrome.state}`} title={state.title}>
           <i aria-hidden="true" />
-          {mode.label}
+          {state.label}
         </span>
       ) : null}
       <DesktopPrimaryNav />
-      <MobilePrimaryNav cta={cta} />
+      {/*
+        G1-043: the same action, with the label the header is showing beside it. The phone sheet
+        still renders the object it is given and writes no label of its own.
+      */}
+      <MobilePrimaryNav cta={{ ...cta, label: ctaLabel }} />
       <span className="nav-actions">
         {/*
           BA-249: ghost, not filled. On /product and /developers the header's filled button and
@@ -57,14 +75,14 @@ export function PublicSiteHeader({
           two filled primaries has none. The hero keeps the fill; the header keeps the action
           available on every scroll position, which is what it is for.
         */}
-        <Link className="btn small ghost" href={cta.href as Route}>{cta.label}</Link>
-        {signedIn ? null : <Link className="nav-signin" href="/login">Sign in</Link>}
+        <Link className="btn small ghost" href={cta.href as Route}>{ctaLabel}</Link>
+        {signedIn ? null : <Link className="nav-signin" href="/login">{korean ? KO_CHROME.signIn : "Sign in"}</Link>}
       </span>
     </header>
   );
 }
 
-export function PublicSiteFooter() {
+export function PublicSiteFooter({ korean = false }: { korean?: boolean } = {}) {
   return (
     <footer className="site">
       <div className="shell">
@@ -72,14 +90,14 @@ export function PublicSiteFooter() {
         <div className="site-footer-groups">
           {FOOTER_GROUPS.map((group) => (
             <nav key={group.title} aria-label={group.title}>
-              <p className="site-footer-title">{group.title}</p>
+              <p className="site-footer-title">{korean ? KO_CHROME.footerGroups[group.title] ?? group.title : group.title}</p>
               {group.links.map((link) => (
                 <Link key={link.href} href={link.href as Route}>{link.label}</Link>
               ))}
             </nav>
           ))}
         </div>
-        <p className="fine">Knowledge compiled with a traceable path back to every source.</p>
+        <p className="fine">{korean ? KO_CHROME.tagline : "Knowledge compiled with a traceable path back to every source."}</p>
         {/*
           BA-250: the row a procurement reader looks for. Copyright, the Korean entry and the
           security inbox -- the last two are pages and an address this site already publishes, so
@@ -100,7 +118,7 @@ export function PublicSiteFooter() {
   );
 }
 
-export function PublicSitePage({ children }: { children: React.ReactNode }) {
+export function PublicSitePage({ children, korean = false }: { children: React.ReactNode; korean?: boolean }) {
   /*
     The commercial posture, read once per page rather than fetched once per visitor.
 
@@ -111,10 +129,10 @@ export function PublicSitePage({ children }: { children: React.ReactNode }) {
     the closed posture.
   */
   return (
-    <div className="page public-page">
-      <PublicSiteHeader cta={primaryCallToAction()} />
+    <div className="page public-page" lang={korean ? "ko" : undefined}>
+      <PublicSiteHeader cta={primaryCallToAction()} korean={korean} />
       <main id="main" tabIndex={-1}>{children}</main>
-      <PublicSiteFooter />
+      <PublicSiteFooter korean={korean} />
     </div>
   );
 }

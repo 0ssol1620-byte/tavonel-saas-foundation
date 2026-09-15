@@ -1,3 +1,4 @@
+import { ACCESS_CTA } from "./site-navigation";
 import type { ExploreChangeStep, ExploreChangeStory } from "./explore-change";
 import type { ExploreSampleAnswer } from "./explore-sample";
 import type { ExploreDocument, VisualEvidence, VisualRevision } from "./visual-world-model";
@@ -173,18 +174,30 @@ export const EXPLORE_COPY = {
     "Entity labels in this fixed sample come from a simple capitalised-token heuristic, not by a resolver. In the recorded evaluation, 3 of 16 baseline labels were true positives. Unreviewed entities are shown only as sample structure; Claims and page-bound evidence are the parts to judge here.",
   /* BA-029: the exit names where it goes. It was an unlabelled X with this only as an aria-label. */
   closeLabel: "Back to TAVONEL",
+  /*
+    G1-047. The sample's five filings are TAVONEL's own, and the label over them said YOUR SOURCES
+    -- on the one page whose whole argument is that a reader can check what is actually there. The
+    heading under it already makes the "your own" offer; the label says whose these are.
+  */
+  endSourcesLabel: "THIS WORLD'S SOURCES",
   endHeading: "Try the same path with your own knowledge.",
   /*
     BA-036: two, not three. "How compilation works" was a third sibling button in one row -- the
     arrangement 3.4 bars -- and it is the one of the three that is reading rather than doing, so
     it moved into the sentence under the row and takes the global label for its destination.
 
-    Both labels that remain are the site's own: "Start with your files" is what
-    `lib/commercial-state.ts` calls the primary action and what /pricing and /trust render, and
-    "Connect a source" is /integrations' own button. Neither is /explore vocabulary.
+    Both labels that remain are the site's own. "Connect a source" is /integrations' own button,
+    and the primary one is `ACCESS_CTA` from `lib/site-navigation.ts` -- the same object the header
+    and the phone sheet render -- rather than a third spelling of the site's access action.
+
+    G1-001: it was "Start with your files" pointing at /login, which is `SELF_SERVE_CTA`, and this
+    module is reachable from the client bundle, where the unprefixed commercial flags inline as
+    `undefined` -- so it could not resolve the posture here and hard-coded the open one. It names
+    the closed one instead, and `lib/brand-copy.test.ts` fails if `activationPolicy.customerData`
+    opens while this still points at /contact, which is the day it has to be resolved server-side.
   */
   endActions: [
-    { label: "Start with your files", href: "/login", primary: true },
+    { label: ACCESS_CTA.label, href: ACCESS_CTA.href, primary: true },
     { label: "Connect a source", href: "/integrations", primary: false },
   ],
 } as const;

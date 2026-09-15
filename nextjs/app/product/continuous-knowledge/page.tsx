@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Fragment } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import CompilerContractDiagram from "@/components/compiler-contract-diagram";
@@ -61,6 +62,13 @@ export const metadata: Metadata = {
 /** The two states this page actually uses, in the order a reader meets them. */
 const STATE_KEY: readonly ContractClauseState[] = ["demonstrated", "direction"];
 
+/** G1-026: the clauses in two halves, so the page's first action can sit between them. */
+const MID_CLAUSE = Math.ceil(CONTRACT_CLAUSES.length / 2);
+const CLAUSE_HALVES = [
+  [0, CONTRACT_CLAUSES.slice(0, MID_CLAUSE)],
+  [MID_CLAUSE, CONTRACT_CLAUSES.slice(MID_CLAUSE)],
+] as const;
+
 export default function ContinuousKnowledgePage() {
   return (
     <PublicSitePage>
@@ -98,20 +106,48 @@ export default function ContinuousKnowledgePage() {
 
           <section className={styles.section} aria-labelledby="clauses">
             <h2 id="clauses">The eight clauses</h2>
-            <ol className={styles.clauses} data-contract-clauses="">
-              {CONTRACT_CLAUSES.map((clause, index) => (
-                <li className={styles.clause} data-contract-clause="" data-state={clause.state} id={clause.id} key={clause.id}>
-                  <div className={styles.head}>
-                    <span className={styles.index}>{String(index + 1).padStart(2, "0")}</span>
-                    <h3>{clause.name}</h3>
-                    <span className={styles.state} data-state-label="">{CONTRACT_STATE[clause.state].label}</span>
-                  </div>
-                  <p className={styles.promise}>{clause.promise}</p>
-                  <p className={styles.explain}>{clause.body}</p>
-                  <p className={styles.check}><b>WHERE TO CHECK IT</b>{clause.evidence}</p>
-                </li>
-              ))}
-            </ol>
+            {/*
+              G1-026. One list became two, with the page's first action between them.
+
+              This page is about 5,800px of prose and its first action was at the very bottom, so a
+              reader who took the argument at clause 03 had nothing to do about it for five screens.
+              The break is halfway, derived from the clause count rather than written as a 4, and it
+              asks for the sample before it asks for anything else -- the contract's own claim is
+              that it can be checked, not that it should be bought. The closing row keeps its three
+              actions; this is not a second copy of them.
+
+              Two `<ol>` elements rather than an item inside one, because the list is a two-column
+              grid at 1100px and an aside cell inside it would need a column-span rule in CSS this
+              lane does not own. The numbering is unaffected: it is computed from the clause's index
+              in `CONTRACT_CLAUSES`, not from the list it is rendered in.
+            */}
+            {CLAUSE_HALVES.map(([from, half], group) => (
+              <Fragment key={from}>
+                {group === 1 ? (
+                  <p className="fine">
+                    {from} clauses in, and every one of them is checkable on a World that is already
+                    compiled.{" "}
+                    <Link href={"/explore" as Route}>Open the public Compiled World</Link> and follow
+                    a fact back to the page it was read from, or{" "}
+                    <Link href="/contact">request access</Link> to compile your own sources.
+                  </p>
+                ) : null}
+                <ol className={styles.clauses} data-contract-clauses="" start={from + 1}>
+                  {half.map((clause, index) => (
+                    <li className={styles.clause} data-contract-clause="" data-state={clause.state} id={clause.id} key={clause.id}>
+                      <div className={styles.head}>
+                        <span className={styles.index}>{String(from + index + 1).padStart(2, "0")}</span>
+                        <h3>{clause.name}</h3>
+                        <span className={styles.state} data-state-label="">{CONTRACT_STATE[clause.state].label}</span>
+                      </div>
+                      <p className={styles.promise}>{clause.promise}</p>
+                      <p className={styles.explain}>{clause.body}</p>
+                      <p className={styles.check}><b>WHERE TO CHECK IT</b>{clause.evidence}</p>
+                    </li>
+                  ))}
+                </ol>
+              </Fragment>
+            ))}
           </section>
 
           <section className={styles.section} aria-labelledby="flow">

@@ -89,7 +89,10 @@ describe("JSON-LD emitted anywhere in the tree", () => {
     named, so moving one still leaves a failure to read rather than a silent green.
   */
   it("finds the emission points it is guarding", () => {
-    expect(emitters.map((file) => file.path.replaceAll("\\", "/")).sort()).toEqual(["app/layout.tsx", "components/breadcrumb-json-ld.tsx"]);
+    // G1-018 adds the third: /knowledge-compiler emits FAQPage, built from the same five
+    // questions the page renders rather than from a second copy of them.
+    expect(emitters.map((file) => file.path.replaceAll("\\", "/")).sort())
+      .toEqual(["app/knowledge-compiler/page.tsx", "app/layout.tsx", "components/breadcrumb-json-ld.tsx"]);
   });
 
   it.each(emitters.map((file) => file.path))("%s claims no date, price, rating or dataset", (path) => {

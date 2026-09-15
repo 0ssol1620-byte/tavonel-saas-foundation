@@ -203,9 +203,28 @@ export default function LoginPage() {
           ) : null}
 
           <div className="auth-actions">
-            <button className="btn" type="button" onClick={() => void signIn()} disabled={busy || authState !== "ready"}>
-              {authState === "checking" ? "Checking this deployment…" :
-                authState === "unconfigured" ? "Sign-in unavailable" :
+            {/*
+              G2-031. The control a visitor came for, present from the first paint.
+
+              While `/api/status` was in flight the button's label was replaced by "Checking this
+              deployment…", so one cold load in three at 412px showed no sign-in control at 300ms
+              and settled well inside 1.5s. Nothing wrong was claimed; the page simply looked like
+              it had nothing to offer for a third of a second on the surface that converts.
+
+              The button is the button the whole time. It is disabled and `aria-busy` while the
+              deployment answers -- so a click cannot start a flow the page has not confirmed is
+              configured -- and it says "Sign-in unavailable" only once the answer is in. That is
+              the same fail-closed behaviour with the label held still.
+            */}
+            <button
+              className="btn"
+              type="button"
+              onClick={() => void signIn()}
+              disabled={busy || authState !== "ready"}
+              aria-busy={authState === "checking" || busy}
+              data-loading={authState === "checking" || busy ? "1" : undefined}
+            >
+              {authState === "unconfigured" ? "Sign-in unavailable" :
                 busy ? "Opening Google…" : "Continue with Google"}
             </button>
             {authState === "ready" && !customerProcessingEnabled ? (

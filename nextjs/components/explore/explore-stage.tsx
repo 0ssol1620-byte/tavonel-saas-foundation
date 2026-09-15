@@ -36,6 +36,7 @@ import AskOverlay from "./ask-overlay";
 import type { TechnicalSelection } from "./technical-details";
 import styles from "./explore-stage.module.css";
 import { useNarrowStage, useReducedMotion } from "@/components/world-visual/use-stage-media";
+import { ACCESS_CTA, PRIMARY_NAV } from "@/lib/site-navigation";
 import {
   EXPLORE_ACTS,
   EXPLORE_COPY,
@@ -49,6 +50,18 @@ import {
 import type { VisualLayout, VisualState, VisualWorldModel } from "@/lib/visual-world-model";
 
 const TechnicalDetails = dynamic(() => import("./technical-details"), { ssr: false });
+
+/*
+  G1-021. The three destinations a visitor who landed here from a search actually needs.
+
+  Read from `PRIMARY_NAV` and `ACCESS_CTA` rather than typed, so the labels are the site's own and
+  a rename reaches this header too. Three, not the whole bar: the stage replaces the site chrome
+  on purpose, and reproducing eight links over it would undo what the stage is for.
+*/
+const EXIT_LINKS = [
+  ...PRIMARY_NAV.filter((link) => link.href === "/product" || link.href === "/pricing"),
+  ACCESS_CTA,
+];
 
 type Props = {
   model: VisualWorldModel;
@@ -267,7 +280,18 @@ export default function ExploreStage({ model, layout, change, answers, technical
           only way back and nothing said so. So the drawer opener is a quiet text button and the
           exit names its destination rather than drawing a glyph.
         */}
+        {/*
+          G1-021. This page replaces the site header, and a visitor who arrives here from a search
+          had TECHNICAL DETAILS and one link home -- no way to Product, Pricing or Contact without
+          going back to the top and starting again. Three links, not a menu: the stage is the page,
+          and reproducing the whole navigation over it would undo what the stage is for.
+        */}
         <div className={styles.headerActions}>
+          <nav className={styles.siteLinks} aria-label="TAVONEL">
+            {EXIT_LINKS.map((link) => (
+              <Link key={link.href} href={link.href as Route}>{link.label}</Link>
+            ))}
+          </nav>
           <button
             type="button"
             className={styles.technicalButton}
@@ -458,7 +482,7 @@ export default function ExploreStage({ model, layout, change, answers, technical
       ) : null}
 
       <section className={styles.next}>
-        <p>YOUR SOURCES</p>
+        <p>{EXPLORE_COPY.endSourcesLabel}</p>
         <h2>{EXPLORE_COPY.endHeading}</h2>
         {/*
           BA-029. The closing section was a two-column grid with the whole left column empty below
@@ -475,6 +499,23 @@ export default function ExploreStage({ model, layout, change, answers, technical
               {document.compiledPageCount === document.pageCount
                 ? `${document.pageCount} pages`
                 : `${document.compiledPageCount} of ${document.pageCount} pages`}
+              {/*
+                G1-023. Two of the five read "36 of 37" and "38 of 40" with no reason beside them,
+                which reads as a compile that gave up rather than as what it is. Every page of every
+                filing went to the compiler -- `sliceRationale` says so -- and `compiledPageCount`
+                counts the pages a region was actually read out of, so the shortfall is pages that
+                produced no region. Nothing in the World stands on them, and the sentence is derived
+                from that definition rather than written per document.
+              */}
+              {document.compiledPageCount !== undefined && document.compiledPageCount < document.pageCount ? (
+                <small className={styles.nextSourceNote}>
+                  {document.pageCount - document.compiledPageCount === 1
+                    ? "1 page carries no region, so nothing in this World stands on it."
+                    : `${document.pageCount - document.compiledPageCount} pages carry no region, so nothing in this World stands on them.`}
+                  {" "}
+                  <Link href={"/explore?act=evidence" as Route}>See what a region is</Link>.
+                </small>
+              ) : null}
             </li>
           ))}
         </ul>
