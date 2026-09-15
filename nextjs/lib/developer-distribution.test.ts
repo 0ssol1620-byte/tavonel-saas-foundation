@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { GET as openApi } from "../app/api/openapi/route";
+import { DEVELOPER_FILES, MCP_TOOL_NAMES } from "./mcp-tools";
 
 const developerAsset = (name: string) => fileURLToPath(new URL(`../public/developer/${name}`, import.meta.url));
 
@@ -44,6 +45,16 @@ describe("developer distribution", () => {
       verifyExport: "tavonel-verify-export.mjs",
       verifyPackage: "tavonel-verify-package.mjs",
       verifyRoundtrip: "tavonel-verify-roundtrip.py",
+      /*
+        G3-017. /docs/integration-recipes told a reader to run these two and they lived in a
+        private repository, so the page's verifiability claim -- "a recipe that has drifted from
+        the product fails a check rather than a customer's afternoon" -- was unverifiable by the
+        only person it was addressed to. They are pinned here like everything else. They carry no
+        DISTRIBUTION_VERSION because neither is the CLI: the channel version names the CLI/MCP
+        build, and these move on their own.
+      */
+      recipePublicSample: "tavonel-public-sample.py",
+      recipeSmoke: "tavonel-recipe-smoke.mjs",
     } as const;
     expect(Object.keys(assetFiles).sort()).toEqual(Object.keys(channel.assets).sort());
     for (const [key, filename] of Object.entries(assetFiles)) {
@@ -121,5 +132,42 @@ describe("developer distribution", () => {
     expect(source.indexOf("result = client.post(")).toBeLessThan(source.indexOf("write_state(args.state"));
     expect(source).toContain("os.replace(temp_name, path)");
     expect(source).toContain('parsed.hostname in {"localhost", "127.0.0.1", "::1"}');
+  });
+
+  /*
+    G3-006 and G3-016: two counts that were wrong on three surfaces each.
+
+    "Eight tools" stood on /developers, /docs/integration-recipes and the 3 September changelog
+    entry while the server registers nine -- `list_worlds` shipped and was never announced, and
+    the number propagated outward from the entry. "Five published files" stood three times
+    against six in channel.json. Neither was a typo: both were a number typed once and copied,
+    with nothing comparing it to the artifact. `lib/mcp-tools.ts` is now the one list every
+    surface renders, and this is what binds it to the artifacts.
+  */
+  it("names exactly the tools the shipped MCP server registers", () => {
+    const source = readFileSync(developerAsset("tavonel-mcp.mjs"), "utf8");
+    const registered = [...source.matchAll(/^\s{4}name: "([a-z_]+)",$/gm)].map((match) => match[1]);
+    expect(registered.length).toBeGreaterThan(0);
+    expect(MCP_TOOL_NAMES).toEqual(registered);
+    expect(registered.filter((name) => /^(create|update|delete|promote|rollback|write|set)_/.test(name))).toEqual([]);
+  });
+
+  it("names exactly the files the channel manifest pins", () => {
+    const channel = JSON.parse(readFileSync(developerAsset("channel.json"), "utf8")) as { assets: Record<string, { url: string }> };
+    expect(DEVELOPER_FILES.map((entry) => entry.key).sort()).toEqual(Object.keys(channel.assets).sort());
+    for (const entry of DEVELOPER_FILES) {
+      expect(channel.assets[entry.key]!.url, entry.key).toBe(`https://tavonel.com/developer/${entry.file}`);
+    }
+  });
+
+  it("publishes two recipe scripts that cannot spend, write or authenticate", () => {
+    const smoke = readFileSync(developerAsset("tavonel-recipe-smoke.mjs"), "utf8");
+    expect(smoke).not.toMatch(/method:s*"(POST|PUT|PATCH|DELETE)"/);
+    expect(smoke).not.toContain("TAVONEL_API_KEY");
+    const sample = readFileSync(developerAsset("tavonel-public-sample.py"), "utf8");
+    expect(sample).not.toContain("TAVONEL_API_KEY");
+    // Stdlib only: the recipe's own claim is that it needs nothing installed.
+    const imports = [...sample.matchAll(/^(?:import|from) ([a-z_.0-9]+)/gm)].map((match) => match[1].split(".")[0]);
+    expect([...new Set(imports)].sort()).toEqual(["__future__", "argparse", "base64", "hashlib", "json", "sys", "urllib"]);
   });
 });

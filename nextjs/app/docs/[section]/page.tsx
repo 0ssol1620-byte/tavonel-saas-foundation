@@ -15,6 +15,7 @@ import {
   type DocsBlock,
 } from "@/lib/docs-content";
 import { readDocsEndpoints, snippetFor, SNIPPET_LANGUAGES, type DocsEndpoint } from "@/lib/docs-endpoints";
+import { WorldLifecycle } from "@/components/docs/world-lifecycle";
 import { DocsToc } from "@/components/docs/docs-toc";
 import { PageToc, tocEntries } from "@/components/docs/page-toc";
 import layout from "@/components/docs/docs-toc.module.css";
@@ -152,6 +153,13 @@ function Block({ block, endpoints, id }: { block: DocsBlock; endpoints: Map<stri
             ))}
           </tbody>
         </table>
+      );
+    case "diagram":
+      return (
+        <div className="stack">
+          <WorldLifecycle />
+          <p className="fine">{block.caption}</p>
+        </div>
       );
     case "endpoint": {
       const endpoint = endpoints.get(block.operationId);
