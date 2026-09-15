@@ -3,7 +3,7 @@ import { activationPolicy } from "@/lib/activation-policy";
 import { BILLING_OFFERS, type BillingOfferCode } from "@/lib/billing-catalog";
 import { billingProductDecision, type ProductAccessLevel, type ProductAccessRole } from "@/lib/billing-product-access";
 import type { FoundationBillingAccount } from "@/lib/billing-store";
-import { readCommercialState } from "@/lib/commercial-state";
+import { primaryCallToAction, readCommercialState } from "@/lib/commercial-state";
 import { readAccessMode } from "@/lib/foundation-pilot";
 
 export const dynamic = "force-dynamic";
@@ -105,6 +105,7 @@ export default function PricingPage() {
     <PricingPageClient
       initialLiveCheckout={commercial.liveChargesEnabled}
       initialSelfService={readAccessMode() === "self_service"}
+      cta={primaryCallToAction()}
       gates={PURCHASE_GATES}
       planCapabilities={PLAN_CAPABILITIES}
     />

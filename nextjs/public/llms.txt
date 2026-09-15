@@ -85,3 +85,4 @@ Indexing: public product, documentation, research and trust pages are indexable.
 - [Refunds](https://tavonel.com/refunds)
 - [Subprocessors](https://tavonel.com/subprocessors)
 - [Contact](https://tavonel.com/contact)
+- [Changelog feed (Atom)](https://tavonel.com/changelog/feed.xml)

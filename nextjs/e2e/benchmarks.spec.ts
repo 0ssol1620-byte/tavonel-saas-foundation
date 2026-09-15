@@ -93,13 +93,13 @@ test("carries no empty structural cell and never overflows its viewport", async 
 test("is reachable from research and from the resources hub", async ({ page }) => {
   await page.goto("/research");
   await expect(page.locator('main a[href="/benchmarks"]').first()).toBeVisible();
-  await expect(page.getByRole("link", { name: "Benchmarks", exact: true }).first())
+  await expect(page.getByRole("link", { name: "Benchmark protocol", exact: true }).first())
     .toHaveAttribute("href", "/benchmarks");
   // And the ghost row it replaced does not come back beside the page's single next step.
   await expect(page.locator("main .actions .btn.ghost")).toHaveCount(0);
 
   await page.goto("/resources");
-  await expect(page.getByRole("link", { name: "Benchmarks", exact: true }).first()).toHaveAttribute("href", "/benchmarks");
+  await expect(page.getByRole("link", { name: "Benchmark protocol", exact: true }).first()).toHaveAttribute("href", "/benchmarks");
 });
 
 /*

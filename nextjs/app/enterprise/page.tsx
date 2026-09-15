@@ -124,7 +124,7 @@ export default function EnterprisePage() {
               <p className="slate"><span />WHAT AN ENGAGEMENT COSTS</p>
               <p>
                 The published plans and the per-page rate above them are on{" "}
-                <Link href={"/pricing" as Route}>Pricing</Link>, in US dollars and excluding tax.
+                <Link href={"/pricing#enterprise-pricing" as Route}>Pricing</Link>, in US dollars and excluding tax.
                 An enterprise number is quoted after the deployment review, against your page
                 volume, your source types and the work that connecting them takes — never before
                 it, because every part of that quote depends on what the review finds.

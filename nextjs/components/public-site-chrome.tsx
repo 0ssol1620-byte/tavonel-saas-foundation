@@ -4,6 +4,7 @@ import Logomark from "@/components/logomark";
 import MobilePrimaryNav from "@/components/mobile-primary-nav";
 import DesktopPrimaryNav from "@/components/site-nav/desktop-primary-nav";
 import { deploymentStateLine, primaryCallToAction } from "@/lib/commercial-state";
+import { MarketingConsentLink } from "@/components/marketing-consent";
 import { FOOTER_GROUPS, FOOTER_LEGAL_ROW, KO_CHROME, type SiteLink } from "@/lib/site-navigation";
 import chrome from "./public-site-chrome.module.css";
 
@@ -91,8 +92,9 @@ export function PublicSiteFooter({ korean = false }: { korean?: boolean } = {}) 
           {FOOTER_GROUPS.map((group) => (
             <nav key={group.title} aria-label={group.title}>
               <p className="site-footer-title">{korean ? KO_CHROME.footerGroups[group.title] ?? group.title : group.title}</p>
+              {/* T1-014: the footer is always below the fold; prefetching every group wasted ~185KB on a cold home load. */}
               {group.links.map((link) => (
-                <Link key={link.href} href={link.href as Route}>{link.label}</Link>
+                <Link key={link.href} href={link.href as Route} prefetch={false}>{link.label}</Link>
               ))}
             </nav>
           ))}
@@ -112,6 +114,8 @@ export function PublicSiteFooter({ korean = false }: { korean?: boolean } = {}) 
           </Link>
           {" · "}
           <a href={`mailto:${FOOTER_LEGAL_ROW.security}`}>{FOOTER_LEGAL_ROW.security}</a>
+          {/* G1-033 / G2-006: the consent-withdrawal path lives here after a choice, not in a floating pill. */}
+          <MarketingConsentLink />
         </p>
       </div>
     </footer>

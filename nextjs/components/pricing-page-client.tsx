@@ -16,7 +16,7 @@ import {
 } from "@/lib/billing-catalog";
 import { COMPILE_MAX_DOCUMENTS, CORPUS_MAX_DOCUMENTS } from "@/lib/compile-limits";
 import { trackFunnel } from "@/lib/funnel-events";
-import { FOOTER_GROUPS } from "@/lib/site-navigation";
+import { FOOTER_GROUPS, type SiteLink } from "@/lib/site-navigation";
 import { jsonLdHtml } from "@/lib/structured-data";
 import {
   MAX_UNITS_PER_PAGE,
@@ -71,6 +71,10 @@ const PAID_PLANS = (Object.entries(BILLING_OFFERS) as Array<[BillingOfferCode, (
     // commercial mode says. See `saleChannel` in the billing catalog.
     offerCode: offer.saleChannel === "self_serve" ? offerCode : null,
   }));
+
+/** Shown on the Evaluation card while `activationPolicy.customerData` is closed (SD-01). */
+const EVALUATION_GATED_DESCRIPTION =
+  "Read the public Compiled World in full today, with Evidence, Ask and a signed export. Compiling your own files is arranged with us, not switched on by this card.";
 
 const EVALUATION = {
   name: "Evaluation",
@@ -589,17 +593,25 @@ const PRICING_JSON_LD = {
 export default function PricingPageClient({
   initialLiveCheckout,
   initialSelfService,
+  cta,
   gates,
   planCapabilities,
 }: {
   initialLiveCheckout: boolean;
   initialSelfService: boolean;
+  /**
+   * G1-010 / G2-026: the header action, resolved on the server by `primaryCallToAction()` so this
+   * page shows the same primary CTA as every other public page while `customerData` is closed.
+   */
+  cta: SiteLink;
   /** Read on the server from `lib/activation-policy`, the object /api/status serves verbatim. */
   gates: readonly PurchaseGate[];
   planCapabilities: readonly PlanCapabilityRow[];
 }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [signedIn, setSignedIn] = useState(false);
+  // SD-01: the same `activationPolicy` row the fine print under the grid prints.
+  const ownFilesOpen = gates.some((gate) => gate.id === "customerData" && gate.enabled);
   /*
     Whether a real charge is possible, not merely which mode a label says.
 
@@ -695,12 +707,7 @@ export default function PricingPageClient({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: jsonLdHtml(PRICING_JSON_LD) }}
       />
-      <PublicSiteHeader
-        cta={{
-          href: liveCheckout || selfService ? "/login" : "/contact",
-          label: liveCheckout || selfService ? "Start with your files" : "Request access",
-        }}
-      />
+      <PublicSiteHeader cta={cta} />
       <main id="main">
         <section className="scene doc">
           <div className="shell">
@@ -764,7 +771,12 @@ export default function PricingPageClient({
                   */}
                   <span className="price">{plan.price}</span>
                   <p className="fine">{plan.unit}</p>
-                  <p>{plan.description}</p>
+                  {/*
+                    SD-01 (G1-001 on this page). The Evaluation card promised "your own files"
+                    while `customerData` is closed. The card now reads the same gate the fine
+                    print under the grid reads, and describes what the trial reaches today.
+                  */}
+                  <p>{plan.name === EVALUATION.name && !ownFilesOpen ? EVALUATION_GATED_DESCRIPTION : plan.description}</p>
                   <ul>{plan.features.map((feature) => <li key={feature}>{feature}</li>)}</ul>
                   {/*
                     SD-02 (G2-002). What this plan does not include, on the card, in the same type

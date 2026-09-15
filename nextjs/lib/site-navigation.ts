@@ -229,7 +229,7 @@ export const RESOURCE_LINKS: readonly ResourceLink[] = [
   { href: "/changelog", label: "Changelog", purposes: ["build"], workflows: [], column: "verify" },
   { href: "/arena", label: "TAVONEL Arena", purposes: ["evaluate", "verify"], workflows: [], column: "verify" },
   { href: "/research", label: "Research", purposes: ["learn"], workflows: [], column: "verify" },
-  { href: "/benchmarks", label: "Benchmarks", purposes: ["verify"], workflows: [], column: "verify" },
+  { href: "/benchmarks", label: "Benchmark protocol", purposes: ["verify"], workflows: [], column: "verify" },
   {
     /*
       BA-252: "Evidence", the one name. The page carried three -- "Technical evidence" here, its
