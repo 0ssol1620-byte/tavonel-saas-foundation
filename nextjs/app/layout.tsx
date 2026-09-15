@@ -91,8 +91,30 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         */}
         <a className="skip" href="#main">Skip to content</a>
         {/*
-          Organization + SoftwareApplication only. No availability, offer, or
+          Organization + WebSite + SoftwareApplication. No availability, offer, or
           aggregateRating — this deployment is a private pilot, not a GA claim.
+
+          G1-031 asked for `WebSite`, and it is the one addition this graph can make honestly: it
+          says the site has a name and an address, which the address bar already said. The three
+          nodes are `@id`-linked so a consumer reads one entity with three facets rather than
+          three unrelated things that share a URL — the site's publisher is the organization, and
+          the software is what the organization makes.
+
+          Deliberately absent, each for its own reason rather than by omission:
+
+          - **`potentialAction` / `SearchAction` on the WebSite.** It declares a URL template a
+            search engine may send a query to, and this site has no such URL: the documentation
+            search is a client-side filter over already-rendered sections and puts no query in the
+            address. Declaring one advertises an endpoint that answers nothing.
+          - **`FAQPage`.** G1-031 asked for it too. No page here is written as questions and
+            answers — `/trust` comes closest and is a table of where each answer lives — and
+            marking prose up as an FAQ to win a SERP feature is the structured-data form of a
+            claim with no source. When `/pricing` gains real FAQ copy, the markup belongs beside
+            it in `lib/structured-data.ts`.
+          - **A rating, a price or a review.** Nothing to cite. Unchanged, and the schema names
+            are deliberately not written here: `lib/structured-data.test.ts` bans them as raw
+            source across every JSON-LD emitter, which is exactly the guard that should refuse a
+            comment talking itself into one.
         */}
         <script
           type="application/ld+json"
@@ -102,18 +124,29 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
               "@graph": [
                 {
                   "@type": "Organization",
+                  "@id": "https://tavonel.com/#organization",
                   name: "TAVONEL",
                   url: "https://tavonel.com",
                   description:
                     "Compile documents, scans and connected systems into source-grounded knowledge.",
                 },
                 {
+                  "@type": "WebSite",
+                  "@id": "https://tavonel.com/#website",
+                  name: "TAVONEL",
+                  url: "https://tavonel.com",
+                  inLanguage: "en",
+                  publisher: { "@id": "https://tavonel.com/#organization" },
+                },
+                {
                   "@type": "SoftwareApplication",
+                  "@id": "https://tavonel.com/#software",
                   name: "TAVONEL",
                   url: "https://tavonel.com",
                   applicationCategory: "Knowledge Compiler",
                   description:
                     "Compile documents, scans and connected systems into source-grounded knowledge.",
+                  publisher: { "@id": "https://tavonel.com/#organization" },
                 },
               ],
             }),

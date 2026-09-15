@@ -11,6 +11,23 @@
 
   A breadcrumb is different in kind: it restates the URL hierarchy the site already has. It
   claims nothing that is not already true of the address bar.
+
+  G1-046 asked for `Dataset` on `/explore`, and it is **not** here. That is a decision rather than
+  an omission, and it is written down because the next reader of that finding will reach for the
+  same change.
+
+  A `Dataset` node tells a consumer there is a dataset to use. `/explore` is a live, interactive
+  sample of a compiled world, and the two facts that would make it usable as one -- a
+  `distribution` naming a file at an address, and a `license` saying on what terms -- do not
+  exist. `lib/structured-data.test.ts` records that check and its result: the only digest-bound
+  public fixtures are on `/reproducibility`, which declares itself noindex, and no licence is
+  stated for any of them. Markup for a download the site does not serve, under terms nobody has
+  set, is the fabricated-artifact failure with schema around it.
+
+  So the blocker is a fact and not a helper: a licensed, addressable export of the sample world.
+  The seo-tech lane report carries it as the open half of G1-046; the `BreadcrumbList` half is
+  done. The guard in `lib/structured-data.test.ts` that bans the word stays exactly as it is --
+  it is the thing that refused this, and it was right to.
 */
 export type BreadcrumbStep = { name: string; path: string };
 
@@ -53,3 +70,4 @@ export function breadcrumbList(trail: readonly BreadcrumbStep[]) {
     })),
   };
 }
+
