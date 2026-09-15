@@ -3,11 +3,12 @@ import { describe, expect, it } from "vitest";
 import { BILLING_OFFERS } from "./billing-catalog";
 import { CLAIM_STATE } from "./claim-state";
 import { readCapabilities } from "./capabilities";
-import { CONTRACT_STATE, clause } from "./compiler-contract";
+import { CONTRACT_CLAUSES, CONTRACT_STATE, clause } from "./compiler-contract";
 import { monthlyTotalUsd } from "../components/pricing-page-client";
 import { PROCESSING_UNIT_USD, STANDARD_UNITS_PER_PAGE } from "./usage-pricing";
 import { DOCS_SECTIONS } from "./docs-content";
 import { CAPABILITY_MANIFEST } from "../../shared/capabilityManifest";
+import CHANNEL from "../public/developer/channel.json";
 
 /**
  * Present-tense product claims, checked against the registries that already know the answer.
@@ -548,5 +549,42 @@ describe("llms.txt maps what the site actually publishes", () => {
     expect(llms).not.toContain("unresolved");
     expect(llms).toContain("Training-corpus crawlers are disallowed everywhere");
     expect(llms).toContain("ClaudeBot, which is a fetch-time agent rather than a training crawler");
+  });
+});
+
+/*
+  G1-025 / SD-06. "WHERE TO CHECK IT" is addressed to someone who can check it.
+
+  The eight rows on /product/continuous-knowledge listed internal module paths -- lib/..., app/...,
+  packages/... -- under that heading, eight times, on a page with no public repository anywhere on
+  the site to open them in. The instruction could not be followed, and what it published instead
+  was the shape of the private tree.
+
+  This bans the repository prefixes rather than requiring a particular wording: what replaces them
+  has to be something the reader can reach, and that is a path inside a package they downloaded, a
+  public route, or a published file whose sha256 is in /developer/channel.json.
+*/
+describe("the Compiler Contract cites only what a reader can reach", () => {
+  it.each(CONTRACT_CLAUSES.map((entry) => [entry.name, entry.evidence] as const))(
+    "%s points at no internal path",
+    (_name, evidence) => {
+      for (const prefix of ["lib/", "app/", "scripts/", "shared/", "packages/", "public/", "drizzle/"]) {
+        expect(evidence, `names the internal path "${prefix}..."`).not.toContain(prefix);
+      }
+      expect(evidence, "names a test file, which no reader has").not.toMatch(/\.test\.tsx?\b/);
+    },
+  );
+
+  it("points at the public distribution record for every published file it names", () => {
+    const named = CONTRACT_CLAUSES.flatMap((entry) =>
+      [...entry.evidence.matchAll(/\/developer\/([\w.-]+)/g)].map((match) => match[1]!));
+    expect(named.length, "at least one published file is cited").toBeGreaterThan(0);
+    const published = new Set(Object.values(CHANNEL.assets).map((asset) => asset.url.split("/").at(-1)!));
+    for (const match of named) {
+      // A sentence period can land inside the match; the record itself is not one of its assets.
+      const file = match.replace(/\.$/, "");
+      if (file === "channel.json") continue;
+      expect(published, `/developer/${file} is cited but not in channel.json`).toContain(file);
+    }
   });
 });

@@ -4,6 +4,28 @@ import type { Route } from "next";
 import { PublicSitePage } from "@/components/public-site-chrome";
 import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
 import { clause } from "@/lib/compiler-contract";
+import { CAPABILITY_MANIFEST, isAcceptedAtUpload } from "../../../../shared/capabilityManifest";
+
+/*
+  G1-005. What an "exact location" is on this deployment, in the sentence rather than a link away.
+
+  The abstraction is right -- a cell, a slide shape and a MIME part are exact locations with no
+  page -- and stating only the abstraction let a reader assume their spreadsheet arrives with
+  cells. Every accepted entry in the capability manifest carries `evidenceLocatorKinds: ["pdf"]`,
+  because every accepted source is sanitized to PDF before anything reads it, so today there is
+  exactly one form and the page can name it without narrowing the contract behind it.
+
+  Derived rather than typed, and fail-closed: the day a second locator kind is implemented, this
+  throws instead of publishing a sentence that has quietly become false.
+*/
+const LOCATOR_KINDS = [...new Set(
+  CAPABILITY_MANIFEST.entries
+    .filter((entry) => isAcceptedAtUpload(entry.status))
+    .flatMap((entry) => entry.evidenceLocatorKinds),
+)];
+if (LOCATOR_KINDS.length !== 1 || LOCATOR_KINDS[0] !== "pdf") {
+  throw new Error(`this page states one locator kind; the manifest now accepts ${LOCATOR_KINDS.join(", ")}`);
+}
 
 export const metadata: Metadata = {
   // Each page declares its own address. Without this every route inherited the root
@@ -124,7 +146,7 @@ const PARTS: readonly Part[] = [
   {
     state: "EVIDENCE",
     title: "Where a fact came from",
-    body: "Every qualified claim points at a source version and its exact location inside it. A world holding an unresolved link is not emitted at all.",
+    body: "Every qualified claim points at a source version and its exact location inside it. On this deployment that location takes one form for every accepted format — a numbered page of the sanitized PDF and a box on it — because a spreadsheet, a slide deck and a Word file are all converted to PDF before anything reads them. A world holding an unresolved link is not emitted at all.",
   },
   {
     state: "VERSIONS",

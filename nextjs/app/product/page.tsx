@@ -7,7 +7,9 @@ export const metadata: Metadata = {
   alternates: { canonical: "/product" },
   openGraph: { url: "/product" },
   title: "Product — TAVONEL",
-  description: "TAVONEL is a Knowledge Compiler. Documents, scans, code and connected systems go in. A Compiled World comes out.",
+  // G1-006: "code" named a format the capability manifest does not accept, in the one sentence a
+  // search result shows. The page's own lede never claimed it.
+  description: "TAVONEL is a Knowledge Compiler. Documents, scans and connected systems go in. A Compiled World comes out.",
 };
 
 const SURFACES = [
@@ -140,7 +142,12 @@ export default function ProductPage() {
             and a second copy of it would be the same button twice.
           */}
           <section className="product-close">
-            <h2>Four surfaces, one compiled World.</h2>
+            {/*
+              G1-040. "Four surfaces" counted the cards above it and nothing on the page said so,
+              so a reader arriving at the closing line had to go back and count. The eyebrows are
+              read off `SURFACES` rather than typed, so a fifth card renames this heading.
+            */}
+            <h2>{SURFACES.map(([, state]) => state.charAt(0) + state.slice(1).toLowerCase()).join(" · ")} — one compiled World.</h2>
             <div className="actions">
               <Link className="btn" href="/explore">Explore a Compiled World</Link>
               <Link className="btn ghost" href="/sources">See supported sources</Link>

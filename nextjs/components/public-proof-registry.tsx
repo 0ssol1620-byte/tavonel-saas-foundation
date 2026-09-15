@@ -74,8 +74,19 @@ export default function PublicProofRegistry({ title, eyebrow, summary, state, in
     links?: Array<{ href: Route; label: string }>;
     /** BA-019: references under the actions, as a list rather than as more buttons. */
     readNext?: Array<{ href: Route; label: string }>;
-    /** BA-020: reference material, behind a disclosure rather than in the reading path. */
-    collapsed?: boolean;
+    /**
+     * Reference material, in a disclosure rather than in the reading path.
+     *
+     * BA-020 put three sections behind one, and G1-018 found the cost: /knowledge-compiler ended
+     * on three headings with nothing under them, which reads as three unfinished sections rather
+     * than as three folded ones. A glossary genuinely is consulted; "when it is not the right
+     * tool" and the FAQ are read, and they are the two a buyer weighs the category on.
+     *
+     * So the field carries three states rather than two: absent is a plain section, `true` is a
+     * closed disclosure, and `"open"` is the same disclosure rendered open -- still skippable,
+     * still one click to fold, but not a heading over an empty space.
+     */
+    collapsed?: boolean | "open";
   }>;
   /*
     One next step under the body, for a page that is a step in a sequence rather than a terminus.
@@ -116,7 +127,12 @@ export default function PublicProofRegistry({ title, eyebrow, summary, state, in
           return <section className={styles.row} id={sectionId(section.title)} key={section.title}>
             <h2>{section.title}</h2>
             {section.collapsed
-              ? <details className={styles.disclosure}><summary>Open {section.title.toLowerCase()}</summary>{body}</details>
+              ? (
+                <details className={styles.disclosure} open={section.collapsed === "open"}>
+                  <summary>{section.collapsed === "open" ? "Hide" : "Open"} {section.title.toLowerCase()}</summary>
+                  {body}
+                </details>
+              )
               : body}
           </section>;
         })}

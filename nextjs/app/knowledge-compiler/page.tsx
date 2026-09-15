@@ -1,6 +1,8 @@
 import type { Metadata, Route } from "next";
 import KnowledgeCompilerDiagram from "@/components/knowledge-compiler-diagram";
 import PublicProofRegistry from "@/components/public-proof-registry";
+import { primaryCallToAction } from "@/lib/commercial-state";
+import { jsonLdHtml } from "@/lib/structured-data";
 
 export const metadata: Metadata = { title: "What Is a Knowledge Compiler? — TAVONEL", description: "A practical guide to Knowledge Compilers, RAG, knowledge graphs and enterprise search.", alternates: { canonical: "/knowledge-compiler" }, openGraph: { url: "/knowledge-compiler" } };
 
@@ -38,8 +40,57 @@ export const metadata: Metadata = { title: "What Is a Knowledge Compiler? — TA
   The primary action moves up to the compile contract, the section that either convinces a reader
   or does not. It was at the very bottom, six screens later.
 */
+/*
+  G1-018. The five questions, lifted out of the section so the JSON-LD below is built from the
+  same array the page renders rather than from a second copy of it.
+*/
+const QUESTIONS = [
+      {
+        question: "Is this just RAG with extra steps?",
+        answer: "RAG is a retrieval strategy; this is an artifact. The chunks a retriever needs are one file in the package, produced from a reviewed World rather than from raw text — so they carry the page and region they came from, and they change only when the World does.",
+      },
+      {
+        question: "Do I have to replace my retrieval stack?",
+        answer: "No. The package ships the graph as Turtle, JSON-LD and CSV, and the retrieval units as JSONL, so an existing vector store, graph database or agent framework loads them without adopting anything else.",
+      },
+      {
+        question: "What happens when a source document changes?",
+        answer: "The new bytes are a new version, and compiling produces a new candidate rather than editing the World in place. The active revision moves only when a person promotes it, and the previous revision stays readable so an older answer remains explainable.",
+      },
+      {
+        question: "What does it do when it does not know?",
+        answer: "It declines when nothing in the World matched the question at all, and says which sources it looked at. What it does not do is decide whether what matched actually answers you \u2014 that judgement stays with the reader, which is why every answer carries the page and the region it came from. A composed answer with no region behind it would be indistinguishable from a correct one, and that is the failure this whole contract exists to prevent.",
+      },
+      {
+        question: "What stops the output from being a black box?",
+        answer: "Every object carries the regions that support it, the package is a set of open formats, and the validator that checks a package is a readable script rather than a service — so a package can be verified without asking us anything.",
+      },
+] as const;
+
+const ACCESS = primaryCallToAction();
+
+/*
+  G1-018. The FAQ is marked up as one, from the same array the page renders.
+
+  Five questions and five answers were on the page as a definition list and as nothing else, so
+  the surface most likely to be quoted back by a search or answer engine carried no structure for
+  one to read. Built from `QUESTIONS` rather than written twice: a sixth question added to the
+  section is in the markup without anybody remembering to add it.
+*/
+const faqPageJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: QUESTIONS.map((entry) => ({
+    "@type": "Question",
+    name: entry.question,
+    acceptedAnswer: { "@type": "Answer", text: entry.answer },
+  })),
+};
+
 export default function KnowledgeCompilerPage() {
-  return <PublicProofRegistry index eyebrow="CATEGORY GUIDE" title="What is a Knowledge Compiler?" summary="A Knowledge Compiler turns changing source material into a versioned, evidence-bound, portable knowledge object that people and AI systems can inspect together." sections={[
+  return <>
+    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(faqPageJsonLd) }} />
+    <PublicProofRegistry index eyebrow="CATEGORY GUIDE" title="What is a Knowledge Compiler?" summary="A Knowledge Compiler turns changing source material into a versioned, evidence-bound, portable knowledge object that people and AI systems can inspect together." sections={[
     { title: "The compile contract", body: "The unit of value is not a chat response. It is a Compiled World with immutable inputs, structured objects, exact evidence, review state, retrieval material and portable files.", links: [
       // One action, not the closing pair repeated: a reader convinced by the contract wants to
       // see one, and the page's two-button close is three thousand pixels below this.
@@ -66,7 +117,7 @@ export default function KnowledgeCompilerPage() {
       { key: "SCRUTINY", description: "Somebody will ask which page an answer came from, and a plausible sentence is not an acceptable reply.", state: "NEEDS EVIDENCE" },
       { key: "CHANGE", description: "Sources are revised, superseded and amended, and last quarter's answer still has to be explainable.", state: "NEEDS VERSIONS" },
     ] },
-    { title: "When it is not the right tool", collapsed: true, body: "A category page that cannot say where its category stops is an advertisement. These are cases this product does not serve, and saying so here is cheaper for everyone than finding out after a pilot.", rows: [
+    { title: "When it is not the right tool", collapsed: "open", body: "A category page that cannot say where its category stops is an advertisement. These are cases this product does not serve, and saying so here is cheaper for everyone than finding out after a pilot.", rows: [
       { key: "ONE DOCUMENT", description: "A single file you will read once. Open it. The compile buys nothing you do not already have.", state: "USE A READER" },
       { key: "LIVE RECORDS", description: "Answers that are a query over a database or a ticket queue, not a claim written in a document.", state: "QUERY THE SYSTEM" },
       { key: "NO REVIEWER", description: "Nobody who can decide whether a candidate World is correct. Promotion is a human decision by design, and without one the World never becomes active.", state: "NEEDS A PERSON" },
@@ -82,28 +133,7 @@ export default function KnowledgeCompilerPage() {
       { key: "ABSTENTION", description: "The answer given when the sources do not support one. It is a result, not a failure.", state: "BEHAVIOUR" },
       { key: "PACKAGE", description: "The portable form: canonical model, Turtle, JSON-LD, CSV, retrieval JSONL, provenance and a validation report.", state: "PORTABILITY" },
     ] },
-    { title: "Questions people ask", collapsed: true, body: "Short answers about what the product does today, not what a category could do in principle.", faq: [
-      {
-        question: "Is this just RAG with extra steps?",
-        answer: "RAG is a retrieval strategy; this is an artifact. The chunks a retriever needs are one file in the package, produced from a reviewed World rather than from raw text — so they carry the page and region they came from, and they change only when the World does.",
-      },
-      {
-        question: "Do I have to replace my retrieval stack?",
-        answer: "No. The package ships the graph as Turtle, JSON-LD and CSV, and the retrieval units as JSONL, so an existing vector store, graph database or agent framework loads them without adopting anything else.",
-      },
-      {
-        question: "What happens when a source document changes?",
-        answer: "The new bytes are a new version, and compiling produces a new candidate rather than editing the World in place. The active revision moves only when a person promotes it, and the previous revision stays readable so an older answer remains explainable.",
-      },
-      {
-        question: "What does it do when it does not know?",
-        answer: "It declines when nothing in the World matched the question at all, and says which sources it looked at. What it does not do is decide whether what matched actually answers you \u2014 that judgement stays with the reader, which is why every answer carries the page and the region it came from. A composed answer with no region behind it would be indistinguishable from a correct one, and that is the failure this whole contract exists to prevent.",
-      },
-      {
-        question: "What stops the output from being a black box?",
-        answer: "Every object carries the regions that support it, the package is a set of open formats, and the validator that checks a package is a readable script rather than a service — so a package can be verified without asking us anything.",
-      },
-    ] },
+    { title: "Questions people ask", collapsed: "open", body: "Short answers about what the product does today, not what a category could do in principle.", faq: [...QUESTIONS] },
     {
       title: "The package is the contract",
       body: "Portability is only real if someone outside can check it. The package format, its required files and the two verifiers — one for the archive's signature, one for what is inside it — are documented, and a compiled sample is open without an account.",
@@ -126,9 +156,15 @@ export default function KnowledgeCompilerPage() {
         knowledge-compilation result has to carry before it may be published as a number -- so the
         door says that, and the page behind it still says plainly that it has no table yet.
       */
+      /*
+        G1-010. This page carried both of the site's access actions at once -- the header offered
+        "Start with your files" and the closing row offered it again beside "Open a Compiled
+        World", while /product and /solutions offered "Request access". One action, from the one
+        object that decides which it is, upper-cased to match the row it sits in.
+      */
       links: [
         { href: "/explore", label: "OPEN A COMPILED WORLD" },
-        { href: "/login", label: "START WITH YOUR FILES" },
+        { href: ACCESS.href as Route, label: ACCESS.label.toUpperCase() },
       ],
       readNext: [
         { href: "/evidence", label: "How evidence is bound" },
@@ -138,5 +174,6 @@ export default function KnowledgeCompilerPage() {
         { href: "/docs/cli" as Route, label: "Verifiers" },
       ],
     },
-  ]} />;
+  ]} />
+  </>;
 }
