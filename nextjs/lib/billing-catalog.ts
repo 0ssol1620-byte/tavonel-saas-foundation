@@ -11,6 +11,13 @@
  * the code that enforces it -- that Developer reaches compile and the developer-key routes,
  * and that no bullet promises seats, SSO, SCIM or anything gated on "when qualified".
  * Adding a bullet here means adding the thing.
+ *
+ * `notYetSold` is the other half of that rule, added 2026-09-16. A plan whose differentiator is
+ * unfinished used to have two options here: claim it, or say nothing and let the buyer infer it
+ * from the price step. Team did the first. It now does neither: the unfinished capability is
+ * named on the card as something that is not sold yet, so the buyer reads the same sentence
+ * `/security` and `/trust` already publish instead of discovering the contradiction between two
+ * pages. An empty list renders nothing.
  */
 export const BILLING_OFFERS = {
   observer_access: {
@@ -28,6 +35,7 @@ export const BILLING_OFFERS = {
       "Evidence, Ask and signed export",
       "API and MCP access",
     ],
+    notYetSold: [],
   },
   studio_access: {
     kind: "subscription",
@@ -48,18 +56,25 @@ export const BILLING_OFFERS = {
     */
     saleChannel: "contact",
     /*
-      Collaboration is what this plan sells, and collaboration is the part not finished.
-      Invitations, roles and seat accounting do not exist yet, so "Up to 5 seats" came off the
-      card rather than onto a roadmap footnote. Team stays reachable through a conversation
-      until the membership flow ships end to end.
+      SD-02, 2026-09-16. Collaboration was what this plan sold, and collaboration is the part
+      that is not finished. "Up to 5 seats" came off the card in an earlier pass, but the copy
+      that replaced it still leaned on membership -- `/pricing` said "Team keeps shared
+      membership and roles" while `/security` and `/trust` said, in plain words, that a
+      workspace here has exactly one member and there are no roles.
+
+      So the plan is described as what it is today: the higher-volume single-member plan. The
+      volume, the review queue, the version history and the onboarding session are all real and
+      all enforced. Membership is named below as something that is not sold yet, in the same
+      card, rather than left for a buyer to discover on the security page after they have paid.
     */
-    description: "For larger corpora that need guided review and onboarding.",
+    description: "The higher-volume plan for a single-member workspace, with guided review and onboarding.",
     features: [
       "2,500 verified standard pages",
       "Everything in Developer",
       "Review queue and version history",
       "Guided corpus onboarding",
     ],
+    notYetSold: ["Shared members and roles", "Per-member source permissions"],
   },
 } as const;
 

@@ -21,11 +21,11 @@ error.
 
 | | |
 |---|---|
-| Processor | TAVONEL. The operating entity's registered name, registration number and address are supplied on the signature version; the site's operator disclosure is environment-driven and is not published in the pilot deployment. |
+| Processor | TAVONEL. The operating entity's registered name, representative, business registration number and registered address are the ones published in the operator disclosure on this site's terms and privacy pages, and they are restated in the signature version. |
 | Controller | The customer signing the agreement. |
 | Subject matter | Processing of the customer's documents and account data to compile them into a traceable knowledge world, and to operate, secure and support that service. |
 | Duration | The term of the service agreement, plus the period in §7. |
-| Governing law | To be specified in the executed version — see Annex A. |
+| Governing law | The Republic of Korea, with the Seoul Central District Court as the court of exclusive jurisdiction. The service terms state the same, and a consumer's right to bring a claim in the country where they live is unaffected. |
 
 The customer is the controller of the personal data contained in the documents they upload or
 connect. TAVONEL processes it only on the customer's instructions, which are given by the
@@ -97,8 +97,9 @@ The customer gives general authorization for the sub-processors listed at
 **`https://tavonel.com/subprocessors`**, which is incorporated by reference and is the
 authoritative list. It is not duplicated in this document.
 
-At the date of this draft that page names Supabase, Vercel, Cloudflare, RunPod, Paddle, Resend and
-Google, each with the purpose and data class it is permitted to process.
+At the date of this draft that page names Supabase, Vercel, Cloudflare, Google Cloud, RunPod,
+Paddle, Resend and Google, each with the purpose, the data class it is permitted to process, and
+the region it is configured to process in.
 
 **Change notice and objection.** TAVONEL notifies the customer of an intended addition or
 replacement of a sub-processor **30 days in advance of that sub-processor beginning to process
@@ -175,15 +176,30 @@ Recovery objectives and a drill cadence: to be specified in the executed version
 
 Mirrors `/privacy`.
 
-The database is configured in Seoul. Vercel, Cloudflare, RunPod, Resend, Google and Paddle may
-process limited data through global infrastructure or support systems outside Korea; the exact
-processor, purpose and data category for each is on `/subprocessors`. Cloudflare R2 location hints
-are best-effort and are **not** a guarantee of Korean data residency. No data residency is
-guaranteed by this agreement.
+The database and the application's serverless functions are configured in Seoul. The content
+disarm and reconstruction service that rasterizes and scans every source — the first component to
+hold document bytes — runs on Google Cloud Run in `asia-northeast3` (Seoul), orchestrated by a
+Cloudflare worker on Cloudflare's edge network. The GPU OCR that reads the sanitized result runs
+on a RunPod endpoint for which this deployment pins no region, and `/subprocessors` says so rather
+than naming one. Cloudflare, RunPod, Resend, Google and Paddle may process limited data through
+global infrastructure or support systems outside Korea; the exact processor, purpose, data
+category and configured region for each is on `/subprocessors`. Cloudflare R2 location hints are
+best-effort and are **not** a guarantee of Korean data residency. No data residency is guaranteed
+by this agreement.
 
-**Transfer mechanism: to be annexed — see Annex A.** The Standard Contractual Clauses, or the UK
-Addendum, will be attached where the customer is established in the EEA or the United Kingdom,
-with the module and role mapping stated and a transfer impact assessment.
+**Transfer mechanism: the Standard Contractual Clauses.** Where the customer is established in
+the European Economic Area, the European Commission's Standard Contractual Clauses of 4 June 2021
+apply to a transfer of personal data outside the EEA, with Module Two (controller to processor)
+between the customer as data exporter and TAVONEL as data importer, and Module Three where TAVONEL
+onward-transfers to a sub-processor. Where the customer is established in the United Kingdom, the
+UK International Data Transfer Addendum to those clauses applies on the same modules. The clauses
+are incorporated into the executed version and prevail over any conflicting term of this agreement
+for the transfer they cover.
+
+The completed annexes to those clauses — the parties, the described processing, the technical and
+organizational measures, the sub-processor list, and a transfer impact assessment — are attached at
+signature, and are drawn from §2, §5 and §6 of this agreement and from `/subprocessors`. See
+Annex A.
 
 ## 11. Audit and information rights
 
@@ -205,8 +221,25 @@ is verified before anything is acted on.
 
 ## 13. Liability, term, precedence
 
-To be specified in the executed version — see Annex A: the liability cap, indemnities, precedence
-between this agreement and the service terms, and the signature blocks.
+**Liability.** Each party's total liability arising out of or relating to this agreement is
+limited to the fees paid to TAVONEL in the twelve months immediately before the event giving rise
+to the claim, and neither party is liable for indirect, incidental, special or consequential loss.
+That limit does not apply to death or personal injury caused by negligence, to fraud or fraudulent
+misrepresentation, to a party's breach of its confidentiality obligations, to a party's indemnity
+obligations, or to anything else the law does not allow to be limited. The service terms state the
+same cap for the service agreement, and the two are one limit rather than two: a claim does not
+recover the cap twice for the same facts.
+
+**Term.** This agreement runs for the term of the service agreement, plus the period in §7.
+
+**Precedence.** Where the Standard Contractual Clauses or the UK Addendum conflict with this
+agreement, they prevail for the transfer they cover. Where this agreement conflicts with the
+service terms on the processing of personal data, this agreement prevails. Where this agreement
+conflicts with a published page — `/privacy`, `/subprocessors`, `/security`, `/terms` — the
+published page is the statement in force, as stated at the top of this document.
+
+**Signature.** The signature blocks and the parties' registered details are completed in the
+executed version — see Annex A.
 
 ---
 
@@ -217,12 +250,15 @@ version. Until then this document is a draft and is not signed.
 
 | Clause | Completed at signature |
 |---|---|
-| §1 Governing law | The governing law, the courts, and the parties' registered details |
 | §9 Recovery objectives | A recovery point objective, a recovery time objective and a drill cadence, or an express exclusion of them |
-| §10 Transfer mechanism | The Standard Contractual Clauses or the UK Addendum, the module and role mapping, and a transfer impact assessment |
-| §13 Liability and precedence | The liability cap, indemnities, precedence between this agreement and the service terms, and the signature blocks |
+| §10 Transfer annexes | The completed annexes to the Standard Contractual Clauses and the UK Addendum: the parties, the described processing, the technical and organizational measures, the sub-processor list, and a transfer impact assessment |
+| §13 Signature | The signature blocks and the parties' registered details |
 
-The three commitments this draft already makes — the 72-hour breach notification (§8), the 30-day
-sub-processor change notice with a right to object (§6), and deletion completed within 30 days of a
-verified request (§7) — are not changed by Annex A. A change to any of them is a new version of
-this document.
+Four terms this draft states are not changed by Annex A: the 72-hour breach notification (§8), the
+30-day sub-processor change notice with a right to object (§6), deletion completed within 30 days
+of a verified request (§7), and the liability cap and governing law (§1, §13). A change to any of
+them is a new version of this document.
+
+Governing law, jurisdiction, the transfer mechanism and the liability cap left this annex on
+2026-09-16 and are stated in the body above. They are Draft v1 wording and have not been reviewed
+by a lawyer; the label at the top of this document is the one to read before relying on them.

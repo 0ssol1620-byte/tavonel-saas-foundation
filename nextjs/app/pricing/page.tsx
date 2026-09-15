@@ -85,6 +85,20 @@ const PLAN_CAPABILITIES: PlanCapabilityRow[] = CAPABILITIES.map((row) => ({
   })),
 }));
 
+/*
+  G2-032's JSON-LD is not here, and that is a runtime constraint rather than a preference.
+
+  The obvious home for an Offer and a FAQPage block is this server component. It cannot be: the
+  seventeen FAQ rows live in the client component, and a "use client" module's non-component
+  exports are replaced by client references in the server bundle, so importing the array here
+  builds and then fails at page-data collection with `PURCHASE_FAQ.map is not a function`.
+
+  Moving the rows into a lib module would work and costs three claim guards their reader. Emitting
+  the block from the client component costs nothing: Next server-renders it into the HTML a
+  crawler reads, and because the array is already in that chunk for the visible accordion, the
+  serialized block adds no duplicated strings to the client bundle. So it is emitted there, beside
+  the data, and `lib/output-escaping.test.ts` carries the justification for the sink.
+*/
 export default function PricingPage() {
   const commercial = readCommercialState();
   return (

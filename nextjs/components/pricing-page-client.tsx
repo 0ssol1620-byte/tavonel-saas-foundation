@@ -14,14 +14,28 @@ import {
   refundablePageAllowance,
   type BillingOfferCode,
 } from "@/lib/billing-catalog";
+import { COMPILE_MAX_DOCUMENTS, CORPUS_MAX_DOCUMENTS } from "@/lib/compile-limits";
 import { trackFunnel } from "@/lib/funnel-events";
 import { FOOTER_GROUPS } from "@/lib/site-navigation";
+import { jsonLdHtml } from "@/lib/structured-data";
 import {
   MAX_UNITS_PER_PAGE,
   PROCESSING_UNIT_USD,
   STANDARD_UNITS_PER_PAGE,
   formatUsd,
 } from "@/lib/usage-pricing";
+/*
+  G2-008. The hard limits a buyer needs, read from the modules that enforce them rather than
+  retyped beside the price.
+
+  `shared/intakeCeiling.ts` is the size ceiling every processor in the chain agrees on -- the
+  Cloudflare worker's MAX_SOURCE_BYTES, the Cloud Run rasterizer's MAX_INPUT_BYTES and its
+  MAX_PAGES -- and it is what `/sources` and a 413 refusal already print. `lib/compile-limits.ts`
+  is the corpus contract: CORPUS_MAX_DOCUMENTS is the largest selection one run may carry and
+  COMPILE_MAX_DOCUMENTS is the size of the parts it is compiled in. Both were published on
+  `/sources` and in the changelog and nowhere near the page where the money decision is made.
+*/
+import { PROCESSING_CEILING, PROCESSING_CEILING_MIB } from "../../shared/intakeCeiling";
 
 /*
   Plans come from the billing catalog, not from a second list kept next to it.
@@ -32,14 +46,27 @@ import {
   "SSO / SCIM when qualified" — a feature card for something that does not exist, with the
   qualification caveat doing the work a missing feature should do, which is to be missing.
 */
+/*
+  G2-009 (SD-08). Every price on this page carries its currency.
+
+  "Tax is not included" was one line of small print under a table, and the only "USD" anywhere on
+  the site was inside the enterprise PDF that has now been deleted -- so a buyer in Seoul, London
+  or São Paulo read "$99" and had to guess which dollar. Paddle settles in USD and no second
+  currency has a settlement path, so the currency is written into the price itself and the tax
+  sentence is stated once, under the grid, where the four prices are.
+
+  G2-039. The qualifier is a block under the price rather than a trailing `<small>`: at the
+  Enterprise card's width "Custom / scoped with" wrapped and left "you" alone on the next line.
+*/
 const PAID_PLANS = (Object.entries(BILLING_OFFERS) as Array<[BillingOfferCode, (typeof BILLING_OFFERS)[BillingOfferCode]]>)
   .map(([offerCode, offer]) => ({
     name: offer.label,
-    price: `$${offer.priceUsd}`,
-    unit: "/ month",
+    price: `$${offer.priceUsd} USD`,
+    unit: "per month",
     tag: offer.saleChannel === "self_serve" ? "START HERE" : null,
     description: offer.description,
     features: offer.features as readonly string[],
+    notYetSold: offer.notYetSold as readonly string[],
     // A plan whose product is unfinished is sold through a conversation, whatever the
     // commercial mode says. See `saleChannel` in the billing catalog.
     offerCode: offer.saleChannel === "self_serve" ? offerCode : null,
@@ -47,8 +74,8 @@ const PAID_PLANS = (Object.entries(BILLING_OFFERS) as Array<[BillingOfferCode, (
 
 const EVALUATION = {
   name: "Evaluation",
-  price: "$0",
-  unit: "/ 7 days",
+  price: "$0 USD",
+  unit: "for 7 days",
   tag: "TRY IT FREE",
   description: "Try TAVONEL with your own files. No card required.",
   features: [
@@ -57,6 +84,7 @@ const EVALUATION = {
     "Signed export",
     "7 days, no card required",
   ],
+  notYetSold: [],
   offerCode: null,
 } as const;
 
@@ -69,10 +97,11 @@ const EVALUATION = {
 const ENTERPRISE = {
   name: "Enterprise",
   price: "Custom",
-  unit: "/ scoped with you",
+  unit: "scoped with you",
   tag: null,
   description: "An assisted pilot for larger corpora and knowledge operations run by a team, scoped in a conversation.",
   features: ["Custom volume", "Custom retention review", "Audit export", "Dedicated onboarding and support"],
+  notYetSold: [],
   offerCode: null,
   /*
     BA-127. The label promised the reader a list of what we do not have, inside the one card that
@@ -82,28 +111,66 @@ const ENTERPRISE = {
   */
   note: { href: "/trust" as Route, label: "What an enterprise security review finds" },
   /*
-    BA-132. The link was fine print under the estimator, where the reader who needs it is not,
-    and the href exposed the internal dated filename. It is now an action on the card that sells
-    the engagement. The stable path `/legal/enterprise-pricing.pdf` is a rewrite in
-    `next.config.mjs`, which this lane does not own: it is listed as a cross-lane request, and
-    the dated file stays the download either way.
+    G2-001 (SD-03). The "Enterprise pricing sheet" link is gone and so is the file it pointed at.
+
+    `public/legal/TAVONEL_ENTERPRISE_PRICING_2026-08-30.pdf` contradicted the page it was linked
+    from on five material points: it sold prepaid credit packs under a headline promising no
+    credit arithmetic, used a plan taxonomy nothing else on the site uses, said live paid sales
+    were not open while three plans were on sale, said the business registration was pending
+    while four live pages published the number, and was sixteen days older than the copy beside
+    it. It is deleted rather than corrected -- a one-page unstyled export that nothing keeps in
+    sync will drift again -- and what replaces it is the "Enterprise" section further down this
+    page, written in the same vocabulary as the rest of it and rendered from the same constants.
   */
-  sheet: { href: "/legal/TAVONEL_ENTERPRISE_PRICING_2026-08-30.pdf", label: "Enterprise pricing sheet" },
+  anchor: "enterprise-pricing",
 } as const;
 
 const PLANS: ReadonlyArray<{
   name: string;
   price: string;
-  /** The unit beside the price. Every card has one, so the four price lines share a baseline. */
+  /** The qualifier under the price. Every card has one, so the four cards share a shape. */
   unit: string;
   /** Rendered only when it exists: an empty tag used to reserve blank space above a title. */
   tag: string | null;
   description: string;
   features: readonly string[];
+  /** Named on the card, never implied by its absence. See `notYetSold` in the billing catalog. */
+  notYetSold: readonly string[];
   offerCode: BillingOfferCode | null;
   note?: { href: Route; label: string };
-  sheet?: { href: string; label: string };
+  /** An in-page destination, for a card whose detail is a section rather than another page. */
+  anchor?: string;
 }> = [EVALUATION, ...PAID_PLANS, ENTERPRISE];
+
+/*
+  G2-003. The three steps between this card and a first compile, written on the card.
+
+  The review's finding was that no purchasable path exists: four inert buttons, and a Developer
+  label promising checkout that led to a Google sign-in. The anchors fix where a click goes; this
+  fixes what the buyer is told about it, which is the half that loses the sale. Each path is the
+  route this page will actually take in the state it is rendered in -- the two flags are the same
+  ones the anchor's href is computed from -- so a closed checkout cannot leave a card describing
+  an open one.
+
+  "First compile" is deliberately the last step on both paid plans. Whether that first compile is
+  your own files or the public Compiled World is the intake gate's sentence, printed under the
+  grid from `activationPolicy` rather than paraphrased here.
+*/
+function planPath(
+  plan: (typeof PLANS)[number],
+  state: { liveCheckout: boolean; selfService: boolean },
+) {
+  if (plan.name === "Evaluation") {
+    return state.selfService
+      ? "Sign in → 3 files and 50 pages → your first World"
+      : "Request access → we arrange intake with you → your first World";
+  }
+  if (plan.name === "Enterprise") return "Talk to us → we scope it against your material → a written quote";
+  if (!plan.offerCode) return `Talk to us → we agree the volume and the onboarding session → first compile`;
+  return state.liveCheckout
+    ? "Sign in → checkout → first compile"
+    : "Request access → we open checkout for you → first compile";
+}
 
 /*
   The usage details, after the plan choices, derived rather than retyped.
@@ -178,9 +245,13 @@ function glanceRows(planCapabilities: readonly PlanCapabilityRow[]) {
     // FD-02 (`docs/policy/DECISION_LOG_2026-09-11.md`): Developer reaches activation when the
     // caller owns the workspace. Delegated decision, 2026-09-11; the row is read off the
     // entitlement function, so it cannot say more than the code admits.
+    // SD-02 (G2-002). This row used to end "Team keeps shared membership and roles", which
+    // `/security` and `/trust` deny in plain words: a workspace here has exactly one member and
+    // there are no roles. What differs between the two plans is volume and guided review, and
+    // that is now what the row says. Membership is on the Team card as something not sold yet.
     [
       "What differs by plan",
-      `${activationPlans.join(" and ")} reach World activation — promoting a candidate to the active World, and rolling one back. On ${BILLING_OFFERS.observer_access.label} that is the workspace owner; ${BILLING_OFFERS.studio_access.label} keeps shared membership and roles, and is sold through a conversation rather than a checkout. Source connections are verified separately in Workspace.`,
+      `${BILLING_OFFERS.studio_access.label} carries ${BILLING_OFFERS.studio_access.includedPages.toLocaleString("en-US")} included pages against ${BILLING_OFFERS.observer_access.label}'s ${BILLING_OFFERS.observer_access.includedPages.toLocaleString("en-US")}, adds the review queue, version history and a guided onboarding session, and is sold through a conversation rather than a checkout. Both are single-member workspaces today. ${activationPlans.join(" and ")} reach World activation — promoting a candidate to the active World, and rolling one back — as the workspace owner. Source connections are verified separately in Workspace.`,
     ],
     [
       "What does not consume pages",
@@ -260,6 +331,122 @@ const SCENARIOS = SCENARIO_PAGES.map((pages) => ({
   developer: monthlyTotalUsd(BILLING_OFFERS.observer_access, pages),
   team: monthlyTotalUsd(BILLING_OFFERS.studio_access, pages),
 }));
+
+/*
+  G2-007. The rows on which the two paid plans actually differ, and only those.
+
+  "What each plan can do" further down is rendered from `billingProductDecision`, and all six of
+  its rows answer the same for both plans -- correctly, because both plans reach every one of
+  those routes. A buyer reading six ✓ / ✓ rows learned nothing about why one plan costs more
+  than the other, and the things that do differ were spread between a card, a tile and a fold.
+
+  Every value is read from `lib/billing-catalog.ts` -- the included pages, the sale channel, the
+  onboarding bullet and the not-yet-sold list -- so a catalog change moves the table. A row that
+  is the same on both plans belongs in "Limits" below, not in a column here.
+*/
+/** Takes the channel as a string so a catalog with one channel per plan still type-checks. */
+function howYouBuy(saleChannel: string) {
+  return saleChannel === "self_serve" ? "Checkout" : "A conversation";
+}
+
+const PLAN_DIFFERENCES: ReadonlyArray<readonly [string, string, string]> = [
+  [
+    "Included standard pages each month",
+    BILLING_OFFERS.observer_access.includedPages.toLocaleString("en-US"),
+    BILLING_OFFERS.studio_access.includedPages.toLocaleString("en-US"),
+  ],
+  [
+    "How you buy it",
+    howYouBuy(BILLING_OFFERS.observer_access.saleChannel),
+    howYouBuy(BILLING_OFFERS.studio_access.saleChannel),
+  ],
+  [
+    "Guided corpus onboarding",
+    BILLING_OFFERS.observer_access.features.some((feature) => feature.includes("onboarding")) ? "Included" : "—",
+    BILLING_OFFERS.studio_access.features.some((feature) => feature.includes("onboarding")) ? "Included" : "—",
+  ],
+];
+
+/*
+  G2-008. The hard limits, stated where the money decision is made rather than only on /sources.
+
+  Four of these are constants the pipeline enforces; the rest are absences, written as absences.
+  A buyer asking "what is the ceiling" was previously answered on `/sources` (size and pages), in
+  the changelog (documents per run) and nowhere at all (retention, residency, resolution target),
+  which meant the three that do not exist read as three we had not got round to publishing.
+
+  Where a row says a limit is not set, that is the state of the deployment and not a promise of
+  an unlimited one: `/privacy` says no retention period in days is established, `/security` says
+  no data residency is guaranteed, and `docs/policy/SUPPORT_TARGETS.md` says the published target
+  is an acknowledgement and not a resolution time.
+*/
+const LIMITS: ReadonlyArray<readonly [string, string]> = [
+  [
+    "Largest single source",
+    `${PROCESSING_CEILING_MIB} MB. Nothing in the reading chain accepts more, so a larger file cannot be compiled at all.`,
+  ],
+  [
+    "Most pages in one source",
+    `${PROCESSING_CEILING.maxSourcePages}. The page ceiling is checked after the document is decoded, so a longer file is refused during processing rather than at upload.`,
+  ],
+  [
+    "Sources in one run",
+    `${CORPUS_MAX_DOCUMENTS}, compiled in parts of ${COMPILE_MAX_DOCUMENTS}. Each part compiles to its own World and is reviewed on its own; the parts are not merged.`,
+  ],
+  [
+    "Members in a workspace",
+    "One, on every plan. Shared members and roles are not sold yet, so there is no seat count to buy and no per-member source permission to set.",
+  ],
+  [
+    "API requests",
+    "Limited per key, per scope, per minute. The limits are the same on both paid plans and are not something a plan buys more of.",
+  ],
+  [
+    "Retention period",
+    "Not set. Material stays until you delete it, until the workspace is deleted, or until a legal retention duty applies — there is no day count, and the privacy notice says why.",
+  ],
+  [
+    "Data residency",
+    "Not guaranteed. The database is configured in Seoul and the processing region of every provider is published on the subprocessors page.",
+  ],
+  [
+    "Uptime and resolution targets",
+    "Not published. Email to support is acknowledged within one business day (KST); no uptime percentage and no resolution time is committed.",
+  ],
+];
+
+/*
+  G2-001 (SD-03). Enterprise pricing as HTML, in this page's vocabulary.
+
+  The deleted PDF answered this question with a price ladder nobody had scoped and a credit
+  catalogue this product does not sell. What a buyer actually needs before a call is what the
+  quote is built from, what we need from them to build it, and what an Enterprise scope does not
+  contain today -- so those are the three lists, and no range is quoted, because none has been
+  agreed. The rate and the ceiling below are the same two constants every other figure on this
+  page is computed from: an Enterprise quote starts from the published rate, it does not replace
+  it with a secret one.
+*/
+const ENTERPRISE_VARIABLES = [
+  "Annual page volume, and how much of it arrives at once",
+  "How many source systems are connected, and whether any of them needs work to read",
+  "How much of the review is run by us rather than by you",
+  "A retention and deletion review written against your own policy",
+  "Onboarding depth, and any support target beyond the published acknowledgement target",
+] as const;
+
+const ENTERPRISE_QUOTE_NEEDS = [
+  "A page volume, even a rough one, and the formats it arrives in",
+  "Where the material sits today, and who is allowed to read it",
+  "What the compiled knowledge has to feed — people, an agent, or your own application",
+  "Who signs, and what their security review asks for",
+] as const;
+
+const ENTERPRISE_NOT_INCLUDED = [
+  "A separate deployment. There is no self-hosted, private-cloud or air-gapped installation, on any scope.",
+  "A data residency guarantee. The processing regions are published; a contractual residency commitment is not offered.",
+  "Shared members and roles. A workspace has one member, and an Enterprise scope does not change that today.",
+  "An audit report. There is no SOC 2, no ISO 27001 and no independent penetration test for this deployment.",
+] as const;
 
 export type PurchaseGate = {
   id: "customerData" | "candidatePromotion";
@@ -346,6 +533,59 @@ const PURCHASE_FAQ: Array<[string, string, Route, string, string]> = [
 /** The order the groups are shown in. Declared rather than derived, because it is an argument. */
 const FAQ_GROUPS = ["What it is", "What it costs", "What happens to my data", "What a review will find"] as const;
 
+/*
+  G2-032. The prices and the questions on this page, in the markup a search or answer engine reads.
+
+  The site's global JSON-LD is Organization + SoftwareApplication and stops there, on the stated
+  ground that a private pilot has no public catalogue. That ground no longer holds for this page
+  and only for this page: `BILLING_OFFERS` is a catalogue, both plans are rendered with real
+  prices, and a buyer can reach a checkout for one of them. So the block is built by mapping over
+  the two modules the page already renders -- a price change moves the markup instead of leaving a
+  crawler with a stale `Offer`.
+
+  Only the two catalogued subscriptions are described. The free evaluation has no `priceUsd` to
+  cite and Enterprise has no agreed price at all, and an `Offer` for either would be the invented
+  fact the evidence rule bars. `availability` follows `saleChannel`, so the plan sold through a
+  conversation is not advertised to a crawler as a checkout.
+
+  It is emitted from this client component rather than from `app/pricing/page.tsx` because a
+  "use client" module's non-component exports are client references in the server bundle, so the
+  server component cannot read `PURCHASE_FAQ`. Next server-renders this into the HTML either way.
+*/
+const PRICING_JSON_LD = {
+  "@context": "https://schema.org",
+  "@graph": [
+    ...Object.values(BILLING_OFFERS).map((offer) => ({
+      "@type": "Offer",
+      name: offer.label,
+      description: offer.description,
+      url: "https://tavonel.com/pricing",
+      category: "subscription",
+      availability:
+        offer.saleChannel === "self_serve"
+          ? "https://schema.org/InStock"
+          : "https://schema.org/LimitedAvailability",
+      priceSpecification: {
+        "@type": "UnitPriceSpecification",
+        price: offer.priceUsd,
+        priceCurrency: "USD",
+        valueAddedTaxIncluded: false,
+        unitText: "month",
+        billingDuration: 1,
+        billingIncrement: 1,
+      },
+    })),
+    {
+      "@type": "FAQPage",
+      mainEntity: PURCHASE_FAQ.map(([question, answer]) => ({
+        "@type": "Question",
+        name: question,
+        acceptedAnswer: { "@type": "Answer", text: answer },
+      })),
+    },
+  ],
+};
+
 export default function PricingPageClient({
   initialLiveCheckout,
   initialSelfService,
@@ -425,23 +665,36 @@ export default function PricingPageClient({
     return () => { cancelled = true; };
   }, []);
 
-  const requestAccess = () => window.location.assign("/contact");
-  const startEvaluation = () => window.location.assign(selfService ? "/login" : "/contact");
+  /*
+    G2-003. Where each plan's action goes, as a URL rather than as a click handler.
 
-  const chooseOffer = (offerCode: BillingOfferCode) => {
-    if (!liveCheckout) {
-      window.location.assign("/contact");
-      return;
-    }
-    if (signedIn) {
-      void startCheckout(offerCode);
-      return;
-    }
-    window.location.assign(loginUrlForOffer(offerCode));
+    All four controls were `<button type="button">`: not linkable, not openable in a new tab,
+    inert with JavaScript disabled and invisible to a crawler, on the one page where the buyer
+    decides. They are anchors now, and this function is what fills the `href`.
+
+    The Paddle overlay still exists and still needs a click, so the Developer anchor keeps an
+    `onClick` that calls `preventDefault()` and opens it -- but only in the one state where the
+    overlay is reachable, which is live checkout with a session. In every other state the href is
+    where the click was going to send the visitor anyway: the sign-in that carries the offer, or
+    /contact. Nothing about the destination depends on JavaScript having run.
+  */
+  const planHref = (plan: (typeof PLANS)[number]) => {
+    if (plan.anchor) return `#${plan.anchor}`;
+    if (plan.name === "Evaluation") return selfService ? "/login" : "/contact";
+    if (!plan.offerCode || !liveCheckout) return "/contact";
+    return loginUrlForOffer(plan.offerCode);
   };
+
+  /** True only where the Paddle overlay can actually open, which is where the anchor is hijacked. */
+  const opensOverlay = (plan: (typeof PLANS)[number]) =>
+    Boolean(plan.offerCode) && liveCheckout && signedIn;
 
   return (
     <div className="page pricing-page">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonLdHtml(PRICING_JSON_LD) }}
+      />
       <PublicSiteHeader
         cta={{
           href: liveCheckout || selfService ? "/login" : "/contact",
@@ -504,14 +757,29 @@ export default function PricingPageClient({
                   */}
                   {plan.tag ? <span className="tag">{plan.tag}</span> : null}
                   <h2>{plan.name}</h2>
-                  <span className="price">{plan.price}<small> {plan.unit}</small></span>
+                  {/*
+                    G2-009 and G2-039. The currency is part of the price and the qualifier is a
+                    block under it. As a trailing `<small>` the Enterprise card's "/ scoped with
+                    you" wrapped mid-phrase and left "you" alone on its own line.
+                  */}
+                  <span className="price">{plan.price}</span>
+                  <p className="fine">{plan.unit}</p>
                   <p>{plan.description}</p>
                   <ul>{plan.features.map((feature) => <li key={feature}>{feature}</li>)}</ul>
+                  {/*
+                    SD-02 (G2-002). What this plan does not include, on the card, in the same type
+                    as the rest of it. Team's differentiator used to be shared membership, which
+                    `/security` and `/trust` deny; a buyer now reads that here instead of after
+                    they have paid.
+                  */}
+                  {plan.notYetSold.length > 0 ? (
+                    <>
+                      <p className="fine"><b>Coming, not yet sold</b></p>
+                      <ul>{plan.notYetSold.map((item) => <li key={item}>{item}</li>)}</ul>
+                    </>
+                  ) : null}
                   {plan.note ? (
                     <p className="fine"><Link href={plan.note.href}>{plan.note.label}</Link></p>
-                  ) : null}
-                  {plan.sheet ? (
-                    <p className="fine"><a href={plan.sheet.href}>{plan.sheet.label}</a></p>
                   ) : null}
                   {/*
                     BA-120. The page where the purchase is decided had no primary action: every
@@ -519,32 +787,48 @@ export default function PricingPageClient({
                     "Cancellation and refunds" at the foot of the page. The featured plan is filled
                     and the other three stay ghost, and each label says what happens next instead
                     of four plans all saying "Request access".
+
+                    G2-003. It is an anchor now, with the destination in the markup, and the three
+                    steps between here and a first compile are written under it rather than
+                    discovered one redirect at a time.
                   */}
-                  <button
+                  <a
                     className={plan.name === "Developer" ? "btn" : "btn ghost"}
-                    type="button"
-                    disabled={Boolean(billingBusy)}
-                    onClick={() => {
+                    href={planHref(plan)}
+                    aria-disabled={billingBusy === plan.offerCode ? true : undefined}
+                    onClick={(event) => {
                       // The plan name is an enumerated UI state, not customer data.
                       trackFunnel("pricing_start_clicked", { plan: plan.name });
-                      if (plan.name === "Evaluation") return startEvaluation();
-                      if (!liveCheckout || !plan.offerCode) return requestAccess();
-                      return chooseOffer(plan.offerCode);
+                      if (!opensOverlay(plan) || !plan.offerCode) return;
+                      event.preventDefault();
+                      void startCheckout(plan.offerCode);
                     }}
                   >
                     {plan.name === "Evaluation"
                       ? selfService ? "Start free evaluation" : "Request evaluation"
                       : !plan.offerCode
-                        ? plan.name === "Enterprise" ? "Scope an Enterprise pilot" : `Talk to us about ${plan.name}`
+                        ? plan.name === "Enterprise" ? "How an Enterprise quote is built" : `Talk to us about ${plan.name}`
                         : !liveCheckout
                           ? `Request ${plan.name} access`
                           : billingBusy === plan.offerCode
                             ? "Opening checkout…"
                             : signedIn ? `Get ${plan.name} access` : `Get ${plan.name} access → sign in`}
-                  </button>
+                  </a>
+                  <p className="fine">{planPath(plan, { liveCheckout, selfService })}</p>
                 </article>
               ))}
             </div>
+            {/*
+              G2-009 (SD-08). The currency and tax sentence, once, where the four prices are.
+
+              Paddle is the merchant of record and settles in US dollars. No second currency has a
+              settlement path here, so none is offered rather than quoted and then not honoured.
+            */}
+            <p className="fine">
+              Every price on this page is in US dollars and excludes tax. Paddle is the merchant of
+              record and presents the applicable tax, the renewal terms and the final amount before
+              you pay.
+            </p>
             {/* BA-119(a). The intake gate, in the policy's own words, as fine print under the grid. */}
             {gates.filter((gate) => gate.id === "customerData" && !gate.enabled).map((gate) => (
               <p className="fine" key={gate.id} data-purchase-gate={gate.id}>
@@ -572,6 +856,110 @@ export default function PricingPageClient({
                   <p>{gate.reason} Nothing reaches an active World without a person, on any plan.</p>
                 </article>
               ))}
+            </div>
+            {/*
+              G2-007. The three rows on which the two paid plans differ, before the table on which
+              they do not. A comparison whose every cell reads ✓ / ✓ answers the wrong question.
+            */}
+            <h3 id="plan-differences-title">What the step between the two plans buys</h3>
+            <div className="table-scroll">
+            <table className="docs-table" aria-labelledby="plan-differences-title">
+              <thead>
+                <tr>
+                  <th scope="col">&nbsp;</th>
+                  <th scope="col">{BILLING_OFFERS.observer_access.label}</th>
+                  <th scope="col">{BILLING_OFFERS.studio_access.label}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {PLAN_DIFFERENCES.map(([label, developer, team]) => (
+                  <tr key={label}>
+                    <th scope="row">{label}</th>
+                    <td>{developer}</td>
+                    <td>{team}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            </div>
+            <p className="fine">
+              Those are the differences. Everything else — compiling, evidence, Ask, signed export,
+              API and MCP access, reviewing a candidate, promoting a World and rolling one back —
+              is reached by both plans, at the same per-page rate past the included pages, under
+              the same limits below. The capability table under this one is the proof: it is
+              answered by the function the API calls, and it reads the same for both.
+            </p>
+            {/*
+              G2-008. The ceilings a buyer has to know before they buy, and the three they will
+              ask about that do not exist. Written as a list rather than a fourth column because
+              none of them varies by plan.
+            */}
+            <h3 id="pricing-limits-title">Limits, and what is not capped</h3>
+            <div className="tiles">
+              {LIMITS.map(([label, value]) => (
+                <article className="tile" key={label}>
+                  <h4>{label}</h4>
+                  <p>{value}</p>
+                </article>
+              ))}
+            </div>
+            <p className="fine">
+              The first three are enforced by the reading chain itself and are the same figures{" "}
+              <Link href={"/sources" as Route}>Sources</Link> publishes and a refusal quotes back
+              at you. The last three are absences: where this page says a limit is not set, nothing
+              has established one, and that is not a promise of an unlimited allowance.
+            </p>
+            {/*
+              G2-010. Standard and complex, defined rather than assumed.
+
+              "Complex pages are escalated only when a page needs it" was circular on a page whose
+              entire price depends on which of the two a page is. What follows is the mechanism
+              rather than a taxonomy, because the mechanism is what exists: `lib/usage-pricing.ts`
+              holds a standard unit count and a maximum unit count per page, and settlement in
+              `docs/CREDIT_ECONOMICS.md` charges the GPU time a page actually took, against a
+              reservation taken at the ceiling before the run starts. No rule anywhere in this
+              repository classifies a page in advance, and no measurement here says what share of
+              a corpus escalates -- so neither is claimed.
+            */}
+            <h3 id="page-classes-title">What makes a page complex</h3>
+            <div className="tiles">
+              <article className="tile">
+                <h4>Standard page</h4>
+                <p>
+                  A page the reader gets through in the standard time: a digital PDF page, a
+                  converted document or slide, a clean single-column scan of ordinary type. It is
+                  billed at {formatUsd(STANDARD_PAGE_USD)}, and most pages are this.
+                </p>
+              </article>
+              <article className="tile">
+                <h4>Complex page</h4>
+                <p>
+                  A page that takes the same reader longer: a skewed, noisy or low-contrast scan, a
+                  tightly packed multi-column layout, a page that is mostly drawing or photograph.
+                  It costs more than a standard page and never more than{" "}
+                  {formatUsd(MAXIMUM_PAGE_USD)}.
+                </p>
+              </article>
+              <article className="tile">
+                <h4>Who decides, and when</h4>
+                <p>
+                  Nobody decides in advance. Every run holds the ceiling — every page at{" "}
+                  {formatUsd(MAXIMUM_PAGE_USD)} — before it starts, so the figure you authorise is
+                  the most it can cost, and the bill is settled on the work the pages actually
+                  took. The invoice can come in under the number you approved; it cannot come in
+                  over it.
+                </p>
+              </article>
+              <article className="tile">
+                <h4>How many escalate</h4>
+                <p>
+                  We publish no figure. Nothing here has measured the share of a typical corpus
+                  that escalates, and a number invented for this page would be exactly the estimate
+                  the reservation exists to replace. Preflight shows the maximum for your own files
+                  before you commit, which is the answer for your corpus rather than an average
+                  over somebody else&apos;s.
+                </p>
+              </article>
             </div>
             {/*
               Audit P05 / M04. Which plan reaches which capability, answered by the function the
@@ -613,19 +1001,19 @@ export default function PricingPageClient({
               </tbody>
             </table>
             </div>
-            <p className="fine">
-              Every Enterprise engagement is scoped with you, so this table compares the three
-              plans you can start from; an Enterprise scope is agreed in the conversation. The free
-              evaluation reaches the {BILLING_OFFERS.observer_access.label} rows that do not
-              activate a World, inside its file and page limits, and it has no column here because
-              it is not a paid plan rather than because it is refused.
-            </p>
+            {/*
+              G2-035. Two consecutive paragraphs carried the same sentence twice, differing in one
+              word -- the evaluation reached "the Developer rows", then "the Developer columns".
+              One paragraph, said once.
+            */}
             <p className="fine">
               Every row is answered for the workspace owner, the role a buyer of either plan holds
               in their own workspace. The free evaluation reaches the{" "}
-              {BILLING_OFFERS.observer_access.label} columns that do not activate a World, inside
-              its file and page limits; activating one needs a paid plan. Nothing an Ask answer
-              returns is invented for it: every answer names the retrieval path it took, and{" "}
+              {BILLING_OFFERS.observer_access.label} rows that do not activate a World, inside its
+              file and page limits; activating one needs a paid plan, which is why it has no column
+              here. An Enterprise scope is agreed in the conversation rather than compared against
+              these two. Nothing an Ask answer returns is invented for it: every answer names the
+              retrieval path it took, and{" "}
               <Link href={"/docs/ask" as Route}>the Ask reference</Link> states which paths exist
               and what each one reads.
             </p>
@@ -659,12 +1047,15 @@ export default function PricingPageClient({
               plan&apos;s included pages. A page is counted when a source is admitted for reading,
               so re-asking, searching and recompiling sources already read do not appear in this
               table. Complex-page processing is capped at {formatUsd(MAXIMUM_PAGE_USD)} per page
-              and is shown before the run starts. Tax is not included.
+              and is shown before the run starts. Every figure is in US dollars, excluding tax.
             </p>
             </section>
             <section className="usage-estimator" aria-labelledby="usage-estimator-title" data-visual>
               <div>
+                {/* G2-042. The widget states its own currency and tax basis: a reader who scrolls
+                    straight to the calculator never passes the sentence under the plan grid. */}
                 <h3 id="usage-estimator-title">What will this corpus cost?</h3>
+                <p className="fine">All figures in US dollars, excluding tax.</p>
                 <label htmlFor="pricing-pages">Processed pages</label>
                 <input
                   id="pricing-pages"
@@ -677,8 +1068,8 @@ export default function PricingPageClient({
                 />
               </div>
               <dl>
-                <div><dt>{BILLING_OFFERS.observer_access.label} total</dt><dd>{formatUsd(estimate.developerTotalUsd)}</dd></div>
-                <div><dt>{BILLING_OFFERS.studio_access.label} total</dt><dd>{formatUsd(estimate.teamTotalUsd)}</dd></div>
+                <div><dt>{BILLING_OFFERS.observer_access.label} total, USD</dt><dd>{formatUsd(estimate.developerTotalUsd)}</dd></div>
+                <div><dt>{BILLING_OFFERS.studio_access.label} total, USD</dt><dd>{formatUsd(estimate.teamTotalUsd)}</dd></div>
                 <div>
                   <dt>Pages beyond {BILLING_OFFERS.observer_access.label}</dt>
                   <dd>{estimate.extraPages.toLocaleString("en-US")} at {formatUsd(STANDARD_PAGE_USD)} = {formatUsd(estimate.extraPagesUsd)}</dd>
@@ -699,6 +1090,37 @@ export default function PricingPageClient({
                 documents have been read, and never exceeds the maximum you were shown.
               </p>
             </details>
+            {/*
+              G2-001 (SD-03). What used to be a one-page PDF, as a section of the page it was
+              linked from. `/enterprise` is another lane's file; the content lives here, where the
+              prices are, and that page is offered the same block as a cross-lane request.
+            */}
+            <section id="enterprise-pricing" aria-labelledby="enterprise-pricing-title">
+              <h2 id="enterprise-pricing-title">Enterprise</h2>
+              <p className="lede">
+                There is no Enterprise price list, because no Enterprise scope has been agreed that
+                a list would describe. An Enterprise quote starts from the same two numbers as
+                every plan above — {formatUsd(STANDARD_PAGE_USD)} per standard page, never more
+                than {formatUsd(MAXIMUM_PAGE_USD)} — and the conversation is about what sits around
+                them. Quotes are written in US dollars, excluding tax.
+              </p>
+              <h3 id="enterprise-variables-title">What moves the quote</h3>
+              <ul aria-labelledby="enterprise-variables-title">
+                {ENTERPRISE_VARIABLES.map((item) => <li key={item}>{item}</li>)}
+              </ul>
+              <h3 id="enterprise-needs-title">What we need to write one</h3>
+              <ul aria-labelledby="enterprise-needs-title">
+                {ENTERPRISE_QUOTE_NEEDS.map((item) => <li key={item}>{item}</li>)}
+              </ul>
+              <h3 id="enterprise-absent-title">What an Enterprise scope does not include today</h3>
+              <ul aria-labelledby="enterprise-absent-title">
+                {ENTERPRISE_NOT_INCLUDED.map((item) => <li key={item}>{item}</li>)}
+              </ul>
+              <div className="actions">
+                <Link className="btn" href="/contact">Scope an Enterprise pilot</Link>
+                <Link className="btn ghost" href={"/trust" as Route}>What an enterprise security review finds</Link>
+              </div>
+            </section>
             <section aria-labelledby="pricing-faq-title">
               <h2 id="pricing-faq-title">Questions before you buy</h2>
               {FAQ_GROUPS.map((group) => (
