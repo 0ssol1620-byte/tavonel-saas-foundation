@@ -178,6 +178,19 @@ export default async function ApiReferencePage() {
             decisions, and no scope grants them.
           </p>
 
+        </div>
+
+        {/*
+          The reference itself is a third grid child spanning both columns.
+
+          `.body` is the two-column editorial grid every document page uses: a title rail and a
+          reading column. That composition is right for a page that is an argument, and wrong for
+          one that is eighty thousand pixels of operation-by-operation reference — it would leave
+          a 480px rail empty for the whole scroll, and squeeze every request example, parameter
+          table and response body into 800px to do it. The header keeps the composition; below it
+          the reference spends the width.
+        */}
+        <div className={styles.full}>
           <ApiTryIt routes={TRY_IT} />
 
           <nav className={styles.index} aria-label="Operations by group">
