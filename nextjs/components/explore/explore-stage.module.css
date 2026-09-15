@@ -53,6 +53,34 @@
 }
 
 /*
+  G1-021. The three ways back into the site, in the same quiet 12px text as the two actions beside
+  them -- this header has one visual weight and nothing in it draws a box. The row is the header's
+  third grid column together with `.headerActions`, so it collapses out of the way first: below
+  720px the stage is a phone scene flow and the exit link plus the drawer are the whole header.
+*/
+.siteLinks {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 14px;
+}
+
+.siteLinks a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--text-lo);
+  font: 12px/1.35 var(--f-sans);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.siteLinks a:hover { color: var(--text-hi); }
+.siteLinks a:focus-visible { outline: 2px solid var(--verified); outline-offset: 2px; }
+
+@media (max-width: 860px) { .siteLinks { display: none; } }
+
+/*
   BA-029. Both header actions used to be bordered boxes of the same weight, which is not a
   hierarchy -- and the second of them was an unlabelled 44px X. Now both are quiet 12px text:
   the drawer opener stays a button, the exit is a link that says where it goes, and the only
@@ -144,7 +172,16 @@
   At 0.55 the node labels competed with the sub-line for the same pixels; this is the level where
   the composition is legible as a shape and the sentence in front of it is legible as a sentence.
 */
-.worldAct[data-dimmed="1"] { opacity: 0.3; }
+/*
+  G1-022. The dim is for the composition, not for the words under it.
+
+  `opacity: 0.3` was on the whole act, so at ENTRY the two labels in the foot -- SELECT AN OBJECT
+  and the parallel list's summary -- rendered at roughly 1.6:1 against the ground. They read as an
+  empty panel rather than as a quiet one, which is what the audit screenshotted. The canvas is the
+  only child that should fade behind the entry copy; the foot and the list keep the contrast they
+  were designed at, and they are still one click from their own act.
+*/
+.worldAct[data-dimmed="1"] > *:not(.worldFoot):not(.parallelList) { opacity: 0.3; }
 
 .worldFoot {
   display: flex;
@@ -1007,6 +1044,18 @@
   font: 9px var(--f-mono);
   letter-spacing: 0.14em;
 }
+
+/*
+  G1-047. The eyebrow sat at the top of a row whose height is a 74px headline, so it floated about
+  160px above the list it labels. Bottom-aligning it in its own cell puts the label back on the
+  thing it names without moving either column.
+*/
+.next > p:first-of-type { align-self: end; }
+
+/* The reason a filing shows two page numbers, under the row it belongs to (G1-023). */
+.nextSourceNote { display: block; margin-top: 3px; color: var(--text-xlo); font-size: 11.5px; line-height: 1.5; }
+.nextSourceNote a { color: var(--text-lo); text-decoration: underline; text-underline-offset: 2px; }
+.nextSourceNote a:hover { color: var(--text-hi); }
 
 /*
   BA-029. The left column of this section was empty below its eyebrow -- half a section of

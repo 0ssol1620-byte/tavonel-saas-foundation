@@ -174,6 +174,12 @@ export const EXPLORE_COPY = {
     "Entity labels in this fixed sample come from a simple capitalised-token heuristic, not by a resolver. In the recorded evaluation, 3 of 16 baseline labels were true positives. Unreviewed entities are shown only as sample structure; Claims and page-bound evidence are the parts to judge here.",
   /* BA-029: the exit names where it goes. It was an unlabelled X with this only as an aria-label. */
   closeLabel: "Back to TAVONEL",
+  /*
+    G1-047. The sample's five filings are TAVONEL's own, and the label over them said YOUR SOURCES
+    -- on the one page whose whole argument is that a reader can check what is actually there. The
+    heading under it already makes the "your own" offer; the label says whose these are.
+  */
+  endSourcesLabel: "THIS WORLD'S SOURCES",
   endHeading: "Try the same path with your own knowledge.",
   /*
     BA-036: two, not three. "How compilation works" was a third sibling button in one row -- the

@@ -651,10 +651,17 @@ export default function WorkspacePage() {
       const client = getSupabaseBrowserClient();
       const { data } = client ? await client.auth.getSession() : { data: { session: null } };
       if (!data.session) {
-        // Send them somewhere that can actually help. /login explains what this is and, where no
-        // provider is configured, says so instead of offering a control that will fail.
+        /*
+          Send them somewhere that can actually help. /login explains what this is and, where no
+          provider is configured, says so instead of offering a control that will fail.
+
+          G2-044: with `?next=/workspace`. This route was rendering the sign-in card at the
+          /workspace URL while its canonical, title and description all named /login, so the URL
+          and the page identity diverged and the back button was unpredictable. Carrying the
+          destination makes the hop a redirect with a stated return rather than a dead end.
+        */
         setSession("anonymous");
-        window.location.replace("/login");
+        window.location.replace("/login?next=/workspace");
         return;
       }
       setSession("signed-in");
