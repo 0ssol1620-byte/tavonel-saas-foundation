@@ -581,7 +581,10 @@ test("a deep link lands on the exact region it names, not only on the act", asyn
 test("the closing action offers the reader their own sources", async ({ page }) => {
   await page.goto("/explore");
   await expect(page.getByRole("heading", { name: "Try the same path with your own knowledge." })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Start with your files" })).toBeVisible();
+  // G1-001 / SD-01: the primary action is ACCESS_CTA until checkout *and* customer data are open.
+  const status = await (await page.request.get("/api/status")).json();
+  const selfServe = status.liveCheckout === true && status.activationPolicy?.customerData?.enabled === true;
+  await expect(page.getByRole("link", { name: selfServe ? "Start with your files" : "Request access" }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: "Connect a source" })).toBeVisible();
   /*
     BA-036. Three sibling buttons in one row is the arrangement 3.4 bars, so the reading action

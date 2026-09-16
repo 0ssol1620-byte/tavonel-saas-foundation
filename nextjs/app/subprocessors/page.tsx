@@ -56,7 +56,7 @@ const PROCESSORS = [
   ["RunPod", "Scale-to-zero GPU OCR", "Sanitized document candidates and processing telemetry", "Not pinned. The endpoint is addressed by id and this deployment sets no region for it, so we do not state one."],
   ["Paddle", "Merchant-of-record billing when commercial mode is enabled", "Billing identity, checkout and subscription events", "Global infrastructure; may process outside Korea"],
   ["Resend", "Transactional inquiry delivery", "Inquiry name, work email, company and message", "Global infrastructure; may process outside Korea"],
-  ["Google", "OAuth identity provider; optional, consent-based public website analytics", "Google account identity and authentication events; for visitors who allow analytics, pseudonymous browser identifiers, device information, public-page visits and selected interactions. Customer source contents and workspace events are excluded from analytics.", "Global infrastructure; may process outside Korea"],
+  ["Google", "OAuth identity provider; optional, consent-based public website analytics", "Google account identity and authentication events; with analytics consent, pseudonymous browser identifiers, device information, public-page visits and selected interactions. No customer source contents or workspace events.", "Global infrastructure; may process outside Korea"],
 ] as const;
 export default function SubprocessorsPage() { return <PolicyLayout label="SUBPROCESSORS" title="Every service permitted to process your data." effective={LEGAL_EFFECTIVE_DATE} lastUpdated={LEGAL_LAST_UPDATED} intro={<>A provider appearing here does not mean every feature is live; the status page states the active deployment mode.</>}>
   <BreadcrumbJsonLd trail={[{ name: "Subprocessors", path: "/subprocessors" }]} />

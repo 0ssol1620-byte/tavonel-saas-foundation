@@ -101,7 +101,8 @@ test("product page shows the product path before secondary product surfaces", as
   expect(statusResponse.ok()).toBe(true);
   const status = await statusResponse.json();
   expect(typeof status.liveCheckout).toBe("boolean");
-  const expectedCta = status.liveCheckout ? SELF_SERVE_CTA : ACCESS_CTA;
+  // G1-001 / SD-01: `isLiveCommerce` requires the customer-data gate as well as live checkout.
+  const expectedCta = status.liveCheckout && status.activationPolicy?.customerData?.enabled ? SELF_SERVE_CTA : ACCESS_CTA;
   await page.goto("/product");
   /*
     The product path's own stages, not "the word SOURCE somewhere on the document". Unscoped,

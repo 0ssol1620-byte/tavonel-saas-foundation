@@ -36,7 +36,7 @@ test("the Connect section uses its content width and exposes the three supported
 
   const details = section.locator("details.one-path-details");
   await details.locator("summary").click();
-  await expect(details.getByRole("link", { name: "Supported formats" })).toHaveAttribute("href", "/sources");
+  await expect(details.getByRole("link", { name: "Supported formats", exact: true })).toHaveAttribute("href", "/sources");
   await expect(details.getByRole("link", { name: "Availability and permissions" })).toHaveAttribute("href", "/integrations");
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   expect(errors).toEqual([]);
