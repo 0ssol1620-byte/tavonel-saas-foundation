@@ -1,6 +1,4 @@
-"use client";
-
-import { useEffect, useState } from "react";
+import { Children, Fragment, cloneElement, isValidElement, type ReactElement, type ReactNode } from "react";
 
 /*
   G2-040 / G2-041. Two findings, one cause.
@@ -11,53 +9,53 @@ import { useEffect, useState } from "react";
   8,007 CSS px, roughly twenty-five screens, with no way to reach a section except by thumb.
 
   A table of contents fixes both, and the sections it needs already exist: every one of these
-  pages writes `<h2>`s inside `.policy-copy`. So the index is read from the rendered document
-  rather than declared a second time in five page files -- there is no list to keep in step, and a
-  page that adds a section gets a jump link for it in the same commit.
+  pages writes `<h2>`s inside `.policy-copy`. So the index is read from the document rather than
+  declared a second time in five page files -- there is no list to keep in step, and a page that
+  adds a section gets a jump link for it in the same commit.
 
-  It is a client component for that one reason and does nothing else on the client: it reads the
-  headings once after mount, gives each an id if the author did not, and renders links. A reader
-  with scripting off loses a navigation aid and no content, which is the right side to fail on.
+  The first version read the headings from the DOM after mount. That cost /privacy a cumulative
+  layout shift of 0.42 on a phone (Lighthouse, 2026-09-16): the index was inserted above the
+  document once JavaScript ran and pushed every paragraph down. This version reads the same
+  headings from the React tree on the server, so the index is in the HTML the first paint uses,
+  works with scripting off, and moves nothing.
+
+  `IndexedPolicyBody` wraps the document's markup; `PolicyJumpIndex` marks where the index goes.
+  The walk only descends into host elements and fragments -- a heading inside another component
+  is that component's to index -- and a document with fewer than three sections gets no index.
 */
 type Entry = { id: string; text: string };
 
 const slug = (text: string) =>
   text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "section";
 
+/** Marker only. Rendered on its own, outside `IndexedPolicyBody`, it renders nothing. */
 export default function PolicyJumpIndex() {
-  const [entries, setEntries] = useState<Entry[]>([]);
+  return null;
+}
 
-  useEffect(() => {
-    /*
-      `h2` where the document has them, `h3` where it does not. /status writes its three sections
-      as `h3` under an `h1` and /subprocessors has a single `h2` over an `h3` list -- a heading
-      level is that page's to fix, and until it is, an index keyed only to `h2` silently skips the
-      longest page in the set. The two levels are never mixed: whichever one the document actually
-      sections on is the one the index is built from.
-    */
-    const level2 = Array.from(document.querySelectorAll<HTMLElement>(".policy-copy h2"));
-    const headings = level2.length >= 3
-      ? level2
-      : Array.from(document.querySelectorAll<HTMLElement>(".policy-copy h3"));
-    const used = new Set<string>();
-    const found = headings.flatMap((heading) => {
-      const text = (heading.textContent ?? "").trim();
-      if (!text) return [];
-      if (!heading.id) {
-        let id = slug(text);
-        let suffix = 2;
-        while (used.has(id) || document.getElementById(id)) id = `${slug(text)}-${suffix++}`;
-        heading.id = id;
-      }
-      used.add(heading.id);
-      return [{ id: heading.id, text }];
-    });
-    // Two headings are a heading pair, not a document that needs an index.
-    setEntries(found.length >= 3 ? found : []);
-  }, []);
+function textOf(node: ReactNode): string {
+  if (node == null || typeof node === "boolean") return "";
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(textOf).join("");
+  if (isValidElement(node)) return textOf((node as ReactElement<{ children?: ReactNode }>).props.children);
+  return "";
+}
 
-  if (entries.length === 0) return null;
+const isHost = (el: ReactElement) => typeof el.type === "string" || el.type === Fragment;
 
+function count(node: ReactNode, level: "h2" | "h3"): number {
+  let n = 0;
+  Children.forEach(node, (child) => {
+    if (!isValidElement(child)) return;
+    const el = child as ReactElement<{ children?: ReactNode }>;
+    if (el.type === level) n += 1;
+    else if (isHost(el)) n += count(el.props.children, level);
+  });
+  return n;
+}
+
+function JumpNav({ entries }: { entries: Entry[] }) {
+  if (entries.length < 3) return null;
   return (
     <nav className="policy-jump" aria-label="On this page">
       <p className="policy-jump-title">On this page</p>
@@ -68,4 +66,44 @@ export default function PolicyJumpIndex() {
       </ol>
     </nav>
   );
+}
+
+export function IndexedPolicyBody({ children }: { children: ReactNode }) {
+  /*
+    `h2` where the document has them, `h3` where it does not. /status writes its three sections
+    as `h3` under an `h1` and /subprocessors has a single `h2` over an `h3` list -- a heading
+    level is that page's to fix, and until it is, an index keyed only to `h2` silently skips the
+    longest page in the set. The two levels are never mixed.
+  */
+  const level: "h2" | "h3" = count(children, "h2") >= 3 ? "h2" : "h3";
+  const entries: Entry[] = [];
+  const used = new Set<string>();
+
+  const walk = (node: ReactNode): ReactNode =>
+    Children.map(node, (child) => {
+      if (!isValidElement(child)) return child;
+      const el = child as ReactElement<{ children?: ReactNode; id?: string }>;
+      if (el.type === PolicyJumpIndex) {
+        // The array is complete by the time React renders the nav: this walk finishes first.
+        return <JumpNav entries={entries} />;
+      }
+      if (el.type === level) {
+        const text = textOf(el.props.children).trim();
+        if (!text) return child;
+        let id = el.props.id ?? slug(text);
+        let suffix = 2;
+        while (used.has(id)) id = `${slug(text)}-${suffix++}`;
+        used.add(id);
+        entries.push({ id, text });
+        return el.props.id === id ? child : cloneElement(el, { id });
+      }
+      if (isHost(el) && el.props.children !== undefined) {
+        return cloneElement(el, undefined, walk(el.props.children));
+      }
+      return child;
+    });
+
+  const body = walk(children);
+  // Two headings are a heading pair, not a document that needs an index; the marker then renders nothing.
+  return <>{entries.length >= 3 ? body : children}</>;
 }

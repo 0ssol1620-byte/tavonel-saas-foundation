@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { Route } from "next";
-import PolicyJumpIndex from "@/components/policy-jump-index";
+import PolicyJumpIndex, { IndexedPolicyBody } from "@/components/policy-jump-index";
 import { PublicSitePage } from "@/components/public-site-chrome";
 import { TrustDisclosures } from "@/components/trust-disclosures";
 
@@ -184,7 +184,7 @@ export default function TrustCenterPage() {
     <PublicSitePage>
       <section className="scene doc">
         <div className="shell">
-          <div className="body policy-copy">
+          <div className="body policy-copy"><IndexedPolicyBody>
             <div className="stack">
               {/*
                 BA-150. The eyebrow named this page's two sections. It now names the page's
@@ -354,7 +354,7 @@ export default function TrustCenterPage() {
                 <Link className="btn ghost" href={"/contact" as Route}>Ask a security review question</Link>
               </div>
             </div>
-          </div>
+          </IndexedPolicyBody></div>
         </div>
       </section>
     </PublicSitePage>

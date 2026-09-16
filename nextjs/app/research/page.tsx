@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { Route } from "next";
-import PolicyJumpIndex from "@/components/policy-jump-index";
+import PolicyJumpIndex, { IndexedPolicyBody } from "@/components/policy-jump-index";
 import { PublicSitePage } from "@/components/public-site-chrome";
 import { TrustNext } from "@/components/trust-next";
 
@@ -89,7 +89,7 @@ export default function ResearchPage() {
     <PublicSitePage>
       <section className="scene doc">
         <div className="shell">
-          <div className="body policy-copy">
+          <div className="body policy-copy"><IndexedPolicyBody>
             <div className="stack">
               <p className="slate"><b>RESEARCH</b><span />KNOWLEDGE COMPILATION</p>
               <h1 className="document-title">The hard parts of turning<br />documents into knowledge.</h1>
@@ -169,7 +169,7 @@ export default function ResearchPage() {
               </p>
             </div>
             <TrustNext from="/research" />
-          </div>
+          </IndexedPolicyBody></div>
         </div>
       </section>
     </PublicSitePage>

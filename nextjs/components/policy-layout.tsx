@@ -1,7 +1,7 @@
 import Link from "next/link";
 import LegalOperatorDisclosure from "@/components/legal-operator-disclosure";
 import Logomark from "@/components/logomark";
-import PolicyJumpIndex from "@/components/policy-jump-index";
+import PolicyJumpIndex, { IndexedPolicyBody } from "@/components/policy-jump-index";
 import { PublicSiteHeader } from "@/components/public-site-chrome";
 import { primaryCallToAction } from "@/lib/commercial-state";
 
@@ -49,7 +49,7 @@ export default function PolicyLayout({
       <PublicSiteHeader cta={primaryCallToAction()} />
       <main id="main" tabIndex={-1}>
         <section className="scene doc policy-page">
-          <div className="shell"><div className="body">
+          <div className="shell"><div className="body"><IndexedPolicyBody>
             <div className="stack">
               <p className="slate"><b>{group}</b><span />{label}</p>
               <h1 className="document-title">{title}</h1>
@@ -78,7 +78,7 @@ export default function PolicyLayout({
                 {closing}
               </div>
             </div>
-          </div></div>
+          </IndexedPolicyBody></div></div>
         </section>
       </main>
       <footer className="site"><div className="shell"><span className="wordmark"><Logomark /><b>TAVONEL</b></span><nav className="site-links" aria-label="Legal"><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link><Link href="/refunds">Refunds</Link><Link href="/subprocessors">Subprocessors</Link><Link href="/security">Security</Link><Link href="/status">Service status</Link><Link href="/contact">Contact</Link></nav><LegalOperatorDisclosure compact /><p className="fine">Questions about this policy: <a href="mailto:privacy@tavonel.com">privacy@tavonel.com</a></p></div></footer>

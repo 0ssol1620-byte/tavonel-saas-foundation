@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { DocsCopyButton } from "@/components/docs-copy-button";
 
 /**
@@ -36,6 +36,8 @@ export function DocsSnippet({ snippets }: { snippets: Array<{ language: string; 
     client's first pass disagree.
   */
   const [active, setActive] = useState(0);
+  // A page carries several snippet groups; ids must be unique per group or the tab/panel pairing is ambiguous.
+  const uid = useId();
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem(LANGUAGE_KEY);
@@ -67,7 +69,7 @@ export function DocsSnippet({ snippets }: { snippets: Array<{ language: string; 
               type="button"
               role="tab"
               aria-selected={index === active}
-              aria-controls={`snippet-${snippet.language}`}
+              aria-controls={`${uid}${snippet.language}`}
               onClick={() => choose(index)}
             >
               {snippet.label}
@@ -79,7 +81,7 @@ export function DocsSnippet({ snippets }: { snippets: Array<{ language: string; 
       {snippets.map((snippet, index) => (
         <pre
           key={snippet.language}
-          id={`snippet-${snippet.language}`}
+          id={`${uid}${snippet.language}`}
           role="tabpanel"
           aria-label={snippet.label}
           hidden={index !== active}
