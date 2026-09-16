@@ -140,7 +140,8 @@ test.describe("workspace first use — desktop", () => {
     // at five. The count is incidental to what these three tests hold -- that the guide's open
     // state follows inventory truth, never a "seen it" flag -- but it has to name the real list.
     await expect(page.getByRole("button", { name: /Getting started 1 of 6 complete/ })).toHaveAttribute("aria-expanded", "false");
-    await expect(page.getByRole("heading", { name: "What changed" })).toBeVisible();
+    // §13.2 "what did I get": one counted line under the state sentence; activation history lives on Changes.
+    await expect(page.getByText(/\d+ ready · \d+ being read · \d+ need review/)).toBeVisible();
 
     const intakeBox = await intake.boundingBox();
     expect(intakeBox).not.toBeNull();
@@ -252,7 +253,8 @@ test.describe("workspace first use — mobile", () => {
     await expect(page.getByRole("button", { name: "Review & activate" })).toBeVisible();
     await expect(page.locator(".workspace-attention")).toBeVisible();
     await expect(page.getByRole("button", { name: "Choose files" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "What changed" })).toBeVisible();
+    // §13.2 "what did I get": one counted line under the state sentence; activation history lives on Changes.
+    await expect(page.getByText(/\d+ ready · \d+ being read · \d+ need review/)).toBeVisible();
 
     // One-Path rail: Home, Knowledge, Use with AI and More stay one tap away.
     for (const label of ["Home", "Knowledge", "Use with AI"]) {

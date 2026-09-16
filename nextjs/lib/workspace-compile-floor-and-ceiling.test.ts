@@ -48,22 +48,23 @@ describe("workspace compile floor and ceiling", () => {
 
   it("moves an authorised staged compile into the real live Sources view before upload begins", () => {
     expect(workspace).toContain('navigateSurface("sources")');
-    expect(workspace).toContain('sources: "workspace-sources"');
-    expect(workspace).toContain('scrollIntoView({ block: "start", behavior: "smooth" })');
+    // Every surface starts at the top now; the anchor map that scrolled past shared blocks is gone.
+    expect(workspace).toContain("window.scrollTo({ top: 0 });");
     expect(workspace.indexOf('navigateSurface("sources")')).toBeLessThan(workspace.indexOf("await uploadDocuments(files)"));
   });
 
-  it("keeps live compilation on Sources and gives phones one readable stage at a time", () => {
+  it("keeps live compilation on Knowledge (and on Home while a run is in flight) and gives phones one readable stage at a time", () => {
     const sourcesGate = workspace.indexOf('{surface === "sources" ? <>');
-    const stage = workspace.indexOf("<CompileStage");
+    const stageOnSources = workspace.indexOf("{compileBlock}", sourcesGate);
     expect(sourcesGate).toBeGreaterThan(-1);
-    expect(sourcesGate).toBeLessThan(stage);
+    expect(stageOnSources).toBeGreaterThan(sourcesGate);
+    expect(workspace).toContain("<CompileStage rows={pipelineRows}");
 
-    expect(compileStage).toContain("if (width < 640)");
+    expect(compileStage).toContain("if (width < 760)");
     expect(compileStage).toContain('const labels = ["SOURCES", "READ", "STRUCTURE", "WORLD"]');
     expect(compileStage).toContain("const current = panes[stageIndex]");
     expect(compileStage).toContain('if (current === "sources") drawSources');
-    expect(compileStage.indexOf("if (width < 640)")).toBeLessThan(compileStage.indexOf("const gap = 10; const colH"));
+    expect(compileStage.indexOf("if (width < 760)")).toBeLessThan(compileStage.indexOf("const gap = 10; const colH"));
   });
 
   it("agrees with the shared judgement at both ends", () => {

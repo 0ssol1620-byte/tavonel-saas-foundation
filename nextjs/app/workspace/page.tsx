@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Logomark from "@/components/logomark";
 import WorldExplorer from "@/components/world-explorer";
-import { Download, FileText, LockKeyhole, ShieldCheck, UploadCloud } from "lucide-react";
+import { FileText, LockKeyhole, ShieldCheck, UploadCloud } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { activationPolicy, type ActivationCapability } from "@/lib/activation-policy";
 import type { DocumentListItem } from "@/lib/immutable-keys";
@@ -245,6 +245,8 @@ export default function WorkspacePage() {
   /** Distinguishes two uploads of the same file in one session. */
   const uploadSeq = useRef(0);
   const [notice, setNotice] = useState<string | null>(null);
+  /** Reported by the shell from /api/access/bootstrap; gates the Connections and Developer bodies, not only their nav entries. */
+  const [accessSource, setAccessSource] = useState<"owner" | "paid" | "trial" | null>(null);
   const { start: buy } = useCheckout(setNotice);
   // Read from the URL on mount so a linked or reloaded workspace opens on the same view.
   const [tab, setTab] = useState<WorkspaceTab>("overview");
@@ -1560,17 +1562,13 @@ export default function WorkspacePage() {
     url.pathname = next === "home" ? "/workspace" : `/workspace/${next}`;
     url.searchParams.delete("tab");
     window.history.pushState(null, "", url.toString());
-    const anchor = ({
-      sources: "workspace-sources",
-      runs: "workspace-runs",
-      review: "workspace-review",
-      changes: "workspace-changes",
-      world: "workspace-world",
-      ask: "workspace-ask",
-      activity: "workspace-runs",
-    } as Partial<Record<WorkspaceSurface, string>>)[next];
-    if (anchor) window.requestAnimationFrame(() => document.getElementById(anchor)?.scrollIntoView({ block: "start", behavior: "smooth" }));
-    else window.scrollTo({ top: 0 });
+    /*
+      Every surface now starts with its own content under the state hero, so a change of
+      surface is a change of page and starts at the top. The old anchor map scrolled past the
+      blocks Home and Knowledge used to share; two of its targets pointed at ids that did not
+      exist, so Changes and Activity silently did nothing.
+    */
+    window.scrollTo({ top: 0 });
   }, []);
 
   const stagedVerdict = judgeCorpusSet(stagedSelection?.files.length ?? 0);
@@ -1931,7 +1929,14 @@ export default function WorkspacePage() {
     is genuinely running arrives as `compileJob`.
   */
   const activePipelineCount = pipelineRows.filter((row) => row.stages.slice(0, 3).some((stage) => stage.state === "active")).length;
-  const activityCount = activePipelineCount || (busy ? 1 : 0);
+  /*
+    A compile that is running on the server is activity too. After a reload the pipeline rows
+    are at rest (their OCR finished long ago) while the job itself is still `reading` or
+    `structuring`; without this the hero said "2 sources are ready to compile" above a panel
+    that said the compile was running.
+  */
+  const compileRunning = Boolean(compileJob && !["ready", "failed", "cancelled", "review_required"].includes(compileJob.state));
+  const activityCount = activePipelineCount || (compileRunning ? Math.max(1, compileJob?.documentsTotal ?? 1) : 0) || (busy ? 1 : 0);
   const reviewCount = collectionResult?.reviewReasons?.length ?? 0;
   const candidateReady = Boolean(collectionResult?.coreExecution);
   const candidateNeedsDecision = Boolean(
@@ -2010,11 +2015,73 @@ export default function WorkspacePage() {
       ? () => runIntent(workspaceState.nextAction.intent)
       : undefined,
   };
-  /* Recent World activations carry a real timestamp; the source inventory carries none, so it
-     is summarised by state rather than dressed up as a change feed with invented times. */
-  const recentActivations = [...worldVersions]
-    .sort((a, b) => Date.parse(b.last_activated_at) - Date.parse(a.last_activated_at))
-    .slice(0, 3);
+  /*
+    One line of facts under the state sentence, for a workspace that has some. The source
+    inventory carries no timestamps, so it is summarised by state; activation history with its
+    real receipts lives on Changes (World history), not in a second card here.
+  */
+  const readingCount = Math.max(0, documentCount - readyDocumentCount - operatorReviewCount);
+  const workspaceFacts = workspaceState.mode === "returning"
+    ? [
+      `${readyDocumentCount} ready`,
+      `${readingCount} being read`,
+      `${operatorReviewCount} need review`,
+      activeWorld ? `World v${activeWorld.revision} active` : "No active World",
+    ].join(" · ")
+    : undefined;
+  /*
+    The compile, drawn and counted, in one block.
+
+    The canvas is the thing to watch -- the same four columns the public film uses, fed only by
+    this visitor's own uploads, pipeline rows and streamed OCR progress. The panel under it is
+    the thing to act on: where the run is, what is stuck, and what can be done about it. They
+    travel together so Home never shows a progress row without its picture or a picture without
+    its counts.
+  */
+  const compileBlock = compileJob || pipelineRows.length > 0 ? (
+    <div className="workspace-compile-block">
+      {compileJob || pipelineRows.length > 0 ? (
+        <CompileStage rows={pipelineRows} reading={reading} names={names} world={worldReadModel} state={compileJob?.state ?? null} />
+      ) : null}
+      {compileJob ? (
+        <CompileJobPanel
+          job={compileJob}
+          corpus={corpus}
+          names={names}
+          busy={busy}
+          onResolve={(resolution) => void resolveCompileBlockers(resolution)}
+          onCancel={() => void cancelCompileJob()}
+          onOpenPart={(jobId) => {
+            const part = corpus?.parts.find((entry) => entry.jobId === jobId);
+            setCompileJob((previous) => (previous && previous.jobId === jobId ? previous : {
+              jobId,
+              state: part?.state ?? "preflight",
+              documentsTotal: 0,
+              documentsReady: 0,
+              blocked: [],
+              blockedResolution: null,
+              errorCode: null,
+              collectionId: null,
+              batchIndex: part?.batchIndex ?? null,
+            }));
+            void followCompileJob(jobId);
+          }}
+        />
+      ) : null}
+    </div>
+  ) : null;
+  const gettingStarted = workspaceStartupReady ? (
+    <WorkspaceGettingStarted
+      autoOpenEligible={false}
+      steps={onboardingSteps}
+      hasActiveWorld={Boolean(activeWorld)}
+      next={{
+        label: nextAction.label,
+        run: () => { if (nextAction.surface) navigateSurface(nextAction.surface); else nextAction.run?.(); },
+      }}
+      onOpenWorld={() => navigateSurface("world")}
+    />
+  ) : null;
 
   return (
     <WorkspaceUltimateShell
@@ -2023,9 +2090,10 @@ export default function WorkspacePage() {
       candidateReady={candidateNeedsDecision}
       reviewCount={candidateReady ? reviewCount : null}
       activityCount={activityCount}
-      truthGates={[]}
       stateTitle={stateTitle}
       stateDescription={stateDescription}
+      stateFacts={workspaceFacts}
+      onAccess={setAccessSource}
       nextAction={nextAction}
       onNavigate={navigateSurface}
       onUpload={() => activationPolicy.customerIntake.enabled ? fileRef.current?.click() : setNotice("Upload remains locked by the current intake policy.")}
@@ -2063,19 +2131,6 @@ export default function WorkspacePage() {
                 <> <button type="button" onClick={() => void startDurableCompile(resumeCorpus)}>Resume the missing parts</button></>
               ) : null}
             </p>
-          ) : null}
-
-          {tab === "overview" && surface === "home" && workspaceStartupReady ? (
-            <WorkspaceGettingStarted
-              autoOpenEligible={false}
-              steps={onboardingSteps}
-              hasActiveWorld={Boolean(activeWorld)}
-              next={{
-                label: nextAction.label,
-                run: () => { if (nextAction.surface) navigateSurface(nextAction.surface); else nextAction.run?.(); },
-              }}
-              onOpenWorld={() => navigateSurface("world")}
-            />
           ) : null}
 
           {/*
@@ -2119,38 +2174,12 @@ export default function WorkspacePage() {
           ) : null}
 
           {/*
-            §13.2, "what did I get" and "what changed", for a workspace that already has one.
-            Activation timestamps are real receipts. The source inventory carries no timestamp,
-            so it is summarised by state instead of being presented as a dated change feed.
+            Home, in flight: the compile is the top block. The result block and the intake bar
+            follow; nothing else competes with the picture of what is happening right now.
           */}
-          {tab === "overview" && surface === "home" && workspaceState.mode === "returning" ? (
-            <section className="workspace-recent" aria-labelledby="workspace-recent-title">
-              <p className="eyebrow">RECENT CHANGES</p>
-              <h2 id="workspace-recent-title">What changed</h2>
-              {recentActivations.length > 0 ? (
-                <ul className="workspace-recent-list">
-                  {recentActivations.map((version) => (
-                    <li key={version.manifest_digest}>
-                      <strong>World {version.lifecycle_status === "active" ? "activated" : "superseded"}</strong>
-                      <small>{formatTimestamp(version.last_activated_at)} · activated {formatCount(version.activation_count)} time{version.activation_count === 1 ? "" : "s"}</small>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="fine">No World has been activated yet, so there is no activation history to show.</p>
-              )}
-              <p className="fine">
-                Sources: {readyDocumentCount} ready to compile · {documentCount - readyDocumentCount - operatorReviewCount} still being read · {operatorReviewCount} needing review.
-              </p>
-              <div className="workspace-recent-actions">
-                <button type="button" onClick={() => navigateSurface("changes")}>Open changes</button>
-                <button type="button" onClick={() => navigateSurface("sources")}>Open sources</button>
-                {activeWorld ? <button type="button" onClick={() => navigateSurface("ask")}>Ask this World</button> : null}
-              </div>
-            </section>
-          ) : null}
+          {tab === "overview" && surface === "home" && (compileJob || activePipelineCount > 0) ? compileBlock : null}
 
-          {tab === "overview" && collectionResult ? (
+          {tab === "overview" && surface === "home" && collectionResult ? (
             /*
               A candidate is not a world yet, and the completion panel now says which one you have.
 
@@ -2403,68 +2432,19 @@ export default function WorkspacePage() {
               ) : null}
             </section>
           {/*
-            The compile itself, as a durable thing rather than a sentence.
-
-            Rendered above the film because it is the panel someone comes back to the tab for:
-            where the run is, what is stuck, and what they can do about it. The film and the
-            board below are still the detail.
+            The guide sits under the work, not above it. It is reopenable from here at any time,
+            and every step's state comes from workspace facts (lib/workspace-onboarding.ts).
           */}
-          {compileJob ? (
-            <CompileJobPanel
-              job={compileJob}
-              corpus={corpus}
-              names={names}
-              busy={busy}
-              onResolve={(resolution) => void resolveCompileBlockers(resolution)}
-              onCancel={() => void cancelCompileJob()}
-              onOpenPart={(jobId) => {
-                const part = corpus?.parts.find((entry) => entry.jobId === jobId);
-                setCompileJob((previous) => (previous && previous.jobId === jobId ? previous : {
-                  jobId,
-                  state: part?.state ?? "preflight",
-                  documentsTotal: 0,
-                  documentsReady: 0,
-                  blocked: [],
-                  blockedResolution: null,
-                  errorCode: null,
-                  collectionId: null,
-                  batchIndex: part?.batchIndex ?? null,
-                }));
-                void followCompileJob(jobId);
-              }}
-            />
-          ) : null}
-          {/*
-            Which documents, by name, with the denominator (audit U05).
-
-            The panel above reports counts -- "9 of 12 read", "3 could not be read" -- which is
-            the right summary and the wrong thing to act on: "partial" is not a defect a reader
-            can do anything with until they know *which* source is missing and why. The same
-            list, from the same derivation, is what the review tab orders by risk and what the
-            candidate API returns, so the three surfaces cannot drift.
-          */}
-          {compileJob || collectionResult ? (
-            <section className="card" aria-labelledby="workspace-corpus-breakdown-title">
-              <p className="eyebrow">WHAT IS IN THIS COMPILE</p>
-              <h2 id="workspace-corpus-breakdown-title">Every source this compile was asked to read.</h2>
-              <ReviewQueue input={reviewQueueInput} compact />
-            </section>
-          ) : null}
+          {surface === "home" ? gettingStarted : null}
           {surface === "sources" ? <>
           {/*
-            The compile, drawn.
-
-            The board below reports state per document and is the thing to read when something
-            stops. This canvas is the thing to *watch*: the same four columns the public cuts
-            use — sources, the page under the reader, the lines coming out of it, and the world
-            their own documents are building. It is fed entirely from this visitor's own uploads,
-            pipeline rows and streamed OCR progress. No fixture ever reaches it.
+            Knowledge: the compile as it runs, then the per-source board, then the choice of
+            what goes into the next candidate. The per-document breakdown ordered by risk lives
+            on Review, from the same derivation, so the two cannot drift.
           */}
-          {compileJob || pipelineRows.length > 0 ? (
-            <CompileStage rows={pipelineRows} reading={reading} names={names} world={worldReadModel} state={compileJob?.state ?? null} />
-          ) : null}
+          {compileBlock}
 
-          <div id="workspace-runs">
+          <div id="workspace-board">
             <PipelineBoard
               rows={pipelineRows}
               reading={reading}
@@ -2472,14 +2452,13 @@ export default function WorkspacePage() {
               onDismiss={uploads.length > 0 ? () => { setUploads([]); setReading({}); } : undefined}
             />
           </div>
-          <p className="eyebrow">SOURCE PIPELINE</p>
-          <p className="lead">Build a traceable body of knowledge from your sources. Each file is prepared, read and compiled through a recorded chain you can inspect.</p>
           <div className="workspace-grid">
             <section id="workspace-sources" className="card document-card">
-              <p className="eyebrow">SOURCES</p>
+              <p className="eyebrow">NEXT CANDIDATE</p>
               <h2>{documents && documents.length > 0 ? "Sources ready for your next World" : "Bring your first source"}</h2>
               {documents && documents.length > 0 ? (
                 <>
+                <p>Compile one or more ready sources into the next candidate. Nothing becomes active until you review it.</p>
                 <ul className="document-meta">
                   {documents.map((doc) => (
                     <li key={`${doc.documentId}-${doc.versionKey}`}>
@@ -2527,38 +2506,20 @@ export default function WorkspacePage() {
                 </div>
               )}
             </section>
-            <section className="card canvas">
-              <p className="eyebrow">COMPILED WORLD</p>
-              <h2>{collectionResult ? "Ready for review" : "Waiting for sources"}</h2>
-              {collectionResult ? (
-                <div className="collection-result">
-                  <strong>Your compiled result</strong>
-                  <p>{collectionResult.validation.counts.documents} documents · {collectionResult.validation.counts.topics} topics · {collectionResult.validation.counts.entities} entities · {collectionResult.validation.counts.claims} claims · {collectionResult.validation.counts.relations} relations</p>
-                  <small>{collectionResult.directoryPlan.length} directory entries · {collectionResult.validation.counts.packageFiles} package files</small>
-                  {collectionResult.coreExecution ? (
-                    <>
-                      <small>{collectionResult.coreExecution.status === "completed" ? "Compilation complete" : "Review required"}</small>
-                      {collectionResult.reviewReasons?.length ? (
-                        <small>{collectionResult.reviewReasons.length} review item{collectionResult.reviewReasons.length === 1 ? "" : "s"} need{collectionResult.reviewReasons.length === 1 ? "s" : ""} a decision.</small>
-                      ) : null}
-                      <Link className="download-package workspace-use-ai-link" href="/docs/use-with-ai">Use this result with AI</Link>
-                      <button className="download-package secondary" disabled={downloading} onClick={() => void downloadCollection()}>
-                        <Download size={15} aria-hidden="true" />
-                        {downloading ? "Signing verified ZIP..." : "Download signed knowledge package"}
-                      </button>
-                    </>
-                  ) : (
-                    <button disabled={busy} onClick={() => void recompileWithCore()}>{busy ? "Running Core..." : "Recompile with separate Core"}</button>
-                  )}
+            {/*
+              A candidate that exists but was never run through Core is the one case Home cannot
+              act on, so the control stays here beside the sources it would read.
+            */}
+            {collectionResult && !collectionResult.coreExecution ? (
+              <section className="card">
+                <p className="eyebrow">COMPILED CANDIDATE</p>
+                <h2>This candidate has not been run through Core.</h2>
+                <p>{collectionResult.validation.counts.documents} documents · {collectionResult.validation.counts.entities} entities · {collectionResult.validation.counts.claims} claims · {collectionResult.validation.counts.relations} relations</p>
+                <div className="billing-actions">
+                  <button disabled={busy} onClick={() => void recompileWithCore()}>{busy ? "Running Core..." : "Recompile with separate Core"}</button>
                 </div>
-              ) : (
-                <div className="collection-result" role="status">
-                  <strong>No Compiled World yet</strong>
-                  <small>Compile one or more ready sources. The graph appears only after real objects and relations exist.</small>
-                </div>
-              )}
-              <p>Prepared sources produce a reviewable directory, ontology, graph, retrieval index and provenance package. A human review keeps activation explicit.</p>
-            </section>
+              </section>
+            ) : null}
           </div>
           </> : null}
           </>
@@ -2606,10 +2567,13 @@ export default function WorkspacePage() {
                   onRollback={rollbackReason.trim().length >= 8 ? (digest) => void rollbackWorld(digest) : undefined}
                   rollbackBusy={worldBusy}
                 />
-                <WorldExplorer
-                  collection={collectionResult}
-                  onUpload={activationPolicy.customerIntake.enabled ? () => fileRef.current?.click() : undefined}
-                />
+                {/* One empty state per surface: World Studio already says there is no World yet. */}
+                {collectionResult ? (
+                  <WorldExplorer
+                    collection={collectionResult}
+                    onUpload={activationPolicy.customerIntake.enabled ? () => fileRef.current?.click() : undefined}
+                  />
+                ) : null}
               </div>
               ) : null}
 
@@ -2769,20 +2733,6 @@ export default function WorkspacePage() {
                   </>
                 ) : <p className="world-empty">Compile a collection to review its page-and-bbox-bound evidence.</p>}
               </section>
-              <section className="card">
-                <p className="eyebrow">OCR CANDIDATES</p>
-                <h2>Verify the extracted JSON</h2>
-                <p>
-                  Reloads the immutable OCR result for the most recently processed document and
-                  checks its digest and object key against the receipt. It reads; it promotes
-                  nothing.
-                </p>
-                <div className="billing-actions">
-                  <button type="button" disabled={busy} onClick={() => void verifyLatestCandidates()}>
-                    {busy ? "Working..." : "Verify latest candidates"}
-                  </button>
-                </div>
-              </section>
               <section id="workspace-review" className="card world-studio" aria-labelledby="world-studio-title">
                 <div className="world-heading">
                   <div>
@@ -2862,6 +2812,24 @@ export default function WorkspacePage() {
                   </div>
                 )}
               </section>
+              {/*
+                The raw material check, behind a disclosure. It verifies the immutable OCR result
+                against its receipt and promotes nothing; a reviewer reaches for it when a
+                comparison looks wrong, not on every visit.
+              */}
+              <details className="card workspace-advanced">
+                <summary>Advanced · verify the extracted OCR result against its receipt</summary>
+                <p>
+                  Reloads the immutable OCR result for the most recently processed document and
+                  checks its digest and object key against the receipt. It reads; it promotes
+                  nothing.
+                </p>
+                <div className="billing-actions">
+                  <button type="button" disabled={busy} onClick={() => void verifyLatestCandidates()}>
+                    {busy ? "Working..." : "Verify latest candidates"}
+                  </button>
+                </div>
+              </details>
               </> : null}
               {surface === "ask" ? (
               <section id="workspace-ask" className="card ask-studio" aria-labelledby="ask-title">
@@ -2988,9 +2956,28 @@ export default function WorkspacePage() {
           </section>
           ) : null}
 
-          {tab === "connections" ? <ConnectionsPanel /> : null}
+          {/*
+            Free evaluation hides Connections and Developer tools from the rail, the More panel
+            and the palette; the URL has to agree with the rail, so the body says why instead of
+            rendering the panel to anyone who types the path.
+          */}
+          {tab === "connections" ? (accessSource === "trial" ? (
+            <section className="card workspace-access-gate" role="status">
+              <p className="eyebrow">CONNECTIONS</p>
+              <h2>Source connections are part of Developer access.</h2>
+              <p>Free evaluation works with files you upload directly. Connect Google Drive, Dropbox, OneDrive or your own storage once the workspace is on Developer access.</p>
+              <div className="billing-actions"><Link className="btn" href="/pricing">See Developer access</Link></div>
+            </section>
+          ) : <ConnectionsPanel />) : null}
 
-          {tab === "developers" ? <DeveloperPanel /> : null}
+          {tab === "developers" ? (accessSource === "trial" ? (
+            <section className="card workspace-access-gate" role="status">
+              <p className="eyebrow">DEVELOPER TOOLS</p>
+              <h2>API keys are part of Developer access.</h2>
+              <p>Free evaluation reads the World inside this workspace. Keys, the OpenAPI document and MCP setup open with Developer access.</p>
+              <div className="billing-actions"><Link className="btn" href="/pricing">See Developer access</Link></div>
+            </section>
+          ) : <DeveloperPanel />) : null}
 
           {tab === "integrity" ? (
           <section className="card gates">

@@ -2144,7 +2144,7 @@ footer.site .shell { display: flex; flex-direction: column; gap: 14px; }
 .workspace-body > header small, .workspace-body > header span { font-family: var(--f-mono); font-size: 10.5px; color: var(--text-xlo); letter-spacing: 0.06em; }
 
 /* Every control in the workspace is an instrument button; there is no second button style. */
-.workspace-body button:not(.side nav button):not(.notice button),
+.workspace-body button:where(:not(.notice button)),
 .proof-actions button,
 .billing-actions button,
 .download-package {
@@ -2153,16 +2153,16 @@ footer.site .shell { display: flex; flex-direction: column; gap: 14px; }
   gap: 8px;
   padding: 9px 14px;
   border: 1px solid var(--hairline-hi);
-  border-radius: 3px;
+  border-radius: 6px;
   background: transparent;
   color: var(--text-mid);
-  font-family: var(--f-mono);
-  font-size: 11px;
-  letter-spacing: 0.07em;
+  font-family: var(--f-sans);
+  font-size: 14px;
+  font-weight: 500;
   white-space: nowrap;
   transition: color 200ms ease, border-color 200ms ease, background 200ms ease;
 }
-.workspace-body button:not(.side nav button):not(.notice button):hover:not(:disabled),
+.workspace-body button:where(:not(.notice button)):hover:not(:disabled),
 .download-package:hover:not(:disabled) { color: var(--text-hi); border-color: var(--text-lo); background: var(--g2); }
 .workspace-body button:disabled, .download-package:disabled { opacity: 0.45; cursor: not-allowed; }
 

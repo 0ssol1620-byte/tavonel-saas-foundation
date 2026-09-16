@@ -34,7 +34,6 @@ const MORE_ITEMS: NavItem[] = [
   { surface: "settings", label: "Settings", icon: Settings, secondary: true },
 ];
 
-type TruthGate = { label: string; qualified: boolean; detail: string };
 type AccessSummary = {
   source: "owner" | "paid" | "trial";
   accessPlan: "observer_access" | "studio_access";
@@ -51,10 +50,13 @@ type Props = {
   candidateReady: boolean;
   reviewCount: number | null;
   activityCount: number;
-  truthGates: TruthGate[];
   stateTitle: string;
   stateDescription: string;
+  /** One line of counted facts under the state sentence; omitted on a first run. */
+  stateFacts?: string;
   nextAction: { label: string; surface?: WorkspaceSurface; run?: () => void };
+  /** The access source from /api/access/bootstrap, so the page can gate surface bodies the same way the rail is gated. */
+  onAccess?: (source: AccessSummary["source"]) => void;
   onNavigate: (surface: WorkspaceSurface) => void;
   onUpload: () => void;
   onRefresh: () => void;
@@ -78,11 +80,12 @@ function PaletteFocus({ panel }: { panel: RefObject<HTMLElement | null> }) {
 }
 
 export default function WorkspaceUltimateShell({
-  surface, children, headerAction, activeRevision, candidateReady, reviewCount, activityCount, truthGates,
-  stateTitle, stateDescription, nextAction, onNavigate, onUpload, onRefresh, onSignOut,
+  surface, children, headerAction, activeRevision, candidateReady, reviewCount, activityCount,
+  stateTitle, stateDescription, stateFacts, nextAction, onAccess, onNavigate, onUpload, onRefresh, onSignOut,
 }: Props) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [query, setQuery] = useState("");
+  /* FINAL_WEB §41: hide filenames, page text, labels and answers while status stays visible. */
   const [privacyMode, setPrivacyMode] = useState(false);
   const [access, setAccess] = useState<AccessSummary | null>(null);
   const pendingGo = useRef(false);
@@ -112,9 +115,11 @@ export default function WorkspaceUltimateShell({
         headers: { authorization: `Bearer ${token}` },
       });
       const body = await response.json().catch(() => null) as { access?: AccessSummary } | null;
-      if (current && response.ok && body?.access) setAccess(body.access);
+      if (current && response.ok && body?.access) { setAccess(body.access); onAccess?.(body.access.source); }
     })().catch(() => undefined);
     return () => { current = false; };
+    // onAccess is a state setter from the page; bootstrap runs once per mount on purpose.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const navItems = useMemo(
@@ -159,14 +164,21 @@ export default function WorkspaceUltimateShell({
     if (action.surface) onNavigate(action.surface); else action.run?.();
   };
 
+  /*
+    The palette speaks the rail's language. It used to say Sources / Review queue / Active
+    World / Ask with citations / Compile activity while the rail said Knowledge / Review /
+    Knowledge graph / Use with AI / Activity -- the same five places under two names.
+  */
   const paletteActions = [
     { group: "CREATE", label: "Upload sources", hint: "U", run: onUpload },
-    { group: "NAVIGATE", label: "Home", hint: "G H", surface: "home" as const },
-    { group: "NAVIGATE", label: "Sources", hint: "G S", surface: "sources" as const },
-    { group: "NAVIGATE", label: "Review queue", hint: "G R", surface: "review" as const },
-    { group: "NAVIGATE", label: "Active World", hint: "G W", surface: "world" as const },
-    { group: "NAVIGATE", label: "Ask with citations", hint: "G A", surface: "ask" as const },
-    { group: "OPERATE", label: "Compile activity", hint: "C", surface: "activity" as const },
+    { group: "GO TO", label: "Home", hint: "G H", surface: "home" as const },
+    { group: "GO TO", label: "Knowledge", hint: "G S", surface: "sources" as const },
+    { group: "GO TO", label: "Review", hint: "G R", surface: "review" as const },
+    { group: "GO TO", label: "Changes", hint: "", surface: "changes" as const },
+    { group: "GO TO", label: "Knowledge graph", hint: "G W", surface: "world" as const },
+    { group: "GO TO", label: "Use with AI", hint: "G A", surface: "ask" as const },
+    { group: "GO TO", label: "Activity", hint: "C", surface: "activity" as const },
+    { group: "GO TO", label: "Settings", hint: "", surface: "settings" as const },
     ...(access?.source === "trial" ? [] : [
       { group: "BUILD", label: "Connections", hint: "", surface: "connections" as const },
       { group: "BUILD", label: "Developer tools", hint: "", surface: "developer" as const },
@@ -227,6 +239,7 @@ export default function WorkspaceUltimateShell({
           </div>
         </nav>
         <div className={styles.railFooter}>
+          <button type="button" aria-pressed={privacyMode} onClick={() => setPrivacyMode((value) => !value)}>{privacyMode ? "Show content" : "Hide content"}</button>
           <button type="button" onClick={onRefresh}>Refresh</button>
           <button type="button" onClick={onSignOut}>Sign out</button>
         </div>
@@ -254,14 +267,14 @@ export default function WorkspaceUltimateShell({
           <div className={styles.ownerStrip}><span>OWNER ACCESS</span><p>Full workspace access · billing exempt</p></div>
         ) : null}
 
-        {truthGates.length > 0 ? <details className={styles.truthStrip}>
-          <summary><span>ADVANCED / SYSTEM DETAILS</span><span data-qualified={truthGates.every((gate) => gate.qualified)}><i aria-hidden="true" />{truthGates.every((gate) => gate.qualified) ? "ALL GATES QUALIFIED" : "SOME GATES HELD"}</span><span>ACTIVITY {activityCount > 0 ? `${activityCount} RUNNING` : "QUIET"}</span><button type="button" aria-pressed={privacyMode} onClick={(event) => { event.preventDefault(); setPrivacyMode((value) => !value); }}>{privacyMode ? "Show content" : "Hide content"}</button></summary>
-          <div>{truthGates.map((gate) => <p key={gate.label}><strong>{gate.label}</strong>{gate.detail}</p>)}</div>
-        </details> : null}
-
         <div className={`workspace-content ${styles.content}`}>
-          <section className={styles.stateHero} aria-labelledby="workspace-state-title">
-            <div><p>YOUR KNOWLEDGE</p><h1 id="workspace-state-title">{stateTitle}</h1><span>{stateDescription}</span></div>
+          <section className={styles.stateHero} aria-labelledby="workspace-state-title" data-activity={activityCount > 0 ? "running" : "quiet"}>
+            <div>
+              <p>YOUR KNOWLEDGE</p>
+              <h1 id="workspace-state-title">{stateTitle}</h1>
+              <span>{stateDescription}</span>
+              {stateFacts ? <small className={styles.stateFacts}>{stateFacts}</small> : null}
+            </div>
             {/* While the workspace state is still resolving there is no honest next action, so
                 the control says so and stays inert rather than offering a guess. */}
             <button type="button" disabled={!nextAction.surface && !nextAction.run} onClick={() => runAction(nextAction)}>{nextAction.label}</button>

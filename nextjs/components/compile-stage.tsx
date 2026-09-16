@@ -80,7 +80,7 @@ export default function CompileStage({ rows, reading = {}, names = {}, world = n
       context.fillStyle = "#16191c";
       context.fillRect(x, y, w, 26);
       context.fillStyle = "#edeae4";
-      context.font = "500 10px ui-monospace, Menlo, monospace";
+      context.font = "500 12px ui-monospace, Menlo, monospace";
       context.fillText(title, x + 10, y + 17);
       context.fillStyle = "rgba(123,224,190,0.9)";
       context.textAlign = "right";
@@ -109,12 +109,12 @@ export default function CompileStage({ rows, reading = {}, names = {}, world = n
         context.fillStyle = row.needsPerson ? "#e0c07a" : on ? "#7be0be" : "#78828a";
         roundRect(context, x + 11, yy - 9, 6, 8, 1.5); context.fill();
         context.fillStyle = on ? "#edeae4" : "#c8ced2";
-        context.font = `${on ? "600" : "400"} 10px ui-monospace, Menlo, monospace`;
+        context.font = `${on ? "600" : "400"} 12px ui-monospace, Menlo, monospace`;
         const label = displayName(row.id, nameMap, row.filename);
         const maxChars = Math.max(14, Math.floor(w / 10) - 9);
         context.fillText(label.length > maxChars ? `${label.slice(0, maxChars - 1)}…` : label, x + 24, yy);
         if (row.needsPerson) {
-          context.fillStyle = "#e0c07a"; context.font = "600 8px ui-monospace, Menlo, monospace"; context.textAlign = "right";
+          context.fillStyle = "#e0c07a"; context.font = "600 10px ui-monospace, Menlo, monospace"; context.textAlign = "right";
           context.fillText("REVIEW", x + w - 10, yy); context.textAlign = "left";
         }
       });
@@ -143,7 +143,7 @@ export default function CompileStage({ rows, reading = {}, names = {}, world = n
       pane(x, y, w, h, "STRUCTURE", `${found} regions`);
       const lines: { text: string; sure: boolean }[] = [];
       progress.pages.forEach((page) => page.boxes.forEach((box) => { if (box.text) lines.push({ text: box.text, sure: box.confidence >= 0.75 }); }));
-      context.font = "400 9px ui-monospace, Menlo, monospace";
+      context.font = "400 11px ui-monospace, Menlo, monospace";
       const packed: { text: string; sure: boolean }[] = [];
       lines.forEach((line) => wrap(context, line.text, w - 38).forEach((part) => packed.push({ text: part, sure: line.sure })));
       const maxRows = Math.max(6, Math.floor((h - 48) / 14));
@@ -197,7 +197,7 @@ export default function CompileStage({ rows, reading = {}, names = {}, world = n
         visible in a compact rail while the current observed stage gets the full canvas width.
         Advancement is driven only by durable job state and evidence already present in the run.
       */
-      if (width < 640) {
+      if (width < 760) {
         const stageIndex = hasWorld || ["building_world", "review_required", "ready"].includes(jobState ?? "")
           ? 3
           : hasStructure || ["structuring", "resolving"].includes(jobState ?? "")
@@ -228,7 +228,7 @@ export default function CompileStage({ rows, reading = {}, names = {}, world = n
           context.arc(cx, railY + 12, active ? 3.5 : 2.5, 0, Math.PI * 2);
           context.fill();
           context.fillStyle = active ? "#edeae4" : reached ? "#aeb6bb" : "#667078";
-          context.font = `${active ? "600" : "500"} 8px ui-monospace, Menlo, monospace`;
+          context.font = `${active ? "600" : "500"} 11px ui-monospace, Menlo, monospace`;
           context.textAlign = "center";
           context.fillText(labels[i], cx, railY + 31);
           if (active) {

@@ -1,0 +1,281 @@
+/*
+  Workspace, 2026-09-16 redesign layer. Loaded last from globals.css and scoped to
+  `.one-path-workspace`, so it wins over the five older sheets without editing them.
+
+  Plan: D:\TAVONEL_WORKSPACE_NO1_DESIGN_PLAN_2026-09-16_KO.md
+  Rules it enforces: mono is for counts, ids, keys and state labels; buttons and prose are
+  Wanted Sans; nothing under 12px; colour means state; depth is luminance and hairlines;
+  cards are for instruments (drop zone, compile stage, result, board, forms), not for prose.
+*/
+.one-path-workspace {
+  --ws-radius: 6px;
+  --ws-radius-sm: 4px;
+  --ws-gap: 24px;
+  --ws-gap-sm: 12px;
+  --t-1: 90ms; --t-2: 140ms; --t-3: 200ms; --t-4: 280ms;
+  --e-out: cubic-bezier(.23, 1, .32, 1);
+}
+
+/* ---- type floor and voices ---------------------------------------------------------- */
+.one-path-workspace .workspace-content { gap: var(--ws-gap); padding: clamp(20px, 2.6vw, 36px) clamp(16px, 3vw, 40px) 72px; }
+.one-path-workspace .workspace-content h2 { margin: 0; color: var(--text-hi); font: 600 18px/1.35 var(--f-sans); letter-spacing: -.01em; }
+.one-path-workspace .eyebrow { color: var(--text-lo); font: 500 12px/1.3 var(--f-mono); letter-spacing: .08em; }
+.one-path-workspace .fine, .one-path-workspace small { font-size: 12px; line-height: 1.5; }
+.one-path-workspace .card p, .one-path-workspace .card li { font-size: 14px; line-height: 1.55; }
+.one-path-workspace .card { border-radius: var(--ws-radius); padding: 20px; gap: 12px; }
+.one-path-workspace .card .card { border-radius: var(--ws-radius-sm); }
+
+/* Buttons: three kinds, one face. Mono stays only on kbd, ids and state chips. */
+.one-path-workspace button:not(.compile-film-motion-control),
+.one-path-workspace .btn,
+.one-path-workspace a.btn {
+  font-family: var(--f-sans);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  border-radius: var(--ws-radius);
+}
+.one-path-workspace .workspace-content button,
+.one-path-workspace .workspace-content a.btn,
+.one-path-workspace .workspace-content .btn {
+  min-height: 40px;
+  transition: background-color var(--t-2) var(--e-out), border-color var(--t-2) var(--e-out), color var(--t-2) var(--e-out), transform var(--t-2) var(--e-out);
+}
+.one-path-workspace .workspace-content button:active:not(:disabled) { transform: scale(.98); }
+.one-path-workspace .workspace-content button:disabled { cursor: not-allowed; opacity: .6; }
+.one-path-workspace kbd { font-family: var(--f-mono); }
+
+/* content-visibility on rows painted them as empty boxes in any capture and jumped on
+   scroll; the rows are bounded already (12 at a time) so nothing needs skipping. */
+.one-path-workspace .document-meta li,
+.one-path-workspace .board-list > li { content-visibility: visible; contain-intrinsic-size: auto; }
+
+/* ---- header action --------------------------------------------------------------- */
+.one-path-workspace .workspace-body > header button { display: inline-flex; align-items: center; gap: 8px; }
+.one-path-workspace .workspace-body > header > div:last-child > button,
+.one-path-workspace .workspace-body > header > div:last-child .proof-actions button {
+  min-height: 36px; padding: 0 14px; border: 1px solid var(--text-hi); border-radius: var(--ws-radius); background: var(--text-hi); color: var(--ground);
+}
+.one-path-workspace .workspace-body > header > div:last-child > button:hover { background: #fff; }
+.one-path-workspace .workspace-body > header > div:last-child > button:disabled { background: transparent; color: var(--text-lo); border-color: var(--hairline); }
+
+/* ---- notice ----------------------------------------------------------------------- */
+.one-path-workspace .notice.static { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0; padding: 12px 16px; border: 1px solid var(--hairline); border-left: 2px solid var(--changed); border-radius: var(--ws-radius); background: var(--g1); color: var(--text-mid); font-size: 14px; line-height: 1.5; }
+.one-path-workspace .notice.static strong { color: var(--text-hi); }
+.one-path-workspace .notice.static button { min-height: 32px; padding: 0 10px; border: 1px solid var(--hairline-hi); color: var(--text-hi); font-size: 13px; }
+
+/* ---- needs attention: rows with written labels, not a tinted card -------------------- */
+.one-path-workspace .workspace-attention { margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; border: 0; border-radius: 0; background: transparent; }
+.one-path-workspace .workspace-attention h2 { margin: 6px 0 0; font-size: 18px; }
+.one-path-workspace .workspace-attention-items { gap: 0; margin-top: 12px; border-top: 1px solid var(--hairline-hi); }
+.one-path-workspace .workspace-attention-items li { grid-template-columns: 160px minmax(0, 1fr) auto; align-items: center; gap: 8px 20px; padding: 14px 0; border-top: 0; border-bottom: 1px solid var(--hairline); }
+.one-path-workspace .workspace-attention-items strong { color: var(--changed); font: 500 12px var(--f-mono); letter-spacing: .06em; text-transform: uppercase; }
+.one-path-workspace .workspace-attention-items p { margin: 0; color: var(--text-mid); font-size: 14px; line-height: 1.5; }
+.one-path-workspace .workspace-attention-items button { min-height: 36px; margin: 0; padding: 0 14px; border: 1px solid var(--hairline-hi); color: var(--text-hi); font-size: 13px; }
+.one-path-workspace .workspace-attention-actions { min-width: 0; }
+.one-path-workspace .workspace-attention-actions button { min-height: 36px; padding: 0 14px; border: 1px solid var(--hairline-hi); font-size: 13px; }
+
+/* ---- compile block: the stage and its counted panel travel together -------------------- */
+.one-path-workspace .workspace-compile-block { display: grid; gap: 1px; border: 1px solid var(--hairline-hi); border-radius: var(--ws-radius); background: var(--hairline); overflow: hidden; }
+.one-path-workspace .workspace-compile-block .compile-stage { margin: 0; border: 0; border-radius: 0; aspect-ratio: 16 / 6; max-height: none; background: var(--ground); }
+.one-path-workspace .workspace-compile-block .workspace-compile-job { margin: 0; border: 0; border-radius: 0; background: var(--g1); }
+.one-path-workspace .workspace-compile-job h2 { font: 600 17px/1.35 var(--f-sans); }
+.one-path-workspace .workspace-compile-job .fine { color: var(--text-mid); font-size: 13px; }
+.one-path-workspace .workspace-compile-job-progress { height: 3px; }
+.one-path-workspace .workspace-compile-job-progress::-webkit-progress-value { transition: width var(--t-4) var(--e-out); }
+/* A settled job needs less room than a running one. */
+.one-path-workspace .workspace-compile-job[data-state="review_required"],
+.one-path-workspace .workspace-compile-job[data-state="ready"] { padding-block: 16px; }
+.one-path-workspace .workspace-compile-job[data-state="review_required"] .fine:last-of-type { display: none; }
+
+/* ---- result block ---------------------------------------------------------------- */
+.one-path-workspace .workspace-complete { margin: 0; padding: 24px; gap: 24px; align-items: start; grid-template-columns: minmax(0, 1.4fr) minmax(260px, .6fr); border: 1px solid var(--hairline-hi); border-radius: var(--ws-radius); background: var(--g1); }
+.one-path-workspace .workspace-complete h2 { max-width: 20ch; margin: 6px 0 10px; font: 600 clamp(22px, 2vw, 28px)/1.2 var(--f-sans); letter-spacing: -.02em; }
+.one-path-workspace .workspace-complete p { color: var(--text-mid); font-size: 15px; line-height: 1.55; }
+.one-path-workspace .workspace-complete p.fine { font-size: 13px; color: var(--text-lo); }
+.one-path-workspace .workspace-complete-actions { display: flex; flex-wrap: wrap; gap: 8px; align-content: start; }
+.one-path-workspace .workspace-complete-actions button { min-height: 40px; padding: 0 14px; border: 1px solid var(--hairline-hi); border-radius: var(--ws-radius); background: transparent; color: var(--text-hi); }
+.one-path-workspace .workspace-complete-actions button:hover:not(:disabled) { border-color: var(--text-lo); background: var(--g2); }
+.one-path-workspace .workspace-complete-actions button:first-child { background: var(--text-hi); border-color: var(--text-hi); color: var(--ground); }
+.one-path-workspace .workspace-complete-actions button:first-child:hover:not(:disabled) { background: #fff; }
+.one-path-workspace .workspace-complete .workspace-ai-use-guide { grid-column: 1 / -1; margin-top: 4px; border-radius: var(--ws-radius-sm); }
+.one-path-workspace .workspace-ai-use-guide > summary { font-size: 14px; }
+.one-path-workspace .workspace-ai-use-guide p, .one-path-workspace .workspace-ai-journey { font-size: 13px; }
+.one-path-workspace .workspace-ai-use-actions button, .one-path-workspace .workspace-ai-use-actions a { font-size: 13px; }
+.one-path-workspace .workspace-ai-package-files code { font-size: 12px; }
+
+/* ---- intake: one large target on a first run, one bar afterwards ---------------------- */
+.one-path-workspace .workspace-intake { grid-template-columns: minmax(0, 1fr); gap: 0; padding: 0; border: 1px dashed var(--hairline-hi); border-radius: var(--ws-radius); background: var(--g1); transition: border-color var(--t-2) var(--e-out), background-color var(--t-2) var(--e-out); }
+.one-path-workspace .workspace-intake[data-active="true"] { border-style: solid; border-color: var(--verified); background: var(--verified-deep); }
+.one-path-workspace .workspace-intake[data-active="true"] .workspace-intake-copy { background: transparent; }
+.one-path-workspace .workspace-intake-copy { min-height: 300px; padding: clamp(28px, 4vw, 56px) 24px; background: transparent; border-radius: var(--ws-radius); }
+.one-path-workspace .workspace-intake-copy h2 { margin: 12px 0 8px; font: 600 clamp(24px, 2.4vw, 30px)/1.15 var(--f-sans); letter-spacing: -.02em; }
+.one-path-workspace .workspace-intake-copy > p:not(.eyebrow) { font-size: 15px; }
+.one-path-workspace .workspace-intake-copy > small { display: block; margin-top: 16px; color: var(--text-lo); font: 12px var(--f-mono); letter-spacing: .04em; }
+.one-path-workspace .workspace-intake-limits { margin-top: 6px !important; font-family: var(--f-sans) !important; letter-spacing: 0 !important; }
+.one-path-workspace .workspace-intake-actions { gap: 8px; margin-top: 20px; }
+.one-path-workspace .workspace-intake-actions button { min-height: 40px; padding: 0 16px; border: 1px solid var(--hairline-hi); border-radius: var(--ws-radius); background: transparent; color: var(--text-hi); font-size: 14px; }
+.one-path-workspace .workspace-intake-actions button:hover:not(:disabled) { background: var(--g2); border-color: var(--text-lo); }
+.one-path-workspace .workspace-intake-copy .workspace-intake-actions button:first-child,
+.one-path-workspace .workspace-preflight .workspace-intake-actions button:first-child { background: var(--text-hi); border-color: var(--text-hi); color: var(--ground); }
+.one-path-workspace .workspace-intake-copy .workspace-intake-actions button:first-child:hover:not(:disabled),
+.one-path-workspace .workspace-preflight .workspace-intake-actions button:first-child:hover:not(:disabled) { background: #fff; }
+/* Provider cards under the drop zone on Knowledge (FINAL_WEB §14). */
+.one-path-workspace .workspace-source-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--hairline); text-align: left; }
+.one-path-workspace .workspace-source-choices button { min-height: 56px; display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--hairline); border-radius: var(--ws-radius-sm); background: var(--ground); color: var(--text-hi); text-align: left; font-size: 14px; }
+.one-path-workspace .workspace-source-choices button:hover { border-color: var(--text-lo); }
+.one-path-workspace .workspace-source-choices small { color: var(--text-lo); font: 12px var(--f-mono); }
+/* The compact bar once documents exist: one row, still a drop target. */
+.one-path-workspace .workspace-intake[data-existing-documents="1"] { border-color: var(--hairline-hi); }
+.one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-copy { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 20px; min-height: 0; padding: 14px 18px; text-align: left; }
+.one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-copy .eyebrow,
+.one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-copy > small,
+.one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-source-choices { display: none; }
+.one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-copy h2 { grid-column: 1; grid-row: 1; margin: 0; font: 600 15px/1.3 var(--f-sans); letter-spacing: 0; }
+.one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-copy h2::after { content: none; }
+.one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-copy > p:not(.eyebrow) { grid-column: 1; grid-row: 2; margin: 0; color: var(--text-lo); font-size: 13px; }
+.one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-actions { grid-column: 2; grid-row: 1 / span 2; margin: 0; justify-content: end; }
+.one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-actions button { min-height: 36px; padding: 0 14px; font-size: 13px; }
+.one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-copy .workspace-intake-actions button:first-child { background: transparent; border-color: var(--hairline-hi); color: var(--text-hi); }
+/* Loading and unavailable stay honest and quiet. */
+.one-path-workspace .workspace-intake-loading { min-height: 160px; }
+.one-path-workspace .workspace-intake-loading h2 { font-size: 20px; }
+/* Archive progress and preflight keep their instrument face, at a readable size. */
+.one-path-workspace .workspace-archive-progress { border: 0; border-top: 1px solid var(--hairline); border-radius: 0; background: transparent; padding: 18px 24px; }
+.one-path-workspace .workspace-preflight { border-top: 1px solid var(--hairline); padding: 24px; background: transparent; }
+.one-path-workspace .workspace-preflight dl { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1px; border: 1px solid var(--hairline); border-radius: var(--ws-radius-sm); overflow: hidden; }
+.one-path-workspace .workspace-preflight dt { font-size: 12px; letter-spacing: .06em; }
+.one-path-workspace .workspace-preflight dd { font-size: 16px; font-variant-numeric: tabular-nums; }
+.one-path-workspace .workspace-preflight-files { border: 1px solid var(--hairline); border-radius: var(--ws-radius-sm); overflow: hidden; }
+.one-path-workspace .workspace-preflight-files strong { font-size: 14px; }
+.one-path-workspace .workspace-preflight-files span { font-size: 12px; }
+.one-path-workspace .workspace-preflight .fine { color: var(--text-mid); font-size: 13px; }
+.one-path-workspace .workspace-preflight-blocked { color: var(--changed); }
+
+/* ---- getting started: a quiet, reopenable line under the work ---------------------------- */
+.one-path-workspace .workspace-getting-started { margin: 0; border-radius: var(--ws-radius); background: transparent; border-color: var(--hairline); }
+.one-path-workspace .workspace-getting-started-toggle { min-height: 44px; padding: 10px 16px; }
+.one-path-workspace .workspace-getting-started-toggle strong { font-size: 14px; }
+.one-path-workspace .workspace-getting-started-toggle > span:last-child { font-size: 12px; }
+.one-path-workspace .workspace-getting-started-body { grid-template-columns: minmax(220px, .8fr) minmax(0, 1.25fr) auto; padding: 18px 16px 20px; background: var(--g1); }
+.one-path-workspace .workspace-getting-started-copy > p:not(.eyebrow) { font-size: 13px; }
+.one-path-workspace .workspace-getting-started-steps { border-radius: var(--ws-radius-sm); overflow: hidden; }
+.one-path-workspace .workspace-getting-started-steps strong { font-size: 14px; }
+.one-path-workspace .workspace-getting-started-steps small { font-size: 12px; }
+.one-path-workspace .workspace-step-state { font-size: 12px; }
+.one-path-workspace .workspace-getting-started-actions > button:not(.text), .one-path-workspace .workspace-getting-started-actions > a { min-height: 36px; border-radius: var(--ws-radius); font: 500 13px var(--f-sans); }
+.one-path-workspace .workspace-getting-started-actions > button.text { font-size: 12px; }
+
+/* ---- Knowledge: board without the tile row, then the selection card -------------------- */
+.one-path-workspace .board.card { padding: 20px; }
+.one-path-workspace .board-rows { grid-template-columns: minmax(0, 1fr); gap: 0; padding: 0; background: transparent; }
+.one-path-workspace .board-rows > li { padding: 0; gap: 0; border: 0; border-left: 2px solid transparent; border-bottom: 1px solid var(--hairline); border-radius: 0; background: var(--ground); }
+.one-path-workspace .board-rows > li[data-held="1"] { border-left-color: var(--changed); }
+.one-path-workspace .board-rows > li[data-status="failed"] { border-left-color: #d36a62; }
+.one-path-workspace .board-rows > li:last-child { border-bottom: 0; }
+.one-path-workspace .board-row-detail:not([hidden]) { padding: 0 12px 14px; }
+.one-path-workspace .board-transfer.compact { margin: 0 12px 10px; }
+.one-path-workspace .compile-selection-actions { position: static; background: transparent; padding-top: 12px; border-top: 1px solid var(--hairline); }
+.one-path-workspace .compile-source-choice { font-family: var(--f-sans); letter-spacing: 0; }
+.one-path-workspace .document-meta strong, .one-path-workspace .document-meta li > strong { font-family: var(--f-sans); letter-spacing: 0; }
+.one-path-workspace .workspace-compile-job .workspace-intake-actions { justify-content: flex-start; }
+.one-path-workspace .board-head-compact h2 { font-size: 18px; }
+.one-path-workspace .board-summary-copy { color: var(--text-mid); font-size: 14px; }
+.one-path-workspace .board-toolbar { margin-top: 12px; }
+.one-path-workspace .board-filters button { min-height: 32px; padding: 0 12px; border: 1px solid var(--hairline); border-radius: 999px; color: var(--text-lo); font: 500 12px var(--f-mono); font-variant-numeric: tabular-nums; }
+.one-path-workspace .board-filters button[data-active="true"] { color: var(--text-hi); background: var(--g3); border-color: var(--hairline-hi); }
+.one-path-workspace .board-search input { min-height: 36px; padding: 0 12px; border: 1px solid var(--hairline); border-radius: var(--ws-radius); background: var(--ground); color: var(--text-hi); font-size: 14px; }
+.one-path-workspace .board-list-wrap { border-radius: var(--ws-radius-sm); }
+.one-path-workspace .board-row-summary { min-height: 48px; border-radius: 0; font-family: var(--f-sans); }
+.one-path-workspace .board-row-name { font-size: 14px; font-weight: 500; }
+.one-path-workspace .board-row-status { font: 500 12px var(--f-mono); letter-spacing: .04em; }
+.one-path-workspace .board-stage-k, .one-path-workspace .board-stage-d { font-size: 12px; }
+.one-path-workspace .board-dismiss, .one-path-workspace .board-more { min-height: 36px; padding: 0 12px; border: 1px solid var(--hairline-hi); font-size: 13px; }
+.one-path-workspace .board-failure-banner button { font: 500 13px var(--f-sans); letter-spacing: 0; text-transform: none; }
+.one-path-workspace .workspace-grid { grid-template-columns: minmax(0, 1fr); margin-top: 0; }
+.one-path-workspace .document-card h2 { font-size: 18px; }
+.one-path-workspace .document-meta li strong { font-size: 14px; }
+.one-path-workspace .document-meta li small { font-size: 12px; }
+.one-path-workspace .compile-source-choice { font-size: 13px; }
+.one-path-workspace .compile-selection-actions button { min-height: 40px; padding: 0 16px; border: 1px solid var(--text-hi); background: var(--text-hi); color: var(--ground); }
+.one-path-workspace .compile-selection-actions button:disabled { background: transparent; border-color: var(--hairline); color: var(--text-lo); }
+.one-path-workspace .compile-selection-actions small { font-size: 12px; }
+.one-path-workspace .document-card .empty strong { font-size: 16px; }
+.one-path-workspace .document-card .empty p { font-size: 14px; }
+
+/* ---- Review, World, Ask, Settings: same voice, fewer boxes --------------------------------- */
+.one-path-workspace .review-decision-actions button { min-height: 38px; padding: 0 14px; border-radius: var(--ws-radius); }
+.one-path-workspace .review-decision-actions button:first-child { background: var(--text-hi); border-color: var(--text-hi); color: var(--ground); }
+.one-path-workspace .review-decision-form label { font-size: 13px; color: var(--text-mid); }
+.one-path-workspace .workspace-advanced { padding: 0; gap: 0; background: transparent; }
+.one-path-workspace .workspace-advanced > summary { min-height: 44px; display: flex; align-items: center; padding: 10px 16px; color: var(--text-lo); font-size: 14px; cursor: pointer; list-style: none; }
+.one-path-workspace .workspace-advanced > summary::-webkit-details-marker { display: none; }
+.one-path-workspace .workspace-advanced > summary::after { content: "+"; margin-left: auto; color: var(--text-lo); font: 16px var(--f-mono); }
+.one-path-workspace .workspace-advanced[open] > summary::after { content: "−"; }
+.one-path-workspace .workspace-advanced > p, .one-path-workspace .workspace-advanced > div { padding: 0 16px 16px; }
+.one-path-workspace .workspace-advanced > p { margin: 0 0 12px; color: var(--text-mid); font-size: 14px; }
+.one-path-workspace .world-status { font: 500 12px var(--f-mono); letter-spacing: .06em; }
+.one-path-workspace .version-list small { font-size: 12px; }
+.one-path-workspace .binding-list span { font-size: 13px; }
+.one-path-workspace .binding-list b { font-size: 12px; }
+.one-path-workspace .world-actions button, .one-path-workspace .version-list button { min-height: 38px; padding: 0 14px; border: 1px solid var(--hairline-hi); border-radius: var(--ws-radius); color: var(--text-hi); }
+.one-path-workspace .world-actions button:not(:disabled) { background: var(--text-hi); border-color: var(--text-hi); color: var(--ground); }
+.one-path-workspace .world-actions small { font-size: 12px; }
+.one-path-workspace .ask-studio form button { min-height: 40px; padding: 0 16px; border: 1px solid var(--text-hi); border-radius: var(--ws-radius); background: var(--text-hi); color: var(--ground); }
+.one-path-workspace .ask-studio form button:disabled { background: transparent; border-color: var(--hairline); color: var(--text-lo); }
+.one-path-workspace .ask-result li b, .one-path-workspace .ask-result li span { font-size: 12px; }
+.one-path-workspace .ask-result button { min-height: 34px; padding: 0 12px; border: 1px solid var(--hairline-hi); font-size: 13px; }
+.one-path-workspace .billing-actions button, .one-path-workspace .billing-actions a { min-height: 38px; padding: 0 14px; border: 1px solid var(--hairline-hi); border-radius: var(--ws-radius); color: var(--text-hi); font: 500 14px var(--f-sans); }
+.one-path-workspace nav.billing-actions button[aria-current="page"] { background: var(--g3); border-color: var(--hairline-hi); }
+.one-path-workspace .billing-card dt { font-size: 12px; }
+.one-path-workspace .billing-card dd { font-variant-numeric: tabular-nums; }
+.one-path-workspace .gate-list strong { font-size: 14px; }
+.one-path-workspace .gate-list p { font-size: 13px; }
+.one-path-workspace .pill { font: 500 12px var(--f-mono); }
+.one-path-workspace .workspace-access-gate p { max-width: 62ch; color: var(--text-mid); }
+.one-path-workspace .world-empty { padding: 28px 16px; border: 1px dashed var(--hairline-hi); border-radius: var(--ws-radius-sm); color: var(--text-lo); font: 14px var(--f-sans); text-align: center; }
+
+/* ---- motion: state reports; keyboard-initiated actions get none --------------------------- */
+@media (prefers-reduced-motion: no-preference) {
+  .one-path-workspace .workspace-complete,
+  .one-path-workspace .workspace-compile-block { transition: opacity var(--t-4) var(--e-out), translate var(--t-4) var(--e-out); @starting-style { opacity: 0; translate: 0 6px; } }
+}
+@media (prefers-reduced-motion: reduce) {
+  .one-path-workspace * { transition-duration: 0s !important; animation-duration: 0s !important; }
+}
+
+/* ---- responsive --------------------------------------------------------------------- */
+@media (max-width: 1023px) {
+  .one-path-workspace .workspace-content { padding: 18px 16px calc(96px + env(safe-area-inset-bottom)); gap: 18px; overflow-x: clip; }
+  .one-path-workspace .workspace-compile-block .compile-stage { aspect-ratio: 4 / 3; }
+  .one-path-workspace .workspace-complete { grid-template-columns: minmax(0, 1fr); }
+  .one-path-workspace .workspace-getting-started-body { grid-template-columns: minmax(0, 1fr); }
+  .one-path-workspace .workspace-attention-items li { grid-template-columns: minmax(0, 1fr); align-items: start; gap: 6px; }
+  .one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-copy { grid-template-columns: minmax(0, 1fr); }
+  .one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-actions { grid-column: 1; grid-row: auto; justify-content: start; }
+  /* Tablet keeps the centred first-run target; the older sheet's phone geometry starts here too, so it is corrected here. */
+  .one-path-workspace .workspace-intake-copy { min-height: 0; padding: 32px 20px; text-align: center; }
+  .one-path-workspace .workspace-intake-copy h2 { max-width: 16ch; margin: 10px auto 8px; font-size: 26px; text-wrap: balance; }
+  .one-path-workspace .workspace-intake-copy > p:not(.eyebrow) { max-width: 36ch; margin-inline: auto; font-size: 15px; }
+  .one-path-workspace .workspace-intake-copy .workspace-intake-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; max-width: 520px; margin-inline: auto; gap: 8px; }
+  .one-path-workspace .workspace-intake-copy .workspace-intake-actions button { width: 100%; min-height: 44px; text-align: center; justify-content: center; font-size: 14px; }
+  .one-path-workspace .workspace-intake-copy .workspace-intake-actions button:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .one-path-workspace .workspace-intake-copy > small { font-size: 12px; letter-spacing: .04em; }
+}
+@media (max-width: 767px) {
+  .one-path-workspace .workspace-intake-copy { padding: 28px 16px; }
+  .one-path-workspace .workspace-intake-actions button { width: 100%; min-height: 44px; }
+  .one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-actions button { min-height: 44px; }
+  .one-path-workspace .workspace-source-choices { display: none; }
+  .one-path-workspace .workspace-compile-block .compile-stage { aspect-ratio: 1 / 1; }
+  .one-path-workspace .workspace-complete-actions button, .one-path-workspace .workspace-attention-items button { width: 100%; min-height: 44px; }
+  .one-path-workspace .board-toolbar { flex-direction: column; align-items: stretch; }
+  .one-path-workspace .board-search input { width: 100%; }
+  .one-path-workspace .review-decision-actions button, .one-path-workspace .billing-actions button, .one-path-workspace .billing-actions a { min-height: 44px; }
+  .one-path-workspace .workspace-preflight dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 420px) {
+  .one-path-workspace .workspace-content { padding-inline: 14px; }
+  .one-path-workspace .workspace-preflight dl { grid-template-columns: minmax(0, 1fr); }
+}

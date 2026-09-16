@@ -314,7 +314,8 @@ describe("where the Change Inbox is wired", () => {
   it("is rendered from the workspace page with the loaded World and its collection", () => {
     expect(workspace).toContain(`{surface === "changes" ? (`);
     expect(workspace).toContain("<ChangeInbox");
-    expect(workspace).toContain("changes: \"workspace-changes\"");
+    // The inbox carries its own anchor; the page passes it the collection it was loaded with.
+    expect(workspace).toContain("collectionId={collectionResult?.collectionId ?? null}");
   });
 
   it("reads the other version from the versioned World endpoint", () => {

@@ -63,12 +63,7 @@ export default function PipelineBoard({ rows, reading = {}, names = {}, onDismis
         </div>
       ) : null}
 
-      <div className="board-metrics" aria-label="Source status summary">
-        <button type="button" data-active={effectiveFilter === "attention"} onClick={() => selectFilter("attention")}><strong>{counts.attention}</strong><span>Need review</span></button>
-        <button type="button" data-active={effectiveFilter === "processing"} onClick={() => selectFilter("processing")}><strong>{counts.processing}</strong><span>Processing</span></button>
-        <button type="button" data-active={effectiveFilter === "ready"} onClick={() => selectFilter("ready")}><strong>{counts.ready}</strong><span>Ready</span></button>
-        <button type="button" data-active={effectiveFilter === "failed"} onClick={() => selectFilter("failed")}><strong>{counts.failed}</strong><span>Failed</span></button>
-      </div>
+      {/* The counts live in the filter chips below; four big-number tiles said the same thing with zeroes. */}
       <div className="board-toolbar"><div className="board-filters" role="group" aria-label="Filter sources"><button type="button" data-active={effectiveFilter === "all"} onClick={() => selectFilter("all")}>All {counts.all}</button><button type="button" data-active={effectiveFilter === "attention"} onClick={() => selectFilter("attention")}>Review {counts.attention}</button><button type="button" data-active={effectiveFilter === "processing"} onClick={() => selectFilter("processing")}>Processing {counts.processing}</button><button type="button" data-active={effectiveFilter === "ready"} onClick={() => selectFilter("ready")}>Ready {counts.ready}</button>{counts.failed > 0 ? <button type="button" data-active={effectiveFilter === "failed"} onClick={() => selectFilter("failed")}>Failed {counts.failed}</button> : null}</div><label className="board-search"><span className="sr-only">Search sources</span><input value={query} onChange={(event) => { setQuery(event.target.value); setVisibleCount(12); }} placeholder="Search sources…" /></label></div>
       <div className="board-list-wrap"><ol className="board-list board-rows" aria-label={`${filtered.length} matching sources`}>
         {visible.map((row) => { const rowStatus = statusOf(row); const expanded = expandedId === row.id; const progress = reading[row.id]; return (

@@ -36,7 +36,6 @@ const COPY_SURFACES = [
   "app/auth/callback/page.tsx",
   "components/answer-switch.tsx",
   "components/change-lattice.tsx",
-  "components/compile-pipeline.tsx",
   "components/evidence-tether.tsx",
   "components/identity-resolve.tsx",
   "components/world-explorer.tsx",
