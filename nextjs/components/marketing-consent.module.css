@@ -82,8 +82,9 @@
 */
 .panel p a {
   display: inline-block;
-  padding-block: 13px;
-  margin-block: -13px;
+  /* 14, not 13: a 17px line plus 26px of padding measured 43.8px, under the 44px touch floor. */
+  padding-block: 14px;
+  margin-block: -14px;
   color: var(--verified);
   text-decoration: underline;
   text-decoration-thickness: 1px;
@@ -174,7 +175,7 @@
     padding: 6px clamp(12px, 3vw, 20px);
   }
   .panel p { font-size: 11px; line-height: 1.25; }
-  .panel p a { padding-block: 15px; margin-block: -15px; }
+  .panel p a { padding-block: 16px; margin-block: -16px; } /* 11px type: 13.75px line + 32px = 45.75px, above the 44px floor */
   .actions { gap: 6px; }
   .actions button { padding: 10px; font-size: 12px; }
   :global(body):has(.panel) { padding-bottom: calc(var(--bar) + 56px); }

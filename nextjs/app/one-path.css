@@ -132,7 +132,14 @@
   `overscroll-behavior-x: contain` keeps the browser's back-swipe out of it.
 */
 @media (max-width: 899px), (pointer: coarse) and (max-width: 1023px) {
-  .compile-film-viewport {
+  /*
+    `.one-path-home .compile-film-viewport` above sets `overflow: hidden` with two classes, which
+    outranked this one-class rule: the frame never scrolled, the audit saw four panes past the
+    right edge, and a phone reader saw the first column only. Same specificity here, later in
+    the sheet, so the pan wins below 900px.
+  */
+  .compile-film-viewport,
+  .one-path-home .compile-film-viewport {
     position: relative;
     overflow-x: auto;
     overflow-y: hidden;
@@ -241,3 +248,11 @@
 @media (prefers-reduced-motion: reduce) {
   .one-path-home *, .one-path-home *::before, .one-path-home *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
 }
+
+/*
+  Touch floor for links that live inside running text on the landing page. A sentence link is
+  one line tall (17-20px); the phone contract is 44px for every reachable control. The padding
+  is paid back with negative block margins so the paragraph keeps its rhythm and only the hit
+  box grows.
+*/
+.one-path-home main p > a:not(.btn):not(.one-path-text-link) { display: inline-block; padding-block: 12px; margin-block: -12px; }

@@ -31,14 +31,30 @@ test("the hero uses the approved encoded film instead of mounting a crushed live
   await expect(video).toHaveAttribute("poster", "/film/poster-1-hero.webp");
 });
 
+/*
+  G1-012 (2026-09-16). Below 900px the film pans instead of shrinking: the frame is a horizontal
+  scroll-snap container and the recording inside it keeps its 16:10 at the frame's full height,
+  so a phone reader sees one legible column at a time rather than a 370px thumbnail of four. What
+  is pinned is therefore the recording's shape and that the frame really scrolls -- the frame's
+  own box is now portrait on purpose. Above 900px the panes are `display: none` and the frame
+  itself is the 16:10 box, as before.
+*/
 test("the hero film keeps its 16:10 source shape on a narrow screen", async ({ page }, testInfo) => {
   test.skip(!NARROW.includes(testInfo.project.name), "the narrow frame is what is under test");
   await openHome(page);
-  const frame = await page.getByTestId("one-path-hero-film").locator(".compile-film-viewport").boundingBox();
-  expect(frame).not.toBeNull();
-  const ratio = frame!.width / frame!.height;
-  expect(ratio).toBeGreaterThan(1.58);
-  expect(ratio).toBeLessThan(1.62);
+  const viewport = page.getByTestId("one-path-hero-film").locator(".compile-film-viewport");
+  const measured = await viewport.evaluate((frame: HTMLElement) => {
+    const panes = frame.querySelector<HTMLElement>(".compile-film-panes");
+    const pans = !!panes && getComputedStyle(panes).display !== "none";
+    const box = (pans ? panes : frame).getBoundingClientRect();
+    return { pans, ratio: box.width / box.height, overflowX: getComputedStyle(frame).overflowX, scrollable: frame.scrollWidth > frame.clientWidth + 1 };
+  });
+  expect(measured.ratio).toBeGreaterThan(1.58);
+  expect(measured.ratio).toBeLessThan(1.62);
+  if (measured.pans) {
+    expect(measured.overflowX, "the panning frame must be a real scroller, not a clipped box").toBe("auto");
+    expect(measured.scrollable, "the recording is wider than the frame and can be panned").toBe(true);
+  }
 });
 
 test("the customer film vocabulary stays readable without reintroducing technical stage names", async ({ page }, testInfo) => {
@@ -112,10 +128,23 @@ test("nothing on the narrow landing is laid out outside the viewport", async ({ 
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   const escaped = await page.evaluate(() => {
     const result: string[] = [];
+    /*
+      G1-012: the film pans below 900px, so its panes and recording sit past the right edge inside
+      a real `overflow-x: auto` frame. That is the supported wide-content pattern (the same rule
+      `overflow-audit.spec.ts` applies to tables and code); `overflow-x: hidden` is not a scroller
+      and still counts, because hidden is what made these defects invisible in the first place.
+    */
+    const clippedByScroller = (element: HTMLElement) => {
+      for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+        const overflowX = getComputedStyle(parent).overflowX;
+        if (overflowX === "auto" || overflowX === "scroll") return true;
+      }
+      return false;
+    };
     for (const element of document.querySelectorAll<HTMLElement>("header.nav *, main *, footer.site *")) {
       const box = element.getBoundingClientRect();
       if (!box.width || !box.height) continue;
-      if (box.left < -1 || box.right > innerWidth + 1) result.push(`${element.tagName}.${String(element.className).slice(0, 36)}`);
+      if ((box.left < -1 || box.right > innerWidth + 1) && !clippedByScroller(element)) result.push(`${element.tagName}.${String(element.className).slice(0, 36)}`);
     }
     return result;
   });
