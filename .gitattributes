@@ -71,3 +71,9 @@ nextjs/scripts/journey/*.mjs text eol=lf
 nextjs/scripts/verify-signed-export.mjs text eol=lf
 nextjs/scripts/compiled-world/validate.mjs text eol=lf
 nextjs/scripts/compiled-world/verify-external-roundtrip.py text eol=lf
+
+# Research receipts are evidence artifacts: their published sha256 was computed over the bytes as
+# written (CRLF, on the machine that produced them), and a receipt's hash is never rewritten.
+# eol=lf would make the served bytes differ from the printed digest on every Linux checkout, which
+# is exactly what CI caught on 2026-09-16. So they are stored and served as-is, no conversion.
+nextjs/public/research/receipts/*.json -text
