@@ -102,6 +102,10 @@ export const KO_CHROME = {
  * ordinary casing -- "a real-world thing" is not this noun.
  */
 export const PRODUCT_NOUNS = [
+  // BQ-098. The category noun, which the guide, the product page, the 404 and the root layout
+  // all capitalise and one resource description did not: "what a knowledge compiler is" on the
+  // card that links to the page titled "What is a Knowledge Compiler?".
+  "Knowledge Compiler",
   "World",
   "Compiled World",
   "Trust Center",

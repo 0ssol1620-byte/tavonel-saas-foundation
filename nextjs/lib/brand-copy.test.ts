@@ -1005,6 +1005,11 @@ describe("the site's own vocabulary", () => {
     // is held to. `RETIRED_NAMES` below is the other half of the same rule.
     expect(PRODUCT_NOUNS).toContain("Compiled World");
     expect(PRODUCT_NOUNS).toContain("Trust Center");
+    // BQ-098: the category noun is in the table too, and no public page writes it in lower case.
+    expect(PRODUCT_NOUNS).toContain("Knowledge Compiler");
+    for (const file of marketingPageFiles()) {
+      expect(prose(file), `${file} lower-cases the category noun`).not.toMatch(/knowledge compiler/);
+    }
     // The commercial posture chooses between the two; it does not write a third.
     expect(primaryCallToAction({})).toEqual(ACCESS_CTA);
     /*
