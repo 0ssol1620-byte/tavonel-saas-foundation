@@ -2111,7 +2111,24 @@
   .docs-langs { display: flex; flex-wrap: wrap; gap: 2px; min-width: 0; }
   .docs-langs button { padding: 3px 8px; border: 1px solid transparent; color: var(--text-lo); font: var(--t-1) var(--f-sans); letter-spacing: 0.06em; }
   .docs-langs button[aria-selected="true"] { border-color: var(--hairline-hi); color: var(--text-hi); }
-  .docs-code pre { width: 100%; max-width: 100%; min-width: 0; margin: 0; padding: 14px 12px; overflow-x: auto; color: var(--text-hi); font: 12px/1.65 var(--f-mono); }
+  /*
+    pages-14. A code line cut dead at the panel border reads as truncated sample code, not as a
+    block that scrolls: "…collections:compile + collection" stopped mid-identifier with no
+    ellipsis, no fade and no scrollbar on the page whose whole job is copy-pasteable commands.
+    A thin, always-drawn scrollbar is the affordance -- it appears only when a block actually
+    overflows, so the blocks that fit are unchanged, and unlike a mask it never dims the last
+    characters of a line that was never cut.
+
+    Both spellings, and both are needed. `scrollbar-width`/`scrollbar-color` is the standard one
+    and the only one Firefox reads; on Blink it leaves the overlay scrollbar in place, which is
+    transparent until you touch it -- invisible in exactly the static view the finding is about.
+    Styling `::-webkit-scrollbar` opts that block out of overlay scrollbars into a classic one
+    that is painted whenever the content overflows, which is the whole point here.
+  */
+  .docs-code pre { width: 100%; max-width: 100%; min-width: 0; margin: 0; padding: 14px 12px; overflow-x: auto; scrollbar-width: thin; scrollbar-color: var(--hairline-hi) transparent; color: var(--text-hi); font: 12px/1.65 var(--f-mono); }
+  .docs-code pre::-webkit-scrollbar { height: 8px; }
+  .docs-code pre::-webkit-scrollbar-track { background: transparent; }
+  .docs-code pre::-webkit-scrollbar-thumb { background: var(--hairline-hi); }
   .docs-copy { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 44px; min-height: 44px; padding: 8px 12px; color: var(--text-mid); border: 1px solid var(--hairline-hi); background: var(--g1); font: 12px var(--f-sans); letter-spacing: 0; }
   .docs-copy[data-state="copied"] { color: var(--verified); border-color: var(--verified); }
 
