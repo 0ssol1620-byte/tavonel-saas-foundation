@@ -76,7 +76,6 @@
   background: var(--g2);
 }
 
-.viewport[data-zoomed="1"] { aspect-ratio: auto; height: clamp(420px, 78svh, 900px); }
 
 .page {
   position: relative;
@@ -152,7 +151,6 @@
   .toolbar { padding: 8px; }
   .controls { width: 100%; justify-content: space-between; }
   .viewport { padding: 10px; }
-  .viewport[data-zoomed="1"] { height: clamp(360px, 70svh, 620px); }
 }
 
 @media (prefers-reduced-motion: reduce) {

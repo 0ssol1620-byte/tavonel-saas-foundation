@@ -163,7 +163,6 @@ export default function OriginalSourcePage({ active, regions, onSelectRegion }: 
       ref={viewport}
       className={styles.viewport}
       data-source-viewport=""
-      data-zoomed={zoom > 1 ? "1" : "0"}
       style={raster ? ({ "--page-aspect": `${raster.width} / ${raster.height}` } as CSSProperties) : undefined}
       tabIndex={0}
       aria-label="Source page; use the zoom controls to read it and the extracted passage below to select a region"
