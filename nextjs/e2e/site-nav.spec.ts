@@ -26,7 +26,30 @@
  * width where it is on screen.
  */
 
-import { test, expect, webkit, type Page } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
+
+/*
+  No trace from this file, and that is load-bearing rather than a preference.
+
+  `playwright.config.ts` already records the reason against the `launch-webkit` project:
+  Playwright 1.62's Windows WebKit port deadlocks while recording a trace for a native
+  `<details>` interaction. Every phone scenario here opens one, and the WebKit run at the foot of
+  this file lives in a width project rather than in `launch-webkit`, so the deadlock does not
+  merely hang one test: the runner either dies with exit 127 and no reporter output or burns the
+  600s budget, stopping the whole suite wherever this file was scheduled. That is what left the
+  full project set unfinishable -- here and in the pass before this one.
+
+  Two escapes were measured and neither is one. Importing `webkit` instead of taking it from the
+  `playwright` fixture changes nothing: the runner instruments every context either way, and the
+  run that proved it still attached a `trace.zip`. `context.tracing.stop()` on the manual context
+  hangs for the full timeout and then reports "Must start tracing before stopping". The option
+  has to sit at file scope because trace forces a new worker, so Playwright refuses `test.use`
+  for it inside a describe -- the same rule that put this file in charge of its own browser.
+
+  The cost is this one file's failure traces. Screenshots, call logs, stacks and every assertion
+  stay, and so does the WebKit coverage the founder's phone depends on.
+*/
+test.use({ trace: "off" });
 
 /*
   Question -> the trail of hrefs a reader clicks to reach its answer.
@@ -258,24 +281,11 @@ test.describe("chromium", () => {
   what resets the header, so sharing a page costs nothing and saves the context launches on the
   slowest engine. The step name is the scenario's own, so a failure here reads the same as the
   Chromium run above.
-
-  WebKit is imported rather than taken from the `playwright` fixture, and that is load-bearing.
-  A browser reached through the fixture has the runner's artifact instrumentation attached to
-  every context it opens, and `playwright.config.ts` already records what that costs here:
-  Playwright 1.62's Windows WebKit port deadlocks while recording a trace for a native
-  `<details>` interaction -- which every phone scenario below performs. Inside a width project
-  that deadlock is worse than one hung test: it takes the runner process down with exit 127 and
-  no reporter output, stopping the whole suite wherever this test happened to be scheduled. That
-  is what made the full set unfinishable. `test.use({ trace: "off" })` is not available -- trace
-  forces a new worker, so Playwright refuses it in a describe, the same rule that put this file
-  in charge of its own browser in the first place. The import is the one knob left. Every
-  assertion and the engine coverage the founder's phone depends on are unchanged; only the
-  instrumentation that hangs is skipped, and a failure still reports its call log and stack.
 */
-test("webkit answers the same questions", async ({ baseURL }, testInfo) => {
+test("webkit answers the same questions", async ({ playwright, baseURL }, testInfo) => {
   test.skip(testInfo.project.name !== "1440", "site-nav drives its own viewport and browser");
   test.setTimeout(600_000);
-  const browser = await webkit.launch();
+  const browser = await playwright.webkit.launch();
   try {
     for (const group of [DESKTOP, PHONE]) {
       const context = await browser.newContext({
