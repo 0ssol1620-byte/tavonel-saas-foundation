@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { DocsCopyButton } from "@/components/docs-copy-button";
+import { CodeTokens } from "@/components/docs/code-tokens";
 
 /**
  * One request, in the language the reader integrates from.
@@ -121,7 +122,7 @@ export function DocsSnippet({ snippets }: { snippets: Array<{ language: string; 
           tabIndex={index === active ? 0 : -1}
           hidden={index !== active}
         >
-          <code>{snippet.body}</code>
+          <code><CodeTokens body={snippet.body} /></code>
         </pre>
       ))}
     </figure>

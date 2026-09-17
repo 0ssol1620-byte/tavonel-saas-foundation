@@ -283,6 +283,20 @@
 .docs-code pre:focus-visible { outline: 2px solid var(--verified); outline-offset: -2px; }
 
 /*
+  BQ-103, the other half of the row: a code block that is not one flat tone.
+
+  Two classes, both from the text ramp, and no syntax palette invented. The site's colours already
+  carry meanings -- `--verified` is evidence, `--changed` is a diff, `--failed` is a failure -- and
+  a third meaning for one of them, "string literal", would cost more than the highlighting is
+  worth. The ramp answers the thing that actually costs a reader time: prose inside a block reads
+  as prose, a literal reads as data, and the syntax between them keeps the block's full contrast.
+
+  `components/docs/code-tokens.tsx` emits them and says how the tokenizing is kept lossless.
+*/
+.docs-code .tok-com { color: var(--text-lo); }
+.docs-code .tok-str { color: var(--text-mid); }
+
+/*
   BQ-137. The copy button reserves the width of its longest state, so pressing it does not move
   it. The reserve is a zero-height ghost of that string; the visible label sits on top of it.
 */

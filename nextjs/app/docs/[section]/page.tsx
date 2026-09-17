@@ -7,6 +7,7 @@ import BreadcrumbJsonLd, { DocBreadcrumb } from "@/components/breadcrumb-json-ld
 import { DocsCopyButton } from "@/components/docs-copy-button";
 import { DocsSnippet } from "@/components/docs-snippet";
 import { withMarks } from "@/components/docs/marks";
+import { CodeTokens } from "@/components/docs/code-tokens";
 import tableStyles from "@/components/docs/docs-table.module.css";
 import {
   DOCS_REVIEWED,
@@ -53,7 +54,7 @@ function CodeBlock({ label, body, id }: { label: string; body: string; id?: stri
         BQ-103: the block scrolls sideways, so it is focusable and named. A scroll container with
         no focusable child cannot be reached from a keyboard at all, let alone scrolled.
       */}
-      <pre tabIndex={0} role="group" aria-label={label}><code>{body}</code></pre>
+      <pre tabIndex={0} role="group" aria-label={label}><code><CodeTokens body={body} /></code></pre>
     </figure>
   );
 }
