@@ -1,3 +1,6 @@
+/* Layered here, not at the @import: `@import … layer()` is rewritten by the build into an
+   invalid `@media layer(…)` block and the whole sheet stops applying. See app/globals.css. */
+@layer overrides {
 /*
   The route-level sheet for the editorial pages (/product, /pricing, /resources and their
   siblings). It is loaded after `tavonel.css` in `app/globals.css` and stays unlayered, so a rule
@@ -556,4 +559,5 @@
   font-size: clamp(22px, 2.2vw, 30px);
   line-height: 1.22;
   letter-spacing: -.02em;
+}
 }

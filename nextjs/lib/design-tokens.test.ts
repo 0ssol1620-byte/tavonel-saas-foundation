@@ -31,6 +31,29 @@ describe("design token contract", () => {
     }
   });
 
+  /*
+    2026-09-18. `@import "./x.css" layer(overrides);` read as correct and was dead: Next 15.5's CSS
+    pipeline rewrites the qualifier into `@media layer(overrides) { … }`, an invalid media query,
+    so product-polish.css, workspace-final-polish.css and workspace-no1.css shipped without a
+    single rule applying -- the workspace rendered tavonel.css's older faces and nothing in this
+    suite could tell. The layer is therefore declared inside each sheet, and the import is plain.
+  */
+  it("layers the route sheets in-file, never at the @import", () => {
+    const code = globals.replace(/\/\*[\s\S]*?\*\//g, "");
+    for (const line of code.split("\n").filter((l) => l.startsWith("@import"))) {
+      expect(line, "an @import qualifier the build turns into a dead @media block").not.toMatch(/layer\(|supports\(/);
+    }
+    for (const sheet of ["product-polish.css", "workspace-final-polish.css", "workspace-no1.css"]) {
+      expect(code, `${sheet} is still imported`).toContain(`@import "./${sheet}";`);
+      const body = readFileSync(new URL(`../app/${sheet}`, import.meta.url), "utf8")
+        .replace(/\r\n/g, "\n")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .trim();
+      expect(body.startsWith("@layer overrides {"), `${sheet} opens with its layer`).toBe(true);
+      expect(body.endsWith("}"), `${sheet} closes it`).toBe(true);
+    }
+  });
+
   it("keeps every global rule inside a named layer", () => {
     for (const layer of ["@layer tokens {", "@layer reset {", "@layer base {", "@layer components {", "@layer utilities {", "@layer overrides {"]) {
       expect(css).toContain(layer);

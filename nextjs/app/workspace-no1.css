@@ -1,3 +1,6 @@
+/* Layered here, not at the @import: `@import … layer()` is rewritten by the build into an
+   invalid `@media layer(…)` block and the whole sheet stops applying. See app/globals.css. */
+@layer overrides {
 /*
   Workspace, 2026-09-16 redesign layer. Loaded last from globals.css and scoped to
   `.one-path-workspace`, so it wins over the five older sheets without editing them.
@@ -123,7 +126,7 @@
    over "Review items", "Use with AI" over "Ask your World". Two filled buttons a few hundred
    pixels apart saying the same thing is the ambiguity D29 names, so the restatement steps back
    and these five actions read as one bordered row. Hit area and height are unchanged. */
-.one-path-workspace .workspace-complete-actions { display: flex; flex-wrap: wrap; gap: 8px; align-content: start; }
+.one-path-workspace .workspace-complete-actions { display: flex; flex-wrap: wrap; gap: 8px; align-content: flex-start; }
 .one-path-workspace .workspace-complete-actions button { min-height: 40px; padding: 0 14px; border: 1px solid var(--hairline-hi); border-radius: var(--ws-radius); background: transparent; color: var(--text-hi); }
 .one-path-workspace .workspace-complete .workspace-ai-use-guide { grid-column: 1 / -1; margin-top: 4px; border-radius: var(--ws-radius-sm); }
 .one-path-workspace .workspace-ai-use-guide > summary { font-size: 14px; }
@@ -510,4 +513,5 @@
   .one-path-workspace .workspace-source-choices button:hover { border-color: var(--text-lo); }
   .one-path-workspace select:hover { border-color: var(--text-lo); }
   .workspace.one-path-workspace .one-path-more-panel button:hover { color: var(--text-hi); background: var(--g2); }
+}
 }

@@ -1,3 +1,6 @@
+/* Layered here, not at the @import: `@import … layer()` is rewritten by the build into an
+   invalid `@media layer(…)` block and the whole sheet stops applying. See app/globals.css. */
+@layer overrides {
 /*
   Workspace hierarchy pass.
 
@@ -72,4 +75,5 @@
   .workspace-ai-use-actions a { width: 100%; justify-content: center; }
   .workspace-intake-actions button { min-height: 44px; }
   .workspace-complete-actions button, .workspace-complete-actions a { min-height: 44px; }
+}
 }

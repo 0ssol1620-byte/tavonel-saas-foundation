@@ -505,20 +505,9 @@
     color: var(--text-lo);
   }
 
-  /*
-    BA-239 -- the halo is scoped to the one page that has a canvas behind its type.
-
-    Every headline on the site carried a two-stop dark glow, including /product and
-    /knowledge-compiler, which have nothing behind them to earn contrast against; at 390 it read as
-    a smear around the letterforms. No premium product site drop-shadows its display type. The
-    landing page does have a live field passing under its text, so it keeps the halo -- and only
-    above 900px, which is the only place the field now mounts.
-  */
-  @media (min-width: 900px) {
-    .landing-page :is(h1, h2, .lede, .slate, .interlude-h, .interlude-sub) {
-      text-shadow: 0 0 14px var(--ground), 0 0 6px var(--ground);
-    }
-  }
+  /* BA-239 / C1. The two-stop dark text-shadow that every headline carried is gone, on the landing
+     too: the canvas field it was earning contrast against (components/world-field.tsx) is deleted,
+     so nothing passes under the type any more. No display type on the site casts a shadow. */
 
   /*
     The `.js .rv` reveal system is gone, and this is why nothing on the site appeared to animate.
@@ -2701,7 +2690,7 @@
   .connection-layout, .developer-layout { display: grid; grid-template-columns: minmax(280px, 0.72fr) minmax(0, 1.28fr); gap: 1px; background: var(--seam); border: 1px solid var(--hairline); }
   .connection-form, .api-key-form { display: flex; flex-direction: column; gap: 9px; background: var(--g1); padding: clamp(18px, 2.4vw, 28px); }
   .connection-form label, .api-key-form > label, .api-key-form legend { color: var(--text-lo); font-family: var(--f-sans); font-size: var(--t-1); letter-spacing: 0; }
-  .connection-form label small { color: var(--text-lo); text-transform: none; letter-spacing: 0; }
+  .connection-form label small { color: var(--text-lo); font-size: var(--t-1); text-transform: none; letter-spacing: 0; }
   .connection-form input, .connection-form select, .api-key-form input, .api-key-form select { width: 100%; border: 1px solid var(--hairline-hi); border-radius: var(--r-paper); background: var(--ground); color: var(--text-hi); padding: 10px 11px; font: 12px var(--f-mono); }
   .connection-form button[type="submit"], .api-key-form button[type="submit"] { margin-top: 8px; justify-content: center; }
   .field-help { margin: 2px 0 7px; color: var(--text-lo); font: var(--t-1)/1.65 var(--f-sans); }
