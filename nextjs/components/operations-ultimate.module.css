@@ -35,7 +35,7 @@
 .events li { display: grid; grid-template-columns: minmax(150px, .45fr) minmax(0, 1fr) auto; gap: 14px; padding: 13px 18px; border-bottom: 1px solid var(--hairline); }
 .events strong { color: var(--text-hi); font-size: 12px; }
 .events span { color: var(--text-lo); font-size: 12px; overflow-wrap: anywhere; }
-.refresh { min-height: 36px; padding: 7px 12px; border: 1px solid var(--hairline-hi); border-radius: var(--r-inst, 6px); color: var(--text-hi); font: 500 13px var(--f-sans); }
+.refresh { min-height: 44px; padding: 7px 12px; border: 1px solid var(--hairline-hi); border-radius: var(--r-inst, 6px); color: var(--text-hi); font: 500 13px var(--f-sans); }
 @media (max-width: 760px) {
   .head { align-items: start; flex-direction: column; }
   .streamState { text-align: left; }

@@ -48,6 +48,10 @@
 /* Selection and hover are inset rings, not outlines, so `outline` stays free for the one
    global :focus-visible ring: a focused card that is also selected still shows both. */
 .evidenceCard[data-selected="true"] { box-shadow: inset 0 0 0 2px var(--verified, #9bb8a4); }
+/* The cards are opaque and paint in DOM order, so the global ring's 2px offset on a focused card
+   is painted over by its right and lower neighbours unless the focused card is lifted. This is
+   the lift the deleted shared `outline` rule carried; the ring itself is still the global one. */
+.evidenceCard:focus-visible { position: relative; z-index: 1; }
 .evidenceCard span, .evidenceCard small { color: var(--studio-faint); font: 12px var(--f-mono, monospace); letter-spacing: .06em; }
 .evidenceCard span { color: var(--verified, #9bb8a4); }
 .evidenceCard strong { flex: 1; color: var(--studio-ink); font-size: 12px; font-weight: 400; line-height: 1.55; }

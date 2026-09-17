@@ -84,6 +84,31 @@ describe("workspace mobile layout contract", () => {
   });
 
   /*
+    n1/n2, WCAG 2.4.7. A CSS module is unlayered, so an `outline` in one of these sheets beats the
+    single layered `:focus-visible { outline: 2px solid var(--verified) }` in app/tavonel.css no
+    matter how specific the global rule is -- which is how `.node:focus-visible { outline: none }`
+    left a keyboard user on the graph canvas with no indicator at all. None of the workspace sheets
+    paints its own; selection and hover use inset box-shadows so `outline` stays the ring's alone.
+  */
+  it("leaves the focus ring to the one global rule", () => {
+    const sheets = [
+      "../app/workspace-final-polish.css",
+      "../app/workspace/workspace-ultimate.module.css",
+      "../components/change-inbox.module.css",
+      "../components/operations-ultimate.module.css",
+      "../components/world-directory-tree.module.css",
+      "../components/world-graph-canvas.module.css",
+      "../components/world-ontology-viewer.module.css",
+      "../components/world-studio-ultimate.module.css",
+      "../components/world-version-diff.module.css",
+    ];
+    for (const path of sheets) {
+      const css = readFileSync(new URL(path, import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+      expect(css, `${path} paints its own focus style`).not.toMatch(/\boutline(-\w+)?\s*:/);
+    }
+  });
+
+  /*
     BQ-023 / one filled primary per viewport: on a RETURNING workspace the state hero already
     holds the filled control, so the drop box's first action steps back to a ghost. The rule
     changes a button face only -- it must not bring back the compacted 76px box D6 removed.
