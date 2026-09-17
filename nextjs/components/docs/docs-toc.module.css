@@ -24,11 +24,11 @@
 .list, .list ul { margin: 0; padding: 0; list-style: none; min-width: 0; }
 .list > li + li { margin-top: 20px; }
 .group { margin: 0 0 8px; font-family: var(--f-mono); font-size: 11px; letter-spacing: .1em; color: var(--text-mid); }
-.list a { display: block; padding: 6px 0; font-size: 14px; line-height: 1.45; color: var(--text-lo); text-decoration: none; overflow-wrap: anywhere; }
-.list a:hover { color: var(--text-hi); }
-.list a[aria-current="page"] { color: var(--text-hi); font-weight: 500; }
+.list .link { display: block; padding: 6px 0; font-size: 14px; line-height: 1.45; color: var(--text-lo); overflow-wrap: anywhere; }
+.list .link:hover { color: var(--text-hi); }
+.list .link[aria-current="page"] { color: var(--text-hi); font-weight: 500; }
 @media (pointer: coarse), (max-width: 1079px) {
-  .list a { min-height: 44px; display: flex; align-items: center; }
+  .list .link { min-height: 44px; display: flex; align-items: center; }
 }
 .layout { display: grid; gap: clamp(24px, 3vw, 44px); min-width: 0; }
 @media (min-width: 1080px) {

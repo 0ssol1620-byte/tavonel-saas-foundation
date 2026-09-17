@@ -55,7 +55,7 @@ export function PageTocList({ entries }: { entries: readonly TocEntry[] }) {
       <ul>
         {entries.map((entry) => (
           <li key={entry.id}>
-            <a href={`#${entry.id}`} aria-current={entry.id === current ? "true" : undefined}>
+            <a className={styles.link} href={`#${entry.id}`} aria-current={entry.id === current ? "true" : undefined}>
               {entry.label}
             </a>
           </li>

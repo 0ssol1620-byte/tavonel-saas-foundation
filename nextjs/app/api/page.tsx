@@ -199,7 +199,7 @@ export default async function ApiReferencePage() {
                 <ul>
                   {group.endpoints.map((endpoint) => (
                     <li key={endpoint.operationId}>
-                      <a href={`#${endpoint.operationId}`}>
+                      <a className={styles.indexLink} href={`#${endpoint.operationId}`}>
                         <b data-method={endpoint.method}>{endpoint.method}</b>
                         <span>{endpoint.summary}</span>
                       </a>

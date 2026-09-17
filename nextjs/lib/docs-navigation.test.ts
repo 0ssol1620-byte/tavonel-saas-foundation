@@ -192,7 +192,10 @@ describe("documentation section index", () => {
 
   it("marks the section being read, with the attribute assistive technology reads", () => {
     expect(docsToc).toContain('aria-current={section.slug === current ? "page" : undefined}');
-    expect(tocCss).toContain('.list a[aria-current="page"]');
+    // BQ-030: the anchor carries a class now, so app/ux-polish.css stops reading a list of
+    // twenty-two sections as twenty-two prose links. What the rule below styles is the same
+    // anchor in the same state; only the selector it is reached by changed.
+    expect(tocCss).toContain('.list .link[aria-current="page"]');
   });
 
   it("needs no client JavaScript: a details element and real links", () => {

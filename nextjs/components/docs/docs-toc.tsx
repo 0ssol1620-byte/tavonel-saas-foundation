@@ -39,7 +39,19 @@ export function DocsToc({ current }: { current: string }) {
           <ul>
             {DOCS_SECTIONS.filter((section) => section.group === group).map((section) => (
               <li key={section.slug}>
+                {/*
+                  BQ-030. A class, so the prose-link rule does not treat this as prose.
+
+                  app/ux-polish.css underlines `:is(p, li, dd, td) > a:not([class])` inside
+                  `.scene`, which is right for a link in a sentence and wrong for a list of
+                  sections: this anchor is a classless <a> inside an <li>, so it matched, and
+                  the module's own `text-decoration: none` lost on specificity. Twenty-two
+                  navigation entries rendered as twenty-two body links. Naming the class is
+                  the fix the rule already provides for; raising specificity here would just
+                  be the same argument at a higher volume.
+                */}
                 <Link
+                  className={styles.link}
                   href={`/docs/${section.slug}` as Route}
                   aria-current={section.slug === current ? "page" : undefined}
                 >

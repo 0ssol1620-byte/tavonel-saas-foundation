@@ -38,7 +38,7 @@
   gap: 2px;
 }
 
-.toc a {
+.toc .link {
   display: block;
   padding: 3px 0 3px 10px;
   border-left: 2px solid transparent;
@@ -53,14 +53,14 @@
   rather than a second kind of highlight -- and it is a colour step plus a rule, never colour
   alone, so it survives a reader who cannot tell the two greys apart.
 */
-.toc a[aria-current] { border-left-color: var(--verified); color: var(--text-hi); }
+.toc .link[aria-current] { border-left-color: var(--verified); color: var(--text-hi); }
 
 @media (hover: hover) and (pointer: fine) {
-  .toc a:hover { color: var(--text-hi); }
+  .toc .link:hover { color: var(--text-hi); }
 }
 
 @media (pointer: coarse) {
-  .toc a { min-height: 44px; display: flex; align-items: center; }
+  .toc .link { min-height: 44px; display: flex; align-items: center; }
 }
 
 /*
