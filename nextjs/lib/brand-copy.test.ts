@@ -1066,6 +1066,10 @@ describe("the site's own vocabulary", () => {
     "Scope an Enterprise pilot",
     "Ask a security review question",
     "Ask a privacy question",
+    // BQ-136: /status closes on the thing it asks for twice in its own prose -- report what
+    // you are seeing rather than wait for it to appear here. "Request access" on a page a
+    // reader opened because something looks broken is a different conversation from this one.
+    "Report an outage",
   ];
 
   it("names the two site-wide actions from their constants on every marketing route", () => {

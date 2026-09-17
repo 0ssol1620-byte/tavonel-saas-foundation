@@ -103,7 +103,16 @@ export default async function StatusPage() {
   const probe = buildProbeSection(
     signer ? await readProbeHistory(signer) : { ok: false as const, code: "PROBE_STORE_NOT_CONFIGURED" },
   );
-  return <PolicyLayout title="TAVONEL service status" intro={<>Each row below is TAVONEL&rsquo;s live configuration and activation state, read {CHECKED_AT.format(new Date(status.generatedAt))} KST when this page rendered: &ldquo;operational&rdquo; means a component is configured and its gate is open. Whether a request recently succeeded through one is the separate question the scheduled checks answer further down. Report an outage you are seeing rather than waiting for it to appear here.</>}>
+    /*
+    BQ-136. The action this page closes on is the one it spends three paragraphs asking for.
+
+    PolicyLayout ends every document with "Back to the Trust Center", which is right for a
+    policy a reader arrived at from a contract. It is wrong here: somebody on the status page
+    is on it because something looks broken, and this page tells them twice to report what
+    they are seeing rather than wait for it to appear -- then offered them a link to a
+    marketing index. The reporting route is the closing action.
+  */
+  return <PolicyLayout closing={<Link className="btn" href={"/contact" as Route}>Report an outage</Link>} title="TAVONEL service status" intro={<>Each row below is TAVONEL&rsquo;s live configuration and activation state, read {CHECKED_AT.format(new Date(status.generatedAt))} KST when this page rendered: &ldquo;operational&rdquo; means a component is configured and its gate is open. Whether a request recently succeeded through one is the separate question the scheduled checks answer further down. Report an outage you are seeing rather than waiting for it to appear here.</>}>
     <h3>Configuration and activation state</h3>
     <div className="status-list">{Object.entries(status.components).map(([key, value]) => <article key={key} data-state={value.state}><span>{value.state.replaceAll("_", " ")}</span><h3>{COMPONENT_LABEL[key] ?? key}</h3><p>{value.detail}</p></article>)}</div>
 

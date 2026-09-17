@@ -490,3 +490,16 @@
   .dev-paths { grid-template-rows: auto; }
   .dev-paths > .link { grid-row: auto; grid-template-rows: none; }
 }
+
+/*
+  BQ-136. The changelog entry header, after the chips came off it.
+
+  `.changelog-entry header a` was the bare "#" permalink and carried `margin-left: auto` to push
+  it to the far end of the row. The date is the link now, so it sits where the date sat, and the
+  rule that pushed it away is what would move the date instead. The date itself goes from 10px
+  mono to the type floor: a rendered date is prose, and the machine form is already in `datetime`.
+*/
+.changelog-entry header a { margin-left: 0; color: var(--text-mid); font: inherit; }
+.changelog-entry header a:hover { color: var(--text-hi); }
+.changelog-entry header time { color: inherit; font: inherit; font-size: 13px; letter-spacing: 0; }
+.changelog-entry header b { font: 500 12px var(--f-sans); letter-spacing: 0; color: var(--verified); }

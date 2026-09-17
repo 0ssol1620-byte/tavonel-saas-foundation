@@ -224,14 +224,25 @@ export default function SecurityPage() {
               </div>
 
               <h2 id="what-holds-what">What holds what</h2>
-              <div className="chain">
+              {/*
+                BQ-136. Four names and what each one holds is a definition list.
+
+                It was four cards in a two-column grid, each with an <h2> inside it -- so the
+                page's heading outline carried "The browser", "Object storage", "The
+                application" and "The database" as siblings of its real sections, and a
+                reader walking the page by heading met four nouns with no question above them.
+                A <dl> says the relationship the cards were drawing: this term, that
+                definition. `.connector-legend` is the same list /integrations uses for the
+                same shape, so this adds no CSS.
+              */}
+              <dl className="connector-legend">
                 {PATH.map(([name, text]) => (
-                  <article className="link" key={name}>
-                    <h2>{name}</h2>
-                    <p>{text}</p>
-                  </article>
+                  <div key={name}>
+                    <dt>{name}</dt>
+                    <dd>{text}</dd>
+                  </div>
                 ))}
-              </div>
+              </dl>
 
               {/*
                 BA-155. One grid, not a controls grid followed by a section labelled "NOT ANSWERED
