@@ -19,7 +19,11 @@
 /* ---- type floor and voices ---------------------------------------------------------- */
 .one-path-workspace .workspace-content { gap: var(--ws-gap); padding: clamp(20px, 2.6vw, 36px) clamp(16px, 3vw, 40px) 72px; }
 .one-path-workspace .workspace-content h2 { margin: 0; color: var(--text-hi); font: 600 18px/1.35 var(--f-sans); letter-spacing: -.01em; }
-.one-path-workspace .eyebrow { color: var(--text-lo); font: 500 12px/1.3 var(--f-mono); letter-spacing: .08em; }
+/* One eyebrow (sans, sentence case, no rule ornament) and one state label (mono caps, machine
+   state only). The workspace used to run both voices through .eyebrow, which is why every
+   section header read like a terminal banner. */
+.one-path-workspace .eyebrow { color: var(--text-mid); font: 500 12px/1.3 var(--f-sans); letter-spacing: .06em; text-transform: none; }
+.one-path-workspace .state-label { color: var(--text-lo); font: 500 12px/1.3 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; }
 .one-path-workspace .fine, .one-path-workspace small { font-size: 12px; line-height: 1.5; }
 .one-path-workspace .card p, .one-path-workspace .card li { font-size: 14px; line-height: 1.55; }
 .one-path-workspace .card { border-radius: var(--ws-radius); padding: 20px; gap: 12px; }
@@ -43,7 +47,13 @@
   transition: background-color var(--t-2) var(--e-out), border-color var(--t-2) var(--e-out), color var(--t-2) var(--e-out), transform var(--t-2) var(--e-out);
 }
 .one-path-workspace .workspace-content button:active:not(:disabled) { transform: scale(.98); }
-.one-path-workspace .workspace-content button:disabled { cursor: not-allowed; opacity: .6; }
+/* BQ-092: opacity .6 put a filled primary at 2.5:1. A token pair holds above 3:1 against the
+   ground and does not fade the label out of readability with it. */
+.one-path-workspace .workspace-content button:disabled,
+.one-path-workspace .workspace-content button[aria-disabled="true"] {
+  cursor: not-allowed; opacity: 1;
+  background: var(--g2); border-color: var(--hairline-hi); color: var(--text-lo);
+}
 .one-path-workspace kbd { font-family: var(--f-mono); }
 
 /* content-visibility on rows painted them as empty boxes in any capture and jumped on
@@ -78,7 +88,8 @@
 
 /* ---- compile block: the stage and its counted panel travel together -------------------- */
 .one-path-workspace .workspace-compile-block { display: grid; gap: 1px; border: 1px solid var(--hairline-hi); border-radius: var(--ws-radius); background: var(--hairline); overflow: hidden; }
-.one-path-workspace .workspace-compile-block .compile-stage { margin: 0; border: 0; border-radius: 0; aspect-ratio: 16 / 6; max-height: none; background: var(--ground); }
+/* BQ-083: one pane at a time needs room for a pane, not a 16/6 letterbox split four ways. */
+.one-path-workspace .workspace-compile-block .compile-stage { margin: 0; border: 0; border-radius: 0; aspect-ratio: 16 / 9; max-height: none; background: var(--ground); }
 .one-path-workspace .workspace-compile-block .workspace-compile-job { margin: 0; border: 0; border-radius: 0; background: var(--g1); }
 .one-path-workspace .workspace-compile-job h2 { font: 600 17px/1.35 var(--f-sans); }
 .one-path-workspace .workspace-compile-job .fine { color: var(--text-mid); font-size: 13px; }
@@ -105,39 +116,39 @@
 .one-path-workspace .workspace-ai-use-actions button, .one-path-workspace .workspace-ai-use-actions a { font-size: 13px; }
 .one-path-workspace .workspace-ai-package-files code { font-size: 12px; }
 
-/* ---- intake: one large target on a first run, one bar afterwards ---------------------- */
-.one-path-workspace .workspace-intake { grid-template-columns: minmax(0, 1fr); gap: 0; padding: 0; border: 1px dashed var(--hairline-hi); border-radius: var(--ws-radius); background: var(--g1); transition: border-color var(--t-2) var(--e-out), background-color var(--t-2) var(--e-out); }
-.one-path-workspace .workspace-intake[data-active="true"] { border-style: solid; border-color: var(--verified); background: var(--verified-deep); }
+/* ---- intake: always a real box ---------------------------------------------------------
+   D6/BQ-023. It used to be a faint dashed outline that collapsed into a 76px action bar as
+   soon as one source existed, with the drive and server connectors hidden by four separate
+   rules and gone entirely below 768px. It is a box now: a visible border on its own ground,
+   the connector tiles inside it, at every width down to 360px. A returning workspace gets a
+   shorter box, not a toolbar. */
+.one-path-workspace .workspace-intake {
+  grid-template-columns: minmax(0, 1fr); gap: 0; padding: 0;
+  border: 1px solid var(--hairline-hi); border-radius: var(--ws-radius); background: var(--g1);
+  transition: border-color var(--t-2) var(--e-out), background-color var(--t-2) var(--e-out);
+}
+.one-path-workspace .workspace-intake[data-active="true"] { border-color: var(--verified); background: var(--verified-deep); }
 .one-path-workspace .workspace-intake[data-active="true"] .workspace-intake-copy { background: transparent; }
-.one-path-workspace .workspace-intake-copy { min-height: 300px; padding: clamp(28px, 4vw, 56px) 24px; background: transparent; border-radius: var(--ws-radius); }
-.one-path-workspace .workspace-intake-copy h2 { margin: 12px 0 8px; font: 600 clamp(24px, 2.4vw, 30px)/1.15 var(--f-sans); letter-spacing: -.02em; }
-.one-path-workspace .workspace-intake-copy > p:not(.eyebrow) { font-size: 15px; }
-.one-path-workspace .workspace-intake-copy > small { display: block; margin-top: 16px; color: var(--text-lo); font: 12px var(--f-mono); letter-spacing: .04em; }
-.one-path-workspace .workspace-intake-limits { margin-top: 6px !important; font-family: var(--f-sans) !important; letter-spacing: 0 !important; }
-.one-path-workspace .workspace-intake-actions { gap: 8px; margin-top: 20px; }
-.one-path-workspace .workspace-intake-actions button { min-height: 40px; padding: 0 16px; border: 1px solid var(--hairline-hi); border-radius: var(--ws-radius); background: transparent; color: var(--text-hi); font-size: 14px; }
+.one-path-workspace .workspace-intake-copy { display: grid; align-content: center; min-height: 320px; padding: clamp(24px, 3.4vw, 40px) clamp(18px, 2.6vw, 32px); background: transparent; border-radius: var(--ws-radius); }
+/* A returning workspace has work above the box, so the box is shorter -- and still a box. */
+.one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-copy { min-height: 200px; }
+.one-path-workspace .workspace-intake-copy h1,
+.one-path-workspace .workspace-intake-copy h2 { margin: 12px 0 8px; color: var(--text-hi); font: 600 clamp(22px, 2.2vw, 28px)/1.18 var(--f-sans); letter-spacing: -.02em; }
+.one-path-workspace .workspace-intake-copy > p:not(.eyebrow) { margin: 0; max-width: 56ch; color: var(--text-mid); font-size: 15px; line-height: 1.55; }
+.one-path-workspace .workspace-intake-copy > small { display: block; margin-top: 16px; color: var(--text-lo); font: 12px var(--f-sans); letter-spacing: 0; }
+.one-path-workspace .workspace-intake-limits { margin-top: 6px !important; }
+.one-path-workspace .workspace-intake-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+.one-path-workspace .workspace-intake-actions button { min-height: 44px; padding: 0 16px; border: 1px solid var(--hairline-hi); border-radius: var(--ws-radius); background: transparent; color: var(--text-hi); font-size: 14px; }
 .one-path-workspace .workspace-intake-actions button:hover:not(:disabled) { background: var(--g2); border-color: var(--text-lo); }
 .one-path-workspace .workspace-intake-copy .workspace-intake-actions button:first-child,
 .one-path-workspace .workspace-preflight .workspace-intake-actions button:first-child { background: var(--text-hi); border-color: var(--text-hi); color: var(--ground); }
 .one-path-workspace .workspace-intake-copy .workspace-intake-actions button:first-child:hover:not(:disabled),
 .one-path-workspace .workspace-preflight .workspace-intake-actions button:first-child:hover:not(:disabled) { background: #fff; }
-/* Provider cards under the drop zone on Knowledge (FINAL_WEB §14). */
+/* The connectors live inside the box. Availability text is WORKSPACE_SOURCE_CHOICES verbatim. */
 .one-path-workspace .workspace-source-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--hairline); text-align: left; }
 .one-path-workspace .workspace-source-choices button { min-height: 56px; display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--hairline); border-radius: var(--ws-radius-sm); background: var(--ground); color: var(--text-hi); text-align: left; font-size: 14px; }
 .one-path-workspace .workspace-source-choices button:hover { border-color: var(--text-lo); }
-.one-path-workspace .workspace-source-choices small { color: var(--text-lo); font: 12px var(--f-mono); }
-/* The compact bar once documents exist: one row, still a drop target. */
-.one-path-workspace .workspace-intake[data-existing-documents="1"] { border-color: var(--hairline-hi); }
-.one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-copy { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 20px; min-height: 0; padding: 14px 18px; text-align: left; }
-.one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-copy .eyebrow,
-.one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-copy > small,
-.one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-source-choices { display: none; }
-.one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-copy h2 { grid-column: 1; grid-row: 1; margin: 0; font: 600 15px/1.3 var(--f-sans); letter-spacing: 0; }
-.one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-copy h2::after { content: none; }
-.one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-copy > p:not(.eyebrow) { grid-column: 1; grid-row: 2; margin: 0; color: var(--text-lo); font-size: 13px; }
-.one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-actions { grid-column: 2; grid-row: 1 / span 2; margin: 0; justify-content: end; }
-.one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-actions button { min-height: 36px; padding: 0 14px; font-size: 13px; }
-.one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-copy .workspace-intake-actions button:first-child { background: transparent; border-color: var(--hairline-hi); color: var(--text-hi); }
+.one-path-workspace .workspace-source-choices small { color: var(--text-lo); font: 12px var(--f-sans); }
 /* Loading and unavailable stay honest and quiet. */
 .one-path-workspace .workspace-intake-loading { min-height: 160px; }
 .one-path-workspace .workspace-intake-loading h2 { font-size: 20px; }
@@ -227,14 +238,70 @@
 .one-path-workspace .ask-result li b, .one-path-workspace .ask-result li span { font-size: 12px; }
 .one-path-workspace .ask-result button { min-height: 34px; padding: 0 12px; border: 1px solid var(--hairline-hi); font-size: 13px; }
 .one-path-workspace .billing-actions button, .one-path-workspace .billing-actions a { min-height: 38px; padding: 0 14px; border: 1px solid var(--hairline-hi); border-radius: var(--ws-radius); color: var(--text-hi); font: 500 14px var(--f-sans); }
-.one-path-workspace nav.billing-actions button[aria-current="page"] { background: var(--g3); border-color: var(--hairline-hi); }
+/* One tab face site-wide: a bare label with a 2px inset underline when selected. Settings used
+   to render its two views as filled buttons, which is the third control face on that surface. */
+.one-path-workspace nav.billing-actions { gap: 0; border-bottom: 1px solid var(--hairline); }
+.one-path-workspace nav.billing-actions button { min-height: 40px; padding: 0 14px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: var(--text-lo); }
+.one-path-workspace nav.billing-actions button[aria-current="page"] { background: transparent; border-bottom-color: var(--verified); color: var(--text-hi); }
 .one-path-workspace .billing-card dt { font-size: 12px; }
 .one-path-workspace .billing-card dd { font-variant-numeric: tabular-nums; }
 .one-path-workspace .gate-list strong { font-size: 14px; }
 .one-path-workspace .gate-list p { font-size: 13px; }
 .one-path-workspace .pill { font: 500 12px var(--f-mono); }
 .one-path-workspace .workspace-access-gate p { max-width: 62ch; color: var(--text-mid); }
-.one-path-workspace .world-empty { padding: 28px 16px; border: 1px dashed var(--hairline-hi); border-radius: var(--ws-radius-sm); color: var(--text-lo); font: 14px var(--f-sans); text-align: center; }
+/* BQ-096: an empty state is its sentence plus at most one action. The 500px void it used to
+   reserve read as a component that had failed to render. Solid hairline, not a fifth dashed
+   box on the screen (BQ-133). */
+.one-path-workspace .world-empty { display: grid; gap: 10px; justify-items: center; min-height: 0; padding: 20px 16px; border: 1px solid var(--hairline); border-radius: var(--ws-radius-sm); color: var(--text-lo); font: 14px var(--f-sans); text-align: center; }
+.one-path-workspace .document-card .empty { min-height: 0; padding: 20px 16px; }
+
+/* ---- native controls wear the token system (BQ-024) --------------------------------------
+   The review-queue filter was an unstyled OS select in the middle of a designed surface:
+   tavonel.css sets appearance:none for .workspace select but never gave it a face, so it lost
+   the platform chrome and gained nothing. Own chevron, own border, own height. */
+.one-path-workspace select {
+  appearance: none; -webkit-appearance: none;
+  width: 100%; max-width: 420px; min-height: 40px;
+  padding: 0 36px 0 12px;
+  border: 1px solid var(--hairline-hi); border-radius: var(--ws-radius);
+  background-color: var(--ground); color: var(--text-hi);
+  font: 14px var(--f-sans);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--text-lo) 50%),
+    linear-gradient(135deg, var(--text-lo) 50%, transparent 50%);
+  background-position: calc(100% - 18px) calc(50% - 2px), calc(100% - 13px) calc(50% - 2px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+.one-path-workspace select:hover { border-color: var(--text-lo); }
+.one-path-workspace input[type="text"], .one-path-workspace textarea {
+  border: 1px solid var(--hairline-hi); border-radius: var(--ws-radius); background: var(--ground); color: var(--text-hi); font: 14px/1.5 var(--f-sans); padding: 10px 12px;
+}
+
+/* ---- the More panel, on the token system (BQ-095, BQ-026) ---------------------------------
+   It used to carry a green palette and 12px/9px radii found nowhere else, a summary whose
+   geometry differed from its sibling nav rows, and a panel anchored to its own bottom edge --
+   which on a full-height desktop rail opened it off the top of the viewport. These rules load
+   after one-path.css and replace that block; see the cross-lane request to delete it there. */
+.one-path-workspace .one-path-more > summary {
+  min-height: 40px; display: grid; grid-template-columns: 20px minmax(0, 1fr); align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: var(--ws-radius);
+  color: var(--text-lo); font: 500 14px/1.2 var(--f-sans); text-align: left;
+}
+.one-path-workspace .one-path-more[open] > summary { color: var(--text-hi); background: var(--g3); }
+.one-path-workspace .one-path-more-panel {
+  position: absolute; left: calc(100% + 10px); top: 0; bottom: auto;
+  width: 248px; max-height: min(560px, 70svh); overflow: auto; padding: 6px;
+  border: 1px solid var(--hairline-hi); border-radius: var(--ws-radius);
+  background: var(--g1); box-shadow: var(--depth-overlay, 0 18px 50px rgb(0 0 0 / .34));
+}
+.one-path-workspace .one-path-more-panel p { margin: 0; padding: 10px 10px 6px; color: var(--text-mid); font: 500 12px var(--f-sans); letter-spacing: .06em; }
+.one-path-workspace .one-path-more-panel button { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 10px 10px; border-radius: var(--ws-radius); color: var(--text-lo); text-align: left; font: 500 14px var(--f-sans); }
+.one-path-workspace .one-path-more-panel button:hover, .one-path-workspace .one-path-more-panel button:focus-visible { color: var(--text-hi); background: var(--g2); }
+.one-path-workspace .one-path-more-panel button[aria-current="page"] { color: var(--text-hi); background: var(--g3); }
+.one-path-workspace .one-path-more-panel button[aria-pressed="true"] { color: var(--text-hi); }
+.one-path-workspace .one-path-more-panel button[aria-pressed="true"] svg { color: var(--verified); }
+.one-path-workspace .one-path-more-session { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--hairline); }
 
 /* ---- motion: state reports; keyboard-initiated actions get none --------------------------- */
 @media (prefers-reduced-motion: no-preference) {
@@ -247,28 +314,40 @@
 
 /* ---- responsive --------------------------------------------------------------------- */
 @media (max-width: 1023px) {
-  .one-path-workspace .workspace-content { padding: 18px 16px calc(96px + env(safe-area-inset-bottom)); gap: 18px; overflow-x: clip; }
+  /* BQ-085/BQ-133: one bottom reserve. The shell already reserves the bar height plus the
+     safe area on .shell; adding a second 96px here doubled it to 160px of dead space while
+     the last list row was still under the bar on the surfaces that scroll inside a card. */
+  .one-path-workspace .workspace-content { padding: 18px 16px 32px; gap: 18px; overflow-x: clip; }
   .one-path-workspace .workspace-compile-block .compile-stage { aspect-ratio: 4 / 3; }
   .one-path-workspace .workspace-complete { grid-template-columns: minmax(0, 1fr); }
   .one-path-workspace .workspace-getting-started-body { grid-template-columns: minmax(0, 1fr); }
   .one-path-workspace .workspace-attention-items li { grid-template-columns: minmax(0, 1fr); align-items: start; gap: 6px; }
-  .one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-copy { grid-template-columns: minmax(0, 1fr); }
-  .one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-actions { grid-column: 1; grid-row: auto; justify-content: start; }
-  /* Tablet keeps the centred first-run target; the older sheet's phone geometry starts here too, so it is corrected here. */
-  .one-path-workspace .workspace-intake-copy { min-height: 0; padding: 32px 20px; text-align: center; }
-  .one-path-workspace .workspace-intake-copy h2 { max-width: 16ch; margin: 10px auto 8px; font-size: 26px; text-wrap: balance; }
-  .one-path-workspace .workspace-intake-copy > p:not(.eyebrow) { max-width: 36ch; margin-inline: auto; font-size: 15px; }
+  /* BQ-133: the 16ch cap broke a four-word heading over four lines on every tablet width.
+     A measure belongs on prose, not on a heading of five words. */
+  .one-path-workspace .workspace-intake-copy { min-height: 280px; padding: 28px 20px; text-align: center; }
+  .one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-copy { min-height: 200px; }
+  .one-path-workspace .workspace-intake-copy h1,
+  .one-path-workspace .workspace-intake-copy h2 { margin: 10px auto 8px; font-size: 26px; text-wrap: balance; }
+  .one-path-workspace .workspace-intake-copy > p:not(.eyebrow) { max-width: 44ch; margin-inline: auto; font-size: 15px; }
   .one-path-workspace .workspace-intake-copy .workspace-intake-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; max-width: 520px; margin-inline: auto; gap: 8px; }
   .one-path-workspace .workspace-intake-copy .workspace-intake-actions button { width: 100%; min-height: 44px; text-align: center; justify-content: center; font-size: 14px; }
   .one-path-workspace .workspace-intake-copy .workspace-intake-actions button:last-child:nth-child(odd) { grid-column: 1 / -1; }
   .one-path-workspace .workspace-intake-copy > small { font-size: 12px; letter-spacing: .04em; }
 }
 @media (max-width: 767px) {
-  .one-path-workspace .workspace-intake-copy { padding: 28px 16px; }
+  .one-path-workspace .workspace-intake-copy { min-height: 240px; padding: 24px 16px; }
   .one-path-workspace .workspace-intake-actions button { width: 100%; min-height: 44px; }
-  .one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-actions button { min-height: 44px; }
-  .one-path-workspace .workspace-source-choices { display: none; }
-  .one-path-workspace .workspace-compile-block .compile-stage { aspect-ratio: 1 / 1; }
+  /* BQ-023: the connectors stay in the box on a phone. This display:none was the fourth of
+     the four hiding rules, and it is the one that removed drive and server intake below
+     768px entirely -- the only widths where "connect the system it already lives in" is the
+     likelier answer than picking files. */
+  .one-path-workspace .workspace-source-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); margin-top: 18px; padding-top: 16px; }
+  .one-path-workspace .workspace-compile-block .compile-stage { aspect-ratio: 4 / 3; }
+  /* BQ-087: a source name is the thing being triaged; it wraps rather than ellipsing into
+     three characters and a dot. */
+  .one-path-workspace .board-row-summary { grid-template-columns: minmax(0, 1fr) auto; align-items: start; row-gap: 4px; padding-block: 10px; }
+  .one-path-workspace .board-row-name { white-space: normal; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .one-path-workspace .board-row-status { grid-column: 1; }
   .one-path-workspace .workspace-complete-actions button, .one-path-workspace .workspace-attention-items button { width: 100%; min-height: 44px; }
   .one-path-workspace .board-toolbar { flex-direction: column; align-items: stretch; }
   .one-path-workspace .board-search input { width: 100%; }
@@ -279,3 +358,18 @@
   .one-path-workspace .workspace-content { padding-inline: 14px; }
   .one-path-workspace .workspace-preflight dl { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ---- flattening, 2026-09-17 ---------------------------------------------------------------
+   BQ-133: Ask nested cards three deep -- the .card surface, the AI-options card inside it, and
+   the disclosure card inside that. One card level: the inner blocks are separated by a seam. */
+.one-path-workspace .ask-studio .workspace-ai-use-guide,
+.one-path-workspace .workspace-complete .workspace-ai-use-guide {
+  margin: 0; border: 0; border-top: 1px solid var(--hairline); border-radius: 0; background: transparent;
+}
+.one-path-workspace .one-path-ai-options { margin-bottom: 0; }
+
+/* BQ-133: the settings tables are prose-and-number, not machine identifiers. */
+.one-path-workspace .billing-card dt,
+.one-path-workspace .gate-list strong,
+.one-path-workspace .gate-list p { font-family: var(--f-sans); letter-spacing: 0; text-transform: none; }
+.one-path-workspace .billing-card dd { font-family: var(--f-mono); }

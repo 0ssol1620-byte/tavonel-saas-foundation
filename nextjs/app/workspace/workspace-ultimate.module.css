@@ -22,18 +22,14 @@
 .nav button.current svg { color: var(--verified); }
 .nav button b { min-width: 20px; padding: 1px 6px; color: var(--changed); border: 1px solid var(--changed); border-radius: 999px; font: 12px var(--f-mono); text-align: center; font-variant-numeric: tabular-nums; }
 .secondaryStart { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--hairline); }
-.railFooter { margin-top: auto; display: grid; gap: 2px; padding-top: 10px; border-top: 1px solid var(--hairline); }
-.railFooter button { min-height: 36px; padding: 6px 10px; color: var(--text-lo); text-align: left; border-radius: 6px; font: 13px var(--f-sans); }
-.railFooter button:hover { color: var(--text-hi); background: var(--g2); }
-.railFooter button[aria-pressed="true"] { color: var(--ground); background: var(--verified); }
 /* Privacy mode (FINAL_WEB §41): customer content blurs, status and motion stay legible. */
-.shell[data-privacy="true"] :global(.document-meta strong), .shell[data-privacy="true"] :global(.document-meta code), .shell[data-privacy="true"] :global(.ask-result q), .shell[data-privacy="true"] :global(.collection-result > strong) { color: transparent !important; text-shadow: 0 0 10px var(--text-hi); user-select: none; }
+.shell[data-privacy="true"] :global(.document-meta strong), .shell[data-privacy="true"] :global(.document-meta code), .shell[data-privacy="true"] :global(.ask-result q), .shell[data-privacy="true"] :global(.collection-result > strong),
 .shell[data-privacy="true"] :global([data-sensitive="content"]) { filter: blur(12px); opacity: .18; pointer-events: none; user-select: none; }
 .body { min-width: 0; }
 .topbar { position: sticky; top: 0; z-index: 10; min-height: var(--ultimate-bar); display: grid; grid-template-columns: minmax(160px, 1fr) repeat(2, minmax(0, auto)) auto auto; align-items: stretch; padding: 0; border-bottom: 1px solid var(--hairline); background: color-mix(in srgb, var(--ground) 94%, transparent); backdrop-filter: blur(14px); }
 .workspaceIdentity, .topStatus, .commandButton { border-right: 1px solid var(--hairline); }
-.workspaceIdentity { display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 8px 18px; }
-.workspaceIdentity span, .topStatus small { color: var(--text-lo); font: 500 12px var(--f-mono); letter-spacing: .08em; }
+.workspaceIdentity { display: flex; align-items: center; gap: 10px; padding: 8px 18px; color: var(--text-hi); }
+.topStatus small { color: var(--text-lo); font: 500 12px var(--f-mono); letter-spacing: .08em; }
 .workspaceIdentity strong, .topStatus b { color: var(--text-hi); font-size: 14px; font-weight: 500; }
 .topStatus { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 2px; padding: 8px 16px; text-align: left; }
 .topStatus:hover { background: var(--g1); }
@@ -56,13 +52,15 @@
 .ownerStrip span { color: var(--text-lo); }
 
 .content { max-width: 1240px; width: 100%; margin: 0 auto; }
+.surfaceTitle { margin: 0 0 4px; color: var(--text-hi); font-size: clamp(22px, 2vw, 28px); font-weight: 600; line-height: 1.15; letter-spacing: -.02em; }
 .stateHero { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 24px; padding: 8px 0 24px; border-bottom: 1px solid var(--hairline-hi); }
 .stateHero > div { display: grid; gap: 8px; }
-.stateHero p { margin: 0; color: var(--text-lo); font: 500 12px var(--f-mono); letter-spacing: .1em; }
+.stateHero p { margin: 0; }
 .stateHero[data-activity="running"] p { color: var(--verified); }
 .stateHero h1 { max-width: 24ch; margin: 0; color: var(--text-hi); font-size: clamp(26px, 2.4vw, 34px); line-height: 1.12; letter-spacing: -.02em; text-wrap: balance; }
 .stateHero span { max-width: 62ch; color: var(--text-lo); font-size: 15px; line-height: 1.55; }
 .stateFacts { color: var(--text-lo); font: 13px var(--f-mono); font-variant-numeric: tabular-nums; }
+.stateHero > button[disabled] { background: var(--g2); border-color: var(--hairline-hi); color: var(--text-lo); opacity: 1; }
 .stateHero > button { min-width: 180px; min-height: 40px; padding: 0 16px; background: var(--text-hi); color: var(--ground); border: 1px solid var(--text-hi); border-radius: 6px; font: 500 14px var(--f-sans); transition: background-color 140ms var(--ease), transform 140ms var(--ease); }
 .stateHero > button:hover:not(:disabled) { background: #fff; color: var(--ground); }
 .stateHero > button:active { transform: scale(.98); }
@@ -96,7 +94,9 @@
 @media (max-width: 1023px) {
   .shell { --ultimate-rail: 0px; grid-template-columns: minmax(0, 1fr); padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
   .rail { position: fixed; top: auto; bottom: 0; width: 100%; height: calc(64px + env(safe-area-inset-bottom)); padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); border: 0; border-top: 1px solid var(--hairline-hi); background: var(--g1); }
-  .brand, .railFooter, .workspaceIdentity { display: none; }
+  .brand { display: none; }
+  .workspaceIdentity { padding-inline: 14px; }
+  .workspaceIdentity strong { display: none; }
   /* Four places, named in workspace-ultimate-shell.tsx (`data-mobile-rail`), never counted by position. */
   .nav { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; }
   .nav > div { display: none; }
@@ -106,7 +106,7 @@
   .nav span[data-mobile-label] { font-size: 0; }
   .nav span[data-mobile-label]::after { content: attr(data-mobile-label); font-size: 12px; }
   .nav button b { position: absolute; margin: -26px 0 0 24px; }
-  .topbar { grid-template-columns: repeat(2, minmax(0, 1fr)) 48px auto; min-height: 56px; }
+  .topbar { grid-template-columns: auto repeat(2, minmax(0, 1fr)) 48px auto; min-height: 56px; }
   .topStatus { min-width: 0; padding: 8px 12px; }
   .topStatus b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .commandButton { width: 48px; min-width: 48px; justify-content: center; padding: 0; }
@@ -119,13 +119,15 @@
   .ownerStrip { padding-inline: 16px; }
 }
 @media (max-width: 560px) {
-  .topbar { grid-template-columns: repeat(2, minmax(0, 1fr)) 48px; }
-  .headerAction { display: none; }
+  .topbar { grid-template-columns: auto minmax(0, 1fr) 48px auto; }
+  /* One state chip on the narrowest screens; the other is a tap away in the graph. */
+  .topStatus ~ .topStatus { display: none; }
+  .headerAction { padding-inline: 10px; }
   .accessStrip { grid-template-columns: 1fr; padding: 9px 16px; }
   .accessStrip a { grid-column: 1; grid-row: auto; justify-self: start; }
   .content { padding: 20px 16px 48px; }
   .stateHero { grid-template-columns: minmax(0, 1fr); align-items: start; gap: 16px; }
-  .stateHero h1 { font-size: 24px; }
+  .stateHero h1, .surfaceTitle { font-size: 24px; }
   .stateHero > button { width: 100%; min-height: 44px; }
 }
 @media (prefers-reduced-motion: reduce) {

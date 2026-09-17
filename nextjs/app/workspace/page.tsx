@@ -2093,6 +2093,7 @@ export default function WorkspacePage() {
       stateTitle={stateTitle}
       stateDescription={stateDescription}
       stateFacts={workspaceFacts}
+      stateHero={workspaceState.mode !== "new"}
       onAccess={setAccessSource}
       nextAction={nextAction}
       onNavigate={navigateSurface}
@@ -2212,14 +2213,12 @@ export default function WorkspacePage() {
                     <button type="button" disabled={downloading} onClick={() => void downloadCollection()}>{downloading ? "Preparing…" : "Download signed package"}</button>
                     <button type="button" onClick={() => navigateSurface("review")}>View evidence</button>
                     <button type="button" onClick={() => navigateSettings("trust")}>Verify export</button>
-                    <button type="button" onClick={() => fileRef.current?.click()}>Add sources</button>
                   </>
                 ) : (
                   <>
                     <button type="button" onClick={() => navigateSurface("review")}>Review items</button>
                     <button type="button" onClick={() => navigateSurface("world")}>Inspect candidate</button>
                     <button type="button" disabled={downloading} onClick={() => void downloadCollection()}>{downloading ? "Preparing…" : "Download signed knowledge package"}</button>
-                    <button type="button" onClick={() => fileRef.current?.click()}>Add sources</button>
                   </>
                 )}
               </div>
@@ -2284,9 +2283,11 @@ export default function WorkspacePage() {
                 <p className="eyebrow">
                   {workspaceState.mode === "new" ? "ADD KNOWLEDGE" : "ADD MORE KNOWLEDGE"}
                 </p>
-                <h2 id="workspace-intake-title">
-                  {workspaceState.mode === "new" ? "Drop files, folders or ZIP here" : "Add files, folders or ZIP"}
-                </h2>
+                {workspaceState.mode === "new" ? (
+                  <h1 id="workspace-intake-title">Drop files, folders or ZIP here</h1>
+                ) : (
+                  <h2 id="workspace-intake-title">Add files, folders or ZIP</h2>
+                )}
                 <p>
                   {workspaceState.mode === "new"
                     ? "Upload sources or connect the system where your knowledge already lives."
@@ -2317,16 +2318,19 @@ export default function WorkspacePage() {
                   losing a batch.
                 */}
                 <small className="workspace-intake-limits">{compileLimits}</small>
-                {surface === "sources" ? (
-                  <div className="workspace-source-choices" aria-label="Available source connections">
-                    {WORKSPACE_SOURCE_CHOICES.map((source) => (
-                      <button type="button" key={source.name} onClick={() => navigateSurface("connections")}>
-                        <span>{source.name}</span>
-                        <small>{source.availability}</small>
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
+                {/*
+                  The availability line under each name is WORKSPACE_SOURCE_CHOICES verbatim.
+                  Nothing here states a support level the capability manifest does not; the
+                  provider-specific limits stay on /integrations.
+                */}
+                <div className="workspace-source-choices" aria-label="Available source connections">
+                  {WORKSPACE_SOURCE_CHOICES.map((source) => (
+                    <button type="button" key={source.name} onClick={() => navigateSurface("connections")}>
+                      <span>{source.name}</span>
+                      <small>{source.availability}</small>
+                    </button>
+                  ))}
+                </div>
               </div>
               )}
               {staging ? (
@@ -2497,12 +2501,7 @@ export default function WorkspacePage() {
                 <div className="empty">
                   <FileText size={22} />
                   <strong>No sources yet</strong>
-                  <p>Upload files, a folder or ZIP archive, or connect the system where your knowledge already lives.</p>
-                  {activationPolicy.customerIntake.enabled ? (
-                    <div className="billing-actions">
-                      <button type="button" onClick={() => fileRef.current?.click()}>Upload your first document</button>
-                    </div>
-                  ) : null}
+                  <p>Add files in the box above, or connect the system where your knowledge already lives.</p>
                 </div>
               )}
             </section>

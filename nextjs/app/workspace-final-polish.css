@@ -1,70 +1,22 @@
-/* Final workspace hierarchy pass.
-   Home is an operational summary, not a second copy of the full Sources inventory. */
+/*
+  Workspace hierarchy pass.
 
-/* When Home is active and documents already exist, keep intake to one compact action row. */
-.workspace:has(button[title^="Home"][aria-current="page"]) .workspace-intake[data-existing-documents="1"] .workspace-intake-copy {
-  min-height: 0;
-  grid-template-columns: minmax(0, 1fr) auto;
-  padding: 14px 16px;
-  gap: 4px 18px;
-}
-.workspace:has(button[title^="Home"][aria-current="page"]) .workspace-intake[data-existing-documents="1"] .workspace-intake-copy .eyebrow,
-.workspace:has(button[title^="Home"][aria-current="page"]) .workspace-intake[data-existing-documents="1"] .workspace-intake-copy > p:not(.eyebrow) {
-  display: none;
-}
-.workspace:has(button[title^="Home"][aria-current="page"]) .workspace-intake[data-existing-documents="1"] .workspace-intake-copy h2 {
-  font-size: 14px;
-  font-weight: 540;
-}
-.workspace:has(button[title^="Home"][aria-current="page"]) .workspace-intake[data-existing-documents="1"] .workspace-intake-copy h2::after {
-  content: " · Add or connect sources";
-  color: var(--text-lo);
-  font-weight: 400;
-}
-.workspace:has(button[title^="Home"][aria-current="page"]) .workspace-intake[data-existing-documents="1"] .workspace-intake-actions button {
-  min-height: 34px;
-  padding: 7px 10px;
-}
+  What changed on 2026-09-17 (BQ-086, BQ-023, BQ-133):
 
-/* The compact intake still takes drops, so it still has to look like it does.
-
-   Compacting it here and in `ux-polish.css:137` cost it both of its drop affordances at once:
-   the plain hairline made it read as a heading rule rather than a target, and the drag
-   highlight stopped applying, because `.workspace-intake[data-existing-documents="1"]` is
-   more specific than the `.workspace-intake[data-active="true"]` rule in `tavonel.css` that
-   turns the border green. The founder saw the full drop zone on first paint -- documents are
-   still null then -- and watched it disappear as soon as the first source loaded, with no way
-   left to tell that the bar he was looking at was where files go.
-
-   Dashed, not the 330px hero: the hierarchy pass above is right that intake stops owning half
-   a screen once sources exist. A dashed edge is the cheapest thing that still says "target",
-   and restoring the highlight at a specificity that wins means the feedback returns on drag. */
-.workspace-intake[data-existing-documents="1"] {
-  border: 1px dashed var(--text-xlo);
-}
-.workspace-intake[data-existing-documents="1"][data-active="true"] {
-  border-style: solid;
-  border-color: var(--verified);
-  background: var(--verified);
-}
-
-/* Home already has the exception-first queue. The complete inventory belongs on Sources. */
-.workspace:has(button[title^="Home"][aria-current="page"]) .document-card {
-  display: none;
-}
-
-/* Keep the live view useful but subordinate to the current-state summary. */
-.workspace:has(button[title^="Home"][aria-current="page"]) .compile-stage {
-  max-height: 300px;
-}
-
-/* Source inventory itself remains bounded and scan-friendly on the dedicated Sources surface. */
-.workspace:has(button[title^="Sources"][aria-current="page"]) .document-meta {
-  max-height: min(58vh, 620px);
-}
-.workspace:has(button[title^="Sources"][aria-current="page"]) .document-card > h2 {
-  margin-bottom: 10px;
-}
+  - Every selector that keyed layout off an English button title
+    (`.workspace:has(button[title^="Home"][aria-current="page"])`) is gone. The shell now
+    stamps `data-surface` on its root, so the surface is a fact the markup states rather than
+    a string a copy edit or a translation can break. The `title^="Sources"` block was already
+    dead -- that rail row has said "Knowledge" since the 09-16 redesign -- and the Home rules
+    that hid `.document-card` were dead too: the source inventory only ever renders on
+    Knowledge.
+  - The compacting rules that turned the drop box into a 76px action row are gone with them.
+    D6: the box is always a box, with its connector tiles inside it, at every width.
+  - The `.workspace-recent*` block had no emitter anywhere in app/ or components/ and is
+    deleted rather than restyled.
+  - Nothing here is below the 12px type floor any more, and the drop box no longer borrows
+    `--text-xlo`, which the token pass removes.
+*/
 
 /* Internal identifiers are technical metadata, never the visual emphasis. */
 .board-row-name,
@@ -73,15 +25,12 @@
   letter-spacing: 0;
 }
 
-@media (max-width: 720px) {
-  .workspace:has(button[title^="Home"][aria-current="page"]) .workspace-intake[data-existing-documents="1"] .workspace-intake-copy {
-    grid-template-columns: 1fr;
-  }
-  .workspace:has(button[title^="Home"][aria-current="page"]) .workspace-intake[data-existing-documents="1"] .workspace-intake-actions {
-    grid-column: 1;
-    grid-row: auto;
-    justify-content: stretch;
-  }
+/* Source inventory stays bounded and scan-friendly on the surface that owns it. */
+.workspace[data-surface="sources"] .document-meta {
+  max-height: min(58vh, 620px);
+}
+.workspace[data-surface="sources"] .document-card > h2 {
+  margin-bottom: 10px;
 }
 
 /* Needs-attention rows carry their own written state label. A reviewer who cannot see the
@@ -89,56 +38,38 @@
 .workspace-attention-items { display: grid; gap: 10px; margin: 8px 0 0; padding: 0; list-style: none; }
 .workspace-attention-items li { display: grid; gap: 3px; padding: 9px 0 0; border-top: 1px solid var(--hairline); }
 .workspace-attention-items li:first-child { border-top: 0; padding-top: 0; }
-.workspace-attention-items strong { color: var(--text-hi); font: 9px var(--f-mono); letter-spacing: .06em; text-transform: uppercase; }
+.workspace-attention-items strong { color: var(--text-hi); font: 12px var(--f-mono); letter-spacing: .06em; text-transform: uppercase; }
 .workspace-attention-items button {
   justify-self: start; min-height: 44px; margin-top: 4px; padding: 8px 12px;
-  border: 1px solid var(--hairline-hi); border-radius: 3px; color: var(--text-hi); font-size: 11px;
+  border: 1px solid var(--hairline-hi); border-radius: 6px; color: var(--text-hi); font-size: 13px;
 }
 .workspace-attention:has(.workspace-attention-items) { grid-template-columns: 1fr; }
 
-/* Recent changes: activation receipts carry real timestamps; source counts do not pretend to. */
-.workspace-recent { margin: 0 0 20px; padding: 16px 18px; border: 1px solid var(--hairline); border-radius: 5px; background: var(--g1); }
-.workspace-recent h2 { margin: 4px 0 10px; color: var(--text-hi); font-size: 18px; }
-.workspace-recent-list { display: grid; gap: 8px; margin: 0 0 10px; padding: 0; list-style: none; }
-.workspace-recent-list li { display: grid; gap: 2px; }
-.workspace-recent-list strong { color: var(--text-hi); font-size: 11px; font-weight: 550; }
-.workspace-recent-list small, .workspace-recent .fine { color: var(--text-xlo); font-size: 10px; line-height: 1.5; }
-.workspace-recent-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-.workspace-recent-actions button {
-  min-height: 44px; padding: 8px 12px; border: 1px solid var(--hairline-hi);
-  border-radius: 3px; color: var(--text-hi); font-size: 11px;
-}
-
 /* "Use with AI": the journey, then the exact files the export writes. */
-.workspace-ai-use-guide { margin-top: 14px; border: 1px solid var(--hairline); border-radius: 4px; background: var(--ground); }
-.workspace-ai-use-guide > summary { min-height: 44px; display: flex; align-items: center; padding: 11px 14px; color: var(--text-hi); font-size: 11px; cursor: pointer; }
+.workspace-ai-use-guide { margin-top: 14px; border: 1px solid var(--hairline); border-radius: 6px; background: var(--ground); }
+.workspace-ai-use-guide > summary { min-height: 44px; display: flex; align-items: center; padding: 11px 14px; color: var(--text-hi); font-size: 14px; cursor: pointer; }
 .workspace-ai-use-guide > div { display: grid; gap: 8px; padding: 0 14px 14px; }
-.workspace-ai-use-guide p { margin: 0; color: var(--text-lo); font-size: 11px; line-height: 1.6; }
-.workspace-ai-use-guide small { color: var(--text-xlo); font-size: 10px; line-height: 1.5; }
-.workspace-ai-journey { display: grid; gap: 3px; margin: 0; padding-left: 18px; color: var(--text-lo); font-size: 11px; }
+.workspace-ai-use-guide p { margin: 0; color: var(--text-lo); font-size: 13px; line-height: 1.6; }
+.workspace-ai-use-guide small { color: var(--text-lo); font-size: 12px; line-height: 1.5; }
+.workspace-ai-journey { display: grid; gap: 3px; margin: 0; padding-left: 18px; color: var(--text-lo); font-size: 13px; }
 .workspace-ai-package-files { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .workspace-ai-package-files li { display: grid; gap: 2px; }
-.workspace-ai-package-files code { color: var(--text-hi); font: 10px var(--f-mono); }
+.workspace-ai-package-files code { color: var(--text-hi); font: 12px var(--f-mono); }
 .workspace-ai-use-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
 .workspace-ai-use-actions button, .workspace-ai-use-actions a {
   min-height: 44px; display: inline-flex; align-items: center; padding: 8px 12px;
-  border: 1px solid var(--hairline-hi); border-radius: 3px; color: var(--text-hi); font-size: 11px;
+  border: 1px solid var(--hairline-hi); border-radius: 6px; color: var(--text-hi); font-size: 13px;
 }
 
 /* The checklist row states are words, not only a tick colour. */
-.workspace-step-state { font: 9px var(--f-mono); letter-spacing: .05em; text-transform: uppercase; }
+.workspace-step-state { font: 12px var(--f-mono); letter-spacing: .05em; text-transform: uppercase; }
 
 /* §19.2 mobile: state, next action, upload, review, Ask and needs-attention stay reachable and
    tappable; the compile canvas and the developer surfaces stay subordinate. */
 @media (max-width: 480px) {
-  .workspace-recent-actions button,
   .workspace-attention-items button,
   .workspace-ai-use-actions button,
   .workspace-ai-use-actions a { width: 100%; justify-content: center; }
-  /* The compact-Home rule above shrinks these to 34px, which is fine under a mouse and not under
-     a thumb. Repeated at that rule's specificity so it wins on a phone and nowhere else. */
-  .workspace:has(button[title^="Home"][aria-current="page"]) .workspace-intake[data-existing-documents="1"] .workspace-intake-actions button,
   .workspace-intake-actions button { min-height: 44px; }
   .workspace-complete-actions button, .workspace-complete-actions a { min-height: 44px; }
-  .workspace:has(button[title^="Home"][aria-current="page"]) .compile-stage { max-height: 220px; }
 }
