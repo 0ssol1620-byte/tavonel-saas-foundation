@@ -20,7 +20,8 @@
     can be deleted rather than forgotten.
 
   Usage: node scripts/check-type-floor.mjs        (fails the build on a violation)
-         node scripts/check-type-floor.mjs --list (prints the deprecated-token census too)
+         node scripts/check-type-floor.mjs --list   (prints the deprecated-token census too)
+         node scripts/check-type-floor.mjs --census (prints the per-sheet count for known_issues)
 */
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -58,6 +59,7 @@ function selectorFor(lines, index) {
 
 const violations = [];
 const deprecated = [];
+const excusedCounts = new Map();
 
 for (const file of stylesheets(root)) {
   const rel = relative(root, file).replace(/\\/g, "/");
@@ -67,10 +69,6 @@ for (const file of stylesheets(root)) {
   const excused = exemptFiles.includes(rel);
 
   lines.forEach((line, index) => {
-    if (excused) {
-      if (line.includes("var(--text-xlo)")) deprecated.push(`${rel}:${index + 1}`);
-      return;
-    }
     if (line.trim().startsWith("/*") || line.trim().startsWith("*")) return;
     const sizes = [];
     for (const match of line.matchAll(/font-size:\s*([0-9.]+)px/g)) sizes.push(Number(match[1]));
@@ -82,7 +80,12 @@ for (const file of stylesheets(root)) {
       const selector = selectorFor(lines, index);
       const exempt = exemptSelectors.some((needle) => selector.includes(needle) || line.includes(needle));
       if (!exempt) {
-        violations.push(`${rel}:${index + 1}  ${selector || "?"}  →  ${small.join("px, ")}px`);
+        const entry = `${rel}:${index + 1}  ${selector || "?"}  →  ${small.join("px, ")}px`;
+        // An excused sheet is a debt with a number on it, not a hole in the check: the count it had
+        // when its lane took ownership is the ceiling, so a new 8px label still fails the build.
+        // (Excusing a sheet from the check entirely is what let 220 sub-12px declarations accumulate.)
+        if (excused) excusedCounts.set(rel, (excusedCounts.get(rel) ?? 0) + 1);
+        else violations.push(entry);
       }
     }
 
@@ -91,10 +94,30 @@ for (const file of stylesheets(root)) {
       /color:\s*[^;]*var\(--(decor|reused)\)/.test(line) &&
       !/border-color|background|outline-color|caret-color|content:/.test(line)
     ) {
-      violations.push(`${rel}:${index + 1}  ${selectorFor(lines, index) || "?"}  →  --decor/--reused used as a text colour`);
+      const entry = `${rel}:${index + 1}  ${selectorFor(lines, index) || "?"}  →  --decor/--reused used as a text colour`;
+      if (excused) excusedCounts.set(rel, (excusedCounts.get(rel) ?? 0) + 1);
+      else violations.push(entry);
     }
     if (line.includes("var(--text-xlo)")) deprecated.push(`${rel}:${index + 1}`);
   });
+}
+
+if (process.argv.includes("--census")) {
+  console.log("Findings per excused sheet (the number that belongs in known_issues):");
+  for (const [file, count] of [...excusedCounts].sort()) console.log(`  ${count}	${file}`);
+  console.log("");
+}
+
+// The ratchet: an excused sheet may not get worse while it waits for its lane.
+for (const entry of exceptions.files ?? []) {
+  if (typeof entry === "string") continue;
+  const found = excusedCounts.get(entry.file) ?? 0;
+  const ceiling = entry.known_issues;
+  if (typeof ceiling !== "number") {
+    violations.push(`lib/type-floor-exceptions.json  ${entry.file}  →  needs a "known_issues" count`);
+  } else if (found > ceiling) {
+    violations.push(`${entry.file}  →  ${found} findings, up from ${ceiling}. An excused sheet may not get worse.`);
+  }
 }
 
 if (deprecated.length && process.argv.includes("--list")) {
