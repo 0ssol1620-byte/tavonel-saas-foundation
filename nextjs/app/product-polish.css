@@ -184,3 +184,126 @@
   put a $0/$29/$99/Custom row inside the same block as the sentence above it.
 */
 .pricing-page .plans { margin-top: clamp(32px, 4vw, 56px); }
+
+/* ========================================================================== /docs
+
+  BQ-104. A real step between a heading and the paragraph under it.
+
+  The documentation inherited the site's editorial `h2` -- clamp(27px, 3.3vw, 43px) -- next to a
+  15px body, so a reference page went from 43px to 15px with nothing between, and there was no
+  `h3` level at all. A flat hierarchy with one enormous step in it is the same defect as a flat
+  hierarchy with none. Three steps: 22 / 17 / 15.
+*/
+.docs-body h2 { margin: 36px 0 0; font-size: 22px; line-height: 1.25; letter-spacing: -.02em; }
+.docs-body h2:first-child { margin-top: 0; }
+.docs-body h3 { margin: 24px 0 0; font-size: 17px; line-height: 1.35; letter-spacing: -.012em; }
+
+/*
+  BQ-104. A note is not a success.
+
+  The accent bar was `--verified`, the token this system uses for a checked, passing state -- on
+  callouts that say tables are not extracted, that a gate is closed, and that a request this
+  deployment will refuse is documented anyway. A reader who has learned what green means on
+  /explore and in the workspace read those as reassurance. The bar is neutral and the "Note"
+  label does the work, which is what the component's own comment already said it was for.
+*/
+.docs-note { border-left-color: var(--hairline-hi); }
+
+/*
+  Type floor, across the documentation chrome. Every one of these was 9px or 10px tracked mono
+  in `--text-xlo`: a table's column headers, the pager, the language tabs and an endpoint's scope
+  line. None of them is a machine identifier -- the identifiers are the `<code>` elements inside
+  the cells, which keep the mono face.
+*/
+.docs-table th { color: var(--text-mid); font: 500 12px/1.4 var(--f-sans); letter-spacing: .02em; text-transform: none; }
+.docs-endpoint header { font-size: 12px; }
+.docs-endpoint header em { color: var(--text-mid); }
+
+/*
+  BQ-137. The pager carried 10px mono and an empty `<span>` as a spacer, so the last section's
+  "previous" link sat under an element with no content and no name. The page renders only the
+  links it has now, and the row pushes a lone "next" to the right without a placeholder.
+*/
+.docs-pager { font: 500 13px/1.4 var(--f-sans); letter-spacing: 0; }
+.docs-pager a { display: inline-flex; align-items: center; min-height: 44px; color: var(--text-mid); }
+.docs-pager a:last-child:first-child { margin-left: auto; }
+
+/*
+  BQ-107. The language tabs are a real control: 12px sans, a 44px target, and an underline on the
+  selected one rather than a box. Keyboard handling is in `components/docs-snippet.tsx` -- the
+  roles were already there and nothing implemented them.
+*/
+.docs-langs button {
+  min-height: 44px;
+  padding: 0 10px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--text-mid);
+  font: 500 12px/1.2 var(--f-sans);
+  letter-spacing: 0;
+  text-transform: none;
+}
+.docs-langs button[aria-selected="true"] { border-bottom-color: var(--verified); color: var(--text-hi); }
+
+/*
+  BQ-103. A code block that overflows can be reached from the keyboard and shows that it can be
+  scrolled.
+
+  `overflow-x: auto` was already set, so a pointer could scroll it and nothing else could: a
+  scroll container with no focusable child is unreachable by keyboard, and the block gave no
+  sign that anything was past its right edge. `tabindex="0"` is added in the page that renders
+  these (it needs an accessible name to go with it), and the affordance is a scrollbar that is
+  always drawn rather than a fade: `scrollbar-gutter: stable` reserves the track so the block
+  does not reflow when one appears, and a thin permanent bar says "there is more to the right"
+  in the one idiom every reader already has. A right-edge mask was the other candidate and it is
+  the worse one -- it paints whether or not the block overflows, so it dims the last characters
+  of every line that fits.
+*/
+.docs-code pre { scrollbar-width: thin; scrollbar-gutter: stable; }
+.docs-code pre:focus-visible { outline: 2px solid var(--verified); outline-offset: -2px; }
+
+/*
+  BQ-137. The copy button reserves the width of its longest state, so pressing it does not move
+  it. The reserve is a zero-height ghost of that string; the visible label sits on top of it.
+*/
+.docs-copy-label { position: relative; display: inline-grid; }
+.docs-copy-reserve { visibility: hidden; height: 0; overflow: hidden; }
+.docs-copy-text { grid-area: 1 / 1; }
+.docs-copy-reserve { grid-area: 1 / 1; }
+
+/*
+  BQ-102. The error catalogue's filter. It sits directly above its table, so the two read as one
+  block rather than as a stray input on a documentation page.
+*/
+.docs-table-filter { display: grid; gap: 6px; margin: 24px 0 12px; max-width: 30rem; }
+.docs-table-filter label { font-size: 12px; font-weight: 500; letter-spacing: .04em; color: var(--text-mid); }
+.docs-table-filter input {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--hairline-hi);
+  border-radius: var(--r-inst, 6px);
+  background: var(--g1);
+  color: var(--text-hi);
+  font: 14px/1.4 var(--f-sans);
+}
+.docs-table-filter input:focus-visible { outline: 2px solid var(--verified); outline-offset: 2px; }
+.docs-table-filter p { margin: 0; min-height: 1.4em; }
+
+/* A linked error code lands under the fixed header rather than behind it. */
+.docs-body tr[id] { scroll-margin-top: 96px; }
+
+/*
+  BQ-105. The search panel had no focus ring at all.
+
+  `.docs-search-field input:focus { outline: none }` removed the browser's own and put nothing
+  back, and the result links inherited the global reset -- so a keyboard reader moving through
+  eight results could not see which one they were on. The ring goes on the field wrapper, which
+  is the thing that looks like the control, and on each result row.
+
+  The excerpt goes to 12px: at 11px it was under the floor, on the line that is the whole reason
+  the result is legible.
+*/
+.docs-search-field:focus-within { outline: 2px solid var(--verified); outline-offset: 2px; }
+.docs-search-results a:focus-visible { outline: 2px solid var(--verified); outline-offset: -2px; }
+.docs-search-results span { font-size: 12px; }
+.docs-search-field { color: var(--text-mid); }

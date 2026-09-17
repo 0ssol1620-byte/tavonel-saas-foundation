@@ -92,7 +92,18 @@ export type DocsBlock =
     component, given a block kind so the section data can use it too.
   */
   | { kind: "snippets"; label: string; items: ReadonlyArray<{ label: string; language: DocsLanguage; body: string }> }
-  | { kind: "table"; head: string[]; rows: string[][] }
+  /*
+    BQ-102. Two optional properties, both earned by the error catalogue.
+
+    `rowAnchors` gives each row an id derived from its first cell, so a support reply or an issue
+    can link to one code rather than to a page holding 229 of them. `filterLabel` puts a filter
+    box above the table and names what it filters -- a bare input on a reference page says
+    nothing about what typing in it will do.
+
+    Both are opt-in: a four-row table gains nothing from either, and a table whose first column
+    is a sentence would mint an id out of a sentence.
+  */
+  | { kind: "table"; head: string[]; rows: string[][]; rowAnchors?: true; filterLabel?: string }
   | { kind: "endpoint"; operationId: string }
   /*
     The one diagram in the documentation (G3-011).
@@ -1330,12 +1341,20 @@ export const DOCS_SECTIONS: DocsSection[] = [
         {
           kind: "table" as const,
           head: ["Code", "Status", "Meaning", "What to do"],
+          /*
+            BQ-102. The code is a token a reader types into a `switch`, and it rendered as plain
+            prose in the same face and colour as the sentence beside it. The backticks are the
+            mark `withMarks` already turns into `<code>` everywhere else on this page, so the
+            column reads as what it is without a second rendering path.
+          */
           rows: group.codes.map((entry) => [
-            entry.code,
+            `\`${entry.code}\``,
             entry.status ? String(entry.status) : "varies",
             entry.meaning,
             entry.whatToDo,
           ]),
+          rowAnchors: true as const,
+          filterLabel: "Filter error codes",
         },
       ]),
       { kind: "heading", text: "Two numbers a client branches on" },
@@ -1442,30 +1461,89 @@ export function findDocsSection(slug: string) {
   return DOCS_SECTIONS.find((section) => section.slug === slug) ?? null;
 }
 
-/** Flattened text, for the search box. Built here so the client bundle carries one copy. */
+/**
+ * The search index, in chunks, one per heading (BQ-105).
+ *
+ * Three things were wrong with the flat lower-cased string this used to build, and all three
+ * were the same mistake: one field was doing the matching *and* the displaying.
+ *
+ * It was `.toLowerCase()`, so every excerpt the search box printed came out in lower case. It
+ * carried the raw marks -- `**bold**` and the backticks the error catalogue writes around every
+ * code -- so an excerpt showed the punctuation an author meant as formatting. And it carried
+ * snippet bodies, so a query could produce an excerpt of a curl invocation.
+ *
+ * Now `chunks` is what a reader sees: original case, marks stripped, no snippet bodies, split at
+ * each heading and carrying that heading's anchor -- so a result links to the passage rather
+ * than to the top of a twenty-screen page. `code` is matched and never shown, which keeps the
+ * recall the flat index had: a query for a token that appears only inside a request body still
+ * finds its section, and falls back to the section summary for the excerpt.
+ *
+ * Both are built here so the client bundle carries one copy, and the payload is about what it
+ * was: the prose is stored once in its real case rather than once lower-cased.
+ */
+export type DocsSearchChunk = { anchor: string | null; display: string };
+
 export function docsSearchIndex() {
   return DOCS_SECTIONS.map((section) => ({
     slug: section.slug,
     title: section.title,
     group: section.group,
     summary: section.summary,
-    text: [section.title, section.summary, ...section.blocks.flatMap(blockText)].join(" ").toLowerCase(),
+    chunks: searchChunks(section),
+    code: section.blocks.flatMap(blockCode).join(" ").toLowerCase(),
   }));
+}
+
+/** `**bold**` and `` `code` `` are formatting, not characters a reader searched for. */
+const unmarked = (text: string) => text.replace(/\*\*([^*]+)\*\*/g, "$1").replace(/`([^`]+)`/g, "$1");
+
+/** The id `app/docs/[section]/page.tsx` gives a heading, derived the same way it derives it. */
+const headingAnchor = (text: string) =>
+  text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "section";
+
+function searchChunks(section: DocsSection): DocsSearchChunk[] {
+  const chunks: DocsSearchChunk[] = [{ anchor: null, display: `${section.title}. ${section.summary}` }];
+  for (const block of section.blocks) {
+    if (block.kind === "heading") {
+      chunks.push({ anchor: headingAnchor(block.text), display: block.text });
+      continue;
+    }
+    const parts = blockText(block);
+    if (parts.length === 0) continue;
+    const last = chunks[chunks.length - 1]!;
+    last.display = `${last.display} ${unmarked(parts.join(" "))}`;
+  }
+  /*
+    A heading with nothing under it carries only its own words, and a duplicate heading would
+    produce a duplicate anchor. Both are the page's problem rather than the index's -- the page
+    de-duplicates ids through `tocEntries` -- so nothing is dropped here: a link to the first of
+    two identical headings is where a browser sends the reader either way.
+  */
+  return chunks;
+}
+
+/** Everything a reader may search for and should never be shown an excerpt of. */
+function blockCode(block: DocsBlock): string[] {
+  if (block.kind === "code") return [block.body];
+  if (block.kind === "snippets") return block.items.map((item) => item.body);
+  return [];
 }
 
 function blockText(block: DocsBlock): string[] {
   switch (block.kind) {
-    // A subheading is the phrase a reader is most likely to search for, so it is indexed.
     case "heading":
+      // Handled by `searchChunks`, which starts a new chunk at each one.
+      return [block.text];
     case "prose":
     case "note":
       return [block.text];
     case "steps":
       return block.items;
+    // The body is in `blockCode`: matched, never excerpted.
     case "code":
-      return [block.label, block.body];
+      return [block.label];
     case "snippets":
-      return [block.label, ...block.items.map((item) => item.body)];
+      return [block.label];
     case "table":
       return [...block.head, ...block.rows.flat()];
     case "endpoint":

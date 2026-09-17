@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { DocsCopyButton } from "@/components/docs-copy-button";
 
 /**
@@ -59,6 +59,32 @@ export function DocsSnippet({ snippets }: { snippets: Array<{ language: string; 
 
   const chosen = snippets[active] ?? snippets[0]!;
 
+  /*
+    BQ-107. The roles were here and nothing implemented them.
+
+    `role="tablist"` and `role="tab"` promise a screen-reader user that the arrow keys move
+    between the tabs and that one Tab press leaves the strip. Neither was true: every tab sat in
+    the tab order and no key did anything, so the markup described a control the page did not
+    have. This is the roving tabindex that pattern requires -- only the selected tab is tabbable,
+    Left and Right move and select, Home and End jump to the ends, and movement wraps.
+  */
+  const tabs = useRef<Array<HTMLButtonElement | null>>([]);
+  const onTabKey = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+    const next =
+      step !== 0
+        ? (index + step + snippets.length) % snippets.length
+        : event.key === "Home"
+          ? 0
+          : event.key === "End"
+            ? snippets.length - 1
+            : null;
+    if (next === null) return;
+    event.preventDefault();
+    choose(next);
+    tabs.current[next]?.focus();
+  };
+
   return (
     <figure className="docs-code">
       <figcaption>
@@ -66,17 +92,21 @@ export function DocsSnippet({ snippets }: { snippets: Array<{ language: string; 
           {snippets.map((snippet, index) => (
             <button
               key={snippet.language}
+              ref={(node) => { tabs.current[index] = node; }}
               type="button"
               role="tab"
               aria-selected={index === active}
               aria-controls={`${uid}${snippet.language}`}
+              tabIndex={index === active ? 0 : -1}
+              onKeyDown={(event) => onTabKey(event, index)}
               onClick={() => choose(index)}
             >
               {snippet.label}
             </button>
           ))}
         </span>
-        <DocsCopyButton value={chosen.body} />
+        {/* BQ-137: the button names what it copies, so a reference page is not eight "Copy"s. */}
+        <DocsCopyButton value={chosen.body} label={`Copy ${chosen.label}`} />
       </figcaption>
       {snippets.map((snippet, index) => (
         <pre
@@ -84,6 +114,11 @@ export function DocsSnippet({ snippets }: { snippets: Array<{ language: string; 
           id={`${uid}${snippet.language}`}
           role="tabpanel"
           aria-label={snippet.label}
+          /*
+            BQ-103: the panel scrolls sideways, so it is focusable and named. A scroll container
+            with no focusable child cannot be reached from a keyboard at all, let alone scrolled.
+          */
+          tabIndex={index === active ? 0 : -1}
           hidden={index !== active}
         >
           <code>{snippet.body}</code>

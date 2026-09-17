@@ -19,7 +19,8 @@ import {
 import { readDocsEndpoints, snippetFor, SNIPPET_LANGUAGES, type DocsEndpoint } from "@/lib/docs-endpoints";
 import { WorldLifecycle } from "@/components/docs/world-lifecycle";
 import { DocsToc } from "@/components/docs/docs-toc";
-import { PageToc, tocEntries } from "@/components/docs/page-toc";
+import { DocsTableFilter } from "@/components/docs/docs-table-filter";
+import { PageToc, slugify, tocEntries } from "@/components/docs/page-toc";
 import layout from "@/components/docs/docs-toc.module.css";
 import anchor from "@/components/docs/page-toc.module.css";
 
@@ -45,9 +46,14 @@ function CodeBlock({ label, body, id }: { label: string; body: string; id?: stri
     <figure className={id ? `docs-code ${anchor.anchor}` : "docs-code"} id={id}>
       <figcaption>
         <span>{label}</span>
-        <DocsCopyButton value={body} />
+        {/* BQ-137: named by what it copies, so eight blocks are not eight identical "Copy"s. */}
+        <DocsCopyButton value={body} label={`Copy ${label.toLowerCase()}`} />
       </figcaption>
-      <pre><code>{body}</code></pre>
+      {/*
+        BQ-103: the block scrolls sideways, so it is focusable and named. A scroll container with
+        no focusable child cannot be reached from a keyboard at all, let alone scrolled.
+      */}
+      <pre tabIndex={0} role="group" aria-label={label}><code>{body}</code></pre>
     </figure>
   );
 }
@@ -129,18 +135,35 @@ function Block({ block, endpoints, id }: { block: DocsBlock; endpoints: Map<stri
       return <DocsSnippet snippets={block.items.map((item) => ({ ...item }))} />;
     case "table":
       return (
-        <table className={`docs-table ${tableStyles.stacked}`}>
-          <thead><tr>{block.head.map((cell) => <th key={cell}>{cell}</th>)}</tr></thead>
-          <tbody>
-            {block.rows.map((row) => (
-              <tr key={row.join("|")}>
-                {row.map((cell, index) => (
-                  <td key={index} data-label={block.head[index]}>{withMarks(cell)}</td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <>
+          {/*
+            BQ-102. The filter sits immediately before the table because that is how it finds it:
+            it walks its own `nextElementSibling`, so nothing has to pass an id around and the
+            two cannot point at different tables.
+          */}
+          {block.filterLabel ? <DocsTableFilter label={block.filterLabel} /> : null}
+          <table className={`docs-table ${tableStyles.stacked}`}>
+            <thead><tr>{block.head.map((cell) => <th key={cell}>{cell}</th>)}</tr></thead>
+            <tbody>
+              {block.rows.map((row) => (
+                /*
+                  BQ-102. A row that carries a stable identifier in its first cell gets that
+                  identifier as an anchor, so one error code is a linkable address. `slugify`
+                  is the documentation's own, the same function the heading anchors use.
+                */
+                <tr
+                  key={row.join("|")}
+                  id={block.rowAnchors ? slugify(row[0] ?? "") || undefined : undefined}
+                  className={block.rowAnchors ? anchor.anchor : undefined}
+                >
+                  {row.map((cell, index) => (
+                    <td key={index} data-label={block.head[index]}>{withMarks(cell)}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
       );
     case "diagram":
       return (
@@ -203,9 +226,18 @@ export default async function DocsSectionPage({ params }: { params: Promise<{ se
                 <Block key={position} block={block} endpoints={endpoints} id={anchorIds.get(position)} />
               ))}
             </div>
-            <nav className="docs-pager">
-              {previous ? <Link href={`/docs/${previous.slug}` as Route}>← {previous.title}</Link> : <span />}
-              {next ? <Link href={`/docs/${next.slug}` as Route}>{next.title} →</Link> : <span />}
+            {/*
+              BQ-137 / BQ-134. The pager was two 10px mono links with an arrow glyph pasted into
+              the label, and an empty `<span>` on whichever side had no neighbour -- an element
+              with no content and no name, there only to hold `justify-content: space-between`
+              apart. It renders the links it has; a lone "next" is pushed right by CSS, and each
+              one says which direction it goes in words rather than in a character.
+            */}
+            <nav className="docs-pager" aria-label="Documentation sections">
+              {previous ? (
+                <Link href={`/docs/${previous.slug}` as Route}>Previous: {previous.title}</Link>
+              ) : null}
+              {next ? <Link href={`/docs/${next.slug}` as Route}>Next: {next.title}</Link> : null}
             </nav>
             <p className="fine">
               API version {DOCS_VERSION} · reviewed {formatReviewDate(DOCS_REVIEWED)} ·{" "}
@@ -216,8 +248,9 @@ export default async function DocsSectionPage({ params }: { params: Promise<{ se
                 BA-221: the label asked "Something wrong on this page?", which opens by assuming
                 the page is wrong. It is the same mailto, phrased as an action.
               */}
+              {/* BQ-134: the arrow is gone. It went nowhere the label did not already say. */}
               <a href={`mailto:support@tavonel.com?subject=${encodeURIComponent(`Docs feedback: ${entry.title}`)}`}>
-                Report an issue with this page →
+                Report an issue with this page
               </a>
             </p>
           </div>
