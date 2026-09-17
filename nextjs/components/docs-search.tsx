@@ -149,12 +149,22 @@ export function DocsSearch({ entries }: { entries: Entry[] }) {
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={(event) => move(event, -1)}
         />
-        {trimmed.length >= 2
-          ? <span className="docs-search-count">{matched.length} {matched.length === 1 ? "section" : "sections"}</span>
-          : <kbd className="docs-search-hint" aria-hidden="true">⌘K</kbd>}
+        {/*
+          BQ-137. The live region is the count, not the result list.
+
+          `role="status"` was on the results container, so every keystroke past two characters
+          announced every matching section title and summary -- the whole panel, re-read, while
+          the reader was still typing. The count is the sentence a person wants said out loud,
+          it is already on screen, and it is one line. It is mounted from the start so the
+          region exists before it has anything to say.
+        */}
+        <span className="docs-search-count" role="status">
+          {trimmed.length >= 2 ? `${matched.length} ${matched.length === 1 ? "section" : "sections"}` : ""}
+        </span>
+        {trimmed.length >= 2 ? null : <kbd className="docs-search-hint" aria-hidden="true">⌘K</kbd>}
       </label>
       {trimmed.length >= 2 ? (
-        <div className="docs-search-results" role="status">
+        <div className="docs-search-results">
           {results.length === 0 ? (
             <p className="fine">Nothing here matches “{query.trim()}”.</p>
           ) : (

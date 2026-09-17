@@ -57,3 +57,21 @@
 .digest { overflow-wrap: anywhere; }
 
 .failed { margin: 0; font-size: 13px; color: var(--text-hi); }
+
+/*
+  BQ-137. The live region, which has nothing to show a sighted reader.
+
+  The outcome is already on screen beside the response: this element exists so the
+  announcement is one line rather than four thousand characters of JSON. Clipped rather than
+  `display: none`, which would take it out of the accessibility tree and announce nothing.
+*/
+.announce {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
