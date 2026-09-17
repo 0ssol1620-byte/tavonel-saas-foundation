@@ -170,4 +170,43 @@ describe("design token contract", () => {
     const tracked = [...css.matchAll(/\.eyebrow[^{}]*\{[^}]*?letter-spacing:\s*([^;}]+)/g)].map((m) => m[1].trim());
     expect(tracked, `tracking set on .eyebrow: ${tracked.join(" | ")}`).toEqual(["0.06em", "0.02em"]);
   });
+
+  /*
+    D34 -- one link contract, and the specificity trap that made type-01.
+
+    type-01 was three primary CTAs rendered cream-on-cream at 1.00:1: `.policy-copy a` set a link
+    colour at (0,1,1) and outranked `.btn, .btn-primary` at (0,1,0) inside the same layer, so every
+    button on a policy page kept the fill and lost its label. The shape is a container rule that
+    repaints an anchor without saying which anchors it does not mean.
+
+    What is asserted is that shape, not the contrast: the contract's own selectors all qualify the
+    anchor -- `:not([class])` for prose, an explicit class for the two action faces -- so the new
+    rule cannot grow into the old defect, and the fix that closed type-01 stays put.
+
+    A wider guard was measured and not landed. "Every rule that colours a bare descendant `a` must
+    exclude .btn" flags sixteen pre-existing rules across four other lanes' families -- a
+    cross-lane change, not a test. It is written up in this pass's lane report.
+  */
+  it("colours a link without ever repainting a control's label", () => {
+    const contract = css.slice(css.indexOf("D34 -- one link contract"), css.indexOf("@layer utilities"));
+    expect(contract, "the contract is in @layer components").toContain("a.link-verify");
+
+    const rules = contract.replace(/^[\s\S]*?\*\//, "").replace(/\/\*[\s\S]*?\*\//g, "");
+    const anchors = [...rules.matchAll(/([^{}]+)\{/g)]
+      .flatMap((m) => m[1].split(","))
+      .map((one) => one.trim())
+      .filter((one) => /(^|[\s>+~])a(?![\w-])/.test(one));
+    expect(anchors.length, `anchor selectors found: ${anchors.join(" | ")}`).toBeGreaterThan(5);
+    for (const selector of anchors) {
+      expect(selector, `${selector} never says which anchors it is not`).toMatch(/:not\(\[class\]\)|a\.link/);
+    }
+
+    // The fix that closed type-01: a container's link colour has to exclude the button classes.
+    expect(css).toContain(".policy-copy a:not(.btn) {");
+
+    // --verified on a link means one thing -- this link opens a surface where the claim can be
+    // checked. Any other link class spending it is the two-meanings defect type-04 names.
+    const verifiedLinks = [...css.matchAll(/(a\.[\w-]+)[^{}]*\{[^}]*color: var\(--verified\)/g)].map((m) => m[1]);
+    expect(verifiedLinks).toEqual(["a.link-verify"]);
+  });
 });

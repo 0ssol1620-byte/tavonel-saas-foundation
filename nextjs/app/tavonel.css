@@ -1668,9 +1668,12 @@
     .source-route h3 { font-size: clamp(16px, 1.45vw, 20px); line-height: 1.25; letter-spacing: -0.018em; }
     .source-route > p { margin: 0; max-width: 62ch; color: var(--text-lo); font-size: 13px; line-height: 1.68; }
   }
-  .link { background: var(--g1); padding: 16px 18px; display: flex; flex-direction: column; gap: 9px; align-items: flex-start; }
-  .link .st { font-family: var(--f-sans); font-size: var(--t-1); letter-spacing: 0.06em; color: var(--text-lo); }
-  .link p { margin: 0; font-size: 12.5px; color: var(--text-lo); }
+  /* The card named `.link` is always a child of `.chain` -- all eight call sites render it inside
+     one. Scoping the card there frees the bare class for the standalone action link D34 names,
+     at the foot of this layer. */
+  .chain .link { background: var(--g1); padding: 16px 18px; display: flex; flex-direction: column; gap: 9px; align-items: flex-start; }
+  .chain .link .st { font-family: var(--f-sans); font-size: var(--t-1); font-weight: 500; letter-spacing: 0.06em; color: var(--text-mid); }
+  .chain .link p { margin: 0; font-size: 12.5px; color: var(--text-lo); }
 
   @media (max-width: 1120px) {
     @layer detail-completion {
@@ -3335,6 +3338,64 @@
      `app/one-path.css` now keys both navs' active styling on. The whole block is deleted rather
      than repointed, because the markup it was written against is gone. */
 
+  /* ============================================================ D34 -- one link contract
+
+     Three unrelated link treatments shipped on one page (landing-08): standalone actions set in
+     --text-hi with no underline and no marker, verification links in --verified, and the footer
+     copyright row underlined. The first group was typographically identical to the body text
+     beside it, so "Inspect the public source   What is preserved" read as two labels rather than
+     two links -- and in the closing paragraph (landing-07) "request access" carried neither a
+     colour cue nor a non-colour one, which is WCAG 1.4.1 with nothing at all holding it up.
+
+     Three faces, and what a link IS decides which one it takes:
+
+       prose <a>      inside running text -- --text-hi with a 1px underline drawn in --hairline-hi
+                      that comes up to the text colour on hover. The underline is the cue; the
+                      colour is the second one, never the only one.
+       .link          a standalone action on its own line -- the same persistent underline at
+                      weight 500, and a 44px target because it is a control. No glyph: an arrow
+                      after every link is an ornament, and the underline already says "link".
+       .link-verify   RESERVED for a link that opens a verification surface -- "Verify on SEC",
+                      "Open the original PDF", "Inspect the evidence". --verified means the reader
+                      can go and check the claim, and on a link it means nothing else.
+
+     No link is typographically identical to the prose beside it.
+
+     `.link` used to be a card class; its card rules moved to `.chain .link` above. `.trust-link`
+     is the one anchor that is still a card, so it is excluded here rather than unpicked.
+  */
+  .scene p > a:not([class]),
+  .policy-copy :is(p, li, dd, td) a:not([class]),
+  .fine :is(p, li, dd, td) a:not([class]),
+  .docs-body :is(p, li, dd, td) a:not([class]),
+  a.link:not(.trust-link),
+  a.link-verify {
+    color: var(--text-hi);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    text-decoration-color: var(--hairline-hi);
+  }
+  a.link:not(.trust-link),
+  a.link-verify {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    font-weight: 500;
+  }
+  a.link-verify { color: var(--verified); }
+  /* Hover is gated, as everywhere: on a touch screen an un-gated hover state sticks after a tap. */
+  @media (hover: hover) and (pointer: fine) {
+    .scene p > a:not([class]):hover,
+    .policy-copy :is(p, li, dd, td) a:not([class]):hover,
+    .fine :is(p, li, dd, td) a:not([class]):hover,
+    .docs-body :is(p, li, dd, td) a:not([class]):hover,
+    a.link:not(.trust-link):hover,
+    a.link-verify:hover {
+      text-decoration-color: currentColor;
+    }
+  }
+
 }
 
 @layer utilities {
@@ -4071,15 +4132,12 @@
     of them. Outside a prose container only a paragraph counts, which is the one element that can
     never be a list of destinations. Inside one -- the docs body, a policy page, the fine print --
     every running-text element still qualifies.
+
+    D34 folded this into the one link contract at the foot of `@layer components`, where the same
+    four selectors now also carry the colour and the 1px underline the contract names. Two copies
+    of one rule in two layers is how the thickness ended up `from-font` in the layer that wins and
+    `1px` in the layer that does not; there is one copy.
   */
-  .scene p > a:not([class]),
-  .policy-copy :is(p, li, dd, td) a:not([class]),
-  .fine :is(p, li, dd, td) a:not([class]),
-  .docs-body :is(p, li, dd, td) a:not([class]) {
-    text-decoration: underline;
-    text-underline-offset: 3px;
-    text-decoration-thickness: from-font;
-  }
 
   /*
     Cross-lane from `truth` -- a surface that is waiting says so visually, not only to a screen
