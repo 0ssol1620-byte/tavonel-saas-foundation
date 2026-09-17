@@ -62,10 +62,19 @@
   and the page fills the panel it sits in. Zooming scrolls inside a fixed frame instead; `Fit page`
   returns to the reserve.
 */
+/*
+  landing-06: `max-height: 92svh` was the rule that bound, not the width.
+
+  At the commonest laptop height 92svh is 828px, and against the page's 1/1.294 portrait ratio
+  that sized the frame from its height: 640px wide inside a 706px pane, with no centring, so all
+  66px of the leftover landed on the right and the largest, most important thing in the proof
+  block sat visibly off-centre and smaller than the panel it was sized for. The comment above
+  says width is what binds; now it is. Zoom still scrolls inside the frame.
+*/
 .viewport {
   position: relative;
   aspect-ratio: var(--page-aspect, 1 / 1.294);
-  max-height: 92svh;
+  margin-inline: auto;
   overflow: auto;
   overscroll-behavior: contain;
   padding: 16px;
