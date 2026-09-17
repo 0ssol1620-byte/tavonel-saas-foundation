@@ -91,7 +91,7 @@ const faqPageJsonLd = {
 export default function KnowledgeCompilerPage() {
   return <>
     <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(faqPageJsonLd) }} />
-    <PublicProofRegistry index eyebrow="CATEGORY GUIDE" title="What is a Knowledge Compiler?" summary="A Knowledge Compiler turns changing source material into a versioned, evidence-bound, portable knowledge object that people and AI systems can inspect together." sections={[
+    <PublicProofRegistry index eyebrow="Category guide" title="What is a Knowledge Compiler?" summary="A Knowledge Compiler turns changing source material into a versioned, evidence-bound, portable knowledge object that people and AI systems can inspect together." sections={[
     { title: "The compile contract", body: "The unit of value is not a chat response. It is a Compiled World with immutable inputs, structured objects, exact evidence, review state, retrieval material and portable files.", links: [
       // One action, not the closing pair repeated: a reader convinced by the contract wants to
       // see one, and the page's two-button close is three thousand pixels below this.
