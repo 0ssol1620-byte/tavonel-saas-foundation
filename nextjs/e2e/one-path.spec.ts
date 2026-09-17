@@ -94,7 +94,7 @@ test("failed video keeps a usable poster instead of a blank hero", async ({ page
 test("Korean entry keeps film first and the live example distinct", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/ko");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("AI가 쓰는 지식으로 만듭니다.");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("AI가 사용하는 지식으로 만듭니다.");
   await expect(page.locator(".one-path-hero-film")).toBeVisible();
   await expect(page.locator(".one-path-film-note")).toContainText("실제 서비스 화면 녹화가 아닙니다");
   // G1-043: the "TAVONEL handles the hard part" promise moved from a section heading into the lede.

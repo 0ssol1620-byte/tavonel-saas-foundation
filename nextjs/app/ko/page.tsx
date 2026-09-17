@@ -102,7 +102,7 @@ export default function KoreanEntryPage() {
         <div className="one-path-section-heading"><h2 id="ko-proof-title">결과에서 원문까지 다시 따라갈 수 있습니다.</h2><p>공개 Apple SEC 자료의 원문 페이지와 추출된 내용을 나란히 살펴보세요. 연출 영상과 실제 결과를 구분해 보여드립니다.</p></div>
         {/* BQ-076: the block brings its own frame, ground and radius. The card that used to wrap it
             here made a card inside a card with a different radius at each level. */}
-        <SolutionProofSample />
+        <SolutionProofSample korean />
         <div className="one-path-links"><Link href="/explore">공개 샘플 열기</Link><Link href="/docs/use-with-ai">AI 활용 방법</Link></div>
       </div></section>
       <section className="one-path-section" aria-labelledby="ko-current-title"><div className="one-path-wrap">

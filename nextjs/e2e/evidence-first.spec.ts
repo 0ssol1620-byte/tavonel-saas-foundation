@@ -80,7 +80,9 @@ test("Korean visitors get the same one-path story and the same real public proof
   const proof = page.locator('[data-proof-variant="canonical"]');
   await proof.scrollIntoViewIfNeeded();
   await expect(proof).toHaveCount(1);
-  await expect(proof).toContainText("Apple SEC corpus");
+  // n34: the block reads in Korean on /ko now; the corpus keeps its own name.
+  await expect(proof).toContainText("Apple SEC");
+  await expect(proof).toContainText("컴파일러가 이 페이지에서 읽은 내용");
   await expect(page.getByRole("link", { name: "공개 샘플 열기" })).toHaveAttribute("href", "/explore");
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
 });

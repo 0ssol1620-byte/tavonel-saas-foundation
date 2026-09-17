@@ -14,7 +14,7 @@ import { KO_AMBIGUOUS, KO_TERMS, koTermDrift } from "./ko-terms";
 import { KO_CHROME } from "./site-navigation";
 
 /** Every file that renders Korean public copy. Add a surface here as it is translated. */
-const KO_SURFACES = ["../app/ko/page.tsx"];
+const KO_SURFACES = ["../app/ko/page.tsx", "./proof-copy.ts"];
 
 describe("the Korean term table", () => {
   it("spells each English term exactly one way", () => {

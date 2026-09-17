@@ -23,10 +23,11 @@ import type { Route } from "next";
 import OriginalSourcePage from "./original-source-page";
 import styles from "./world-visual.module.css";
 import type { VisualEvidence } from "@/lib/visual-world-model";
+import { proofCopy } from "@/lib/proof-copy";
 import { sameSourcePage } from "@/lib/source-page-geometry";
 import { sourcePageQualifier, sourceRegionRaster } from "@/lib/source-page-rasters";
 
-export default function SourceSheet({ regions, activeId, onSelectRegion, ledger = "open" }: {
+export default function SourceSheet({ regions, activeId, onSelectRegion, ledger = "open", korean }: {
   regions: VisualEvidence[];
   activeId: string;
   onSelectRegion?: (id: string) => void;
@@ -36,7 +37,14 @@ export default function SourceSheet({ regions, activeId, onSelectRegion, ledger 
     verifying -- /explore and the workspace -- keep it open.
   */
   ledger?: "open" | "disclosure";
+  /*
+    BQ-063 / n34. /ko rendered this block's every word in English -- the field names of the
+    ledger, the page caption, the footer. The locale picks a record in lib/proof-copy.ts and
+    English is the default, so no English surface and no e2e selector moves.
+  */
+  korean?: boolean;
 }) {
+  const copy = proofCopy(korean);
   const active = regions.find(region => region.id === activeId) ?? regions[0];
   if (!active) return null;
   const onPage = regions.filter(region => sameSourcePage(active, region));
@@ -52,7 +60,7 @@ export default function SourceSheet({ regions, activeId, onSelectRegion, ledger 
 
     <div className={styles.sheetBody}>
       <div className={styles.sheetPage}>
-        <OriginalSourcePage active={active} regions={onPage} onSelectRegion={onSelectRegion} />
+        <OriginalSourcePage active={active} regions={onPage} onSelectRegion={onSelectRegion} korean={korean} />
       </div>
 
       <div className={styles.sheetAside}>
@@ -66,13 +74,13 @@ export default function SourceSheet({ regions, activeId, onSelectRegion, ledger 
             {/* eslint-disable-next-line @next/next/no-img-element -- the committed raster is
                 served byte for byte: next/image would re-encode it, and the manifest's sha256 of
                 these bytes is what makes the render checkable against its source. */}
-            <img src={crop.file} alt={`The region of page ${active.page} this passage was read from`} width={crop.width} height={crop.height} decoding="async" />
-            <figcaption>The highlighted region above, at twice its size.</figcaption>
+            <img src={crop.file} alt={copy.cropAlt(active.page)} width={crop.width} height={crop.height} decoding="async" />
+            <figcaption>{copy.cropCaption}</figcaption>
           </figure>
         ) : null}
 
         <div className={styles.passage} data-parsed-source-page="">
-          <p className={styles.passageLabel}>What the compiler read from this page</p>
+          <p className={styles.passageLabel}>{copy.passageLabel}</p>
           {onPage.map(region => {
             const isActive = region.id === active.id;
             const content = <>{isActive ? <span className={styles.regionPin} aria-hidden="true" /> : null}{region.excerpt}</>;
@@ -84,23 +92,23 @@ export default function SourceSheet({ regions, activeId, onSelectRegion, ledger 
     </div>
 
     <details className={styles.ledger} open={ledger === "open"} data-source-provenance="">
-      <summary>Verify this source</summary>
+      <summary>{copy.verify}</summary>
       <dl className={styles.provenance}>
-        <div><dt>Filing</dt><dd>{active.form ? `${active.form}${active.filingDate ? ` · filed ${active.filingDate}` : ""}` : active.filename}</dd></div>
-        <div><dt>Read from</dt><dd data-representation={active.representationKind ?? "original"}>{sourcePageQualifier(active.representationKind)} · {active.filename}<span className={styles.digest}>{active.digest}</span></dd></div>
-        {rendered && active.sourceFilename && active.originalSha256 ? <div><dt>Source</dt><dd data-acquired-original="">SEC EDGAR primary document · {active.sourceFilename.replace(/^.*\//, "")}<span className={styles.digest}>{active.originalSha256}</span></dd></div> : null}
-        <div><dt>Region</dt><dd>bbox, per mille of the page · {active.bbox1000.join(", ")}</dd></div>
-        {active.accession ? <div><dt>Accession</dt><dd>{active.accession}</dd></div> : null}
-        <div><dt>Authority</dt><dd>{active.authority}</dd></div>
+        <div><dt>{copy.fieldFiling}</dt><dd>{active.form ? `${active.form}${active.filingDate ? ` · ${copy.filed(active.filingDate)}` : ""}` : active.filename}</dd></div>
+        <div><dt>{copy.fieldReadFrom}</dt><dd data-representation={active.representationKind ?? "original"}>{sourcePageQualifier(active.representationKind, korean)} · {active.filename}<span className={styles.digest}>{active.digest}</span></dd></div>
+        {rendered && active.sourceFilename && active.originalSha256 ? <div><dt>{copy.fieldSource}</dt><dd data-acquired-original="">{copy.edgarPrimary} · {active.sourceFilename.replace(/^.*\//, "")}<span className={styles.digest}>{active.originalSha256}</span></dd></div> : null}
+        <div><dt>{copy.fieldRegion}</dt><dd>{copy.bbox} · {active.bbox1000.join(", ")}</dd></div>
+        {active.accession ? <div><dt>{copy.fieldAccession}</dt><dd>{active.accession}</dd></div> : null}
+        <div><dt>{copy.fieldAuthority}</dt><dd>{active.authority}</dd></div>
       </dl>
     </details>
 
     <footer>
-      <span>{active.compiledPageCount === undefined ? "This page, as the compiler read it" : active.compiledPageCount >= active.pageCount ? `Full filing compiled · ${active.pageCount} pages` : `Curated page slice · ${active.compiledPageCount} of ${active.pageCount} pages compiled`}</span>
+      <span>{active.compiledPageCount === undefined ? copy.asRead : active.compiledPageCount >= active.pageCount ? copy.fullyCompiled(active.pageCount) : copy.slice(active.compiledPageCount, active.pageCount)}</span>
       <span>
-        <Link className={styles.sourceLink} href={active.href as Route} target="_blank" rel="noreferrer">Open the {sourcePageQualifier(active.representationKind)}</Link>
-        {rendered && active.sourceHref ? <Link className={styles.sourceLink} href={active.sourceHref as Route} target="_blank" rel="noreferrer">Open the acquired original</Link> : null}
-        {active.secHref ? <a className={styles.sourceLink} href={active.secHref} target="_blank" rel="noreferrer">Verify on SEC</a> : null}
+        <Link className={styles.sourceLink} href={active.href as Route} target="_blank" rel="noreferrer">{copy.openQualified(sourcePageQualifier(active.representationKind, korean))}</Link>
+        {rendered && active.sourceHref ? <Link className={styles.sourceLink} href={active.sourceHref as Route} target="_blank" rel="noreferrer">{copy.openAcquired}</Link> : null}
+        {active.secHref ? <a className={styles.sourceLink} href={active.secHref} target="_blank" rel="noreferrer">{copy.verifyOnSec}</a> : null}
       </span>
     </footer>
   </article>;

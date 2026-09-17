@@ -110,7 +110,9 @@ describe("solution proof sample", () => {
     const canonical = source.slice(source.indexOf('data-proof-variant="canonical"'));
     const beats = [
       "<SourceSheet regions={onPage}",
-      "Objects compiled from this region",
+      // n34: the beat is the same beat; its words come from lib/proof-copy.ts now, because /ko
+      // rendered this block entirely in English.
+      "copy.linkedObjects",
       "styles.counts",
     ].map((beat) => canonical.indexOf(beat));
     expect(beats.every((at) => at > -1), "a beat of the canonical staging is missing").toBe(true);

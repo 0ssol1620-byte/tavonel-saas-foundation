@@ -4,10 +4,15 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { PDFDocumentProxy, PDFDocumentLoadingTask, RenderTask } from "pdfjs-dist";
 import type { VisualEvidence } from "@/lib/visual-world-model";
 import { boundedPixelRatio, publicPdfPath, sameSourcePage, sourceRectStyle, sourceScale } from "@/lib/source-page-geometry";
+import { proofCopy } from "@/lib/proof-copy";
 import { sourcePageLabel, sourcePageRaster } from "@/lib/source-page-rasters";
 import styles from "./original-source-page.module.css";
 
-type Props = { active: VisualEvidence; regions: VisualEvidence[]; onSelectRegion?: (id: string) => void };
+/*
+  n34: `korean` selects the string record and nothing else. The messages thrown inside the check
+  below stay English on purpose -- see the note at the top of lib/proof-copy.ts.
+*/
+type Props = { active: VisualEvidence; regions: VisualEvidence[]; onSelectRegion?: (id: string) => void; korean?: boolean };
 type Phase = "idle" | "loading" | "ready" | "error";
 const MAX_BYTES = 16 * 1024 * 1024;
 
@@ -20,7 +25,8 @@ const MAX_BYTES = 16 * 1024 * 1024;
   of it. The live reader remains the authority: it hashes the committed bytes before painting,
   which a picture cannot, and its canvas replaces the raster the moment it is ready.
 */
-export default function OriginalSourcePage({ active, regions, onSelectRegion }: Props) {
+export default function OriginalSourcePage({ active, regions, onSelectRegion, korean }: Props) {
+  const copy = proofCopy(korean);
   const root = useRef<HTMLDivElement>(null);
   const viewport = useRef<HTMLDivElement>(null);
   const paper = useRef<HTMLDivElement>(null);
@@ -148,13 +154,13 @@ export default function OriginalSourcePage({ active, regions, onSelectRegion }: 
   }, [loaded, active.page, pageKey, size.width, size.height, zoom]);
 
   return <section ref={root} className={styles.root} data-original-source="" data-render-state={ready ? "ready" : phase === "ready" ? "loading" : phase} data-source-page={active.page} data-source-digest={active.digest}>
-    <div className={styles.toolbar} aria-label="Source page controls">
-      <span className={styles.kind}>{sourcePageLabel(active.representationKind)}</span>
+    <div className={styles.toolbar} aria-label={copy.pageControls}>
+      <span className={styles.kind}>{sourcePageLabel(active.representationKind, korean)}</span>
       <div className={styles.controls}>
-        <button type="button" aria-label="Zoom out" disabled={zoom <= 1} onClick={() => setZoom(value => Math.max(1, value - .5))}>−</button>
-        <button type="button" onClick={() => { setZoom(1); viewport.current?.scrollTo({ top: 0, left: 0 }); }}>Fit page</button>
-        <button type="button" aria-label="Zoom in" disabled={zoom >= 4} onClick={() => setZoom(value => Math.min(4, value + .5))}>+</button>
-        <button type="button" aria-pressed={overlay} onClick={() => setOverlay(value => !value)}>Highlight</button>
+        <button type="button" aria-label={copy.zoomOut} disabled={zoom <= 1} onClick={() => setZoom(value => Math.max(1, value - .5))}>−</button>
+        <button type="button" onClick={() => { setZoom(1); viewport.current?.scrollTo({ top: 0, left: 0 }); }}>{copy.fitPage}</button>
+        <button type="button" aria-label={copy.zoomIn} disabled={zoom >= 4} onClick={() => setZoom(value => Math.min(4, value + .5))}>+</button>
+        <button type="button" aria-pressed={overlay} onClick={() => setOverlay(value => !value)}>{copy.highlight}</button>
       </div>
     </div>
     {/* G1-037: a stable hook so a host surface can size this frame without depending on a hashed
@@ -165,19 +171,17 @@ export default function OriginalSourcePage({ active, regions, onSelectRegion }: 
       data-source-viewport=""
       style={raster ? ({ "--page-aspect": `${raster.width} / ${raster.height}` } as CSSProperties) : undefined}
       tabIndex={0}
-      aria-label={onSelectRegion
-        ? "Source page; use the zoom controls to read it and the extracted passage beside it to select a region"
-        : "Source page; use the zoom controls to read it"}
+      aria-label={onSelectRegion ? copy.viewportSelectable : copy.viewportPlain}
     >
       {/* The committed render: painted under the live canvas, and left in place under any message. */}
       {/* eslint-disable-next-line @next/next/no-img-element -- the committed raster is
           served byte for byte: next/image would re-encode it, and the manifest's sha256 of
           these bytes is what makes the render checkable against its source. */}
-      {raster && !ready ? <img className={styles.raster} src={raster.file} alt={`${active.filename}, page ${active.page} of ${active.pageCount}`} width={raster.width} height={raster.height} decoding="async" /> : null}
+      {raster && !ready ? <img className={styles.raster} src={raster.file} alt={copy.pageAlt(active.filename, active.page, active.pageCount)} width={raster.width} height={raster.height} decoding="async" /> : null}
       {!ready && (phase === "error" || !raster) ? <div className={styles.message} role="status" data-tone={phase === "error" ? "error" : "loading"}>
         {phase === "error"
-          ? <><strong>The live check of this file did not finish</strong><span>{error}{raster ? " The page above is this repository’s committed render of the same source." : ""}</span><button type="button" onClick={() => setGeneration(value => value + 1)}>Check again</button></>
-          : <span>Loading the source page…</span>}
+          ? <><strong>{copy.checkUnfinished}</strong><span>{error}{raster ? copy.committedFallback : ""}</span><button type="button" onClick={() => setGeneration(value => value + 1)}>{copy.checkAgain}</button></>
+          : <span>{copy.loadingPage}</span>}
       </div> : null}
       <div ref={paper} className={styles.page} style={{ visibility: ready ? "visible" : "hidden" }} onPointerUp={event => {
         if (!ready || !rotationSupported || !onSelectRegion) return;
@@ -187,11 +191,11 @@ export default function OriginalSourcePage({ active, regions, onSelectRegion }: 
         const match = samePage.find(region => x >= region.bbox1000[0] && x <= region.bbox1000[2] && y >= region.bbox1000[1] && y <= region.bbox1000[3]);
         if (match) onSelectRegion(match.id);
       }}>
-        <canvas ref={canvas} aria-label={`${active.filename}, PDF page ${active.page} of ${active.pageCount}`} role="img" />
+        <canvas ref={canvas} aria-label={copy.canvasAlt(active.filename, active.page, active.pageCount)} role="img" />
         {ready && overlay && rectangle ? <span className={styles.selection} style={rectangle} data-original-region={active.id} aria-hidden="true" /> : null}
       </div>
     </div>
-    <div className={styles.caption}><span>Page <b>{active.page}</b> of {active.pageCount}</span><span>{ready ? "Source bytes verified in this browser" : raster ? "Committed render · verifying the source bytes" : "Verifying the source bytes"}</span></div>
-    {ready && !rotationSupported ? <p className={styles.notice}>This rotated page is shown without a region overlay.</p> : null}
+    <div className={styles.caption}><span>{korean ? <>전체 {active.pageCount}쪽 중 <b>{active.page}</b>쪽</> : <>Page <b>{active.page}</b> of {active.pageCount}</>}</span><span>{ready ? copy.bytesVerified : raster ? copy.committedVerifying : copy.verifying}</span></div>
+    {ready && !rotationSupported ? <p className={styles.notice}>{copy.rotated}</p> : null}
   </section>;
 }
