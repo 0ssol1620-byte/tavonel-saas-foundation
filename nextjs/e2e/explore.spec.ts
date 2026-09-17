@@ -95,8 +95,8 @@ test("Act 1 draws a curated composition of compiled objects", async ({ page }) =
   // The opening composition is colourless: nothing here is claimed as an active fact.
   expect([...new Set(drawn.states)]).toEqual(["candidate"]);
 
-  await expect(page.getByText("SELECT AN OBJECT")).toBeVisible();
-  await expect(page.getByText(/^SHOWING \d+ OF \d+ GRAPH NODES$/)).toBeVisible();
+  await expect(page.getByText("Select an object")).toBeVisible();
+  await expect(page.getByText(/^Showing \d+ of \d+ graph nodes$/)).toBeVisible();
 
   const firstFiling = page.locator(`${STAGE} ${NODE}[data-node-kind="Document"]`).first();
   await firstFiling.click();
@@ -276,13 +276,13 @@ test("an object with many regions is walked with previous and next", async ({ pa
     The counter says how many regions this browser was sent and, when the compiler bound more
     than that, how many it bound. §24 bounds the payload; it does not get to shrink the number.
   */
-  await expect(group.getByText(/^REGION 1 OF \d+( SHOWN · \d+ COMPILED)?$/)).toBeVisible();
-  await expect(group.getByRole("button", { name: "← PREVIOUS" })).toBeDisabled();
-  await group.getByRole("button", { name: "NEXT →" }).click();
-  await expect(group.getByText(/^REGION 2 OF \d+( SHOWN · \d+ COMPILED)?$/)).toBeVisible();
-  await expect(group.getByRole("button", { name: "← PREVIOUS" })).toBeEnabled();
-  await group.getByRole("button", { name: "← PREVIOUS" }).click();
-  await expect(group.getByText(/^REGION 1 OF \d+( SHOWN · \d+ COMPILED)?$/)).toBeVisible();
+  await expect(group.getByText(/^Region 1 of \d+( shown · \d+ compiled)?$/)).toBeVisible();
+  await expect(group.getByRole("button", { name: "← Previous" })).toBeDisabled();
+  await group.getByRole("button", { name: "Next →" }).click();
+  await expect(group.getByText(/^Region 2 of \d+( shown · \d+ compiled)?$/)).toBeVisible();
+  await expect(group.getByRole("button", { name: "← Previous" })).toBeEnabled();
+  await group.getByRole("button", { name: "← Previous" }).click();
+  await expect(group.getByText(/^Region 1 of \d+( shown · \d+ compiled)?$/)).toBeVisible();
 });
 
 test("a filing says how much of itself is in the World", async ({ page }) => {
@@ -299,7 +299,7 @@ test("a filing says how much of itself is in the World", async ({ page }) => {
   await page.getByRole("button", { name: "Open source evidence" }).click();
   const sheet = page.locator("[data-source-sheet]");
   await expect(
-    sheet.getByText(/^(FULL FILING COMPILED · \d+ PAGES|CURATED PAGE SLICE · \d+ OF \d+ PAGES COMPILED)$/),
+    sheet.getByText(/^(Full filing compiled · \d+ pages|Curated page slice · \d+ of \d+ pages compiled)$/),
   ).toBeVisible();
 
   await page.getByRole("button", { name: "Technical details" }).click();
@@ -327,7 +327,7 @@ test("Act 3 reports the arriving filings with derived counts and claims no equiv
   */
   const arrivals = page.locator("[data-arrival]");
   await expect(arrivals).toHaveCount(4);
-  await expect(arrivals.getByText(/^REFERENCE RENDER · /)).toHaveCount(4);
+  await expect(arrivals.getByText(/^Source page · reference render · /)).toHaveCount(4);
   const filed = await arrivals.locator("header b").allInnerTexts();
   expect(filed).toHaveLength(4);
   expect(filed.map((label) => label.replace(/^.*FILED /, ""))).toEqual(
@@ -562,7 +562,7 @@ test("a deep link lands on the exact region it names, not only on the act", asyn
   expect(opening, "the source sheet publishes the id of the region it is showing").toBeTruthy();
 
   await page.getByRole("group", { name: "Source regions for this object" })
-    .getByRole("button", { name: "NEXT →" }).click();
+    .getByRole("button", { name: "Next →" }).click();
   const target = await sheet.locator("[data-active-region]").getAttribute("data-region-id");
   expect(target, "NEXT must reach a different region, or the link proves nothing").not.toBe(opening);
 
