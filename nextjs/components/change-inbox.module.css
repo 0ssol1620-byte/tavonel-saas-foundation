@@ -52,7 +52,6 @@
   border-left: 2px solid transparent;
   color: var(--ci-muted);
 }
-.inbox button:hover { color: var(--ci-ink); }
 .inbox button[data-current="true"] { border-left-color: var(--ci-ink); color: var(--ci-ink); }
 .inbox code { color: var(--ci-faint); font: 12px var(--f-mono, monospace); overflow-wrap: anywhere; }
 .inbox small { color: var(--ci-faint); font: 12px var(--f-mono, monospace); }
@@ -74,32 +73,31 @@
 
 .status { color: var(--ci-faint); font: 12px var(--f-mono, monospace); letter-spacing: .1em; text-transform: uppercase; }
 .note { margin: 0; color: var(--ci-faint); font-size: 12px; line-height: 1.6; }
-.summary { margin: 0; color: var(--ci-ink); font: 12px/1.6 var(--f-mono, monospace); overflow-wrap: anywhere; }
+.summary { margin: 0; color: var(--ci-ink); font: 13px/1.6 var(--f-sans, sans-serif); overflow-wrap: anywhere; }
 
 .counts { display: grid; gap: 1px; margin: 0; background: var(--ci-line); border: 1px solid var(--ci-line); }
 .counts > div { display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; padding: 9px 12px; background: var(--ground, #08090a); }
-.counts dt { color: var(--ci-faint); font: 12px var(--f-mono, monospace); letter-spacing: .1em; text-transform: uppercase; }
+.counts dt { color: var(--ci-faint); font: 500 12px var(--f-sans, sans-serif); letter-spacing: .06em; text-transform: uppercase; }
 .counts dd { margin: 0; color: var(--ci-ink); font: 12px var(--f-mono, monospace); }
 
 .inspect {
   justify-self: start;
+  min-height: 44px;
   padding: 8px 14px;
   color: var(--ci-ink);
   border: 1px solid var(--ci-line-hi);
-  font: 12px var(--f-mono, monospace);
-  letter-spacing: .08em;
-  text-transform: uppercase;
+  border-radius: var(--r-inst, 6px);
+  font: 500 13px var(--f-sans, sans-serif);
   background: transparent;
   transition: background-color 120ms linear;
 }
-.inspect:hover { background: var(--g2, #14171a); }
 
 .impact { display: grid; gap: 20px; padding-top: 6px; border-top: 1px solid var(--ci-line); }
 @media (min-width: 900px) {
   .impact { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
   .full { grid-column: 1 / -1; }
 }
-.impact h4 { margin: 0 0 8px; color: var(--ci-faint); font: 12px var(--f-mono, monospace); letter-spacing: .12em; }
+.impact h4 { margin: 0 0 8px; color: var(--ci-faint); font: 500 12px var(--f-sans, sans-serif); letter-spacing: .06em; }
 
 .lines { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
 .lines > li { display: grid; gap: 3px; padding-left: 10px; border-left: 1px solid var(--ci-line-hi); min-width: 0; }
@@ -107,9 +105,9 @@
 /* Removal has no state token, and the row says "removed" in words. */
 .lines > li[data-effect="changed"] { border-left-color: var(--ci-changed); }
 .lines b { color: var(--ci-ink); font: 400 12px/1.5 var(--f-sans, sans-serif); overflow-wrap: anywhere; }
-.lines small { color: var(--ci-faint); font: 12px var(--f-mono, monospace); letter-spacing: .06em; text-transform: uppercase; }
-.lines s { color: var(--ci-changed); font: 12px/1.6 var(--f-mono, monospace); text-decoration-thickness: 1px; overflow-wrap: anywhere; }
-.lines ins { color: var(--ci-verified); font: 12px/1.6 var(--f-mono, monospace); text-decoration: none; overflow-wrap: anywhere; }
+.lines small { color: var(--ci-faint); font: 500 12px var(--f-sans, sans-serif); letter-spacing: .06em; text-transform: uppercase; }
+.lines s { color: var(--ci-changed); font: 13px/1.6 var(--f-sans, sans-serif); text-decoration-thickness: 1px; overflow-wrap: anywhere; }
+.lines ins { color: var(--ci-verified); font: 13px/1.6 var(--f-sans, sans-serif); text-decoration: none; overflow-wrap: anywhere; }
 
 .where { color: var(--ci-faint); font: 12px var(--f-mono, monospace); letter-spacing: .08em; text-transform: uppercase; overflow-wrap: anywhere; }
 
@@ -143,4 +141,11 @@
 .inbox button { transition: color 120ms linear, border-color 120ms linear; }
 @media (prefers-reduced-motion: reduce) {
   .inbox button, .inspect { transition: none; }
+}
+
+/* Hover, in one gated place (TOKEN_CONTRACT_0917): a tap on a phone fires :hover and leaves the
+   control wearing that face until something else is tapped. Focus and current faces stay above. */
+@media (hover: hover) and (pointer: fine) {
+  .inbox button:hover { color: var(--ci-ink); }
+  .inspect:hover { background: var(--g2, #14171a); }
 }

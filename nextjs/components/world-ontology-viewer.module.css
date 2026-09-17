@@ -9,20 +9,21 @@
   min-width: 0;
 }
 
-.summary { margin: 0; color: var(--ont-faint); font: 12px var(--f-mono, monospace); letter-spacing: .04em; }
+.summary { margin: 0; color: var(--ont-faint); font: 13px var(--f-sans, sans-serif); font-variant-numeric: tabular-nums; }
 
 .viewer h3 {
   margin: 0 0 8px;
   color: var(--ont-faint);
-  font: 12px var(--f-mono, monospace);
-  letter-spacing: .12em;
+  font: 500 12px var(--f-sans, sans-serif);
+  letter-spacing: .06em;
   text-transform: uppercase;
 }
 
-.table { width: 100%; border-collapse: collapse; font: 12px var(--f-mono, monospace); }
+.table { width: 100%; border-collapse: collapse; font: 13px var(--f-sans, sans-serif); font-variant-numeric: tabular-nums; }
 .table th, .table td { padding: 8px 10px; border-top: 1px solid var(--ont-line); text-align: left; vertical-align: top; }
-.table thead th { color: var(--ont-faint); border-top: 0; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; }
-.table tbody th { color: var(--ont-ink); font-weight: 400; }
+.table thead th { color: var(--ont-faint); border-top: 0; font-size: 12px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; }
+/* The row heading is the class or property name the compiler emitted -- a schema identifier. */
+.table tbody th { color: var(--ont-ink); font: 12px var(--f-mono, monospace); }
 .table td { color: var(--ont-muted); }
 
 /* The bar is a background on the cell rather than an element in the flow, so the number stays

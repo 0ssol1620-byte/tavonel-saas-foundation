@@ -63,11 +63,17 @@ describe("workspace mobile layout contract", () => {
     `(hover: hover) and (pointer: fine)` block; focus and selected faces stay outside it.
   */
   it("gates every hover the workspace defines on a real pointer", () => {
-    const studioCss = readFileSync(new URL("../components/world-studio-ultimate.module.css", import.meta.url), "utf8");
+    // Widened 2026-09-18 with the module sweep: the workspace instruments gate their hovers too.
+    const sheet = (name: string) => readFileSync(new URL(`../components/${name}`, import.meta.url), "utf8");
     const sheets: Array<[string, string]> = [
       ["workspace-no1.css", workspaceCss],
       ["workspace-ultimate.module.css", shellCss],
-      ["world-studio-ultimate.module.css", studioCss],
+      ...([
+        "world-studio-ultimate.module.css",
+        "change-inbox.module.css",
+        "world-graph-canvas.module.css",
+        "world-directory-tree.module.css",
+      ].map((name) => [name, sheet(name)] as [string, string])),
     ];
     for (const [name, css] of sheets) {
       const gate = css.indexOf("@media (hover: hover) and (pointer: fine)");

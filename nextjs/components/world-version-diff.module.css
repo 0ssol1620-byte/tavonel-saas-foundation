@@ -13,8 +13,8 @@
 .panel h4 {
   margin: 0 0 6px;
   color: var(--diff-faint);
-  font: 12px var(--f-mono, monospace);
-  letter-spacing: .12em;
+  font: 500 12px var(--f-sans, sans-serif);
+  letter-spacing: .06em;
   text-transform: uppercase;
 }
 
@@ -32,12 +32,12 @@
 .versions strong { color: var(--diff-ink); font-weight: 400; }
 .versions code, .versions small { color: var(--diff-faint); font-size: 12px; }
 .versions em { margin-left: auto; color: var(--diff-added); font-style: normal; font-size: 12px; }
-.versions button { margin-left: auto; color: var(--diff-muted); border: 1px solid var(--diff-line); padding: 4px 10px; font: 12px var(--f-mono, monospace); text-transform: uppercase; }
+.versions button { margin-left: auto; min-height: 44px; color: var(--diff-muted); border: 1px solid var(--diff-line); border-radius: var(--r-inst, 6px); padding: 4px 12px; font: 500 13px var(--f-sans, sans-serif); }
 .versions button[aria-pressed="true"] { color: var(--diff-ink); border-color: var(--diff-added); }
 .status { color: var(--diff-faint); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; }
 
-.summary { margin: 0; color: var(--diff-muted); font: 12px var(--f-mono, monospace); }
-.summary code { color: var(--diff-ink); }
+.summary { margin: 0; color: var(--diff-muted); font: 13px var(--f-sans, sans-serif); }
+.summary code { color: var(--diff-ink); font: 12px var(--f-mono, monospace); }
 .note { margin: 0; color: var(--diff-faint); font-size: 12px; line-height: 1.6; }
 
 .plain { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; font: 12px/1.6 var(--f-mono, monospace); }
@@ -50,8 +50,8 @@
 .fields { display: grid; gap: 3px; margin: 4px 0 8px 16px; padding: 0; list-style: none; }
 .fields li { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
 .fields b { min-width: 74px; color: var(--diff-faint); font: 12px var(--f-mono, monospace); letter-spacing: .08em; text-transform: uppercase; }
-.fields s { color: var(--diff-removed); text-decoration-thickness: 1px; overflow-wrap: anywhere; }
-.fields ins { color: var(--diff-added); text-decoration: none; overflow-wrap: anywhere; }
+.fields s { color: var(--diff-removed); font: 13px var(--f-sans, sans-serif); text-decoration-thickness: 1px; overflow-wrap: anywhere; }
+.fields ins { color: var(--diff-added); font: 13px var(--f-sans, sans-serif); text-decoration: none; overflow-wrap: anywhere; }
 
 .decisions { display: grid; gap: 1px; margin: 0; padding: 0; list-style: none; background: var(--diff-line); }
 .decisions li { display: grid; gap: 5px; padding: 10px 12px; background: var(--ground, #11120f); }
@@ -63,7 +63,7 @@
 .decisions small { color: var(--diff-faint); font: 12px var(--f-mono, monospace); }
 
 .rollback { display: grid; gap: 8px; padding: 14px; border: 1px solid var(--diff-removed); }
-.rollback button { justify-self: start; padding: 8px 14px; color: var(--diff-ink); border: 1px solid var(--diff-removed); font: 12px var(--f-mono, monospace); text-transform: uppercase; }
+.rollback button { justify-self: start; min-height: 44px; padding: 8px 14px; color: var(--diff-ink); border: 1px solid var(--diff-removed); border-radius: var(--r-inst, 6px); font: 500 13px var(--f-sans, sans-serif); }
 
 .empty { display: grid; gap: 8px; padding: 20px; border: 1px solid var(--hairline, rgb(255 255 255 / 0.12)); }
 .empty span { color: var(--text-lo, #74736d); font: 12px var(--f-mono, monospace); letter-spacing: .12em; }
