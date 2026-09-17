@@ -120,6 +120,14 @@ export type PipelineRow = {
   stages: Stage[];
   /** True when a person must act before this document can move. */
   needsPerson: boolean;
+  /**
+   * BQ-087's age field: when the sanitized representation became durable, as R2 observed it.
+   *
+   * Carried from `DocumentListItem.sanitizedObservedAt`, never derived. There is no clock in this
+   * module and nothing computes "an hour ago" from one: a row the server reported no observation
+   * time for says nothing, which is the rule every stage above it already follows.
+   */
+  observedAt: string | null;
 };
 
 /** A file this browser is sending or has sent. The server list cannot see it until CDR runs. */
@@ -215,6 +223,7 @@ function rowFor(
     transfer: upload && upload.phase === "sending" ? { loaded: upload.loaded, total: upload.bytes } : null,
     stages: [quarantine, sanitize, read, compile],
     needsPerson: [quarantine, sanitize, read, compile].some((item) => item.state === "held"),
+    observedAt: server?.sanitizedObservedAt ?? null,
   };
 }
 

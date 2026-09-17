@@ -134,6 +134,17 @@ describe("pipeline board", () => {
     ]);
     expect(rows).toHaveLength(1);
     expect(rows[0].stages[2].state).toBe("active");
+    // BQ-087: the age the board shows is the selected version's observation, not the older one's.
+    expect(rows[0].observedAt).toBe("2026-09-10T00:00:00.000Z");
+  });
+
+  it("reports no age for a document the server gave no observation time", () => {
+    // The board prints nothing rather than a plausible time. Same rule as every stage above it.
+    const rows = buildPipeline(
+      [upload({ phase: "stored", documentId: "doc-1" })],
+      [doc({ documentId: "doc-1", sanitizedKey: "k/sanitized.pdf" })],
+    );
+    expect(rows[0].observedAt).toBeNull();
   });
 
   it("holds a multi-version document when its chronology is unavailable", () => {

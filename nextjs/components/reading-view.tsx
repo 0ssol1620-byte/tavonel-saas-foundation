@@ -32,7 +32,7 @@ const UNCERTAIN_BELOW = 0.75;
 const LINE_STEP_MS = 24;
 const LINE_STEP_CAP = 14;
 
-export default function ReadingView({ progress, facsimile = false }: { progress: OcrProgress; facsimile?: boolean }) {
+export default function ReadingView({ progress }: { progress: OcrProgress }) {
   const page = currentPage(progress);
   const fraction = readFraction(progress);
   const lines = useRef<HTMLOListElement | null>(null);
@@ -71,25 +71,16 @@ export default function ReadingView({ progress, facsimile = false }: { progress:
             <b>p.{page ? String(page.pageNumber1).padStart(2, "0") : "--"}</b>
           </figcaption>
           <div className="reading-sheet">
+            {/*
+              D28. What used to sit behind the regions was a drawn facsimile: Georgia on cream at
+              5-7.5px, with an invented contract, invented amounts and a RECEIVED stamp. It was the
+              only reason `lib/type-floor-exceptions.json` carried selector exceptions at all, and
+              it was a picture of a document that does not exist. There is no committed raster for
+              a customer's own upload -- `lib/source-page-rasters.ts` is keyed by the sha256 of a
+              committed sample PDF -- so the mount holds no picture. The regions are still at the
+              coordinates the reader reported, which is the only thing here that was ever true.
+            */}
             <div className="reading-page">
-            {facsimile ? (
-              <div className="reading-facsimile" aria-hidden="true">
-                <p className="rf-title">SERVICES AGREEMENT 2026</p>
-                <p className="rf-h">§3.2  Payment terms</p>
-                <table className="rf-table">
-                  <thead><tr><th>Item</th><th>Qty</th><th>Amount</th></tr></thead>
-                  <tbody>
-                    <tr><td>Survey</td><td>1</td><td>£4,200</td></tr>
-                    <tr><td>Line 4 OT</td><td>12</td><td>£1,860</td></tr>
-                  </tbody>
-                </table>
-                <div className="rf-fig">
-                  <i /><i />
-                  <span>Fig. 2 Bay layout</span>
-                </div>
-                <span className="rf-stamp">RECEIVED</span>
-              </div>
-            ) : null}
               {page?.boxes.map((box, index) => {
                 const [x0, y0, x1, y1] = box.bbox1000;
                 return (

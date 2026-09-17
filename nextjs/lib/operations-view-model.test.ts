@@ -7,6 +7,7 @@ const row = (id: string, read: "done" | "active" | "held"): PipelineRow => ({
   filename: null,
   transfer: null,
   needsPerson: read === "held",
+  observedAt: null,
   stages: [
     { key: "quarantine", label: "QUARANTINE", state: "done", detail: "stored" },
     { key: "sanitize", label: "SANITIZE", state: "done", detail: "sanitized.pdf" },

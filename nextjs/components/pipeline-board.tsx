@@ -10,6 +10,8 @@ import { trackFunnel } from "@/lib/funnel-events";
 // behind the whitelist that produced the rejection. Both come from the Capability Manifest.
 import { acceptedFormatSentence } from "@/lib/qualified-input";
 import { PIPELINE_STAGES } from "@/lib/pipeline-vocabulary";
+// One UTC face for every device, so the time in a support conversation is the time on the screen.
+import { formatTimestamp } from "@/lib/format";
 
 type Filter = "all" | "attention" | "processing" | "ready" | "failed";
 /*
@@ -105,6 +107,11 @@ export default function PipelineBoard({ rows, reading = {}, names = {}, onDismis
             </div>
             {row.transfer ? <div className="board-transfer compact" aria-label="Upload progress"><i style={{ width: `${row.transfer.total > 0 ? (row.transfer.loaded / row.transfer.total) * 100 : 0}%` }} /></div> : null}
             <div className="board-row-detail" hidden={!expanded}>
+              {/* BQ-087's third triage field. Absolute and UTC rather than "2 hours ago": this
+                  renders on the server too, and a relative age would be a different sentence on
+                  each side of hydration. A row the server gave no observation time for prints
+                  nothing. */}
+              {row.observedAt ? <p className="fine board-row-observed">Source ready <time dateTime={row.observedAt}>{formatTimestamp(row.observedAt)}</time></p> : null}
               {progress && row.stages[2].state === "active" ? <ReadingView progress={progress} /> : null}
               <div className="board-stages board-stages-detail">{row.stages.map((stageItem) => <div className="board-stage" key={stageItem.key} data-s={stageItem.state}><span className="board-stage-k"><i aria-hidden="true" />{stageItem.label}</span><span className="board-stage-d">{stageItem.state === "failed" ? failureCopy(stageItem.detail) : stageItem.detail || "Not started"}</span></div>)}</div>
             </div>
