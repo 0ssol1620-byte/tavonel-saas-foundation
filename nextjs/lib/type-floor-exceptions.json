@@ -1,0 +1,161 @@
+{
+  "comment": "Named exceptions to the 12px type floor. Every entry needs a reason a reviewer can disagree with. A label that does not fit at 12px is a label that is too long — this file is not for those.",
+  "selectors": [
+    {
+      "match": ".rf-",
+      "reason": "components/reading-view.tsx draws a page as a 186px-wide thumbnail with aria-hidden=\"true\". It is an image of a document, not text anyone reads; the type inside it is at page scale, not UI scale. The real fix is the one the design direction asks for — replace the drawn facsimile with the real page raster — and it belongs to the lane that owns reading-view.tsx."
+    },
+    {
+      "match": ".reading-facsimile",
+      "reason": "Same drawn thumbnail as .rf-* above."
+    }
+  ],
+  "files": [
+    {
+      "file": "app/benchmarks/benchmarks.module.css",
+      "lane": "L5",
+      "reason": "Below the 12px floor at the time of the L1 token sweep; L5 owns this sheet. Delete this entry when the sweep lands."
+    },
+    {
+      "file": "app/enterprise/enterprise.css",
+      "lane": "L5",
+      "reason": "Below the 12px floor at the time of the L1 token sweep; L5 owns this sheet. Delete this entry when the sweep lands."
+    },
+    {
+      "file": "app/evidence/evidence.module.css",
+      "lane": "L5",
+      "reason": "Below the 12px floor at the time of the L1 token sweep; L5 owns this sheet. Delete this entry when the sweep lands."
+    },
+    {
+      "file": "app/one-path.css",
+      "lane": "L2",
+      "reason": "Below the 12px floor at the time of the L1 token sweep; L2 owns this sheet. Delete this entry when the sweep lands."
+    },
+    {
+      "file": "app/product-polish.css",
+      "lane": "L5",
+      "reason": "Below the 12px floor at the time of the L1 token sweep; L5 owns this sheet. Delete this entry when the sweep lands."
+    },
+    {
+      "file": "app/product/continuous-knowledge/continuous-knowledge.module.css",
+      "lane": "L5",
+      "reason": "Below the 12px floor at the time of the L1 token sweep; L5 owns this sheet. Delete this entry when the sweep lands."
+    },
+    {
+      "file": "app/resources/resources.module.css",
+      "lane": "L5",
+      "reason": "Below the 12px floor at the time of the L1 token sweep; L5 owns this sheet. Delete this entry when the sweep lands."
+    },
+    {
+      "file": "app/solutions/solutions.module.css",
+      "lane": "L5",
+      "reason": "Below the 12px floor at the time of the L1 token sweep; L5 owns this sheet. Delete this entry when the sweep lands."
+    },
+    {
+      "file": "app/workspace-final-polish.css",
+      "lane": "L4",
+      "reason": "Below the 12px floor at the time of the L1 token sweep; L4 owns this sheet. Delete this entry when the sweep lands."
+    },
+    {
+      "file": "components/change-inbox.module.css",
+      "lane": "L4",
+      "reason": "Below the 12px floor at the time of the L1 token sweep; L4 owns this sheet. Delete this entry when the sweep lands."
+    },
+    {
+      "file": "components/compiler-contract-diagram.module.css",
+      "lane": "L5",
+      "reason": "Below the 12px floor at the time of the L1 token sweep; L5 owns this sheet. Delete this entry when the sweep lands."
+    },
+    {
+      "file": "components/docs/api-reference.module.css",
+      "lane": "L5",
+      "reason": "Below the 12px floor at the time of the L1 token sweep; L5 owns this sheet. Delete this entry when the sweep lands."
+    },
+    {
+      "file": "components/docs/api-try-it.module.css",
+      "lane": "L5",
+      "reason": "Below the 12px floor at the time of the L1 token sweep; L5 owns this sheet. Delete this entry when the sweep lands."
+    },
+    {
+      "file": "components/docs/docs-table.module.css",
+      "lane": "L5",
+      "reason": "Below the 12px floor at the time of the L1 token sweep; L5 owns this sheet. Delete this entry when the sweep lands."
+    },
+    {
+      "file": "components/docs/docs-toc.module.css",
+      "lane": "L5",
+      "reason": "Below the 12px floor at the time of the L1 token sweep; L5 owns this sheet. Delete this entry when the sweep lands."
+    },
+    {
+      "file": "components/docs/page-toc.module.css",
+      "lane": "L5",
+      "reason": "Below the 12px floor at the time of the L1 token sweep; L5 owns this sheet. Delete this entry when the sweep lands."
+    },
+    {
+      "file": "components/docs/world-lifecycle.module.css",
+      "lane": "L5",
+      "reason": "Below the 12px floor at the time of the L1 token sweep; L5 owns this sheet. Delete this entry when the sweep lands."
+    },
+    {
+      "file": "components/explore/explore-stage.module.css",
+      "lane": "L3",
+      "reason": "Below the 12px floor at the time of the L1 token sweep; L3 owns this sheet. Delete this entry when the sweep lands."
+    },
+    {
+      "file": "components/knowledge-compiler-diagram.module.css",
+      "lane": "L5",
+      "reason": "Below the 12px floor at the time of the L1 token sweep; L5 owns this sheet. Delete this entry when the sweep lands."
+    },
+    {
+      "file": "components/marketing-consent.module.css",
+      "lane": "L2",
+      "reason": "Below the 12px floor at the time of the L1 token sweep; L2 owns this sheet. Delete this entry when the sweep lands."
+    },
+    {
+      "file": "components/operations-ultimate.module.css",
+      "lane": "L4",
+      "reason": "Below the 12px floor at the time of the L1 token sweep; L4 owns this sheet. Delete this entry when the sweep lands."
+    },
+    {
+      "file": "components/pdf-evidence-viewer.module.css",
+      "lane": "L3",
+      "reason": "Below the 12px floor at the time of the L1 token sweep; L3 owns this sheet. Delete this entry when the sweep lands."
+    },
+    {
+      "file": "components/public-proof-registry.module.css",
+      "lane": "L5",
+      "reason": "Below the 12px floor at the time of the L1 token sweep; L5 owns this sheet. Delete this entry when the sweep lands."
+    },
+    {
+      "file": "components/world-directory-tree.module.css",
+      "lane": "L4",
+      "reason": "Below the 12px floor at the time of the L1 token sweep; L4 owns this sheet. Delete this entry when the sweep lands."
+    },
+    {
+      "file": "components/world-graph-canvas.module.css",
+      "lane": "L4",
+      "reason": "Below the 12px floor at the time of the L1 token sweep; L4 owns this sheet. Delete this entry when the sweep lands."
+    },
+    {
+      "file": "components/world-ontology-viewer.module.css",
+      "lane": "L4",
+      "reason": "Below the 12px floor at the time of the L1 token sweep; L4 owns this sheet. Delete this entry when the sweep lands."
+    },
+    {
+      "file": "components/world-studio-ultimate.module.css",
+      "lane": "L4",
+      "reason": "Below the 12px floor at the time of the L1 token sweep; L4 owns this sheet. Delete this entry when the sweep lands."
+    },
+    {
+      "file": "components/world-version-diff.module.css",
+      "lane": "L4",
+      "reason": "Below the 12px floor at the time of the L1 token sweep; L4 owns this sheet. Delete this entry when the sweep lands."
+    },
+    {
+      "file": "components/world-visual/world-visual.module.css",
+      "lane": "L3",
+      "reason": "Below the 12px floor at the time of the L1 token sweep; L3 owns this sheet. Delete this entry when the sweep lands."
+    }
+  ],
+  "filesComment": "Stylesheets still under the floor when the token lane swept the sheets it owns. Each one belongs to another lane in the 2026-09-17 brand-quality campaign and is listed as a debt, not a dispensation: delete the entry with the sweep. The floor is already enforced on every sheet not named here."
+}

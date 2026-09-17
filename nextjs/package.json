@@ -18,7 +18,7 @@
     "qa:launch:firefox": "playwright test --project=launch-firefox",
     "qa:launch:webkit": "playwright test --project=launch-webkit",
     "qa:lighthouse": "node scripts/launch-qa/lighthouse-budgets.mjs",
-    "check": "tsc --noEmit && eslint app components lib",
+    "check": "node scripts/check-type-floor.mjs && tsc --noEmit && eslint app components lib",
     "lint": "eslint app components lib",
     "proof:live-ocr": "node scripts/foundation-live-ocr-proof.mjs",
     "ops:smoke": "node scripts/operations-smoke.mjs",

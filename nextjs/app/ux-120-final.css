@@ -91,9 +91,9 @@
 .integration-technical > summary {
   list-style: none;
   color: var(--text-lo);
-  font-family: var(--f-mono);
-  font-size: 10px;
-  letter-spacing: .12em;
+  font-family: var(--f-sans);
+  font-size: var(--t-1);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 .integration-technical > summary::-webkit-details-marker { display: none; }
@@ -133,8 +133,8 @@
   min-height: 36px;
   padding: 7px 11px;
   border: 1px solid var(--hairline-hi);
-  font-family: var(--f-mono);
-  font-size: 10px;
+  font-family: var(--f-sans);
+  font-size: var(--t-1);
   letter-spacing: .08em;
   text-transform: uppercase;
 }
@@ -226,9 +226,9 @@
   }
 
   .workspace-intake-copy .eyebrow {
-    font-size: 9px;
+    font-size: var(--t-1);
     line-height: 1.45;
-    letter-spacing: .14em;
+    letter-spacing: 0.08em;
   }
 
   .workspace-intake-copy h2 {
@@ -267,7 +267,7 @@
   .workspace-intake-copy > small {
     max-width: 100%;
     margin-inline: auto;
-    font-size: 8.5px;
+    font-size: var(--t-1);
     line-height: 1.55;
     letter-spacing: .06em;
     overflow-wrap: anywhere;
