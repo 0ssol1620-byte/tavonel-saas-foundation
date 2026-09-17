@@ -47,10 +47,12 @@
   a `title` attribute no phone and no keyboard ever shows. One meaning, at the site's type floor,
   in the site's own face, linking to the page that carries the rest.
 
-  It still hides below 1000px: the string is 552px of `white-space: nowrap`, and below that width
-  it pushes the access action and the sign-in link off the right edge of a `position: fixed`
-  header, where no amount of scrolling brings them back. Every page where the fact decides
-  something -- /pricing, /login, /integrations, /security, /status, /ko -- states it in the body.
+  It still hides itself, now at the same 1249px the desktop row leaves at (BQ-007): the label is
+  one `white-space: nowrap` line, and in a `position: fixed` header a line that does not fit
+  pushes the access action and the sign-in link off the right edge, where no amount of scrolling
+  brings them back. It appears with the desktop navigation and goes with it. Every page where
+  this fact decides something -- /pricing, /login, /integrations, /security, /status, /ko --
+  states it in the body, where it has room to wrap.
 */
 .state {
   display: inline-flex;
@@ -67,7 +69,7 @@
 @media (hover: hover) and (pointer: fine) {
   .state:hover { color: var(--text-hi); }
 }
-@media (max-width: 1000px) {
+@media (max-width: 1249px) {
   .state { display: none; }
 }
 

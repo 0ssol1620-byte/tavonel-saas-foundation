@@ -136,8 +136,21 @@ describe("eyebrow labels read as two clauses", () => {
     "../app/docs/page.tsx",
     "../app/docs/[section]/page.tsx",
     "../app/cookbooks/[slug]/page.tsx",
-    "../app/ko/page.tsx",
   ];
+
+  /*
+    BQ-056. /ko used to be the fifth surface here, and is now the case below it.
+
+    Its five eyebrows were the numbered section kickers -- "01 / TAVONEL WORKS" through "05 /
+    READY FOR AI" -- a third ordinal system on a page that already numbers a six-step grid inside
+    one of those sections, above headings they restated. A kicker that says what the heading
+    below it says is deleted rather than restyled, so there is no two-clause label left on that
+    page to separate. The tripwire moves with it: that page must render none, not some.
+  */
+  it("../app/ko/page.tsx renders no eyebrow, because each one restated the heading under it", () => {
+    const source = read("../app/ko/page.tsx");
+    expect([...source.matchAll(/className="(?:slate|one-path-eyebrow|eyebrow)"/g)]).toHaveLength(0);
+  });
 
   it.each(SURFACES)("%s separates the label from the text it sits beside", (surface) => {
     const source = read(surface);

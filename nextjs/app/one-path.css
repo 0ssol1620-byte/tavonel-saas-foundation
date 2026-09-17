@@ -380,7 +380,13 @@
   background: var(--g1);
   min-width: 0;
 }
-.one-path-source-proof > .eyebrow { margin: 0 0 20px; }
+/*
+  The proof block's label. `.eyebrow` is L1's rule (sans 12px, +.06em, `--text-mid`, sentence
+  case); the floor and the case are restated here only until that lands, because `tavonel.css`
+  still sets this class to 10px monospace caps and a 10px label is under the site's type floor.
+  Delete these two declarations when L1's `.eyebrow` is in.
+*/
+.one-path-source-proof > .eyebrow { margin: 0 0 20px; font-size: var(--t-1, 12px); text-transform: none; }
 .one-path-source-proof .rv { opacity: 1; transform: none; visibility: visible; }
 
 /* BQ-129: one column, because a heading and three short steps are one column of content. */

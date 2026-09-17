@@ -40,9 +40,10 @@ export function MarketingConsentLink() {
 
         The footer wrote `{" · "}<MarketingConsentLink />`, and this component returns null on an
         unmeasured path -- /404 and every workspace and auth route -- so the legal row rendered
-        "security@tavonel.comAnalytics preferences", the address running straight into the next
-        label. Four separate review lenses reported the same string. Owning the separator here
-        means it cannot outlive the thing it separates.
+        the security address running straight into the next label with no separator between them.
+        Four separate review lenses reported the same run-on string. Owning the separator here
+        means it cannot outlive the thing it separates -- and the label itself still comes from
+        `consentCopy`, never from a word typed into this file.
       */}
       {" · "}
       <button

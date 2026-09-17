@@ -99,7 +99,7 @@ export default function KoreanEntryPage() {
       </div></section>
       <section className="one-path-section" aria-labelledby="ko-use-title"><div className="one-path-wrap">
         <div className="one-path-section-heading"><h2 id="ko-use-title">준비된 지식을 내 AI로.</h2><p>지원되는 연결을 설정하거나 지식 패키지를 활용하세요. 활성화는 사람이 승인하며, 연결 설정을 열었다고 실제 연결 성공으로 표시하지 않습니다.</p></div>
-        <details className="one-path-details"><summary>요금과 활성화 조건</summary><p>활성화는 유료 플랜에서 제공됩니다. 워크스페이스 소유자라면 {DEVELOPER_PLAN.label} 플랜에서, 또는 {TEAM_PLAN.label} 플랜에서 활성화할 수 있습니다. {TEAM_PLAN.label} 플랜은 상담을 거쳐 제공됩니다. 가격은 미국 달러(USD) 기준이며 세금은 별도입니다. 각 플랜의 정확한 범위는 Pricing 페이지가 기준입니다.</p><Link className="one-path-text-link" href="/pricing">요금과 플랜 범위</Link></details>
+        <details className="one-path-details"><summary>요금과 활성화 조건</summary><p>활성화는 유료 플랜에서 제공됩니다. 워크스페이스 소유자라면 {DEVELOPER_PLAN.label} 플랜에서, 또는 {TEAM_PLAN.label} 플랜에서 활성화할 수 있습니다. {TEAM_PLAN.label} 플랜은 상담을 거쳐 제공됩니다. 다만 현재 배포에서는 고객 파일의 업로드·컴파일 자체가 열려 있지 않으므로, 플랜과 무관하게 내 자료 처리는 협의를 거쳐 시작합니다. 가격은 미국 달러(USD) 기준이며 세금은 별도입니다. 각 플랜의 정확한 범위는 Pricing 페이지가 기준입니다.</p><Link className="one-path-text-link" href="/pricing">요금과 플랜 범위</Link></details>
         <details className="one-path-details"><summary>기술 문서와 보안 안내</summary><div className="one-path-links"><Link href="/product">Product</Link><Link href="/docs">Documentation</Link><Link href="/sources">Sources</Link><Link href="/security">Security</Link><Link href="/trust">Trust Center</Link></div><p>도입 검토와 기술 문의는 한국어로 받습니다. 제품·문서·요금의 기준 문서는 영문이며, 위 링크는 영문 페이지로 연결됩니다.</p></details>
       </div></section>
     </div>
