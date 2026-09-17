@@ -25,9 +25,11 @@ export function DocsTableFilter({ label }: { label: string }) {
   const [shown, setShown] = useState<number | null>(null);
 
   const apply = (term: string) => {
-    const table = container.current?.nextElementSibling;
-    if (!(table instanceof HTMLElement)) return;
-    const rows = table.querySelectorAll("tbody tr");
+    // The next sibling is the table's `.table-scroll` wrapper, so the rows are queried out of it
+    // rather than off the table element -- one query that holds either way round.
+    const region = container.current?.nextElementSibling;
+    if (!(region instanceof HTMLElement)) return;
+    const rows = region.querySelectorAll("tbody tr");
     const needle = term.trim().toLowerCase();
     let visible = 0;
     for (const row of rows) {

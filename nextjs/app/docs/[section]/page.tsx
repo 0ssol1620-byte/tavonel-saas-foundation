@@ -8,7 +8,6 @@ import { DocsCopyButton } from "@/components/docs-copy-button";
 import { DocsSnippet } from "@/components/docs-snippet";
 import { withMarks } from "@/components/docs/marks";
 import { CodeTokens } from "@/components/docs/code-tokens";
-import tableStyles from "@/components/docs/docs-table.module.css";
 import {
   DOCS_REVIEWED,
   DOCS_SECTIONS,
@@ -82,7 +81,8 @@ function Endpoint({ endpoint, id }: { endpoint: DocsEndpoint; id?: string }) {
         }))}
       />
       {endpoint.requestExample ? <CodeBlock label="Request body" body={endpoint.requestExample} /> : null}
-      <table className={`docs-table ${tableStyles.stacked}`}>
+      <div className="table-scroll">
+      <table className="docs-table">
         <thead><tr><th>Status</th><th>Response</th></tr></thead>
         <tbody>
           {endpoint.responses.map((response) => (
@@ -93,6 +93,7 @@ function Endpoint({ endpoint, id }: { endpoint: DocsEndpoint; id?: string }) {
           ))}
         </tbody>
       </table>
+      </div>
     </article>
   );
 }
@@ -137,12 +138,13 @@ function Block({ block, endpoints, id }: { block: DocsBlock; endpoints: Map<stri
       return (
         <>
           {/*
-            BQ-102. The filter sits immediately before the table because that is how it finds it:
-            it walks its own `nextElementSibling`, so nothing has to pass an id around and the
-            two cannot point at different tables.
+            BQ-102. The filter sits immediately before the table's scroll wrapper because that is
+            how it finds it: it walks its own `nextElementSibling` and queries the rows out of it,
+            so nothing has to pass an id around and the two cannot point at different tables.
           */}
           {block.filterLabel ? <DocsTableFilter label={block.filterLabel} /> : null}
-          <table className={`docs-table ${tableStyles.stacked}`}>
+          <div className="table-scroll">
+          <table className="docs-table">
             <thead><tr>{block.head.map((cell) => <th key={cell}>{cell}</th>)}</tr></thead>
             <tbody>
               {block.rows.map((row) => (
@@ -162,6 +164,7 @@ function Block({ block, endpoints, id }: { block: DocsBlock; endpoints: Map<stri
               ))}
             </tbody>
           </table>
+          </div>
         </>
       );
     case "diagram":

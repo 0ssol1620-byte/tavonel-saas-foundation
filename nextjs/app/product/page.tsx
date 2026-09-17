@@ -111,6 +111,7 @@ export default function ProductPage() {
               it in a sentence, and it is the only heading this section has.
             */}
             <h2 id="product-layers-title">What we replace, and what we plug into.</h2>
+            <div className="table-scroll">
             <table className="docs-table">
               <thead>
                 <tr>
@@ -129,6 +130,7 @@ export default function ProductPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </section>
 
           {/*

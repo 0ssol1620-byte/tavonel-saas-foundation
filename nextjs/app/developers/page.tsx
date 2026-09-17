@@ -1,5 +1,4 @@
 import { Fragment } from "react";
-import tableStyles from "@/components/docs/docs-table.module.css";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { Route } from "next";
@@ -219,7 +218,8 @@ export default function DevelopersPage() {
                   Compiled World&rsquo;s RDF / JSON-LD semantic projection — a projection of the
                   compiled objects and relations, with no schema for you to author.
                 </p>
-                <table className={`docs-table ${tableStyles.stacked}`}>
+                <div className="table-scroll">
+                <table className="docs-table">
                   <thead><tr><th>Path</th><th>Use it for</th></tr></thead>
                   <tbody>
                     {/*
@@ -236,6 +236,7 @@ export default function DevelopersPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
 
               <h2>Next</h2>

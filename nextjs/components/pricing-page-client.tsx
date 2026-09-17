@@ -919,7 +919,7 @@ export default function PricingPageClient({
             */}
             <h3 id="plan-differences-title">What the step between the two plans buys</h3>
             <div className="table-scroll">
-            <table className={`docs-table ${tableStyles.stacked}`} aria-labelledby="plan-differences-title">
+            <table className={`docs-table ${tableStyles.rowHeader}`} aria-labelledby="plan-differences-title">
               <thead>
                 <tr>
                   <th scope="col">&nbsp;</th>
@@ -1025,7 +1025,7 @@ export default function PricingPageClient({
             */}
             <h3 id="plan-capability-title">What each plan can do</h3>
             <div className="table-scroll">
-            <table className={`docs-table ${tableStyles.stacked}`} aria-labelledby="plan-capability-title">
+            <table className={`docs-table ${tableStyles.rowHeader}`} aria-labelledby="plan-capability-title">
               <thead>
                 <tr>
                   <th scope="col">Capability</th>
@@ -1079,7 +1079,7 @@ export default function PricingPageClient({
             */}
             <h3 id="pricing-scenarios-title">What four volumes cost</h3>
             <div className="table-scroll">
-            <table className={`docs-table ${tableStyles.stacked}`} aria-labelledby="pricing-scenarios-title">
+            <table className={`docs-table ${tableStyles.rowHeader}`} aria-labelledby="pricing-scenarios-title">
               <thead>
                 <tr>
                   <th scope="col">Pages read in a month</th>

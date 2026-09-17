@@ -8,7 +8,6 @@ import { ApiTryIt, type TryItRoute } from "@/components/docs/api-try-it";
 import { withMarks } from "@/components/docs/marks";
 import { CodeTokens } from "@/components/docs/code-tokens";
 import { PageToc, tocEntries } from "@/components/docs/page-toc";
-import tableStyles from "@/components/docs/docs-table.module.css";
 import { API_VERSION } from "@/lib/api-version";
 import { readApiReference, type ReferenceEndpoint } from "@/lib/api-reference";
 import { snippetFor, SNIPPET_LANGUAGES } from "@/lib/docs-endpoints";
@@ -90,7 +89,8 @@ function Operation({ endpoint }: { endpoint: ReferenceEndpoint }) {
       {endpoint.parameters.length > 0 ? (
         <>
           <p className={styles.label}>Parameters</p>
-          <table className={`docs-table ${tableStyles.stacked}`}>
+          <div className="table-scroll">
+          <table className="docs-table">
             <thead><tr><th>Name</th><th>In</th><th>Required</th><th>Shape</th></tr></thead>
             <tbody>
               {endpoint.parameters.map((parameter) => (
@@ -106,6 +106,7 @@ function Operation({ endpoint }: { endpoint: ReferenceEndpoint }) {
               ))}
             </tbody>
           </table>
+          </div>
         </>
       ) : null}
 
