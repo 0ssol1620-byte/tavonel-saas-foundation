@@ -120,9 +120,12 @@ export default function PublicProofRegistry({ title, eyebrow, summary, state, in
             {section.figure ? <figure className={styles.figure}>{section.figure}</figure> : null}
             {section.rows ? <ol className={styles.protocol}>{section.rows.map((row) => <li key={row.key}><b>{row.key}</b><span>{row.description}</span><em>{row.state}</em></li>)}</ol> : null}
             {section.faq ? <dl className={styles.faq}>{section.faq.map((entry) => <div key={entry.question}><dt>{entry.question}</dt><dd>{entry.answer}</dd></div>)}</dl> : null}
-            {section.links ? <p className={styles.links}>{section.links.map((link) => <Link key={link.href} href={link.href}>{link.label}</Link>)}</p> : null}
+            {/* pages-16: the contract's secondary button, not a bespoke bordered box drawn here. */}
+            {section.links ? <p className={styles.links}>{section.links.map((link) => <Link className="btn btn-secondary" key={link.href} href={link.href}>{link.label}</Link>)}</p> : null}
             {section.readNext ? <div className={styles.readNext}><p>Read next</p><ul>{section.readNext.map((link) => <li key={link.href}><Link href={link.href}>{link.label}</Link></li>)}</ul></div> : null}
-            {section.download ? <a className={styles.download} href={section.download.href} download>{section.download.label}</a> : null}
+            {/* Same shape as `.links` on the same component: a download is a control, so it takes
+                a contract variant. Ghost, not secondary -- the row above it is the louder pair. */}
+            {section.download ? <a className={`btn btn-ghost ${styles.download}`} href={section.download.href} download>{section.download.label}</a> : null}
           </div>;
           return <section className={styles.row} id={sectionId(section.title)} key={section.title}>
             <h2>{section.title}</h2>

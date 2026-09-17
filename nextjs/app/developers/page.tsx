@@ -42,19 +42,19 @@ const FIRST_CALL = `curl -H "Authorization: Bearer $TAVONEL_API_KEY" \\
 
 const PATHS = [
   {
-    kind: "LIVE",
+    kind: "Live",
     title: "MCP and the API",
     body: `Read the active World over HTTP, or give an agent the read-only MCP server: ${MCP_TOOL_COUNT_WORD} tools over sources, Worlds, one World, search, Ask, objects, relations, evidence and package. Always the current revision, with no copy to keep in step.`,
     detail: "No write tool, and the server refuses to start if one is added.",
   },
   {
-    kind: "PORTABLE",
+    kind: "Portable",
     title: "A signed package",
     body: "Take the World away as files: JSON-LD and Turtle semantic projections, graph nodes and relationships, a retrieval corpus, provenance activities and a validation report, under a signed manifest with a digest for every file.",
     detail: "Verifiable offline against a fingerprint you fetch separately. It is a snapshot of one revision — take the live path when the reader must stay current.",
   },
   {
-    kind: "HUMAN",
+    kind: "Human",
     title: "Ask and the workspace",
     body: "A person asks a question and gets an answer whose citations open the exact source location behind them, or a statement that the available evidence is insufficient rather than a filled gap.",
     detail: "The same World the two machine paths read, with a reviewer in front of it.",

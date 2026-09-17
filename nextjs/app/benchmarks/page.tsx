@@ -311,13 +311,14 @@ export default function BenchmarksPage() {
                   so the closing statement of the page that says what we optimise for carried a
                   notice, in tracked uppercase, that we have no number for it -- and brought
                   back "this deployment" while doing it. The label's job is to say that this is
-                  a definition, which "DEFINITION" does. An absent value is already evident from
-                  the absence of a value.
+                  a definition, which the one word "Definition" does. An absent value is already
+                  evident from the absence of a value. (type-02 later took the caps off the label
+                  as well: it is a kicker, and a kicker is sentence case.)
                 */}
-                <p className={styles.northMark}>DEFINITION</p>
+                <p className={styles.northMark}>Definition</p>
                 <h3>{NORTH_STAR.name}</h3>
                 <p>{NORTH_STAR.definition}</p>
-                <p className={styles.northMark}>SUPPORTING METRICS</p>
+                <p className={styles.northMark}>Supporting metrics</p>
                 <ul className={styles.supporting}>
                   {NORTH_STAR.supporting.map((metric) => <li key={metric}>{metricLabel(metric)}</li>)}
                 </ul>

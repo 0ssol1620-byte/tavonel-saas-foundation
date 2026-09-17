@@ -119,7 +119,12 @@
   the "Open →" line under the body is gone -- the whole card is the anchor, so it was a second
   label for a link the reader is already inside.
 */
-.product-surface > span { align-self: start; color: var(--verified); font: 500 12px/1.2 var(--f-sans); letter-spacing: .06em; }
+/*
+  type-02 / type-04: the card's section label is a kicker, so it takes the one kicker face from
+  `.eyebrow`; only its grid placement is this sheet's business. The mint it carried taught a second
+  meaning for the colour that marks a verified state elsewhere on the same page.
+*/
+.product-surface > .eyebrow { align-self: start; }
 .product-surface h2 { margin: 0; align-self: end; color: var(--text-hi); font-size: 26px; }
 .product-surface p { margin: 0; color: var(--text-lo); font-size: 13px; line-height: 1.65; }
 @media (max-width: 900px) { .product-surface-grid { grid-template-columns: 1fr; } }
@@ -426,7 +431,8 @@
 */
 .connector-legend { display: grid; gap: 10px; margin: 0; }
 .connector-legend > div { display: grid; grid-template-columns: minmax(0, 10rem) minmax(0, 1fr); gap: 4px 16px; }
-.connector-legend dt { color: var(--verified); font-size: 12px; font-weight: 500; letter-spacing: .04em; }
+/* type-04: a glossary term carries no state, so it is not painted in the state colour. */
+.connector-legend dt { color: var(--text-mid); font-size: var(--t-1); font-weight: 500; letter-spacing: .04em; }
 .connector-legend dd { margin: 0; color: var(--text-lo); font-size: 13px; line-height: 1.6; }
 @media (max-width: 620px) {
   .connector-legend > div { grid-template-columns: minmax(0, 1fr); }

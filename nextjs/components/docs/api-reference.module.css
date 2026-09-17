@@ -20,12 +20,12 @@
   .index { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 28px; }
 }
 
+/* pages-05 / type-03: the operation index is navigation. One kicker face: sans, sentence case. */
 .groupName {
   margin: 0 0 8px;
-  font: 12px var(--f-mono);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--text-lo);
+  font: 500 var(--t-1) var(--f-sans);
+  letter-spacing: 0.06em;
+  color: var(--text-mid);
 }
 
 .index ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; min-width: 0; }
@@ -75,16 +75,16 @@
 
 .signature b { color: var(--text-hi); letter-spacing: 0.08em; }
 .signature > code { color: var(--text-mid); overflow-wrap: anywhere; }
-.signature em { font-style: normal; color: var(--text-lo); font-size: 12px; }
+/* type-03: "No key required" is a sentence about the operation, not part of the signature. */
+.signature em { font-style: normal; font-family: var(--f-sans); color: var(--text-lo); font-size: var(--t-1); }
 
 .summary { margin: 0; font-size: 17px; font-weight: 500; line-height: 1.35; color: var(--text-hi); }
 
 .label {
   margin: 4px 0 0;
-  font: 12px var(--f-mono);
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--text-lo);
+  font: 500 var(--t-1) var(--f-sans);
+  letter-spacing: 0.06em;
+  color: var(--text-mid);
 }
 
 .response { display: grid; gap: 8px; min-width: 0; padding-top: 10px; border-top: 1px solid var(--hairline); }

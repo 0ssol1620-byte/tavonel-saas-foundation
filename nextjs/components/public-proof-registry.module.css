@@ -44,14 +44,20 @@
 .faq dd { max-width: 760px; margin: 0; color: var(--text-lo); font-size: 12px; line-height: 1.7; }
 .links { display: flex; flex-wrap: wrap; gap: 10px; margin: 4px 0 0; }
 /*
-  BQ-111. The page's two actions were 10px tracked uppercase mono -- the face this system
-  reserves for hashes, paths and ids -- two sizes under the type floor, and under 44px tall.
-  They are sans at 13px in a 44px control now, and the labels are written the way they are
-  spoken. The first still carries the accent that marks it as the primary.
+  BQ-111 then pages-16. The page's two actions were 10px tracked uppercase mono, and the first
+  one also painted its border and its label in --verified -- a fifth button variant that existed
+  on exactly one route, spending the verification colour on a navigation control.
+
+  BQ-111 fixed the type and the 44px target by drawing a bordered box HERE. That was still a
+  fifth variant: it matched neither `.btn-secondary` (which has a --g2 ground) nor `.btn-ghost`,
+  so the page taught a face no other page used. The face is deleted rather than re-tuned, and
+  the markup takes `btn btn-secondary` / `btn btn-ghost` from the contract in `app/tavonel.css`.
+  These rules cannot be left behind as a fallback: a CSS module is unlayered, so anything here
+  would beat the `@layer components` variant it is supposed to defer to.
+
+  What survives is the row, and `.download`'s block placement -- geometry, not a face.
 */
-.links a { display: inline-flex; align-items: center; min-height: 44px; padding: 10px 14px; border: 1px solid var(--hairline-hi); border-radius: var(--r-inst); color: var(--text-hi); font-size: 13px; letter-spacing: 0; }
-.links a:first-child { border-color: var(--verified); color: var(--verified); }
-.download { width: fit-content; padding: 10px 13px; border: 1px solid var(--verified); color: var(--verified); font: 12px var(--f-mono); letter-spacing: .08em; }
+.download { width: fit-content; }
 
 /*
   BA-019 and BA-020: references read as a list, and reference sections open on request.

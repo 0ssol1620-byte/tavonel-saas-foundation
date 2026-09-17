@@ -1158,10 +1158,9 @@
     list-style: none;
     cursor: pointer;
     padding: 14px 0;
-    font: 500 var(--t-1)/1 var(--f-sans);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text-lo);
+    font: 500 var(--t-2)/1.4 var(--f-sans);
+    letter-spacing: 0;
+    color: var(--text-mid);
     display: flex;
     align-items: center;
     gap: 10px;
@@ -1171,7 +1170,7 @@
   .status-fold > summary::before {
     content: "+";
     font-size: 14px;
-    color: var(--verified);
+    color: var(--text-mid);
   }
   .status-fold[open] > summary::before { content: "−"; }
   @media (hover: hover) and (pointer: fine) {
@@ -1386,7 +1385,7 @@
   .changelog-breaking b { color: var(--changed); font: var(--t-1) var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; }
   .changelog-breaking span { color: var(--text-lo); font-size: 12px; line-height: 1.7; }
   .changelog-group { margin-top: 14px; }
-  .changelog-group > p { margin: 0 0 6px; color: var(--text-lo); font: var(--t-1) var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; }
+  .changelog-group > p { margin: 0 0 6px; color: var(--text-mid); font: 500 var(--t-1) var(--f-sans); letter-spacing: 0.06em; }
   .changelog-group ul { margin: 0; padding-left: 18px; color: var(--text-lo); font-size: 13px; line-height: 1.75; }
 
   .contact-qualify { display: grid; gap: 16px; padding: 18px 0 0; border: 0; border-top: 1px solid var(--hairline); }
@@ -1672,9 +1671,12 @@
     .source-route h3 { font-size: clamp(16px, 1.45vw, 20px); line-height: 1.25; letter-spacing: -0.018em; }
     .source-route > p { margin: 0; max-width: 62ch; color: var(--text-lo); font-size: 13px; line-height: 1.68; }
   }
-  .link { background: var(--g1); padding: 16px 18px; display: flex; flex-direction: column; gap: 9px; align-items: flex-start; }
-  .link .st { font-family: var(--f-sans); font-size: var(--t-1); letter-spacing: 0.06em; color: var(--text-lo); }
-  .link p { margin: 0; font-size: 12.5px; color: var(--text-lo); }
+  /* The card named `.link` is always a child of `.chain` -- all eight call sites render it inside
+     one. Scoping the card there frees the bare class for the standalone action link D34 names,
+     at the foot of this layer. */
+  .chain .link { background: var(--g1); padding: 16px 18px; display: flex; flex-direction: column; gap: 9px; align-items: flex-start; }
+  .chain .link .st { font-family: var(--f-sans); font-size: var(--t-1); font-weight: 500; letter-spacing: 0.06em; color: var(--text-mid); }
+  .chain .link p { margin: 0; font-size: 12.5px; color: var(--text-lo); }
 
   @media (max-width: 1120px) {
     @layer detail-completion {
@@ -1704,7 +1706,7 @@
   */
   .tiles > :last-child:nth-child(odd) { grid-column: 1 / -1; }
   .tile { background: var(--g1); padding: 16px 18px; display: flex; flex-direction: column; gap: 9px; }
-  .tile .n { font-family: var(--f-sans); font-size: var(--t-1); letter-spacing: 0.06em; color: var(--text-lo); }
+  .tile .n { font-family: var(--f-sans); font-size: var(--t-1); font-weight: 500; letter-spacing: 0.06em; color: var(--text-mid); }
   /* A card heading is a card heading at any level. The landing tiles are h2 because they are the
      first sections under the hero and an h3 there jumped the document outline; the size is the h3
      treatment, exactly as `.chain .link h2` does it. */
@@ -3214,7 +3216,7 @@
   .src-matrix {
     width: 100%;
     border-collapse: collapse;
-    font-size: 12.5px;
+    font-size: var(--t-2);
     line-height: 1.55;
   }
   .src-matrix caption {
@@ -3223,7 +3225,7 @@
     text-align: left;
     font-family: var(--f-sans);
     font-size: var(--t-1);
-    letter-spacing: 0.08em;
+    letter-spacing: 0;
     color: var(--text-lo);
     word-break: break-word;
   }
@@ -3247,7 +3249,7 @@
   .src-matrix tbody th b {
     display: block;
     font-family: var(--f-sans);
-    font-size: 12.5px;
+    font-size: var(--t-2);
     font-weight: 500;
     color: var(--text-hi);
   }
@@ -3366,6 +3368,78 @@
      `app/one-path.css` now keys both navs' active styling on. The whole block is deleted rather
      than repointed, because the markup it was written against is gone. */
 
+  /* ============================================================ D34 -- one link contract
+
+     Three unrelated link treatments shipped on one page (landing-08): standalone actions set in
+     --text-hi with no underline and no marker, verification links in --verified, and the footer
+     copyright row underlined. The first group was typographically identical to the body text
+     beside it, so "Inspect the public source   What is preserved" read as two labels rather than
+     two links -- and in the closing paragraph (landing-07) "request access" carried neither a
+     colour cue nor a non-colour one, which is WCAG 1.4.1 with nothing at all holding it up.
+
+     Three faces, and what a link IS decides which one it takes:
+
+       prose <a>      inside running text -- --text-hi with a 1px underline drawn in --hairline-hi
+                      that comes up to the text colour on hover. The underline is the cue; the
+                      colour is the second one, never the only one.
+       .link          a standalone action on its own line -- the same persistent underline at
+                      weight 500, and a 44px target because it is a control. No glyph: an arrow
+                      after every link is an ornament, and the underline already says "link".
+       .link-verify   RESERVED for a link that opens a verification surface -- "Verify on SEC",
+                      "Open the original PDF", "Inspect the evidence". --verified means the reader
+                      can go and check the claim, and on a link it means nothing else.
+
+     No link is typographically identical to the prose beside it.
+
+     `.link` used to be a card class; its card rules moved to `.chain .link` above. `.trust-link`
+     is the one anchor that is still a card, so it is excluded here rather than unpicked.
+
+     The prose half is stated as one rule, not as a list of containers. The first draft enumerated
+     `.scene` / `.policy-copy` / `.fine` / `.docs-body`, which is the set the OLD utilities rule
+     named -- and that set is exactly why landing-07 stayed broken: the closing paragraph it names
+     is `p.design-partners-fine` inside `section.design-partners` on `/` and `/ko`, which is in
+     none of the four. The same gap swallowed `p.fine > a` (the container list required `.fine` to
+     be an ANCESTOR of the paragraph, so a paragraph that IS `.fine` never matched) and every link
+     in a `<li>` or `<dd>` outside those four scopes.
+
+     So: any unclassed `a` in a prose element inside `main`. Three carve-outs, each measured:
+       :not([class])  -- a link that carries a class has taken a face on purpose (.btn, .link,
+                        .link-verify, a module class). This rule is for the bare ones.
+       :not(nav a)    -- an index is not prose. Without it the /privacy, /trust and /docs section
+                        indexes (14 + 6 + 1 bare anchors in `nav > ol > li`) would all underline.
+       no figcaption  -- `.solution-proof-sample` puts "Inspect the evidence" in one, in --verified.
+                        That is a `.link-verify` waiting for lane E's class, not a prose link; the
+                        rule would repaint it --text-hi and take the verification cue off it.
+     Measured over 21 routes: 4 routes change, all of them links that had NO cue at all --
+     `/` "supported formats" + "request access", `/ko` 이용 문의 + 공개 샘플, `/reproducibility`
+     five `p.fine` links, `/knowledge-compiler` four "Read next" items.
+  */
+  main :is(p, li, dd, td) a:not([class]):not(nav a),
+  a.link:not(.trust-link),
+  a.link-verify {
+    color: var(--text-hi);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    text-decoration-color: var(--hairline-hi);
+  }
+  a.link:not(.trust-link),
+  a.link-verify {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    font-weight: 500;
+  }
+  a.link-verify { color: var(--verified); }
+  /* Hover is gated, as everywhere: on a touch screen an un-gated hover state sticks after a tap. */
+  @media (hover: hover) and (pointer: fine) {
+    main :is(p, li, dd, td) a:not([class]):not(nav a):hover,
+    a.link:not(.trust-link):hover,
+    a.link-verify:hover {
+      text-decoration-color: currentColor;
+    }
+  }
+
 }
 
 @layer utilities {
@@ -3415,7 +3489,7 @@
 
   /* The /explore node labels the audit measured at 8px in the faintest tone -- one step up as well,
      because the graph is meant to be an argument and it was annotated in the faintest ink there is. */
-  .page :is(.tile .n, .link .st, .source-route-kind, .site-footer-title) {
+  .page :is(.source-route-kind, .site-footer-title) {
     color: var(--text-lo);
   }
 
@@ -4080,15 +4154,12 @@
     of them. Outside a prose container only a paragraph counts, which is the one element that can
     never be a list of destinations. Inside one -- the docs body, a policy page, the fine print --
     every running-text element still qualifies.
+
+    D34 folded this into the one link contract at the foot of `@layer components`, where the same
+    four selectors now also carry the colour and the 1px underline the contract names. Two copies
+    of one rule in two layers is how the thickness ended up `from-font` in the layer that wins and
+    `1px` in the layer that does not; there is one copy.
   */
-  .scene p > a:not([class]),
-  .policy-copy :is(p, li, dd, td) a:not([class]),
-  .fine :is(p, li, dd, td) a:not([class]),
-  .docs-body :is(p, li, dd, td) a:not([class]) {
-    text-decoration: underline;
-    text-underline-offset: 3px;
-    text-decoration-thickness: from-font;
-  }
 
   /*
     Cross-lane from `truth` -- a surface that is waiting says so visually, not only to a screen
@@ -4285,15 +4356,19 @@
   }
   .integration-technical > summary {
     list-style: none;
-    color: var(--text-lo);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    color: var(--text-mid);
     font-family: var(--f-sans);
-    font-size: var(--t-1);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    font-size: var(--t-2);
+    font-weight: 500;
+    letter-spacing: 0;
   }
   .integration-technical > summary::-webkit-details-marker { display: none; }
-  .integration-technical > summary::after { content: ' +'; color: var(--verified); }
-  .integration-technical[open] > summary::after { content: ' −'; }
+  .integration-technical > summary::after { content: "+"; color: var(--text-mid); }
+  .integration-technical[open] > summary::after { content: "−"; }
   .integration-technical .integration-facts { margin-top: 14px; }
   .integration-footnote { max-width: 80ch; margin-top: 20px; }
 
