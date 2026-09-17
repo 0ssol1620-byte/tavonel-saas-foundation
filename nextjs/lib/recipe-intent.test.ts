@@ -334,7 +334,8 @@ describe("recipe preflight", () => {
 
   it("names the human review gate and the page the reader comes back to", () => {
     const html = render({ intent: intentFor(RECIPE_IDS[2]) });
-    expect(html).toContain("Promotion is always an explicit human decision");
+    // D9: the verb is "activate" in every string a reader sees. The gate itself is unchanged.
+    expect(html).toContain("Activation is always an explicit human decision");
     expect(html).toContain(defaultReturnTo(RECIPE_IDS[2]));
   });
 });

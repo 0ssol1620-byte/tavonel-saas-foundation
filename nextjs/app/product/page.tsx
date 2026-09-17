@@ -60,7 +60,7 @@ const SURFACES = [
 */
 const LAYERS = [
   ["Document parsing and OCR", "Replaced", "Reading is a compile step here: sanitize, read, keep the location and the uncertainty, and carry both into review."],
-  ["Ingestion and cleanup scripts", "Replaced", "One compile over a collection, versioned, producing a candidate a person promotes, with the revision it replaces still readable."],
+  ["Ingestion and cleanup scripts", "Replaced", "One compile over a collection, versioned, producing a candidate a person activates, with the revision it replaces still readable."],
   ["Enterprise search", "Connects to", "The package carries a retrieval corpus, and the API and MCP are read-only. An existing search product keeps its index; what changes is that a result can name the source version behind it."],
   ["Ontology and knowledge platforms", "Connects to", "Turtle, JSON-LD and CSV leave in a signed package that a graph database or an ontology tool imports, so modelling and business rules stay in the tool your team already runs."],
   ["Agent and workflow orchestration", "Connects to", "Eight read-only MCP tools and an HTTP API: an agent reads a World, and the actions it takes stay in the orchestrator that took them."],

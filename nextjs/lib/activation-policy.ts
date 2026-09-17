@@ -56,7 +56,7 @@ export const activationPolicy = {
   */
   cdr: { enabled: true, reason: "Quarantine source objects are sanitized by an IAM-only PDFium and ClamAV service on Google Cloud Run (Seoul, asia-northeast3) before anything downstream reads them. The production Worker uses short-lived workload identity, refuses redirects, and stores only digest-bound immutable PDFs for downstream reading." },
   ocrGpu: { enabled: true, reason: "GPU OCR is open, with scale-to-zero and candidate-only review controls enforced." },
-  candidatePromotion: { enabled: false, reason: "Promotion is always an explicit human decision." },
+  candidatePromotion: { enabled: false, reason: "Activation is always an explicit human decision." },
   /*
     BA-118. This one string renders on /pricing, /security, /status, /login and /workspace, so the
     three words it used to carry -- "the founder", "the security suite" (our own CI) and "an

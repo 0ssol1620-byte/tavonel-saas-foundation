@@ -1030,6 +1030,31 @@ describe("the site's own vocabulary", () => {
   });
 
   /*
+    D9. One verb for the act, in the copy a reader sees: a candidate is *activated*, never
+    *promoted*.
+
+    The decision lets the code keep the older name -- the route is still
+    `app/api/collections/[id]/promote/route.ts` and the gate is still `candidatePromotion`, and
+    renaming either is a migration rather than a copy fix -- so a line naming one of those two
+    is not reader copy and does not count here. /privacy and /terms are the founder's legal
+    text and are not an implementer's to rewrite at all.
+
+    Comments are stripped by `prose`, which is what makes the rule checkable: the pages are full
+    of paragraphs explaining which word was there before.
+  */
+  it("activates a candidate, and never promotes one, in reader copy (D9)", () => {
+    const LEGAL = ["app/privacy/page.tsx", "app/terms/page.tsx"];
+    for (const file of marketingPageFiles()) {
+      if (LEGAL.includes(file)) continue;
+      const lines = prose(file)
+        .split(/\r?\n/)
+        .filter((line) => !/candidatePromotion|promote\/route/.test(line))
+        .filter((line) => /\bpromot/i.test(line));
+      expect(lines, `${file} writes the promote verb in copy a reader sees`).toEqual([]);
+    }
+  });
+
+  /*
     G1-001: /explore's closing action is the site's access action, not a fourth spelling of it.
 
     `lib/explore-story.ts` is reachable from the client bundle, where the commercial flags inline

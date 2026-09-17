@@ -131,7 +131,7 @@ export default function AuthCallbackPage() {
 
           {!failed ? (
             <p className="fine">
-              No password is created or stored. Nothing you upload is promoted into a live world
+              No password is created or stored. Nothing you upload is activated into a live world
               without you deciding it.
             </p>
           ) : null}
