@@ -520,14 +520,14 @@
 }
 
 /*
-  BQ-137. Three one-line titles, each reserving two lines, on /developers.
+  BQ-137. Aligning the bodies of a card row without reserving a line in every card.
 
-  `.chain .link > h2 { min-height: 2.4em }` in app/tavonel.css reserves a second line on every
-  card heading so the bodies in a row start together. It is the right rule for a grid where one
-  title wraps and its neighbour does not; on this row none of the three wraps, so all it does is
-  open 20px of empty space under each title, three times. Subgrid gives the four parts of the
-  card a row each measured across the row, which aligns the bodies whatever the titles do -- and
-  then the reserved line is not needed by anything.
+  `.chain .link > h2 { min-height: 2.4em }` in app/tavonel.css used to buy that alignment by
+  reserving a second line on EVERY card heading, which opened 20px of empty space under each
+  one-line title -- three times on this row, where none of the three wraps. pages-06 deleted it.
+  Subgrid is what replaces it, here and on any row where a title does wrap: the four parts of the
+  card get a row each, measured across the row, so the bodies start together whatever the titles
+  do, and nothing reserves a line it does not use.
 */
 .dev-paths { grid-template-rows: repeat(4, auto); }
 .dev-paths > .link {
@@ -536,7 +536,6 @@
   grid-template-rows: subgrid;
   align-content: start;
 }
-.dev-paths > .link > h2 { min-height: 0; }
 @media (max-width: 760px) {
   .dev-paths { grid-template-rows: auto; }
   .dev-paths > .link { grid-row: auto; grid-template-rows: none; }

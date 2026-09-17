@@ -4203,10 +4203,20 @@
      nothing. `.body > .stack:first-child` is sticky above 1321px for exactly that reason, and a
      blanket `position: static` on every public route cancelled it.
 
-     It stays static on the two shapes that are not two columns: `.policy-copy` turns `.body` into
-     a flex column (`.policy-copy { display: flex; flex-direction: column }` below), so pinning its
-     first child lays the heading over the sections under it; and the one-column D32 routes, which
-     the BQ-100 block in product-polish.css pins static with more specificity. */
+     It stays static on the two shapes that are not two columns: `.body.policy-copy`, which
+     `.policy-copy { display: flex; flex-direction: column }` (below) turns into a flex column, so
+     pinning its first child lays the heading over the sections under it -- /enterprise, /research
+     and /trust, the three routes that put the class on `.body` itself; and the one-column D32
+     routes, which the BQ-100 block in product-polish.css pins static with more specificity.
+
+     Blast radius of narrowing the old blanket rule to that selector, recorded because it reaches
+     past the finding's own routes: the two-track routes are pinned again above 1321px, which is
+     the fix on /docs /developers /changelog /integrations /api /contact, and ALSO turns the four
+     PolicyLayout documents (/privacy /terms /refunds /subprocessors) sticky -- their `.body` is a
+     normal two-track body and only an inner `<div>` carries `.policy-copy`. Verified at 1440: the
+     H1 and effective-date block ride with the reader instead of leaving the rail dead. Their "On
+     this page" box is still rendered inside the reading column by components/policy-layout.tsx,
+     not in the rail (pages-13's remaining half; that file belongs to no lane in this pass). */
   .public-page .body.policy-copy > .stack:first-child { position: static; top: auto; }
 
   /* Integration cards: three real connectors means three real columns. Never paint a fourth empty
