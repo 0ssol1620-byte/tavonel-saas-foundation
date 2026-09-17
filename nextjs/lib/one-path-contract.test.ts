@@ -62,8 +62,22 @@ describe("approved one-path experience", () => {
     expect(text("app/page.tsx")).toContain("isLiveCommerce()");
     expect(text("app/page.tsx")).toContain("<SolutionProofSample");
     expect(text("app/ko/page.tsx")).toContain("playbackRate={1.5} compact");
-    expect(text("app/ko/page.tsx")).toContain("01 / TAVONEL WORKS");
-    expect(text("app/ko/page.tsx")).toContain('canonical: "/ko"');
+    /*
+      BQ-056. This pinned "01 / TAVONEL WORKS" -- one of five numbered section kickers that made a
+      third ordinal system on a page which already numbers a six-step grid inside one of those
+      sections. They are deleted, so the guard follows what it was there for: /ko runs the same
+      sections in the same order as `/`, identified by their headings rather than by a count.
+    */
+    const korean = text("app/ko/page.tsx");
+    // Comments stripped: the rationale for deleting them names the strings it deleted.
+    expect(korean.replace(/\{?\/\*[\s\S]*?\*\/\}?/g, ""), "a numbered section kicker is not a section name")
+      .not.toMatch(/0\d \/ /);
+    for (const heading of ["ko-works-title", "ko-intake-title", "ko-proof-title", "ko-current-title", "ko-use-title"]) {
+      expect(korean).toContain(`id="${heading}"`);
+    }
+    expect(korean.indexOf("ko-works-title")).toBeLessThan(korean.indexOf("ko-proof-title"));
+    expect(korean.indexOf("ko-proof-title")).toBeLessThan(korean.indexOf("ko-use-title"));
+    expect(korean).toContain('canonical: "/ko"');
   });
   it("keeps low-motion, Save-Data and hidden-tab playback protections", () => {
     const player = text("components/compile-stage-player.tsx");

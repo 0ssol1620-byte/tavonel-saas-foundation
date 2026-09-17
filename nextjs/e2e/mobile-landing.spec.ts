@@ -62,7 +62,8 @@ test("the customer film vocabulary stays readable without reintroducing technica
   await openHome(page);
   const chips = page.locator(".one-path-hero-film-steps span");
   await expect(chips).toHaveCount(4);
-  await expect(chips).toHaveText(["SOURCE", "READ", "ORGANIZE", "READY FOR AI"]);
+  // BQ-011 / BQ-056: sentence case, from `PIPELINE_STAGES`, and no longer pill-shaped.
+  await expect(chips).toHaveText(["Source", "Read", "Organize", "Ready for AI"]);
   const boxes = await chips.evaluateAll(elements => elements.map(element => {
     const rect = element.getBoundingClientRect();
     return { left: rect.left, right: rect.right, top: rect.top, width: rect.width };
@@ -181,7 +182,9 @@ test("the mobile menu exposes only the three customer choices plus the commercia
   const direct = panel.locator("a.mobile-nav-direct");
   await expect(direct).toHaveCount(3);
   await expect(direct).toHaveText(["How it works", "Connect", "Pricing"]);
-  await expect(panel.locator("a.mobile-nav-cta")).toHaveCount(1);
+  // BQ-059: the header keeps the action at every width; the sheet is the three sections.
+  await expect(panel.locator("a.mobile-nav-cta")).toHaveCount(0);
+  await expect(page.locator("header .nav-actions .btn")).toHaveCount(1);
   await expect(panel.locator("details.mobile-nav-group")).toHaveCount(0);
   const geometry = await panel.boundingBox();
   expect(geometry).not.toBeNull();
