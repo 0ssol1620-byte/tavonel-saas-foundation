@@ -1221,6 +1221,15 @@
   .scene.doc .stack > .slate { margin-top: 14px; }
   .policy-copy { display: flex; flex-direction: column; gap: 14px; }
   .policy-copy h2 { margin: 20px 0 0; font-size: 18px; letter-spacing: -0.01em; }
+  /*
+    pages-23. `/status` now renders this document inside the public chrome, and its five sections
+    are real `<h2>`s rather than `<h3>`s under an `<h1>` -- which exposed that the 18px above is
+    smaller than the site's own `h3` (20px), so promoting a heading made it shrink. On the public
+    variant the h2 takes the h2 step and the page reads 56 / 30 / 20. The four legal documents
+    keep their dense 18px: they are read as contracts, not scanned as product pages, and changing
+    them is not this finding.
+  */
+  .public-page .policy-copy h2 { font-size: var(--t-h2-sm); }
   .policy-copy p { margin: 0; color: var(--text-lo); line-height: 1.72; }
   /* `:not(.btn)`: the closing CTA rows on /trust, /enterprise and /research sit inside this
      block, and the link colour (0,1,1) outranked `.btn`'s `color: var(--ground)` (0,1,0) -- three
