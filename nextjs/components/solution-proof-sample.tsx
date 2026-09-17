@@ -127,7 +127,7 @@ export default function SolutionProofSample({ pick, variant = "canonical" }: {
   const last = exploreSampleSnapshots[exploreSampleSnapshots.length - 1];
 
   return (
-    <figure className={styles.block} aria-labelledby="solution-proof-sample-title" data-proof-kind="source-passage" data-proof-variant="canonical">
+    <figure className={styles.block} aria-labelledby="solution-proof-sample-title" data-proof-kind="source-passage" data-proof-variant="canonical" data-evidence-id={region.id}>
       <figcaption className={styles.head}>
         <span id="solution-proof-sample-title">Public compiled World · Apple SEC corpus</span>
         <Link href={regionHref(region)}>Inspect the evidence</Link>

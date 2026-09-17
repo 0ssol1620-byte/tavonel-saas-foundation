@@ -35,7 +35,7 @@ test("solution pages use a readable hero and visible source-bound proof", async 
       const title = document.querySelector<HTMLElement>(".solution-hero .document-title")!;
       const titleRange = document.createRange();
       titleRange.selectNodeContents(title);
-      const proof = document.querySelector<HTMLElement>(".solution-proof-sample")!;
+      const proof = document.querySelector<HTMLElement>('[data-proof-variant="canonical"]')!;
       const flow = document.querySelector<HTMLElement>(".solution-flow")!;
       const solutionSections = [...document.querySelectorAll<HTMLElement>(".solution-section")];
       const flowItems = [...flow.children].map((item) => item.getBoundingClientRect());
@@ -61,7 +61,7 @@ test("solution pages use a readable hero and visible source-bound proof", async 
       replace, not looser -- the region's own words have to be on screen, the counts have to be
       the artifact's, and the candidate count may not be published as an object count again.
     */
-    const sheet = page.locator(".solution-proof-sample [data-source-sheet]");
+    const sheet = page.locator('[data-proof-variant="canonical"] [data-source-sheet]');
     await expect(sheet).toHaveCount(1);
     await expect(sheet.locator("[data-active-region]")).toHaveCount(1);
     const quoted = (await sheet.locator("[data-active-region]").innerText()).trim();
@@ -71,7 +71,7 @@ test("solution pages use a readable hero and visible source-bound proof", async 
     for (const figure of ["5 filings", "290 pages", "1,281 regions", "W0", "W4", "sha256"]) {
       await expect(counts).toContainText(figure);
     }
-    await expect(page.locator(".solution-proof-sample")).not.toContainText("6,300");
+    await expect(page.locator('[data-proof-variant="canonical"]')).not.toContainText("6,300");
 
     const viewport = page.viewportSize()!;
     if (viewport.width >= 1440) {

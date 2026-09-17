@@ -67,7 +67,7 @@
 .edge[data-edge-state="affected"],
 .edge[data-edge-state="changed"] { stroke: var(--changed-dim); }
 .edge[data-lit="1"] { stroke: var(--verified-dim); }
-.edges g[data-focus-dimmed="1"] { opacity: 0.18; }
+.edges g[data-focus-dimmed="1"] { opacity: 0.5; }
 .edgeLabel {
   fill: var(--verified);
   font: 12px var(--f-mono);
@@ -140,7 +140,8 @@
   box-shadow: inset 2px 0 var(--verified);
 }
 .node[data-related="1"] { border-color: var(--verified-dim); color: var(--text-hi); }
-.node[data-focus-dimmed="1"] { opacity: 0.2; }
+/* BQ-132: 0.2 put an unselected node under 1.6:1 against the ground -- dimmed, not deleted. */
+.node[data-focus-dimmed="1"] { opacity: 0.55; }
 
 .node[data-node-state="dim"] { opacity: 0.36; }
 

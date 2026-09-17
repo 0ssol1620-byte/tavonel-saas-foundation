@@ -60,7 +60,7 @@ function ArrivalCard({ arrival }: { arrival: ExploreChangeArrivalView }) {
       <p className={styles.revisionLocator}>Page {arrival.page} of {arrival.pageCount}</p>
       <footer>
         <Link className={styles.sourceLink} href={arrival.href as Route} target="_blank" rel="noreferrer">
-          {rendered ? "Open reference render ↗" : "Open committed PDF ↗"}
+          {rendered ? "Open the reference render" : "Open the original PDF"}
         </Link>
       </footer>
     </article>
@@ -177,7 +177,7 @@ export default function ChangeAct({
               target="_blank"
               rel="noreferrer"
             >
-              Open committed PDF ↗
+              Open the original PDF
             </Link>
           </footer>
         </article>

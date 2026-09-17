@@ -67,8 +67,14 @@ const change = buildExploreChangeView(
 );
 
 describe("the act a link may ask for", () => {
-  it("accepts the three deep-linkable acts", () => {
-    expect(Object.keys(DEEP_LINK_ACTS)).toEqual(["world", "evidence", "change"]);
+  it("accepts the three deep-linkable acts, and the one alias the landing already published", () => {
+    // BQ-078: `?act=source` was a live landing CTA that resolved to nothing, so the page's one
+    // promise of the source delivered its front door. It resolves to the act that opens a region
+    // on its page. This is not a fourth act -- it is a fourth spelling of the second one, which is
+    // what the second assertion holds: three states, four ways a URL may name them.
+    expect(Object.keys(DEEP_LINK_ACTS)).toEqual(["world", "evidence", "change", "source"]);
+    expect(new Set(Object.values(DEEP_LINK_ACTS)).size).toBe(3);
+    expect(actFromQuery("source")).toBe("evidence");
     for (const [query, act] of Object.entries(DEEP_LINK_ACTS)) expect(actFromQuery(query)).toBe(act);
   });
 

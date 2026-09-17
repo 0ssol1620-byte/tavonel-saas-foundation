@@ -209,19 +209,19 @@ test("Act 2 opens an object onto the page region it was compiled from", async ({
   // The source sheet names the file, not the relation list that happens to name it too.
   const sheet = page.locator("[data-source-sheet]");
   await expect(sheet.getByText(/^apple-\d{4}(-\d+)?-.*\.pdf$/i).first()).toBeVisible();
-  // Original bytes are the default representation. Parsed text remains one explicit tab away,
-  // so the source is never mistaken for a typeset reconstruction of the filing.
-  const originalTab = sheet.getByRole("tab", { name: /^(Original page|Reference page)$/ });
-  await expect(originalTab).toHaveAttribute("aria-selected", "true");
+  // BQ-014: the page is the first and largest thing in the sheet, and the passage read from it
+  // is below rather than behind a tab, so the source is never mistaken for a typeset
+  // reconstruction and never hidden behind a click either.
   await expect(sheet.locator("[data-original-source]")).toBeVisible();
-  await sheet.getByRole("tab", { name: "Parsed text" }).click();
-  await expect(page.getByText(/^REGION ON PAGE \d+ OF \d+$/)).toBeVisible();
+  await expect(sheet.locator("[data-parsed-source-page]")).toBeVisible();
   await expect(page.getByText("This object is supported by this exact source region.")).toBeVisible();
   await expect(page.getByRole("link", { name: /Verify on SEC/ })).toBeVisible();
   // The marked line is the region the object came from, and it is one line, not the page.
   await expect(page.locator("[data-active-region]")).toHaveCount(1);
-  // The tether is the drawn claim: object to region, measured rather than described.
-  await expect(page.locator(`${STAGE} svg path[pathLength="1"]`)).toHaveCount(1);
+  // BQ-018: the relationship is stated at both ends -- one ring, one locator -- not drawn
+  // between them by a curve that vanishes on scroll.
+  await expect(page.locator(`${STAGE} svg path[pathLength="1"]`)).toHaveCount(0);
+  await expect(page.locator("[data-source-locator]")).toHaveCount(2);
 
   /*
     §11.3 and §11.6, and the one deliberate exception to "no machine detail on the default
@@ -260,9 +260,9 @@ test("a reference render never presents itself as the acquired original", async 
   await expect(provenance.locator("[data-acquired-original]"))
     .toContainText(/^SEC EDGAR primary document · apple-2026-.*\.html/);
   await expect(provenance.getByText(/^sha256:[a-f0-9]{64}$/)).toHaveCount(2);
-  await expect(page.getByRole("link", { name: /Open reference render/ })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Open acquired original/ })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Open committed PDF/ })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /Open the reference render/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Open the acquired original/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Open the original PDF/ })).toHaveCount(0);
 });
 
 test("an object with many regions is walked with previous and next", async ({ page }) => {
@@ -468,15 +468,13 @@ test("a phone walks World, Object, Source as steps rather than shrinking three p
   await expect(page.locator(`${STAGE} ${NODE}[data-focus-dimmed="1"]`).first()).toBeHidden();
   await page.getByRole("button", { name: "Open source evidence" }).click();
   await expect(page.locator(STAGE)).toHaveAttribute("data-world-act", "object_focus");
-  await expect(page.getByRole("link", { name: /Open committed PDF/ })).toBeHidden();
+  await expect(page.getByRole("link", { name: /Open the original PDF/ })).toBeHidden();
 
   await page.getByRole("button", { name: /Open the source region/ }).click();
   await expect(page.locator(STAGE)).toHaveAttribute("data-world-act", "evidence");
   const sheet = page.locator("[data-source-sheet]");
-  await expect(sheet.getByRole("tab", { name: /^(Original page|Reference page)$/ })).toHaveAttribute("aria-selected", "true");
   await expect(sheet.locator("[data-original-source]")).toBeVisible();
-  await sheet.getByRole("tab", { name: "Parsed text" }).click();
-  await expect(page.getByText(/^REGION ON PAGE \d+ OF \d+$/)).toBeVisible();
+  await expect(sheet.locator("[data-parsed-source-page]")).toBeVisible();
 
   await page.getByRole("button", { name: "Back to the World" }).click();
   await expect(page.locator(STAGE)).toHaveAttribute("data-world-act", "object_focus");

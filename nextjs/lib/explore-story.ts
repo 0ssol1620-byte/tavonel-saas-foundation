@@ -40,6 +40,15 @@ export const DEEP_LINK_ACTS: Readonly<Record<string, ExploreAct>> = {
   world: "world",
   evidence: "evidence",
   change: "change_compare",
+  /*
+    BQ-078. The landing has shipped "Inspect the public source" pointing at `?act=source` for long
+    enough that the URL is in sitemaps and in whatever anyone bookmarked, and nothing handled it:
+    the link fell through to `entry`, so the one CTA on the landing that promises the source
+    delivered the page's front door instead. `source` is the reader's word for the evidence act --
+    it is the act that opens a region on its page -- so it resolves there, rather than being
+    corrected in one caller and left dead everywhere else it has already been published.
+  */
+  source: "evidence",
 };
 
 /**
