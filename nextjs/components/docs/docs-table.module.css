@@ -40,6 +40,26 @@
   .stacked.stacked td + td {
     margin-top: 10px;
   }
+  /*
+    BQ-135. A row that names itself with a `<th scope="row">` rather than with a first cell.
+
+    /pricing's two comparison tables are shaped that way, and a row header left as a table-cell
+    inside a `display: block` row is laid out in an anonymous table box of its own -- which puts
+    the row's name in a narrow column beside the stack instead of at the top of it. It is the
+    card's title here, so it is a block like the cells and it carries a title's weight.
+    `.src-matrix` on /sources resolves the same thing the same way.
+  */
+  .stacked.stacked tbody th {
+    display: block;
+    padding: 0;
+    border: 0;
+    text-align: left;
+    font-weight: 500;
+    color: var(--text-hi);
+  }
+  .stacked.stacked th + td {
+    margin-top: 10px;
+  }
   .stacked.stacked td::before {
     content: attr(data-label);
     display: block;

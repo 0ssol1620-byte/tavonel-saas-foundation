@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { useEffect, useRef, useState } from "react";
 import { PublicSiteFooter, PublicSiteHeader } from "@/components/public-site-chrome";
+import tableStyles from "@/components/docs/docs-table.module.css";
 import { useCheckout } from "@/lib/use-checkout";
 import { loginUrlForOffer } from "@/lib/checkout-intent";
 import {
@@ -918,7 +919,7 @@ export default function PricingPageClient({
             */}
             <h3 id="plan-differences-title">What the step between the two plans buys</h3>
             <div className="table-scroll">
-            <table className="docs-table" aria-labelledby="plan-differences-title">
+            <table className={`docs-table ${tableStyles.stacked}`} aria-labelledby="plan-differences-title">
               <thead>
                 <tr>
                   <th scope="col">&nbsp;</th>
@@ -930,8 +931,8 @@ export default function PricingPageClient({
                 {PLAN_DIFFERENCES.map(([label, developer, team]) => (
                   <tr key={label}>
                     <th scope="row">{label}</th>
-                    <td>{developer}</td>
-                    <td>{team}</td>
+                    <td data-label={BILLING_OFFERS.observer_access.label}>{developer}</td>
+                    <td data-label={BILLING_OFFERS.studio_access.label}>{team}</td>
                   </tr>
                 ))}
               </tbody>
@@ -939,7 +940,7 @@ export default function PricingPageClient({
             </div>
             <p className="fine">
               Those are the differences. Everything else — compiling, evidence, Ask, signed export,
-              API and MCP access, reviewing a candidate, promoting a World and rolling one back —
+              API and MCP access, reviewing a candidate, activating a World and rolling one back —
               is reached by both plans, at the same per-page rate past the included pages, under
               the same limits below. The capability table under this one is the proof: it is
               answered by the function the API calls, and it reads the same for both.
@@ -1024,7 +1025,7 @@ export default function PricingPageClient({
             */}
             <h3 id="plan-capability-title">What each plan can do</h3>
             <div className="table-scroll">
-            <table className="docs-table" aria-labelledby="plan-capability-title">
+            <table className={`docs-table ${tableStyles.stacked}`} aria-labelledby="plan-capability-title">
               <thead>
                 <tr>
                   <th scope="col">Capability</th>
@@ -1047,7 +1048,7 @@ export default function PricingPageClient({
                   <tr key={row.capability}>
                     <th scope="row">{row.capability}</th>
                     {row.plans.map((plan) => (
-                      <td key={plan.label} data-allowed={plan.allowed ? 1 : 0} aria-label={plan.allowed ? "Yes" : "No"}>
+                      <td key={plan.label} data-label={plan.label} data-allowed={plan.allowed ? 1 : 0} aria-label={plan.allowed ? "Yes" : "No"}>
                         {plan.allowed ? "✓" : "—"}
                       </td>
                     ))}
@@ -1078,7 +1079,7 @@ export default function PricingPageClient({
             */}
             <h3 id="pricing-scenarios-title">What four volumes cost</h3>
             <div className="table-scroll">
-            <table className="docs-table" aria-labelledby="pricing-scenarios-title">
+            <table className={`docs-table ${tableStyles.stacked}`} aria-labelledby="pricing-scenarios-title">
               <thead>
                 <tr>
                   <th scope="col">Pages read in a month</th>
@@ -1090,8 +1091,8 @@ export default function PricingPageClient({
                 {SCENARIOS.map((scenario) => (
                   <tr key={scenario.pages}>
                     <th scope="row">{scenario.pages.toLocaleString("en-US")}</th>
-                    <td>{formatUsd(scenario.developer)}</td>
-                    <td>{formatUsd(scenario.team)}</td>
+                    <td data-label={BILLING_OFFERS.observer_access.label}>{formatUsd(scenario.developer)}</td>
+                    <td data-label={BILLING_OFFERS.studio_access.label}>{formatUsd(scenario.team)}</td>
                   </tr>
                 ))}
               </tbody>
