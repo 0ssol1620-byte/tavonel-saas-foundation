@@ -279,29 +279,31 @@
 }
 
 /* ---- the More panel, on the token system (BQ-095, BQ-026) ---------------------------------
+   Doubled class, because one-path.css is imported after globals.css: equal specificity would
+   lose to the block these replace, and !important is not an answer to load order.
    It used to carry a green palette and 12px/9px radii found nowhere else, a summary whose
    geometry differed from its sibling nav rows, and a panel anchored to its own bottom edge --
    which on a full-height desktop rail opened it off the top of the viewport. These rules load
    after one-path.css and replace that block; see the cross-lane request to delete it there. */
-.one-path-workspace .one-path-more > summary {
+.workspace.one-path-workspace .one-path-more > summary {
   min-height: 40px; display: grid; grid-template-columns: 20px minmax(0, 1fr); align-items: center; gap: 10px;
   padding: 8px 10px; border-radius: var(--ws-radius);
   color: var(--text-lo); font: 500 14px/1.2 var(--f-sans); text-align: left;
 }
-.one-path-workspace .one-path-more[open] > summary { color: var(--text-hi); background: var(--g3); }
-.one-path-workspace .one-path-more-panel {
+.workspace.one-path-workspace .one-path-more[open] > summary { color: var(--text-hi); background: var(--g3); }
+.workspace.one-path-workspace .one-path-more-panel {
   position: absolute; left: calc(100% + 10px); top: 0; bottom: auto;
   width: 248px; max-height: min(560px, 70svh); overflow: auto; padding: 6px;
   border: 1px solid var(--hairline-hi); border-radius: var(--ws-radius);
   background: var(--g1); box-shadow: var(--depth-overlay, 0 18px 50px rgb(0 0 0 / .34));
 }
-.one-path-workspace .one-path-more-panel p { margin: 0; padding: 10px 10px 6px; color: var(--text-mid); font: 500 12px var(--f-sans); letter-spacing: .06em; }
-.one-path-workspace .one-path-more-panel button { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 10px 10px; border-radius: var(--ws-radius); color: var(--text-lo); text-align: left; font: 500 14px var(--f-sans); }
-.one-path-workspace .one-path-more-panel button:hover, .one-path-workspace .one-path-more-panel button:focus-visible { color: var(--text-hi); background: var(--g2); }
-.one-path-workspace .one-path-more-panel button[aria-current="page"] { color: var(--text-hi); background: var(--g3); }
-.one-path-workspace .one-path-more-panel button[aria-pressed="true"] { color: var(--text-hi); }
-.one-path-workspace .one-path-more-panel button[aria-pressed="true"] svg { color: var(--verified); }
-.one-path-workspace .one-path-more-session { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--hairline); }
+.workspace.one-path-workspace .one-path-more-panel p { margin: 0; padding: 10px 10px 6px; color: var(--text-mid); font: 500 12px var(--f-sans); letter-spacing: .06em; }
+.workspace.one-path-workspace .one-path-more-panel button { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 10px 10px; border-radius: var(--ws-radius); color: var(--text-lo); text-align: left; font: 500 14px var(--f-sans); }
+.workspace.one-path-workspace .one-path-more-panel button:hover, .workspace.one-path-workspace .one-path-more-panel button:focus-visible { color: var(--text-hi); background: var(--g2); }
+.workspace.one-path-workspace .one-path-more-panel button[aria-current="page"] { color: var(--text-hi); background: var(--g3); }
+.workspace.one-path-workspace .one-path-more-panel button[aria-pressed="true"] { color: var(--text-hi); }
+.workspace.one-path-workspace .one-path-more-panel button[aria-pressed="true"] svg { color: var(--verified); }
+.workspace.one-path-workspace .one-path-more-session { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--hairline); }
 
 /* ---- motion: state reports; keyboard-initiated actions get none --------------------------- */
 @media (prefers-reduced-motion: no-preference) {
@@ -366,7 +368,7 @@
 .one-path-workspace .workspace-complete .workspace-ai-use-guide {
   margin: 0; border: 0; border-top: 1px solid var(--hairline); border-radius: 0; background: transparent;
 }
-.one-path-workspace .one-path-ai-options { margin-bottom: 0; }
+.workspace.one-path-workspace .one-path-ai-options { margin-bottom: 0; }
 
 /* BQ-133: the settings tables are prose-and-number, not machine identifiers. */
 .one-path-workspace .billing-card dt,
@@ -427,3 +429,23 @@
    exists. Columns start at the top and size to what is in them. */
 .one-path-workspace .connection-layout, .one-path-workspace .developer-layout { align-items: start; }
 .one-path-workspace .connection-list, .one-path-workspace .api-key-list { min-height: 0; }
+
+/* ---- focus, and the mobile origin of the More panel ---------------------------------------
+   one-path.css sets a 5px-offset #dce9d8 ring on every workspace button, and anchors the More
+   panel to its own bottom edge for the bottom bar. Both are its rules, and it is imported
+   after globals.css, so these carry one extra class rather than an !important. The ring is the
+   single focus style the token contract names. The mobile panel keeps opening upward, because
+   above a bottom bar that is correct -- it is the desktop rail, where the same rule opened the
+   panel off the top of the viewport, that BQ-095 is about. */
+.workspace.one-path-workspace :is(button, summary, a, input, select, textarea):focus-visible {
+  outline: 2px solid var(--verified); outline-offset: 2px;
+}
+@media (max-width: 1023px) {
+  .workspace.one-path-workspace .one-path-more-panel {
+    position: fixed; left: auto; right: 12px; top: auto; bottom: calc(76px + env(safe-area-inset-bottom));
+    width: min(320px, calc(100vw - 24px)); max-height: min(60svh, 520px);
+  }
+  .workspace.one-path-workspace .one-path-more > summary {
+    min-height: 52px; grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 4px; text-align: center; font-size: 12px;
+  }
+}
