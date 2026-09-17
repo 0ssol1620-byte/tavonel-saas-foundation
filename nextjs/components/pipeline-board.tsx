@@ -46,8 +46,24 @@ function failureCopy(detail: string) {
   return detail || "The source stopped before processing completed.";
 }
 
-export default function PipelineBoard({ rows, reading = {}, names = {}, onDismiss }: { rows: PipelineRow[]; reading?: Record<string, OcrProgress>; names?: DocumentNames; onDismiss?: () => void }) {
+/*
+  BQ-093: the board is the only list of sources on Knowledge, so "include this in the next
+  candidate" lives on the row it applies to rather than in a second card that reprinted every
+  name. The board does not decide which rows are eligible -- the page passes the ids it read
+  from the document list, so eligibility and the compile call cannot drift apart.
+*/
+export default function PipelineBoard({ rows, reading = {}, names = {}, onDismiss, selectableIds, selectedIds, onToggleSelected }: {
+  rows: PipelineRow[];
+  reading?: Record<string, OcrProgress>;
+  names?: DocumentNames;
+  onDismiss?: () => void;
+  selectableIds?: readonly string[];
+  selectedIds?: readonly string[];
+  onToggleSelected?: (documentId: string) => void;
+}) {
   const firstFailed = rows.find((row) => statusOf(row) === "failed") ?? null;
+  const selectable = new Set(selectableIds ?? []);
+  const selected = new Set(selectedIds ?? []);
   const [filter, setFilter] = useState<Filter>(() => firstFailed ? "failed" : "attention");
   const [query, setQuery] = useState("");
   const [visibleCount, setVisibleCount] = useState(12);
@@ -78,7 +94,15 @@ export default function PipelineBoard({ rows, reading = {}, names = {}, onDismis
       <div className="board-list-wrap"><ol className="board-list board-rows" aria-label={`${filtered.length} matching sources`}>
         {visible.map((row) => { const rowStatus = statusOf(row); const expanded = expandedId === row.id; const progress = reading[row.id]; return (
           <li key={row.id} data-status={rowStatus} data-document-id={row.id} data-held={row.needsPerson ? "1" : "0"}>
-            <button type="button" className="board-row-summary" aria-expanded={expanded} onClick={() => setExpandedId(expanded ? null : row.id)}><span className="board-row-name" data-sensitive="content">{displayName(row.id, names, row.filename)}</span><span className="board-row-stage">{stageLabel(row)}</span><span className="board-row-status" data-status={rowStatus}>{statusLabel(row, reading)}</span><span className="board-row-chevron" aria-hidden="true">{expanded ? "−" : "+"}</span></button>
+            <div className="board-row-head">
+              {onToggleSelected && selectable.has(row.id) ? (
+                <label className="board-row-select">
+                  <input type="checkbox" checked={selected.has(row.id)} onChange={() => onToggleSelected(row.id)} />
+                  <span className="sr-only">Include {displayName(row.id, names, row.filename)} in the next candidate</span>
+                </label>
+              ) : null}
+              <button type="button" className="board-row-summary" aria-expanded={expanded} onClick={() => setExpandedId(expanded ? null : row.id)}><span className="board-row-name" data-sensitive="content">{displayName(row.id, names, row.filename)}</span><span className="board-row-stage">{stageLabel(row)}</span><span className="board-row-status" data-status={rowStatus}>{statusLabel(row, reading)}</span><span className="board-row-chevron" aria-hidden="true">{expanded ? "−" : "+"}</span></button>
+            </div>
             {row.transfer ? <div className="board-transfer compact" aria-label="Upload progress"><i style={{ width: `${row.transfer.total > 0 ? (row.transfer.loaded / row.transfer.total) * 100 : 0}%` }} /></div> : null}
             <div className="board-row-detail" hidden={!expanded}>
               {progress && row.stages[2].state === "active" ? <ReadingView progress={progress} /> : null}

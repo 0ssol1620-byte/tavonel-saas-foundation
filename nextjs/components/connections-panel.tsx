@@ -334,13 +334,18 @@ export default function ConnectionsPanel() {
       <p className="connection-notice" role="status">{notice}</p>
       <div className="connection-form">
         <p className="field-help">TAVONEL requests read-only access and stores refresh credentials only in the encrypted secret broker. Disconnecting removes the broker credential.</p>
+        {/*
+          The optional name sits ABOVE the provider buttons: each button leaves the page for the
+          provider's consent screen the moment it is pressed, so a field placed after it can only
+          be reached by scrolling back past the control that already consumed it.
+        */}
+        <label htmlFor="oauth-connection-name">Name this connection <small>optional</small></label>
+        <input id="oauth-connection-name" maxLength={100} value={oauthDisplayName} onChange={(event) => setOAuthDisplayName(event.target.value)} placeholder="Defaults to the provider name" />
         {oauthProviders.map((item) => (
           <button key={item.provider} type="button" disabled={busy || !item.configured} onClick={() => void connectOAuth(item.provider)}>
             {item.configured ? `Connect ${oauthProviderLabel(item.provider)}` : `${oauthProviderLabel(item.provider)} not configured`}
           </button>
         ))}
-        <label htmlFor="oauth-connection-name">Name this connection <small>optional</small></label>
-        <input id="oauth-connection-name" maxLength={100} value={oauthDisplayName} onChange={(event) => setOAuthDisplayName(event.target.value)} placeholder="Defaults to the provider name" />
         {oauthProviders.length === 0 ? <p className="field-help">{readFailed ? "Provider availability could not be confirmed. Refresh state to retry." : "Reading OAuth provider availability."}</p> : null}
       </div>
       <div className="connection-layout">

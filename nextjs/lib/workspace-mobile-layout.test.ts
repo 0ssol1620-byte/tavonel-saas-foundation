@@ -57,6 +57,39 @@ describe("workspace mobile layout contract", () => {
     expect(shellCss.slice(shellCss.indexOf("@media (max-width: 560px)"))).not.toContain(".headerAction { display: none; }");
   });
 
+  /*
+    TOKEN_CONTRACT_0917: a tap on a phone fires :hover and leaves the control stuck in its hover
+    face until something else is tapped. Every :hover these three sheets define sits inside one
+    `(hover: hover) and (pointer: fine)` block; focus and selected faces stay outside it.
+  */
+  it("gates every hover the workspace defines on a real pointer", () => {
+    const studioCss = readFileSync(new URL("../components/world-studio-ultimate.module.css", import.meta.url), "utf8");
+    const sheets: Array<[string, string]> = [
+      ["workspace-no1.css", workspaceCss],
+      ["workspace-ultimate.module.css", shellCss],
+      ["world-studio-ultimate.module.css", studioCss],
+    ];
+    for (const [name, css] of sheets) {
+      const gate = css.indexOf("@media (hover: hover) and (pointer: fine)");
+      expect(gate, `${name} defines no hover gate`).toBeGreaterThan(-1);
+      const rules = css.slice(0, gate).replace(/\/\*[\s\S]*?\*\//g, "");
+      expect(rules.includes(":hover"), `${name} has an ungated :hover`).toBe(false);
+    }
+  });
+
+  /*
+    BQ-023 / one filled primary per viewport: on a RETURNING workspace the state hero already
+    holds the filled control, so the drop box's first action steps back to a ghost. The rule
+    changes a button face only -- it must not bring back the compacted 76px box D6 removed.
+  */
+  it("keeps one filled primary on a returning Home", () => {
+    const marker = '.one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-copy .workspace-intake-actions button:first-child {';
+    expect(workspaceCss).toContain(marker);
+    const rule = workspaceCss.slice(workspaceCss.indexOf(marker), workspaceCss.indexOf(marker) + marker.length + 180);
+    expect(rule).toContain("background: transparent;");
+    expect(rule).not.toContain("min-height");
+  });
+
   it("states the surface in the markup instead of reading it off an English button title", () => {
     // BQ-086: layout can no longer break on a copy edit or a translation.
     const polish = readFileSync(new URL("../app/workspace-final-polish.css", import.meta.url), "utf8");

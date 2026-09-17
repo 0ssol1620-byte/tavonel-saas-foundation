@@ -30,7 +30,7 @@ import { qualifyProgress, type OcrProgress } from "@/lib/ocr-progress";
 import { advanceProgressPoll, type ProgressPollState } from "@/lib/progress-poll";
 import PipelineBoard from "@/components/pipeline-board";
 import CompileStage from "@/components/compile-stage";
-import { displayName, recallDocumentNames, rememberDocumentName, type DocumentNames } from "@/lib/document-names";
+import { recallDocumentNames, rememberDocumentName, type DocumentNames } from "@/lib/document-names";
 import { trackFunnel, trackFunnelOnce } from "@/lib/funnel-events";
 import ConnectionsPanel from "@/components/connections-panel";
 import DeveloperPanel from "@/components/developer-panel";
@@ -1945,6 +1945,9 @@ export default function WorkspacePage() {
   );
   const documentCount = documents?.length ?? 0;
   const readyDocumentCount = documents?.filter((document) => document.hasOcrJson).length ?? 0;
+  /* Which board rows may be ticked for the next candidate: a source that has been read. The
+     board owns the list; this owns the eligibility, from the same document read. */
+  const compilableDocumentIds = documents?.filter((document) => document.hasOcrJson).map((document) => document.documentId) ?? [];
   const operatorReviewCount = documents?.filter((document) => document.processingState === "operator_review").length ?? 0;
   const collectionReviewRequired = Boolean(
     collectionResult?.coreExecution?.status === "review_required" ||
@@ -2282,10 +2285,17 @@ export default function WorkspacePage() {
                 <p className="eyebrow">
                   {workspaceState.mode === "new" ? "Add knowledge" : "Add more knowledge"}
                 </p>
-                {workspaceState.mode === "new" ? (
+                {/*
+                  One h1 per page. The shell prints the surface title as an h1 on every surface
+                  except Home, so the drop box may only claim the h1 on Home -- and only on a new
+                  workspace, where it is the first and largest thing on the page.
+                */}
+                {workspaceState.mode === "new" && surface === "home" ? (
                   <h1 id="workspace-intake-title">Drop files, folders or ZIP here</h1>
                 ) : (
-                  <h2 id="workspace-intake-title">Add files, folders or ZIP</h2>
+                  <h2 id="workspace-intake-title">
+                    {workspaceState.mode === "new" ? "Drop files, folders or ZIP here" : "Add files, folders or ZIP"}
+                  </h2>
                 )}
                 <p>
                   {workspaceState.mode === "new"
@@ -2447,11 +2457,22 @@ export default function WorkspacePage() {
           */}
           {compileBlock}
 
+          {/*
+            BQ-093. The board is the one list of sources on this surface. The include-in-the-next-
+            candidate choice used to live in a second list below it that printed every name again;
+            it is now a checkbox on the row it applies to, and the card underneath keeps only the
+            count and the compile action.
+          */}
           <div id="workspace-board">
             <PipelineBoard
               rows={pipelineRows}
               reading={reading}
               names={names}
+              selectableIds={compilableDocumentIds}
+              selectedIds={selectedDocumentIds}
+              onToggleSelected={(documentId) => setSelectedDocumentIds((current) => current.includes(documentId)
+                ? current.filter((id) => id !== documentId)
+                : [...current, documentId])}
               onDismiss={uploads.length > 0 ? () => { setUploads([]); setReading({}); } : undefined}
             />
           </div>
@@ -2461,31 +2482,7 @@ export default function WorkspacePage() {
               <h2>{documents && documents.length > 0 ? "Sources ready for your next World" : "Bring your first source"}</h2>
               {documents && documents.length > 0 ? (
                 <>
-                <p>Compile one or more ready sources into the next candidate. Nothing becomes active until you review it.</p>
-                <ul className="document-meta">
-                  {documents.map((doc) => (
-                    <li key={`${doc.documentId}-${doc.versionKey}`}>
-                      {/*
-                        The same rule as the floor above: a name a person recognises, then the
-                        id underneath for the receipts to hang off.
-                      */}
-                      <strong>{displayName(doc.documentId, names)}</strong>
-                      {doc.hasOcrJson ? (
-                        <label className="compile-source-choice">
-                          <input
-                            type="checkbox"
-                            checked={selectedDocumentIds.includes(doc.documentId)}
-                            onChange={(event) => setSelectedDocumentIds((current) => event.target.checked
-                              ? [...new Set([...current, doc.documentId])]
-                              : current.filter((documentId) => documentId !== doc.documentId))}
-                          />
-                          Include in the next candidate
-                        </label>
-                      ) : null}
-                      <small>{doc.hasOcrJson ? "Ready to compile" : doc.processingState === "operator_review" ? "Needs review" : "Preparing and reading"}</small>
-                    </li>
-                  ))}
-                </ul>
+                <p>Compile one or more ready sources into the next candidate. Tick them on the board above; nothing becomes active until you review it.</p>
                 <div className="compile-selection-actions">
                   <small>
                     {selectedDocumentIds.length} OCR-qualified document{selectedDocumentIds.length === 1 ? "" : "s"} selected

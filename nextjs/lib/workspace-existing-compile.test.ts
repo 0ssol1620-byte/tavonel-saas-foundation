@@ -14,7 +14,11 @@ describe("existing immutable document compilation", () => {
     after all of them had been read.
   */
   it("offers only OCR-qualified documents and judges the selection against the shared limit", () => {
-    expect(source).toContain("doc.hasOcrJson ? (");
+    // Moved 2026-09-17 with BQ-093, same intent. The per-document tick left the second list of
+    // names and moved onto the board row it applies to, so eligibility is one derivation on the
+    // page -- still `hasOcrJson`, and still the only thing the board will let anyone tick.
+    expect(source).toContain("documents?.filter((document) => document.hasOcrJson).map((document) => document.documentId)");
+    expect(source).toContain("selectableIds={compilableDocumentIds}");
     expect(source).toContain("judgeCorpusSet(selectedDocumentIds.length).ok");
     // The sentence is now computed from what this browser can actually expand.
     expect(source).toContain("compileLimitsNotice(archiveCeilingMb)");

@@ -40,6 +40,35 @@ describe("2026-09-05 production hardening", () => {
   });
 
   /*
+    BQ-093, tightened 2026-09-17: Knowledge lists a source exactly once. The board is the list;
+    the card below it keeps the count and the compile action, and the per-source "include in the
+    next candidate" tick sits on the row it applies to -- as a SIBLING of the disclosure button,
+    because a checkbox inside a <button> is not operable.
+  */
+  it("lists a source once on Knowledge, with the candidate tick on the row", () => {
+    const workspace = read("app/workspace/page.tsx");
+    const board = read("components/pipeline-board.tsx");
+    expect(workspace).not.toContain('<ul className="document-meta">');
+    expect(workspace).toContain("selectableIds={compilableDocumentIds}");
+    expect(board).toContain('className="board-row-head"');
+    expect(board).toContain('className="board-row-select"');
+  });
+
+  /*
+    BQ-020, tightened 2026-09-17: one <h1> per page. The shell prints the surface title as an h1
+    on every surface but Home, and the intake renders on Knowledge as well as Home, so the drop
+    box may only claim the h1 on a new workspace's Home.
+  */
+  it("gives the workspace page exactly one h1", () => {
+    const workspace = read("app/workspace/page.tsx");
+    expect(workspace).toContain('workspaceState.mode === "new" && surface === "home" ? (');
+    // Two in the file, never two on a page: the signed-out screen, and the drop box on a new
+    // Home. Every other surface takes its h1 from the shell's SURFACE_TITLES.
+    expect(workspace.match(/<h1[ >]/g) ?? []).toHaveLength(2);
+    expect(read("components/workspace-ultimate-shell.tsx").match(/<h1[ >]/g) ?? []).toHaveLength(2);
+  });
+
+  /*
     Moved 2026-09-17 with BQ-021/BQ-022/BQ-083, same intent: the workspace shows the real
     lifecycle, from the durable record, the moment a compile exists.
 
