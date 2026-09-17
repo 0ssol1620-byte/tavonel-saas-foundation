@@ -154,15 +154,23 @@ function collect(data: FormData) {
   return body;
 }
 
-/** Announced as a word, not as an asterisk a screen reader may skip or read as "star". */
+/*
+  Announced as a word, not as an asterisk a screen reader may skip or read as "star".
+
+  pages-11: the word was set in the label's own face, size, weight and colour, so "Name Required"
+  read as one string and the field looked as if it were called that. The marker carries its own
+  class now -- a separator and the eyebrow tone, sentence case against the label's caps -- so it
+  is visibly a qualifier. It stays a word inside the label element, which is what keeps it in the
+  accessible name and what the sentence above the form promises ("They are marked Required").
+*/
 function RequiredMark() {
-  return <small className="fine">Required</small>;
+  return <small className="contact-required">Required</small>;
 }
 
 function Field({ label, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) {
   return (
     <label className="contact-field">
-      <span>{label} {props.required ? <RequiredMark /> : null}</span>
+      <span>{label}{props.required ? <> <RequiredMark /></> : null}</span>
       <input {...props} />
     </label>
   );
