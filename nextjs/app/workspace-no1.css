@@ -205,6 +205,9 @@
 .one-path-workspace .board-rows > li[data-status="failed"] { border-left-color: #d36a62; }
 .one-path-workspace .board-rows > li:last-child { border-bottom: 0; }
 .one-path-workspace .board-row-detail:not([hidden]) { padding: 0 12px 14px; }
+/* BQ-087's age line. A timestamp is a machine identifier, so it is the one mono run here. */
+.one-path-workspace .board-row-observed { margin: 0 0 10px; color: var(--text-lo); }
+.one-path-workspace .board-row-observed time { font-family: var(--f-mono); }
 .one-path-workspace .board-transfer.compact { margin: 0 12px 10px; }
 .one-path-workspace .compile-selection-actions { position: static; background: transparent; padding-top: 12px; border-top: 1px solid var(--hairline); }
 .one-path-workspace .compile-source-choice { font-family: var(--f-sans); letter-spacing: 0; }
