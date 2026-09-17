@@ -148,7 +148,7 @@ export default function OriginalSourcePage({ active, regions, onSelectRegion }: 
   }, [loaded, active.page, pageKey, size.width, size.height, zoom]);
 
   return <section ref={root} className={styles.root} data-original-source="" data-render-state={ready ? "ready" : phase === "ready" ? "loading" : phase} data-source-page={active.page} data-source-digest={active.digest}>
-    <div className={styles.toolbar} aria-label="Original page controls">
+    <div className={styles.toolbar} aria-label="Source page controls">
       <span className={styles.kind}>{sourcePageLabel(active.representationKind)}</span>
       <div className={styles.controls}>
         <button type="button" aria-label="Zoom out" disabled={zoom <= 1} onClick={() => setZoom(value => Math.max(1, value - .5))}>−</button>
@@ -165,7 +165,9 @@ export default function OriginalSourcePage({ active, regions, onSelectRegion }: 
       data-source-viewport=""
       style={raster ? ({ "--page-aspect": `${raster.width} / ${raster.height}` } as CSSProperties) : undefined}
       tabIndex={0}
-      aria-label="Source page; use the zoom controls to read it and the extracted passage below to select a region"
+      aria-label={onSelectRegion
+        ? "Source page; use the zoom controls to read it and the extracted passage beside it to select a region"
+        : "Source page; use the zoom controls to read it"}
     >
       {/* The committed render: painted under the live canvas, and left in place under any message. */}
       {/* eslint-disable-next-line @next/next/no-img-element -- the committed raster is

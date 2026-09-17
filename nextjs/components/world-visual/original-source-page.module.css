@@ -76,7 +76,6 @@
   background: var(--g2);
 }
 
-
 .page {
   position: relative;
   margin-inline: auto;
@@ -102,7 +101,7 @@
 .selection {
   position: absolute;
   border: 2px solid var(--verified);
-  background: rgb(123 224 190 / 0.14);
+  background: color-mix(in srgb, var(--verified) 14%, transparent);
   pointer-events: none;
   box-sizing: border-box;
   transition: left var(--dur-3, 200ms) var(--ease-out, ease), top var(--dur-3, 200ms) var(--ease-out, ease),
@@ -128,7 +127,7 @@
 .message span { max-width: 45ch; }
 
 /* A failure is said where the page is, at a readable size, rather than left as a blank frame. */
-.message[data-tone="error"] { background: rgb(8 9 10 / 0.86); border-radius: var(--r-inst, 6px); }
+.message[data-tone="error"] { background: color-mix(in srgb, var(--ground) 86%, transparent); border-radius: var(--r-inst, 6px); }
 .message[data-tone="error"] strong { color: var(--failed, #e2857a); }
 
 .caption {

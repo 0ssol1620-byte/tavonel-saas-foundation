@@ -76,10 +76,10 @@ test("Korean visitors get the same one-path story and the same real public proof
   await page.goto("/ko");
   await expect(page.locator("#ko-one-path-title")).toContainText("자료를 가져오세요.");
   await expect(page.locator("#ko-one-path-title")).toContainText("AI가 쓰는 지식으로 만듭니다.");
-  await expect(page.locator(".one-path-hero .one-path-source-proof")).toHaveCount(0);
-  const proof = page.locator('.one-path-source-proof[aria-label="공개 샘플과 원문"]');
+  await expect(page.locator(".one-path-hero [data-proof-variant]")).toHaveCount(0);
+  const proof = page.locator('[data-proof-variant="canonical"]');
   await proof.scrollIntoViewIfNeeded();
-  await expect(proof.locator('[data-proof-variant="canonical"]')).toHaveCount(1);
+  await expect(proof).toHaveCount(1);
   await expect(proof).toContainText("Apple SEC corpus");
   await expect(page.getByRole("link", { name: "공개 샘플 열기" })).toHaveAttribute("href", "/explore");
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);

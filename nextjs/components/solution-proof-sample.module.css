@@ -115,7 +115,7 @@
   /* Two lines, cut on a word boundary above and clamped here, so a long region cannot grow a rail. */
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   overflow: hidden;
   color: var(--text-hi);
   font-size: 16px;
