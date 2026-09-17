@@ -18,7 +18,7 @@
   display: grid;
   place-items: center;
   padding: 20px;
-  color: var(--ground);
+  color: var(--paper-ink);
   font: var(--t-1, 12px) / 1.5 var(--f-sans);
   text-align: center;
 }
