@@ -97,6 +97,18 @@ export const BRAND_LINE = {
 export const KO_CHROME = {
   cta: { [ACCESS_CTA.href]: "이용 문의", [SELF_SERVE_CTA.href]: "내 자료로 시작하기" } as Record<string, string>,
   signIn: "로그인",
+  /*
+    BQ-013 / D12. The three primary destinations, keyed by href for the same reason the two CTA
+    labels are: a label exists here only where `CUSTOMER_NAV` already points, so this table cannot
+    invent a fourth section. Literal translations of the English labels -- a translation is not a
+    new claim, and the primary nav vocabulary itself is the founder's.
+  */
+  nav: {
+    "/product": "작동 방식",
+    "/integrations": "연결",
+    "/pricing": "요금",
+  } as Record<string, string>,
+  menu: "메뉴",
   footerGroups: {
     Product: "제품",
     Research: "리서치",
@@ -283,16 +295,30 @@ export const FOOTER_GROUPS: readonly { title: string; links: readonly SiteLink[]
         second way to it that does not require opening a menu at all.
       */
       { href: "/sources", label: "Supported files" },
+      /*
+        BQ-052. Three advertised routes the footer could not reach.
+
+        `/enterprise`, `/resources` and `/knowledge-compiler` are in the sitemap, are linked from
+        inside other pages and are what a reader who arrived on a docs page is looking for -- and
+        the only way to any of them was a link in running text on a page they might never open.
+      */
+      { href: "/knowledge-compiler", label: "Knowledge Compiler" },
+      { href: "/enterprise", label: "Enterprise" },
       { href: "/pricing", label: "Pricing" },
     ],
   },
   {
     title: "Research",
     links: [
-      { href: "/arena", label: "Arena" },
+      /*
+        D11. `/arena` is out of the footer until it has content. The route still answers -- it
+        says the work is not published yet and carries `robots: noindex` -- but a standing link
+        to a page with nothing on it is the site advertising a result it has not produced.
+      */
       { href: "/benchmarks", label: "Methodology" },
       { href: "/research", label: "Research" },
       { href: "/evidence", label: "Evidence" },
+      { href: "/resources", label: "Resources" },
     ],
   },
   {

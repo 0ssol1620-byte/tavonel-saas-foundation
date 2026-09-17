@@ -47,7 +47,10 @@ test("the mobile menu ships only the customer choices and one commercial action"
   for (const item of CUSTOMER_LINKS) expect(html).toContain(`href="${item.href}"`);
 
   for (const item of CUSTOMER_LINKS) expect(html).toContain(item.label);
-  expect(html.match(/mobile-nav-cta/g)?.length ?? 0, "one commercial mobile action is rendered").toBe(1);
+  // BQ-059: the action lives in the header at every width and is no longer drawn a second time
+  // inside the phone sheet, forty pixels below the first copy of it.
+  expect(html.match(/mobile-nav-cta/g)?.length ?? 0, "the phone sheet does not repeat the header action").toBe(0);
+  expect(html.match(/nav-actions/g)?.length ?? 0, "and the header still carries it").toBeGreaterThan(0);
 });
 
 test("Connect owns the Sources route without adding another top-level choice", async ({ page }) => {

@@ -143,10 +143,10 @@ test("the supporting film caption follows the selected approved cut", async ({ p
   const film = page.getByTestId("one-path-works-film");
   await film.scrollIntoViewIfNeeded();
 
-  await film.getByRole("tab", { name: "UPDATES", exact: true }).click();
-  await expect(film.getByRole("tab", { name: "UPDATES", exact: true })).toHaveAttribute("aria-selected", "true");
+  await film.getByRole("tab", { name: "Updates", exact: true }).click();
+  await expect(film.getByRole("tab", { name: "Updates", exact: true })).toHaveAttribute("aria-selected", "true");
   await expect(film.locator(".compile-film-caption p")).toHaveText("A changed source and its affected knowledge are shown together.");
 
-  await film.getByRole("tab", { name: "ORGANIZE", exact: true }).click();
+  await film.getByRole("tab", { name: "Organize", exact: true }).click();
   await expect(film.locator(".compile-film-caption p")).toHaveText("Related information is organized into a connected knowledge structure.");
 });

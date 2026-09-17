@@ -1,18 +1,94 @@
 /*
-  The one rule the shared header needs that `app/tavonel.css` does not already have.
+  The rules the shared chrome needs that `app/tavonel.css` cannot give it.
 
-  G1-001 / G2-026 put a deployment state line in the header's `.mode` slot -- "Public Compiled
-  World: open · Your own files: arranged with us" -- which is 552px of `white-space: nowrap` mono.
-  The bar fits it from about 990px up. Below that it pushes the access action and the sign-in link
-  off the right edge, and because `header.nav` is `position: fixed` the page does not scroll to
-  reveal them: they are simply gone.
-
-  `.mode` already hides itself at 520px for the same reason at a smaller size. This moves that
-  floor up to where this particular string stops fitting, as its own class rather than by editing
-  the global rule, which another lane owns. A narrow reader is not left without the fact: the pages
-  where it decides something -- /pricing, /login, /integrations, /security, /status, /ko -- each
-  render the full sentence in the body, where it has room to wrap.
+  Module CSS is unlayered and scoped, so these land on the header and footer this file renders
+  without editing a global sheet another lane owns, and without out-specifying anything.
 */
-@media (max-width: 1000px) {
+
+/*
+  BQ-053. One gutter, and the footer stops carrying the scene rail.
+
+  Three vertical edges ran down one page: the header padded itself with `clamp(16px, 3vw, 30px)`,
+  the body measure sat at 80, and the footer at 124 -- `footer.site`'s `padding-left: var(--rail)`
+  (76px) plus the measure inside it. `--rail` is the landing page's scene rail, a layout device
+  for the body, and it has no business in the footer: it is what pushed the whole bottom of every
+  page 76px to the right of the content above it.
+
+  The footer's inline padding is zero, so the measure inside it -- `.one-path-wrap`, the same
+  element the sections above use -- is what positions it, and the two line up by construction
+  rather than by two numbers that happen to match. The header takes `--gutter`, which is L1's
+  token (TOKEN_CONTRACT); the fallback is the value it resolves to until that lands.
+
+  What this does *not* claim to fix: `header.nav` is full-bleed and the content columns are
+  capped at 1280px, so above ~1340px the header's own edge is outside the content edge by
+  design. Making those two agree means putting the header's contents in the same measure, which
+  is a structural change to a row three e2e specs select into -- noted for the integrator rather
+  than done quietly here.
+*/
+.header.header {
+  padding-inline: var(--gutter, clamp(16px, 3vw, 30px));
+}
+.footer.footer {
+  padding-inline: 0;
+}
+
+/*
+  BQ-007. The header breaks between 1080 and 1250, and it breaks in two places at once.
+
+  `.nav` is a flex row and every item in it was allowed to shrink, so in that band the wordmark
+  wrapped to "TAVO / NEL" and the access action dropped to a second line -- a 170px header with
+  the brand broken in half, on the width a 13" laptop actually runs at. The switch to the phone
+  disclosure is at 1249px now (`app/one-path.css`), and these two rules are the other half: the
+  lockup never wraps, and the row never becomes two rows.
+*/
+.header.header {
+  flex-wrap: nowrap;
+}
+.wordmark.wordmark {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/*
+  BQ-058 / D10. The deployment state, as a label a reader can act on.
+
+  It was `.mode` -- 9.5px monospace, an amber `--changed` dot, and the actual sentence hidden in
+  a `title` attribute no phone and no keyboard ever shows. One meaning, at the site's type floor,
+  in the site's own face, linking to the page that carries the rest.
+
+  It still hides itself, now at the same 1249px the desktop row leaves at (BQ-007): the label is
+  one `white-space: nowrap` line, and in a `position: fixed` header a line that does not fit
+  pushes the access action and the sign-in link off the right edge, where no amount of scrolling
+  brings them back. It appears with the desktop navigation and goes with it. Every page where
+  this fact decides something -- /pricing, /login, /integrations, /security, /status, /ko --
+  states it in the body, where it has room to wrap.
+*/
+.state {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--text-mid);
+  font-family: var(--f-sans);
+  font-size: 12px;
+  line-height: 1.4;
+  letter-spacing: 0;
+  text-decoration: none;
+  white-space: nowrap;
+}
+@media (hover: hover) and (pointer: fine) {
+  .state:hover { color: var(--text-hi); }
+}
+@media (max-width: 1249px) {
   .state { display: none; }
+}
+
+/*
+  BQ-052. Five groups, laid out as five.
+
+  `.site-footer-groups` is a four-column grid and the footer has five groups, so Legal dropped
+  onto a row of its own with four empty columns beside it -- the one visual defect in a footer
+  that a reader reads as "unfinished" without being able to say why.
+*/
+@media (min-width: 1100px) {
+  .footerGroups.footerGroups { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 }

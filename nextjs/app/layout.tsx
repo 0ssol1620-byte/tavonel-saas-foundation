@@ -1,8 +1,9 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { IBM_Plex_Mono } from "next/font/google";
-import RouteBoot from "@/components/route-boot";
 import MarketingConsent from "@/components/marketing-consent";
+import SkipLink from "@/components/skip-link";
+import { BRAND_LINE } from "@/lib/site-navigation";
 import { jsonLdHtml } from "@/lib/structured-data";
 import "./globals.css";
 import "./one-path.css";
@@ -68,12 +69,25 @@ export const metadata: Metadata = {
     */
   },
   openGraph: {
-    title: "Your knowledge already exists. Compile it.",
-    description:
-      "TAVONEL compiles your own sources into a current, traceable world your AI can use.",
+    /* D8 / BQ-061: one positioning line. This used to be a sixth sentence of its own. */
+    title: BRAND_LINE.headline,
+    description: BRAND_LINE.descriptor,
     type: "website",
     url: "/",
   },
+};
+
+/*
+  BQ-062. The browser chrome, told which world it is in.
+
+  `color-scheme: dark` in `tavonel.css` already handles scrollbars and form controls; this is the
+  other half -- the address bar, the task-switcher card and the installed window title bar, which
+  read `theme-color` and not CSS. Without it a near-black page sat inside a white shell on every
+  Android and installed surface.
+*/
+export const viewport: Viewport = {
+  themeColor: "#08090A",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -88,7 +102,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           before it reaches a sentence, and a keyboard or screen-reader visitor had to walk all
           of it on every page. Visually hidden until focused, and then a real, visible control.
         */}
-        <a className="skip" href="#main">Skip to content</a>
+        <SkipLink />
         {/*
           Organization + WebSite + SoftwareApplication. No availability, offer, or
           aggregateRating — this deployment is a private pilot, not a GA claim.
@@ -151,7 +165,13 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             }),
           }}
         />
-        <RouteBoot />
+        {/*
+          BQ-057. `RouteBoot` is gone, and with it the "● ROUTING → /pricing" stamp it flashed in
+          the corner on every navigation. It gated nothing and reported nothing -- a monospace
+          readout of a fact the address bar had already shown -- which is the fake-terminal tell
+          §16 of the handoff bars outright. `.route-boot` in `app/tavonel.css` is now dead and is
+          L1's to delete.
+        */}
         {children}
         {/*
           Measurement, on the same terms as everything else here.

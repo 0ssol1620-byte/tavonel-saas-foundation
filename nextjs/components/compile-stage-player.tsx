@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { FILM_DURATION } from "@/lib/film-script";
+import { PIPELINE_STAGES } from "@/lib/pipeline-vocabulary";
 
 export type CompileStage = {
   id: string;
@@ -22,11 +23,24 @@ export type CompileStage = {
   screen. The caption now says the part the viewer is actually watching, which is also the part
   a RAG index cannot do. Nothing else about the film changes; the films are locked.
 */
+/*
+  BQ-056. Sentence case, and the one stage name that is a pipeline stage comes from the constant.
+
+  These were set in monospace caps -- FILES / ORGANIZE / UPDATES / USE WITH AI -- which is the
+  instrument voice, and a tab label is not machine state. They are the page's own face now.
+
+  What they are *not* is `PIPELINE_STAGES` relabelled. Two of these cuts show something the
+  pipeline has no stage for: cut 3 changes one clause in one source and traces what it reaches,
+  and cut 4 shows three tools reading the same citations. Naming them "Read" and "Ready for AI"
+  to make one list out of two would put a stage name on a film that does not show that stage,
+  which is the mislabelling this row was opened about. The cut that *is* a pipeline stage takes
+  its name from the constant, so that one cannot drift.
+*/
 export const COMPILE_STAGES: readonly CompileStage[] = [
-  { id: "sources", label: "FILES", line: "From the original page to extracted content and connected knowledge.", src: "/film/compile-cut.mp4", poster: "/film/poster-1.webp" },
-  { id: "read", label: "ORGANIZE", line: "Related information is organized into a connected knowledge structure.", src: "/film/compile-cut-2.mp4", poster: "/film/poster-2.webp" },
-  { id: "structure", label: "UPDATES", line: "A changed source and its affected knowledge are shown together.", src: "/film/compile-cut-3.mp4", poster: "/film/poster-3.webp" },
-  { id: "world", label: "USE WITH AI", line: "An assistant, editor and terminal use the same knowledge and its citations.", src: "/film/compile-cut-4.mp4", poster: "/film/poster-4.webp" },
+  { id: "sources", label: "Files", line: "From the original page to extracted content and connected knowledge.", src: "/film/compile-cut.mp4", poster: "/film/poster-1.webp" },
+  { id: "read", label: PIPELINE_STAGES[2].label, line: "Related information is organized into a connected knowledge structure.", src: "/film/compile-cut-2.mp4", poster: "/film/poster-2.webp" },
+  { id: "structure", label: "Updates", line: "A changed source and its affected knowledge are shown together.", src: "/film/compile-cut-3.mp4", poster: "/film/poster-3.webp" },
+  { id: "world", label: "Use with AI", line: "An assistant, editor and terminal use the same knowledge and its citations.", src: "/film/compile-cut-4.mp4", poster: "/film/poster-4.webp" },
 ] as const;
 
 const LIVE_FILMS = [
@@ -108,11 +122,42 @@ export function filmMotionControl(state: {
   return state.paused ? "resume" : "pause";
 }
 
+/*
+  BQ-129: the pause glyph was `Ⅱ`, U+2161 -- the Roman numeral two. It renders in the text face
+  at text weight, sits on the baseline rather than centred, and a screen reader that reaches it
+  says "two". The two bars are `▮▮`, which is what a pause control is drawn with.
+*/
 export const FILM_CONTROL_LABEL: Record<FilmControl, { label: string; glyph: string }> = {
   play: { label: "Play the compilation film", glyph: "▶" },
   resume: { label: "Resume the compilation film", glyph: "▶" },
-  pause: { label: "Pause the compilation film", glyph: "Ⅱ" },
+  pause: { label: "Pause the compilation film", glyph: "▮▮" },
 };
+
+/*
+  BQ-013. The half of the locale thread that is not visible copy.
+
+  /ko passes Korean stages, so the tab labels and the caption follow the page. Five strings do
+  not, because they live in the player rather than in the stage list: the tablist name and the
+  three control names -- which are the accessible name of every control in the film -- and the
+  sentence shown when a decoder refuses. A Korean reader on a screen reader heard the whole film
+  in English.
+
+  D12: literal translations of the strings above, not new copy. The English record stays the
+  default, so every English surface and the e2e specs that select on those names are unchanged.
+*/
+export const FILM_CONTROL_LABEL_KO: Record<FilmControl, string> = {
+  play: "컴파일 영상 재생",
+  resume: "컴파일 영상 이어서 재생",
+  pause: "컴파일 영상 일시정지",
+};
+
+const FILM_ERROR = "This browser could not play the film. The poster remains visible.";
+const FILM_ERROR_KO = "이 브라우저에서는 영상을 재생할 수 없습니다. 대표 이미지는 그대로 표시됩니다.";
+
+export const FILM_TEXT = {
+  en: { stages: "Compilation stages", error: FILM_ERROR, errorLong: `${FILM_ERROR.slice(0, -1)}; try another stage or inspect the public sample.` },
+  ko: { stages: "컴파일 단계", error: FILM_ERROR_KO, errorLong: `${FILM_ERROR_KO} 다른 단계를 선택하거나 공개 샘플을 확인해 보세요.` },
+} as const;
 
 export default function CompileStagePlayer({
   stages = COMPILE_STAGES,
@@ -121,6 +166,7 @@ export default function CompileStagePlayer({
   playbackRate = 1,
   compact = false,
   priorityPoster = false,
+  korean = false,
 }: {
   stages?: readonly CompileStage[];
   onStageChange?: (stage: CompileStage, index: number) => void;
@@ -132,7 +178,10 @@ export default function CompileStagePlayer({
   compact?: boolean;
   /** Mark an above-the-fold poster as the page's priority image without changing its bytes. */
   priorityPoster?: boolean;
+  /** BQ-013. Name the controls and the fallback in the page's language. The stage list carries its own. */
+  korean?: boolean;
 }) {
+  const text = korean ? FILM_TEXT.ko : FILM_TEXT.en;
   const instanceId = useId().replaceAll(":", "");
   const panelId = `${instanceId}-compile-stage-panel`;
   const tabId = useCallback((stageId: string) => `${instanceId}-compile-stage-tab-${stageId}`, [instanceId]);
@@ -183,7 +232,6 @@ export default function CompileStagePlayer({
     the conservative visual fallback and does not change any source asset.
   */
   const active = stages[index] ?? stages[0] ?? COMPILE_STAGES[0]!;
-  const admitted = useMemo(() => new Set([index]), [index]);
 
   useEffect(() => {
     const query = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -320,7 +368,7 @@ export default function CompileStagePlayer({
     /* Below 900px the horizontal gesture pans the film (G1-012), so it may not also change the
        stage -- the tab strip above stays the way to do that. */
     <div className="compile-film-sequence rv" ref={frameRef} {...(narrow ? {} : touchHandlers)} data-film-renderer={live ? "live-canvas" : "video-fallback"} data-compact={compact ? 1 : 0} data-narrow={narrow ? 1 : 0}>
-      {!compact ? <div className="compile-film-stages" role="tablist" aria-label="Compilation stages" onKeyDown={onKeyDown}>
+      {!compact ? <div className="compile-film-stages" role="tablist" aria-label={text.stages} onKeyDown={onKeyDown}>
         {stages.map((stage, position) => (
           <button key={stage.id} type="button" role="tab" id={tabId(stage.id)} aria-selected={position === index} aria-controls={panelId} tabIndex={position === index ? 0 : -1} data-active={position === index ? 1 : 0} onClick={() => chooseStage(position)}>{stage.label}</button>
         ))}
@@ -358,23 +406,29 @@ export default function CompileStagePlayer({
           <div className="compile-film-live" aria-hidden="true"><LiveFilm /></div>
         ) : (
           /*
-            One decoder, keyed to the stage that owns it.
+            One decoder, one element, and `src` as an attribute rather than `<source>` children.
 
-            Swapping the <source> children of a live element does nothing on its own -- the
-            browser has already committed to the resource it loaded -- so the four cuts shared a
-            frame that only ever played the first one. Keying the element to the stage replaces
-            it, which is also what keeps exactly one decoder open on a phone.
+            The problem this replaces: swapping `<source>` children of a live element does nothing
+            on its own -- the browser has already committed to the resource it loaded -- so the
+            four cuts shared a frame that only ever played the first one. That was fixed by
+            keying the element to the stage, which works, and which is also why the console
+            reported `ERR_ABORTED` on `compile-cut-2.mp4` on every advance (BQ-130): React
+            unmounted an element with a request in flight, and the browser cancelled the fetch it
+            had already partly paid for.
+
+            `src` on the element itself is the version that does both. Setting it re-runs the
+            media resource selection algorithm, so the cut really does change; the element
+            survives, so nothing is torn down mid-fetch, and there is still exactly one decoder
+            open on a phone.
           */
-          <video key={active.id} ref={videoRef} className="compile-film-video" data-active={1} muted autoPlay playsInline preload="metadata" poster={active.poster} aria-label={`${active.label} — ${active.line}`} onLoadedMetadata={(event) => { event.currentTarget.playbackRate = Math.max(0.1, playbackRate); }} onEnded={onEnded} onError={() => { setVideoError(true); setPaused(true); }}>
-            {stages.map((stage, position) => admitted.has(position) ? <source key={stage.id} src={stage.src} type="video/mp4" /> : null)}
-          </video>
+          <video ref={videoRef} className="compile-film-video" src={active.src} data-active={1} muted autoPlay playsInline preload="metadata" poster={active.poster} aria-label={`${active.label} — ${active.line}`} onLoadedMetadata={(event) => { event.currentTarget.playbackRate = Math.max(0.1, playbackRate); }} onEnded={onEnded} onError={() => { setVideoError(true); setPaused(true); }} />
         )}
         {/* Always rendered: the two states that most need it were the two that hid it. */}
         <button
           type="button"
           className="compile-film-motion-control"
           data-control={control}
-          aria-label={FILM_CONTROL_LABEL[control].label}
+          aria-label={korean ? FILM_CONTROL_LABEL_KO[control] : FILM_CONTROL_LABEL[control].label}
           aria-pressed={control === "pause"}
           onClick={() => {
             if (control === "pause") { setPaused(true); return; }
@@ -387,9 +441,9 @@ export default function CompileStagePlayer({
         </button>
       </div>
 
-      {compact && videoError ? <p className="compile-film-inline-error" role="status">This browser could not play the film. The poster remains visible.</p> : null}
+      {compact && videoError ? <p className="compile-film-inline-error" role="status">{text.error}</p> : null}
       {!compact ? <div className="compile-film-caption">
-        <p>{videoError ? "This browser could not play the film. The poster remains visible; try another stage or inspect the public sample." : active.line}</p>
+        <p>{videoError ? text.errorLong : active.line}</p>
         <span className="compile-film-progress" aria-hidden="true">{String(index + 1).padStart(2, "0")} / {String(stages.length).padStart(2, "0")}</span>
       </div> : null}
     </div>

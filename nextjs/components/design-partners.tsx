@@ -10,15 +10,27 @@ import Link from "next/link";
   something that already exists on this deployment -- the capability manifest, the published
   limits, the receipts -- or of the intake path the header already states ("arranged with us").
   Nothing here promises a date, a price or a contract term; those are the founder's to set.
+
+  BQ-065 changes how it says it, not what it says. The heading was "No customer logos, because
+  there are none to show." under an eyebrow reading "DESIGN PARTNERS / INSTEAD OF A LOGO WALL" --
+  two lines that advertise an absence twice, above a kicker that restates the heading under it,
+  which the kicker rule deletes rather than restyles. The four things a partner gets have not
+  changed by a word; the frame around them names the programme instead of naming what the
+  programme is not. The sentence that has to stay -- that nothing on this site belongs to a
+  customer -- stays, as the fine print it always was.
+
+  What it may not do is write a new claim. The first draft of the lede here read "TAVONEL is set
+  up with an early partner rather than sold to one" -- present tense, on a page whose previous
+  copy said there are no customers to show. Whether a design partner exists is a fact about the
+  business and a public claim, which is the founder's to make, not an implementer's. The lede is
+  the surviving half of the sentence that was already here.
 */
 export default function DesignPartners({ className }: { className?: string }) {
   return (
     <section className={className ? `design-partners ${className}` : "design-partners"} aria-labelledby="design-partners-title">
-      <p className="slate"><b>DESIGN PARTNERS</b><span />INSTEAD OF A LOGO WALL</p>
-      <h2 id="design-partners-title">No customer logos, because there are none to show.</h2>
+      <h2 id="design-partners-title">Working with a design partner.</h2>
       <p className="design-partners-lede">
-        No name, logo or quote on this site belongs to a customer, and none will until a customer
-        signs off on the exact wording. What an early partner works with instead:
+        What an early partner works with:
       </p>
       <ul className="design-partners-list">
         <li>
@@ -41,8 +53,9 @@ export default function DesignPartners({ className }: { className?: string }) {
         </li>
       </ul>
       <p className="design-partners-fine">
-        Availability is a conversation, not a checkout. <Link href="/contact">Request access</Link>{" "}
-        and say what you are trying to compile.
+        No name, logo or quote on this site belongs to a customer, and none will until a customer
+        signs off on the exact wording. Availability is a conversation, not a checkout:{" "}
+        <Link href="/contact">request access</Link> and say what you are trying to compile.
       </p>
     </section>
   );
