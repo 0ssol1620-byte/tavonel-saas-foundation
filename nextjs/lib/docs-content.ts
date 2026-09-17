@@ -168,7 +168,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
           "PUT the file to that URL with the same content type you declared.",
           "Start a compile with the document ids you want in the World. It answers 202 with a job id, not a World.",
           "Poll GET /api/compile-jobs/{jobId} until state is ready, review_required, failed or cancelled. A settled job carries the collectionId the candidate was written to.",
-          "A person activates the World. This step is not in the script and not in the API: activation is a browser-session action by a human in the workspace, and the published contract has no activation and no rollback path for any key to call.",
+          "A person activates the World. This step is not in the script and not in the API: activation is a browser-session action by a human in the workspace, and no API key can activate or roll back a World.",
           "Ask the active World a question, and read which retrieval runtime answered it.",
           "Download the signed package and verify it offline with the published verifiers.",
         ],
@@ -178,7 +178,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
       { kind: "heading", text: "Why step 5 stops a script" },
       {
         kind: "note",
-        text: "Step 5 is the one that stops a script, and it stops for two separate reasons. Activation is human-only by design — a candidate is not organizational truth until a person says so, and no API key of any plan has an activation or rollback path to call. Separately, the activation surface is plan-gated: it runs on the **Developer** plan held by the workspace **owner**, or on the **Team** plan under its usual workspace roles, so steps 1-4 and 6-7 are what a Developer key is scoped for, and step 5 is open to you as well when you own the workspace. Any other caller is refused with `STUDIO_SUBSCRIPTION_REQUIRED`, and an evaluation trial with `SUBSCRIPTION_REQUIRED`; branch on those two codes. Team is arranged with us rather than bought at a checkout. That is the plan gate, and it is not the only one: the deployment-wide intake gate at the top of this page stops steps 1 to 4 on every plan until intake is arranged, so a Developer key passing the plan check still will not compile your files here today.",
+        text: "Step 5 is the one that stops a script, and it stops for two separate reasons. Activation is human-only by design — a candidate is not organizational truth until a person says so, and no API key of any plan has a `promote` or `rollback` path to call. Separately, the activation surface is plan-gated: it runs on the **Developer** plan held by the workspace **owner**, or on the **Team** plan under its usual workspace roles, so steps 1-4 and 6-7 are what a Developer key is scoped for, and step 5 is open to you as well when you own the workspace. Any other caller is refused with `STUDIO_SUBSCRIPTION_REQUIRED`, and an evaluation trial with `SUBSCRIPTION_REQUIRED`; branch on those two codes. Team is arranged with us rather than bought at a checkout. That is the plan gate, and it is not the only one: the deployment-wide intake gate at the top of this page stops steps 1 to 4 on every plan until intake is arranged, so a Developer key passing the plan check still will not compile your files here today.",
       },
       { kind: "heading", text: "Compile a document set" },
       {
@@ -1185,7 +1185,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
       },
       { kind: "note", text: "The sample is a product fixture and says so in its own `disclosure` field: it is unsigned, it is not an activated customer World, and it is not a quality measurement. Use it to build against the shape, not to judge extraction." },
       { kind: "heading", text: "Recipe 3 — curl, before you have a key" },
-      { kind: "prose", text: "Three unauthenticated reads answer the three questions an evaluator asks first. `/api/v1/capabilities` is the same list the upload route validates against, so a format absent from it is refused at upload rather than accepted and dropped. `/api/openapi` is the contract itself — and carries no activation or rollback path, because neither exists for a key. `/api/export/trust` publishes the export signing key, or refuses with `EXPORT_SIGNER_NOT_CONFIGURED` on a deployment that has none." },
+      { kind: "prose", text: "Three unauthenticated reads answer the three questions an evaluator asks first. `/api/v1/capabilities` is the same list the upload route validates against, so a format absent from it is refused at upload rather than accepted and dropped. `/api/openapi` is the contract itself — and carries no `promote` and no `rollback` path, because neither exists for a key. `/api/export/trust` publishes the export signing key, or refuses with `EXPORT_SIGNER_NOT_CONFIGURED` on a deployment that has none." },
       {
         kind: "code",
         label: "What this deployment can read, publish and sign",
