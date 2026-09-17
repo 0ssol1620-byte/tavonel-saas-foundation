@@ -3362,11 +3362,28 @@
 
      `.link` used to be a card class; its card rules moved to `.chain .link` above. `.trust-link`
      is the one anchor that is still a card, so it is excluded here rather than unpicked.
+
+     The prose half is stated as one rule, not as a list of containers. The first draft enumerated
+     `.scene` / `.policy-copy` / `.fine` / `.docs-body`, which is the set the OLD utilities rule
+     named -- and that set is exactly why landing-07 stayed broken: the closing paragraph it names
+     is `p.design-partners-fine` inside `section.design-partners` on `/` and `/ko`, which is in
+     none of the four. The same gap swallowed `p.fine > a` (the container list required `.fine` to
+     be an ANCESTOR of the paragraph, so a paragraph that IS `.fine` never matched) and every link
+     in a `<li>` or `<dd>` outside those four scopes.
+
+     So: any unclassed `a` in a prose element inside `main`. Three carve-outs, each measured:
+       :not([class])  -- a link that carries a class has taken a face on purpose (.btn, .link,
+                        .link-verify, a module class). This rule is for the bare ones.
+       :not(nav a)    -- an index is not prose. Without it the /privacy, /trust and /docs section
+                        indexes (14 + 6 + 1 bare anchors in `nav > ol > li`) would all underline.
+       no figcaption  -- `.solution-proof-sample` puts "Inspect the evidence" in one, in --verified.
+                        That is a `.link-verify` waiting for lane E's class, not a prose link; the
+                        rule would repaint it --text-hi and take the verification cue off it.
+     Measured over 21 routes: 4 routes change, all of them links that had NO cue at all --
+     `/` "supported formats" + "request access", `/ko` 이용 문의 + 공개 샘플, `/reproducibility`
+     five `p.fine` links, `/knowledge-compiler` four "Read next" items.
   */
-  .scene p > a:not([class]),
-  .policy-copy :is(p, li, dd, td) a:not([class]),
-  .fine :is(p, li, dd, td) a:not([class]),
-  .docs-body :is(p, li, dd, td) a:not([class]),
+  main :is(p, li, dd, td) a:not([class]):not(nav a),
   a.link:not(.trust-link),
   a.link-verify {
     color: var(--text-hi);
@@ -3385,10 +3402,7 @@
   a.link-verify { color: var(--verified); }
   /* Hover is gated, as everywhere: on a touch screen an un-gated hover state sticks after a tap. */
   @media (hover: hover) and (pointer: fine) {
-    .scene p > a:not([class]):hover,
-    .policy-copy :is(p, li, dd, td) a:not([class]):hover,
-    .fine :is(p, li, dd, td) a:not([class]):hover,
-    .docs-body :is(p, li, dd, td) a:not([class]):hover,
+    main :is(p, li, dd, td) a:not([class]):not(nav a):hover,
     a.link:not(.trust-link):hover,
     a.link-verify:hover {
       text-decoration-color: currentColor;

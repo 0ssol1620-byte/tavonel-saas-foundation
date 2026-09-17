@@ -201,6 +201,17 @@ describe("design token contract", () => {
       expect(selector, `${selector} never says which anchors it is not`).toMatch(/:not\(\[class\]\)|a\.link/);
     }
 
+    // landing-07 survived the first pass at D34 because the prose half was written as a list of
+    // four container classes copied from the rule it replaced -- and the paragraph the finding
+    // names (`p.design-partners-fine` on `/` and `/ko`) is in none of the four, so the contract
+    // read as written and changed nothing on the route it was written for. The container list is
+    // itself the defect: it is a closed set, and every section added later is born outside it.
+    // The rule is rooted at `main`, with `:not([class])` and `:not(nav a)` doing the excluding.
+    expect(contract, "the prose half is one rule rooted at main, not a list of containers")
+      .toMatch(/main :is\([^)]*\) a:not\(\[class\]\):not\(nav a\)/);
+    expect(contract, "the container list is gone, not kept beside the general rule")
+      .not.toMatch(/\.scene p > a|\.policy-copy :is|\.docs-body :is|\.fine :is/);
+
     // The fix that closed type-01: a container's link colour has to exclude the button classes.
     expect(css).toContain(".policy-copy a:not(.btn) {");
 
