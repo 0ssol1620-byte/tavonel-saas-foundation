@@ -110,14 +110,31 @@ function Operation({ endpoint }: { endpoint: ReferenceEndpoint }) {
         </>
       ) : null}
 
-      <p className={styles.label}>Request</p>
-      <DocsSnippet
-        snippets={SNIPPET_LANGUAGES.map((language) => ({
-          language,
-          label: LANGUAGE_LABELS[language],
-          body: snippetFor(endpoint, language),
-        }))}
-      />
+      {/*
+        pages-24. The reference stays one page; the examples stop being unskippable.
+
+        All 33 operations rendered every request snippet in three languages and every response
+        body open at once: 81,960px tall at 1440, 100,576 CSS px at 412 -- about 110 phone screens
+        -- 282 `<pre>` blocks and 7,161 DOM nodes, all painted, with the in-page index as the only
+        way through. What a reader scans is the signature, the summary, the parameters and the
+        status codes; the payloads are what they open when they have found the operation they
+        came for. So the reference content stays in place and visible, and only the examples go
+        behind a disclosure.
+
+        The `id` stays on the `<article>`, not inside a `<details>`: an index link lands on the
+        operation's own header, which is never collapsed, so every anchor still arrives somewhere
+        legible whatever the browser does with a fragment inside a closed disclosure.
+      */}
+      <details className={styles.examples}>
+        <summary className={styles.label}>Request</summary>
+        <DocsSnippet
+          snippets={SNIPPET_LANGUAGES.map((language) => ({
+            language,
+            label: LANGUAGE_LABELS[language],
+            body: snippetFor(endpoint, language),
+          }))}
+        />
+      </details>
 
       <p className={styles.label}>Responses</p>
       {endpoint.responses.map((response) => (
@@ -132,10 +149,14 @@ function Operation({ endpoint }: { endpoint: ReferenceEndpoint }) {
             </p>
           ) : null}
           {response.example ? (
-            <figure className="docs-code">
-              <figcaption><span>Example response</span><DocsCopyButton value={response.example} /></figcaption>
-              <pre tabIndex={0} role="group" aria-label={`Example ${response.status} response`}><code><CodeTokens body={response.example} /></code></pre>
-            </figure>
+            <details className={styles.examples}>
+              <summary className={styles.label}>Example response</summary>
+              <figure className="docs-code">
+                {/* The caption names the status rather than repeating the summary above it. */}
+                <figcaption><span>{response.status}</span><DocsCopyButton value={response.example} /></figcaption>
+                <pre tabIndex={0} role="group" aria-label={`Example ${response.status} response`}><code><CodeTokens body={response.example} /></code></pre>
+              </figure>
+            </details>
           ) : null}
           {response.bestEffort ? (
             <p className="fine">

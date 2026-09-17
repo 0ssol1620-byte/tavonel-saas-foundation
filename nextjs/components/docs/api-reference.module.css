@@ -118,3 +118,14 @@
   gap: 18px;
   min-width: 0;
 }
+
+/*
+  pages-24. The examples disclosure: a grid row that keeps the operation's own rhythm when open,
+  and a summary that is a real 44px control rather than a line of text with a triangle.
+*/
+.examples { display: grid; gap: 10px; min-width: 0; }
+.examples > summary { display: flex; align-items: center; gap: 8px; min-height: 44px; list-style: none; color: var(--text-mid); }
+.examples > summary::-webkit-details-marker { display: none; }
+/* The site's one disclosure marker, the same +/- the contact fold and the workspace use. */
+.examples > summary::before { content: "+"; font: 12px var(--f-mono); }
+.examples[open] > summary::before { content: "−"; }
