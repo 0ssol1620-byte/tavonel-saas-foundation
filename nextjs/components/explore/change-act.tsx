@@ -24,6 +24,7 @@ import WorldCanvas from "@/components/world-visual/world-canvas";
 import ParallelView from "./parallel-view";
 import styles from "./explore-stage.module.css";
 import { EXPLORE_COPY, type ExploreChangeArrivalView, type ExploreChangeView } from "@/lib/explore-story";
+import { sourcePageLabel, sourceRegionRaster } from "@/lib/source-page-rasters";
 import type { VisualLayout, VisualState, VisualWorldModel } from "@/lib/visual-world-model";
 
 /** "4 filings", "1 filing" -- a measured count read out loud, never a hand-typed one. */
@@ -33,13 +34,15 @@ const count = (value: number, noun: string) =>
 /*
   One arriving filing, opened on a region of itself.
 
-  REFERENCE RENDER is printed rather than implied. The 2026 filings' acquired originals are SEC
-  EDGAR HTML documents; the committed PDF beside each one is a deterministic render of it, and
-  calling that "the source PDF" here would be the most convenient untruth available on this page
-  (§11.3).
+  The reference-render qualifier is printed rather than implied. The 2026 filings' acquired
+  originals are SEC EDGAR HTML documents; the committed PDF beside each one is a deterministic
+  render of it, and calling that "the source PDF" here would be the most convenient untruth
+  available on this page (§11.3). BQ-075: the qualifier comes from `sourcePageLabel`, the one
+  place the site names this artefact, rather than being spelled again here.
 */
 function ArrivalCard({ arrival }: { arrival: ExploreChangeArrivalView }) {
   const rendered = arrival.representationKind === "reference_render";
+  const crop = sourceRegionRaster(arrival.digest, arrival.page, arrival.bbox1000);
   return (
     <article className={styles.revision} data-tone="after" data-arrival="">
       <header>
@@ -47,16 +50,24 @@ function ArrivalCard({ arrival }: { arrival: ExploreChangeArrivalView }) {
         <span>{arrival.filename}</span>
       </header>
       <p className={styles.revisionMeta}>
-        {rendered ? "REFERENCE RENDER" : "ORIGINAL"} · PERIOD ENDED {arrival.reportDate} · ACCESSION{" "}
+        {sourcePageLabel(arrival.representationKind)} · Period ended {arrival.reportDate} · Accession{" "}
         {arrival.accession}
       </p>
       <p className={styles.revisionText}>{arrival.excerpt}</p>
       {/*
         BQ-016. This was an outlined rectangle with a highlight box in it -- a drawing of where a
-        region sits on a page, standing in for the region. The card already carries the passage,
-        the filing and a link to the committed bytes; the one thing the drawing added that the
-        card did not say is the locator, so the locator is said.
+        region sits on a page, standing in for the region. It is now the region itself, cut from
+        the committed render of that page at twice the scale. Where no crop is committed the
+        locator alone is printed rather than a rectangle standing in for the evidence.
       */}
+      {crop ? (
+        <figure className={styles.revisionCrop}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- the committed raster is
+              served byte for byte: next/image would re-encode it, and the manifest's sha256 of
+              these bytes is what makes the render checkable against its source. */}
+          <img src={crop.file} alt={`The region of page ${arrival.page} this passage was read from`} width={crop.width} height={crop.height} decoding="async" loading="lazy" />
+        </figure>
+      ) : null}
       <p className={styles.revisionLocator}>Page {arrival.page} of {arrival.pageCount}</p>
       <footer>
         <Link className={styles.sourceLink} href={arrival.href as Route} target="_blank" rel="noreferrer">

@@ -38,11 +38,16 @@ const PAGE_WIDTH = 1400;
 const REGION_SCALE = 2;
 const QUALITY = 82;
 
-/** file -> the pages a shipped proof pick or the /explore entry proof opens. */
+/**
+ * file -> the pages a shipped proof pick, the /explore entry proof, or a Change-act arrival card
+ * opens.
+ */
 const PAGES = [
   { file: "apple-2025-form-10-k.pdf", pages: [4] },
   { file: "apple-2026-q1-10-q-reference.pdf", pages: [4, 19] },
-  { file: "apple-2026-proxy-def14a-reference.pdf", pages: [11, 17] },
+  { file: "apple-2026-q2-10-q-reference.pdf", pages: [4] },
+  { file: "apple-2026-q3-10-q-reference.pdf", pages: [4] },
+  { file: "apple-2026-proxy-def14a-reference.pdf", pages: [11, 17, 48] },
 ];
 
 /** The regions those picks highlight, in per-mille page coordinates as the compiler emitted them. */
@@ -52,6 +57,15 @@ const REGIONS = [
   { file: "apple-2026-q1-10-q-reference.pdf", page: 19, bbox1000: [62, 392, 939, 584] },
   { file: "apple-2026-proxy-def14a-reference.pdf", page: 11, bbox1000: [62, 40, 949, 518] },
   { file: "apple-2026-proxy-def14a-reference.pdf", page: 17, bbox1000: [62, 40, 949, 521] },
+  /*
+    BQ-016, the Change act's four arrival cards. `exploreChangeStory.arrivals` picks these at
+    module load from the frozen compile snapshot; `lib/source-page-rasters.test.ts` reads the same
+    selection and fails when one of them resolves to a page or bbox that is not rendered here.
+  */
+  { file: "apple-2026-proxy-def14a-reference.pdf", page: 48, bbox1000: [62, 90, 949, 257] },
+  { file: "apple-2026-q1-10-q-reference.pdf", page: 4, bbox1000: [64, 561, 936, 639] },
+  { file: "apple-2026-q2-10-q-reference.pdf", page: 4, bbox1000: [64, 561, 936, 639] },
+  { file: "apple-2026-q3-10-q-reference.pdf", page: 4, bbox1000: [64, 583, 936, 668] },
 ];
 
 const sha256 = (bytes) => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;

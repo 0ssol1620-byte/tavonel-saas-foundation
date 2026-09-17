@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import manifest from "../public/explore-sample/pages/pages.manifest.json";
 import { sourcePageLabel, sourcePageRaster, sourceRegionRaster } from "./source-page-rasters";
 import { chooseExploreEntryProof } from "./explore-entry-proof";
+import { exploreChangeStory } from "./explore-change";
 import { exploreSampleDocuments, exploreSampleWorld } from "./explore-sample";
 import { toVisualWorldModel } from "./visual-world-model";
 
@@ -65,6 +66,21 @@ describe("committed source page rasters", () => {
     }
   });
 
+  /*
+    BQ-016 on the Change act. The four arrival cards pick their own page and region at module load
+    from the frozen compile snapshot, so the render script's literal list can drift from them the
+    same way it can drift from a proof pick. Same guard, same reason.
+  */
+  it("covers the page and region every Change-act arrival card resolves to", () => {
+    expect(exploreChangeStory.arrivals).toHaveLength(4);
+    for (const arrival of exploreChangeStory.arrivals) {
+      expect(
+        sourceRegionRaster(arrival.digest, arrival.page, arrival.bbox1000),
+        `no crop for ${arrival.filename} p${arrival.page}`,
+      ).not.toBeNull();
+    }
+  });
+
   it("returns null rather than a stand-in for a page nobody rendered", () => {
     expect(sourcePageRaster("sha256:" + "0".repeat(64), 1)).toBeNull();
     expect(sourceRegionRaster(manifest.pages[0].sourceSha256, manifest.pages[0].page, [1, 2, 3, 4])).toBeNull();
@@ -77,10 +93,11 @@ describe("committed source page rasters", () => {
       "components/world-visual/source-sheet.tsx",
       "components/world-visual/original-source-page.tsx",
       "components/solution-proof-sample.tsx",
+      "components/explore/change-act.tsx",
     ];
     for (const file of surfaces) {
       const text = readFileSync(join(process.cwd(), file), "utf8");
-      for (const banned of ["Reference page", "Page render", "page render", "Source render"]) {
+      for (const banned of ["Reference page", "Page render", "page render", "Source render", "Original page", "REFERENCE RENDER"]) {
         expect(text, `${file} re-names the source page as "${banned}"`).not.toContain(banned);
       }
     }
