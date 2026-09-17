@@ -38,7 +38,9 @@
   spoken. The first still carries the accent that marks it as the primary.
 */
 .links a { display: inline-flex; align-items: center; min-height: 44px; padding: 10px 14px; border: 1px solid var(--hairline-hi); border-radius: var(--r-inst); color: var(--text-hi); font-size: 13px; letter-spacing: 0; }
-.links a:first-child { border-color: var(--verified); color: var(--verified); }
+/* pages-16: the first link in this row was a fifth button variant that existed on one route, and
+   it spent the verification colour on a navigation control. Both links take the one secondary
+   face the rule above already draws. */
 .download { width: fit-content; padding: 10px 13px; border: 1px solid var(--verified); color: var(--verified); font: 12px var(--f-mono); letter-spacing: .08em; }
 
 /*
