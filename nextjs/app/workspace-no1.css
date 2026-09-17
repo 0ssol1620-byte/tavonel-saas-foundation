@@ -373,3 +373,8 @@
 .one-path-workspace .gate-list strong,
 .one-path-workspace .gate-list p { font-family: var(--f-sans); letter-spacing: 0; text-transform: none; }
 .one-path-workspace .billing-card dd { font-family: var(--f-mono); }
+
+/* BQ-133: when a browser gives the compile view no 2D context, the run is reported in words
+   rather than behind a black rectangle. This is that fallback, not a decoration. */
+.one-path-workspace .compile-stage-text { display: block; margin: 0; padding: 24px; color: var(--text-mid); font: 14px/1.6 var(--f-sans); }
+.one-path-workspace .workspace-compile-block .compile-stage:has(.compile-stage-text) { aspect-ratio: auto; }

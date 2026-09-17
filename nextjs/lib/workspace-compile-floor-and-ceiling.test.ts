@@ -53,18 +53,46 @@ describe("workspace compile floor and ceiling", () => {
     expect(workspace.indexOf('navigateSurface("sources")')).toBeLessThan(workspace.indexOf("await uploadDocuments(files)"));
   });
 
-  it("keeps live compilation on Knowledge (and on Home while a run is in flight) and gives phones one readable stage at a time", () => {
+  /*
+    The same intent as before -- live compilation belongs to Knowledge, and to Home only while a
+    run is in flight, and a narrow screen gets one readable stage rather than four slivers --
+    now asserted against the 09-17 stage (BQ-083). The width branch is gone because there is no
+    longer a wide layout to branch to: one chapter plays at a time at every width, so the phone
+    case cannot regress separately from the desktop one.
+  */
+  it("keeps live compilation on Knowledge (and on Home while a run is in flight) and plays one chapter at a time", () => {
     const sourcesGate = workspace.indexOf('{surface === "sources" ? <>');
     const stageOnSources = workspace.indexOf("{compileBlock}", sourcesGate);
     expect(sourcesGate).toBeGreaterThan(-1);
     expect(stageOnSources).toBeGreaterThan(sourcesGate);
     expect(workspace).toContain("<CompileStage rows={pipelineRows}");
 
-    expect(compileStage).toContain("if (width < 760)");
-    expect(compileStage).toContain('const labels = ["SOURCES", "READ", "STRUCTURE", "WORLD"]');
-    expect(compileStage).toContain("const current = panes[stageIndex]");
-    expect(compileStage).toContain('if (current === "sources") drawSources');
-    expect(compileStage.indexOf("if (width < 760)")).toBeLessThan(compileStage.indexOf("const gap = 10; const colH"));
+    // One pane, chosen by how far the run has got -- not four columns.
+    expect(compileStage).toContain("/* One pane. Not four, and not four with three of them empty. */");
+    expect(compileStage).toContain("if (reached === 0) drawSources");
+    expect(compileStage).not.toContain("if (width < 760)");
+    // The chapter names are the shared vocabulary, not a fifth set of labels.
+    expect(compileStage).toContain('import { PIPELINE_STAGES } from "@/lib/pipeline-vocabulary"');
+    expect(compileStage).toContain("PIPELINE_STAGES.forEach((stage, i)");
+    expect(compileStage).not.toContain('const labels = ["SOURCES", "READ", "STRUCTURE", "WORLD"]');
+  });
+
+  /*
+    BQ-021 and BQ-022, as source facts, for the same reason the two above are: they are
+    control-flow and colour decisions inside a canvas that no DOM assertion can see.
+  */
+  it("draws from tokens and from job position, never from a hash of a filename", () => {
+    // No hashed hue, no hashed geometry, no private palette.
+    expect(compileStage).not.toContain("16777619");
+    expect(compileStage).not.toContain("AREA_RGB");
+    // No literal paint anywhere the canvas actually draws.
+    expect(compileStage).not.toMatch(/(?:fillStyle|strokeStyle) = "(?:#|rgb)/);
+    expect(compileStage).toContain("const computed = window.getComputedStyle(section)");
+    // A stage that has been passed stays passed: position is the max of observation and record.
+    expect(compileStage).toContain("Math.max(observed, state ? STAGE_OF_STATE[state] : 0)");
+    expect(compileStage).toContain("const done = settled || i < current;");
+    // A canvas with no context reports itself instead of painting nothing.
+    expect(compileStage).toContain("setDrawable(false)");
   });
 
   it("agrees with the shared judgement at both ends", () => {
