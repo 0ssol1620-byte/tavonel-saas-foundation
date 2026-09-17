@@ -522,3 +522,28 @@
 }
 .changelog-entry header time { color: inherit; font: inherit; font-size: 13px; letter-spacing: 0; }
 .changelog-entry header b { font: 500 12px var(--f-sans); letter-spacing: 0; color: var(--verified); }
+
+/* ================================================== the section heading, after BQ-099
+
+  A promoted kicker is a section heading, and a section heading is not nearly an H1.
+
+  BQ-099 deleted the kickers that restated the heading beside them and promoted the rest from
+  `p.slate` to a real `<h2>` -- the right markup, and it landed them on `h2` in `tavonel.css`,
+  which is `clamp(27px, 3.3vw, 43px)`. That is the landing page's section type: a band heading
+  that owns a whole screen. On a document page it puts "What connects today." at 43px beside a
+  `.document-title` that tops out at 52px, so the page's second level is within nine pixels of
+  its first, and the level below it is 19px. One barely-there step and then a cliff is the flat
+  hierarchy the direction names.
+
+  The step is the fix, scoped to the composition it is wrong in: a heading that is a direct child
+  of a `.body` column. Card titles are untouched -- they are inside `.chain`, `.tiles` and
+  `.product-surface-grid`, never a column's own child -- and so is every `h2` outside `.scene.doc`.
+  `.docs-body h2` is 22px above, which is the same decision one surface further in.
+
+  The root fix is the type scale in `tavonel.css`; it is in the report for L1.
+*/
+.scene.doc .body > .stack > h2 {
+  font-size: clamp(22px, 2.2vw, 30px);
+  line-height: 1.22;
+  letter-spacing: -.02em;
+}

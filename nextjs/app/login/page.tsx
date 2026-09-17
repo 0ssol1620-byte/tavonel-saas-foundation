@@ -257,7 +257,16 @@ export default function LoginPage() {
             {selfService && customerProcessingEnabled ? <li><b>Bounded evaluation.</b> Free compute is limited before processing begins, so paid workloads remain protected.</li> : null}
           </ul>
         </div>
+        {/*
+          The way back, after BQ-113 cut the action row to one primary and one ghost.
+
+          The ghost that went was "Back to the site", and the sign-in shell has no site header --
+          only the wordmark, which does link home but says so to nobody who has not learned that a
+          wordmark is a link. It belongs in this row rather than back in the action row: these are
+          the onward links, and the row above is the one decision the page is asking for.
+        */}
         <p className="fine auth-legal">
+          <Link href="/">Back to the site</Link> ·{" "}
           <Link href="/privacy">Privacy notice</Link> · <Link href="/terms">Terms</Link> ·{" "}
           <Link href="/security">Security</Link> · <Link href="/contact">Contact</Link>
         </p>

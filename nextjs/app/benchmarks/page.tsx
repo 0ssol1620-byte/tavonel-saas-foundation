@@ -233,6 +233,13 @@ export default function BenchmarksPage() {
                       family's members, so they are a `<ul>` in sans -- and a screen reader
                       announces "list, five items" rather than one long sentence whose separators
                       it does not speak.
+
+                      The row says "render metrics as a real table" and this is deliberately not
+                      one. What the row is against is the mono middot string, and a table here
+                      would have two columns -- family and its metrics -- of which the second is
+                      still a list of names, beside a definition that is a paragraph. At 390px it
+                      would stack back into exactly these cards. The list is the table's honest
+                      shape for this data; the divergence is on the record rather than silent.
                     */}
                     <ul className={styles.taxonomy}>
                       {family.metrics.map((metric) => <li key={metric}>{metricLabel(metric)}</li>)}

@@ -1,6 +1,15 @@
 /** Public marketing measurement only. Never send a caller-provided URL or event payload. */
 export const GA_ID = "G-XQ6Z2RJME7";
 export const CONSENT_KEY = "tavonel.analytics-consent.v1";
+/*
+  D11 keeps /arena in this set on purpose.
+
+  The decision delists the route -- out of the footer, out of RESOURCE_LINKS, out of the sitemap,
+  and `robots: noindex` on the page -- and it does not delete it: the URL still resolves and says
+  the page is not published yet. Somebody holding an older link still lands there, and a landing
+  nobody can see is how a delisted page stays delisted by accident after it ships. Being listed
+  here is what makes a *consented* page view possible; it exempts nothing.
+*/
 export const PUBLIC_MARKETING_PATHS = new Set([
   "/", "/api", "/arena", "/benchmarks", "/changelog", "/contact", "/developers", "/docs", "/enterprise",
   "/evidence", "/explore", "/integrations", "/knowledge-compiler", "/pricing", "/privacy",
