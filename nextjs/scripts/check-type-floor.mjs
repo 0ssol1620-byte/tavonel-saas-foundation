@@ -15,12 +15,13 @@
 
   - `--decor` and `--reused` are surface tones (2.2:1 to 2.65:1 on the panel grounds). They are
     legitimate for a rule, a glyph or an inert control, and never for a `color:` carrying words.
-  - `--text-xlo` is deprecated: it was within 1.03:1 of `--text-lo` and failed AA on `--g3`. It
-    survives as an alias for one integration cycle; this check counts what is left so the alias
-    can be deleted rather than forgotten.
+  - `--text-xlo` was within 1.03:1 of `--text-lo` and failed AA on `--g3`. It survived one
+    integration cycle as an alias and this check counted what was left; D24 deleted it, so a
+    stylesheet that still reads the name now resolves to nothing at all. It is a violation rather
+    than a census, and unlike the floor an excused sheet gets no dispensation from it: an excused
+    sheet is a sheet with small type in it, not a sheet allowed to read a token that is gone.
 
   Usage: node scripts/check-type-floor.mjs        (fails the build on a violation)
-         node scripts/check-type-floor.mjs --list   (prints the deprecated-token census too)
          node scripts/check-type-floor.mjs --census (prints the per-sheet count for known_issues)
 */
 
@@ -58,14 +59,13 @@ function selectorFor(lines, index) {
 }
 
 const violations = [];
-const deprecated = [];
 const excusedCounts = new Map();
 
 for (const file of stylesheets(root)) {
   const rel = relative(root, file).replace(/\\/g, "/");
   const lines = readFileSync(file, "utf8").replace(/\r\n/g, "\n").split("\n");
-  // A listed file is excused the floor, not the deprecated-token census: the point of the census
-  // is to know when the --text-xlo alias can go, and it is these files that still read it.
+  // A listed file is excused the floor, not the deleted-token check: --text-xlo resolves to
+  // nothing now, so reading it is a broken declaration rather than a debt with a number on it.
   const excused = exemptFiles.includes(rel);
 
   lines.forEach((line, index) => {
@@ -98,7 +98,9 @@ for (const file of stylesheets(root)) {
       if (excused) excusedCounts.set(rel, (excusedCounts.get(rel) ?? 0) + 1);
       else violations.push(entry);
     }
-    if (line.includes("var(--text-xlo)")) deprecated.push(`${rel}:${index + 1}`);
+    if (line.includes("var(--text-xlo)")) {
+      violations.push(`${rel}:${index + 1}  ${selectorFor(lines, index) || "?"}  →  reads --text-xlo, which no longer exists`);
+    }
   });
 }
 
@@ -120,21 +122,15 @@ for (const entry of exceptions.files ?? []) {
   }
 }
 
-if (deprecated.length && process.argv.includes("--list")) {
-  console.log(`--text-xlo still read in ${deprecated.length} place(s):`);
-  for (const entry of deprecated) console.log(`  ${entry}`);
-  console.log("");
-}
-
 if (violations.length) {
   console.error(`Type floor: ${violations.length} violation(s). The floor is ${FLOOR_PX}px.\n`);
   for (const entry of violations) console.error(`  ${entry}`);
   console.error(
     "\nRaise the size, or add a named exception with a reason to lib/type-floor-exceptions.json.\n" +
-      "A label that does not fit at 12px is a label that is too long.",
+      "A label that does not fit at 12px is a label that is too long.\n" +
+      "A rule that reads --text-xlo wants --text-lo: the alias is deleted.\n",
   );
   process.exit(1);
 }
 
 console.log(`Type floor: clean (${FLOOR_PX}px) across every stylesheet.`);
-if (deprecated.length) console.log(`--text-xlo still read in ${deprecated.length} place(s); run with --list to see them.`);

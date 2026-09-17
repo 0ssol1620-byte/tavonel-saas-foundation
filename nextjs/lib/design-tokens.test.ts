@@ -32,7 +32,7 @@ describe("design token contract", () => {
   });
 
   it("keeps every global rule inside a named layer", () => {
-    for (const layer of ["@layer tokens {", "@layer reset {", "@layer base {", "@layer components {", "@layer overrides {"]) {
+    for (const layer of ["@layer tokens {", "@layer reset {", "@layer base {", "@layer components {", "@layer utilities {", "@layer overrides {"]) {
       expect(css).toContain(layer);
     }
   });
@@ -55,6 +55,14 @@ describe("design token contract", () => {
     expect(css).not.toContain(":focus-visible::after");
     const rings = [...css.matchAll(/:focus-visible[^{]*\{[^}]*outline:/g)];
     expect(rings, "one ring, not eight").toHaveLength(1);
+    /*
+      Widened 2026-09-18. The guard read only the rings a sheet paints, so the three declarations
+      that painted nothing -- two `outline: none` and one `outline: 0`, on a contact input, the
+      docs search field and the board search -- passed it while taking the ring off three keyboard
+      paths. A suppressed outline is the failure this rule exists to catch, not a second ring.
+    */
+    const suppressed = [...css.matchAll(/outline: *(?:none|0);/g)].map((match) => match[0]);
+    expect(suppressed, `outline suppressed in ${suppressed.length} place(s)`).toEqual([]);
   });
 
   it("gates every hover on a pointer that can hover", () => {
@@ -90,10 +98,36 @@ describe("design token contract", () => {
     expect(shadows, `shadows outside the three depth tokens: ${shadows.join(" | ")}`).toEqual([]);
   });
 
-  it("defines --text-xlo only as a deprecated alias", () => {
-    expect(css).toContain("--text-xlo: var(--text-lo);");
-    const reads = css.split("var(--text-xlo)").length - 1;
-    expect(reads, "tavonel.css reads the deprecated alias").toBe(0);
+  /*
+    Moved 2026-09-18 with D24, and the intent is stronger than the rule it replaces.
+
+    This used to assert that `--text-xlo` survived as a deprecated alias that nothing read, which
+    was the right shape while four other lanes still had call sites. The alias is deleted now, so
+    the assertion is that the name is gone entirely -- a definition coming back is how a deprecated
+    token becomes a permanent one. `scripts/check-type-floor.mjs` carries the other half across
+    every stylesheet in the repository: a sheet that still reads the name fails the build, because
+    there is nothing behind it to resolve to.
+  */
+  it("does not define --text-xlo at all", () => {
+    // The declaration and every read, not the word: the comment above the text tones explains
+    // what the fourth tone was and why it went, which is the part worth keeping.
+    expect(css, "the alias is back").not.toContain("--text-xlo:");
+    expect(css, "tavonel.css reads a token that no longer exists").not.toContain("var(--text-xlo)");
+  });
+
+  it("names the gutter and the two display sizes the scale stops short of", () => {
+    // BQ-053: one side gutter, so the header edge and the body edge cannot drift apart.
+    expect(css).toContain("--gutter: clamp(16px, 3vw, 30px);");
+    expect(css).toContain("padding: 0 var(--gutter);");
+    // BQ-006: the section h2 and the design-partners h2 had no token and stayed literal.
+    expect(css).toContain("--t-h2: clamp(28px, 3.3vw, 44px);");
+    expect(css).toContain("--t-h2-sm: clamp(22px, 2.1vw, 30px);");
+  });
+
+  it("defines the accessible-name utility once, and unscoped", () => {
+    // D25. Undefined, `.sr-only` renders as visible text beside the control it names.
+    expect(css).toContain("@layer utilities {");
+    expect(css).toMatch(/\.sr-only \{[\s\S]*?clip-path: inset\(50%\);/);
   });
 
   it("names the pipeline stages once, and the positioning line once", () => {

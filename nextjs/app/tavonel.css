@@ -73,8 +73,10 @@
     /*
       Three text tones, down from four. --text-lo and --text-xlo differed by 1.03:1 -- a distinction
       no reader can see and every author had to choose between -- and the fainter of the two failed
-      AA at 4.23:1 on --g3. --text-xlo is gone; its call sites read --text-lo, lightened here to
-      5.42:1 on --g3, the darkest ground it is set on.
+      AA at 4.23:1 on --g3. --text-xlo is gone, alias included: its call sites read --text-lo,
+      lightened here to 5.42:1 on --g3, the darkest ground it is set on.
+      scripts/check-type-floor.mjs fails the build on a stylesheet that still reads the old name,
+      because there is no longer anything behind it.
 
       --decor is for marks that are not text a reader needs: a strikethrough rule, a tree glyph, an
       inert control. It and --reused are surface tones and never a `color:` for words.
@@ -85,10 +87,6 @@
     --text-mid: #9aa3a8;
     --text-lo: #8b959b;
     --decor: #4c565c;
-    /* Deprecated alias. Kept for one integration cycle only, so a module stylesheet another lane
-       owns still resolves to a colour instead of to nothing. Nothing new reads it; the remaining
-       call sites are listed in the L1 lane report. */
-    --text-xlo: var(--text-lo);
 
     /* State. The entire chromatic vocabulary of the product. */
     --verified: #7be0be;
@@ -128,6 +126,14 @@
     --t-7: 24px;
     --t-8: 32px;
     --t-9: clamp(38px, 4vw, 56px);
+    /*
+      BQ-006. Two display sizes that sit between the h1 and `--t-8`, because a landing section
+      heading is a band that owns a screen and a card heading is not. They are named rather than
+      left literal in app/one-path.css: four call sites there were carrying the same two clamps
+      and a comment explaining why they had no token.
+    */
+    --t-h2: clamp(28px, 3.3vw, 44px);
+    --t-h2-sm: clamp(22px, 2.1vw, 30px);
 
     /*
       Radius, by material rather than by eye (DESIGN_MASTER_V3 §6). Five values, and --r-full is a
@@ -161,6 +167,13 @@
     /* The fixed header's own height, so an in-page anchor can clear it without a magic number at
        every jump target. */
     --header: 68px;
+    /*
+      BQ-053. The one side gutter the page has. `header.nav` and `.one-path-wrap` already consumed
+      it by name with this as their fallback, while `.shell` -- which lays out the body and the
+      footer of every route other than / and /ko -- carried `clamp(20px, 4vw, 64px)` of its own.
+      Above about 1000px that put a 64px body edge against a 30px header edge on 28 routes.
+    */
+    --gutter: clamp(16px, 3vw, 30px);
     /* The workspace has a bottom instrument bar; a marketing page does not, and reserved 46px of
        nothing at the foot of every public page. Set where the bar actually exists. */
     --bar: 0px;
@@ -257,41 +270,6 @@
   .skip:focus, .skip:focus-visible { transform: translateY(0); }
 
   /*
-    D9 -- a stamp, not a spinner. See components/route-boot.tsx: this never gates the page, it
-    only confirms a route change already happened, in the bar's own instrument voice.
-  */
-  .route-boot {
-    position: fixed;
-    top: 14px;
-    right: 14px;
-    z-index: 150;
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    padding: 6px 12px;
-    background: var(--g2);
-    border: 1px solid var(--hairline-hi);
-    border-radius: var(--r-inst);
-    font-family: var(--f-mono);
-    font-size: var(--t-1);
-    letter-spacing: 0.1em;
-    color: var(--text-lo);
-    text-transform: uppercase;
-    pointer-events: none;
-    animation: boot-flash var(--dur-4) var(--ease-out) both;
-  }
-  .route-boot-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--verified); flex: none; }
-  @keyframes boot-flash {
-    0% { opacity: 0; transform: translateY(-4px); }
-    18% { opacity: 1; transform: translateY(0); }
-    78% { opacity: 1; }
-    100% { opacity: 0; }
-  }
-  @media (max-width: 620px) {
-    .route-boot { top: auto; bottom: calc(var(--bar) + 12px); right: 12px; font-size: var(--t-1); padding: 5px 10px; }
-  }
-
-  /*
     A detent, not a hover.
     A click had no confirmation beyond whatever state change followed it -- often a second later.
     This is the switch's own click standing in, and it fires on real activation (`:active` covers
@@ -351,7 +329,7 @@
     width: 100%;
     max-width: var(--shell);
     margin: 0 auto;
-    padding: 0 clamp(20px, 4vw, 64px);
+    padding: 0 var(--gutter);
     position: relative;
     z-index: 10;
   }
@@ -565,7 +543,7 @@
     display: flex;
     align-items: center;
     gap: 14px;
-    padding: 12px clamp(16px, 3vw, 30px);
+    padding: 12px var(--gutter);
     transition: background var(--dur-4) var(--ease-out), border-color var(--dur-4) var(--ease-out);
     border-bottom: 1px solid transparent;
   }
@@ -763,7 +741,14 @@
     .tab:hover, [role="tab"]:hover { color: var(--text-hi); }
   }
 
-  .btn.small { min-height: 36px; padding: 0 14px; font-size: var(--t-1); }
+  /*
+    BQ-060. `.small` is the header's access action and nothing else -- components/public-site-chrome.tsx
+    is its only emitter -- so it is not a size variant, it is one control that had drifted off the
+    system: 12px in a 36px box, in the row a phone visitor reads first. It takes the 44px target and
+    the 14px face; the narrow padding is the only thing the header row actually needs from it.
+    `.btn-sm` is still there for a genuinely small control.
+  */
+  .btn.small { padding: 0 14px; }
   .nav .btn { white-space: nowrap; flex-shrink: 0; }
 
   .mini {
@@ -1109,7 +1094,17 @@
     .site-footer-groups a:hover { color: var(--text-hi); }
   }
   .nav-actions { display: inline-flex; align-items: center; gap: 14px; }
-  .nav-signin { color: var(--text-lo); font-size: 13px; text-decoration: none; }
+  /* BQ-060. A link in the header row is still a control: 44px of height and the same 14px face as
+     the action beside it, rather than 13px of bare text with no box at all. Below 520px it is
+     hidden where the access action is present, so the width this costs is width the row has. */
+  .nav-signin {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    color: var(--text-lo);
+    font-size: var(--t-3);
+    text-decoration: none;
+  }
   @media (hover: hover) and (pointer: fine) {
     .nav-signin:hover { color: var(--text-hi); }
   }
@@ -1330,7 +1325,6 @@
     color: var(--text-hi);
     font: inherit;
     font-size: 14px;
-    outline: none;
     transition: border-color var(--dur-2) var(--ease-out), background var(--dur-2) var(--ease-out);
   }
   .contact-field select,
@@ -1391,7 +1385,6 @@
   .changelog-entry header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; margin-bottom: 10px; }
   .changelog-entry header time { color: var(--text-lo); font: var(--t-1) var(--f-mono); letter-spacing: .09em; }
   .changelog-entry header b { color: var(--verified); font: var(--t-1) var(--f-mono); letter-spacing: .09em; }
-  .changelog-entry header em { padding: 2px 7px; border: 1px solid var(--hairline); color: var(--text-lo); font: normal var(--t-1) var(--f-mono); letter-spacing: .1em; text-transform: uppercase; }
   .changelog-entry header a { margin-left: auto; color: var(--text-lo); font: 12px var(--f-mono); }
   .changelog-breaking { display: grid; gap: 6px; margin: 12px 0; padding: 12px 14px; border-left: 2px solid var(--changed); background: var(--g1); }
   .changelog-breaking b { color: var(--changed); font: var(--t-1) var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; }
@@ -2054,7 +2047,6 @@
   .docs-search { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; gap: 10px; }
   .docs-search-field { display: flex; min-width: 0; max-width: 100%; align-items: center; gap: 9px; padding: 10px 12px; border: 1px solid var(--hairline-hi); color: var(--text-lo); }
   .docs-search-field input { flex: 1; min-width: 0; color: var(--text-hi); background: none; border: 0; font: inherit; font-size: 13px; }
-  .docs-search-field input:focus { outline: none; }
   .docs-search-results ul { display: grid; gap: 1px; margin: 0; padding: 0; list-style: none; background: var(--seam); border: 1px solid var(--hairline); }
   .docs-search-results a { display: grid; gap: 3px; padding: 10px 12px; background: var(--ground); }
   .docs-search-results strong { font-size: 13px; font-weight: 500; color: var(--text-hi); }
@@ -2077,7 +2069,10 @@
   .docs-endpoint, .docs-body > * { min-width: 0; }
   /* Running docs text carries paths, URLs and identifiers with no break opportunity; at 360px one of them widened /docs/mcp by 38px. */
   .docs-body :is(p, li, dd, td, th, h2, h3, figcaption) { overflow-wrap: anywhere; min-width: 0; }
-  .docs-code figcaption { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding: 8px 12px; border-bottom: 1px solid var(--hairline); color: var(--text-lo); font: var(--t-1) var(--f-mono); letter-spacing: .1em; text-transform: uppercase; }
+  /* The caption names the block -- "Request body", "Example response", the language tabs. Those
+     are words, not identifiers, and they were set in tracked monospace capitals. The code inside
+     the figure is still the mono voice; its label is not. */
+  .docs-code figcaption { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding: 8px 12px; border-bottom: 1px solid var(--hairline); color: var(--text-lo); font: var(--t-1) var(--f-sans); letter-spacing: .06em; }
   /* Language tabs sit in the code block's caption, where the single label used to be. */
   .docs-langs { display: flex; flex-wrap: wrap; gap: 2px; min-width: 0; }
   .docs-langs button { padding: 3px 8px; border: 1px solid transparent; color: var(--text-lo); font: var(--t-1) var(--f-sans); letter-spacing: 0.06em; }
@@ -2095,7 +2090,10 @@
   .docs-endpoint header b[data-method="GET"] { color: var(--verified); }
   .docs-endpoint header b[data-method="POST"] { color: var(--changed); }
   .docs-endpoint header code { min-width: 0; max-width: 100%; color: var(--text-hi); overflow-wrap: anywhere; white-space: normal; }
-  .docs-endpoint header em { color: var(--text-lo); font-style: normal; }
+  /* `<em>Scope <code>collections:read</code></em>`: the word is prose and the scope is an
+     identifier, so only the inner code keeps the header's mono voice. */
+  .docs-endpoint header em { color: var(--text-lo); font-style: normal; font-family: var(--f-sans); }
+  .docs-endpoint header em code { font-family: var(--f-mono); }
 
   /*
     A table stays a table.
@@ -2499,38 +2497,11 @@
     box-shadow: var(--depth-hover);
     overflow: hidden;
   }
-  .reading-facsimile {
-    position: absolute;
-    inset: 8px 8px 10px;
-    color: #1a1612;
-    font-family: Georgia, "Times New Roman", serif;
-    pointer-events: none;
-  }
-  .rf-title { margin: 0; font-size: 7.5px; font-weight: 700; letter-spacing: 0.04em; }
-  .rf-h { margin: 6px 0 4px; font-size: 6.5px; }
-  .rf-table { width: 100%; border-collapse: collapse; font-size: 5.5px; font-family: var(--f-mono), ui-monospace, monospace; }
-  .rf-table th, .rf-table td { border: 1px solid #8a8174; padding: 1px 2px; }
-  .rf-fig { display: flex; align-items: flex-end; gap: 4px; margin-top: 8px; }
-  .rf-fig i { display: block; width: 28px; height: 18px; border: 1px solid #2a2622; background: #d8d0c0; }
-  .rf-fig i:last-of-type { width: 22px; height: 14px; }
-  .rf-fig span { font-size: 5px; color: #5a5348; }
-  .rf-stamp {
-    position: absolute;
-    right: 2px;
-    top: 18px;
-    font-family: var(--f-mono), ui-monospace, monospace;
-    font-size: 5.5px;
-    letter-spacing: 0.08em;
-    color: #9b2c2c;
-    border: 1px solid #9b2c2c;
-    border-radius: 50%;
-    width: 34px;
-    height: 34px;
-    display: grid;
-    place-items: center;
-    transform: rotate(-18deg);
-    opacity: 0.8;
-  }
+  /* D28. `.reading-facsimile` and `.rf-*` drew a fake contract inside that mount -- Georgia on
+     cream at 5 to 7.5px, with invented amounts and a RECEIVED stamp -- and they were the only
+     reason lib/type-floor-exceptions.json carried selector exceptions at all. The markup went
+     with components/reading-view.tsx; the mount above stays, and holds a real page raster or
+     nothing at all. */
   .rb {
     position: absolute;
     overflow: hidden;
@@ -2851,8 +2822,12 @@
        was the one row on the site under it. The gap absorbs the two pixels. */
     .nav { gap: 7px; padding: 10px 16px; }
     /* The access verb stays. Hiding it here would undo the split it exists for: a phone visitor
-       would again be offered only "Sign in", the one control a first-time reader cannot use. */
-    .nav .btn.small { padding: 10px 10px; font-size: var(--t-1); letter-spacing: 0; }
+       would again be offered only "Sign in", the one control a first-time reader cannot use.
+       BQ-060: it is no longer shrunk to get it here. The size override that sat on this line was
+       written when the desktop nav switched to the phone sheet at 860px and this control was a
+       desktop afterthought; the switch is at 1079px now, so this is the header CTA on a phone and
+       it keeps the 44px box and the 14px face. Only the tracking is still trimmed for width. */
+    .nav .btn.small { letter-spacing: 0; }
     .caps, .checks, .plans, .packs, .stops, .legend { grid-template-columns: minmax(0, 1fr); }
     .contact-pair { grid-template-columns: minmax(0, 1fr); }
     .contact-submit { align-items: stretch; flex-direction: column; }
@@ -3085,136 +3060,13 @@
     .film-caption { inset: auto 0 64px 0; padding-bottom: 12px; }
   }
 
-  /* ============================================================ evidence tether + identity resolve */
-
-  /*
-    Hairline and luminance only. Colour stays reserved for state: a lit tether is verified
-    evidence, not decoration. No glow, no sparkle, no serif pull-quote.
-  */
-
-  .tether {
-    position: relative;
-    display: grid;
-    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.25fr) minmax(0, 1fr);
-    grid-template-areas:
-      "source fact contract"
-      "source fact po";
-    gap: 16px 40px;
-    padding: 20px 18px 8px;
-    min-height: 228px;
-  }
-
-  .tether-edges {
-    position: absolute;
-    inset: 0;
-    grid-column: 1 / -1;
-    grid-row: 1 / -1;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    overflow: visible;
-    z-index: 0;
-  }
-
-  .tether-node {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 6px;
-    width: 100%;
-    text-align: left;
-    background: var(--g1);
-    border: 1px solid var(--hairline);
-    border-radius: var(--r-paper);
-    padding: 12px 13px;
-    color: inherit;
-    cursor: pointer;
-    transition: border-color var(--dur-3) var(--ease-out), background var(--dur-3) var(--ease-out);
-  }
-
-  .tether-node[data-id="source"] { grid-area: source; align-self: center; }
-  .tether-node[data-id="fact"] { grid-area: fact; align-self: center; }
-  .tether-node[data-id="contract"] { grid-area: contract; }
-  .tether-node[data-id="po"] { grid-area: po; }
-
-  .tether-node[data-hot="1"] {
-    background: var(--g2);
-    border-color: var(--hairline-hi);
-  }
-
-  .tether[data-lit="1"] .tether-node[data-hot="1"] {
-    border-color: var(--verified-dim);
-  }
-
-  .tether-k {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    font-family: var(--f-sans);
-    font-size: var(--t-1);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text-lo);
-  }
-
-  .tether-k i {
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: var(--reused);
-    flex: none;
-  }
-
-  .tether-node[data-tone="verified"] .tether-k i { background: var(--verified); }
-  .tether-node[data-tone="changed"] .tether-k i { background: var(--changed); }
-  .tether-node[data-tone="held"] .tether-k i { background: var(--unresolved); }
-  .tether-node[data-tone="unused"] .tether-k i { background: var(--reused); }
-
-  .tether-node b {
-    color: var(--text-hi);
-    font-size: 15px;
-    letter-spacing: -0.015em;
-    font-variation-settings: "wght" 560;
-    font-weight: 500;
-  }
-
-  .tether-d {
-    font-family: var(--f-sans);
-    font-size: var(--t-1);
-    line-height: 1.55;
-    color: var(--text-lo);
-  }
-
-  .tether-edge {
-    fill: none;
-    stroke: var(--hairline-hi);
-    stroke-width: 1;
-    vector-effect: non-scaling-stroke;
-    stroke-dasharray: 1;
-    stroke-dashoffset: 0;
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    .tether:not([data-drawn="1"]) .tether-edge { stroke-dashoffset: 1; }
-    .tether[data-drawn="1"] .tether-edge {
-      stroke-dashoffset: 0;
-      transition: stroke-dashoffset 700ms var(--ease), stroke var(--dur-3) var(--ease-out);
-    }
-  }
-
-  .tether[data-lit="1"] .tether-edge { stroke: var(--verified-dim); }
-  .tether[data-lit="1"] .tether-edge[data-direct="1"] { stroke: var(--verified); }
-
-  .tether-cite {
-    margin: 0;
-    padding: 12px 18px 16px;
-    border-top: 1px solid var(--hairline);
-    font-size: 12.5px;
-    color: var(--text-lo);
-    line-height: 1.6;
-  }
+  /* ============================================================ identity resolve
+     The evidence tether that stood beside it -- .tether, .tether-edges, .tether-node and its
+     data-id/data-hot/data-tone variants, .tether-k, .tether-d, .tether-edge, the SVG edge-draw
+     animation and .tether-cite -- is deleted with BQ-018: components/evidence-tether.tsx and
+     world-visual/provenance-tether.tsx are gone and nothing emits any of those class names. The
+     relationship between a source and its region is drawn as a shared --verified ring and a
+     matching locator label at both ends instead, which needs no curve. */
 
   .resolve {
     display: flex;
@@ -3343,17 +3195,6 @@
   .panel-head .right + .mini { margin-left: 0; }
 
   @media (max-width: 720px) {
-    .tether {
-      grid-template-columns: minmax(0, 1fr);
-      grid-template-areas:
-        "source"
-        "fact"
-        "contract"
-        "po";
-      gap: 28px;
-      min-height: 0;
-      padding-bottom: 16px;
-    }
     .resolve-row { grid-template-columns: minmax(0, 1fr); }
     .resolve-join { display: none; }
   }
@@ -3518,153 +3359,63 @@
     .pricing-page .pricing-glance { gap: 20px; }
   }
 
-  /* ============================================================ site navigation (IA redesign, 2026-09-11)
-     BEGIN wg-ia-nav. Appended as one block so the rules that need to out-specify `.nav > nav a`
-     (0,1,2) can do it with `.nav .site-nav-panel a` (0,2,1) instead of by reordering anything above.
-     END marker at the bottom of the file. */
-
-  /* The trigger is a control, so it gets the row's link treatment plus a caret and a state. The
-     caret is inside the button, not beside it: a 10px arrow is not a click target. */
-  .site-nav-trigger {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: none;
-    border: 0;
-    padding: 0;
-    cursor: pointer;
-    font: inherit;
-  }
-  .site-nav-trigger::after {
-    content: "";
-    width: 5px;
-    height: 5px;
-    border-right: 1px solid currentColor;
-    border-bottom: 1px solid currentColor;
-    transform: translateY(-2px) rotate(45deg);
-    transition: transform var(--dur-2) var(--ease-out);
-  }
-  .site-nav-trigger[aria-expanded="true"]::after { transform: translateY(1px) rotate(225deg); }
-  .nav > nav .site-nav-trigger[aria-expanded="true"],
-  .nav > nav [aria-current="true"] { color: var(--text-hi); }
-  .nav > nav [aria-current="true"] { box-shadow: inset 0 -1px 0 var(--verified); }
-
-  /* ---- the phone accordion. The outer panel's grid already draws a hairline between its rows
-     through `gap: 1px` on a hairline ground, so a group needs no border of its own. */
-  /*
-     Every rule here is qualified with `.mobile-primary-nav`, which is not decoration.
-
-     The panel's own controls are styled by `.mobile-primary-nav summary` (0,1,1) and
-     `.mobile-primary-nav[open] summary` (0,2,1), and both are *descendant* selectors, so they
-     reach the nested group summaries too. Measured on this build at 390: every collapsed group
-     drew the open marker, because that second rule out-specified a bare
-     `.mobile-nav-group[open] > summary::after` (0,1,1) and applied its "−" to all five summaries
-     whenever the outer disclosure was open -- which is whenever any of them is on screen. These
-     are (0,2,1) and (0,3,1) and come later, so a group's marker is its own.
-
-     The same inheritance hands a nested summary the MENU button's border, radius and ground,
-     which inside a flush list of rows reads as five stacked boxes. They are reset rather than
-     overridden one property at a time by a more specific selector somewhere else.
-  */
-  .mobile-nav-group { background: var(--ground); }
-  .mobile-primary-nav .mobile-nav-group > summary {
-    /* Same 44px floor as a link row: a category is the only way to that category's links. */
-    min-height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    padding: 0 clamp(14px, 4vw, 24px);
-    border: 0;
-    border-radius: 0;
-    background: transparent;
-    color: var(--text-lo);
-    font: 500 12px var(--f-sans);
-    letter-spacing: 0.06em;
-    cursor: pointer;
-    list-style: none;
-  }
-  .mobile-primary-nav .mobile-nav-group > summary::-webkit-details-marker { display: none; }
-  .mobile-primary-nav .mobile-nav-group > summary::after { content: "+"; margin-left: 0; color: var(--verified); }
-  .mobile-primary-nav .mobile-nav-group[open] > summary::after { content: "−"; }
-  .mobile-primary-nav .mobile-nav-group > summary[aria-current="true"] { color: var(--text-hi); }
-  .mobile-primary-nav .mobile-nav-group[open] > summary { color: var(--text-hi); background: var(--g1); }
-  .mobile-primary-nav nav > a[aria-current="true"],
-  .mobile-primary-nav .mobile-nav-links a[aria-current="true"] { color: var(--text-hi); }
-  /* END wg-ia-nav */
+  /* ============================================================ site navigation
+     The 2026-09-11 IA nav (a `.site-nav-trigger` disclosure per section on the desktop row, a
+     `.mobile-nav-group` accordion inside the phone sheet) was replaced by five direct links in
+     both navs. Nothing emits `.site-nav-trigger` or `.mobile-nav-group` any more -- three e2e
+     specs assert their count is zero -- and the two `[aria-current="true"]` rules that styled the
+     active row never matched at all: `customerNavOwns` sets `aria-current="page"`, which is what
+     `app/one-path.css` now keys both navs' active styling on. The whole block is deleted rather
+     than repointed, because the markup it was written against is gone. */
 
 }
 
+@layer utilities {
+  /*
+    D25 -- the accessible-name utility, defined once.
+
+    Nothing in this repository defined `.sr-only`, so every use of it rendered as visible text: the
+    board's search label sat beside its own placeholder, each row checkbox printed a full sentence
+    next to it, and the compile stage's `role="status"` readout -- which exists so a screen reader
+    is told what the film is showing -- was drawn over the film. A lane defined a copy scoped to
+    `.one-path-workspace` as a stopgap; this is the unscoped one it is dropped for.
+
+    `clip-path: inset(50%)` rather than the old `clip: rect(...)`, and `white-space: nowrap` so a
+    long name is not wrapped into a 1px column, which is what makes some engines announce it one
+    character per line.
+  */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+}
+
 @layer overrides {
-  /* ============================================================ BA-236 · the 12px floor
+  /* ============================================================ BA-236 -- the 12px floor, retired here
 
-     The design system sets its own minimum at 12px for body and UI text (7.3 [CONFIRMED], and
-     decision.md:438 agrees), and a measurement across the public routes found 138 text nodes under
-     it on /explore alone, 37 of them at 8px, plus 9px link labels on /product, 9px table headers on
-     /pricing and a 10px footer heading. Two of them failed WCAG AA for ordinary text as well.
+     This was the floor: one `.page :is(...)` block naming thirty selectors, setting each to 12px
+     and re-tracking it, because the sizes it corrected were authored in thirty rules across 3,800
+     lines. It has been replaced twice over. `scripts/check-type-floor.mjs` greps every stylesheet
+     in the repository -- modules included, which a selector list can never reach -- and the token
+     pass raised each of those rules at its source, so every selector named here already declared
+     `var(--t-1)` before this block reached it.
 
-     This block is the floor, applied where visitors read -- the public chrome and the landing page,
-     not the authenticated workspace, whose dense instrument surfaces are a separate argument. It is
-     one block on purpose: the sizes it corrects were set in thirty different rules across 3,800
-     lines, and a reader trying to find out what the floor is should find it in one place. Tracking
-     comes down with each size, because letter-spacing authored for 9px is 40% too wide at 12px.
+     Keeping it was not free. `letter-spacing: 0.1em` is tracking authored for 9px, and in the
+     overrides layer it beat the 0.02em--0.08em the same pass had just set on `.docs-table th`,
+     `.tag`, `.tile .n` and a dozen more: the values in the rules a reader would go and read were
+     the ones not applying. It also flattened two deliberate sizes on /pricing -- `.plan ul` at
+     13px and `.price small` -- back to 12px from a later, equally specific selector.
 
-     A label that does not fit at 12px is a label that is too long.
-     -------------------------------------------------------------------------------------------- */
-  .page :is(
-    .mode,
-    .tick,
-    .site-footer-title,
-    .tile .n,
-    .tag,
-    .cap-s,
-    .link .st,
-    .interlude-sub,
-    .source-route-kind,
-    .changelog-filter button,
-    .changelog-entry header time,
-    .changelog-entry header b,
-    .changelog-breaking b,
-    .changelog-group > p,
-    .integration-facts dt,
-    .docs-code figcaption,
-    .docs-langs button,
-    .docs-endpoint header,
-    .docs-table th,
-    .docs-pager,
-    .src-matrix thead th,
-    .document-meta li small,
-    .price small,
-    .plan ul,
-    .cap-n,
-    .src-none,
-    .usage-estimator label,
-    .usage-estimator dt,
-    .gate-list p
-  ) {
-    font-size: var(--t-1);
-  }
-  .page :is(
-    .mode,
-    .tick,
-    .site-footer-title,
-    .tile .n,
-    .tag,
-    .cap-s,
-    .link .st,
-    .source-route-kind,
-    .changelog-filter button,
-    .changelog-breaking b,
-    .changelog-group > p,
-    .integration-facts dt,
-    .docs-code figcaption,
-    .docs-langs button,
-    .docs-table th,
-    .src-matrix thead th
-  ) {
-    letter-spacing: 0.1em;
-  }
-  /* The /explore node labels the audit measured at 8px on --text-xlo: one step up in tone as well,
+     The tone rule below it stays: it is a colour decision, not a size one. */
+
+  /* The /explore node labels the audit measured at 8px in the faintest tone -- one step up as well,
      because the graph is meant to be an argument and it was annotated in the faintest ink there is. */
   .page :is(.tile .n, .link .st, .source-route-kind, .site-footer-title) {
     color: var(--text-lo);
@@ -3779,103 +3530,11 @@
   .solution-hero > .stack:first-child { position: static; }
   .solution-hero .document-title { width: 100%; max-width: 17ch; }
   .solution-hero-copy { width: 100%; max-width: 680px; justify-self: end; align-self: center; }
-  .solution-proof-sample {
-    grid-column: 1 / -1;
-    margin: clamp(42px, 5vw, 68px) 0 0;
-    border: 1px solid var(--hairline-hi);
-    border-radius: var(--r-inst-lg);
-    overflow: hidden;
-    background: var(--ground);
-  }
-  /*
-    BA-041 / BA-043 / BA-056 -- the four drawn tiles are gone, and with them the icon stack, the
-    striped fake page, the empty dot grid under a candidate count, and the glowing timeline dot.
-    What is left holds one real region rendered by /explore's own `SourceSheet`, so the styling
-    here is a frame and a caption; the evidence inside brings its own.
-  */
-  .solution-proof-sample-head {
-    min-height: 44px;
-    padding: 10px 16px;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 6px 18px;
-    border-bottom: 1px solid var(--hairline);
-    color: var(--text-lo);
-    font-size: 12px;
-    letter-spacing: .01em;
-  }
-  /* The card's only link was 115x11px on a phone (BA-056): it is now a 44px row target. */
-  .solution-proof-sample-head a {
-    display: inline-flex;
-    align-items: center;
-    min-height: 44px;
-    color: var(--verified);
-    font-size: 12px;
-    text-decoration: underline;
-    text-underline-offset: 3px;
-  }
-  .solution-proof-sample-body {
-    display: grid;
-    gap: 0;
-    background: var(--g1);
-  }
-  .solution-proof-claim {
-    margin: 0;
-    padding: 16px;
-    border-bottom: 1px solid var(--hairline);
-    color: var(--text-hi);
-    font-size: 14px;
-    line-height: 1.55;
-  }
-  .solution-proof-claim span {
-    display: block;
-    margin-bottom: 6px;
-    color: var(--text-lo);
-    font: 12px var(--f-sans);
-    letter-spacing: .1em;
-    text-transform: uppercase;
-  }
-  /* The sheet is a flex child in /explore's stage; here it is a block in a figure. */
-  .solution-proof-sample-body > article {
-    border: 0;
-    border-radius: 0;
-  }
-  .solution-proof-counts {
-    margin: 0;
-    padding: 12px 16px;
-    border-top: 1px solid var(--hairline);
-    color: var(--text-lo);
-    font: 12px/1.6 var(--f-mono);
-    overflow-wrap: anywhere;
-  }
-  .solution-proof-digest { color: var(--text-lo); }
-
-  /*
-    G1-037. Three things in this panel were too small to be evidence.
-
-    The page render was fitted into a 420px frame inside a ~690px panel, so the page itself came out
-    about 145px wide -- a reader could see that something was highlighted and nothing else, which is
-    the opposite of what an evidence surface is for. The frame is taller now and the region overlay
-    is legible at arm's length. The provenance list was 9px mono at the dimmest text token on the
-    scale; 11px and one step up in contrast is still quiet and is now readable. The sha256 already
-    wraps (`.digest`), so it no longer runs off as one line.
-  */
-  .solution-proof-sample [data-source-viewport] { height: clamp(460px, 44vw, 620px); }
-  .solution-proof-sample [data-source-provenance] { font-size: var(--t-1); line-height: 1.6; }
-  .solution-proof-sample [data-source-provenance] dt { color: var(--text-lo); }
-  .solution-proof-sample [data-source-provenance] dd { color: var(--text-hi); }
-
-  /* G1-016. Why this page opens on this filing rather than on the same one five times. */
-  .solution-proof-framing {
-    margin: 0;
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--hairline);
-    color: var(--text-mid);
-    font-size: 13px;
-    line-height: 1.6;
-  }
+  /* BA-041/G1-016/G1-037. The `.solution-proof-*` rules that framed this block are deleted: the
+     proof renders components/solution-proof-sample.module.css's hashed classes now, so the frame,
+     the head row, the claim with its cream ground and left border, the counts, the digest, the
+     provenance sizing and the framing note were all styling nothing. The 44px-target assertion
+     that read the head link moved to the module in lib/solution-proof-sample.test.ts. */
 
   .solution-section {
     display: grid;
@@ -4099,7 +3758,10 @@
   }
   .board-filters button[data-active="true"] { color: var(--ground); background: var(--verified); border-color: var(--verified); }
   .board-search { min-width: min(240px, 42vw); }
-  .board-search input { width: 100%; min-height: 34px; padding: 7px 10px; border: 1px solid var(--hairline); border-radius: var(--r-inst); outline: 0; background: var(--ground); color: var(--text-hi); font-size: var(--t-1); }
+  /* Nothing here suppresses the outline. The global :focus-visible ring is the one focus style on
+     the site, and a search field that turns it off is a keyboard reader with no cursor. The border
+     tint below is the resting affordance, not the indicator. */
+  .board-search input { width: 100%; min-height: 34px; padding: 7px 10px; border: 1px solid var(--hairline); border-radius: var(--r-inst); background: var(--ground); color: var(--text-hi); font-size: var(--t-1); }
   .board-search input:focus { border-color: var(--verified-dim); }
   .board-list-wrap { max-height: min(54vh, 560px); overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; margin-top: 10px; border: 1px solid var(--hairline); border-radius: var(--r-inst-lg); }
   .board-list { margin: 0; padding: 0; list-style: none; }
@@ -4165,7 +3827,6 @@
     .solution-flow li { min-height: 132px; }
     .solution-flow li:last-child { grid-column: 1 / -1; }
     .solution-notes { margin-top: 54px; }
-    .solution-proof-sample-head { align-items: flex-start; flex-direction: column; justify-content: center; gap: 5px; padding-block: 12px; }
     .board-row-summary { grid-template-columns: minmax(0, 1fr) auto 18px; gap: 8px; }
     .board-row-status { max-width: 112px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .compile-stage { aspect-ratio: 1 / 1; }
@@ -4436,9 +4097,17 @@
 
     `text-underline-offset` rather than the default, because at 13px the baseline underline cuts
     through the descenders of the mono face the digests are set in.
+
+    BQ-030. The `.scene` half used to reach `li`, `dd`, `td`, `figcaption` and `summary` too, and a
+    list of links is not prose: three navigation lists rendered as underlined body copy because
+    their anchors happened to carry no class, and the fix on the day was to invent a class for each
+    of them. Outside a prose container only a paragraph counts, which is the one element that can
+    never be a list of destinations. Inside one -- the docs body, a policy page, the fine print --
+    every running-text element still qualifies.
   */
-  .scene :is(p, li, dd, td, figcaption, summary) > a:not([class]),
+  .scene p > a:not([class]),
   .policy-copy :is(p, li, dd, td) a:not([class]),
+  .fine :is(p, li, dd, td) a:not([class]),
   .docs-body :is(p, li, dd, td) a:not([class]) {
     text-decoration: underline;
     text-underline-offset: 3px;
@@ -4463,16 +4132,10 @@
     `activationPolicy.customerData.reason`'s own words. Quiet: it is a standing fact beside the
     action, not a warning, and the header carries the same string.
   */
-  .one-path-state {
-    margin: 14px 0 0;
-    padding-left: 14px;
-    border-left: 2px solid var(--hairline-hi, #435046);
-    max-width: 68ch;
-    color: var(--text-lo, #9aaba1);
-    font-size: 13px;
-    line-height: 1.65;
-  }
-  .one-path-state[data-customer-data="open"] { border-left-color: var(--verified, #7fb08a); }
+  /* BQ-129. The coloured-left-border callout that `.one-path-state` used to be -- a 2px bar that
+     turned green when the gate opened, a state colour spent on a sentence that is not a state --
+     is not carried forward from ux-polish.css. `app/one-path.css` draws it as a hairline panel on
+     its one emitter (components/home-page-client.tsx, inside `.one-path-home`). */
 
   /* ---------------------------------------------------------------- folded from responsive-polish.css */
 
@@ -4486,9 +4149,10 @@
     content-visibility: auto;
     contain-intrinsic-size: auto 72px;
   }
-  /* The product surfaces sit above the fold on /product, where deferring the paint buys nothing
-     and costs a shift; they keep the reserved size and drop the deferral. */
-  .product-surface { contain-intrinsic-size: auto 260px; }
+  /* `.product-surface` used to be in that list. A size-contained element contributes no row to its
+     parent grid, which silently disabled the subgrid those cards now use, and the reserved size it
+     kept afterwards did nothing on its own -- `contain-intrinsic-size` applies only while size
+     containment is active. Both are gone from here, so app/product-polish.css needs no override. */
 
   /* Interactive surfaces move subtly; no decorative animation competes with the product film.
      `.btn` is not in this list any more: it carries its own transition and its own press state in
@@ -4850,54 +4514,22 @@
   .landing-page .hero .actions { gap: 12px 20px; flex-wrap: wrap; }
   .landing-page .hero .hero-proof { font-size: var(--t-3); line-height: 1.5; }
 
-  .home-proof-label {
-    display: flex;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 8px 16px;
-    margin: 0 0 12px;
-    font-size: var(--t-3);
-    line-height: 1.5;
-    color: var(--text-hi);
-  }
-  .home-proof-label > span { color: var(--text-mid); }
-  .home-evidence-preview { min-width: 0; }
-  .home-evidence-preview .solution-proof-sample { margin: 0; min-width: 0; }
-  .home-evidence-preview .solution-proof-sample-head { gap: 10px; flex-wrap: wrap; }
-  /* The claim is printed on the one light surface in the system, because it is a passage from a
-     page. --paper and --paper-ink are that surface; the cream and the ink used to be two literals. */
-  .home-evidence-preview .solution-proof-claim {
-    background: var(--paper);
-    color: var(--paper-ink);
-    border-left: 3px solid var(--verified-dim);
-    padding: 20px;
-    font-size: var(--t-5);
-    line-height: 1.55;
-  }
-  .home-evidence-preview .solution-proof-claim > span { color: var(--text-lo); }
-  .home-evidence-preview .solution-proof-counts { font-size: var(--t-2); line-height: 1.6; overflow-wrap: anywhere; }
-
-  /* Entry-page preview: one selected passage, with the original-PDF and SEC links retained.
-     Explore still exposes the whole page and full provenance; this is not a full-page rendition.
-     Only nonselected evidence paragraphs are trimmed; notices and source disclosures remain. */
-  :is(.home-evidence-preview, .ko-published-proof) [data-source-sheet] p[data-region-id]:not([data-active-region]) { display: none; }
-  :is(.home-evidence-preview, .ko-published-proof) [data-source-provenance] { display: none; }
-  :is(.home-evidence-preview, .ko-published-proof) a { min-height: 44px; display: inline-flex; align-items: center; white-space: normal; }
+  /* BQ-070/BQ-076. The landing proof is no longer wrapped: `.home-evidence-preview`,
+     `.ko-published-proof` and `.home-proof-label` are not emitted by any page, and the block
+     brings its own frame from components/solution-proof-sample.module.css. The rule that mattered
+     most here was `[data-source-provenance] { display: none; }`, which hid the sha256 ledger on /
+     and /ko by attribute -- so it also hid the collapsed "Verify this source" disclosure that
+     replaced it, removing the verify path from both entry pages. Deleted with the wrapper. */
 
   .landing-page .hero .tile { min-width: 0; overflow-wrap: anywhere; }
   .landing-page .hero .tile > * { min-width: 0; max-width: 100%; }
   .landing-page .hero .tiles .tile > h2 { width: 100%; max-width: 100%; min-width: 0; text-wrap: wrap; align-self: stretch; }
   .landing-page .hero .tile h2 { font-size: var(--t-7); line-height: 1.2; }
   .landing-page .hero .tile p { font-size: var(--t-4); line-height: 1.55; }
-  .ko-published-proof { min-width: 0; margin: 16px 0 24px; }
-  .ko-published-proof .solution-proof-sample { margin-inline: 0; }
 
   @media (max-width: 600px) {
     .landing-page .hero .lede { font-size: var(--t-4); line-height: 1.55; }
     .landing-page .hero .tile h2 { font-size: var(--t-7); }
-    .home-proof-label { font-size: var(--t-2); }
-    .home-evidence-preview .solution-proof-claim { font-size: var(--t-4); padding: 16px; }
-    .home-evidence-preview .solution-proof-sample-head { align-items: flex-start; }
   }
 
 }

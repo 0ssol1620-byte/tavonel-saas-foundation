@@ -1,8 +1,8 @@
 /*
   Motion semantics, as data rather than as scattered CSS durations.
 
-  Blueprint §14.4 gives motion a vocabulary -- fade means appear, tether means provenance, pulse
-  means affected, dim means unaffected, settle means the world is stable -- and §58 gives it a
+  Blueprint §14.4 gives motion a vocabulary -- fade means appear, pulse means affected, dim means
+  unaffected, settle means the world is stable -- and §58 gives it a
   budget: an object responds in under 100ms, a reveal lands between 250 and 600ms, and only the
   first entry into the stage is allowed to take about a second. Both are asserted in
   `visual-motion.test.ts`, so a duration that drifts out of the budget fails a run instead of
@@ -12,11 +12,10 @@
   the rest of the product follows: motion reports a state change or it does not happen.
 */
 
-export type MotionName = "fade" | "tether" | "pulse" | "dim" | "rewrite" | "settle";
+export type MotionName = "fade" | "pulse" | "dim" | "rewrite" | "settle";
 
 export const MOTION: Record<MotionName, { ms: number; meaning: string }> = {
   fade: { ms: 260, meaning: "appear" },
-  tether: { ms: 320, meaning: "provenance" },
   pulse: { ms: 560, meaning: "affected" },
   dim: { ms: 300, meaning: "unaffected" },
   rewrite: { ms: 420, meaning: "recompiled" },
