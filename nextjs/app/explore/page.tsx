@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import ExploreStage from "@/components/explore/explore-stage";
+import stageStyles from "@/components/explore/explore-stage.module.css";
 import { PublicSiteFooter } from "@/components/public-site-chrome";
 import { chooseExploreEntryProof } from "@/lib/explore-entry-proof";
 import {
@@ -126,7 +127,9 @@ export default function ExplorePage() {
         technical={technical}
         capturedOn={capturedOn}
       />
-      <PublicSiteFooter />
+      <div className={stageStyles.siteFooter}>
+        <PublicSiteFooter />
+      </div>
     </>
   );
 }

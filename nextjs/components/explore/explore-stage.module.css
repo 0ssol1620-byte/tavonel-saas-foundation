@@ -1235,3 +1235,22 @@
   .askRegions button:hover { color: var(--text-hi); border-color: var(--verified); }
   .nextSourceNote a:hover { color: var(--text-hi); }
 }
+
+/* ------------------------------------------------------------------ footer */
+
+/*
+  chrome-02 / chrome-03 on /explore.
+
+  The site footer arrived under a stage whose chrome edge is this file's `clamp(14px, 3vw, 40px)`,
+  not the site's `--gutter`: at 1440 the header wordmark sat at x = 40 and the footer's at x = 70
+  (the shared `.shell`'s 1360px cap plus a 30px gutter), and at 412 they were 14 and 16. /explore
+  is the one route with both an instrument header and site chrome, so the two lockups have to agree
+  on one edge, and the edge the reader already sees is the stage's.
+
+  Scoped through this wrapper rather than through `footer.site .shell`, which is shared chrome:
+  the rule reaches only the footer this page renders, and it holds whatever the shared cap becomes.
+*/
+.siteFooter :global(footer.site .shell) {
+  max-width: none;
+  padding-inline: clamp(14px, 3vw, 40px);
+}
