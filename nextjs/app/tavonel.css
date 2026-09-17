@@ -80,6 +80,8 @@
       inert control. It and --reused are surface tones and never a `color:` for words.
     */
     --text-hi: #edeae4;
+    /* The one step above --text-hi: the primary button's hover fill, and nothing else. */
+    --text-max: #ffffff;
     --text-mid: #9aa3a8;
     --text-lo: #8b959b;
     --decor: #4c565c;
@@ -219,7 +221,7 @@
 
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-track { background: var(--ground); }
-  ::-webkit-scrollbar-thumb { background: var(--seam); border: 3px solid var(--ground); border-radius: var(--r-full); }
+  ::-webkit-scrollbar-thumb { background: var(--seam); border: 3px solid var(--ground); border-radius: var(--r-paper-lg); }
   @media (hover: hover) and (pointer: fine) {
     ::-webkit-scrollbar-thumb:hover { background: var(--hairline-hi); }
   }
@@ -472,7 +474,7 @@
      The landing page now depends on one of these to send a reader from the evidence claim to the
      capability manifest, so it stops being cosmetic. Same treatment `.policy-copy a` already uses.
   */
-  .fine a, .input-guidance a {
+  .fine a {
     color: var(--text-lo);
     text-decoration: underline;
     text-decoration-thickness: 1px;
@@ -544,11 +546,11 @@
     The `.js .rv` reveal system is gone, and this is why nothing on the site appeared to animate.
 
     Every rule in it was gated on `html.js`, which was added by `lib/use-scroll-scenes.ts` -- a hook
-    with no remaining caller. So the opt-in never opened: the reveals, the per-word blur, the
-    staggered strike-through were all inert, and the page had been shipping its final state for
-    months. Deleting the mechanism rather than reviving it keeps the one motion rule the system has
-    (motion reports a state change), and the states those rules were animating towards are now the
-    authored defaults.
+    with no remaining caller, deleted with the rules it gated. So the opt-in never opened: the
+    reveals, the per-word blur and the staggered strike-through were all inert, and the page had
+    been shipping its final state for months. Deleting the mechanism rather than reviving it keeps
+    the one motion rule the system has (motion reports a state change), and the states those rules
+    were animating towards are now the authored defaults.
   */
 
 }
@@ -728,7 +730,7 @@
   }
 
   @media (hover: hover) and (pointer: fine) {
-    .btn:hover:not(:disabled), .btn-primary:hover:not(:disabled) { background: #fff; border-color: #fff; }
+    .btn:hover:not(:disabled), .btn-primary:hover:not(:disabled) { background: var(--text-max); border-color: var(--text-max); }
     .btn-secondary:hover:not(:disabled) { background: var(--g3); border-color: var(--text-lo); }
     .btn-ghost:hover:not(:disabled), .btn.ghost:hover:not(:disabled) { border-color: var(--text-lo); color: var(--text-hi); background: var(--g1); }
     .btn-danger:hover:not(:disabled) { background: var(--failed-deep); border-color: var(--failed); }
@@ -966,7 +968,7 @@
     margin-inline: auto;
     aspect-ratio: 1440 / 900;
     max-height: calc(100dvh - 300px);
-    background: #08090a;
+    background: var(--ground);
     border: 1px solid var(--hairline);
     overflow: hidden;
   }
@@ -1195,7 +1197,7 @@
   .compile-stage {
     width: 100%;
     aspect-ratio: 1440 / 620;
-    background: #08090a;
+    background: var(--ground);
     border: 1px solid var(--hairline);
     border-radius: var(--r-paper-lg);
     overflow: hidden;
@@ -3006,6 +3008,7 @@
   @media (prefers-reduced-motion: reduce) {
     :root { --dur-1: 0ms; --dur-2: 0ms; --dur-3: 0ms; --dur-4: 0ms; }
     html { scroll-behavior: auto; }
+    html.landing-scroll { scroll-snap-type: none; }
     *, *::before, *::after {
       animation-duration: 0.01ms !important;
       /* Without this a staggered delay would keep `both`-filled content hidden for a third of a
@@ -3611,7 +3614,6 @@
   .page :is(
     .mode,
     .tick,
-    .band-head .kicker,
     .site-footer-title,
     .tile .n,
     .tag,
@@ -3619,7 +3621,6 @@
     .link .st,
     .interlude-sub,
     .source-route-kind,
-    .eyebrow,
     .changelog-filter button,
     .changelog-entry header time,
     .changelog-entry header b,
@@ -3641,19 +3642,17 @@
     .usage-estimator dt,
     .gate-list p
   ) {
-    font-size: 12px;
+    font-size: var(--t-1);
   }
   .page :is(
     .mode,
     .tick,
-    .band-head .kicker,
     .site-footer-title,
     .tile .n,
     .tag,
     .cap-s,
     .link .st,
     .source-route-kind,
-    .eyebrow,
     .changelog-filter button,
     .changelog-breaking b,
     .changelog-group > p,
@@ -3677,7 +3676,7 @@
     IBM Plex Mono has no Hangul, so every mono class on /ko fell back to a system face at monospace
     metrics and misaligned against everything around it.
   */
-  :lang(ko) :is(.slate, .fine, .mode, .tick, .eyebrow, .band-head .kicker, .site-footer-title) {
+  :lang(ko) :is(.slate, .fine, .mode, .tick, .eyebrow, .site-footer-title) {
     font-family: var(--f-sans);
     letter-spacing: 0.02em;
   }
@@ -3708,19 +3707,20 @@
 
   /* ============================================================ BA-240 · the 44px floor, past the one page that tested it
 
-     `e2e/mobile-landing.spec.ts:330` measures every `a` and `button` against 44px on a coarse
-     pointer -- on `/` only. So `/` passes and /pricing fails at 22 controls, /resources at 17, the
-     policy footer at all six links, the docs pager, the chips and every inline link inside fine
-     print. The pattern is the one the consent banner already documents: grow the hit area with
-     block padding and take it back with an equal negative margin, so the line box keeps its text
-     height and the paragraph does not reflow.
+     `e2e/mobile-landing.spec.ts` measured every `a` and `button` against 44px on a coarse pointer
+     -- on `/` only, which is why `/` passed while /pricing failed at 22 controls, /resources at 17,
+     the policy footer at all six links, the docs pager, the chips and every inline link inside
+     fine print. That spec now runs the same measurement over six routes. The pattern is the one
+     the consent banner already documents: grow the hit area with block padding and take it back
+     with an equal negative margin, so the line box keeps its text height and the paragraph does
+     not reflow.
      -------------------------------------------------------------------------------------------- */
   @media (pointer: coarse), (max-width: 1079px) {
     /* Inline links inside running prose: grow the hit area with block padding and take it back
        with an equal negative margin, so the line box keeps its text height and the paragraph does
        not reflow. Unscoped -- the footer, the policy pages and the docs pager are exactly the
        places that failed, and every one of them sat outside the wrapper this was scoped to. */
-    :is(.fine, .lede, .policy-copy, .input-guidance, .site-footer, .faq, .tile, .link, .docs-pager, .src-matrix, .doc-breadcrumb) a,
+    :is(.fine, .lede, .policy-copy, .site-footer, .faq, .tile, .link, .docs-pager, .src-matrix, .doc-breadcrumb) a,
     a[href^="mailto:"],
     a[href^="tel:"] {
       display: inline-block;
@@ -4013,7 +4013,7 @@
   }
   .workspace-intake[data-existing-documents="1"] .workspace-intake-copy .eyebrow { grid-column: 1; }
   .workspace-intake[data-existing-documents="1"] .workspace-intake-copy h2 { grid-column: 1; margin: 0; font-size: 19px; }
-  .workspace-intake[data-existing-documents="1"] .workspace-intake-copy > p:not(.eyebrow) { grid-column: 1; margin: 0; max-width: none; font-size: 12px; }
+  .workspace-intake[data-existing-documents="1"] .workspace-intake-copy > p:not(.eyebrow) { grid-column: 1; margin: 0; max-width: none; font-size: var(--t-1); }
   .workspace-intake[data-existing-documents="1"] .workspace-intake-actions { grid-column: 2; grid-row: 1 / span 3; margin: 0; justify-content: flex-end; }
   .workspace-intake[data-existing-documents="1"] .workspace-intake-copy > small,
   .workspace-intake[data-existing-documents="1"] .workspace-source-choices { display: none; }
@@ -4708,9 +4708,10 @@
     .board-failure-banner { grid-template-columns: 1fr; }
   }
 
-  @media (pointer: coarse), (prefers-reduced-motion: reduce) {
+  /* Scroll snapping is a touch-ergonomics problem as well as a motion one; the reduced-motion arm
+     of this lives in the single block above, so that block stays the only answer to the setting. */
+  @media (pointer: coarse) {
     html.landing-scroll { scroll-snap-type: none; }
-    .board-row-detail:not([hidden]) { animation: none; }
   }
 
   /* Workspace mobile mode begins at the same breakpoint as the fixed bottom rail. Keeping the
@@ -4758,9 +4759,7 @@
     }
 
     .workspace-intake-copy .eyebrow {
-      font-size: var(--t-1);
       line-height: 1.45;
-      letter-spacing: 0.08em;
     }
 
     .workspace-intake-copy h2 {
@@ -4875,7 +4874,7 @@
     font-size: var(--t-5);
     line-height: 1.55;
   }
-  .home-evidence-preview .solution-proof-claim > span { color: #59646e; }
+  .home-evidence-preview .solution-proof-claim > span { color: var(--text-lo); }
   .home-evidence-preview .solution-proof-counts { font-size: var(--t-2); line-height: 1.6; overflow-wrap: anywhere; }
 
   /* Entry-page preview: one selected passage, with the original-PDF and SEC links retained.

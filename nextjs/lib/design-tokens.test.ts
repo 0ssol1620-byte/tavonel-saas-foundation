@@ -73,7 +73,10 @@ describe("design token contract", () => {
   });
 
   it("has one reduced-motion block, and it zeroes the duration tokens", () => {
-    const blocks = [...css.matchAll(/@media \(prefers-reduced-motion: reduce\)/g)];
+    // Any media query that mentions the setting counts, not only the bare one: a second block
+    // spelled `@media (pointer: coarse), (prefers-reduced-motion: reduce)` also answered the
+    // setting, and an exact-match regex read the file as compliant while two rules disagreed.
+    const blocks = [...css.matchAll(/@media[^{]*prefers-reduced-motion:\s*reduce/g)];
     expect(blocks, "eight of these is not a contract, it is a search").toHaveLength(1);
     expect(css).toContain("--dur-1: 0ms");
   });
@@ -104,5 +107,10 @@ describe("design token contract", () => {
     expect(css).toContain(".eyebrow,\n  .slate,\n  .kicker {");
     expect(css, "the 34px rule beside every kicker").not.toContain(".slate span { width: 34px");
     expect(css).toContain(".state-label {");
+
+    // The contract is .06em, and a later layer had been quietly winning with 0.1em. Two rules may
+    // set tracking on a kicker: the canonical face, and the Korean face (Hangul at .06em crowds).
+    const tracked = [...css.matchAll(/\.eyebrow[^{}]*\{[^}]*?letter-spacing:\s*([^;}]+)/g)].map((m) => m[1].trim());
+    expect(tracked, `tracking set on .eyebrow: ${tracked.join(" | ")}`).toEqual(["0.06em", "0.02em"]);
   });
 });
