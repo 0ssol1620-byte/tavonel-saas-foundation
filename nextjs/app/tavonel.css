@@ -1223,7 +1223,10 @@
     contain-intrinsic-size: auto 900px;
   }
   .scene.doc .stack > .slate { margin-top: 14px; }
-  .policy-copy { display: flex; flex-direction: column; gap: 14px; }
+  /* D32. `.body`'s `align-items: start` is a grid instruction; inherited by this flex column it
+     became a cross-axis rule and every block shrink-wrapped -- the /enterprise card grid measured
+     1,183px inside a 1,380px column, a third measure on a page that should have one. */
+  .policy-copy { display: flex; flex-direction: column; align-items: stretch; gap: 14px; }
   .policy-copy h2 { margin: 20px 0 0; font-size: 18px; letter-spacing: -0.01em; }
   .policy-copy p { margin: 0; color: var(--text-lo); line-height: 1.72; }
   /* `:not(.btn)`: the closing CTA rows on /trust, /enterprise and /research sit inside this
@@ -3968,33 +3971,8 @@
     template is one column and the index becomes what a phone needs instead -- a short list at the
     top of the document, before the first section rather than beside it.
   */
-  .policy-jump { margin-top: 26px; border-top: 1px solid var(--hairline-hi); padding-top: 16px; }
-  .policy-jump-title { margin: 0 0 10px; color: var(--text-lo); font: var(--t-1) var(--f-sans); letter-spacing: 0.06em; }
-  .policy-jump ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 0; counter-reset: policy-jump; }
-  .policy-jump li { counter-increment: policy-jump; border-bottom: 1px solid var(--hairline); }
-  .policy-jump a {
-    display: flex;
-    gap: 12px;
-    align-items: baseline;
-    min-height: 44px;
-    padding: 11px 0;
-    color: var(--text-mid);
-    font-size: 13px;
-    line-height: 1.45;
-    text-decoration: none;
-  }
-  .policy-jump a::before { content: counter(policy-jump, decimal-leading-zero); flex: none; color: var(--text-lo); font: var(--t-1) var(--f-sans); }
-  @media (hover: hover) and (pointer: fine) {
-    .policy-jump a:hover { color: var(--text-hi); }
-  }
-  @media (min-width: 1321px) {
-    /* `.body > .stack:first-child` is already sticky at this width; the index rides with it and
-       scrolls on its own if the document has more sections than the viewport has room for. */
-    .policy-jump ol { max-height: calc(100svh - 320px); overflow-y: auto; }
-  }
-  @media (max-width: 1320px) {
-    .policy-jump { margin-top: 20px; }
-  }
+  /* pages-13: the policy jump index renders `PageTocList` now, so these rules describe nothing.
+     Its 1321px `max-height` moved to `.toc ul` in components/docs/page-toc.module.css. */
 
   /*
     G1-019 -- the change surface on /product/compiled-world, filling a column that held nothing.

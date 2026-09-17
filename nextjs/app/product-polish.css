@@ -505,20 +505,12 @@
   BQ-136. A section number is a number, not an identifier.
 
   `decimal-leading-zero` turns 1 into 01, which is the form a machine writes -- a build number, a
-  take, a track. On a policy page's jump index it made a nine-item list read as a catalogue of
-  part numbers, in 10px tracked mono two sizes under the floor, in the faintest ink on the page.
-  The counter is plain, the face is the one the list is set in, and the size is on the floor.
+  take, a track. The counter is plain, the face is the one the list is set in, and the size is on
+  the floor. (The policy jump index this also covered renders `PageTocList` since pages-13.)
 
   These rules live here rather than in app/ux-polish.css because that sheet belongs to another
   lane; it is imported before this one, so ordering carries the override.
 */
-.policy-jump a::before {
-  content: counter(policy-jump) ".";
-  flex: none;
-  color: var(--text-lo);
-  font: 12px var(--f-sans);
-  letter-spacing: 0;
-}
 .dev-journey li::before {
   content: counter(devstep) ".";
   font-family: var(--f-sans);

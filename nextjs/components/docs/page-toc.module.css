@@ -7,6 +7,10 @@
 */
 
 .toc {
+  /* pages-13. One width as well as one form. On the documentation routes the box fills a 480px
+     rail; on the policy documents it sits in a full-width column, where an unbounded box drew a
+     1,336px rule for a 150px label. */
+  max-width: 480px;
   margin: 0;
   padding: 14px 16px;
   border: 1px solid var(--hairline);
@@ -36,6 +40,12 @@
   list-style: none;
   display: grid;
   gap: 2px;
+}
+
+/* Moved from `.policy-jump ol`, which this replaces: where the column is pinned, an index with
+   more sections than the viewport has room for scrolls on its own rather than running off. */
+@media (min-width: 1321px) {
+  .toc ul { max-height: calc(100svh - 320px); overflow-y: auto; }
 }
 
 .toc .link {
