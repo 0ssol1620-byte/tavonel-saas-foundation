@@ -112,7 +112,7 @@ const technical: ExploreTechnicalRecord = {
   (explore-stage.module.css's header note, G1-021) -- but a public route with no footer had no
   Privacy, no Terms, no Trust group and no Korean entry at all, which is the half of the finding
   that survived the skeptic. The site footer is rendered here rather than inside the stage so it
-  stays a server component: the stage is `"use client"`, and importing the footer into it would
+  stays a server component: the stage is a client component, and importing the footer into it would
   ship the whole footer directory to the browser for markup that never changes.
 */
 export default function ExplorePage() {
