@@ -44,9 +44,12 @@ const DESCRIPTIONS: Record<string, string> = {
   proposal, and a draft cookbook is not linked from this hub as a representative case.
 */
 const FILTERS: readonly { tag: ResourceTag | null; group: string | null }[] = [
-  { tag: null, group: "SHOW" },
-  ...RESOURCE_PURPOSES.map((tag, index) => ({ tag, group: index === 0 ? "BY PURPOSE" : null })),
-  ...RESOURCE_WORKFLOWS.map((tag, index) => ({ tag, group: index === 0 ? "BY WORKFLOW" : null })),
+  // type-02: these three labels are kickers, and a kicker is sentence case. `.groupLabel` already
+  // draws the canonical face (sans 12px / 500 / .06em / --text-mid, `text-transform: none`), so
+  // the shouting was never in the CSS -- it was in the string literals. Fixed where it lived.
+  { tag: null, group: "Show" },
+  ...RESOURCE_PURPOSES.map((tag, index) => ({ tag, group: index === 0 ? "By purpose" : null })),
+  ...RESOURCE_WORKFLOWS.map((tag, index) => ({ tag, group: index === 0 ? "By workflow" : null })),
 ];
 
 export default function ResourcesPage() {
