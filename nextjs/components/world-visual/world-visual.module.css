@@ -24,7 +24,7 @@
   The ratio is the composition baseline the landing film shares, so it is held rather than
   clamped: instead of letting a short viewport squash the frame, the frame gives up width until
   its own height fits. The subtracted constant is the stage chrome around it -- header, rail,
-  caption, Ask bar -- so "SELECT AN OBJECT" stays on screen with the world it is about.
+  caption, Ask bar -- so "Select an object" stays on screen with the world it is about.
 */
 .field {
   position: relative;
@@ -70,9 +70,8 @@
 .edges g[data-focus-dimmed="1"] { opacity: 0.5; }
 .edgeLabel {
   fill: var(--verified);
-  font: 12px var(--f-mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font: 12px var(--f-sans);
+  letter-spacing: 0.06em;
   paint-order: stroke;
   stroke: var(--ground);
   stroke-width: 4px;
@@ -131,7 +130,6 @@
   border-color: var(--hairline-hi);
 }
 
-.node:hover { color: var(--text-hi); }
 .node:focus-visible { outline: 2px solid var(--verified); outline-offset: 2px; }
 
 .node[data-selected="1"] {
@@ -170,9 +168,9 @@
 }
 
 .nodeKind {
-  color: var(--text-xlo);
-  font: 12px var(--f-mono);
-  letter-spacing: 0.13em;
+  color: var(--text-lo);
+  font: 12px var(--f-sans);
+  letter-spacing: 0.06em;
 }
 
 .node[data-node-state="affected"] .nodeKind,
@@ -189,8 +187,8 @@
 }
 
 .nodeMeta {
-  color: var(--text-xlo);
-  font: 12px var(--f-mono);
+  color: var(--text-lo);
+  font: 12px var(--f-sans);
   letter-spacing: 0.1em;
 }
 
@@ -422,7 +420,7 @@ button.line:focus-visible { outline: 2px solid var(--verified); outline-offset: 
   min-width: 0;
   overflow: hidden;
   color: var(--text-hi);
-  font: 12px/1.5 var(--f-mono);
+  font: 12px/1.5 var(--f-sans);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -499,4 +497,9 @@ button.line:focus-visible { outline: 2px solid var(--verified); outline-offset: 
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* The token contract: every :hover is gated, so a touch device never keeps a hover state. */
+@media (hover: hover) and (pointer: fine) {
+  .node:hover { color: var(--text-hi); }
 }

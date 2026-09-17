@@ -100,7 +100,7 @@ export const EXPLORE_COPY = {
   hero: "Step inside a Compiled World.",
   sub: "Explore how knowledge, relationships and answers remain connected to the exact source that supports them.",
   enter: "ENTER WORLD",
-  worldHint: "SELECT AN OBJECT",
+  worldHint: "Select an object",
   /*
     §11.6's user-facing sentence, word for word.
 

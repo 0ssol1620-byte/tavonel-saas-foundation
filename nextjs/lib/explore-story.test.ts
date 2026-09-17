@@ -268,7 +268,7 @@ describe("public copy on this lane's surfaces", () => {
   it("opens with the copy the blueprint asks for", () => {
     expect(EXPLORE_COPY.hero).toBe("Step inside a Compiled World.");
     expect(EXPLORE_COPY.enter).toBe("ENTER WORLD");
-    expect(EXPLORE_COPY.worldHint).toBe("SELECT AN OBJECT");
+    expect(EXPLORE_COPY.worldHint).toBe("Select an object");
     expect(EXPLORE_COPY.endHeading).toBe("Try the same path with your own knowledge.");
   });
 
