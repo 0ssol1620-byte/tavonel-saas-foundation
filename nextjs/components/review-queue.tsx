@@ -12,6 +12,7 @@ import {
   type ReviewQueueStatus,
 } from "@/lib/review-queue";
 import { formatTimestamp } from "@/lib/format";
+import { countNoun } from "@/lib/plural";
 
 /*
   The queue a reviewer works, and the breakdown a reader needs.
@@ -99,11 +100,14 @@ export default function ReviewQueue({
           <label className="fine" htmlFor="review-queue-reason-filter">Filter by review reason</label>
           <select
             id="review-queue-reason-filter"
-            style={{ maxWidth: "100%" }}
+            /* workspace-21: a one-option filter stretched to 1078px read as an empty control. It
+               keeps the block layout the comment above describes -- capped, it would otherwise sit
+               on the label's own line. */
+            style={{ display: "block", maxWidth: "min(320px, 100%)" }}
             value={reasons.includes(reason) ? reason : ""}
             onChange={(event) => setReason(event.target.value)}
           >
-            <option value="">All {queue.total} sources</option>
+            <option value="">All {countNoun(queue.total, "source")}</option>
             {reasons.map((value) => (
               <option key={value} value={value}>{value.length > 40 ? `${value.slice(0, 39)}…` : value}</option>
             ))}

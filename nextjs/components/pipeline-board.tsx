@@ -10,6 +10,7 @@ import { trackFunnel } from "@/lib/funnel-events";
 // behind the whitelist that produced the rejection. Both come from the Capability Manifest.
 import { acceptedFormatSentence } from "@/lib/qualified-input";
 import { PIPELINE_STAGES } from "@/lib/pipeline-vocabulary";
+import { countNoun } from "@/lib/plural";
 // One UTC face for every device, so the time in a support conversation is the time on the screen.
 import { formatTimestamp } from "@/lib/format";
 
@@ -82,7 +83,7 @@ export default function PipelineBoard({ rows, reading = {}, names = {}, onDismis
 
   return (
     <section className="card board board-compact" aria-label="Document processing">
-      <div className="board-head board-head-compact"><div><h2>{rows.length} sources</h2><p className="board-summary-copy">{counts.failed > 0 ? `${counts.failed} failed and needs attention first.` : counts.attention > 0 ? `${counts.attention} need review. Focus on exceptions first; ready sources stay collapsed.` : counts.processing > 0 ? `${counts.processing} still processing. Ready sources stay out of the way.` : "All observed sources are settled."}</p></div>{onDismiss ? <button type="button" className="board-dismiss" onClick={onDismiss}>Clear finished</button> : null}</div>
+      <div className="board-head board-head-compact"><div><h2>{countNoun(rows.length, "source")}</h2><p className="board-summary-copy">{counts.failed > 0 ? `${counts.failed} failed and needs attention first.` : counts.attention > 0 ? `${counts.attention} need review. Focus on exceptions first; ready sources stay collapsed.` : counts.processing > 0 ? `${counts.processing} still processing. Ready sources stay out of the way.` : "All observed sources are settled."}</p></div>{onDismiss ? <button type="button" className="board-dismiss" onClick={onDismiss}>Clear finished</button> : null}</div>
 
       {firstFailed ? (
         <div className="board-failure-banner" role="alert">
@@ -93,7 +94,7 @@ export default function PipelineBoard({ rows, reading = {}, names = {}, onDismis
 
       {/* The counts live in the filter chips below; four big-number tiles said the same thing with zeroes. */}
       <div className="board-toolbar"><div className="board-filters" role="group" aria-label="Filter sources"><button type="button" data-active={effectiveFilter === "all"} onClick={() => selectFilter("all")}>All {counts.all}</button><button type="button" data-active={effectiveFilter === "attention"} onClick={() => selectFilter("attention")}>Review {counts.attention}</button><button type="button" data-active={effectiveFilter === "processing"} onClick={() => selectFilter("processing")}>Processing {counts.processing}</button><button type="button" data-active={effectiveFilter === "ready"} onClick={() => selectFilter("ready")}>Ready {counts.ready}</button>{counts.failed > 0 ? <button type="button" data-active={effectiveFilter === "failed"} onClick={() => selectFilter("failed")}>Failed {counts.failed}</button> : null}</div><label className="board-search"><span className="sr-only">Search sources</span><input value={query} onChange={(event) => { setQuery(event.target.value); setVisibleCount(12); }} placeholder="Search sources…" /></label></div>
-      <div className="board-list-wrap"><ol className="board-list board-rows" aria-label={`${filtered.length} matching sources`}>
+      <div className="board-list-wrap"><ol className="board-list board-rows" aria-label={countNoun(filtered.length, "matching source")}>
         {visible.map((row) => { const rowStatus = statusOf(row); const expanded = expandedId === row.id; const progress = reading[row.id]; return (
           <li key={row.id} data-status={rowStatus} data-document-id={row.id} data-held={row.needsPerson ? "1" : "0"}>
             <div className="board-row-head">
