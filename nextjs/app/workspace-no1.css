@@ -15,7 +15,11 @@
   --ws-radius-sm: var(--r-paper-lg, 4px);
   --ws-gap: 24px;
   --ws-gap-sm: 12px;
-  --t-1: var(--dur-1, 90ms); --t-2: var(--dur-2, 140ms); --t-3: var(--dur-3, 200ms); --t-4: var(--dur-4, 280ms);
+  /* These were named --t-1..--t-4, which is the TOKEN_CONTRACT_0917 *type scale* (12/13/14/16px).
+     Re-declaring those four names on .one-path-workspace redefined them for every descendant, so
+     every `font-size: var(--t-1)` tavonel.css applies inside the workspace resolved to `90ms` and
+     fell back to the inherited size. Durations get a prefix that cannot collide with the scale. */
+  --ws-d1: var(--dur-1, 90ms); --ws-d2: var(--dur-2, 140ms); --ws-d3: var(--dur-3, 200ms); --ws-d4: var(--dur-4, 280ms);
   --e-out: var(--ease-out, cubic-bezier(.23, 1, .32, 1));
 }
 
@@ -47,7 +51,7 @@
 .one-path-workspace .workspace-content a.btn,
 .one-path-workspace .workspace-content .btn {
   min-height: 40px;
-  transition: background-color var(--t-2) var(--e-out), border-color var(--t-2) var(--e-out), color var(--t-2) var(--e-out), transform var(--t-2) var(--e-out);
+  transition: background-color var(--ws-d2) var(--e-out), border-color var(--ws-d2) var(--e-out), color var(--ws-d2) var(--e-out), transform var(--ws-d2) var(--e-out);
 }
 .one-path-workspace .workspace-content button:active:not(:disabled) { transform: scale(.98); }
 /* BQ-092: opacity .6 put a filled primary at 2.5:1. A token pair holds above 3:1 against the
@@ -58,13 +62,8 @@
   background: var(--g2); border-color: var(--hairline-hi); color: var(--text-lo);
 }
 .one-path-workspace kbd { font-family: var(--f-mono); }
-/* No sheet in this repo defines `.sr-only`, so every use of it rendered as visible text -- the
-   compile stage's run report printed under the canvas that was already drawing it. Defined here
-   because both consumers are workspace components; L1 should own the global one. */
-.one-path-workspace .sr-only {
-  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
-  overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
-}
+/* `.sr-only` was defined here as a stopgap while no sheet in the repo defined it at all. D25
+   makes it one global utility in tavonel.css; the scoped copy is gone so there is one. */
 
 /* content-visibility on rows painted them as empty boxes in any capture and jumped on
    scroll; the rows are bounded already (12 at a time) so nothing needs skipping. */
@@ -73,9 +72,13 @@
 
 /* ---- header action --------------------------------------------------------------- */
 .one-path-workspace .workspace-body > header button { display: inline-flex; align-items: center; gap: 8px; }
+/* D29, one filled control per viewport. This is chrome that repeats an act the page already
+   offers -- Upload, beside the drop box's own "Choose files" and beside the state hero's next
+   action, both of which were filled too. The act keeps the fill; the shortcut to it steps back
+   to a bordered face. Height and hit area are unchanged. */
 .one-path-workspace .workspace-body > header > div:last-child > button,
 .one-path-workspace .workspace-body > header > div:last-child .proof-actions button {
-  min-height: 36px; padding: 0 14px; border: 1px solid var(--text-hi); border-radius: var(--ws-radius); background: var(--text-hi); color: var(--ground);
+  min-height: 36px; padding: 0 14px; border: 1px solid var(--hairline-hi); border-radius: var(--ws-radius); background: transparent; color: var(--text-hi);
 }
 .one-path-workspace .workspace-body > header > div:last-child > button:disabled { background: transparent; color: var(--text-lo); border-color: var(--hairline); }
 
@@ -103,7 +106,7 @@
 .one-path-workspace .workspace-compile-job h2 { font: 600 17px/1.35 var(--f-sans); }
 .one-path-workspace .workspace-compile-job .fine { color: var(--text-mid); font-size: 13px; }
 .one-path-workspace .workspace-compile-job-progress { height: 3px; }
-.one-path-workspace .workspace-compile-job-progress::-webkit-progress-value { transition: width var(--t-4) var(--e-out); }
+.one-path-workspace .workspace-compile-job-progress::-webkit-progress-value { transition: width var(--ws-d4) var(--e-out); }
 /* A settled job needs less room than a running one. */
 .one-path-workspace .workspace-compile-job[data-state="review_required"],
 .one-path-workspace .workspace-compile-job[data-state="ready"] { padding-block: 16px; }
@@ -132,7 +135,7 @@
 .one-path-workspace .workspace-intake {
   grid-template-columns: minmax(0, 1fr); gap: 0; padding: 0;
   border: 1px solid var(--hairline-hi); border-radius: var(--ws-radius); background: var(--g1);
-  transition: border-color var(--t-2) var(--e-out), background-color var(--t-2) var(--e-out);
+  transition: border-color var(--ws-d2) var(--e-out), background-color var(--ws-d2) var(--e-out);
 }
 .one-path-workspace .workspace-intake[data-active="true"] { border-color: var(--verified); background: var(--verified-deep); }
 .one-path-workspace .workspace-intake[data-active="true"] .workspace-intake-copy { background: transparent; }
@@ -157,6 +160,12 @@
 }
 /* The connectors live inside the box. Availability text is WORKSPACE_SOURCE_CHOICES verbatim. */
 .one-path-workspace .workspace-source-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--hairline); text-align: left; }
+/* D6/BQ-023: the connectors are in the box at every width and in every mode. The folded
+   ux-120-final rule in tavonel.css still hides them at [data-compact="1"] -- a returning
+   workspace, which is exactly the visitor most likely to be connecting a system rather than
+   dragging a file. Restated here at matching specificity rather than editing another lane's
+   sheet; the tavonel.css rule should be deleted outright (cross-lane request n46). */
+.one-path-workspace .workspace-intake[data-compact="1"] .workspace-source-choices { display: grid; }
 .one-path-workspace .workspace-source-choices button { min-height: 56px; display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--hairline); border-radius: var(--ws-radius-sm); background: var(--ground); color: var(--text-hi); text-align: left; font-size: 14px; }
 .one-path-workspace .workspace-source-choices small { color: var(--text-lo); font: 12px var(--f-sans); }
 /* Loading and unavailable stay honest and quiet. */
@@ -326,7 +335,7 @@
 /* ---- motion: state reports; keyboard-initiated actions get none --------------------------- */
 @media (prefers-reduced-motion: no-preference) {
   .one-path-workspace .workspace-complete,
-  .one-path-workspace .workspace-compile-block { transition: opacity var(--t-4) var(--e-out), translate var(--t-4) var(--e-out); @starting-style { opacity: 0; translate: 0 6px; } }
+  .one-path-workspace .workspace-compile-block { transition: opacity var(--ws-d4) var(--e-out), translate var(--ws-d4) var(--e-out); @starting-style { opacity: 0; translate: 0 6px; } }
 }
 @media (prefers-reduced-motion: reduce) {
   .one-path-workspace * { transition-duration: 0s !important; animation-duration: 0s !important; }
@@ -474,7 +483,7 @@
    outside this block; keep it that way. Relative order is the order the rules had inline, so
    the cascade is unchanged on a pointer device. */
 @media (hover: hover) and (pointer: fine) {
-  .one-path-workspace .workspace-body > header > div:last-child > button:hover { background: #fff; }
+  .one-path-workspace .workspace-body > header > div:last-child > button:hover:not(:disabled) { background: var(--g2); border-color: var(--text-lo); }
   .one-path-workspace .workspace-complete-actions button:hover:not(:disabled) { border-color: var(--text-lo); background: var(--g2); }
   .one-path-workspace .workspace-complete-actions button:first-child:hover:not(:disabled) { background: #fff; }
   .one-path-workspace .workspace-intake-actions button:hover:not(:disabled) { background: var(--g2); border-color: var(--text-lo); }
