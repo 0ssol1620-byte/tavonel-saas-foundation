@@ -1,0 +1,91 @@
+/* Evidence in Focus — scoped rollout, approved blueprint 2026-09-12.
+   Keep product status colours, the locked films, and workspace semantics unchanged. */
+.landing-page .hero > .shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(420px, .95fr);
+  column-gap: clamp(32px, 4vw, 64px);
+  row-gap: 0;
+  max-width: 1408px;
+  align-items: start;
+  align-content: start;
+}
+.landing-page .hero > .shell > :not(.home-evidence-preview):not(.tiles) { grid-column: 1; align-self: start; }
+.landing-page .hero h1 {
+  max-width: 16ch;
+  font-size: clamp(56px, 4.8vw, 76px);
+  line-height: 1.06;
+  letter-spacing: -.055em;
+  text-wrap: balance;
+}
+.landing-page .hero h1 .line { white-space: normal; }
+.landing-page .hero .lede { max-width: 44ch; font-size: 18px; line-height: 1.6; }
+.landing-page .hero .actions { gap: 12px 20px; flex-wrap: wrap; }
+.landing-page .hero .btn:not(.ghost) { background: #2855d9; border-color: #2855d9; color: #fff; }
+.landing-page .hero .btn:focus-visible { outline: 2px solid #73c6da; outline-offset: 4px; }
+.landing-page .hero .hero-proof { font-size: 14px; line-height: 1.5; }
+.landing-page .home-evidence-preview {
+  grid-column: 2;
+  grid-row: 1 / span 5;
+  align-self: start;
+  min-width: 0;
+  margin-top: 12px;
+}
+.home-proof-label {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #f0ede6;
+}
+.home-proof-label > span { color: #a2abb2; }
+.home-evidence-preview .solution-proof-sample { margin: 0; min-width: 0; }
+.home-evidence-preview .solution-proof-sample-head { gap: 10px; flex-wrap: wrap; }
+.home-evidence-preview .solution-proof-claim {
+  background: #f3f0e9;
+  color: #20262d;
+  border-left: 3px solid #0b6479;
+  padding: 20px;
+  font-size: 17px;
+  line-height: 1.55;
+}
+.home-evidence-preview .solution-proof-claim > span { color: #59646e; }
+.home-evidence-preview .solution-proof-counts { font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+/* Entry-page preview: one selected passage, with the original-PDF and SEC links retained.
+   Explore still exposes the whole page and full provenance; this is not a full-page rendition.
+   Only nonselected evidence paragraphs are trimmed; notices and source disclosures remain. */
+:is(.home-evidence-preview, .ko-published-proof) [data-source-sheet] p[data-region-id]:not([data-active-region]) { display: none; }
+:is(.home-evidence-preview, .ko-published-proof) [data-source-provenance] { display: none; }
+:is(.home-evidence-preview, .ko-published-proof) a { min-height: 44px; display: inline-flex; align-items: center; white-space: normal; }
+.landing-page .hero > .shell > .tiles { grid-column: 1 / -1; margin-top: 48px; }
+.landing-page .hero .tile { min-width: 0; overflow-wrap: anywhere; }
+.landing-page .hero .tile > * { min-width: 0; max-width: 100%; }
+.landing-page .hero .tiles .tile > h2 { width: 100%; max-width: 100%; min-width: 0; text-wrap: wrap; align-self: stretch; }
+.landing-page .hero .tile h2 { font-size: 24px; line-height: 1.2; }
+.landing-page .hero .tile p { font-size: 16px; line-height: 1.55; }
+.ko-published-proof { min-width: 0; margin: 16px 0 24px; }
+.ko-published-proof .solution-proof-sample { margin-inline: 0; }
+@media (min-width: 1101px) {
+  /* A tall proof panel must not distribute empty space into the headline and action rows. */
+  .landing-page .hero > .shell { grid-template-rows: repeat(4, max-content) minmax(min-content, 1fr) auto; }
+}
+@media (max-width: 1100px) {
+  .landing-page .hero > .shell { grid-template-columns: minmax(0, 1fr); }
+  .landing-page .home-evidence-preview { grid-column: 1; grid-row: auto; margin-top: 32px; max-width: 680px; width: 100%; }
+  .landing-page .hero h1 { max-width: 20ch; font-size: clamp(42px, 6.2vw, 66px); }
+  .landing-page .hero > .shell > .tiles { margin-top: 32px; }
+}
+@media (max-width: 600px) {
+  .landing-page .hero > .shell { padding-inline: 20px; }
+  .landing-page .hero h1 { font-size: clamp(36px, 9.6vw, 42px); max-width: 17ch; }
+  .landing-page .hero .lede { font-size: 17px; line-height: 1.55; }
+  .landing-page .hero .tile h2 { font-size: 23px; }
+  .home-proof-label { font-size: 13px; }
+  .home-evidence-preview .solution-proof-claim { font-size: 16px; padding: 16px; }
+  .home-evidence-preview .solution-proof-sample-head { align-items: flex-start; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing-page .hero h1 .line i { animation: none; transform: none; }
+}

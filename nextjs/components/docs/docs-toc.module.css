@@ -1,101 +1,46 @@
-/*
-  One list, two presentations, one breakpoint -- 1080px, the same width at which the site header
-  swaps its link row for the MENU disclosure (`app/tavonel.css`, `@media (max-width: 1079px)`).
-  Below it the viewport has no room for a column beside 76ch of prose, so the index becomes a
-  closed disclosure above the article instead of pushing the reading measure under 40ch.
-*/
-
+/* Documentation is a reading surface, not a second marketing split hero.
+   Below 1080px the chapter index becomes a disclosure; above it the article keeps one column. */
 .column { display: none; }
-
 @media (min-width: 1080px) {
-  .column {
-    display: block;
-    position: sticky;
-    /* Clears the fixed header (.nav, ~57px) with a breathing gap. */
-    top: 96px;
-    max-height: calc(100vh - 128px);
-    overflow-y: auto;
-    padding-right: 10px;
-    border-right: 1px solid var(--hairline);
-  }
+  .column { display: block; position: sticky; top: 96px; max-height: calc(100vh - 128px); overflow-y: auto; padding-right: 10px; border-right: 1px solid var(--hairline); }
   .disclosure { display: none; }
 }
-
-.disclosure {
-  margin: 0;
-  border: 1px solid var(--hairline);
-  border-radius: 4px;
-  background: var(--g1);
-}
-
-.disclosure > summary {
-  /* 44px under a coarse pointer, which is where this rendering is the one on screen. */
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-  padding: 0 14px;
-  cursor: pointer;
-  font-family: var(--f-mono);
-  font-size: 10px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--text-mid);
-}
-
+.disclosure { margin: 0; border: 1px solid var(--hairline); border-radius: 4px; background: var(--g1); }
+.disclosure > summary { min-height: 44px; display: flex; align-items: center; padding: 0 14px; cursor: pointer; font-family: var(--f-mono); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--text-mid); }
 .disclosure > summary:hover { color: var(--text-hi); }
 .disclosure > nav { padding: 4px 14px 14px; }
-
-.list, .list ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  min-width: 0;
-}
-
-.list > li + li { margin-top: 16px; }
-
-.group {
-  margin: 0 0 6px;
-  font-family: var(--f-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.16em;
-  color: var(--text-xlo);
-}
-
-.list a {
-  display: block;
-  /* The mobile disclosure is a touch surface; the desktop column is not, so the target grows
-     only where a finger uses it. */
-  padding: 4px 0;
-  font-size: 12.5px;
-  line-height: 1.45;
-  color: var(--text-lo);
-  text-decoration: none;
-  overflow-wrap: anywhere;
-}
-
+.list, .list ul { margin: 0; padding: 0; list-style: none; min-width: 0; }
+.list > li + li { margin-top: 20px; }
+.group { margin: 0 0 8px; font-family: var(--f-mono); font-size: 11px; letter-spacing: .1em; color: var(--text-mid); }
+.list a { display: block; padding: 6px 0; font-size: 14px; line-height: 1.45; color: var(--text-lo); text-decoration: none; overflow-wrap: anywhere; }
 .list a:hover { color: var(--text-hi); }
-
-/* Where you are, marked once and read by assistive technology from the same attribute. */
-.list a[aria-current="page"] {
-  color: var(--text-hi);
-  font-weight: 500;
-}
-
+.list a[aria-current="page"] { color: var(--text-hi); font-weight: 500; }
 @media (pointer: coarse), (max-width: 1079px) {
   .list a { min-height: 44px; display: flex; align-items: center; }
 }
-
-/*
-  The section page's grid: index column, then the article.
-
-  It lives here rather than in a page-level module because the column is the only reason the
-  page needs a grid at all. `.body` inside it keeps its own two-column contract (title beside
-  content above 1320px, stacked below) -- `e2e/public-layout-balance.spec.ts` asserts that
-  `main .body` never grows a third child, so the index is a sibling of `.body`, never a child.
-*/
-.layout { display: grid; gap: clamp(20px, 3vw, 40px); min-width: 0; }
-
+.layout { display: grid; gap: clamp(24px, 3vw, 44px); min-width: 0; }
 @media (min-width: 1080px) {
   .layout { grid-template-columns: minmax(0, 220px) minmax(0, 1fr); align-items: start; }
+}
+/* The chapter index is one column. Title, summary and article share the other.
+   Previously the nested .body made two more columns at 1440px: a large empty title column
+   sat between the index and 540px of prose. Keep the existing two DOM children and anchors;
+   change their reading order in layout, never their keyboard/document order. */
+.layout > :global(.body) { display: flex; flex-direction: column; align-items: stretch; gap: 28px; min-width: 0; width: 100%; max-width: min(82ch, 100%); font-size: 17px; }
+.layout > :global(.body) > :global(.stack) { min-width: 0; width: 100%; }
+.layout :global(.document-title) { width: 100%; max-width: 100%; font-size: clamp(34px, 3.5vw, 50px); line-height: 1.08; }
+.layout :global(.docs-body) { max-width: 100%; width: 100%; }
+.layout :global(.docs-body p), .layout :global(.docs-steps) { font-size: 17px; line-height: 1.7; }
+.layout :global(.docs-body .lede) { font-size: 18px; line-height: 1.6; }
+.layout :global(.docs-note) { font-size: 15px !important; }
+.layout :global(.docs-table) { font-size: 14px; }
+.layout :global(.docs-table th) { font-size: 11px; line-height: 1.5; }
+.layout :global(.docs-table code) { font-size: 13px; }
+.layout :global(.docs-code pre) { font-size: 13px; line-height: 1.7; }
+.layout :global(.docs-langs button) { min-height: 44px; font-size: 12px; }
+.layout :global(.docs-pager) { font-size: 13px; }
+.layout :global(.docs-pager a) { min-height: 44px; display: inline-flex; align-items: center; }
+@media (max-width: 600px) {
+  .layout > :global(.body) { gap: 22px; }
+  .layout :global(.docs-body p), .layout :global(.docs-steps) { font-size: 16px; }
 }

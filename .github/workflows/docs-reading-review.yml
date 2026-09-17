@@ -1,0 +1,44 @@
+name: Documentation reading review
+on:
+  push:
+    branches: [agent/evidence-first-20260912]
+    paths: [.github/workflows/docs-reading-review.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  reading-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.34.4 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: pnpm install --frozen-lockfile
+        working-directory: nextjs
+      - run: pnpm exec playwright install --with-deps chromium
+        working-directory: nextjs
+      - name: Measure the exact 2ee99feb preview, with no customer session
+        working-directory: nextjs
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';import path from 'node:path';import {chromium} from '@playwright/test';
+          const out=path.resolve('../docs-reading-review');fs.mkdirSync(out,{recursive:true});
+          const base='https://tavonel-saas-foundation-ejhgs5xnp-phillips-projects-a8cf32fc.vercel.app';
+          let ready=false;for(let i=0;i<24;i++){try{const r=await fetch(base+'/docs/quickstart',{signal:AbortSignal.timeout(10000)});if(r.status===200){ready=true;break;}}catch{}await new Promise(r=>setTimeout(r,5000));}if(!ready)throw Error('Exact preview did not become available; no substitute deployment used');
+          const slugs=[...fs.readFileSync('lib/docs-content.ts','utf8').matchAll(/slug:\s*"([^"]+)"/g)].map(m=>m[1]);
+          const jobs=[];for(const slug of slugs){for(const width of ['quickstart','ask','cli'].includes(slug)?[1440,1280,768,390,360]:[1440])jobs.push({slug,width});}
+          const browser=await chromium.launch();const rows=[];
+          for(const {slug,width} of jobs){const page=await browser.newPage({viewport:{width,height:width>=1000?900:844}});try{await page.goto(base+'/docs/'+slug,{waitUntil:'domcontentloaded',timeout:30000});await page.evaluate(()=>document.fonts.ready);const r=await page.evaluate(()=>{const h=document.querySelector('h1').getBoundingClientRect();const s=document.querySelector('.docs-body>.lede').getBoundingClientRect();const a=document.querySelector('.docs-body').getBoundingClientRect();const p=document.querySelector('.docs-body p:not(.docs-note):not(.lede)');return{overflow:document.documentElement.scrollWidth-innerWidth,titleBottom:h.bottom,summaryTop:s.top,alignment:Math.abs(h.x-s.x),articleWidth:a.width,paragraphFont:p?parseFloat(getComputedStyle(p).fontSize):null}});rows.push({slug,width,...r});await page.screenshot({path:path.join(out,slug+'-'+width+'.png')});}catch(e){rows.push({slug,width,error:String(e)})}finally{await page.close();}}
+          await browser.close();const failures=rows.filter(r=>r.error||r.overflow>1||r.summaryTop<r.titleBottom||r.alignment>=2||(r.width>=1280&&r.articleWidth<=580)||(r.paragraphFont!==null&&r.paragraphFont<(r.width<=600?16:17)));
+          fs.writeFileSync(path.join(out,'checks.json'),JSON.stringify({sha:'2ee99feb2f865405197d925641b92438980e90c8',deployment:base,scope:'public documentation layout only; not whole release qualification',rows,failures,pass:failures.length===0},null,2));console.log(JSON.stringify({rows:rows.length,failures}));if(failures.length)process.exitCode=1;
+          JS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: docs-reading-review-${{ github.sha }}
+          path: docs-reading-review
+          retention-days: 7
+          if-no-files-found: error

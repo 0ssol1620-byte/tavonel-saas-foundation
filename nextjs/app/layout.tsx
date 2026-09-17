@@ -5,6 +5,7 @@ import RouteBoot from "@/components/route-boot";
 import MarketingConsent from "@/components/marketing-consent";
 import { jsonLdHtml } from "@/lib/structured-data";
 import "./globals.css";
+import "./evidence-first.css";
 
 /**
  * SPEC §6.11 — Wanted Sans is the display and text face. It is self-hosted from
@@ -103,7 +104,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                   name: "TAVONEL",
                   url: "https://tavonel.com",
                   description:
-                    "Compile documents, scans, code and connected systems into source-grounded knowledge.",
+                    "Compile documents, scans and connected systems into source-grounded knowledge.",
                 },
                 {
                   "@type": "SoftwareApplication",
@@ -111,7 +112,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                   url: "https://tavonel.com",
                   applicationCategory: "Knowledge Compiler",
                   description:
-                    "Compile documents, scans, code and connected systems into source-grounded knowledge.",
+                    "Compile documents, scans and connected systems into source-grounded knowledge.",
                 },
               ],
             }),

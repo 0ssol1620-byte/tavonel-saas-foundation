@@ -8,6 +8,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { Fragment, cloneElement, isValidElement, useCallback, useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import CanvasTransitionLink from "@/components/canvas-transition-link";
 import CompileStagePlayer, { type CompileStage } from "@/components/compile-stage-player";
 import Logomark from "@/components/logomark";
@@ -37,22 +38,22 @@ const SCENES = [
 const JOBS = [
   {
     eyebrow: "TECHNICAL SUPPORT",
-    title: "Answer from the manual that is current",
-    body: "In: the manuals, scans and service notes your team already keeps. Out: a reviewed World where every answer opens the document version and the place inside it that the answer was read from. What the read does and does not recover is on the solution page.",
+    title: "Draft the answer. Keep the manual in view.",
+    body: "Bring manuals and service notes together. Review a result beside its source before using it in a customer reply.",
     href: "/solutions/document-intelligence" as Route,
     action: "Reading difficult documents",
   },
   {
-    eyebrow: "CONTRACT AND ANNEX REVIEW",
-    title: "See what the annex changed before you sign",
-    body: "In: a contract and the annexes that amend it. Out: one knowledge asset every AI project reads instead of re-cleaning the same files, with the source behind each claim. Where a compile is not worth it is stated on the solution page.",
+    eyebrow: "AI APPLICATIONS",
+    title: "Use reviewed knowledge in your AI tools.",
+    body: "Keep the source behind each claim. Inspect the knowledge asset, then choose an API, MCP or portable-package workflow.",
     href: "/solutions/ai-ready-knowledge" as Route,
     action: "One grounded knowledge asset",
   },
   {
     eyebrow: "CHANGE IMPACT",
-    title: "Know what a revised source moved",
-    body: "In: a source that has been revised. Out: a candidate version beside the active one, promoted only by a person, with the previous revision still readable. What rollback does not undo is stated on the solution page.",
+    title: "Review changes before your AI uses them.",
+    body: "Compare a candidate with the active version. A person decides what goes live; the previous revision remains traceable.",
     href: "/solutions/knowledge-operations" as Route,
     action: "Running knowledge as an operation",
   },
@@ -76,7 +77,7 @@ const BANDS: Record<BandName, { mode: WorldMode }> = {
   access: { mode: "current" },
 };
 
-export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean }) {
+export default function HomePageClient({ liveCommerce, proof }: { liveCommerce: boolean; proof?: ReactNode }) {
   const [signedIn, setSignedIn] = useState(false);
   const [filmStage, setFilmStage] = useState("SOURCES");
   const handleStageChange = useCallback((stage: CompileStage) => setFilmStage(stage.label), []);
@@ -113,7 +114,8 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
   }, []);
 
   const jump = (id: number) => {
-    document.getElementById(`s${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    document.getElementById(`s${id}`)?.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
   };
 
   const cta = (name: string) => () => {
@@ -183,13 +185,12 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
               `brand-copy.test.ts` locks the new wording in the same commit.
             */}
             <h1>
-              <span className="line"><i>Your AI needs more than searchable files.</i></span>
-              <span className="line dim"><i>It needs a current, traceable world.</i></span>
+              <span className="line"><i>Give your AI </i></span>
+              <span className="line dim"><i>knowledge you can check.</i></span>
             </h1>
             <p className="lede">
-              TAVONEL compiles your own sources into that world: current, because it is
-              recompiled when those sources change, and traceable, because every compiled fact
-              stays traceable to its exact source location.
+              Explore a published sample. Open the source behind a result and see how a
+              Compiled World is organized.
             </p>
             {/*
               Understanding comes before the account.
@@ -230,6 +231,12 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
               <li><Link href="/security">Reviewed before it goes live</Link></li>
               <li><Link href={"/developers" as Route}>MCP · API · signed export</Link></li>
             </ul>
+            {proof ? (
+              <div className="home-evidence-preview" aria-label="Published sample and its source">
+                <p className="home-proof-label">Published sample <span>Original source included</span></p>
+                {proof}
+              </div>
+            ) : null}
             {/*
               Audit B01 / U02 / B02: three jobs, before the vocabulary.
 

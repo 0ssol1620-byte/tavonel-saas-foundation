@@ -1,0 +1,49 @@
+name: Film-first design review
+on:
+  push:
+    branches: [agent/evidence-first-20260912]
+    paths: [docs/brand/FILM_FIRST_REVIEW_2026-09-12.html, .github/workflows/film-first-design-review.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  design-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.34.4 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: pnpm install --frozen-lockfile
+        working-directory: nextjs
+      - run: pnpm exec playwright install --with-deps chromium
+        working-directory: nextjs
+      - name: Inspect the design artifact, not the production application
+        working-directory: nextjs
+        run: |
+          mkdir -p ../film-first-review/assets
+          cp ../docs/brand/FILM_FIRST_REVIEW_2026-09-12.html ../film-first-review/index.html
+          cp public/film/*.mp4 public/film/poster-*.webp ../film-first-review/assets/
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import {chromium} from '@playwright/test';
+          const out=path.resolve('../film-first-review');
+          let html=fs.readFileSync(path.join(out,'index.html'),'utf8');
+          html=html.replaceAll('https://tavonel.com/film/','assets/');
+          fs.writeFileSync(path.join(out,'index.html'),html);
+          const browser=await chromium.launch();const rows=[];
+          for(const width of [1440,1280,768,390,360]){const page=await browser.newPage({viewport:{width,height:width>=1000?900:844}});await page.goto('file://'+path.join(out,'index.html'));await page.waitForTimeout(2200);const data=await page.evaluate(()=>({overflow:document.documentElement.scrollWidth-innerWidth,filmTop:document.querySelector('video').getBoundingClientRect().top,filmBottom:document.querySelector('video').getBoundingClientRect().bottom,bodyHeight:document.documentElement.scrollHeight,heroWords:document.querySelector('.intro').innerText.trim().split(/\s+/).length,smallTargets:[...document.querySelectorAll('button,.action,.utility')].filter(e=>e.offsetWidth&&e.getBoundingClientRect().height<44).length}));await page.screenshot({path:path.join(out,'review-'+width+'.png')});await page.screenshot({path:path.join(out,'review-'+width+'-full.jpg'),fullPage:true,type:'jpeg',quality:80});await page.locator('#job-0').focus();await page.keyboard.press('ArrowRight');const keyboard=await page.locator('#job-1').getAttribute('aria-selected');await page.locator('#film-2').click();const selected=await page.locator('video').getAttribute('src');rows.push({width,...data,keyboardSelected:keyboard==='true',filmTabSelectsCorrectAsset:selected.endsWith('compile-cut-3.mp4')});await page.close();}
+          const reduced=await browser.newPage({viewport:{width:1280,height:900},reducedMotion:'reduce'});await reduced.goto('file://'+path.join(out,'index.html'));await reduced.waitForTimeout(1500);const noAutoplay=await reduced.locator('video').evaluate(v=>v.paused);await reduced.screenshot({path:path.join(out,'review-reduced-motion.png')});await browser.close();
+          const pass=rows.every(r=>r.overflow===0&&r.filmTop<500&&r.smallTargets===0&&r.keyboardSelected&&r.filmTabSelectsCorrectAsset)&&noAutoplay;
+          fs.writeFileSync(path.join(out,'checks.json'),JSON.stringify({sha:process.env.GITHUB_SHA,scope:'static design artifact only; not current app E2E',pass,noAutoplay,rows},null,2));console.log(JSON.stringify({pass,noAutoplay,rows}));if(!pass)process.exitCode=1;
+          JS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: film-first-design-review-${{ github.sha }}
+          path: film-first-review
+          retention-days: 7
+          if-no-files-found: error

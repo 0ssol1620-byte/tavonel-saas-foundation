@@ -348,14 +348,14 @@ describe("public copy", () => {
     forever; it is a claim that the string does not drift without a decision. This is that
     decision, so the lock moves with it instead of being deleted.
   */
-  it("keeps the locked current-and-traceable hero and its two definitions", () => {
+  it("keeps the approved evidence-first hero and published-sample scope", () => {
     const page = landingSource();
-    expect(page).toContain("Your AI needs more than searchable files.");
-    expect(page).toContain("It needs a current, traceable world.");
-    expect(page).toContain("TAVONEL compiles your own sources into that world");
-    // Both adjectives are defined on the page, not left as adjectives.
-    expect(page).toContain("recompiled when those sources change");
-    expect(page).toContain("stays traceable to its exact source location");
+    expect(page).toContain("Give your AI");
+    expect(page).toContain("knowledge you can check.");
+    expect(page).toContain("Explore a published sample. Open the source behind a result");
+    expect(page).toContain("Published sample and its source");
+    expect(page).toContain("Original source included");
+    expect(page).toContain("{proof}");
     // The retired wording must not come back by hand.
     expect(page).not.toContain("evidence back to the page");
   });

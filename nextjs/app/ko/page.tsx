@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
+import SolutionProofSample from "@/components/solution-proof-sample";
 import { PublicSitePage } from "@/components/public-site-chrome";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
 import { pageMetadata } from "@/lib/page-seo";
@@ -62,13 +63,12 @@ export default function KoreanEntryPage() {
           <div className="body">
             <div className="stack">
               <p className="slate"><b>한국어</b><span aria-hidden="true" />· TAVONEL</p>
-              <h1 className="document-title">문서는 이미 있습니다.<br />AI가 쓸 수 있게 컴파일하십시오.</h1>
+              <h1 className="document-title">AI가 쓰는 지식,<br />근거까지 확인하세요.</h1>
             </div>
             <div className="stack">
               <p className="lede">
-                TAVONEL은 회사가 이미 가진 문서와 스캔, 연결된 시스템을 AI가 근거와 함께 쓸 수 있는
-                지식으로 컴파일합니다. 컴파일된 결과의 각 항목은 그것이 나온 원문 위치로 되짚어
-                갈 수 있습니다.
+                공개 샘플에서 결과와 원문을 나란히 살펴보세요. 어떤 문서에서 나온 내용인지,
+                근거가 어디에 있는지 직접 확인할 수 있습니다.
               </p>
               {/*
                 BA-224. The first card was headed "한국어로 있는 것" -- what exists in Korean -- and
@@ -124,9 +124,13 @@ export default function KoreanEntryPage() {
                 above is two cards rather than three).
               */}
               <div className="actions">
-                <Link className="btn" href="/contact">문의하기</Link>
-                <Link className="btn ghost" href="/explore">공개 샘플 열기</Link>
+                <Link className="btn" href="/explore">공개 샘플 열기</Link>
+                <Link className="btn ghost" href="/contact">도입 문의</Link>
                 <Link className="btn ghost" href="/docs">문서 보기 (EN)</Link>
+              </div>
+              <div className="ko-published-proof" aria-label="실제 원문이 포함된 공개 샘플">
+                <p className="slate"><b>공개 샘플</b><span aria-hidden="true" />· Apple SEC 문서</p>
+                <SolutionProofSample />
               </div>
 
               {/*
