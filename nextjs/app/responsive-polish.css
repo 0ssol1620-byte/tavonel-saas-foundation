@@ -53,6 +53,5 @@
   .board-list-wrap { max-height: 52vh; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.001ms !important; animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
-}
+/* The reduced-motion contract is one block, in tavonel.css. This file's copy of it was a
+   duplicate that had already drifted (0.001ms against 0.01ms) and is deleted. */

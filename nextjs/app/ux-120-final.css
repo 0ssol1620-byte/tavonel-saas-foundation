@@ -107,11 +107,13 @@
 .compile-film-live { position: absolute; inset: 0; }
 .compile-film-live .film { width: 100%; height: 100%; }
 .compile-film-live .film-canvas { width: 100%; height: 100%; display: block; }
-.compile-film-viewport { min-height: clamp(430px, 52vw, 850px); background: #070809; }
+.compile-film-viewport { min-height: clamp(430px, 52vw, 850px); background: var(--ground); }
 .compile-film-still { object-fit: cover; }
 .compile-film-motion-control { opacity: .42; }
-.compile-film-viewport:hover .compile-film-motion-control,
 .compile-film-motion-control:focus-visible { opacity: 1; }
+@media (hover: hover) and (pointer: fine) {
+  .compile-film-viewport:hover .compile-film-motion-control { opacity: 1; }
+}
 
 /* Workspace information density: failures win attention, inventories remain bounded and rows are
    scan-able at 1/12/55/128+ source counts. */
@@ -122,8 +124,8 @@
   align-items: center;
   margin: 0 0 18px;
   padding: 14px 16px;
-  border: 1px solid color-mix(in srgb, #d76d68 62%, var(--hairline));
-  background: color-mix(in srgb, #d76d68 7%, var(--g1));
+  border: 1px solid color-mix(in srgb, var(--failed) 62%, var(--hairline));
+  background: color-mix(in srgb, var(--failed) 7%, var(--g1));
 }
 .board-failure-banner strong { display: block; color: var(--text-hi); font-weight: 560; }
 .board-failure-banner p { margin: 3px 0 0; color: var(--text-mid); }
