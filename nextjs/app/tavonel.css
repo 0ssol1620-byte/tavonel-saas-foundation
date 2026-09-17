@@ -3362,6 +3362,16 @@
     .src-legend > div { grid-template-columns: minmax(0, 1fr); gap: 5px; }
   }
 
+  /*
+    pages-19. The pricing hero writes its H1 and its two ledes as direct children of `.shell`
+    rather than inside the `.stack` every other `.doc` scene uses, so it got none of that
+    element's 18px rhythm: measured at 1440, the H1 bottom and the lede top were both at y=210
+    and the second paragraph started where the first ended, which is three blocks reading as one
+    wall of text on the commercial page. Same 18px, applied where this hero actually is.
+  */
+  .pricing-page .scene.doc > .shell > .document-title { margin-bottom: 18px; }
+  .pricing-page .scene.doc > .shell > .lede + .lede { margin-top: 18px; }
+
   /* Pricing is an editorial choice surface, not a wall of equal technical cards.
      The same catalog remains the sole source of amounts, entitlements and actions. */
   .pricing-page .plans { margin-top: 26px; gap: 16px; border: 0; background: transparent; overflow: visible; }
