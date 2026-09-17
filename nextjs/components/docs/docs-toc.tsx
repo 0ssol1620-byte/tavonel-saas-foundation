@@ -35,7 +35,7 @@ export function DocsToc({ current }: { current: string }) {
     <ul className={styles.list}>
       {DOCS_GROUPS.map((group) => (
         <li key={group}>
-          <p className={styles.group}>{group.toUpperCase()}</p>
+          <p className={styles.group}>{group}</p>
           <ul>
             {DOCS_SECTIONS.filter((section) => section.group === group).map((section) => (
               <li key={section.slug}>

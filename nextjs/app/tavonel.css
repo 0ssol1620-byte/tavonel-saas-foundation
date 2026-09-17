@@ -1382,7 +1382,7 @@
   .changelog-breaking b { color: var(--changed); font: var(--t-1) var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; }
   .changelog-breaking span { color: var(--text-lo); font-size: 12px; line-height: 1.7; }
   .changelog-group { margin-top: 14px; }
-  .changelog-group > p { margin: 0 0 6px; color: var(--text-lo); font: var(--t-1) var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; }
+  .changelog-group > p { margin: 0 0 6px; color: var(--text-mid); font: 500 var(--t-1) var(--f-sans); letter-spacing: 0.06em; }
   .changelog-group ul { margin: 0; padding-left: 18px; color: var(--text-lo); font-size: 13px; line-height: 1.75; }
 
   .contact-qualify { display: grid; gap: 16px; padding: 18px 0 0; border: 0; border-top: 1px solid var(--hairline); }
@@ -1709,7 +1709,7 @@
   .tiles > :last-child:nth-child(odd) > :is(h2, h3) { flex: 0 0 auto; max-width: 22ch; }
   .tiles > :last-child:nth-child(odd) > p { flex: 1 1 30ch; max-width: 64ch; }
   .tile { background: var(--g1); padding: 16px 18px; display: flex; flex-direction: column; gap: 9px; }
-  .tile .n { font-family: var(--f-sans); font-size: var(--t-1); letter-spacing: 0.06em; color: var(--text-lo); }
+  .tile .n { font-family: var(--f-sans); font-size: var(--t-1); font-weight: 500; letter-spacing: 0.06em; color: var(--text-mid); }
   /* A card heading is a card heading at any level. The landing tiles are h2 because they are the
      first sections under the hero and an h3 there jumped the document outline; the size is the h3
      treatment, exactly as `.chain .link h2` does it. */
@@ -3445,7 +3445,7 @@
 
   /* The /explore node labels the audit measured at 8px in the faintest tone -- one step up as well,
      because the graph is meant to be an argument and it was annotated in the faintest ink there is. */
-  .page :is(.tile .n, .link .st, .source-route-kind, .site-footer-title) {
+  .page :is(.source-route-kind, .site-footer-title) {
     color: var(--text-lo);
   }
 

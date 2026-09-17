@@ -30,20 +30,30 @@
   color: var(--text-hi);
 }
 
-.leadLocator > p {
+/*
+  type-05: `.leadLocator > p` outranked `.leadMark`, so the mark's size and colour never applied
+  and 13.5px -- off the scale -- was what rendered. Exclude the mark; put the body on the scale.
+*/
+.leadLocator > p:not(.leadMark) {
   margin: 0;
   max-width: 68ch;
-  font-size: 13.5px;
+  font-size: var(--t-3);
   line-height: 1.66;
   color: var(--text-mid);
 }
 
+/*
+  type-02: the one kicker face. "Reading today" names a section -- it is neither a machine
+  identifier nor a verified state, and the mint it carried is the colour this product spends on
+  state alone.
+*/
 .leadMark {
-  font-family: var(--f-mono);
-  font-size: 12px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--verified);
+  margin: 0;
+  font-family: var(--f-sans);
+  font-size: var(--t-1);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--text-mid);
 }
 
 /*

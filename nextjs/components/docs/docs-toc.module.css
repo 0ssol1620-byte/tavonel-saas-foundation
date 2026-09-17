@@ -18,13 +18,14 @@
   .disclosure { display: none; }
 }
 .disclosure { margin: 0; border: 1px solid var(--hairline); border-radius: var(--r-paper-lg); background: var(--g1); }
-.disclosure > summary { min-height: 44px; display: flex; align-items: center; padding: 0 14px; cursor: pointer; font-family: var(--f-mono); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--text-mid); }
+.disclosure > summary { min-height: 44px; display: flex; align-items: center; padding: 0 14px; cursor: pointer; font-family: var(--f-sans); font-size: var(--t-2); font-weight: 500; letter-spacing: 0; color: var(--text-mid); }
 /* Hover is gated: on a touch screen an un-gated :hover sticks after a tap (token contract). */
 @media (hover: hover) and (pointer: fine) { .disclosure > summary:hover { color: var(--text-hi); } }
 .disclosure > nav { padding: 4px 14px 14px; }
 .list, .list ul { margin: 0; padding: 0; list-style: none; min-width: 0; }
 .list > li + li { margin-top: 20px; }
-.group { margin: 0 0 8px; font-family: var(--f-mono); font-size: 12px; letter-spacing: .1em; color: var(--text-mid); }
+/* pages-05 / type-03: a chapter-index group label is navigation, not a machine identifier. */
+.group { margin: 0 0 8px; font-family: var(--f-sans); font-size: var(--t-1); font-weight: 500; letter-spacing: .06em; color: var(--text-mid); }
 .list .link { display: block; padding: 6px 0; font-size: 14px; line-height: 1.45; color: var(--text-lo); overflow-wrap: anywhere; }
 @media (hover: hover) and (pointer: fine) { .list .link:hover { color: var(--text-hi); } }
 .list .link[aria-current="page"] { color: var(--text-hi); font-weight: 500; }

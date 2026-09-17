@@ -199,8 +199,10 @@ describe("the Solutions panel", () => {
 
   it("takes each label and audience from the page instead of writing new ones", () => {
     for (const item of items) {
+      // type-02: the kicker is sentence case now, so the coupling is the label verbatim rather
+      // than its upper-cased form. Same intent: the menu and the page say the same words.
       expect(page, `no eyebrow matches the menu label "${item.label}"`).toContain(
-        `eyebrow: "${item.label.toUpperCase()}"`,
+        `eyebrow: "${item.label}"`,
       );
       expect(page, `no audience matches the menu description for ${item.href}`).toContain(
         `audience: "${item.description}"`,

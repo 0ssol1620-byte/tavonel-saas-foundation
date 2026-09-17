@@ -157,20 +157,31 @@
   letter-spacing: -0.018em;
   font-variation-settings: "wght" 580;
 }
-.north p {
+/*
+  type-05: `.north p` at (0,1,1) outranked `.northMark` at (0,1,0) in the same unlayered sheet, so
+  the mark class never got its own size or colour, and what rendered was the section body's 13.5px
+  -- a step that is not on the 12/13/14/16/18/20/24/32 scale. Excluding the mark makes the
+  component a component; the body moves onto the scale.
+*/
+.north > p:not(.northMark) {
   margin: 0;
   max-width: 68ch;
-  font-size: 13.5px;
+  font-size: var(--t-3);
   line-height: 1.66;
   color: var(--text-mid);
 }
+/*
+  type-02 / type-03: the one kicker face -- sans at the floor, sentence case, --text-mid.
+  "Definition" names a section; it is not a hash, a path, an id or a code, so it is not set in the
+  typeface this system reserves for those.
+*/
 .northMark {
   margin: 0;
-  font-family: var(--f-mono);
-  font-size: 12px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--text-lo);
+  font-family: var(--f-sans);
+  font-size: var(--t-1);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--text-mid);
 }
 .supporting {
   display: flex;
@@ -180,14 +191,18 @@
   padding: 0;
   list-style: none;
 }
+/*
+  type-03: a metric name is spaced title-case English. "95th-percentile time from source change to
+  Active World" is 55 characters of a sentence and wraps like one, so it reads as prose in the
+  identifier typeface. Sans, sentence case, no caps tracking.
+*/
 .supporting li {
   padding: 4px 9px;
   border: 1px solid var(--hairline-hi);
-  font-family: var(--f-mono);
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-lo);
+  font-family: var(--f-sans);
+  font-size: var(--t-1);
+  letter-spacing: 0;
+  color: var(--text-mid);
 }
 
 /* ---------------------------------------------------------------- results */

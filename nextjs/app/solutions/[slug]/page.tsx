@@ -22,7 +22,7 @@ export const SOLUTIONS = {
   "ai-ready-knowledge": {
     resources: "build",
     audience: "AI and platform engineers",
-    eyebrow: "AI-READY KNOWLEDGE",
+    eyebrow: "AI-ready knowledge",
     name: "AI-ready knowledge",
     title: "Give every AI project the same grounded knowledge asset.",
     lede: "Compile document collections into a versioned World before retrieval, assistants or agent workflows consume them.",
@@ -52,7 +52,7 @@ export const SOLUTIONS = {
   "document-intelligence": {
     resources: "evaluate",
     audience: "Document and operations teams",
-    eyebrow: "DOCUMENT INTELLIGENCE",
+    eyebrow: "Document intelligence",
     name: "Document intelligence",
     title: "Read the source before asking AI to reason over it.",
     /*
@@ -95,7 +95,7 @@ export const SOLUTIONS = {
   "knowledge-graph": {
     resources: "build",
     audience: "Data and knowledge architects",
-    eyebrow: "KNOWLEDGE GRAPH",
+    eyebrow: "Knowledge graph",
     name: "Knowledge graph",
     title: "Compile a graph people can inspect and machines can reuse.",
     lede: "Turn document facts into stable semantic objects and evidence-bound relations inside a versioned World.",
@@ -136,7 +136,7 @@ export const SOLUTIONS = {
   "source-grounded-assistants": {
     resources: "use-elsewhere",
     audience: "Application and agent developers",
-    eyebrow: "GROUNDED ASSISTANTS",
+    eyebrow: "Grounded assistants",
     name: "Source-grounded assistants",
     title: "Let an answer travel all the way back to the source.",
     lede: "Ask, API and MCP consume the same current World and return evidence from the same version.",
@@ -169,7 +169,7 @@ export const SOLUTIONS = {
   "knowledge-operations": {
     resources: "verify",
     audience: "Knowledge owners and security reviewers",
-    eyebrow: "KNOWLEDGE OPERATIONS",
+    eyebrow: "Knowledge operations",
     name: "Knowledge operations",
     title: "Review, activate and govern knowledge as an operational asset.",
     lede: "Separate candidate compilation from the active World, preserve change history and keep human decisions explicit.",

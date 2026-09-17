@@ -16,12 +16,12 @@ export const metadata: Metadata = {
 };
 
 const SURFACES = [
-  ["/knowledge-compiler", "CATEGORY", "Knowledge Compiler", "Read sources, reconstruct structure, resolve identities, map relationships, keep evidence attached, and compile the result."],
+  ["/knowledge-compiler", "Category", "Knowledge Compiler", "Read sources, reconstruct structure, resolve identities, map relationships, keep evidence attached, and compile the result."],
   // Audit M01: /product/document-understanding now derives what the read recovers from the
   // capability manifest, and typed structure is not in it. This card stops promising it.
-  ["/product/document-understanding", "READING", "Document understanding", "Recover text, reading order and coordinates from documents and scans before anything is compiled."],
-  ["/product/compiled-world", "OUTPUT", "Compiled World", "Structured knowledge with provenance and reusable retrieval artifacts — not a pile of searchable files."],
-  ["/product/continuous-knowledge", "CONTRACT", "Continuous recompilation", "What a compile promises when a source changes: eight clauses, each carrying the state it holds in this deployment."],
+  ["/product/document-understanding", "Reading", "Document understanding", "Recover text, reading order and coordinates from documents and scans before anything is compiled."],
+  ["/product/compiled-world", "Output", "Compiled World", "Structured knowledge with provenance and reusable retrieval artifacts — not a pile of searchable files."],
+  ["/product/continuous-knowledge", "Contract", "Continuous recompilation", "What a compile promises when a source changes: eight clauses, each carrying the state it holds in this deployment."],
 ] as const;
 
 /*
@@ -90,7 +90,7 @@ export default function ProductPage() {
           <div className="product-surface-grid">
             {SURFACES.map(([href, state, title, body]) => (
               <Link className="product-surface" href={href} key={href}>
-                <span>{state}</span>
+                <span className="eyebrow">{state}</span>
                 <h2>{title}</h2>
                 <p>{body}</p>
                 {/*
