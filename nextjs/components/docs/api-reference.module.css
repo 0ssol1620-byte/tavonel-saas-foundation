@@ -51,7 +51,7 @@
 
 .group { display: grid; gap: 20px; min-width: 0; }
 
-.group > h2 { margin: 0; scroll-margin-top: 96px; }
+.group > h2 { margin: 0; }
 
 .prose { margin: 0; color: var(--text-lo); font-size: 15px; line-height: 1.7; }
 
@@ -62,7 +62,6 @@
   padding: 18px;
   border: 1px solid var(--hairline);
   border-radius: var(--r-paper-lg);
-  scroll-margin-top: 96px;
 }
 
 .signature {

@@ -30,6 +30,38 @@ const sectionPage = read("../app/docs/[section]/page.tsx");
 const docsToc = read("../components/docs/docs-toc.tsx");
 const tocCss = read("../components/docs/docs-toc.module.css");
 
+/*
+  The offset that keeps an anchored heading out from under the fixed header is declared once, as
+  `html { scroll-padding-top }` in `app/tavonel.css`, and a per-target `scroll-margin-top` adds
+  to it rather than replacing it -- so a jump landed roughly a header's height above its target.
+  Six sheets carried one; the marker class `.anchor` existed for nothing else and is gone with
+  them. This is the guard that used to live on that class.
+*/
+describe("one scroll offset for a fragment jump", () => {
+  const sheets = [
+    "../app/product-polish.css",
+    "../app/resources/resources.module.css",
+    "../app/product/continuous-knowledge/continuous-knowledge.module.css",
+    "../components/docs/api-reference.module.css",
+    "../components/docs/page-toc.module.css",
+  ];
+
+  it("declares the offset globally", () => {
+    expect(read("../app/tavonel.css")).toContain("scroll-padding-top: calc(var(--header) + 16px)");
+  });
+
+  it.each(sheets)("adds no second offset in %s", (sheet) => {
+    expect(read(sheet)).not.toMatch(/^s*scroll-margin-top:/m);
+  });
+
+  it.each(["../app/docs/[section]/page.tsx", "../app/cookbooks/[slug]/page.tsx", "../app/api/page.tsx", "../app/developers/page.tsx", "../app/docs/page.tsx", "../app/integrations/page.tsx"])(
+    "leaves no reference to the retired marker class in %s",
+    (page) => {
+      expect(read(page)).not.toContain("page-toc.module.css");
+    },
+  );
+});
+
 describe("in-page table of contents", () => {
   it("derives a fragment from the text of the heading", () => {
     expect(slugify("Steps 1 to 4 — bash")).toBe("steps-1-to-4-bash");
@@ -91,9 +123,8 @@ describe("in-page table of contents", () => {
     `#cookbook-${section.key}` -- a second jump list with a second set of slug rules, and two
     strings that had to agree for a link to land. It now derives both halves from one
     `tocEntries` call, so the anchor and the link that names it cannot disagree, and the
-    `scroll-margin-top` that keeps a heading out from under the fixed header comes with it
-    instead of being rediscovered. The last assertion is the one that stops the old list
-    growing back beside the new one.
+header clearance comes with it instead of being rediscovered. The last assertion is the one
+    that stops the old list growing back beside the new one.
   */
   it("is reused by the cookbook route rather than copied", () => {
     const cookbook = read("../app/cookbooks/[slug]/page.tsx");
@@ -107,8 +138,8 @@ describe("in-page table of contents", () => {
     */
     expect(cookbook).toContain("const toc = tocEntries([...ready.map((section) => SECTION_LABEL[section.key]), PENDING_HEADING]);");
     expect(cookbook).toContain("id={toc[ready.length]!.id}");
-    // The id and the anchor class sit on the element the link points at.
-    expect(cookbook).toContain('<h2 id={id} className={anchor.anchor}>');
+    // The id sits on the element the link points at.
+    expect(cookbook).toContain('<h2 id={id}>');
     expect(cookbook).toContain("id={toc[order]!.id}");
     expect(cookbook).not.toContain("#cookbook-");
     expect(cookbook).not.toContain('aria-label="Sections on this page"');

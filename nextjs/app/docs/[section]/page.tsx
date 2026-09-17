@@ -23,7 +23,6 @@ import { DocsToc } from "@/components/docs/docs-toc";
 import { DocsTableFilter } from "@/components/docs/docs-table-filter";
 import { PageToc, slugify, tocEntries } from "@/components/docs/page-toc";
 import layout from "@/components/docs/docs-toc.module.css";
-import anchor from "@/components/docs/page-toc.module.css";
 
 export function generateStaticParams() {
   return DOCS_SECTIONS.map((section) => ({ section: section.slug }));
@@ -44,7 +43,7 @@ export async function generateMetadata({ params }: { params: Promise<{ section: 
 
 function CodeBlock({ label, body, id }: { label: string; body: string; id?: string }) {
   return (
-    <figure className={id ? `docs-code ${anchor.anchor}` : "docs-code"} id={id}>
+    <figure className="docs-code" id={id}>
       <figcaption>
         <span>{label}</span>
         {/* BQ-137: named by what it copies, so eight blocks are not eight identical "Copy"s. */}
@@ -64,7 +63,7 @@ const LANGUAGE_LABELS = { curl: "cURL", python: "Python", typescript: "TypeScrip
 
 function Endpoint({ endpoint, id }: { endpoint: DocsEndpoint; id?: string }) {
   return (
-    <article className={id ? `docs-endpoint ${anchor.anchor}` : "docs-endpoint"} id={id}>
+    <article className="docs-endpoint" id={id}>
       <header>
         <b data-method={endpoint.method}>{endpoint.method}</b>
         <code>{endpoint.path}</code>
@@ -117,7 +116,7 @@ function headingLabel(block: DocsBlock): string | null {
 function Block({ block, endpoints, id }: { block: DocsBlock; endpoints: Map<string, DocsEndpoint>; id?: string }) {
   switch (block.kind) {
     case "heading":
-      return <h2 id={id} className={anchor.anchor}>{block.text}</h2>;
+      return <h2 id={id}>{block.text}</h2>;
     case "prose":
       return <p>{withMarks(block.text)}</p>;
     case "note":
@@ -155,7 +154,6 @@ function Block({ block, endpoints, id }: { block: DocsBlock; endpoints: Map<stri
                 <tr
                   key={row.join("|")}
                   id={block.rowAnchors ? slugify(row[0] ?? "") || undefined : undefined}
-                  className={block.rowAnchors ? anchor.anchor : undefined}
                 >
                   {row.map((cell, index) => (
                     <td key={index} data-label={block.head[index]}>{withMarks(cell)}</td>

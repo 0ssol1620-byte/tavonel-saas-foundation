@@ -50,17 +50,14 @@
 }
 
 /*
-  BQ-111. The control the reader just pressed is scrolled to, and the sticky header is 62px
-  tall.
+  BQ-111. The control the reader just pressed is scrolled to, and it has to clear the header.
 
   Selecting a filter navigates to that control’s own fragment, which is what makes the
-  narrowing work without script -- and the browser then puts the fragment at the very top of
-  the viewport, i.e. underneath the header, with the tiles it filtered pushed off the bottom.
-  It reads as the page jumping and the selection disappearing. A scroll margin lands the
-  filter row under the header with its results already in view.
+  narrowing work without script. The offset is `html { scroll-padding-top }` in `tavonel.css`,
+  once for every fragment target on the site; a `scroll-margin-top` here would add to it rather
+  than replace it and land the filter row a header's height too low.
 */
 .filters a {
-  scroll-margin-top: 96px;
   display: inline-flex;
   align-items: center;
   min-height: 44px;

@@ -326,9 +326,6 @@
 .docs-table-filter input:focus-visible { outline: 2px solid var(--verified); outline-offset: 2px; }
 .docs-table-filter p { margin: 0; min-height: 1.4em; }
 
-/* A linked error code lands under the fixed header rather than behind it. */
-.docs-body tr[id] { scroll-margin-top: 96px; }
-
 /*
   BQ-105. The search panel had no focus ring at all.
 

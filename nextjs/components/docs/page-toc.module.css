@@ -62,10 +62,3 @@
 @media (pointer: coarse) {
   .toc .link { min-height: 44px; display: flex; align-items: center; }
 }
-
-/*
-  The header is `position: fixed`, so an anchored block lands under it without this. Applied to
-  the anchor targets themselves (`app/docs/[section]/page.tsx` puts this class on every block it
-  gives an id) rather than to `:target`, which Safari has historically applied late.
-*/
-.anchor { scroll-margin-top: 96px; }
