@@ -83,6 +83,16 @@ describe("the logomark", () => {
     expect(read("app/opengraph-image.tsx")).not.toContain("ImageResponse");
   });
 
+  it("draws both copies in one ink, above the 3:1 a graphical object needs", () => {
+    // BQ-131. `--text-mid` is #9AA3A8; the two pages were 0.66 of `--text-lo` (2.95:1 at 20px)
+    // in the nav and #C8CED2 in the tab -- one mark, two greys, one of them under the floor.
+    expect(mark).not.toContain("opacity={0.66}");
+    expect(mark.match(/opacity=\{0\.8\}/g)).toHaveLength(2);
+    expect(read("app/one-path.css")).toContain(".wordmark .logomark { color: var(--text-mid); }");
+    expect(favicon).toContain('stroke="#9AA3A8"');
+    expect(favicon).not.toContain("#C8CED2");
+  });
+
   it("ships exactly one favicon source", () => {
     // `app/icon.tsx` drew the retired cream/teal tile and Next served it as `/icon` alongside
     // `app/icon.svg`. Two icon files at one route segment is two brands on one tab.

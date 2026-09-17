@@ -35,6 +35,15 @@
 
 .nav > .one-path-primary-nav { width: auto; min-width: 0; flex: 0 1 auto; gap: 10px; }
 /*
+  BQ-131. The brand mark, above the contrast floor.
+
+  `.wordmark` sets `--text-lo`, and `logomark.tsx` draws its two pages at 0.66 of it: 2.95:1 at
+  the 20px the header renders, under the 3:1 a graphical object needs, on the one element on the
+  page that is the brand. `--text-mid` with the mark's own opacity raised to 0.8 puts the pages
+  near 5.2:1 and leaves the thread -- the element A-06 keeps at full contrast -- above 6.
+*/
+.wordmark .logomark { color: var(--text-mid); }
+/*
   BQ-060. One face and one size for every label in the header row.
 
   The bar carried five type treatments at once -- a monospace wordmark, monospace 11px nav links,
