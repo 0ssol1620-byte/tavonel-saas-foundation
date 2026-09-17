@@ -75,7 +75,7 @@ test("the proof opens Explore on the same source region and both representations
 test("Korean visitors get the same one-path story and the same real public proof", async ({ page }) => {
   await page.goto("/ko");
   await expect(page.locator("#ko-one-path-title")).toContainText("자료를 가져오세요.");
-  await expect(page.locator("#ko-one-path-title")).toContainText("AI가 쓰는 지식으로 만듭니다.");
+  await expect(page.locator("#ko-one-path-title")).toContainText("AI가 사용하는 지식으로 만듭니다.");
   await expect(page.locator(".one-path-hero [data-proof-variant]")).toHaveCount(0);
   const proof = page.locator('[data-proof-variant="canonical"]');
   await proof.scrollIntoViewIfNeeded();

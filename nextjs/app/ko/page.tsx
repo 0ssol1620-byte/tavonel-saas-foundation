@@ -32,7 +32,7 @@ const KO_WORK_STAGES = [
 ] as const;
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = pageMetadata({
-  title: "내 자료를 AI가 쓰는 지식으로 — TAVONEL",
+  title: "내 자료를 AI가 사용하는 지식으로 — TAVONEL",
   description: "파일을 추가하거나 소스를 연결하고, 준비된 지식과 원문을 확인한 뒤 AI에서 활용하세요. TAVONEL의 제품 흐름과 실제 공개 샘플을 확인할 수 있습니다.",
   canonical: "/ko",
   languages: { ko: "/ko", en: "/", "x-default": "/" },
@@ -52,10 +52,13 @@ export default function KoreanEntryPage() {
               G1-043. 영문 H1("Bring your knowledge. TAVONEL makes it ready for AI.")과 같은 구조로,
               웹 헤드라인에 과한 하십시오체 대신 바로 아래 리드 문장과 같은 -하세요 어조를 쓴다.
 
-              BQ-056: 제목을 다시 말하던 eyebrow("AI가 쓰기 좋은 지식으로")는 고쳐 쓰지 않고 지운다.
+              BQ-056: 제목을 다시 말하던 eyebrow는 고쳐 쓰지 않고 지운다.
+
+              BQ-116 / D12: 동사는 KO_TERMS의 "사용"이다. "쓰다"는 write와 use를 동시에 읽히게 해서,
+              원본 없이는 아무것도 쓰지 않는다는 것이 논지인 페이지에서 정확히 반대로 읽힌다.
               BQ-009: 2단 그리드와 함께 <br/>도 제거한다. 줄바꿈은 측정값(measure)이 정한다.
             */}
-            <h1 id="ko-one-path-title">자료를 가져오세요. AI가 쓰는 지식으로 만듭니다.</h1>
+            <h1 id="ko-one-path-title">자료를 가져오세요. AI가 사용하는 지식으로 만듭니다.</h1>
             <p className="one-path-lede">파일을 올리거나 기존 소스를 연결하세요. 복잡한 처리는 TAVONEL이 맡습니다.</p>
             <div className="one-path-actions actions"><Link className="btn" href={live ? "/login" : "/contact"}>{live ? "내 자료 추가하기" : "이용 문의"}</Link><a className="one-path-text-link" href="#ko-how-it-works">어떻게 처리되는지 보기</a></div>
             {/*
@@ -92,7 +95,7 @@ export default function KoreanEntryPage() {
         <div className="one-path-works-film"><CompileStagePlayer stages={KO_WORK_STAGES} preferVideo korean /></div>
       </div></section>
       <section className="one-path-section" aria-labelledby="ko-intake-title"><div className="one-path-wrap">
-        <div className="one-path-section-heading"><h2 id="ko-intake-title">자료가 있는 곳에서 시작하세요.</h2><p>파일·폴더·ZIP을 선택하거나 연결 가능한 소스를 확인하세요. 고객이 parser나 모델을 고르지 않아도 됩니다.</p></div>
+        <div className="one-path-section-heading"><h2 id="ko-intake-title">자료가 있는 곳에서 시작하세요.</h2><p>파일·폴더·ZIP을 선택하거나 연결 가능한 소스를 확인하세요. 파서나 모델을 고르지 않아도 됩니다.</p></div>
         <div className="one-path-links"><Link href="/integrations">연결 방식 확인</Link><Link href="/sources">지원 파일 확인</Link><Link href="/pricing">요금 확인</Link></div>
       </div></section>
       <section className="one-path-section" aria-labelledby="ko-proof-title"><div className="one-path-wrap">

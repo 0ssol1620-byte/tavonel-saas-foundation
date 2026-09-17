@@ -1,15 +1,20 @@
 /*
-  The term table is the thing under test, not the pages that will read it.
+  The term table, and the Korean copy that reads it.
 
-  `app/ko/page.tsx` still carries all three drifts this table names, and it belongs to another
-  lane in this campaign: asserting against it here would be a red suite rather than a stricter
-  rule, and the patch went out as a cross-lane request instead. What is asserted is the table
-  itself and the chrome strings that are already translated -- so the day /ko is corrected, the
-  only change needed here is the file list.
+  This asserted the table and the chrome only. `app/ko/page.tsx` still carried all three drifts
+  the table names and belonged to another lane, so asserting against it would have been a red
+  suite rather than a stricter rule. n54 lands that correction and n34 gives the proof block a
+  Korean string record, so the file list below is the change the old comment said would be the
+  only one needed -- and a fourth Korean surface is one row, not a new test.
 */
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { KO_AMBIGUOUS, KO_TERMS, koTermDrift } from "./ko-terms";
 import { KO_CHROME } from "./site-navigation";
+
+/** Every file that renders Korean public copy. Add a surface here as it is translated. */
+const KO_SURFACES = ["../app/ko/page.tsx"];
 
 describe("the Korean term table", () => {
   it("spells each English term exactly one way", () => {
@@ -33,6 +38,11 @@ describe("the Korean term table", () => {
     expect(koTermDrift("AI가 쓰는 지식으로 만듭니다.").map((entry) => entry.instead)).toEqual(["사용하는 지식"]);
     expect(koTermDrift("고객이 parser나 모델을 고르지 않아도 됩니다.").length).toBe(2);
     expect(koTermDrift("검토·승인된 결과를 AI가 사용할 수 있게 준비합니다.")).toEqual([]);
+  });
+
+  it.each(KO_SURFACES)("is true of the Korean copy in %s", (file) => {
+    const copy = readFileSync(resolve(import.meta.dirname, file), "utf8");
+    expect(koTermDrift(copy).map((entry) => entry.wrong + " -> " + entry.instead)).toEqual([]);
   });
 
   it("is already true of the Korean chrome", () => {
