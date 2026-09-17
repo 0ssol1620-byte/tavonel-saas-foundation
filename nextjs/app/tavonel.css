@@ -2497,38 +2497,11 @@
     box-shadow: var(--depth-hover);
     overflow: hidden;
   }
-  .reading-facsimile {
-    position: absolute;
-    inset: 8px 8px 10px;
-    color: #1a1612;
-    font-family: Georgia, "Times New Roman", serif;
-    pointer-events: none;
-  }
-  .rf-title { margin: 0; font-size: 7.5px; font-weight: 700; letter-spacing: 0.04em; }
-  .rf-h { margin: 6px 0 4px; font-size: 6.5px; }
-  .rf-table { width: 100%; border-collapse: collapse; font-size: 5.5px; font-family: var(--f-mono), ui-monospace, monospace; }
-  .rf-table th, .rf-table td { border: 1px solid #8a8174; padding: 1px 2px; }
-  .rf-fig { display: flex; align-items: flex-end; gap: 4px; margin-top: 8px; }
-  .rf-fig i { display: block; width: 28px; height: 18px; border: 1px solid #2a2622; background: #d8d0c0; }
-  .rf-fig i:last-of-type { width: 22px; height: 14px; }
-  .rf-fig span { font-size: 5px; color: #5a5348; }
-  .rf-stamp {
-    position: absolute;
-    right: 2px;
-    top: 18px;
-    font-family: var(--f-mono), ui-monospace, monospace;
-    font-size: 5.5px;
-    letter-spacing: 0.08em;
-    color: #9b2c2c;
-    border: 1px solid #9b2c2c;
-    border-radius: 50%;
-    width: 34px;
-    height: 34px;
-    display: grid;
-    place-items: center;
-    transform: rotate(-18deg);
-    opacity: 0.8;
-  }
+  /* D28. `.reading-facsimile` and `.rf-*` drew a fake contract inside that mount -- Georgia on
+     cream at 5 to 7.5px, with invented amounts and a RECEIVED stamp -- and they were the only
+     reason lib/type-floor-exceptions.json carried selector exceptions at all. The markup went
+     with components/reading-view.tsx; the mount above stays, and holds a real page raster or
+     nothing at all. */
   .rb {
     position: absolute;
     overflow: hidden;
@@ -3785,7 +3758,10 @@
   }
   .board-filters button[data-active="true"] { color: var(--ground); background: var(--verified); border-color: var(--verified); }
   .board-search { min-width: min(240px, 42vw); }
-  .board-search input { width: 100%; min-height: 34px; padding: 7px 10px; border: 1px solid var(--hairline); border-radius: var(--r-inst); outline: 0; background: var(--ground); color: var(--text-hi); font-size: var(--t-1); }
+  /* Nothing here suppresses the outline. The global :focus-visible ring is the one focus style on
+     the site, and a search field that turns it off is a keyboard reader with no cursor. The border
+     tint below is the resting affordance, not the indicator. */
+  .board-search input { width: 100%; min-height: 34px; padding: 7px 10px; border: 1px solid var(--hairline); border-radius: var(--r-inst); background: var(--ground); color: var(--text-hi); font-size: var(--t-1); }
   .board-search input:focus { border-color: var(--verified-dim); }
   .board-list-wrap { max-height: min(54vh, 560px); overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; margin-top: 10px; border: 1px solid var(--hairline); border-radius: var(--r-inst-lg); }
   .board-list { margin: 0; padding: 0; list-style: none; }
