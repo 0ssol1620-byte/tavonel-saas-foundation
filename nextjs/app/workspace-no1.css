@@ -378,3 +378,42 @@
    rather than behind a black rectangle. This is that fallback, not a decoration. */
 .one-path-workspace .compile-stage-text { display: block; margin: 0; padding: 24px; color: var(--text-mid); font: 14px/1.6 var(--f-sans); }
 .one-path-workspace .workspace-compile-block .compile-stage:has(.compile-stage-text) { aspect-ratio: auto; }
+
+/* ---- mono is for machine identifiers, 2026-09-17 (BQ-088) ---------------------------------
+   Wherever the older sheets set IBM Plex Mono on a sentence, a field label or a table header,
+   the workspace sets it back to Wanted Sans at the 12px floor. What stays mono: digests, ids,
+   object keys, page and region counts, timestamps, keyboard hints and state labels. */
+.one-path-workspace .workspace-preflight dt,
+.one-path-workspace .workspace-preflight-files span,
+.one-path-workspace .board-stage-k,
+.one-path-workspace .board-stage-d,
+.one-path-workspace .world-studio label,
+.one-path-workspace .ask-studio label,
+.one-path-workspace .ask-result > strong,
+.one-path-workspace .ask-result > small,
+.one-path-workspace .ask-result li,
+.one-path-workspace .connection-notice,
+.one-path-workspace .connection-form label,
+.one-path-workspace .api-key-form > label,
+.one-path-workspace .api-key-form legend,
+.one-path-workspace .api-key-form fieldset label,
+.one-path-workspace .connection-list small,
+.one-path-workspace .api-key-list small,
+.one-path-workspace .connection-title span,
+.one-path-workspace .billing-card small,
+.one-path-workspace .notice button,
+.one-path-workspace .workspace-name small {
+  font-family: var(--f-sans); font-size: 12px; letter-spacing: 0; text-transform: none; color: var(--text-lo);
+}
+.one-path-workspace .ask-result li { font-size: 13px; }
+.one-path-workspace .ask-result li b,
+.one-path-workspace .connection-list small code,
+.one-path-workspace .board-id small { font-family: var(--f-mono); font-size: 12px; }
+.one-path-workspace .ask-result q { font-family: var(--f-sans); font-size: 14px; line-height: 1.55; color: var(--text-mid); }
+.one-path-workspace .world-actions small,
+.one-path-workspace .workspace-preflight dd { font-family: var(--f-mono); font-size: 12px; }
+.one-path-workspace .workspace-preflight dd { font-size: 16px; }
+.one-path-workspace .connection-form input,
+.one-path-workspace .connection-form select,
+.one-path-workspace .api-key-form input,
+.one-path-workspace .api-key-form select { font: 14px var(--f-sans); border-radius: var(--ws-radius); }

@@ -3,6 +3,7 @@
 import { Cloud, Link2, Server, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { failureSentence } from "@/lib/workspace-failure-copy";
 import { trackFunnelOnce } from "@/lib/funnel-events";
 import ConnectionSyncStatus from "@/components/connection-sync-status";
 import { formatTimestamp } from "@/lib/format";
@@ -106,7 +107,7 @@ export default function ConnectionsPanel() {
   const [connections, setConnections] = useState<Connection[] | null>(null);
   const [oauthConnections, setOAuthConnections] = useState<OAuthConnection[] | null>(null);
   const [oauthProviders, setOAuthProviders] = useState<OAuthProviderState[]>([]);
-  const [oauthDisplayName, setOAuthDisplayName] = useState("Research Drive");
+  const [oauthDisplayName, setOAuthDisplayName] = useState("");
   const [provider, setProvider] = useState<Connection["provider"]>("file_server");
   const [displayName, setDisplayName] = useState("");
   const [bucket, setBucket] = useState("");
@@ -130,7 +131,7 @@ export default function ConnectionsPanel() {
       const json = await response.json() as { code?: string; connections?: Connection[] };
       if (!response.ok || !Array.isArray(json.connections)) {
         setReadFailed(true);
-        setNotice(`Connections could not be read (${json.code ?? response.status}). No connection state is being inferred.`);
+        setNotice(`Connections could not be read. ${failureSentence(json.code, response.status)} No connection state is being inferred.`);
         return;
       }
       setConnections(json.connections);
@@ -182,7 +183,7 @@ export default function ConnectionsPanel() {
       });
       const json = await response.json() as { code?: string; connection?: Connection };
       if (!response.ok || !json.connection) {
-        setNotice(`Connection was not created (${json.code ?? response.status}). No credential values were retained.`);
+        setNotice(`Connection was not created. ${failureSentence(json.code, response.status)} No credential values were retained.`);
         return;
       }
       setConnections((current) => [json.connection!, ...(current ?? [])]);
@@ -213,7 +214,7 @@ export default function ConnectionsPanel() {
       });
       if (!response.ok) {
         const json = await response.json().catch(() => ({})) as { code?: string };
-        setNotice(`Connection was not revoked (${json.code ?? response.status}).`);
+        setNotice(`Connection was not revoked. ${failureSentence(json.code, response.status)}`);
         return;
       }
       setConnections((current) => (current ?? []).filter((item) => item.connectionId !== connection.connectionId));
@@ -226,11 +227,9 @@ export default function ConnectionsPanel() {
   };
 
   const connectOAuth = async (provider: OAuthProvider) => {
-    const name = oauthDisplayName.trim();
-    if (!name) {
-      setNotice("Give the OAuth source a connection name before continuing.");
-      return;
-    }
+    /* An unnamed connection is named after the provider it is. Nothing is invented and
+       nothing is pre-filled into a field the person has not reached yet. */
+    const name = oauthDisplayName.trim() || oauthProviderLabel(provider);
     setBusy(true);
     try {
       const token = await sessionToken();
@@ -245,7 +244,7 @@ export default function ConnectionsPanel() {
       });
       const json = await response.json() as { code?: string; authorizationUrl?: string };
       if (!response.ok || typeof json.authorizationUrl !== "string") {
-        setNotice(`OAuth connection could not start (${json.code ?? response.status}).`);
+        setNotice(`OAuth connection could not start. ${failureSentence(json.code, response.status)}`);
         return;
       }
       window.location.assign(json.authorizationUrl);
@@ -271,7 +270,7 @@ export default function ConnectionsPanel() {
       });
       if (!response.ok) {
         const json = await response.json().catch(() => ({})) as { code?: string };
-        setNotice(`OAuth connection was not revoked (${json.code ?? response.status}).`);
+        setNotice(`OAuth connection was not revoked. ${failureSentence(json.code, response.status)}`);
         return;
       }
       setOAuthConnections((current) => (current ?? []).filter((item) => item.oauthConnectionId !== connection.oauthConnectionId));
@@ -306,7 +305,7 @@ export default function ConnectionsPanel() {
         setNotice(json.code === "JOB_SYNC_CONFLICT"
           ? "Another target or an older import is already running for this connection. Review its progress before starting a new import."
           : json.code === "INTAKE_DISABLED" ? "Document imports are currently paused. Existing workspace results remain available."
-          : `Import could not be started (${json.code ?? response.status}).`);
+          : `Import could not be started. ${failureSentence(json.code, response.status)}`);
         return;
       }
       // A connector import is the other way a first source arrives, and it counts the same.
@@ -328,27 +327,24 @@ export default function ConnectionsPanel() {
     <section className="connection-studio" aria-labelledby="connections-title">
       <header className="studio-heading">
         <div>
-          <p className="eyebrow">SOURCE CONNECTIONS</p>
           <h2 id="connections-title">Bring storage to the compiler without giving it a password.</h2>
         </div>
         <button type="button" disabled={busy} onClick={() => void load()}>Refresh state</button>
       </header>
       <p className="connection-notice" role="status">{notice}</p>
       <div className="connection-form">
-        <label htmlFor="oauth-connection-name">Cloud connection name</label>
-        <input id="oauth-connection-name" required maxLength={100} value={oauthDisplayName} onChange={(event) => setOAuthDisplayName(event.target.value)} placeholder="Research Drive" />
         <p className="field-help">TAVONEL requests read-only access and stores refresh credentials only in the encrypted secret broker. Disconnecting removes the broker credential.</p>
         {oauthProviders.map((item) => (
-          <button key={item.provider} type="button" disabled={busy || !item.configured || !oauthDisplayName.trim()} onClick={() => void connectOAuth(item.provider)}>
+          <button key={item.provider} type="button" disabled={busy || !item.configured} onClick={() => void connectOAuth(item.provider)}>
             {item.configured ? `Connect ${oauthProviderLabel(item.provider)}` : `${oauthProviderLabel(item.provider)} not configured`}
           </button>
         ))}
+        <label htmlFor="oauth-connection-name">Name this connection <small>optional</small></label>
+        <input id="oauth-connection-name" maxLength={100} value={oauthDisplayName} onChange={(event) => setOAuthDisplayName(event.target.value)} placeholder="Defaults to the provider name" />
         {oauthProviders.length === 0 ? <p className="field-help">{readFailed ? "Provider availability could not be confirmed. Refresh state to retry." : "Reading OAuth provider availability."}</p> : null}
       </div>
       <div className="connection-layout">
         <form className="connection-form" onSubmit={create}>
-          <label htmlFor="connection-name">Connection name</label>
-          <input id="connection-name" required maxLength={100} value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Patent research share" />
           <label htmlFor="connection-provider">Source type</label>
           <select id="connection-provider" value={provider} onChange={(event) => {
             const next = event.target.value as Connection["provider"];
@@ -372,7 +368,9 @@ export default function ConnectionsPanel() {
           ) : (
             <p className="field-help">Mount the share with Windows, macOS, Linux, or an SFTP filesystem. The local agent reads that mount; TAVONEL never receives the mount password. <a href="/developer/tavonel-source-agent.py" download>Download source agent</a>.</p>
           )}
-          <button type="submit" disabled={busy || !displayName.trim() || (provider !== "file_server" && !bucket.trim())}>
+          <label htmlFor="connection-name">Name this connection <small>optional</small></label>
+          <input id="connection-name" maxLength={100} value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder={providerLabel(provider)} />
+          <button type="submit" disabled={busy || (provider !== "file_server" && !bucket.trim())}>
             {busy ? "Writing durable record..." : "Create connection"}
           </button>
         </form>

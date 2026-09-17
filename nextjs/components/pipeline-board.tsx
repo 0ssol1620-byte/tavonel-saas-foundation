@@ -54,7 +54,7 @@ export default function PipelineBoard({ rows, reading = {}, names = {}, onDismis
 
   return (
     <section className="card board board-compact" aria-label="Document processing">
-      <div className="board-head board-head-compact"><div><p className="eyebrow">SOURCES</p><h2>{rows.length} sources</h2><p className="board-summary-copy">{counts.failed > 0 ? `${counts.failed} failed and needs attention first.` : counts.attention > 0 ? `${counts.attention} need review. Focus on exceptions first; ready sources stay collapsed.` : counts.processing > 0 ? `${counts.processing} still processing. Ready sources stay out of the way.` : "All observed sources are settled."}</p></div>{onDismiss ? <button type="button" className="board-dismiss" onClick={onDismiss}>Clear finished</button> : null}</div>
+      <div className="board-head board-head-compact"><div><h2>{rows.length} sources</h2><p className="board-summary-copy">{counts.failed > 0 ? `${counts.failed} failed and needs attention first.` : counts.attention > 0 ? `${counts.attention} need review. Focus on exceptions first; ready sources stay collapsed.` : counts.processing > 0 ? `${counts.processing} still processing. Ready sources stay out of the way.` : "All observed sources are settled."}</p></div>{onDismiss ? <button type="button" className="board-dismiss" onClick={onDismiss}>Clear finished</button> : null}</div>
 
       {firstFailed ? (
         <div className="board-failure-banner" role="alert">

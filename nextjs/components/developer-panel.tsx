@@ -3,6 +3,7 @@
 import { Check, Copy, KeyRound, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { DEVELOPER_SCOPES, type DeveloperScope } from "@/lib/developer-contracts";
+import { failureSentence } from "@/lib/workspace-failure-copy";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 type ApiKey = {
@@ -41,7 +42,7 @@ export default function DeveloperPanel() {
     const response = await fetch("/api/developer/keys", { headers: { authorization: `Bearer ${token}` } });
     const json = await response.json() as { code?: string; keys?: ApiKey[] };
     if (!response.ok || !Array.isArray(json.keys)) {
-      setNotice(`API keys could not be read (${json.code ?? response.status}).`);
+      setNotice(`API keys could not be read. ${failureSentence(json.code, response.status)}`);
       return;
     }
     setKeys(json.keys);
@@ -68,7 +69,7 @@ export default function DeveloperPanel() {
       });
       const json = await response.json() as { code?: string; key?: ApiKey; token?: string };
       if (!response.ok || !json.key || !json.token) {
-        setNotice(`API key was not created (${json.code ?? response.status}).`);
+        setNotice(`API key was not created. ${failureSentence(json.code, response.status)}`);
         return;
       }
       setKeys((current) => [json.key!, ...(current ?? [])]);
@@ -88,7 +89,7 @@ export default function DeveloperPanel() {
       const response = await fetch(`/api/developer/keys/${key.keyId}`, { method: "DELETE", headers: { authorization: `Bearer ${token}` } });
       if (!response.ok) {
         const json = await response.json().catch(() => ({})) as { code?: string };
-        setNotice(`API key was not revoked (${json.code ?? response.status}).`);
+        setNotice(`API key was not revoked. ${failureSentence(json.code, response.status)}`);
         return;
       }
       setKeys((current) => (current ?? []).map((item) => item.keyId === key.keyId ? { ...item, revokedAt: new Date().toISOString() } : item));
@@ -109,7 +110,7 @@ export default function DeveloperPanel() {
     <section className="developer-studio" aria-labelledby="developer-title">
       <header className="studio-heading">
         <div>
-          <p className="eyebrow">DEVELOPER ACCESS</p>
+          <p className="eyebrow">Developer access</p>
           <h2 id="developer-title">One scope at a time. One plaintext reveal.</h2>
         </div>
         <a href="/api/openapi" target="_blank" rel="noreferrer">OpenAPI 3.1</a>
