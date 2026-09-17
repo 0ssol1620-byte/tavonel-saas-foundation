@@ -6,6 +6,7 @@ import WorldExplorer from "@/components/world-explorer";
 import { FileText, LockKeyhole, ShieldCheck, UploadCloud } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { activationPolicy, type ActivationCapability } from "@/lib/activation-policy";
+import { failureSentence } from "@/lib/workspace-failure-copy";
 import type { DocumentListItem } from "@/lib/immutable-keys";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { useCheckout } from "@/lib/use-checkout";
@@ -29,7 +30,7 @@ import { qualifyProgress, type OcrProgress } from "@/lib/ocr-progress";
 import { advanceProgressPoll, type ProgressPollState } from "@/lib/progress-poll";
 import PipelineBoard from "@/components/pipeline-board";
 import CompileStage from "@/components/compile-stage";
-import { displayName, recallDocumentNames, rememberDocumentName, type DocumentNames } from "@/lib/document-names";
+import { recallDocumentNames, rememberDocumentName, type DocumentNames } from "@/lib/document-names";
 import { trackFunnel, trackFunnelOnce } from "@/lib/funnel-events";
 import ConnectionsPanel from "@/components/connections-panel";
 import DeveloperPanel from "@/components/developer-panel";
@@ -532,7 +533,7 @@ export default function WorkspacePage() {
       return;
     }
     if (!response.ok || !json.activeWorld || !Array.isArray(json.versions)) {
-      setNotice(`Active world verification failed (${json.code ?? response.status}).`);
+      setNotice(`Active world verification failed. ${failureSentence(json.code, response.status)}`);
       return;
     }
     setActiveWorld(json.activeWorld);
@@ -630,7 +631,7 @@ export default function WorkspacePage() {
       !paths.includes("graph/nodes.csv") ||
       !paths.includes("graph/relationships.csv")
     ) {
-      setNotice(`Immutable collection verification failed (${json.code ?? response.status}).`);
+      setNotice(`Immutable collection verification failed. ${failureSentence(json.code, response.status)}`);
       return;
     }
     setCollectionResult({ ...artifact, artifactKey: json.artifactKey ?? "" });
@@ -793,7 +794,7 @@ export default function WorkspacePage() {
       });
       const json = await response.json() as { code?: string; url?: string };
       if (!response.ok || !json.url) {
-        setNotice(`Billing portal is unavailable (${json.code ?? response.status}).`);
+        setNotice(`Billing portal is unavailable. ${failureSentence(json.code, response.status)}`);
         return;
       }
       window.location.assign(json.url);
@@ -884,8 +885,8 @@ export default function WorkspacePage() {
       });
       const json = await capability.json() as { code?: string; documentId?: string; uploadUrl?: string; declaredMimeType?: string };
       if (!capability.ok || !json.uploadUrl) {
-        refuse(`capability not issued (${json.code ?? capability.status})`);
-        setNotice(json.code === "AUTH_REQUIRED" ? "Sign in with Google first." : `Upload was not issued (${json.code ?? capability.status}).`);
+        refuse(failureSentence(json.code, capability.status));
+        setNotice(`Upload was not issued. ${failureSentence(json.code, capability.status)}`);
         return null;
       }
 
@@ -1054,7 +1055,7 @@ export default function WorkspacePage() {
     setCollectionResult((result) => {
       if (!result || result.collectionId !== compiled) return result;
       setNotice(result.lifecycle === "review_required"
-        ? `Collection ${result.collectionId} produced a signed review package with ${result.reviewReasons?.length ?? 0} review reason(s). Download and inspect it; promotion remains blocked.`
+        ? `Collection ${result.collectionId} produced a signed review package with ${result.reviewReasons?.length ?? 0} review reason(s). Download and inspect it; nothing is active yet.`
         : `Compiled World ready from ${result.validation.counts.documents} documents: ${result.validation.counts.topics} topics, ${result.validation.counts.entities} entities, ${result.validation.counts.claims} claims and ${result.validation.counts.relations} evidence-bound relations.`);
       return result;
     });
@@ -1198,7 +1199,7 @@ export default function WorkspacePage() {
       return;
     }
     if (!response.ok || !json.jobId) {
-      setNotice(json.message ?? `Compile could not be started (${json.code ?? response.status}).`);
+      setNotice(json.message ?? `Compile could not be started. ${failureSentence(json.code, response.status)}`);
       return;
     }
     setCorpus(null);
@@ -1236,7 +1237,7 @@ export default function WorkspacePage() {
       if (!response.ok) {
         setNotice(json.code === "SECURITY_BLOCKER_REQUIRES_EXPLICIT_REMOVAL"
           ? "A file was stopped by a safety check. Remove it from this compile explicitly, or cancel."
-          : `That choice was not applied (${json.code ?? response.status}).`);
+          : `That choice was not applied. ${failureSentence(json.code, response.status)}`);
         return;
       }
       setCompileJob((previous) => (previous ? { ...previous, blockedResolution: resolution } : previous));
@@ -1262,7 +1263,7 @@ export default function WorkspacePage() {
         // the finished World is not thrown away to honour the click.
         setNotice(json.code === "COMPILE_JOB_ALREADY_SETTLED"
           ? "That compile had already finished. Nothing was discarded."
-          : `Cancel failed (${json.code ?? response.status}).`);
+          : `Cancel failed. ${failureSentence(json.code, response.status)}`);
         return;
       }
       followRef.current?.abort();
@@ -1297,13 +1298,13 @@ export default function WorkspacePage() {
       });
       const json = await response.json() as CollectionResult & { code?: string };
       if (!response.ok || (json.coreExecution?.status !== "completed" && json.coreExecution?.status !== "review_required")) {
-        setNotice(`Core compilation failed (${json.code ?? response.status}). No candidate was promoted.`);
+        setNotice(`Core compilation failed. ${failureSentence(json.code, response.status)} Nothing was activated.`);
         return;
       }
       setCollectionResult(json);
       await loadWorldState(json.collectionId, token);
       setNotice(json.coreExecution.status === "review_required"
-        ? `Separate Core produced a review-required package for ${json.collectionId}; ${json.reviewReasons?.join(", ") || "manual review required"}. Signed download is available and promotion remains blocked.`
+        ? `Separate Core produced a review-required package for ${json.collectionId}; ${json.reviewReasons?.join(", ") || "manual review required"}. The signed download is available and nothing is active yet.`
         : `Compiled World ${json.collectionId} is ready for evidence review.`);
     } finally {
       setBusy(false);
@@ -1352,7 +1353,7 @@ export default function WorkspacePage() {
       );
       if (!response.ok || response.headers.get("content-type") !== "application/zip") {
         const json = await response.json().catch(() => ({ code: response.status }));
-        setNotice(`Signed knowledge package download failed (${json.code ?? response.status}).`);
+        setNotice(`Signed knowledge package download failed. ${failureSentence(json.code, response.status)}`);
         return;
       }
       const url = URL.createObjectURL(await response.blob());
@@ -1645,7 +1646,7 @@ export default function WorkspacePage() {
       }
       await uploadDocuments(files);
     } catch {
-      setNotice("Public collection proof could not be prepared. Candidate promotion remains closed.");
+      setNotice("The public collection proof could not be prepared. Nothing was activated.");
     } finally {
       setBusy(false);
     }
@@ -1674,7 +1675,7 @@ export default function WorkspacePage() {
     };
     const candidates = json.candidates;
     if (!response.ok || candidates?.status !== "ok" || typeof candidates.text !== "string" || typeof candidates.pageCount !== "number") {
-      setNotice(`OCR candidates JSON verification failed (${json.code ?? response.status}).`);
+      setNotice(`OCR candidates JSON verification failed. ${failureSentence(json.code, response.status)}`);
       return;
     }
     const versionKey = target.versionKey.toLowerCase();
@@ -1753,7 +1754,7 @@ export default function WorkspacePage() {
       if (!response.ok) {
         setNotice(body.code === "PATCH_BEFORE_MISMATCH"
           ? "That value has already been corrected by someone else. Reload the World and look again."
-          : `Review decision could not be recorded (${body.code ?? response.status}).`);
+          : `Review decision could not be recorded. ${failureSentence(body.code, response.status)}`);
         return;
       }
       setEvidenceReviewAction(null);
@@ -1791,7 +1792,7 @@ export default function WorkspacePage() {
       collectionResult.coreExecution.runtime !== "tavonel-python-core-v2" ||
       !collectionResult.coreExecution.worldStateId
     ) {
-      setNotice("Only a completed Python Core v2 candidate with a bound world state can be promoted.");
+      setNotice("Only a completed Python Core v2 candidate with a bound world state can be activated.");
       return;
     }
     if (!window.confirm("Activate this exact immutable candidate as the collection's current world? This records your review reason and does not alter candidate bytes.")) return;
@@ -1799,7 +1800,7 @@ export default function WorkspacePage() {
     try {
       const token = await getAuthToken();
       if (!token) {
-        setNotice("Sign in with Google before promoting a reviewed candidate.");
+        setNotice("Sign in with Google before activating a reviewed candidate.");
         return;
       }
       const response = await fetch(`/api/collections/${collectionResult.collectionId}/promote`, {
@@ -1813,7 +1814,7 @@ export default function WorkspacePage() {
       });
       const json = await response.json() as { code?: string };
       if (!response.ok) {
-        setNotice(`World promotion failed (${json.code ?? response.status}). The previous active pointer is unchanged.`);
+        setNotice(`Activation failed. ${failureSentence(json.code, response.status)} The active World is unchanged.`);
         if (response.status === 409) await loadWorldState(collectionResult.collectionId, token);
         return;
       }
@@ -1847,7 +1848,7 @@ export default function WorkspacePage() {
       });
       const json = await response.json() as { code?: string };
       if (!response.ok) {
-        setNotice(`World rollback failed (${json.code ?? response.status}). The active pointer is unchanged.`);
+        setNotice(`World rollback failed. ${failureSentence(json.code, response.status)} The active pointer is unchanged.`);
         if (response.status === 409) await loadWorldState(collectionResult.collectionId, token);
         return;
       }
@@ -1876,7 +1877,7 @@ export default function WorkspacePage() {
       });
       const json = await response.json() as GroundedAnswer & { code?: string };
       if (!response.ok || (json.status !== "grounded" && json.status !== "abstained")) {
-        setNotice(`Grounded Ask failed (${json.code ?? response.status}). No answer was inferred.`);
+        setNotice(`Grounded Ask failed. ${failureSentence(json.code, response.status)} No answer was inferred.`);
         return;
       }
       setAskResult(json);
@@ -1900,7 +1901,7 @@ export default function WorkspacePage() {
         </header>
         <div className="auth-body">
           <div className="auth-card">
-            <p className="eyebrow">WORKSPACE</p>
+            <p className="eyebrow">Workspace</p>
             <h1>{session === "checking" ? "Checking your session." : "Sign-in required."}</h1>
             <p className="lead" role="status">
               {session === "checking"
@@ -1944,6 +1945,9 @@ export default function WorkspacePage() {
   );
   const documentCount = documents?.length ?? 0;
   const readyDocumentCount = documents?.filter((document) => document.hasOcrJson).length ?? 0;
+  /* Which board rows may be ticked for the next candidate: a source that has been read. The
+     board owns the list; this owns the eligibility, from the same document read. */
+  const compilableDocumentIds = documents?.filter((document) => document.hasOcrJson).map((document) => document.documentId) ?? [];
   const operatorReviewCount = documents?.filter((document) => document.processingState === "operator_review").length ?? 0;
   const collectionReviewRequired = Boolean(
     collectionResult?.coreExecution?.status === "review_required" ||
@@ -2093,6 +2097,7 @@ export default function WorkspacePage() {
       stateTitle={stateTitle}
       stateDescription={stateDescription}
       stateFacts={workspaceFacts}
+      stateHero={workspaceState.mode !== "new"}
       onAccess={setAccessSource}
       nextAction={nextAction}
       onNavigate={navigateSurface}
@@ -2141,7 +2146,7 @@ export default function WorkspacePage() {
           {tab === "overview" && surface === "home" && attentionItems.length > 0 ? (
             <section className="workspace-attention" role="alert" aria-labelledby="workspace-attention-title">
               <div>
-                <p className="eyebrow">NEEDS ATTENTION</p>
+                <p className="eyebrow">Needs attention</p>
                 <h2 id="workspace-attention-title">{attentionItems.length === 1 ? "1 thing needs a decision" : `${attentionItems.length} things need a decision`}</h2>
                 <ul className="workspace-attention-items">
                   {attentionItems.map((item) => (
@@ -2192,7 +2197,7 @@ export default function WorkspacePage() {
             */
             <section className="workspace-complete" aria-labelledby="workspace-complete-title">
               <div>
-                <p className="eyebrow">{activeWorld ? "ACTIVE WORLD" : "CANDIDATE READY"}</p>
+                <p className="eyebrow">{activeWorld ? "Active World" : "Candidate ready"}</p>
                 <h2 id="workspace-complete-title">
                   {activeWorld ? "Your Compiled World is ready." : "Your compiled candidate is ready for review."}
                 </h2>
@@ -2200,7 +2205,7 @@ export default function WorkspacePage() {
                 {activeWorld ? null : (
                   <p className="fine">
                     Nothing is active until you approve it. Review the evidence, then activate the
-                    candidate to make it the world that Ask, the API and MCP read.
+                    candidate to make it the World that Ask, the API and MCP read.
                   </p>
                 )}
               </div>
@@ -2212,14 +2217,12 @@ export default function WorkspacePage() {
                     <button type="button" disabled={downloading} onClick={() => void downloadCollection()}>{downloading ? "Preparing…" : "Download signed package"}</button>
                     <button type="button" onClick={() => navigateSurface("review")}>View evidence</button>
                     <button type="button" onClick={() => navigateSettings("trust")}>Verify export</button>
-                    <button type="button" onClick={() => fileRef.current?.click()}>Add sources</button>
                   </>
                 ) : (
                   <>
                     <button type="button" onClick={() => navigateSurface("review")}>Review items</button>
                     <button type="button" onClick={() => navigateSurface("world")}>Inspect candidate</button>
                     <button type="button" disabled={downloading} onClick={() => void downloadCollection()}>{downloading ? "Preparing…" : "Download signed knowledge package"}</button>
-                    <button type="button" onClick={() => fileRef.current?.click()}>Add sources</button>
                   </>
                 )}
               </div>
@@ -2266,13 +2269,11 @@ export default function WorkspacePage() {
               */}
               {workspaceState.mode === "loading" ? (
                 <div className="workspace-intake-copy workspace-intake-loading" role="status" aria-live="polite">
-                  <p className="eyebrow">SOURCES</p>
                   <h2 id="workspace-intake-title">Checking your sources…</h2>
                   <p>Loading the workspace state before showing the correct intake controls.</p>
                 </div>
               ) : workspaceState.mode === "unavailable" ? (
                 <div className="workspace-intake-copy workspace-intake-loading" role="status" aria-live="polite">
-                  <p className="eyebrow">SOURCES</p>
                   <h2 id="workspace-intake-title">Your sources could not be loaded</h2>
                   <p>{workspaceState.stateDescription}</p>
                   <div className="workspace-intake-actions">
@@ -2282,11 +2283,20 @@ export default function WorkspacePage() {
               ) : (
               <div className="workspace-intake-copy">
                 <p className="eyebrow">
-                  {workspaceState.mode === "new" ? "ADD KNOWLEDGE" : "ADD MORE KNOWLEDGE"}
+                  {workspaceState.mode === "new" ? "Add knowledge" : "Add more knowledge"}
                 </p>
-                <h2 id="workspace-intake-title">
-                  {workspaceState.mode === "new" ? "Drop files, folders or ZIP here" : "Add files, folders or ZIP"}
-                </h2>
+                {/*
+                  One h1 per page. The shell prints the surface title as an h1 on every surface
+                  except Home, so the drop box may only claim the h1 on Home -- and only on a new
+                  workspace, where it is the first and largest thing on the page.
+                */}
+                {workspaceState.mode === "new" && surface === "home" ? (
+                  <h1 id="workspace-intake-title">Drop files, folders or ZIP here</h1>
+                ) : (
+                  <h2 id="workspace-intake-title">
+                    {workspaceState.mode === "new" ? "Drop files, folders or ZIP here" : "Add files, folders or ZIP"}
+                  </h2>
+                )}
                 <p>
                   {workspaceState.mode === "new"
                     ? "Upload sources or connect the system where your knowledge already lives."
@@ -2317,16 +2327,19 @@ export default function WorkspacePage() {
                   losing a batch.
                 */}
                 <small className="workspace-intake-limits">{compileLimits}</small>
-                {surface === "sources" ? (
-                  <div className="workspace-source-choices" aria-label="Available source connections">
-                    {WORKSPACE_SOURCE_CHOICES.map((source) => (
-                      <button type="button" key={source.name} onClick={() => navigateSurface("connections")}>
-                        <span>{source.name}</span>
-                        <small>{source.availability}</small>
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
+                {/*
+                  The availability line under each name is WORKSPACE_SOURCE_CHOICES verbatim.
+                  Nothing here states a support level the capability manifest does not; the
+                  provider-specific limits stay on /integrations.
+                */}
+                <div className="workspace-source-choices" aria-label="Available source connections">
+                  {WORKSPACE_SOURCE_CHOICES.map((source) => (
+                    <button type="button" key={source.name} onClick={() => navigateSurface("connections")}>
+                      <span>{source.name}</span>
+                      <small>{source.availability}</small>
+                    </button>
+                  ))}
+                </div>
               </div>
               )}
               {staging ? (
@@ -2337,7 +2350,7 @@ export default function WorkspacePage() {
                   frame in which to draw a number and no event loop in which to hear a click.
                 */
                 <div className="workspace-archive-progress" role="status" aria-live="polite">
-                  <p className="eyebrow">OPENING ARCHIVE</p>
+                  <p className="eyebrow">Opening archive</p>
                   <p>{staging.archive}</p>
                   <progress max={staging.total} value={staging.done} aria-label={`${staging.done} of ${staging.total} entries expanded`} />
                   <p className="fine">{staging.done} of {staging.total} entries. Nothing has been uploaded.</p>
@@ -2346,7 +2359,7 @@ export default function WorkspacePage() {
               ) : null}
               {stagedSelection ? (
                 <div className="workspace-preflight" role="region" aria-label="Compile preflight">
-                  <p className="eyebrow">PREFLIGHT</p>
+                  <p className="eyebrow">Preflight</p>
                   <p className="workspace-staged-summary">
                     <strong>{stagedSelection.files.length} file{stagedSelection.files.length === 1 ? "" : "s"} staged.</strong>{" "}
                     Nothing has been uploaded yet. Review the estimate, then upload and compile.
@@ -2444,45 +2457,32 @@ export default function WorkspacePage() {
           */}
           {compileBlock}
 
+          {/*
+            BQ-093. The board is the one list of sources on this surface. The include-in-the-next-
+            candidate choice used to live in a second list below it that printed every name again;
+            it is now a checkbox on the row it applies to, and the card underneath keeps only the
+            count and the compile action.
+          */}
           <div id="workspace-board">
             <PipelineBoard
               rows={pipelineRows}
               reading={reading}
               names={names}
+              selectableIds={compilableDocumentIds}
+              selectedIds={selectedDocumentIds}
+              onToggleSelected={(documentId) => setSelectedDocumentIds((current) => current.includes(documentId)
+                ? current.filter((id) => id !== documentId)
+                : [...current, documentId])}
               onDismiss={uploads.length > 0 ? () => { setUploads([]); setReading({}); } : undefined}
             />
           </div>
           <div className="workspace-grid">
             <section id="workspace-sources" className="card document-card">
-              <p className="eyebrow">NEXT CANDIDATE</p>
+              <p className="eyebrow">Next candidate</p>
               <h2>{documents && documents.length > 0 ? "Sources ready for your next World" : "Bring your first source"}</h2>
               {documents && documents.length > 0 ? (
                 <>
-                <p>Compile one or more ready sources into the next candidate. Nothing becomes active until you review it.</p>
-                <ul className="document-meta">
-                  {documents.map((doc) => (
-                    <li key={`${doc.documentId}-${doc.versionKey}`}>
-                      {/*
-                        The same rule as the floor above: a name a person recognises, then the
-                        id underneath for the receipts to hang off.
-                      */}
-                      <strong>{displayName(doc.documentId, names)}</strong>
-                      {doc.hasOcrJson ? (
-                        <label className="compile-source-choice">
-                          <input
-                            type="checkbox"
-                            checked={selectedDocumentIds.includes(doc.documentId)}
-                            onChange={(event) => setSelectedDocumentIds((current) => event.target.checked
-                              ? [...new Set([...current, doc.documentId])]
-                              : current.filter((documentId) => documentId !== doc.documentId))}
-                          />
-                          Include in the next candidate
-                        </label>
-                      ) : null}
-                      <small>{doc.hasOcrJson ? "Ready to compile" : doc.processingState === "operator_review" ? "Needs review" : "Preparing and reading"}</small>
-                    </li>
-                  ))}
-                </ul>
+                <p>Compile one or more ready sources into the next candidate. Tick them on the board above; nothing becomes active until you review it.</p>
                 <div className="compile-selection-actions">
                   <small>
                     {selectedDocumentIds.length} OCR-qualified document{selectedDocumentIds.length === 1 ? "" : "s"} selected
@@ -2497,12 +2497,7 @@ export default function WorkspacePage() {
                 <div className="empty">
                   <FileText size={22} />
                   <strong>No sources yet</strong>
-                  <p>Upload files, a folder or ZIP archive, or connect the system where your knowledge already lives.</p>
-                  {activationPolicy.customerIntake.enabled ? (
-                    <div className="billing-actions">
-                      <button type="button" onClick={() => fileRef.current?.click()}>Upload your first document</button>
-                    </div>
-                  ) : null}
+                  <p>Add files in the box above, or connect the system where your knowledge already lives.</p>
                 </div>
               )}
             </section>
@@ -2512,7 +2507,7 @@ export default function WorkspacePage() {
             */}
             {collectionResult && !collectionResult.coreExecution ? (
               <section className="card">
-                <p className="eyebrow">COMPILED CANDIDATE</p>
+                <p className="eyebrow">Compiled candidate</p>
                 <h2>This candidate has not been run through Core.</h2>
                 <p>{collectionResult.validation.counts.documents} documents · {collectionResult.validation.counts.entities} entities · {collectionResult.validation.counts.claims} claims · {collectionResult.validation.counts.relations} relations</p>
                 <div className="billing-actions">
@@ -2606,7 +2601,7 @@ export default function WorkspacePage() {
                 threshold dressed up as a measurement.
               */}
               <section className="card" aria-labelledby="review-queue-title">
-                <p className="eyebrow">REVIEW QUEUE</p>
+                <p className="eyebrow">Review queue</p>
                 <h2 id="review-queue-title">Worst first, by the reasons already on the record.</h2>
                 <ReviewQueue
                   input={reviewQueueInput}
@@ -2618,7 +2613,7 @@ export default function WorkspacePage() {
                 />
               </section>
               <section className="card review-comparison" aria-labelledby="review-comparison-title">
-                <p className="eyebrow">REVIEW</p>
+                <p className="eyebrow">Review</p>
                 <h2 id="review-comparison-title">Compare the compiled result with its source.</h2>
                 {worldReadModel?.evidence.length ? (
                   <>
@@ -2705,7 +2700,7 @@ export default function WorkspacePage() {
                             {patchTarget ? <p className="fine">Before: {patchTarget.label}</p> : null}
                             <p className="fine">
                               This compiles a new candidate. The one you are reviewing is not changed, and this
-                              correction does not clear a review requirement or promote anything.
+                              correction does not clear a review requirement, and it activates nothing.
                             </p>
                           </>
                         ) : null}
@@ -2736,7 +2731,7 @@ export default function WorkspacePage() {
               <section id="workspace-review" className="card world-studio" aria-labelledby="world-studio-title">
                 <div className="world-heading">
                   <div>
-                    <p className="eyebrow">ADVANCED REVIEW · WORLD LIFECYCLE</p>
+                    <p className="eyebrow">Advanced review · World lifecycle</p>
                     <h2 id="world-studio-title">Candidate bytes stay immutable. Humans move the active pointer.</h2>
                   </div>
                   <output className={activeWorld ? "world-status active" : "world-status"}>
@@ -2768,15 +2763,15 @@ export default function WorkspacePage() {
                           disabled={worldBusy || reviewReason.trim().length < 8 || collectionResult.lifecycle !== "candidate" || collectionResult.validation.status !== "passed" || collectionResult.coreExecution?.status !== "completed" || collectionResult.coreExecution.runtime !== "tavonel-python-core-v2" || !collectionResult.coreExecution.worldStateId || activeWorld?.manifestDigest === collectionResult.manifestDigest}
                           onClick={() => void promoteCandidate()}
                         >
-                          {activeWorld?.manifestDigest === collectionResult.manifestDigest ? "This candidate is active" : worldBusy ? "Recording decision..." : "Promote reviewed candidate"}
+                          {activeWorld?.manifestDigest === collectionResult.manifestDigest ? "This candidate is active" : worldBusy ? "Recording decision…" : "Activate reviewed candidate"}
                         </button>
                       </div>
-                      <p className="fine">Promotion uses compare-and-swap against the current manifest. A stale browser cannot overwrite a newer human decision.</p>
+                      <p className="fine">Activation uses compare-and-swap against the current manifest. A stale browser cannot overwrite a newer human decision.</p>
                     </div>
                     <div className="version-panel">
-                      <p className="eyebrow">RETAINED VERSIONS</p>
+                      <p className="eyebrow">Retained versions</p>
                       {worldVersions.length === 0 ? (
-                        <p>No promoted version exists for this collection.</p>
+                        <p>No version of this collection has been activated yet.</p>
                       ) : (
                         <ol className="version-list">
                           {worldVersions.map((version) => (
@@ -2814,14 +2809,14 @@ export default function WorkspacePage() {
               </section>
               {/*
                 The raw material check, behind a disclosure. It verifies the immutable OCR result
-                against its receipt and promotes nothing; a reviewer reaches for it when a
+                against its receipt and activates nothing; a reviewer reaches for it when a
                 comparison looks wrong, not on every visit.
               */}
               <details className="card workspace-advanced">
                 <summary>Advanced · verify the extracted OCR result against its receipt</summary>
                 <p>
                   Reloads the immutable OCR result for the most recently processed document and
-                  checks its digest and object key against the receipt. It reads; it promotes
+                  checks its digest and object key against the receipt. It reads; it activates
                   nothing.
                 </p>
                 <div className="billing-actions">
@@ -2838,22 +2833,29 @@ export default function WorkspacePage() {
                     downloading={downloading} onOpen={() => trackFunnel("workspace_ai_connect_opened")} />
                 </div>
                 <div>
-                  <p className="eyebrow">TRY A QUESTION</p>
+                  <p className="eyebrow">Try a question</p>
                   <h2 id="ask-title">Ask your knowledge. Check the source.</h2>
                   <p>Retrieval runs only against the active world. If no page-and-bbox evidence matches, TAVONEL abstains.</p>
                 </div>
+                {activeWorld ? null : (
+                  <p className="notice static" role="status">
+                    <strong>No active World yet.</strong> Ask reads the active World only. Review a
+                    candidate and activate it, and this becomes answerable.
+                    <button type="button" onClick={() => navigateSurface("review")}>Go to Review</button>
+                  </p>
+                )}
                 <form onSubmit={(event) => { event.preventDefault(); void askActiveWorld(); }}>
                   <label htmlFor="ask-question">Question</label>
                   <textarea
                     id="ask-question"
                     maxLength={500}
                     disabled={!activeWorld || askBusy}
-                    placeholder={activeWorld ? "Ask in Korean or English about this active collection." : "Promote a reviewed world before asking."}
+                    placeholder="Which contracts renew before March, and which page says so?"
                     value={askQuestion}
                     onChange={(event) => setAskQuestion(event.target.value)}
                   />
                   <button type="submit" disabled={!activeWorld || askBusy || askQuestion.trim().length < 3}>
-                    {askBusy ? "Checking evidence..." : "Ask active world"}
+                    {askBusy ? "Checking evidence…" : "Ask the active World"}
                   </button>
                 </form>
                 {askResult ? (
@@ -2889,6 +2891,12 @@ export default function WorkspacePage() {
                       </ol>
                     ) : null}
                     <small>Citations verified against the active World revision.</small>
+                    {askResult.status === "abstained" ? (
+                      <div className="workspace-intake-actions">
+                        <button type="button" onClick={() => navigateSurface("sources")}>Add the source that would answer this</button>
+                        <button type="button" onClick={() => navigateSurface("review")}>Check what is waiting for review</button>
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
                 {askEvidenceId ? (
@@ -2909,7 +2917,7 @@ export default function WorkspacePage() {
           {tab === "billing" ? (
           <section className="card billing-card">
             <div>
-              <p className="eyebrow">BILLING & CAPACITY</p>
+              <p className="eyebrow">Billing & capacity</p>
               <h2>{billingAccount?.accessPlan ? `${billingAccount.accessPlan.replace("_access", "")} access` : "Usage & billing"}</h2>
               <p>Included usage is granted only from a signed subscription transaction and settled from observed processing.</p>
             </div>
@@ -2963,7 +2971,6 @@ export default function WorkspacePage() {
           */}
           {tab === "connections" ? (accessSource === "trial" ? (
             <section className="card workspace-access-gate" role="status">
-              <p className="eyebrow">CONNECTIONS</p>
               <h2>Source connections are part of Developer access.</h2>
               <p>Free evaluation works with files you upload directly. Connect Google Drive, Dropbox, OneDrive or your own storage once the workspace is on Developer access.</p>
               <div className="billing-actions"><Link className="btn" href="/pricing">See Developer access</Link></div>
@@ -2972,7 +2979,6 @@ export default function WorkspacePage() {
 
           {tab === "developers" ? (accessSource === "trial" ? (
             <section className="card workspace-access-gate" role="status">
-              <p className="eyebrow">DEVELOPER TOOLS</p>
               <h2>API keys are part of Developer access.</h2>
               <p>Free evaluation reads the World inside this workspace. Keys, the OpenAPI document and MCP setup open with Developer access.</p>
               <div className="billing-actions"><Link className="btn" href="/pricing">See Developer access</Link></div>
@@ -2981,7 +2987,7 @@ export default function WorkspacePage() {
 
           {tab === "integrity" ? (
           <section className="card gates">
-            <p className="eyebrow">PROCESSING INTEGRITY</p>
+            <p className="eyebrow">Processing integrity</p>
             <h2>Processing gates</h2>
             {/* Written labels, not the policy keys: "ocrGpu" split on capitals rendered as
                 "ocr Gpu" in the UI. The state marker is the same pill the public capability

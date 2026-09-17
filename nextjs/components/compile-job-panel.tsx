@@ -2,6 +2,7 @@
 
 import type { BlockerResolution, CompileBlocker, CompileState } from "@/lib/compile-job-store";
 import type { CorpusProgress } from "@/lib/corpus-batching";
+import { failureSentence } from "@/lib/workspace-failure-copy";
 
 /*
   What the server is doing with a compile, and what the customer is allowed to do about it.
@@ -105,7 +106,7 @@ export function CompileJobPanel({
 
   return (
     <section className="workspace-compile-job" aria-labelledby="workspace-compile-job-title" data-state={job.state}>
-      <p className="eyebrow">{corpus ? `CORPUS · PART ${(job.batchIndex ?? 0) + 1} OF ${corpus.batchCount}` : "COMPILE"}</p>
+      <p className="eyebrow">{corpus ? `Part ${(job.batchIndex ?? 0) + 1} of ${corpus.batchCount}` : "Compile"}</p>
       <h2 id="workspace-compile-job-title">{STATE_COPY[job.state]}</h2>
       {corpus ? (
         <>
@@ -147,10 +148,8 @@ export function CompileJobPanel({
           </ol>
         </>
       ) : null}
-      <p className="fine">
-        {job.documentsReady} of {job.documentsTotal} read
-        {job.errorCode ? ` · ${job.errorCode}` : ""}
-      </p>
+      <p className="fine">{job.documentsReady} of {job.documentsTotal} read</p>
+      {job.errorCode ? <p className="fine workspace-preflight-blocked" role="alert">{failureSentence(job.errorCode, 500)}</p> : null}
       {/*
         The sentence this whole change exists to make true. It is worth saying out loud, in the
         place where somebody is deciding whether they can close the laptop.

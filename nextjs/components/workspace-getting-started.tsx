@@ -57,7 +57,7 @@ export default function WorkspaceGettingStarted({
       {open ? (
         <div className="workspace-getting-started-body" id={guideId}>
           <div className="workspace-getting-started-copy">
-            <p className="eyebrow">WORKSPACE SETUP</p>
+            <p className="eyebrow">Workspace setup</p>
             <h2>{hasActiveWorld ? "Your World is ready to use." : "The short path to a useful Compiled World."}</h2>
             <p>
               Add a source, compile a candidate, review what needs a decision, then activate.

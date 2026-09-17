@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import {
-  Activity, Braces, CircleHelp, Command, FileStack, GitCompareArrows, Home, Inbox, Network, Plug, Search, Settings, Upload, X,
+  Activity, Braces, CircleHelp, Command, EyeOff, FileStack, GitCompareArrows, Home, Inbox, LogOut, Network, Plug, RefreshCw, Search, Settings, Upload, X,
 } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import Logomark from "@/components/logomark";
@@ -34,6 +34,28 @@ const MORE_ITEMS: NavItem[] = [
   { surface: "settings", label: "Settings", icon: Settings, secondary: true },
 ];
 
+/*
+  BQ-020: the state hero belongs to Home. Every other surface opens on its own content under a
+  single h1, so Knowledge, Review, the graph, Ask, Connections and Settings stop opening on a
+  copy of Home.
+
+  The headings are the rail's own words rather than a second vocabulary: whatever the nav row
+  says, the heading says, so no surface is called two things in one viewport (BQ-025).
+*/
+const SURFACE_TITLES: Record<WorkspaceSurface, string> = {
+  home: "Home",
+  sources: "Knowledge",
+  runs: "Runs",
+  review: "Review",
+  changes: "Changes",
+  world: "Knowledge graph",
+  ask: "Use with AI",
+  connections: "Connections",
+  developer: "Developer tools",
+  activity: "Activity",
+  settings: "Settings",
+};
+
 type AccessSummary = {
   source: "owner" | "paid" | "trial";
   accessPlan: "observer_access" | "studio_access";
@@ -54,6 +76,12 @@ type Props = {
   stateDescription: string;
   /** One line of counted facts under the state sentence; omitted on a first run. */
   stateFacts?: string;
+  /*
+    D6/BQ-023: a workspace with no sources opens on the drop box, and nothing competes with it
+    above the fold. The page turns the hero off for that one case and carries the h1 on the box
+    itself, so the surface still has exactly one.
+  */
+  stateHero?: boolean;
   nextAction: { label: string; surface?: WorkspaceSurface; run?: () => void };
   /** The access source from /api/access/bootstrap, so the page can gate surface bodies the same way the rail is gated. */
   onAccess?: (source: AccessSummary["source"]) => void;
@@ -81,7 +109,7 @@ function PaletteFocus({ panel }: { panel: RefObject<HTMLElement | null> }) {
 
 export default function WorkspaceUltimateShell({
   surface, children, headerAction, activeRevision, candidateReady, reviewCount, activityCount,
-  stateTitle, stateDescription, stateFacts, nextAction, onAccess, onNavigate, onUpload, onRefresh, onSignOut,
+  stateTitle, stateDescription, stateFacts, stateHero = true, nextAction, onAccess, onNavigate, onUpload, onRefresh, onSignOut,
 }: Props) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -170,21 +198,21 @@ export default function WorkspaceUltimateShell({
     Knowledge graph / Use with AI / Activity -- the same five places under two names.
   */
   const paletteActions = [
-    { group: "CREATE", label: "Upload sources", hint: "U", run: onUpload },
-    { group: "GO TO", label: "Home", hint: "G H", surface: "home" as const },
-    { group: "GO TO", label: "Knowledge", hint: "G S", surface: "sources" as const },
-    { group: "GO TO", label: "Review", hint: "G R", surface: "review" as const },
-    { group: "GO TO", label: "Changes", hint: "", surface: "changes" as const },
-    { group: "GO TO", label: "Knowledge graph", hint: "G W", surface: "world" as const },
-    { group: "GO TO", label: "Use with AI", hint: "G A", surface: "ask" as const },
-    { group: "GO TO", label: "Activity", hint: "C", surface: "activity" as const },
-    { group: "GO TO", label: "Settings", hint: "", surface: "settings" as const },
+    { group: "Create", label: "Upload sources", hint: "U", run: onUpload },
+    { group: "Go to", label: "Home", hint: "G H", surface: "home" as const },
+    { group: "Go to", label: "Knowledge", hint: "G S", surface: "sources" as const },
+    { group: "Go to", label: "Review", hint: "G R", surface: "review" as const },
+    { group: "Go to", label: "Changes", hint: "", surface: "changes" as const },
+    { group: "Go to", label: "Knowledge graph", hint: "G W", surface: "world" as const },
+    { group: "Go to", label: "Use with AI", hint: "G A", surface: "ask" as const },
+    { group: "Go to", label: "Activity", hint: "C", surface: "activity" as const },
+    { group: "Go to", label: "Settings", hint: "", surface: "settings" as const },
     ...(access?.source === "trial" ? [] : [
-      { group: "BUILD", label: "Connections", hint: "", surface: "connections" as const },
-      { group: "BUILD", label: "Developer tools", hint: "", surface: "developer" as const },
+      { group: "Build", label: "Connections", hint: "", surface: "connections" as const },
+      { group: "Build", label: "Developer tools", hint: "", surface: "developer" as const },
     ]),
-    { group: "HELP", label: "Getting started", hint: "", run: () => window.location.assign("/docs/quickstart") },
-    { group: "HELP", label: "Use results with AI", hint: "", run: () => window.location.assign("/docs/use-with-ai") },
+    { group: "Help", label: "Getting started", hint: "", run: () => window.location.assign("/docs/quickstart") },
+    { group: "Help", label: "Use results with AI", hint: "", run: () => window.location.assign("/docs/use-with-ai") },
   ].filter((item) => item.label.toLowerCase().includes(query.toLowerCase()));
 
   const moveRailFocus = (event: KeyboardEvent<HTMLElement>) => {
@@ -201,7 +229,7 @@ export default function WorkspaceUltimateShell({
     : null;
 
   return (
-    <main id="main" className={`workspace one-path-workspace ${styles.shell}`} data-privacy={privacyMode} data-access={access?.source ?? "unknown"} tabIndex={-1}>
+    <main id="main" className={`workspace one-path-workspace ${styles.shell}`} data-surface={surface} data-privacy={privacyMode} data-access={access?.source ?? "unknown"} tabIndex={-1}>
       <aside className={styles.rail} aria-label="Workspace navigation" onKeyDown={moveRailFocus}>
         <Link href="/" className={styles.brand} aria-label="TAVONEL home"><Logomark size={23} /></Link>
         <nav className={styles.nav}>
@@ -224,7 +252,7 @@ export default function WorkspaceUltimateShell({
             <details className="one-path-more" ref={moreRef}>
               <summary data-rail-item aria-label="More workspace tools"><Settings size={17} aria-hidden="true" /><span>More</span></summary>
               <div className="one-path-more-panel" aria-label="More workspace tools">
-                <p>TOOLS & SETTINGS</p>
+                <p className="eyebrow">Tools and settings</p>
                 {moreItems.map((item) => {
                   const Icon = item.icon;
                   return <button key={item.surface} type="button" data-rail-item
@@ -234,25 +262,41 @@ export default function WorkspaceUltimateShell({
                     {item.surface === "review" && reviewCount ? <b>{reviewCount}</b> : null}
                   </button>;
                 })}
+                {/*
+                  BQ-026: this session group used to live in the rail footer, which the bottom
+                  bar below 1024px hides -- so a phone had no sign-out and no way back out of
+                  privacy mode. It lives in the one panel that exists at every width instead of
+                  being duplicated into a second place that can drift from this one.
+                */}
+                <div className="one-path-more-session">
+                  <p className="eyebrow">This session</p>
+                  <button type="button" data-rail-item aria-pressed={privacyMode} onClick={() => setPrivacyMode((value) => !value)}>
+                    <EyeOff size={16} aria-hidden="true" /><span>{privacyMode ? "Show content" : "Hide content"}</span>
+                  </button>
+                  <button type="button" data-rail-item onClick={() => { if (moreRef.current) moreRef.current.open = false; onRefresh(); }}>
+                    <RefreshCw size={16} aria-hidden="true" /><span>Refresh</span>
+                  </button>
+                  <button type="button" data-rail-item onClick={onSignOut}>
+                    <LogOut size={16} aria-hidden="true" /><span>Sign out</span>
+                  </button>
+                </div>
               </div>
             </details>
           </div>
         </nav>
-        <div className={styles.railFooter}>
-          <button type="button" aria-pressed={privacyMode} onClick={() => setPrivacyMode((value) => !value)}>{privacyMode ? "Show content" : "Hide content"}</button>
-          <button type="button" onClick={onRefresh}>Refresh</button>
-          <button type="button" onClick={onSignOut}>Sign out</button>
-        </div>
       </aside>
 
       <section className={`workspace-body ${styles.body}`}>
         <header className={styles.topbar}>
+          {/* BQ-094: the mark stays in the top bar at every width. Below 1024px the rail (and
+              with it the rail's brand) becomes a bottom bar, and the workspace lost its only
+              sign of whose product it is. */}
           <div className={styles.workspaceIdentity}>
-            <span>TAVONEL</span>
+            <Logomark size={20} />
             <strong>Knowledge workspace</strong>
           </div>
-          {activeRevision !== null ? <button type="button" className={styles.topStatus} onClick={() => onNavigate("world")}><small>PUBLISHED</small><b>v{activeRevision}</b></button> : null}
-          {candidateReady ? <button type="button" className={styles.topStatus} onClick={() => onNavigate("review")}><small>NEEDS YOUR REVIEW</small><b>{reviewCount ? `${reviewCount} ITEMS` : "NEW VERSION"}</b></button> : null}
+          {activeRevision !== null ? <button type="button" className={styles.topStatus} onClick={() => onNavigate("world")}><small>Published</small><b>v{activeRevision}</b></button> : null}
+          {candidateReady ? <button type="button" className={styles.topStatus} onClick={() => onNavigate("review")}><small>Needs your review</small><b>{reviewCount ? `${reviewCount} to review` : "New version"}</b></button> : null}
           <button type="button" className={styles.commandButton} onClick={() => setPaletteOpen(true)}><Search size={15} aria-hidden="true" /><span>Search / Command</span><kbd>Ctrl K</kbd></button>
           <div className={styles.headerAction}>{headerAction}</div>
         </header>
@@ -264,21 +308,27 @@ export default function WorkspaceUltimateShell({
             <Link href="/pricing">Upgrade to Developer</Link>
           </div>
         ) : access?.source === "owner" ? (
-          <div className={styles.ownerStrip}><span>OWNER ACCESS</span><p>Full workspace access · billing exempt</p></div>
+          /* BQ-133: the strip used to print "billing exempt" for every owner. The exemption is a
+             field on the access record, so it is read rather than asserted. */
+          <div className={styles.ownerStrip}><span className="state-label">OWNER</span><p>Full workspace access{access.billingExempt ? " · not billed" : ""}</p></div>
         ) : null}
 
         <div className={`workspace-content ${styles.content}`}>
-          <section className={styles.stateHero} aria-labelledby="workspace-state-title" data-activity={activityCount > 0 ? "running" : "quiet"}>
-            <div>
-              <p>YOUR KNOWLEDGE</p>
-              <h1 id="workspace-state-title">{stateTitle}</h1>
-              <span>{stateDescription}</span>
-              {stateFacts ? <small className={styles.stateFacts}>{stateFacts}</small> : null}
-            </div>
-            {/* While the workspace state is still resolving there is no honest next action, so
-                the control says so and stays inert rather than offering a guess. */}
-            <button type="button" disabled={!nextAction.surface && !nextAction.run} onClick={() => runAction(nextAction)}>{nextAction.label}</button>
-          </section>
+          {surface === "home" && stateHero ? (
+            <section className={styles.stateHero} aria-labelledby="workspace-state-title" data-activity={activityCount > 0 ? "running" : "quiet"}>
+              <div>
+                <p className="eyebrow">Your knowledge</p>
+                <h1 id="workspace-state-title">{stateTitle}</h1>
+                <span>{stateDescription}</span>
+                {stateFacts ? <small className={styles.stateFacts}>{stateFacts}</small> : null}
+              </div>
+              {/* While the workspace state is still resolving there is no honest next action, so
+                  the control says so and stays inert rather than offering a guess. */}
+              <button type="button" disabled={!nextAction.surface && !nextAction.run} onClick={() => runAction(nextAction)}>{nextAction.label}</button>
+            </section>
+          ) : surface === "home" ? null : (
+            <h1 className={styles.surfaceTitle}>{SURFACE_TITLES[surface]}</h1>
+          )}
           {children}
         </div>
       </section>
@@ -288,7 +338,7 @@ export default function WorkspaceUltimateShell({
           <section ref={paletteRef} className={styles.palette} role="dialog" aria-modal="true" aria-label="Workspace command palette" onMouseDown={(event) => event.stopPropagation()}>
             <PaletteFocus panel={paletteRef} />
             <div className={styles.paletteSearch}><Command size={17} aria-hidden="true" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Jump to a surface or run an action" aria-label="Search commands" /><button type="button" onClick={() => setPaletteOpen(false)} aria-label="Close command palette"><X size={16} /></button></div>
-            <p>COMMANDS · ? TO OPEN</p>
+            <p className="eyebrow">Commands · press ? to open</p>
             <div className={styles.paletteResults}>
               {paletteActions.map((action) => <button key={action.label} type="button" onClick={() => runAction(action)}><span><small>{action.group}</small>{action.label}</span><kbd>{action.hint}</kbd></button>)}
               {paletteActions.length === 0 ? <span>No matching action.</span> : null}

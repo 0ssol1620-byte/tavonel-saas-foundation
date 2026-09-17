@@ -26,6 +26,9 @@ type Props = {
   rollbackBusy?: boolean;
 };
 
+/* What the stat strip prints before there is anything to count. Not "--", and not "0":
+   a count of zero and a count nobody has taken are different facts. */
+const NOT_YET = "not yet";
 const LENSES: Array<{ id: WorldStudioLens; label: string }> = [
   { id: "overview", label: "Overview" },
   { id: "graph", label: "Graph" },
@@ -44,13 +47,13 @@ function selectWorldEvidence(model: WorldReadModel | null, evidenceId: string | 
 }
 
 function EmptyState({ title, children }: { title: string; children: string }) {
-  return <section className={styles.notYet} role="status"><span>EMPTY</span><h3>{title}</h3><p>{children}</p></section>;
+  return <section className={styles.notYet} role="status"><span>Empty</span><h3>{title}</h3><p>{children}</p></section>;
 }
 
 function EvidenceCard({ evidence, selected, onSelect }: { evidence: WorldEvidence; selected: boolean; onSelect: (evidence: WorldEvidence) => void }) {
   return (
     <button type="button" className={styles.evidenceCard} data-sensitive="content" data-selected={selected} aria-pressed={selected} onClick={() => onSelect(evidence)}>
-      <span>{evidence.sourceId} / p.{evidence.page}</span><strong>{evidence.excerpt}</strong><small>BBOX [{evidence.bbox.join(", ")}]</small>
+      <span>{evidence.sourceId} / p.{evidence.page}</span><strong>{evidence.excerpt}</strong><small>Region [{evidence.bbox.join(", ")}]</small>
     </button>
   );
 }
@@ -107,12 +110,12 @@ export default function WorldStudioUltimate({ model, initialLens = "overview", s
   return (
     <section className={styles.studio} aria-labelledby="world-studio-title">
       <header className={styles.header}>
-        <div><span>COMPILED WORLD</span><h2 id="world-studio-title">World Studio</h2><p>Inspect the current World first, then open the graph, directory, ontology or exact source evidence when you need the detail.</p></div>
+        <div><span className="eyebrow">Compiled World</span><h2 id="world-studio-title">World Studio</h2><p>Inspect the current World first, then open the graph, directory, ontology or exact source evidence when you need the detail.</p></div>
         <dl>
-          <div><dt>STATE</dt><dd>{model?.world.status.toUpperCase() ?? "NOT READY"}</dd></div>
-          <div><dt>SOURCES</dt><dd>{overview?.sources ?? "--"}</dd></div>
-          <div><dt>OBJECTS</dt><dd>{model ? model.objects.length : "--"}</dd></div>
-          <div><dt>RELATIONS</dt><dd>{model ? model.relations.length : "--"}</dd></div>
+          <div><dt>State</dt><dd>{model ? model.world.status : "Not compiled"}</dd></div>
+          <div><dt>Sources</dt><dd>{overview ? overview.sources : NOT_YET}</dd></div>
+          <div><dt>Objects</dt><dd>{model ? model.objects.length : NOT_YET}</dd></div>
+          <div><dt>Relations</dt><dd>{model ? model.relations.length : NOT_YET}</dd></div>
         </dl>
       </header>
 
@@ -126,15 +129,15 @@ export default function WorldStudioUltimate({ model, initialLens = "overview", s
             !model || !overview ? <EmptyState title="No World yet">Compile sources and review a candidate to create a World you can inspect here.</EmptyState> : (
               <div className={styles.overview}>
                 <div className={styles.overviewMetrics}>
-                  <article><span>SOURCES</span><strong>{overview.sources}</strong><p>documents represented by page-bound evidence</p></article>
-                  <article><span>OBJECTS</span><strong>{model.objects.length}</strong><p>compiled semantic objects</p></article>
-                  <article><span>RELATIONS</span><strong>{model.relations.length}</strong><p>persisted connections between objects</p></article>
-                  <article><span>EVIDENCE COVERAGE</span><strong>{overview.evidenceCoverage}%</strong><p>{overview.sourcedObjects} of {model.objects.length} objects carry evidence</p></article>
+                  <article><span>Sources</span><strong>{overview.sources}</strong><p>documents represented by page-bound evidence</p></article>
+                  <article><span>Objects</span><strong>{model.objects.length}</strong><p>compiled semantic objects</p></article>
+                  <article><span>Relations</span><strong>{model.relations.length}</strong><p>persisted connections between objects</p></article>
+                  <article><span>Evidence coverage</span><strong>{overview.evidenceCoverage}%</strong><p>{overview.sourcedObjects} of {model.objects.length} objects carry evidence</p></article>
                 </div>
                 <div className={styles.overviewActions}>
-                  <button type="button" onClick={() => setLens("graph")}><b>See relationships</b><span>Open Graph →</span></button>
-                  <button type="button" onClick={() => setLens("evidence")}><b>Verify the source</b><span>Open Evidence →</span></button>
-                  <button type="button" onClick={() => setLens("versions")}><b>Understand changes</b><span>Open Versions →</span></button>
+                  <button type="button" onClick={() => setLens("graph")}><b>See relationships</b><span>Open graph</span></button>
+                  <button type="button" onClick={() => setLens("evidence")}><b>Verify the source</b><span>Open evidence</span></button>
+                  <button type="button" onClick={() => setLens("versions")}><b>Understand changes</b><span>Open versions</span></button>
                 </div>
               </div>
             )
@@ -150,11 +153,11 @@ export default function WorldStudioUltimate({ model, initialLens = "overview", s
 
         <aside className={styles.inspector} aria-label="World selection inspector">
           {selection ? (
-            <><div className={styles.inspectorTitle}><span>SELECTED EVIDENCE</span><button type="button" onClick={clearEvidence}>Clear</button></div><strong>{selection.sourceId}</strong><dl><div><dt>PAGE</dt><dd>{selection.page}</dd></div><div><dt>BBOX</dt><dd>[{selection.bbox.join(", ")}]</dd></div></dl><div className={styles.pagePreview} aria-label={`Actual source page ${selection.page} with evidence bounding box`}>{currentPreview?.state === "ready" ? <PdfEvidenceViewer key={JSON.stringify([selection.sourceId, selection.sourceVersionId, selection.page])} data={currentPreview.bytes} page={selection.page} bbox={selection.bbox} label={`Source ${selection.sourceId}, page ${selection.page}, exact evidence region`} /> : <span>{!currentPreview || currentPreview.state === "loading" ? "Opening source page…" : `Preview unavailable · page ${selection.page}`}</span>}</div></>
+            <><div className={styles.inspectorTitle}><span>Selected evidence</span><button type="button" onClick={clearEvidence}>Clear</button></div><strong>{selection.sourceId}</strong><dl><div><dt>Page</dt><dd>{selection.page}</dd></div><div><dt>Region</dt><dd>[{selection.bbox.join(", ")}]</dd></div></dl><div className={styles.pagePreview} aria-label={`Actual source page ${selection.page} with evidence bounding box`}>{currentPreview?.state === "ready" ? <PdfEvidenceViewer key={JSON.stringify([selection.sourceId, selection.sourceVersionId, selection.page])} data={currentPreview.bytes} page={selection.page} bbox={selection.bbox} label={`Source ${selection.sourceId}, page ${selection.page}, exact evidence region`} /> : <span>{!currentPreview || currentPreview.state === "loading" ? "Opening source page…" : `Preview unavailable · page ${selection.page}`}</span>}</div></>
           ) : selectedObject ? (
-            <><div className={styles.inspectorTitle}><span>SELECTED OBJECT</span></div><strong data-sensitive="content">{selectedObject.label}</strong><dl><div><dt>TYPE</dt><dd>{selectedObject.type}</dd></div><div><dt>STATE</dt><dd>{selectedObject.readState === "read" ? "READY" : "NEEDS REVIEW"}</dd></div><div><dt>RELATIONS</dt><dd>{selectedObject.relations.length}</dd></div><div><dt>EVIDENCE</dt><dd>{selectedObject.evidenceRefs.length}</dd></div></dl></>
+            <><div className={styles.inspectorTitle}><span>Selected object</span></div><strong data-sensitive="content">{selectedObject.label}</strong><dl><div><dt>Type</dt><dd>{selectedObject.type}</dd></div><div><dt>State</dt><dd>{selectedObject.readState === "read" ? "READY" : "NEEDS REVIEW"}</dd></div><div><dt>Relations</dt><dd>{selectedObject.relations.length}</dd></div><div><dt>Evidence</dt><dd>{selectedObject.evidenceRefs.length}</dd></div></dl></>
           ) : lens === "overview" ? (
-            <div className={styles.inspectorHint}><span>WORLD OVERVIEW</span><p>Select Graph, Directory, Ontology or Evidence when you want to inspect an individual object.</p></div>
+            <div className={styles.inspectorHint}><span>World overview</span><p>Select Graph, Directory, Ontology or Evidence when you want to inspect an individual object.</p></div>
           ) : <EmptyState title="Nothing selected">Select a compiled object or evidence record to inspect it here.</EmptyState>}
         </aside>
       </div>

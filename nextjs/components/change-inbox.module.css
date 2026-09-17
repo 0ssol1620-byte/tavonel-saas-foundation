@@ -11,7 +11,7 @@
 .surface {
   --ci-ink: var(--text-hi, #edeae4);
   --ci-muted: var(--text-lo, #7d878d);
-  --ci-faint: var(--text-xlo, #78828a);
+  --ci-faint: var(--text-lo, #78828a);
   --ci-line: var(--hairline, #23282d);
   --ci-line-hi: var(--hairline-hi, #2e353b);
   --ci-verified: var(--verified, #7be0be);
@@ -30,9 +30,9 @@
   display: grid;
   gap: 8px;
   padding: 26px;
-  border: 1px dashed var(--ci-line-hi);
+  border: 1px solid var(--ci-line-hi);
 }
-.state span { color: var(--ci-faint); font: 9px var(--f-mono, monospace); letter-spacing: .12em; }
+.state span { color: var(--ci-faint); font: 12px var(--f-mono, monospace); letter-spacing: .12em; }
 .state[data-state="unavailable"] span { color: var(--ci-unresolved); }
 .state p { margin: 0; color: var(--ci-muted); font-size: 13px; line-height: 1.6; }
 
@@ -54,8 +54,8 @@
 }
 .inbox button:hover { color: var(--ci-ink); }
 .inbox button[data-current="true"] { border-left-color: var(--ci-ink); color: var(--ci-ink); }
-.inbox code { color: var(--ci-faint); font: 10px var(--f-mono, monospace); overflow-wrap: anywhere; }
-.inbox small { color: var(--ci-faint); font: 10px var(--f-mono, monospace); }
+.inbox code { color: var(--ci-faint); font: 12px var(--f-mono, monospace); overflow-wrap: anywhere; }
+.inbox small { color: var(--ci-faint); font: 12px var(--f-mono, monospace); }
 
 .rowVersions { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
 .rowVersions strong { color: inherit; font: 400 13px var(--f-sans, sans-serif); }
@@ -72,21 +72,21 @@
 }
 .detail h3 i { color: var(--ci-faint); font-style: normal; }
 
-.status { color: var(--ci-faint); font: 9px var(--f-mono, monospace); letter-spacing: .1em; text-transform: uppercase; }
+.status { color: var(--ci-faint); font: 12px var(--f-mono, monospace); letter-spacing: .1em; text-transform: uppercase; }
 .note { margin: 0; color: var(--ci-faint); font-size: 12px; line-height: 1.6; }
 .summary { margin: 0; color: var(--ci-ink); font: 12px/1.6 var(--f-mono, monospace); overflow-wrap: anywhere; }
 
 .counts { display: grid; gap: 1px; margin: 0; background: var(--ci-line); border: 1px solid var(--ci-line); }
 .counts > div { display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; padding: 9px 12px; background: var(--ground, #08090a); }
-.counts dt { color: var(--ci-faint); font: 9px var(--f-mono, monospace); letter-spacing: .1em; text-transform: uppercase; }
-.counts dd { margin: 0; color: var(--ci-ink); font: 11px var(--f-mono, monospace); }
+.counts dt { color: var(--ci-faint); font: 12px var(--f-mono, monospace); letter-spacing: .1em; text-transform: uppercase; }
+.counts dd { margin: 0; color: var(--ci-ink); font: 12px var(--f-mono, monospace); }
 
 .inspect {
   justify-self: start;
   padding: 8px 14px;
   color: var(--ci-ink);
   border: 1px solid var(--ci-line-hi);
-  font: 10px var(--f-mono, monospace);
+  font: 12px var(--f-mono, monospace);
   letter-spacing: .08em;
   text-transform: uppercase;
   background: transparent;
@@ -99,7 +99,7 @@
   .impact { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
   .full { grid-column: 1 / -1; }
 }
-.impact h4 { margin: 0 0 8px; color: var(--ci-faint); font: 9px var(--f-mono, monospace); letter-spacing: .12em; }
+.impact h4 { margin: 0 0 8px; color: var(--ci-faint); font: 12px var(--f-mono, monospace); letter-spacing: .12em; }
 
 .lines { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
 .lines > li { display: grid; gap: 3px; padding-left: 10px; border-left: 1px solid var(--ci-line-hi); min-width: 0; }
@@ -107,11 +107,11 @@
 /* Removal has no state token, and the row says "removed" in words. */
 .lines > li[data-effect="changed"] { border-left-color: var(--ci-changed); }
 .lines b { color: var(--ci-ink); font: 400 12px/1.5 var(--f-sans, sans-serif); overflow-wrap: anywhere; }
-.lines small { color: var(--ci-faint); font: 9px var(--f-mono, monospace); letter-spacing: .06em; text-transform: uppercase; }
-.lines s { color: var(--ci-changed); font: 11px/1.6 var(--f-mono, monospace); text-decoration-thickness: 1px; overflow-wrap: anywhere; }
-.lines ins { color: var(--ci-verified); font: 11px/1.6 var(--f-mono, monospace); text-decoration: none; overflow-wrap: anywhere; }
+.lines small { color: var(--ci-faint); font: 12px var(--f-mono, monospace); letter-spacing: .06em; text-transform: uppercase; }
+.lines s { color: var(--ci-changed); font: 12px/1.6 var(--f-mono, monospace); text-decoration-thickness: 1px; overflow-wrap: anywhere; }
+.lines ins { color: var(--ci-verified); font: 12px/1.6 var(--f-mono, monospace); text-decoration: none; overflow-wrap: anywhere; }
 
-.where { color: var(--ci-faint); font: 9px var(--f-mono, monospace); letter-spacing: .08em; text-transform: uppercase; overflow-wrap: anywhere; }
+.where { color: var(--ci-faint); font: 12px var(--f-mono, monospace); letter-spacing: .08em; text-transform: uppercase; overflow-wrap: anywhere; }
 
 .full { display: grid; gap: 8px; }
 
@@ -126,13 +126,13 @@
   padding: 10px 12px;
   background: var(--ground, #08090a);
   border-left: 2px solid transparent;
-  font: 11px var(--f-mono, monospace);
+  font: 12px var(--f-mono, monospace);
 }
 .versions > li[data-status="active"] { border-left-color: var(--ci-verified); }
 .versions > li[data-status="candidate"] { border-left-color: var(--ci-changed); }
 .versions strong { color: var(--ci-ink); font-weight: 400; }
-.versions code { color: var(--ci-faint); font-size: 10px; overflow-wrap: anywhere; }
-.versions small { color: var(--ci-faint); font-size: 10px; }
+.versions code { color: var(--ci-faint); font-size: 12px; overflow-wrap: anywhere; }
+.versions small { color: var(--ci-faint); font-size: 12px; }
 .versions small:last-child { margin-left: auto; }
 
 /*

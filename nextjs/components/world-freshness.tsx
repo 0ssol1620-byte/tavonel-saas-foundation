@@ -57,12 +57,12 @@ export function readWorldFreshness(value: unknown): WorldFreshness | null {
 }
 
 const ROWS: Array<[keyof WorldFreshness, string, string]> = [
-  ["observedAt", "OBSERVED", "when the source itself was last seen to change"],
-  ["processedAt", "PROCESSED", "when the compile settled"],
+  ["observedAt", "Observed", "when the source itself was last seen to change"],
+  ["processedAt", "Processed", "when the compile settled"],
   // The schema records exactly one review instant: the decision that cleared a compile blocker.
   // Not "someone reviewed this World" -- that would be a claim the column cannot keep.
-  ["reviewedAt", "REVIEWED", "when a person resolved a compile blocker, the only review decision recorded"],
-  ["activatedAt", "ACTIVE SINCE", "when this revision became the one consumers read"],
+  ["reviewedAt", "Reviewed", "when a person resolved a compile blocker, the only review decision recorded"],
+  ["activatedAt", "Active since", "when this revision became the one consumers read"],
 ];
 
 export default function WorldFreshness({ freshness }: { freshness: unknown }) {
@@ -70,7 +70,7 @@ export default function WorldFreshness({ freshness }: { freshness: unknown }) {
   if (!read) return null;
   return (
     <section className="card" aria-labelledby="world-freshness-title">
-      <p className="eyebrow">FRESHNESS</p>
+      <p className="eyebrow">Freshness</p>
       <h2 id="world-freshness-title">What &ldquo;current&rdquo; means for this World, in four times.</h2>
       <div className="binding-list" aria-label="World freshness">
         {ROWS.map(([field, label, help]) => {
@@ -83,7 +83,7 @@ export default function WorldFreshness({ freshness }: { freshness: unknown }) {
           );
         })}
         {read.activeManifestDigest ? (
-          <span><b>ACTIVE DIGEST</b>{read.activeManifestDigest.replace("sha256:", "").slice(0, 12)}</span>
+          <span><b>Active digest</b>{read.activeManifestDigest.replace("sha256:", "").slice(0, 12)}</span>
         ) : null}
       </div>
       {read.candidateAwaitingActivation ? (

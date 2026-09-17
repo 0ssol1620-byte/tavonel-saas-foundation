@@ -165,7 +165,7 @@ export default function ChangeInbox({ model, collectionId, names }: Props) {
   return (
     <section id="workspace-changes" className={`card ${styles.surface}`} aria-labelledby="workspace-changes-title">
       <div className={styles.intro}>
-        <p className="eyebrow">CHANGES</p>
+        <p className="eyebrow">Changes</p>
         <h2 id="workspace-changes-title">What changed, and what it changed.</h2>
         <p>
           Every row is a transition between two compiled versions of this World. The counts are

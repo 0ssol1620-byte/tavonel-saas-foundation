@@ -550,8 +550,10 @@ describe("public copy", () => {
   });
   it("stages a customer's own upload in the workspace, not a fixture world", () => {
     const stage = read("components/compile-stage.tsx");
-    expect(stage).toContain("SOURCES");
-    expect(stage).toContain("WORLD");
+    /* Moved 2026-09-17 with BQ-083: the chapter names are no longer four mono-caps literals in
+       this file, they are the shared pipeline vocabulary. What this guards is unchanged --
+       the authenticated stage draws the visitor's own run. */
+    expect(stage).toContain('import { PIPELINE_STAGES } from "@/lib/pipeline-vocabulary"');
     // The landing fixture must never be pasted into the authenticated surface: no import of
     // the demo world, and no census figure. (The file may name them in prose to say so.)
     expect(stage).not.toMatch(/from ["']@\/lib\/demo-world["']/);
