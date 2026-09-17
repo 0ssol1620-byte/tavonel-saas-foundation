@@ -684,13 +684,25 @@ describe("hreflang is declared only where a counterpart exists", () => {
     }
   });
 
-  it("is on no retired-URL stub, which declares no head of its own at all", () => {
+  /*
+    BQ-114. A stub may now declare a head; what it may not declare is a counterpart.
+
+    This read "declares no head of its own at all", which was true of all five stubs and was
+    the cheapest way to prove none of them carried an hreflang pair. It also pinned the defect:
+    a page that declares no metadata inherits the root layout's, so /customers served the
+    homepage's title, description and share card with a 404 status. The rule this test exists
+    for is the pair, so the pair is what it asserts -- alongside the noindex a retired URL owes
+    a crawler, which the old shape could not ask for because a stub had no head to read.
+  */
+  it("is on no retired-URL stub, and a stub that declares a head asks not to be indexed", () => {
     const stubs = pages.filter((page) => page.retiredStub);
     expect(stubs.length, "the retired stubs are the pages this risk was about").toBeGreaterThanOrEqual(5);
     for (const stub of stubs) {
       const source = readFileSync(stub.file, "utf8");
-      expect(source, `${stub.route} must not declare metadata`).not.toContain("export const metadata");
-      expect(source, `${stub.route} must not declare metadata`).not.toContain("generateMetadata");
+      expect(source, `${stub.route} must not claim a Korean counterpart`).not.toMatch(/languages:/);
+      if (!source.includes("export const metadata") && !source.includes("generateMetadata")) continue;
+      expect(source, `${stub.route} declares a head and must ask not to be indexed`).toMatch(/index: false/);
+      expect(source, `${stub.route} declares a head and must not self-canonicalise`).toMatch(/canonical: null/);
     }
   });
 });

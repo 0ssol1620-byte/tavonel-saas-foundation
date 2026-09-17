@@ -164,11 +164,19 @@ export default function LoginPage() {
 
       <div className="auth-body">
         <div className="auth-card">
-          {intent || recipe ? <p className="eyebrow">SIGN IN TO CONTINUE</p> : null}
+          {/*
+            BQ-113. One claim per heading.
+
+            The default read "Open your workspace." -- and on a deployment where customer file
+            processing is closed, the notice directly under it read "Customer file processing is
+            not open yet." The heading and the first paragraph contradicted each other on the
+            surface that converts. The heading now says what the page does, which is true in
+            every deployment state; what is and is not open is the notice’s job.
+          */}
           <h1>
             {intent ? "One step before checkout."
               : recipe ? "One step before you run this."
-                : "Open your workspace."}
+                : "Sign in to TAVONEL."}
           </h1>
           <p className="lead">
             TAVONEL turns your documents and connected sources into a structured, source-grounded
@@ -232,7 +240,6 @@ export default function LoginPage() {
             {authState === "ready" && !customerProcessingEnabled ? (
               <Link className="btn ghost" href={EXPLORE_CTA.href as Route}>{EXPLORE_CTA.label}</Link>
             ) : null}
-            <Link className="btn ghost" href="/">Back to the site</Link>
           </div>
 
           {authState === "unconfigured" ? (

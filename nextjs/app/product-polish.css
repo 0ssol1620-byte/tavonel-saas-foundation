@@ -375,3 +375,48 @@
   word-break: normal;
   overflow-wrap: anywhere;
 }
+
+/*
+  BQ-113. One typeface for a form label, and facts in the face that prose is set in.
+
+  /contact set a field label in 10px tracked uppercase mono (`.contact-field > span`) and the
+  checkbox label beside it in 13px sans (`.contact-checks label`), so the same object -- the
+  name of a thing you type into -- had two typefaces on one screen, and the mono half was two
+  sizes under the 12px floor. The mono face is reserved for hashes, paths, ids, error codes and
+  timestamps; "Work email" is none of those, and neither is "Google sign-in. No separate
+  TAVONEL password is created or stored."
+
+  The email addresses under `.contact-address a` stay in mono. An address is the one thing on
+  this page a reader copies character by character, which is what that face is for.
+*/
+.contact-address span,
+.contact-field > span,
+.contact-field > legend,
+.contact-qualify > legend {
+  font-family: var(--f-sans);
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-mid);
+}
+.contact-qualify > legend { color: var(--text-lo); }
+.contact-qualification-fold > summary span {
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-lo);
+}
+.contact-submit span,
+.contact-status p {
+  font-family: var(--f-sans);
+  font-size: 12px;
+  letter-spacing: 0;
+  color: var(--text-lo);
+}
+.auth-facts li {
+  font-family: var(--f-sans);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-lo);
+}
+.auth-facts b { color: var(--text-hi); }
