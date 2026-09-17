@@ -32,11 +32,16 @@ test("the resources hub narrows by a fragment and keeps every entry in the HTML"
 
   // Every title stays in the served document at a filtered state, which is what WG-074 asks for:
   // the page is one document to a crawler and to Ctrl+F whatever the filter is showing.
-  // BA-083 gave each card an "Open" action beside its heading link, so the count is per element.
   for (const link of RESOURCE_LINKS) {
     await expect(page.locator(`[data-tags] h3 a[href="${link.href}"]`)).toHaveCount(1);
-    await expect(page.locator(`[data-tags] p a[href="${link.href}"]`)).toHaveCount(1);
   }
+  /*
+    BA-083's second link per card is gone. BQ-111 / BQ-134 deleted the "Open ->" action -- the
+    ninth copy of one verb on one page, sitting beside a heading that already linked to the same
+    URL -- so the heading link is the whole entry now. The inverse guard keeps the decision:
+    nothing inside a tile's prose links anywhere.
+  */
+  await expect(page.locator("[data-tags] p a")).toHaveCount(0);
 });
 
 /*

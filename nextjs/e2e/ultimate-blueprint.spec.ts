@@ -87,6 +87,8 @@ test("Security record exposes fail-closed controls without certification claims"
   await page.goto("/security");
   await expect(page.getByRole("heading", { name: /Where your documents go/ })).toBeVisible();
   await expect(page.getByText(/Every external operation fails closed/)).toBeVisible();
-  await expect(page.getByText("CURRENT DEPLOYMENT CONTROLS", { exact: true })).toBeVisible();
+  // The tracked mono-caps label became the section's own heading in sentence case (the 12px
+  // floor and the "mono only for machine identifiers" rule). Same section, same claim.
+  await expect(page.getByRole("heading", { name: "Current deployment controls" })).toBeVisible();
   await expect(page.locator("body")).not.toContainText(/SOC 2 certified|ISO 27001 certified/i);
 });

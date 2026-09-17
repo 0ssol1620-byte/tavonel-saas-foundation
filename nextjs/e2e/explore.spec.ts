@@ -236,7 +236,13 @@ test("Act 2 opens an object onto the page region it was compiled from", async ({
   */
   const provenance = page.locator("[data-source-provenance]");
   await expect(provenance).toBeVisible();
-  await expect(provenance.getByText(/^(Reference render|Original) · apple-/)).toBeVisible();
+  /*
+    The two nouns are `sourcePageQualifier`'s, from `lib/source-page-rasters.ts` -- the one place
+    the representation is named, so a surface cannot invent a third spelling of it. They read as
+    running words now ("reference render", "original PDF") rather than the sentence-cased labels
+    this pinned; what the line has to say is unchanged.
+  */
+  await expect(provenance.getByText(/^(reference render|original PDF) · apple-/)).toBeVisible();
   await expect(provenance.getByText(/bbox \(per mille\) \d+, \d+, \d+, \d+/)).toBeVisible();
   await expect(provenance.getByText(/^\d{10}-\d{2}-\d{6}$/)).toBeVisible();
   await expect(provenance.getByText("official")).toBeVisible();
@@ -256,7 +262,8 @@ test("a reference render never presents itself as the acquired original", async 
   await page.getByRole("button", { name: "Open source evidence" }).click();
   const provenance = page.locator("[data-source-provenance]");
   await expect(provenance.locator('[data-representation="reference_render"]'))
-    .toContainText(/^Reference render · apple-2026-.*\.pdf/);
+    // `sourcePageQualifier` again: the noun is lower case in running text, the claim is the same.
+    .toContainText(/^reference render · apple-2026-.*\.pdf/);
   await expect(provenance.locator("[data-acquired-original]"))
     .toContainText(/^SEC EDGAR primary document · apple-2026-.*\.html/);
   await expect(provenance.getByText(/^sha256:[a-f0-9]{64}$/)).toHaveCount(2);

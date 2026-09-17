@@ -87,11 +87,19 @@ test("Explore reaches the actual interactive instrument without a hero-length de
   const height = await page.evaluate(() => window.innerHeight);
   expect(box).not.toBeNull();
   expect(box!.y, "the interactive stage begins below the first viewport").toBeLessThan(height);
-  await expect(page.locator(`${STAGE} [data-visual-node]`).first()).toBeVisible();
+  /*
+    BQ-079 took the World act out of flow behind the entry: the page used to open on a ghost of
+    its own next screen, drawn at 0.3 under a 0.74 scrim, with labels at about 1.6:1. So a node
+    visible here would now be the regression, and the claim this test makes -- the instrument is
+    real and one click away, not a hero-length detour -- is the pair below.
+  */
+  const node = page.locator(`${STAGE} [data-visual-node]`).first();
+  await expect(node).toBeHidden();
   await testInfo.attach("explore-fold", { body: await page.screenshot({ fullPage: false }), contentType: "image/png" });
 
   await page.getByRole("button", { name: "ENTER WORLD" }).click();
   await expect(stage).toHaveAttribute("data-world-act", "world");
+  await expect(node).toBeVisible();
 });
 
 test("product page shows the product path before secondary product surfaces", async ({ page }) => {
@@ -105,15 +113,19 @@ test("product page shows the product path before secondary product surfaces", as
   const expectedCta = status.liveCheckout && status.activationPolicy?.customerData?.enabled ? SELF_SERVE_CTA : ACCESS_CTA;
   await page.goto("/product");
   /*
-    The product path's own stages, not "the word SOURCE somewhere on the document". Unscoped,
-    the first match is the header's `Sources` nav link, which the primary nav hides below 1024
-    in favour of `MobilePrimaryNav` — so this asserted the visibility of site chrome at the wide
-    projects and failed on a hidden link at the narrow ones, never once reading `.product-flow`.
+    BQ-109 deleted `.product-flow`. /product printed the same four beats twice -- once as a
+    numbered SOURCE-to-WORLD strip, once as four cards -- and the cards are the half that links
+    anywhere, so the strip went rather than being restyled (`app/product-polish.css` keeps the
+    note). The strip's assertions become the inverse guard, and what the page shows before its
+    secondary material is the four linked surfaces the strip was duplicating.
+
+    The scoping the old comment argued for still matters: unscoped, "SOURCE" first matched the
+    header's own nav link rather than anything on the page.
   */
-  const flow = page.locator(".product-flow");
-  await expect(flow.locator("> article")).toHaveCount(4);
-  await expect(flow.getByText("SOURCE", { exact: false }).first()).toBeVisible();
-  await expect(flow.getByText("WORLD", { exact: false }).first()).toBeVisible();
+  await expect(page.locator(".product-flow")).toHaveCount(0);
+  const surfaces = page.locator(".product-surface-grid > .product-surface");
+  await expect(surfaces).toHaveCount(4);
+  await expect(surfaces.first()).toBeVisible();
   /*
     The page's own CTA, not "a Start free somewhere on the document". `PublicSiteHeader` renders
     the same runtime-derived `PublicPrimaryCta` on every public route (both arrived in `e5eb77c`),

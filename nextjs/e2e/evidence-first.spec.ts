@@ -10,10 +10,15 @@ test("the hero explains the value while the published sample remains a separate 
   await expect(page.locator("#one-path-title")).toContainText("ready for AI.");
   await expect(page.locator("#s1 [data-proof-variant]")).toHaveCount(0);
 
-  const proof = page.locator('#proof [data-proof-variant="canonical"]');
-  await proof.scrollIntoViewIfNeeded();
-  await expect(proof).toBeVisible();
-  const sample = proof.locator('[data-proof-variant="canonical"]');
+  /*
+    The landing proof was unwrapped in the 2026-09-17 pass: the section used to hold a wrapper
+    that held the figure, and `#proof [data-proof-variant="canonical"]` resolved to the wrapper.
+    The figure is that element now, so looking for the variant a second level down finds nothing.
+    Every assertion below is the one it always was -- they just address the figure directly.
+  */
+  const sample = page.locator('#proof [data-proof-variant="canonical"]');
+  await sample.scrollIntoViewIfNeeded();
+  await expect(sample).toBeVisible();
   await expect(sample).toHaveCount(1);
   await expect(sample).toHaveAttribute("data-proof-kind", "source-passage");
   await expect(sample).toContainText("Public compiled World · Apple SEC corpus");

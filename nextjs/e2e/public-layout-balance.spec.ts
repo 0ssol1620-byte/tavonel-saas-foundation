@@ -50,8 +50,14 @@ test("integration marketing copy uses access modes instead of beta badges", asyn
   await page.goto("/integrations");
   const main = page.locator("main");
   await expect(main).not.toContainText(/\bBeta\b/i);
-  await expect(main.getByText("Read-only", { exact: true })).toHaveCount(3);
-  await expect(main.getByText("Customer-run", { exact: true })).toHaveCount(2);
+  /*
+    BQ-106 added the legend that says what the two access modes mean, so each term is now printed
+    once more than the rows that carry it: three managed connectors plus the legend's own <dt>,
+    two customer-run rows plus its <dt>. The contract is the one this always measured -- every row
+    declares who holds the credential, and none of them says "Beta".
+  */
+  await expect(main.getByText("Read-only", { exact: true })).toHaveCount(4);
+  await expect(main.getByText("Customer-run", { exact: true })).toHaveCount(3);
 });
 
 /*

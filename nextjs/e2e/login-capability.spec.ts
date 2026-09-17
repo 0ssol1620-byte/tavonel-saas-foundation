@@ -8,7 +8,10 @@ test("sign-in explains the customer processing gate even when evaluation account
   await page.goto("/login");
   await expect(page.getByText("Customer file processing is not open yet.")).toBeVisible();
   await expect(page.getByText("Start with a free evaluation.")).toHaveCount(0);
-  const explore = page.getByRole("link", { name: "Explore the public World" });
+  // BA-252 left one name for this destination and `EXPLORE_CTA` holds it; /login renders that
+  // constant, so "Explore the public World" is one of the four names the vocabulary pass removed.
+  // The contract is unchanged: the closed gate still offers the public sample, at a 44px target.
+  const explore = page.getByRole("link", { name: "Explore a Compiled World" });
   await expect(explore).toHaveAttribute("href", "/explore");
   expect((await explore.boundingBox())!.height).toBeGreaterThanOrEqual(44);
 });

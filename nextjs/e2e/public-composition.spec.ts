@@ -35,7 +35,7 @@ test("solution pages use a readable hero and visible source-bound proof", async 
       const title = document.querySelector<HTMLElement>(".solution-hero .document-title")!;
       const titleRange = document.createRange();
       titleRange.selectNodeContents(title);
-      const proof = document.querySelector<HTMLElement>('[data-proof-variant="canonical"]')!;
+      const proof = document.querySelector<HTMLElement>('[data-proof-variant="excerpt"]')!;
       const flow = document.querySelector<HTMLElement>(".solution-flow")!;
       const solutionSections = [...document.querySelectorAll<HTMLElement>(".solution-section")];
       const flowItems = [...flow.children].map((item) => item.getBoundingClientRect());
@@ -54,24 +54,33 @@ test("solution pages use a readable hero and visible source-bound proof", async 
     expect(geometry.proofWidth, `${route} proof uses the main reading width`).toBeGreaterThan(300);
     expect(geometry.delayedSections, `${route} does not leave buyer-facing sections as off-screen placeholders`).toBe(0);
     /*
-      BA-041 -- the four drawn tiles are gone, so this pins what replaced them.
+      BA-041 put /explore's whole source sheet on these five pages; BQ-019 / D4 took it back off.
+      A solution page shows the passage its own audience would be reading and nothing else -- the
+      excerpt variant: the compiler's own words, the filing and page they were read from, and the
+      way through to that exact region in the World. The sheet, its two digests and the corpus
+      counts live on /explore and on the landing proof, where `e2e/evidence-first.spec.ts` and
+      `e2e/explore.spec.ts` measure them, so restaging them here is the regression to guard
+      against rather than the thing to assert.
 
-      The figure renders /explore's own source sheet over one real region: the page, the
-      excerpt, the locator line and the digests. The assertions are tighter than the ones they
-      replace, not looser -- the region's own words have to be on screen, the counts have to be
-      the artifact's, and the candidate count may not be published as an object count again.
+      What the test is named for is unchanged and is still checked below: the proof is bound to a
+      source, nothing on it is authored, and the region's own words are long enough to read.
     */
-    const sheet = page.locator('[data-proof-variant="canonical"] [data-source-sheet]');
-    await expect(sheet).toHaveCount(1);
-    await expect(sheet.locator("[data-active-region]")).toHaveCount(1);
-    const quoted = (await sheet.locator("[data-active-region]").innerText()).trim();
-    expect(quoted.length, `${route} highlights a region too short to read`).toBeGreaterThanOrEqual(100);
-    await expect(sheet.locator("[data-source-provenance]")).toContainText("bbox (per mille)");
-    const counts = page.locator(".solution-proof-counts");
-    for (const figure of ["5 filings", "290 pages", "1,281 regions", "W0", "W4", "sha256"]) {
-      await expect(counts).toContainText(figure);
-    }
-    await expect(page.locator('[data-proof-variant="canonical"]')).not.toContainText("6,300");
+    const proof = page.locator('[data-proof-variant="excerpt"]');
+    await expect(proof).toHaveCount(1);
+    await expect(proof).toHaveAttribute("data-proof-kind", "source-passage");
+    await expect(
+      page.locator('[data-proof-variant="canonical"], [data-source-sheet]'),
+      `${route} restages the canonical proof block`,
+    ).toHaveCount(0);
+
+    const quoted = (await proof.locator("[data-evidence-id]").innerText()).trim();
+    expect(quoted.length, `${route} quotes a passage too short to read`).toBeGreaterThanOrEqual(100);
+    // Named by the filing and the page it came from -- not "a source", and not a page number the
+    // reader has to take on trust.
+    await expect(proof).toContainText(/·\s*page \d+/);
+    const region = await proof.getByRole("link").first().getAttribute("href");
+    expect(region, `${route} proof does not link to the region it quotes`)
+      .toMatch(/^\/explore\?act=evidence&(amp;)?evidence=/);
 
     const viewport = page.viewportSize()!;
     if (viewport.width >= 1440) {
