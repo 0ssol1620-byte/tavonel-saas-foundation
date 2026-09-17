@@ -131,7 +131,6 @@
 */
 .one-path-hero > .one-path-wrap { display: block; }
 .one-path-intro { min-width: 0; max-width: 680px; }
-.one-path-eyebrow { margin: 0 0 18px; }
 .one-path-home h1 {
   font-size: var(--t-9, clamp(38px, 4vw, 56px));
   line-height: 1.05;
@@ -196,6 +195,19 @@
 .one-path-hero-film-steps span { display: inline-flex; align-items: baseline; gap: 10px; }
 .one-path-hero-film-steps span:last-child { color: var(--text-mid); }
 .one-path-hero-film-steps i { width: 14px; height: 1px; background: var(--hairline-hi); align-self: center; }
+/*
+  The four names are one line at 360px, or they are not a sequence.
+
+  `e2e/mobile-landing.spec.ts` asserts all four share a top edge; the caption measures about
+  300px at the desktop spacing against 328px of content width at 360, which is a margin thin
+  enough that a font-metric change would wrap it. The separators and the gaps give back 18px
+  here, which is the part of the line that carries no meaning.
+*/
+@media (max-width: 480px) {
+  .one-path-hero-film-steps { gap: 6px 8px; }
+  .one-path-hero-film-steps span { gap: 8px; }
+  .one-path-hero-film-steps i { width: 10px; }
+}
 
 .one-path-home .compile-film-viewport {
   position: relative;
@@ -294,6 +306,13 @@
 */
 .one-path-section { padding: 80px 0; border-top: 1px solid var(--hairline); }
 .one-path-section-heading { max-width: 730px; margin-bottom: 36px; }
+/*
+  BQ-006, the one deliberate exception. The contract's scale stops at `--t-9` (the h1), so the
+  two display sizes below the h1 -- the section h2 here and the design-partners h2 -- have no
+  token to consume and stay literal, as do the two narrow-width h1 overrides, which are
+  breakpoint tuning of `--t-9` rather than a fifth size. Everything else in this sheet is a
+  token. Filed to L1 as `--t-h2` / `--t-h2-sm`; when they exist these four sites take them.
+*/
 .one-path-section-heading h2 {
   font-size: clamp(28px, 3.3vw, 44px);
   line-height: 1.12;
@@ -327,7 +346,6 @@
   content: counter(one-path-step, decimal-leading-zero);
   display: block;
   margin-bottom: 16px;
-  font-family: var(--f-mono);
   font-size: var(--t-1, 12px);
   letter-spacing: .08em;
   color: var(--text-lo);
@@ -408,7 +426,6 @@
   position: absolute;
   left: 0;
   top: 22px;
-  font-family: var(--f-mono);
   font-size: var(--t-1, 12px);
   line-height: 1.6;
   color: var(--text-lo);
@@ -563,7 +580,9 @@
     line-height: 1.5;
     color: var(--text-lo);
   }
-  .one-path-ko .one-path-hero-film-v2::after { content: "옆으로 밀어 영상을 이동하세요"; }
+  /* BQ-013: the works film carries the same caption, and it was only overridden on the hero. */
+  .one-path-ko .one-path-hero-film-v2::after,
+  .one-path-ko .one-path-works-film::after { content: "옆으로 밀어 영상을 이동하세요"; }
 }
 @media (min-width: 900px) {
   .compile-film-panes { display: none; }
@@ -601,7 +620,6 @@
   .one-path-intro { margin-bottom: 28px; }
   .one-path-home h1 { font-size: clamp(32px, 6.4vw, 44px); }
   .one-path-lede { max-width: 46ch; font-size: var(--t-4, 16px); margin-bottom: 20px; }
-  .one-path-eyebrow { margin-bottom: 12px; }
   .one-path-actions { margin-top: 18px; }
   .one-path-hero-film { margin-top: 28px; }
   .one-path-film-note { margin: 10px 0 0; }

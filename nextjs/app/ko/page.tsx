@@ -22,7 +22,14 @@ const KO_HERO_STAGE = [{
   src: "/film/compile-cut.mp4",
   poster: "/film/poster-1.webp",
 }] as const;
-const KO_WORK_STAGES = [COMPILE_STAGES[1]!, COMPILE_STAGES[2]!] as const;
+/*
+  BQ-013. 두 컷은 한국어 페이지에 영어 탭과 영어 캡션으로 걸려 있었다(COMPILE_STAGES를 그대로 재사용).
+  D12에 따라 기존 영문 문자열을 그대로 옮긴 번역이며 새 주장은 없다. id·src·poster는 잠긴 자산 그대로.
+*/
+const KO_WORK_STAGES = [
+  { ...COMPILE_STAGES[1]!, label: PIPELINE_STAGES[2].ko, line: "관련 정보를 연결된 지식 구조로 정리합니다." },
+  { ...COMPILE_STAGES[2]!, label: "업데이트", line: "바뀐 원본과 그 영향을 받는 지식을 함께 보여줍니다." },
+] as const;
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = pageMetadata({
   title: "내 자료를 AI가 쓰는 지식으로 — TAVONEL",
@@ -67,7 +74,7 @@ export default function KoreanEntryPage() {
           </div>
           {/* BQ-011 / BQ-056: 알약 모양 칩 네 개가 아니라 한 줄 캡션이다. 단계 이름은
               `PIPELINE_STAGES`의 한국어 표기를 그대로 쓴다. */}
-          <div className="one-path-hero-film one-path-hero-film-v2"><p className="one-path-hero-film-steps">{PIPELINE_STAGES.map((stage, position) => <span key={stage.key}>{position > 0 ? <i aria-hidden="true" /> : null}{stage.ko}</span>)}</p><CompileStagePlayer stages={KO_HERO_STAGE} preferVideo playbackRate={1.5} compact priorityPoster /></div>
+          <div className="one-path-hero-film one-path-hero-film-v2"><p className="one-path-hero-film-steps">{PIPELINE_STAGES.map((stage, position) => <span key={stage.key}>{position > 0 ? <i aria-hidden="true" /> : null}{stage.ko}</span>)}</p><CompileStagePlayer stages={KO_HERO_STAGE} preferVideo playbackRate={1.5} compact priorityPoster korean /></div>
           {/* D3 / BQ-129: 한 문장은 영상 아래에 그대로 두고, 세 가지 차이는 펼침으로 옮긴다. */}
           <div className="one-path-film-note">
             <p>제품 흐름을 설명하는 연출 영상이며 실제 서비스 화면 녹화가 아닙니다. 영상 속 세 가지는 현재 배포보다 앞서 있습니다.</p>
@@ -82,7 +89,7 @@ export default function KoreanEntryPage() {
         <div className="one-path-section-heading"><h2 id="ko-works-title">자료만 가져오세요. 어려운 처리는 TAVONEL이 맡습니다.</h2><p>정상 문서는 자동으로 처리하고, 어려운 부분은 더 적합한 처리 경로로 보냅니다. 검증할 수 없는 항목은 조용히 통과시키지 않고 검토 대상으로 표시합니다.</p></div>
         {/* BQ-129: 영문 페이지와 같이 <ol> + <h3>. 일반 div에 aria-label을 붙여도 이름이 붙지 않는다. */}
         <ol className="one-path-workflow"><li><h3>파일 확인</h3><p>형식과 무결성, 네이티브 구조를 먼저 확인합니다.</p></li><li><h3>내용 읽기</h3><p>구조화된 경로를 우선하고 필요한 부분만 전문 처리를 사용합니다.</p></li><li><h3>자리 유지</h3><p>인쇄된 순서대로 각 영역을 읽고, 그 영역이 있던 페이지와 위치를 함께 보관합니다.</p></li><li><h3>지식 연결</h3><p>관련 정보를 원문과 분리하지 않고 연결합니다.</p></li><li><h3>출처 확인</h3><p>근거를 점검하고 예외만 검토 대상으로 올립니다.</p></li><li><h3>AI 활용 준비</h3><p>검토·승인된 결과를 AI가 사용할 수 있게 준비합니다.</p></li></ol>
-        <div className="one-path-works-film"><CompileStagePlayer stages={KO_WORK_STAGES} preferVideo /></div>
+        <div className="one-path-works-film"><CompileStagePlayer stages={KO_WORK_STAGES} preferVideo korean /></div>
       </div></section>
       <section className="one-path-section" aria-labelledby="ko-intake-title"><div className="one-path-wrap">
         <div className="one-path-section-heading"><h2 id="ko-intake-title">자료가 있는 곳에서 시작하세요.</h2><p>파일·폴더·ZIP을 선택하거나 연결 가능한 소스를 확인하세요. 고객이 parser나 모델을 고르지 않아도 됩니다.</p></div>

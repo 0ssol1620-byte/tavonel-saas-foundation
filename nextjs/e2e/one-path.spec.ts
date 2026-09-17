@@ -57,7 +57,7 @@ test("hero is the accelerated V2 presentation and Works uses the supporting lock
 
   const film = page.getByTestId("one-path-works-film");
   await film.scrollIntoViewIfNeeded();
-  const pairs = [["ORGANIZE", "compile-cut-2.mp4"], ["UPDATES", "compile-cut-3.mp4"]];
+  const pairs = [["Organize", "compile-cut-2.mp4"], ["Updates", "compile-cut-3.mp4"]];
   for (const [label, name] of pairs) {
     await film.getByRole("tab", { name: label, exact: true }).click();
     await expect(film.getByRole("tab", { name: label, exact: true })).toHaveAttribute("aria-selected", "true");

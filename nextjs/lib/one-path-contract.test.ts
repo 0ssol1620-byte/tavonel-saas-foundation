@@ -57,6 +57,28 @@ describe("approved one-path experience", () => {
     expect(page).toContain("the page it was read from");
     expect(page).toContain("/explore?act=source");
   });
+  /*
+    BQ-013. The locale thread reached the chrome and stopped at the film.
+
+    /ko reused `COMPILE_STAGES[1]` and `[2]` verbatim, so the Korean page rendered English tab
+    labels and an English caption, and the player kept the tablist name, the three control names
+    and the decoder-failure sentence in English whatever page it was on. None of that is visible
+    marketing copy, which is why it survived every copy pass; all of it is the accessible name of
+    a control. The guard follows the prop rather than the strings: a film that stops taking the
+    locale fails here.
+  */
+  it("names the film and its controls in the language of the page they are on", () => {
+    const ko = text("app/ko/page.tsx");
+    expect(ko.match(/<CompileStagePlayer[^>]*korean/g)).toHaveLength(2);
+    expect(ko, "the Korean works film may not reuse the English stage labels verbatim")
+      .not.toContain("const KO_WORK_STAGES = [COMPILE_STAGES[1]!, COMPILE_STAGES[2]!]");
+    const player = text("components/compile-stage-player.tsx");
+    for (const wired of ["aria-label={text.stages}", "FILM_CONTROL_LABEL_KO[control]", "{text.error}", "text.errorLong"]) {
+      expect(player, `${wired} must read the locale, not a literal`).toContain(wired);
+    }
+    expect(text("app/one-path.css"), "and the swipe caption is overridden on both Korean films")
+      .toContain(".one-path-ko .one-path-works-film::after");
+  });
   it("preserves state-controlled entry and actual public proof", () => {
     expect(text("components/home-page-client.tsx")).toContain("liveCommerce ? SELF_SERVE_CTA : ACCESS_CTA");
     expect(text("app/page.tsx")).toContain("isLiveCommerce()");

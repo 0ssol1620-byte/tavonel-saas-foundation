@@ -432,10 +432,19 @@ describe("public copy", () => {
     expect(landing).toContain("playbackRate={1.5} compact");
     expect(landing).toContain("stages={WORK_STAGES}");
 
-    const player = read("components/compile-stage-player.tsx");
-    for (const stage of ["FILES", "ORGANIZE", "UPDATES", "USE WITH AI"]) {
+    /*
+      BQ-056. The labels are sentence case now, and this guard must read the strip rather than the
+      file: the uppercase list it used to assert went on passing after the change because the
+      commit note above `COMPILE_STAGES` quotes the old names. Assert the exported values.
+    */
+    const player = read("components/compile-stage-player.tsx").replace(/\/\*[\s\S]*?\*\//g, "");
+    for (const stage of [`label: "Files"`, `label: "Updates"`, `label: "Use with AI"`]) {
       expect(player, `the stage strip must offer ${stage}`).toContain(stage);
     }
+    expect(player, "the one stage that is a pipeline stage takes its name from the constant")
+      .toContain("label: PIPELINE_STAGES[2].label");
+    expect(player, "and the strip is not set in the instrument voice any more")
+      .not.toContain(`label: "ORGANIZE"`);
     expect(player, "stages must be selectable, not decorative").toContain('role="tab"');
     expect(player, "reduced motion gets stills and no timer").toContain("prefers-reduced-motion");
   });

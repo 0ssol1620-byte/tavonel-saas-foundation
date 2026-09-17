@@ -72,7 +72,10 @@ test("the customer film vocabulary stays readable without reintroducing technica
   for (const box of boxes) {
     expect(box.left).toBeGreaterThanOrEqual(-1);
     expect(box.right).toBeLessThanOrEqual((page.viewportSize()?.width ?? 390) + 1);
-    expect(box.width).toBeGreaterThan(40);
+    // BQ-011: they are caption words now, not 999px pills. "Source" is the one span with no
+    // leading rule, so its box is the text: about 41px at 12px. The floor still catches a
+    // collapsed or clipped name, which is what this assertion was opened about.
+    expect(box.width).toBeGreaterThan(24);
   }
 });
 
@@ -81,7 +84,7 @@ test("the Works film remains a two-stage accessible tablist with readable captio
   const film = await openWorksFilm(page);
   const tabs = film.locator('.compile-film-stages[role="tablist"] [role="tab"]');
   await expect(tabs).toHaveCount(2);
-  await expect(tabs).toHaveText(["ORGANIZE", "UPDATES"]);
+  await expect(tabs).toHaveText(["Organize", "Updates"]);
   await expect(film.locator('.compile-film-viewport[role="tabpanel"]')).toHaveCount(1);
   await expect(film.locator(".compile-film-caption p")).toContainText(/knowledge|source/i);
   await expect(film.locator(".compile-film-progress")).toHaveText(/^\d\d \/ 02$/);
@@ -92,7 +95,7 @@ test("the Works film remains a two-stage accessible tablist with readable captio
 test("a visitor-selected Works stage stays selected when the current cut ends", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "390", "one phone width is enough for the manual-hold state machine");
   const film = await openWorksFilm(page);
-  const updates = film.getByRole("tab", { name: "UPDATES" });
+  const updates = film.getByRole("tab", { name: "Updates" });
   await updates.click();
   await expect(updates).toHaveAttribute("aria-selected", "true");
   const video = film.locator(".compile-film-video");
