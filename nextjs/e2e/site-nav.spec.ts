@@ -26,7 +26,7 @@
  * width where it is on screen.
  */
 
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, webkit, type Page } from "@playwright/test";
 
 /*
   Question -> the trail of hrefs a reader clicks to reach its answer.
@@ -258,11 +258,24 @@ test.describe("chromium", () => {
   what resets the header, so sharing a page costs nothing and saves the context launches on the
   slowest engine. The step name is the scenario's own, so a failure here reads the same as the
   Chromium run above.
+
+  WebKit is imported rather than taken from the `playwright` fixture, and that is load-bearing.
+  A browser reached through the fixture has the runner's artifact instrumentation attached to
+  every context it opens, and `playwright.config.ts` already records what that costs here:
+  Playwright 1.62's Windows WebKit port deadlocks while recording a trace for a native
+  `<details>` interaction -- which every phone scenario below performs. Inside a width project
+  that deadlock is worse than one hung test: it takes the runner process down with exit 127 and
+  no reporter output, stopping the whole suite wherever this test happened to be scheduled. That
+  is what made the full set unfinishable. `test.use({ trace: "off" })` is not available -- trace
+  forces a new worker, so Playwright refuses it in a describe, the same rule that put this file
+  in charge of its own browser in the first place. The import is the one knob left. Every
+  assertion and the engine coverage the founder's phone depends on are unchanged; only the
+  instrumentation that hangs is skipped, and a failure still reports its call log and stack.
 */
-test("webkit answers the same questions", async ({ playwright, baseURL }, testInfo) => {
+test("webkit answers the same questions", async ({ baseURL }, testInfo) => {
   test.skip(testInfo.project.name !== "1440", "site-nav drives its own viewport and browser");
   test.setTimeout(600_000);
-  const browser = await playwright.webkit.launch();
+  const browser = await webkit.launch();
   try {
     for (const group of [DESKTOP, PHONE]) {
       const context = await browser.newContext({
