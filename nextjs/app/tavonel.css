@@ -1145,10 +1145,9 @@
     list-style: none;
     cursor: pointer;
     padding: 14px 0;
-    font: 500 var(--t-1)/1 var(--f-sans);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text-lo);
+    font: 500 var(--t-2)/1.4 var(--f-sans);
+    letter-spacing: 0;
+    color: var(--text-mid);
     display: flex;
     align-items: center;
     gap: 10px;
@@ -1158,7 +1157,7 @@
   .status-fold > summary::before {
     content: "+";
     font-size: 14px;
-    color: var(--verified);
+    color: var(--text-mid);
   }
   .status-fold[open] > summary::before { content: "−"; }
   @media (hover: hover) and (pointer: fine) {
@@ -3186,7 +3185,7 @@
   .src-matrix {
     width: 100%;
     border-collapse: collapse;
-    font-size: 12.5px;
+    font-size: var(--t-2);
     line-height: 1.55;
   }
   .src-matrix caption {
@@ -3195,7 +3194,7 @@
     text-align: left;
     font-family: var(--f-sans);
     font-size: var(--t-1);
-    letter-spacing: 0.08em;
+    letter-spacing: 0;
     color: var(--text-lo);
     word-break: break-word;
   }
@@ -3219,7 +3218,7 @@
   .src-matrix tbody th b {
     display: block;
     font-family: var(--f-sans);
-    font-size: 12.5px;
+    font-size: var(--t-2);
     font-weight: 500;
     color: var(--text-hi);
   }
@@ -4311,15 +4310,19 @@
   }
   .integration-technical > summary {
     list-style: none;
-    color: var(--text-lo);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    color: var(--text-mid);
     font-family: var(--f-sans);
-    font-size: var(--t-1);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    font-size: var(--t-2);
+    font-weight: 500;
+    letter-spacing: 0;
   }
   .integration-technical > summary::-webkit-details-marker { display: none; }
-  .integration-technical > summary::after { content: ' +'; color: var(--verified); }
-  .integration-technical[open] > summary::after { content: ' −'; }
+  .integration-technical > summary::after { content: "+"; color: var(--text-mid); }
+  .integration-technical[open] > summary::after { content: "−"; }
   .integration-technical .integration-facts { margin-top: 14px; }
   .integration-footnote { max-width: 80ch; margin-top: 20px; }
 
