@@ -174,7 +174,7 @@ export default function DocumentUnderstandingPage() {
               <p className="lede">
                 Read scans and complex layouts while retaining the location of every region and
                 the uncertainty around it. The compiler has to recover text and coordinates
-                <b> before anything can be compiled into a world.</b>
+                 before anything can be compiled into a world.
               </p>
               <div className="tiles">
                 {PARTS.map(([state, title, body]) => (

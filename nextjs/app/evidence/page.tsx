@@ -73,7 +73,7 @@ const MECHANISM = [
 ] as const;
 
 const VERIFY = [
-  ["Open a result", "Ask a question, or open any object in a compiled world, and follow its citation."],
+  ["Open a result", "Ask a question, or open any object in a Compiled World, and follow its citation."],
   ["Reach the location", "The evidence record names the source version and the exact location inside it, and opens that location."],
   ["Export the world", "Download the signed package: ontology, graph, retrieval corpus, provenance and validation."],
   ["Verify independently", "Check every file digest against the manifest, and the manifest signature against the published key."],
@@ -143,9 +143,9 @@ export default function EvidencePage() {
                 is part of the lede now; the cross-links are one labelled row at the foot.
               */}
               <p className="lede">
-                A compiled world is only worth as much as its ability to show its work.{" "}
-                <b>Every compiled fact stays traceable to its exact source location.</b> This page
-                is <b>how a compiled result stays bound to the source it came from</b>, and how to
+                A Compiled World is only worth as much as its ability to show its work.{" "}
+                Every compiled fact stays traceable to its exact source location. This page
+                is how a compiled result stays bound to the source it came from, and how to
                 check that yourself, without taking our word for it.
               </p>
               {/*

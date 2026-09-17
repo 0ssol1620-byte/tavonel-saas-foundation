@@ -42,7 +42,7 @@ import {
 export const metadata: Metadata = {
   title: "Supported sources — TAVONEL",
   description:
-    "Every source format TAVONEL reads, its support tier, what survives into the compiled world, and the limits that come with it.",
+    "Every source format TAVONEL reads, its support tier, what survives into the Compiled World, and the limits that come with it.",
   alternates: { canonical: "/sources" },
   openGraph: { url: "/sources" },
   robots: { index: true, follow: true },
@@ -77,9 +77,9 @@ export default function SourcesPage() {
             <div className="stack">
               <p className="lede">
                 One list decides what the upload route accepts, what the file picker offers, what
-                a rejection says and what this page prints. <b>They cannot disagree, because they
-                are the same list.</b> Each row states its support tier and what survives into the
-                compiled world; anything not listed here is refused at upload rather than accepted
+                a rejection says and what this page prints. They cannot disagree, because they
+                are the same list. Each row states its support tier and what survives into the
+                Compiled World; anything not listed here is refused at upload rather than accepted
                 and quietly mishandled.
               </p>
 

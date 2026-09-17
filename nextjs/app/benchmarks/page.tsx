@@ -138,8 +138,8 @@ export default function BenchmarksPage() {
                 knowledge also has to bind each statement to the region that supports it, decide
                 when two mentions are one thing, keep track of which revision is current, work out
                 what a change to page 40 invalidates three files away, and refuse to answer what
-                the world cannot support. <b>The Knowledge Compilation Benchmark is the protocol
-                for measuring all of it</b> — eight families, one receipt, four rules.
+                the world cannot support. The Knowledge Compilation Benchmark is the protocol
+                for measuring all of it — eight families, one receipt, four rules.
               </p>
 
               {/*

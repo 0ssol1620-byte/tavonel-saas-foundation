@@ -208,7 +208,7 @@ export default function CompiledWorldPage() {
               <p className="lede">
                 The output of a compile is a Compiled World: objects, relations, evidence,
                 versions and the artifacts that project them.
-                <b> One world, used by retrieval, agents, MCP, APIs and applications.</b>
+                 One world, used by retrieval, agents, MCP, APIs and applications.
               </p>
               <div className="tiles">
                 {PARTS.map((part) => (

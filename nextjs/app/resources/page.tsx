@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   openGraph: { url: "/resources" },
   title: "Resources — TAVONEL",
   description:
-    "Explore a compiled world, read the documentation and API, and inspect the research and evidence behind the compiler.",
+    "Explore a Compiled World, read the documentation and API, and inspect the research and evidence behind the compiler.",
 };
 
 /*

@@ -1,4 +1,11 @@
 /*
+  The route-level sheet for the editorial pages (/product, /pricing, /resources and their
+  siblings). It is loaded after `tavonel.css` in `app/globals.css` and stays unlayered, so a rule
+  here is a deliberate per-route override of the system sheet rather than a competing definition
+  of it. Nothing site-wide belongs in this file; that is `tavonel.css`.
+*/
+
+/*
   BA-021. One vertical scale for the page, instead of a per-block margin each time.
 
   Measured on this branch at 1280 before the change: 95px between the lede and the buttons that
@@ -102,3 +109,78 @@
 .product-surface p { margin: 0; color: var(--text-lo); font-size: 13px; line-height: 1.65; }
 @media (max-width: 900px) { .product-flow { grid-template-columns: repeat(2, 1fr); } .product-surface-grid { grid-template-columns: 1fr; } .product-surface { min-height: 210px; } }
 @media (max-width: 560px) { .product-flow { grid-template-columns: 1fr; } .product-flow article { min-height: 112px; } }
+
+/* ======================================================================== /pricing
+
+  BQ-027. Four plan cards on four shared baselines, by subgrid rather than by min-height.
+
+  Measured at 1440 before this: the four titles, prices, bodies and buttons each started
+  wherever the card above them happened to end, 32px apart at the worst pair, because every card
+  was its own flex column. The grid owns four rows now -- head, body, features, action -- and
+  each card spans them, so a row is as tall as the tallest card's content and all four cards
+  start their slot on the same line. A `min-height` per part would be a measurement of today's
+  copy; this is a relationship between the cards, which is what was actually wrong.
+
+  At two columns and at one the rows repeat implicitly, so the pairing still holds where the
+  grid wraps and the rule needs no width query of its own.
+*/
+.pricing-page .plans { grid-template-rows: repeat(4, auto); grid-auto-rows: auto; align-items: stretch; }
+.pricing-page .plan {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: span 4;
+  align-content: start;
+}
+.pricing-page .plan-head { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.pricing-page .plan-body { margin: 0; }
+.pricing-page .plan-features { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+.pricing-page .plan-action { display: flex; flex-direction: column; gap: 10px; align-items: stretch; align-self: end; }
+.pricing-page .plan-action .btn { width: 100%; }
+
+/*
+  BQ-110. The section headings under "How your plan works" had no scale between them: `h3` came
+  out of the browser default with zero margin against the block above it, and `h4` was never
+  styled at all, so a tile's title and its body were the same 14px. Three real steps -- 24 / 18 /
+  15 -- with the space each one owns above it.
+*/
+.pricing-page .pricing-details h3 { margin: 40px 0 14px; font-size: 18px; letter-spacing: -.015em; }
+.pricing-page .pricing-details .tile h4 { margin: 0 0 6px; color: var(--text-hi); font-size: 15px; font-weight: 500; }
+
+/*
+  BQ-135. The page is roughly 13,000px on a phone. This is the way down it.
+
+  The jump strip is the one `/security` already uses -- plain anchors to headings that already
+  carry ids, in fine print under the plan grid -- so there is no new component and nothing to
+  keep in step: a section that loses its id loses its link in the same edit.
+*/
+.pricing-page .pricing-jump { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 26px 0 0; }
+
+/*
+  BQ-135. The estimator read as a machine ledger: 10px tracked uppercase mono for both the field
+  label and every row title, in `--text-xlo`. These are questions a buyer reads, not identifiers,
+  so they take sans at the type floor; the amounts stay tabular, because a column of figures a
+  reader compares is exactly what tabular numerals are for.
+*/
+.usage-estimator label,
+.usage-estimator dt {
+  font-family: var(--f-sans);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--text-mid);
+  text-transform: none;
+}
+
+/*
+  BQ-135. One divider treatment in the glance grid. The tiles carried a bottom hairline each, so
+  a three-column row drew three segments that stopped short of each other and read as a broken
+  rule. The row gap is the separation; the segments are gone.
+*/
+.pricing-page .pricing-glance .tile { border-bottom: 0; padding-bottom: 0; }
+.pricing-page .pricing-glance { gap: 28px 24px; }
+
+/*
+  BQ-135. Air under the hero. The plan grid started 26px under a paragraph of fine print, which
+  put a $0/$29/$99/Custom row inside the same block as the sentence above it.
+*/
+.pricing-page .plans { margin-top: clamp(32px, 4vw, 56px); }

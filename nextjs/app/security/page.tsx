@@ -189,7 +189,7 @@ export default function SecurityPage() {
                 Your sources move through a tenant-scoped processing path, and activation remains
                 under human control. Browser-direct upload → quarantine → sanitize and disarm →
                 isolated analysis → candidate world → your approval.
-                <b> Every external operation fails closed.</b>
+                 Every external operation fails closed.
               </p>
 
               {/*

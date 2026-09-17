@@ -55,7 +55,7 @@ export default function ResearchNotesPage() {
             </div>
             <div className="stack">
               <p className="lede">
-                This is the record of <b>what has actually been measured</b>, and what has not.
+                This is the record of what has actually been measured, and what has not.
                 Every result carries the state of its evidence: a measurement is a number we
                 produced and can describe the conditions for, open is code that passes its tests
                 without that making a threshold right, and not supported is a hypothesis we
