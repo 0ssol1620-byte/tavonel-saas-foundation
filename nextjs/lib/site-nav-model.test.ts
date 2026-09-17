@@ -14,6 +14,7 @@ import {
   RESOURCE_LINKS,
   navHrefs,
   navSectionForPath,
+  KO_CHROME,
 } from "./site-navigation";
 
 /*
@@ -139,12 +140,37 @@ describe("the global menu's destinations", () => {
     slot is asserted empty so that filling it is a deliberate act by the lane that owns the
     operator record, and not something that arrives with an unrelated edit.
   */
+  /*
+    chrome-14 / D36. One language per footer.
+
+    Korean group headings over 24 English link labels reads as an unfinished translation. Every
+    destination the footer lists carries a Korean label, and the table may not name a route the
+    footer does not list -- which is what keys-by-href buys.
+  */
+  it("gives every footer destination a Korean label on /ko", () => {
+    const hrefs = FOOTER_GROUPS.flatMap((group) => group.links.map((link) => link.href));
+    for (const href of hrefs) expect(KO_CHROME.footerLinks[href], href).toBeTruthy();
+    expect(Object.keys(KO_CHROME.footerLinks).sort()).toEqual([...hrefs].sort());
+    expect(read("../components/public-site-chrome.tsx"), "and the footer renders them")
+      .toContain("korean ? KO_CHROME.footerLinks[link.href] ?? link.label : link.label");
+  });
+
   it("closes the footer with the copyright, the Korean entry and the security inbox", () => {
     expect(FOOTER_LEGAL_ROW.copyright).toBe("© 2026 TAVONEL");
     expect(FOOTER_LEGAL_ROW.language).toEqual({ href: "/ko", label: "한국어" });
     expect(SITEMAP_PATHS.has(FOOTER_LEGAL_ROW.language.href), "the Korean entry is a published route").toBe(true);
+    /*
+      chrome-06. The switch is reciprocal: it was one static entry rendered on every route, so on
+      /ko it read "한국어" and pointed at the page the reader was already on. The guard follows the
+      constant -- both sides, both published -- and holds the footer to picking the side the page
+      is not on.
+    */
+    expect(FOOTER_LEGAL_ROW.languageBack).toEqual({ href: "/", label: "English" });
+    expect(SITEMAP_PATHS.has(FOOTER_LEGAL_ROW.languageBack.href), "the English entry is a published route").toBe(true);
+    expect(read("../components/public-site-chrome.tsx"), "the footer picks the other language")
+      .toContain("korean ? FOOTER_LEGAL_ROW.languageBack : FOOTER_LEGAL_ROW.language");
     expect(FOOTER_LEGAL_ROW.security).toBe("security@tavonel.com");
-    expect(Object.keys(FOOTER_LEGAL_ROW).sort()).toEqual(["copyright", "language", "security"]);
+    expect(Object.keys(FOOTER_LEGAL_ROW).sort()).toEqual(["copyright", "language", "languageBack", "security"]);
     const chrome = read("../components/public-site-chrome.tsx");
     expect(chrome, "the row is rendered, not just declared").toContain("FOOTER_LEGAL_ROW.copyright");
     for (const invented of ["Co., Ltd", "Inc.", "Republic of Korea", "governed by the laws"]) {

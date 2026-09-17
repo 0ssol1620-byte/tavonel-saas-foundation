@@ -116,6 +116,38 @@ export const KO_CHROME = {
     Trust: "신뢰와 보안",
     Legal: "약관",
   } as Record<string, string>,
+  /*
+    chrome-14 / D36. The footer was half translated: Korean group headings over 24 English link
+    labels, which reads as an unfinished translation rather than a decision. Keyed by href for
+    the same reason the nav and CTA tables are -- a label exists here only where FOOTER_GROUPS
+    already points, so this cannot name a route the site does not have. Literal translations of
+    the English labels; product names (TAVONEL, MCP, API) are not translated.
+  */
+  footerLinks: {
+    "/product": "제품",
+    "/solutions": "솔루션",
+    "/integrations": "연동",
+    "/sources": "지원 파일",
+    "/knowledge-compiler": "지식 컴파일러",
+    "/enterprise": "엔터프라이즈",
+    "/pricing": "요금",
+    "/benchmarks": "방법론",
+    "/research": "리서치",
+    "/evidence": "증거",
+    "/resources": "자료",
+    "/docs": "문서",
+    "/api": "API",
+    "/developers": "MCP와 에이전트",
+    "/changelog": "변경 이력",
+    "/trust": "신뢰 센터",
+    "/security": "보안",
+    "/status": "상태",
+    "/subprocessors": "하위 처리자",
+    "/contact": "문의",
+    "/privacy": "개인정보 처리방침",
+    "/terms": "이용약관",
+    "/refunds": "환불 정책",
+  } as Record<string, string>,
   tagline: "모든 결과에서 원문까지 다시 따라갈 수 있도록 컴파일합니다.",
   stateLine: "공개 Compiled World: 지금 전체 열람 가능 · 내 자료 컴파일: 협의 후 진행",
 } as const;
@@ -381,8 +413,16 @@ export const FOOTER_GROUPS: readonly { title: string; links: readonly SiteLink[]
 export const FOOTER_LEGAL_ROW = {
   /** The brand, which is what this site is published as. No entity, no jurisdiction -- see above. */
   copyright: "© 2026 TAVONEL",
-  /** The §12.4 Korean entry, in Korean, because that is who it is for. */
+  /*
+    The §12.4 Korean entry, in Korean, because that is who it is for -- and its return trip.
+
+    chrome-06: this was one static entry rendered on every route, so on /ko itself the control
+    read "한국어" and pointed at /ko. A switch whose only job is to change language was a self-link
+    on the one page where it matters. The pair is reciprocal now and the footer picks the side the
+    page is not on.
+  */
   language: { href: "/ko", label: "한국어" },
+  languageBack: { href: "/", label: "English" },
   security: "security@tavonel.com",
 } as const;
 

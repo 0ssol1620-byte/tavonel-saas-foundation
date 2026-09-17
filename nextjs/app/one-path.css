@@ -160,8 +160,17 @@
 /* ================================================================================ the landing */
 
 .one-path-home { background: var(--ground); color: var(--text-hi); }
+/*
+  D33 / chrome-03 / chrome-04. One container, on all 27 routes.
+
+  This was capped at 1280px while every other public route's body sits in `.public-page .shell`
+  at `--shell-wide`, so at 1440 the landing's H1, its films and its footer lockup sat at x=80
+  while the header wordmark above them sat at x=30 -- and /ko, which renders the shared footer
+  rather than this wrap, put its body at 80 and its footer at 30 on the same page. Same formula as
+  `.shell`, so the landing, its Korean twin and the other 25 routes share one left edge.
+*/
 .one-path-wrap {
-  width: min(1280px, calc(100% - 2 * var(--gutter, 30px)));
+  width: min(var(--shell-wide), calc(100% - 2 * var(--gutter, 30px)));
   margin-inline: auto;
   min-width: 0;
 }

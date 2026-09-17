@@ -52,6 +52,12 @@ describe("the Korean term table", () => {
       KO_CHROME.signIn,
       ...Object.values(KO_CHROME.cta),
       ...Object.values(KO_CHROME.footerGroups),
+      /*
+        chrome-14 / D36. The footer was Korean headings over 24 English link labels. The labels are
+        chrome strings like the rest of this list, so they are held to the same term table -- and
+        every one of them has to point at a route FOOTER_GROUPS already lists.
+      */
+      ...Object.values(KO_CHROME.footerLinks),
     ].join("\n");
     expect(koTermDrift(chrome)).toEqual([]);
     expect(chrome, "the chrome already spells the artifact the way the table does").toContain(KO_TERMS["Compiled World"]);
