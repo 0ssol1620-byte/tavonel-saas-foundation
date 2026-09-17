@@ -8,17 +8,9 @@
   --content-gap: clamp(24px, 3vw, 52px);
 }
 
-/* A precision-instrument pointer rather than a decorative trailing cursor. Text editing keeps the
-   platform I-beam, touch has no custom cursor, and the hotspot is the centre of the reticle. */
-@media (pointer: fine) {
-  body {
-    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='2' fill='%239aa3a8'/%3E%3Cpath d='M12 2v5M12 17v5M2 12h5M17 12h5' stroke='%237d878d' stroke-width='1'/%3E%3C/svg%3E") 12 12, crosshair;
-  }
-  a, button, [role='button'], summary, label[for] {
-    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26'%3E%3Cpath d='M4 10V4h6M16 4h6v6M22 16v6h-6M10 22H4v-6' fill='none' stroke='%237be0be' stroke-width='1.5'/%3E%3Ccircle cx='13' cy='13' r='1.7' fill='%237be0be'/%3E%3C/svg%3E") 13 13, pointer;
-  }
-  input, textarea, [contenteditable='true'], code, pre { cursor: text; }
-}
+/* Cursor: the system default, everywhere. A crosshair over the page and a bracket over every
+   link is a demo toy, not an instrument -- it removes the one pointer affordance every visitor
+   already knows and replaces it with a 26px SVG that has to be decoded on every pointer move. */
 
 /* Marketing canvas: text retains readable measure, product visuals get the pixels they deserve. */
 .landing-page .shell,
@@ -121,11 +113,6 @@
 .compile-film-viewport:hover .compile-film-motion-control,
 .compile-film-motion-control:focus-visible { opacity: 1; }
 
-/* Avoid the temporary 'out of focus' impression users saw between scenes. State should arrive via
-   position/luminance, not simulated optical blur. */
-.js .rv.word { filter: none; transform: translateY(10px); }
-.js .rv.word.in { filter: none; transform: none; }
-
 /* Workspace information density: failures win attention, inventories remain bounded and rows are
    scan-able at 1/12/55/128+ source counts. */
 .board-failure-banner {
@@ -188,7 +175,6 @@
 }
 
 @media (pointer: coarse), (prefers-reduced-motion: reduce) {
-  body, a, button, [role='button'], summary { cursor: auto; }
   html.landing-scroll { scroll-snap-type: none; }
   .board-row-detail:not([hidden]) { animation: none; }
 }
