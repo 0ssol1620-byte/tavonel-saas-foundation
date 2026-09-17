@@ -2192,32 +2192,9 @@
   .workspace-compile-job-blocked ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
   .workspace-compile-job-blocked li { color: var(--text-hi); font: 13px/1.5 var(--f-sans); }
   .workspace-compile-job-blocked em { color: var(--changed); font-style: normal; }
-  .workspace-source-choices {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 1px;
-    width: min(100%, 860px);
-    margin-top: 20px;
-    background: var(--seam);
-    border: 1px solid var(--hairline);
-  }
-  .workspace-source-choices button {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 10px;
-    min-height: 72px;
-    padding: 14px;
-    color: var(--text-hi);
-    text-align: left;
-    background: var(--ground);
-    border: 0;
-  }
-  .workspace-source-choices button:focus-visible { background: color-mix(in srgb, var(--verified) 7%, var(--ground)); }
-  @media (hover: hover) and (pointer: fine) {
-    .workspace-source-choices button:hover { background: color-mix(in srgb, var(--verified) 7%, var(--ground)); }
-  }
-  .workspace-source-choices small { color: var(--text-lo); font: var(--t-1) var(--f-sans); letter-spacing: 0.06em; }
+  /* The connector tiles (`.workspace-source-choices`) are drawn by app/workspace-no1.css alone; the
+     seam-grid version that lived here painted a filled empty cell behind the seven tiles and clipped
+     their availability text. */
   .workspace-complete {
     display: grid;
     grid-template-columns: minmax(0, 1.4fr) minmax(280px, .6fr);
@@ -2234,7 +2211,6 @@
   .workspace-complete-actions { display: grid; gap: 8px; }
   .workspace-complete-actions button { min-height: 48px; }
   @media (max-width: 760px) {
-    .workspace-source-choices { grid-template-columns: 1fr 1fr; }
     .workspace-complete { grid-template-columns: 1fr; }
   }
   .review-comparison { display: grid; gap: 16px; }

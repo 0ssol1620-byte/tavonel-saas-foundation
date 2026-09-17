@@ -107,7 +107,9 @@
   .nav span[data-mobile-label] { font-size: 0; }
   .nav span[data-mobile-label]::after { content: attr(data-mobile-label); font-size: 12px; }
   .nav button b { position: absolute; margin: -26px 0 0 24px; }
-  .topbar { grid-template-columns: auto repeat(2, minmax(0, 1fr)) 48px auto; min-height: 56px; }
+  /* Columns by content, not by count: `.topStatus` is not always rendered, and a fixed 48px track
+     assigned by position put the 100px Upload button into it at 360px (10px of horizontal scroll). */
+  .topbar { grid-template-columns: auto minmax(0, 1fr) auto auto; min-height: 56px; }
   .topStatus { min-width: 0; padding: 8px 12px; }
   .topStatus b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .commandButton { width: 48px; min-width: 48px; justify-content: center; padding: 0; }
@@ -120,7 +122,7 @@
   .ownerStrip { padding-inline: 16px; }
 }
 @media (max-width: 560px) {
-  .topbar { grid-template-columns: auto minmax(0, 1fr) 48px auto; }
+  .topbar { grid-template-columns: auto minmax(0, 1fr) auto auto; }
   /* One state chip on the narrowest screens; the other is a tap away in the graph. */
   .topStatus ~ .topStatus { display: none; }
   .headerAction { padding-inline: 10px; }

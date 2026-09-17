@@ -75,6 +75,14 @@ export function sourcePageRaster(sourceSha256: string, page: number): SourcePage
   };
 }
 
+/**
+ * How many raster pixels stand for one page pixel in a region crop. The region files are rendered
+ * at `regionScale` times the 1400px page width so a zoomed reader stays sharp; a surface that shows
+ * a crop at page scale divides its width by this, or the statement header on
+ * /product/document-understanding reads as 40px display type.
+ */
+export const REGION_SCALE: number = manifest.regionScale;
+
 export function sourceRegionRaster(
   sourceSha256: string,
   page: number,

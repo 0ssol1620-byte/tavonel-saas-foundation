@@ -10,7 +10,7 @@ import {
   exploreSampleSources,
   exploreSampleWorld,
 } from "@/lib/explore-sample";
-import { sourceRegionRaster } from "@/lib/source-page-rasters";
+import { REGION_SCALE, sourceRegionRaster } from "@/lib/source-page-rasters";
 import { toVisualWorldModel, type VisualEvidence } from "@/lib/visual-world-model";
 
 /*
@@ -113,7 +113,7 @@ export default function SolutionProofSample({ pick, variant = "canonical", korea
         {/* eslint-disable-next-line @next/next/no-img-element -- the committed raster is
             served byte for byte: next/image would re-encode it, and the manifest's sha256 of
             these bytes is what makes the render checkable against its source. */}
-        <img src={crop.file} alt={`${filingLabel(region, korean)}, ${copy.cropAlt(region.page)}`} width={crop.width} height={crop.height} decoding="async" />
+        <img src={crop.file} alt={`${filingLabel(region, korean)}, ${copy.cropAlt(region.page)}`} width={crop.width} height={crop.height} decoding="async" style={{ maxWidth: `${Math.round(crop.width / REGION_SCALE)}px` }} />
         <figcaption className={styles.excerptFoot}>
           <span>{filingLabel(region, korean)} · {copy.pageOf(region.page, region.pageCount)}</span>
           <Link href={regionHref(region)}>{copy.openRegion}</Link>

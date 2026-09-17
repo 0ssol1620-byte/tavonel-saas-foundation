@@ -148,7 +148,8 @@
 */
 .fullWidth { grid-column: 1 / -1; min-width: 0; margin-top: clamp(24px, 3vw, 40px); }
 
-/* The page-crop variant: the region, at the width of the content it is placed in. */
+/* The page-crop variant: the region at page scale (the <img> caps its own max-width from the
+   manifest's regionScale), never wider than the content it is placed in. */
 .crop {
   display: grid;
   gap: 10px;
