@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import {
@@ -26,28 +27,44 @@ const STATE_TOKEN = {
 } as const;
 
 /*
-  The row's link names where it goes, and a row never links to the page it is on.
+  Where the longer answers are maintained, named once under the list.
 
-  Fourteen identical "Where this is maintained" lines is a footer repeated fourteen times, and on
-  /security six of them pointed at /security. The Trust Center's own rule applies: a link to where
-  you already are is worse than no link.
+  The row's link used to render on every row, and a row never linked to the page it was on. That
+  halved the problem and left the other half: fourteen rows carry five destinations between them,
+  so /enterprise printed "More on Trust" five times and "More on Security" six -- eleven links in
+  one list, which a screen reader's link list shows as eleven identical names (BQ-115).
+
+  A footer repeated fourteen times is one footer. `href` stays on the row, because which page
+  maintains an answer is a fact about that row, and the line under the list is derived from the
+  rows actually rendered -- so a row pointed somewhere new adds its destination here without
+  anybody editing a second list.
 */
 const DESTINATION: Record<string, string> = {
-  "/trust": "More on Trust",
-  "/security": "More on Security",
-  "/status": "More on Status",
-  "/terms": "More in the terms",
-  "/contact": "Ask us directly",
+  "/trust": "Trust",
+  "/security": "Security",
+  "/status": "Status",
+  "/terms": "the terms",
+  "/contact": "ask us directly",
 };
 
+/** The destinations these rows name, in declaration order, each once, minus the page we are on. */
+function destinations(on?: string) {
+  const seen = new Set<string>();
+  for (const row of TRUST_DISCLOSURES) {
+    if (row.href && row.href !== on && DESTINATION[row.href]) seen.add(row.href);
+  }
+  return [...seen];
+}
+
 export function TrustDisclosures({
-  heading = "WHAT A SECURITY REVIEW WILL FIND",
+  heading = "What a security review will find",
   on,
 }: {
   heading?: string;
   /** The page rendering the list, so a row does not link to where the reader already is. */
   on?: string;
 }) {
+  const onward = destinations(on);
   return (
     <>
       <h2>{heading}</h2>
@@ -57,12 +74,21 @@ export function TrustDisclosures({
             <span>{DISCLOSURE_STATUS_LABEL[row.status]}</span>
             <h3>{row.subject}</h3>
             <p>{row.line}</p>
-            {row.href && row.href !== on ? (
-              <p className="fine"><Link href={row.href as Route}>{DESTINATION[row.href]}</Link></p>
-            ) : null}
           </article>
         ))}
       </div>
+      {onward.length > 0 ? (
+        <p className="fine">
+          The longer answers are maintained on{" "}
+          {onward.map((href, index) => (
+            <Fragment key={href}>
+              {index > 0 ? (index === onward.length - 1 ? ", or " : ", ") : null}
+              <Link href={href as Route}>{DESTINATION[href]}</Link>
+            </Fragment>
+          ))}
+          .
+        </p>
+      ) : null}
     </>
   );
 }

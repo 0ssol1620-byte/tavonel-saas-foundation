@@ -338,7 +338,7 @@ export default function TrustCenterPage() {
                 again in their checklist position, which is where somebody comparing vendors goes
                 looking for them.
               */}
-              <TrustDisclosures heading="THE CHECKLIST, ROW BY ROW" on="/trust" />
+              <TrustDisclosures heading="The checklist, row by row" on="/trust" />
 
               {/*
                 BA-173. The first sentence answered an accusation nobody made ("nothing here is a

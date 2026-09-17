@@ -327,7 +327,7 @@ export default function SecurityPage() {
               <h2 id="review">What a security review will find</h2>
               <details className="status-fold">
                 <summary>The full checklist: what is in place, what is planned, and what is not in place</summary>
-                <TrustDisclosures on="/security" heading="IN THE ORDER A REVIEW ASKS THEM" />
+                <TrustDisclosures on="/security" heading="In the order a review asks them" />
               </details>
 
               <h2 id="deployment">Current deployment controls</h2>
