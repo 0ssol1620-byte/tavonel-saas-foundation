@@ -5,7 +5,6 @@ import RouteBoot from "@/components/route-boot";
 import MarketingConsent from "@/components/marketing-consent";
 import { jsonLdHtml } from "@/lib/structured-data";
 import "./globals.css";
-import "./evidence-first.css";
 import "./one-path.css";
 
 /**

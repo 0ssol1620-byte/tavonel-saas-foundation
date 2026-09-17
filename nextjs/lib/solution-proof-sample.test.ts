@@ -87,7 +87,7 @@ describe("solution proof sample", () => {
   });
 
   it("keeps the one link a thumb has to hit at the 44px floor", () => {
-    const css = readFileSync(join(process.cwd(), "app/ux-polish.css"), "utf8");
+    const css = readFileSync(join(process.cwd(), "app/tavonel.css"), "utf8");
     const rule = css.slice(css.indexOf(".solution-proof-sample-head a {"));
     expect(rule.slice(0, rule.indexOf("}"))).toContain("min-height: 44px");
   });

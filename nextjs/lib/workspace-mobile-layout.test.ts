@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const finalCss = readFileSync(new URL("../app/ux-120-final.css", import.meta.url), "utf8");
+// The 120-point sheet was folded into tavonel.css's `overrides` layer when the nine global
+// stylesheets collapsed to five; the contract it asserts is unchanged, only its address.
+const finalCss = readFileSync(new URL("../app/tavonel.css", import.meta.url), "utf8");
 const shellCss = readFileSync(new URL("../app/workspace/workspace-ultimate.module.css", import.meta.url), "utf8");
 
 describe("workspace mobile layout contract", () => {

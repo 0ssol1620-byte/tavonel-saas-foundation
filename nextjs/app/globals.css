@@ -1,7 +1,23 @@
+/*
+  The cascade, declared.
+
+  Nine global stylesheets used to load in sequence, and which rule won was decided by @import
+  order rather than by anything an author wrote down: `ux-120-final.css` was "intentionally last",
+  `ux-polish.css` "intentionally after tavonel.css", and moving any of them broke pages nobody
+  would think to check. Three separate :root blocks defined overlapping tokens on top of that.
+
+  The layer order below is the whole contract. Every rule in every global sheet sits in one of
+  these six layers, so a rule in `components` cannot be beaten by a rule in `base` no matter which
+  file loads first — and the polish sheets stopped being a stack. Four of them (ux-polish,
+  responsive-polish, ux-120-final, evidence-first) are folded into tavonel.css's `overrides` layer
+  and deleted; the three that other surfaces own are imported straight into `overrides`.
+
+  Module stylesheets (*.module.css) stay unlayered on purpose: unlayered wins over every layer,
+  which is what a component-scoped sheet should do. Keep them small and token-only.
+*/
+@layer reset, tokens, base, components, utilities, overrides;
+
 @import "./tavonel.css";
-@import "./ux-polish.css";
-@import "./product-polish.css";
-@import "./responsive-polish.css";
-@import "./workspace-final-polish.css";
-@import "./ux-120-final.css";
-@import "./workspace-no1.css";
+@import "./product-polish.css" layer(overrides);
+@import "./workspace-final-polish.css" layer(overrides);
+@import "./workspace-no1.css" layer(overrides);

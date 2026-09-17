@@ -109,7 +109,7 @@ describe("2026-09-05 production hardening", () => {
     The compact intake keeps a drop affordance. Founder report, 2026-09-06.
 
     The hierarchy pass shrank `.workspace-intake` to a one-row bar as soon as a source exists,
-    and the toolbar rule in `ux-polish.css` gave it the plain hairline and a transparent ground.
+    and the toolbar rule folded in from `ux-polish.css` gave it the plain hairline and a transparent ground.
     The section still accepts drops, so what it lost was only the ability to say so: the founder
     saw the full drop zone while documents were still null and could not find where files went
     once the first one loaded. The `[data-active="true"]` highlight went with it, outranked by
@@ -129,14 +129,14 @@ describe("2026-09-05 production hardening", () => {
   });
 
   it("removes the full-viewport floor from short landing scenes but keeps the film immersive", () => {
-    const css = read("app/ux-120-final.css");
+    const css = read("app/tavonel.css");
     expect(css).toContain(".landing-page .scene:not(.film)");
     expect(css).toContain("min-height: auto");
     expect(css).toContain(".landing-page .scene.film { min-height: 100svh");
   });
 
   it("centres the wide compile film instead of pushing it beyond the viewport", () => {
-    const css = read("app/ux-120-final.css");
+    const css = read("app/tavonel.css");
     expect(css).toContain("--compile-film-width: min(94vw, 1580px)");
     expect(css).toContain("calc((100% - var(--compile-film-width)) / 2)");
     expect(css).not.toContain("min(94vw, 1580px)) / 2 * -1");
