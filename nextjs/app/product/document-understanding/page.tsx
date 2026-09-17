@@ -5,6 +5,7 @@ import { PublicSitePage } from "@/components/public-site-chrome";
 import BreadcrumbJsonLd, { DocBreadcrumb } from "@/components/breadcrumb-json-ld";
 import SolutionProofSample, { type ProofPick } from "@/components/solution-proof-sample";
 import { CAPABILITY_MANIFEST, isAcceptedAtUpload } from "../../../../shared/capabilityManifest";
+import { EXPLORE_CTA } from "@/lib/site-navigation";
 
 /*
   G1-019. The region this page opens on, selected out of the published corpus rather than written.
@@ -203,7 +204,7 @@ export default function DocumentUnderstandingPage() {
                 twice in two adjacent elements, with the button competing with the primary.
               */}
               <div className="actions">
-                <Link className="btn" href={"/explore" as Route}>See a page and its regions</Link>
+                <Link className="btn" href={EXPLORE_CTA.href as Route}>{EXPLORE_CTA.label}</Link>
                 <Link className="btn ghost" href="/knowledge-compiler">What happens after the read</Link>
               </div>
             </div>

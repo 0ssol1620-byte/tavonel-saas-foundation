@@ -19,6 +19,7 @@ import { loginUrlForRecipe } from "@/lib/recipe-intent";
 import { sanitizeDocumentText } from "@/lib/sanitize-html";
 import { PageToc, tocEntries } from "@/components/docs/page-toc";
 import anchor from "@/components/docs/page-toc.module.css";
+import { ACCESS_CTA } from "@/lib/site-navigation";
 
 /*
   One route for the six cookbooks, arranged the way `/docs/[section]` arranges the documentation:
@@ -210,7 +211,7 @@ export default async function CookbookPage({ params }: { params: Promise<{ slug:
           */}
           <div className="actions">
             <Link className="btn" href={loginUrlForRecipe(record.recipeId) as Route}>Start this recipe</Link>
-            <Link className="btn ghost" href="/contact">Talk to us about your corpus</Link>
+            <Link className="btn ghost" href={ACCESS_CTA.href as Route}>{ACCESS_CTA.label}</Link>
           </div>
         </div>
       </div></div></section>

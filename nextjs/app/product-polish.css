@@ -80,17 +80,25 @@
   strip whose four members are the same kind of thing. The tint is gone; the eyebrow and the copy
   say which step the page ends on, and a background is not the place to say it twice.
 */
-.product-flow span { color: var(--text-lo); font: 9px var(--f-mono); letter-spacing: .13em; }
+/* Type floor: 12px sans. A step's ordinal and name is a label a reader reads, not a machine id. */
+.product-flow span { color: var(--text-lo); font: 500 12px/1.2 var(--f-sans); letter-spacing: .06em; }
 .product-flow strong { max-width: 20ch; color: var(--text-hi); font-size: 16px; font-weight: 540; line-height: 1.35; }
 /* Four surfaces; every column count below divides four, so the last row is never a card beside
    empty tracks. Three columns left exactly that orphan slot when the fourth card was added. */
 .product-surface-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: var(--product-gap); }
 @media (max-width: 1240px) { .product-surface-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .product-surface { min-height: 260px; display: flex; flex-direction: column; padding: 24px; border: 1px solid var(--hairline); border-radius: 6px; background: var(--g1); transition: border-color 160ms ease, transform 160ms ease, background 160ms ease; }
-.product-surface:hover { border-color: var(--hairline-hi); background: var(--g2); transform: translateY(-2px); }
-.product-surface > span { color: var(--verified); font: 9px var(--f-mono); letter-spacing: .12em; }
+/* Hover is gated: on a touch screen it sticks after a tap and reads as a selection. */
+@media (hover: hover) and (pointer: fine) {
+  .product-surface:hover { border-color: var(--hairline-hi); background: var(--g2); transform: translateY(-2px); }
+}
+/*
+  BQ-134 / type floor: the card's state label is 12px and no longer sub-floor mono at 9px, and
+  the "Open →" line under the body is gone -- the whole card is the anchor, so it was a second
+  label for a link the reader is already inside.
+*/
+.product-surface > span { color: var(--verified); font: 500 12px/1.2 var(--f-sans); letter-spacing: .06em; }
 .product-surface h2 { margin: auto 0 10px; color: var(--text-hi); font-size: 26px; }
 .product-surface p { margin: 0; color: var(--text-lo); font-size: 13px; line-height: 1.65; }
-.product-surface b { margin-top: 22px; color: var(--text-mid); font: 9px var(--f-mono); letter-spacing: .08em; font-weight: 500; }
 @media (max-width: 900px) { .product-flow { grid-template-columns: repeat(2, 1fr); } .product-surface-grid { grid-template-columns: 1fr; } .product-surface { min-height: 210px; } }
 @media (max-width: 560px) { .product-flow { grid-template-columns: 1fr; } .product-flow article { min-height: 112px; } }

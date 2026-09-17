@@ -4,6 +4,7 @@ import type { Route } from "next";
 import PolicyJumpIndex, { IndexedPolicyBody } from "@/components/policy-jump-index";
 import { PublicSitePage } from "@/components/public-site-chrome";
 import { TrustDisclosures } from "@/components/trust-disclosures";
+import { EXPLORE_CTA } from "@/lib/site-navigation";
 
 export const metadata: Metadata = {
   title: "Enterprise — TAVONEL",
@@ -133,8 +134,8 @@ export default function EnterprisePage() {
               </p>
 
               <div className="actions">
-                <Link className="btn" href={"/contact" as Route}>Talk about a pilot</Link>
-                <Link className="btn ghost" href={"/explore" as Route}>Explore a Compiled World</Link>
+                <Link className="btn" href={"/contact" as Route}>Scope an Enterprise pilot</Link>
+                <Link className="btn ghost" href={EXPLORE_CTA.href as Route}>{EXPLORE_CTA.label}</Link>
                 <Link className="btn ghost" href="/security">How your documents are handled</Link>
               </div>
             </div>

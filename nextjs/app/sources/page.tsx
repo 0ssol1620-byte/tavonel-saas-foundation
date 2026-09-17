@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { PublicSitePage } from "@/components/public-site-chrome";
 import SourceCapabilityTable from "@/components/source-capability-table";
+import { ACCESS_CTA } from "@/lib/site-navigation";
 import {
   publicCapabilityRows,
   sharedAcceptedLimitationLabels,
@@ -181,7 +182,7 @@ export default function SourcesPage() {
                 and already says so.
               */}
               <div className="actions">
-                <Link className="btn" href="/contact">Talk to us about your sources</Link>
+                <Link className="btn" href={ACCESS_CTA.href as Route}>{ACCESS_CTA.label}</Link>
                 <Link className="btn ghost" href={"/docs/files-and-formats" as Route}>Files and formats</Link>
                 <Link className="btn ghost" href="/evidence">How evidence is bound</Link>
               </div>

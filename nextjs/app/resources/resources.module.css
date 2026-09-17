@@ -54,7 +54,7 @@
   align-items: center;
   min-height: 44px;
   border: 1px solid var(--hairline);
-  border-radius: 3px;
+  border-radius: var(--r-inst);
   padding: 6px 13px;
   font-size: 12px;
   line-height: 1.3;
@@ -87,23 +87,24 @@
 */
 .hub .filters .groupLabel { max-width: none; }
 
+/*
+  BQ-111 / type floor: 12px sans, not 10px tracked mono. These three words label a group of
+  controls a reader chooses between; they are not a machine identifier, and 10px was under the
+  floor the token contract sets. `--text-xlo` is deleted by that contract, so the colour is the
+  one the eyebrow uses.
+*/
 .groupLabel {
   flex-basis: 100%;
   margin: 10px 0 0;
-  font-family: var(--f-mono);
-  font-size: 10px;
-  letter-spacing: 0.16em;
-  color: var(--text-xlo);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--text-mid);
 }
 
 .groupLabel:first-child { margin-top: 0; }
 
-/* BA-083: the card's way in, where the tracked-uppercase tag repetition used to be. */
-.tileAction { margin: 0; font-size: 12px; }
-.tileAction a { color: var(--text-mid); text-decoration: none; }
-.tileAction a:hover { color: var(--text-hi); }
-
-.representative { margin: 0; font-size: 11.5px; color: var(--text-mid); }
+.representative { margin: 0; font-size: 12px; color: var(--text-mid); }
 
 .hub:has(:global(#find-evaluate):target) [data-tags]:not([data-tags~="evaluate"]),
 .hub:has(:global(#find-build):target) [data-tags]:not([data-tags~="build"]),

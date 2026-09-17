@@ -270,7 +270,9 @@ describe("the limits are read from the product, and sit above the calls to actio
     const actions = PAGE.slice(PAGE.indexOf('className="actions"'));
     expect([...actions.matchAll(/className="btn/g)]).toHaveLength(2);
     expect(actions).toContain("loginUrlForRecipe(record.recipeId)");
-    expect(actions).toContain('href="/contact"');
+    // BQ-029: the access action takes its destination and its label from one constant, so the
+    // literal this used to look for now lives in `lib/site-navigation.ts`.
+    expect(actions).toContain("{ACCESS_CTA.href as Route}");
     for (const record of COOKBOOKS) {
       const next = record.sections.find((section) => section.key === "next")!;
       expect(next.body.toLowerCase(), record.slug + ": the next action names neither the docs nor the sample")

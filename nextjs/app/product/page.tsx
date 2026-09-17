@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import type { Route } from "next";
 import { PublicPageShell } from "@/components/public-page-shell";
 import PublicPrimaryCta from "@/components/public-primary-cta";
+import { EXPLORE_CTA } from "@/lib/site-navigation";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/product" },
@@ -80,7 +82,7 @@ export default function ProductPage() {
             </div>
             <div className="stack">
               <p className="lede">Documents, scans and connected systems go in. A source-grounded, versioned Compiled World comes out — with evidence still attached.</p>
-              <div className="actions"><PublicPrimaryCta className="btn" /><Link className="btn ghost" href="/explore">Explore a World</Link></div>
+              <div className="actions"><PublicPrimaryCta className="btn" /><Link className="btn ghost" href={EXPLORE_CTA.href as Route}>{EXPLORE_CTA.label}</Link></div>
             </div>
           </div>
 
@@ -99,18 +101,23 @@ export default function ProductPage() {
                 <span>{state}</span>
                 <h2>{title}</h2>
                 <p>{body}</p>
-                <b>Open →</b>
+                {/*
+                  BQ-134: "Open →" is gone from all four cards. The whole `<article>` is the
+                  anchor, so it was a second label for a link the reader is already inside, set
+                  in 9px tracked mono -- below the type floor, and the least useful four
+                  characters on the card. The heading names the destination.
+                */}
               </Link>
             ))}
           </div>
 
           <section className="product-boundary" aria-labelledby="product-layers-title">
-            <h2 id="product-layers-title">What this replaces, and what it connects to</h2>
             {/*
               BA-027. "Two of these layers are ours. Three of them are yours." was a riddle whose
               answer was the table under it, and on the page where the other question a buyer
               brings is who holds their data, ours-versus-yours is the wrong axis to be ambiguous
-              about. The eyebrow above already says it; this says it in a sentence.
+              about. BQ-099 deleted the eyebrow that used to say it above this; the heading says
+              it in a sentence, and it is the only heading this section has.
             */}
             <h2 id="product-layers-title">What we replace, and what we plug into.</h2>
             <table className="docs-table">
@@ -148,7 +155,7 @@ export default function ProductPage() {
             */}
             <h2>{SURFACES.map(([, state]) => state.charAt(0) + state.slice(1).toLowerCase()).join(" · ")} — one compiled World.</h2>
             <div className="actions">
-              <Link className="btn" href="/explore">Explore a Compiled World</Link>
+              <Link className="btn" href={EXPLORE_CTA.href as Route}>{EXPLORE_CTA.label}</Link>
               <Link className="btn ghost" href="/sources">See supported sources</Link>
             </div>
           </section>

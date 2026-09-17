@@ -13,6 +13,7 @@ import {
   type ContractClauseState,
 } from "@/lib/compiler-contract";
 import styles from "./continuous-knowledge.module.css";
+import { EXPLORE_CTA } from "@/lib/site-navigation";
 
 export const metadata: Metadata = {
   // Each page declares its own address. Without this every route inherited the root
@@ -226,7 +227,7 @@ export default function ContinuousKnowledgePage() {
 
           <div className={styles.section}>
             <div className="actions">
-              <Link className="btn" href={"/explore" as Route}>See a compiled World</Link>
+              <Link className="btn" href={EXPLORE_CTA.href as Route}>{EXPLORE_CTA.label}</Link>
               <Link className="btn ghost" href="/product/compiled-world">What a World contains</Link>
               <Link className="btn ghost" href="/evidence">What has been measured</Link>
             </div>

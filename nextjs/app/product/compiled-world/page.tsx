@@ -6,6 +6,7 @@ import BreadcrumbJsonLd, { DocBreadcrumb } from "@/components/breadcrumb-json-ld
 import { clause } from "@/lib/compiler-contract";
 import WorldDiffSample from "@/components/world-diff-sample";
 import { CAPABILITY_MANIFEST, isAcceptedAtUpload } from "../../../../shared/capabilityManifest";
+import { EXPLORE_CTA } from "@/lib/site-navigation";
 
 /*
   G1-005. What an "exact location" is on this deployment, in the sentence rather than a link away.
@@ -246,7 +247,7 @@ export default function CompiledWorldPage() {
                 <Link href="/docs/use-with-ai">Use the result with AI</Link>.
               </p>
               <div className="actions">
-                <Link className="btn" href={"/explore" as Route}>Explore a Compiled World</Link>
+                <Link className="btn" href={EXPLORE_CTA.href as Route}>{EXPLORE_CTA.label}</Link>
                 <Link className="btn ghost" href="/developers">Read it from your code</Link>
               </div>
             </div>

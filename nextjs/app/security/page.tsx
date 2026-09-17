@@ -349,9 +349,11 @@ export default function SecurityPage() {
               <p className="fine">
                 Promotion is closed by design: a candidate world becomes active only after an
                 authenticated person approves it. Retention and deletion are set out step by step
-                in the <Link href={"/privacy" as Route}>privacy notice</Link>, and a security
-                review or a vulnerability report reaches us{" "}
-                <Link href={"/contact" as Route}>here</Link>.
+                in the <Link href={"/privacy" as Route}>privacy notice</Link>. A security review or
+                a vulnerability report reaches us through{" "}
+                {/* BQ-134: a link named "here" says nothing out of its sentence, and a screen
+                    reader's link list is exactly that. */}
+                <Link href={"/contact" as Route}>the contact page</Link>.
               </p>
 
               <div className="actions">

@@ -14,6 +14,7 @@
  */
 
 import Link from "next/link";
+import type { Route } from "next";
 import { useEffect, useState } from "react";
 import Logomark from "@/components/logomark";
 import { RecipePreflight } from "@/components/recipe-preflight";
@@ -27,6 +28,7 @@ import {
   type RecipeIntent,
 } from "@/lib/recipe-intent";
 import { BILLING_OFFERS, type BillingOfferCode } from "@/lib/billing-catalog";
+import { EXPLORE_CTA } from "@/lib/site-navigation";
 
 type AuthState = "checking" | "ready" | "unconfigured";
 
@@ -228,7 +230,7 @@ export default function LoginPage() {
                 busy ? "Opening Google…" : "Continue with Google"}
             </button>
             {authState === "ready" && !customerProcessingEnabled ? (
-              <Link className="btn ghost" href="/explore">Explore the public World</Link>
+              <Link className="btn ghost" href={EXPLORE_CTA.href as Route}>{EXPLORE_CTA.label}</Link>
             ) : null}
             <Link className="btn ghost" href="/">Back to the site</Link>
           </div>

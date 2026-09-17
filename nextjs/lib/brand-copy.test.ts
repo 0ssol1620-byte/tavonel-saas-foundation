@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -280,6 +280,25 @@ const OVERCLAIMS = ["generally available", "production-ready", "fully automated 
 
 function read(surface: string): string {
   return readFileSync(join(root, surface), "utf8");
+}
+
+/**
+ * Every marketing `page.tsx`, walked rather than listed (BQ-029).
+ *
+ * `app/api` is route handlers, `app/workspace` and `app/dev` are behind sign-in, and neither is
+ * a surface a first-time reader meets. Everything else under `app/` is.
+ */
+function marketingPageFiles(directory = "app", found: string[] = []): string[] {
+  for (const entry of readdirSync(join(root, directory), { withFileTypes: true })) {
+    const path = `${directory}/${entry.name}`;
+    if (entry.isDirectory()) {
+      if (["api", "workspace", "dev", "auth"].includes(entry.name) && directory === "app") continue;
+      marketingPageFiles(path, found);
+    } else if (entry.name === "page.tsx") {
+      found.push(path);
+    }
+  }
+  return found;
 }
 
 /*
@@ -1010,6 +1029,45 @@ describe("the site's own vocabulary", () => {
     for (const name of RETIRED_NAMES) {
       expect(source, `"${name}" is a retired spelling; the table is PRODUCT_NOUNS`).not.toContain(name);
     }
+  });
+
+  /*
+    BQ-029, and the widening the comment above `RETIRED_NAMES` promised.
+
+    The audit counted thirteen spellings of the contact action and fourteen of the Explore
+    action across the marketing routes: "Open the read-only sample", "Explore a World", "See a
+    compiled World", "See a page and its regions", "Talk to us about your corpus", "Talk to us
+    about your sources", "Talk about a pilot". None of them was wrong on its own page; together
+    they meant a reader could not learn one name for one thing.
+
+    This walks the marketing routes rather than a list of surfaces, so a page added tomorrow is
+    checked without anybody remembering to add it. A **button** to either destination reads its
+    label from the constant. Prose is deliberately not covered: a link inside a sentence is part
+    of the sentence, and forcing a constant into one produces English nobody writes.
+
+    A context variant is still allowed where the destination is a genuinely different
+    conversation, and it is allowed by being named here rather than by not being noticed --
+    today, scoping an Enterprise pilot and asking a security-review question.
+  */
+  const CTA_VARIANTS = [
+    "Scope an Enterprise pilot",
+    "Ask a security review question",
+    "Ask a privacy question",
+  ];
+
+  it("names the two site-wide actions from their constants on every marketing route", () => {
+    const routes = marketingPageFiles();
+    expect(routes.length, "no marketing routes found -- the walk is out of date").toBeGreaterThan(10);
+    const offenders: string[] = [];
+    for (const file of routes) {
+      const source = prose(file);
+      for (const [, label] of source.matchAll(
+        /<Link className="btn[^"]*" href=(?:"\/(?:explore|contact)"|\{"\/(?:explore|contact)" as Route\})>([^<{][^<]*)<\/Link>/g,
+      )) {
+        if (!CTA_VARIANTS.includes(label.trim())) offenders.push(`${file}: "${label.trim()}"`);
+      }
+    }
+    expect(offenders, "a button writes its own label for an action that has a constant").toEqual([]);
   });
 
   /*

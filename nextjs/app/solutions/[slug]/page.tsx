@@ -5,7 +5,7 @@ import { PublicPageShell } from "@/components/public-page-shell";
 import PublicPrimaryCta from "@/components/public-primary-cta";
 import SolutionProofSample from "@/components/solution-proof-sample";
 import DesignPartners from "@/components/design-partners";
-import { RESOURCE_TAG_LABELS, resourceFilterHref, type ResourceTag } from "@/lib/site-navigation";
+import { EXPLORE_CTA, RESOURCE_TAG_LABELS, resourceFilterHref, type ResourceTag } from "@/lib/site-navigation";
 import styles from "../solutions.module.css";
 
 /*
@@ -348,7 +348,7 @@ export default async function SolutionPage({ params }: { params: Promise<{ slug:
 
         <div className="actions solution-actions">
           <PublicPrimaryCta className="btn" />
-          <Link className="btn ghost" href="/explore">Explore a World</Link>
+          <Link className="btn ghost" href={EXPLORE_CTA.href as Route}>{EXPLORE_CTA.label}</Link>
         </div>
       </div></section>
     </PublicPageShell>
