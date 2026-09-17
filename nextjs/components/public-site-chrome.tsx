@@ -138,15 +138,15 @@ export function PublicSiteFooter({ korean = false, onePath = false }: { korean?:
           nowrap span, so the row breaks between pairs or not at all.
         */}
         <p className="fine site-footer-legal">
-          <span className="site-footer-legal-pair">{FOOTER_LEGAL_ROW.copyright}</span>
+          <span className="site-footer-legal-pair">{FOOTER_LEGAL_ROW.copyright}</span>{" "}
           <span className="site-footer-legal-pair">
-            {" · "}
+            {"· "}
             <Link href={language.href as Route} hrefLang={korean ? "en" : "ko"}>{language.label}</Link>
-          </span>
+          </span>{" "}
           <span className="site-footer-legal-pair">
-            {" · "}
+            {"· "}
             <a href={`mailto:${FOOTER_LEGAL_ROW.security}`}>{FOOTER_LEGAL_ROW.security}</a>
-          </span>
+          </span>{" "}
           {/* G1-033 / G2-006: the consent-withdrawal path lives here after a choice, not in a floating pill.
               It owns its own separator (BQ-051, because it returns null off a measured path), so the
               nowrap span goes around the component rather than inside the row. */}

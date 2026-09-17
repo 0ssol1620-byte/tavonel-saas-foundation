@@ -521,7 +521,17 @@
 .one-path-links { display: flex; flex-wrap: wrap; gap: 12px 28px; margin-top: 20px; }
 
 /* BQ-129: one column, because a heading and three short steps are one column of content. */
-.one-path-update-steps { margin: 0; padding: 0; list-style: none; max-width: 780px; counter-reset: one-path-update; }
+/*
+  landing-10. Three steps, three columns -- the measure the section it sits in already uses.
+
+  The list was capped at 780px inside the section's container, so the right 40% of a ~640px-tall
+  band was empty on both locales while the sections either side of it ("You bring the source",
+  "Bring what you already have") run the full measure. The page alternated between full-width and
+  half-width blocks for no reason a reader can see. This is the same 3-up the source options use,
+  with the same hairline between columns, so the two read as one system; below the stack break it
+  is the vertical list it always was.
+*/
+.one-path-update-steps { margin: 0; padding: 0; list-style: none; counter-reset: one-path-update; }
 .one-path-update-steps > li { position: relative; padding: 22px 0 22px 48px; border-bottom: 1px solid var(--hairline-hi); }
 .one-path-update-steps > li:first-child { padding-top: 0; }
 .one-path-update-steps > li::before {
@@ -538,6 +548,27 @@
 .one-path-update-steps h3 { font-size: var(--t-6, 20px); font-weight: 500; margin: 0 0 12px; }
 .one-path-update-steps p { color: var(--text-mid); font-size: var(--t-4, 16px); line-height: 1.6; margin: 0; }
 .one-path-update-steps + .one-path-text-link { margin-top: 24px; }
+@media (min-width: 900px) {
+  .one-path-update-steps {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    border-top: 1px solid var(--hairline-hi);
+    border-bottom: 1px solid var(--hairline-hi);
+  }
+  .one-path-update-steps > li,
+  .one-path-update-steps > li:first-child { padding: 28px 28px 30px; border-bottom: 0; }
+  .one-path-update-steps > li:first-child { padding-left: 0; }
+  .one-path-update-steps > li + li { border-left: 1px solid var(--hairline-hi); }
+  /* In a column the ordinal sits over its step rather than beside it: there is no 48px rail to
+     hang it in, and column one starts at the page gutter like everything else on the page. */
+  .one-path-update-steps > li::before,
+  .one-path-update-steps > li:first-child::before {
+    position: static;
+    display: block;
+    margin-bottom: 8px;
+  }
+  .one-path-update-steps p { max-width: 34ch; }
+}
 
 .one-path-output-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-block: 1px solid var(--hairline-hi); }
 .one-path-output-options a { min-width: 0; min-height: 112px; padding: 26px 18px; display: flex; flex-direction: column; gap: 12px; text-decoration: none; }
@@ -713,10 +744,30 @@
 .design-partners { display: grid; gap: 14px; margin-top: 56px; }
 .design-partners h2 { margin: 0; font-size: var(--t-h2-sm); line-height: 1.2; letter-spacing: -0.02em; }
 .design-partners-lede { margin: 0; max-width: 62ch; line-height: 1.65; }
-.design-partners-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 0 28px; margin: 10px 0 0; padding: 0; list-style: none; }
-.design-partners-list li { display: grid; gap: 6px; align-content: start; padding: 18px 0; border-top: 1px solid var(--hairline); line-height: 1.6; font-size: var(--t-3, 14px); }
+.design-partners-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); grid-auto-rows: auto; gap: 0 28px; margin: 10px 0 0; padding: 0; list-style: none; }
+/*
+  landing-11. The four bodies start on one line.
+
+  Column 3's heading ("Your result with its receipts.") is one line while the other three wrap to
+  two, so its body began ~22px above theirs and the row read ragged. Each item is a two-row
+  subgrid of the list, which is the pattern the plan and surface cards already use -- a shared
+  baseline that follows the copy instead of a min-height guessed from today's strings.
+*/
+.design-partners-list li {
+  display: grid;
+  grid-row: span 2;
+  grid-template-rows: subgrid;
+  gap: 6px;
+  align-content: start;
+  padding: 18px 0;
+  border-top: 1px solid var(--hairline);
+  line-height: 1.6;
+  font-size: var(--t-3, 14px);
+}
 .design-partners-list strong { font-weight: 500; color: var(--text-hi); }
-.design-partners-fine { margin: 6px 0 0; font-size: var(--t-2, 13px); line-height: 1.6; color: var(--text-lo); }
+/* landing-15: this ran the full container measure -- 224 characters on one line at 13px, while
+   every other paragraph on the page is held to about 465px. It takes a reading measure too. */
+.design-partners-fine { margin: 6px 0 0; max-width: 70ch; font-size: var(--t-2, 13px); line-height: 1.6; color: var(--text-lo); }
 /* BQ-065: it is the last block on the landing page now, below the closing action. */
 .one-path-design-partners { margin-top: 64px; padding-top: 40px; border-top: 1px solid var(--hairline); }
 /* The solution pages put the "Next:" line straight after this block; it needs its own air. */
