@@ -8,7 +8,6 @@ import { DocsCopyButton } from "@/components/docs-copy-button";
 import { DocsSnippet } from "@/components/docs-snippet";
 import { withMarks } from "@/components/docs/marks";
 import { CodeTokens } from "@/components/docs/code-tokens";
-import tableStyles from "@/components/docs/docs-table.module.css";
 import {
   DOCS_REVIEWED,
   DOCS_SECTIONS,
@@ -23,7 +22,6 @@ import { DocsToc } from "@/components/docs/docs-toc";
 import { DocsTableFilter } from "@/components/docs/docs-table-filter";
 import { PageToc, slugify, tocEntries } from "@/components/docs/page-toc";
 import layout from "@/components/docs/docs-toc.module.css";
-import anchor from "@/components/docs/page-toc.module.css";
 
 export function generateStaticParams() {
   return DOCS_SECTIONS.map((section) => ({ section: section.slug }));
@@ -44,7 +42,7 @@ export async function generateMetadata({ params }: { params: Promise<{ section: 
 
 function CodeBlock({ label, body, id }: { label: string; body: string; id?: string }) {
   return (
-    <figure className={id ? `docs-code ${anchor.anchor}` : "docs-code"} id={id}>
+    <figure className="docs-code" id={id}>
       <figcaption>
         <span>{label}</span>
         {/* BQ-137: named by what it copies, so eight blocks are not eight identical "Copy"s. */}
@@ -64,7 +62,7 @@ const LANGUAGE_LABELS = { curl: "cURL", python: "Python", typescript: "TypeScrip
 
 function Endpoint({ endpoint, id }: { endpoint: DocsEndpoint; id?: string }) {
   return (
-    <article className={id ? `docs-endpoint ${anchor.anchor}` : "docs-endpoint"} id={id}>
+    <article className="docs-endpoint" id={id}>
       <header>
         <b data-method={endpoint.method}>{endpoint.method}</b>
         <code>{endpoint.path}</code>
@@ -83,7 +81,8 @@ function Endpoint({ endpoint, id }: { endpoint: DocsEndpoint; id?: string }) {
         }))}
       />
       {endpoint.requestExample ? <CodeBlock label="Request body" body={endpoint.requestExample} /> : null}
-      <table className={`docs-table ${tableStyles.stacked}`}>
+      <div className="table-scroll">
+      <table className="docs-table">
         <thead><tr><th>Status</th><th>Response</th></tr></thead>
         <tbody>
           {endpoint.responses.map((response) => (
@@ -94,6 +93,7 @@ function Endpoint({ endpoint, id }: { endpoint: DocsEndpoint; id?: string }) {
           ))}
         </tbody>
       </table>
+      </div>
     </article>
   );
 }
@@ -117,7 +117,7 @@ function headingLabel(block: DocsBlock): string | null {
 function Block({ block, endpoints, id }: { block: DocsBlock; endpoints: Map<string, DocsEndpoint>; id?: string }) {
   switch (block.kind) {
     case "heading":
-      return <h2 id={id} className={anchor.anchor}>{block.text}</h2>;
+      return <h2 id={id}>{block.text}</h2>;
     case "prose":
       return <p>{withMarks(block.text)}</p>;
     case "note":
@@ -138,12 +138,13 @@ function Block({ block, endpoints, id }: { block: DocsBlock; endpoints: Map<stri
       return (
         <>
           {/*
-            BQ-102. The filter sits immediately before the table because that is how it finds it:
-            it walks its own `nextElementSibling`, so nothing has to pass an id around and the
-            two cannot point at different tables.
+            BQ-102. The filter sits immediately before the table's scroll wrapper because that is
+            how it finds it: it walks its own `nextElementSibling` and queries the rows out of it,
+            so nothing has to pass an id around and the two cannot point at different tables.
           */}
           {block.filterLabel ? <DocsTableFilter label={block.filterLabel} /> : null}
-          <table className={`docs-table ${tableStyles.stacked}`}>
+          <div className="table-scroll">
+          <table className="docs-table">
             <thead><tr>{block.head.map((cell) => <th key={cell}>{cell}</th>)}</tr></thead>
             <tbody>
               {block.rows.map((row) => (
@@ -155,7 +156,6 @@ function Block({ block, endpoints, id }: { block: DocsBlock; endpoints: Map<stri
                 <tr
                   key={row.join("|")}
                   id={block.rowAnchors ? slugify(row[0] ?? "") || undefined : undefined}
-                  className={block.rowAnchors ? anchor.anchor : undefined}
                 >
                   {row.map((cell, index) => (
                     <td key={index} data-label={block.head[index]}>{withMarks(cell)}</td>
@@ -164,6 +164,7 @@ function Block({ block, endpoints, id }: { block: DocsBlock; endpoints: Map<stri
               ))}
             </tbody>
           </table>
+          </div>
         </>
       );
     case "diagram":

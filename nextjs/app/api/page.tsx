@@ -8,8 +8,6 @@ import { ApiTryIt, type TryItRoute } from "@/components/docs/api-try-it";
 import { withMarks } from "@/components/docs/marks";
 import { CodeTokens } from "@/components/docs/code-tokens";
 import { PageToc, tocEntries } from "@/components/docs/page-toc";
-import tocStyles from "@/components/docs/page-toc.module.css";
-import tableStyles from "@/components/docs/docs-table.module.css";
 import { API_VERSION } from "@/lib/api-version";
 import { readApiReference, type ReferenceEndpoint } from "@/lib/api-reference";
 import { snippetFor, SNIPPET_LANGUAGES } from "@/lib/docs-endpoints";
@@ -91,7 +89,8 @@ function Operation({ endpoint }: { endpoint: ReferenceEndpoint }) {
       {endpoint.parameters.length > 0 ? (
         <>
           <p className={styles.label}>Parameters</p>
-          <table className={`docs-table ${tableStyles.stacked}`}>
+          <div className="table-scroll">
+          <table className="docs-table">
             <thead><tr><th>Name</th><th>In</th><th>Required</th><th>Shape</th></tr></thead>
             <tbody>
               {endpoint.parameters.map((parameter) => (
@@ -107,6 +106,7 @@ function Operation({ endpoint }: { endpoint: ReferenceEndpoint }) {
               ))}
             </tbody>
           </table>
+          </div>
         </>
       ) : null}
 
@@ -233,7 +233,7 @@ export default async function ApiReferencePage() {
 
           {reference.groups.map((group, index) => (
             <div className={styles.group} key={group.name}>
-              <h2 className={tocStyles.anchor} id={groups[index].id}>{group.name}</h2>
+              <h2 id={groups[index].id}>{group.name}</h2>
               <p className={styles.prose}>{group.description}</p>
               {group.endpoints.map((endpoint) => (
                 <Operation endpoint={endpoint} key={endpoint.operationId} />

@@ -1,55 +1,23 @@
 /*
-  G3-024. Below 760px a documentation table stops being a table.
+  The one thing the global stacked-table pattern cannot do from the outside.
 
-  The error catalogue is four columns — code, status, meaning, what to do — and two of them are
-  sentences. On a 412px phone that is a horizontally scrolled table whose third and fourth columns
-  are off-screen, which is the same as not publishing them: the reader sees a code and a status
-  and cannot reach the half that tells them what to do about it.
+  `app/tavonel.css` stacks any `.docs-table` whose cells carry `data-label` below 620px, so the
+  module that used to duplicate that pattern here -- at its own 760px breakpoint, unlayered and
+  therefore beating the global rule on the three routes that imported it -- is gone.
 
-  So each row becomes a stacked card and each cell prints its own column name, read from the
-  `data-label` the renderer already writes. The pattern and the 760px breakpoint are the ones
-  `.src-matrix` on /sources already uses, rather than a second answer to the same question.
+  What is left is /pricing's shape: a row named by `<th scope="row">` rather than by a first
+  cell. A row header left as a table-cell inside a `display: block` row is laid out in an
+  anonymous table box of its own, which puts the row's name in a narrow column beside the stack
+  instead of at the top of it. It is the card's title there, so it is a block like the cells and
+  it carries a title's weight. `.src-matrix` on /sources resolves the same thing the same way.
 
-  The class is doubled in every selector on purpose. `.docs-table td` in the global sheet has the
+  The class is doubled in every selector on purpose. `.docs-table th` in the global sheet has the
   same specificity as a single module class, so a tie would be decided by stylesheet order, which
-  is not something this file can see.
+  is not something this file can see. The breakpoint is the global one, not a second answer to
+  the same question.
 */
-@media (max-width: 760px) {
-  .stacked.stacked {
-    display: block;
-    overflow-x: visible;
-  }
-  .stacked.stacked thead {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-  }
-  .stacked.stacked tr {
-    display: block;
-    padding: 14px 0;
-    border-bottom: 1px solid var(--hairline-hi);
-  }
-  .stacked.stacked td {
-    display: block;
-    padding: 0;
-    border: 0;
-    max-width: 100%;
-  }
-  .stacked.stacked td + td {
-    margin-top: 10px;
-  }
-  /*
-    BQ-135. A row that names itself with a `<th scope="row">` rather than with a first cell.
-
-    /pricing's two comparison tables are shaped that way, and a row header left as a table-cell
-    inside a `display: block` row is laid out in an anonymous table box of its own -- which puts
-    the row's name in a narrow column beside the stack instead of at the top of it. It is the
-    card's title here, so it is a block like the cells and it carries a title's weight.
-    `.src-matrix` on /sources resolves the same thing the same way.
-  */
-  .stacked.stacked tbody th {
+@media (max-width: 620px) {
+  .rowHeader.rowHeader tbody th {
     display: block;
     padding: 0;
     border: 0;
@@ -57,22 +25,7 @@
     font-weight: 500;
     color: var(--text-hi);
   }
-  .stacked.stacked th + td {
+  .rowHeader.rowHeader th + td {
     margin-top: 10px;
-  }
-  .stacked.stacked td::before {
-    content: attr(data-label);
-    display: block;
-    margin-bottom: 4px;
-    /* Type floor: a column's name is a label a reader reads, not a machine identifier. */
-    font-size: 12px;
-    font-weight: 500;
-    letter-spacing: 0.04em;
-    color: var(--text-mid);
-  }
-  /* An empty cell with only its label reads as a bug. `varies` is what the catalogue means. */
-  .stacked.stacked td:empty::after {
-    content: "—";
-    color: var(--text-lo);
   }
 }

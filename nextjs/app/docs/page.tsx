@@ -4,7 +4,6 @@ import type { Route } from "next";
 import { PublicPageShell } from "@/components/public-page-shell";
 import { DocsSearch } from "@/components/docs-search";
 import { PageToc, tocEntries } from "@/components/docs/page-toc";
-import tocStyles from "@/components/docs/page-toc.module.css";
 import { DOCS_GROUPS, DOCS_REVIEWED, DOCS_SECTIONS, DOCS_VERSION, docsSearchIndex, findDocsSection, formatReviewDate } from "@/lib/docs-content";
 
 /*
@@ -73,7 +72,7 @@ export default function DocsPage() {
           <div className="docs-groups">
             {groups.map(({ id, label: group }) => (
               <div className="stack" key={group}>
-                <h2 className={tocStyles.anchor} id={id}>{group}</h2>
+                <h2 id={id}>{group}</h2>
                 <ul className="docs-index">
                   {DOCS_SECTIONS.filter((section) => section.group === group).map((section) => (
                     <li key={section.slug}>

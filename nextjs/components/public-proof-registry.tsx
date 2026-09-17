@@ -102,7 +102,7 @@ export default function PublicProofRegistry({ title, eyebrow, summary, state, in
         placeholder-then-replace client fallback that used to supply it is gone. */}
     <PublicSiteHeader cta={primaryCallToAction()} />
     <main id="main">
-      <section className={styles.hero}><div><p className={styles.eyebrow}>{eyebrow}</p><h1>{title}</h1></div><aside>{state ? <span className={styles.status}>{state}</span> : null}<p>{summary}</p></aside></section>
+      <section className={styles.hero}><div className={styles.heroLead}><p className="eyebrow">{eyebrow}</p><h1>{title}</h1></div><aside>{state ? <span className={styles.status}>{state}</span> : null}<p>{summary}</p></aside></section>
       <div className={styles.body}>
         {index ? (
           <nav className={styles.index} aria-label="On this page">

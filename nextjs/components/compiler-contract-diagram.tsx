@@ -41,8 +41,14 @@ type Stage = {
 };
 
 const BOX_H = 54;
-const WIDE = 236;
-const NARROW = 180;
+/*
+  The boxes are sized to the longest caption at the type floor, not to the eye: 44 monospace
+  characters at 12px is 317 user units, so a 236-wide box was setting its own captions at 10.5px
+  to make them fit. Widening the box is the half of that trade that does not cost the reader
+  anything -- the drawing pans inside `.scroller` either way.
+*/
+const WIDE = 348;
+const NARROW = 220;
 
 /** Centre-anchored, because every row below is described by where its middle sits. */
 const at = (centre: number, y: number, width = WIDE) => ({ x: centre - width / 2, y, width });
@@ -178,9 +184,9 @@ export default function CompilerContractDiagram() {
 
       {/* Named where it runs, so the one solid line on the page cannot be read as decoration. */}
       <g className={styles.bypassLabel} data-contract-bypass="">
-        <text x="76" y="152">WHAT RUNS HERE:</text>
+        <text x="76" y="150">WHAT RUNS HERE:</text>
         <text x="76" y="168">FULL RECOMPILE</text>
-        <text x="76" y="184">OF THE COLLECTION</text>
+        <text x="76" y="186">OF THE COLLECTION</text>
       </g>
 
       {STAGES.map((box) => (

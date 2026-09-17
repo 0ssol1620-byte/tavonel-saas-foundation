@@ -250,7 +250,7 @@ function glanceRows(planCapabilities: readonly PlanCapabilityRow[]) {
     // that is now what the row says. Membership is on the Team card as something not sold yet.
     [
       "What differs by plan",
-      `${BILLING_OFFERS.studio_access.label} carries ${BILLING_OFFERS.studio_access.includedPages.toLocaleString("en-US")} included pages against ${BILLING_OFFERS.observer_access.label}'s ${BILLING_OFFERS.observer_access.includedPages.toLocaleString("en-US")}, adds the review queue, version history and a guided onboarding session, and is sold through a conversation rather than a checkout. Both are single-member workspaces today. ${activationPlans.join(" and ")} reach World activation — promoting a candidate to the active World, and rolling one back — as the workspace owner. Source connections are verified separately in Workspace.`,
+      `${BILLING_OFFERS.studio_access.label} carries ${BILLING_OFFERS.studio_access.includedPages.toLocaleString("en-US")} included pages against ${BILLING_OFFERS.observer_access.label}'s ${BILLING_OFFERS.observer_access.includedPages.toLocaleString("en-US")}, adds the review queue, version history and a guided onboarding session, and is sold through a conversation rather than a checkout. Both are single-member workspaces today. ${activationPlans.join(" and ")} reach World activation — activating a candidate and rolling one back — as the workspace owner. Source connections are verified separately in Workspace.`,
     ],
     [
       "What does not consume pages",
@@ -503,7 +503,7 @@ const PURCHASE_FAQ: Array<[string, string, Route, string, string]> = [
   ["What exactly is a World?", "The output of one compile: objects, relations, evidence, retrieval material and a validation report, addressed by a digest. Two Worlds with the same digest are the same World.", "/knowledge-compiler" as Route, "Glossary", "What it is"],
   ["How does this relate to RAG?", "RAG retrieves chunks at question time. Here the chunks are one file in the package, produced from a reviewed World, so they carry the page and region they came from and change only when the World does.", "/knowledge-compiler" as Route, "Compared with RAG", "What it is"],
   ["Can I verify an answer?", "Every object carries the regions that support it, and an export carries a manifest with a digest for each file, signed on the way out. The public key is published, so a recipient can check a package without asking us.", "/evidence" as Route, "How evidence is bound", "What a review will find"],
-  ["What happens when a source document changes?", "The new bytes are a new version, and compiling produces a new candidate rather than editing the World in place. The active revision moves only when a person promotes it, and the previous one stays readable.", "/knowledge-compiler" as Route, "Questions people ask", "What it is"],
+  ["What happens when a source document changes?", "The new bytes are a new version, and compiling produces a new candidate rather than editing the World in place. The active revision moves only when a person activates it, and the previous one stays readable.", "/knowledge-compiler" as Route, "Questions people ask", "What it is"],
   ["Can it read Office files, images and tables?", "It accepts them. Every accepted source is sanitized to PDF and read by OCR, and what survives is the page, the paragraph text and the bounding box — a spreadsheet's cells and formulas do not.", "/sources" as Route, "What this deployment reads", "What a review will find"],
   ["Can my agent use it?", "A read-only MCP server and an HTTP API are published, with eight tools over sources, World, search, Ask, objects, relations, evidence and package. There is no write tool.", "/developers" as Route, "API and MCP", "What a review will find"],
   ["What does it do when it is uncertain?", "It abstains and says which sources it looked at. A composed answer with no region behind it would be indistinguishable from a correct one, which is the failure the whole contract exists to prevent.", "/knowledge-compiler" as Route, "Questions people ask", "What it is"],
@@ -919,7 +919,7 @@ export default function PricingPageClient({
             */}
             <h3 id="plan-differences-title">What the step between the two plans buys</h3>
             <div className="table-scroll">
-            <table className={`docs-table ${tableStyles.stacked}`} aria-labelledby="plan-differences-title">
+            <table className={`docs-table ${tableStyles.rowHeader}`} aria-labelledby="plan-differences-title">
               <thead>
                 <tr>
                   <th scope="col">&nbsp;</th>
@@ -1025,7 +1025,7 @@ export default function PricingPageClient({
             */}
             <h3 id="plan-capability-title">What each plan can do</h3>
             <div className="table-scroll">
-            <table className={`docs-table ${tableStyles.stacked}`} aria-labelledby="plan-capability-title">
+            <table className={`docs-table ${tableStyles.rowHeader}`} aria-labelledby="plan-capability-title">
               <thead>
                 <tr>
                   <th scope="col">Capability</th>
@@ -1079,7 +1079,7 @@ export default function PricingPageClient({
             */}
             <h3 id="pricing-scenarios-title">What four volumes cost</h3>
             <div className="table-scroll">
-            <table className={`docs-table ${tableStyles.stacked}`} aria-labelledby="pricing-scenarios-title">
+            <table className={`docs-table ${tableStyles.rowHeader}`} aria-labelledby="pricing-scenarios-title">
               <thead>
                 <tr>
                   <th scope="col">Pages read in a month</th>

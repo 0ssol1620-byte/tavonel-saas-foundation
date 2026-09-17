@@ -1,5 +1,4 @@
 import { Fragment } from "react";
-import tableStyles from "@/components/docs/docs-table.module.css";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { Route } from "next";
@@ -7,7 +6,6 @@ import { PublicSitePage } from "@/components/public-site-chrome";
 import { DocsCopyButton } from "@/components/docs-copy-button";
 import { TrackedLink } from "@/components/tracked-link";
 import { PageToc, tocEntries } from "@/components/docs/page-toc";
-import tocStyles from "@/components/docs/page-toc.module.css";
 import { PACKAGE_CONTENTS } from "@/lib/package-contents";
 import { MCP_TOOL_COUNT_WORD, MCP_TOOL_NAMES } from "@/lib/mcp-tools";
 
@@ -125,7 +123,7 @@ export default function DevelopersPage() {
                 the asset.
               </p>
 
-              <h2 className={tocStyles.anchor} id={sections[0].id}>Three ways to use a Compiled World</h2>
+              <h2 id={sections[0].id}>Three ways to use a Compiled World</h2>
               <div className="chain dev-paths">
                 {PATHS.map((path) => (
                   <article className="link" key={path.kind}>
@@ -137,7 +135,7 @@ export default function DevelopersPage() {
                 ))}
               </div>
 
-              <h2 className={tocStyles.anchor} id={sections[1].id}>From sources to a grounded answer</h2>
+              <h2 id={sections[1].id}>From sources to a grounded answer</h2>
               <ol className="dev-journey">
                 {JOURNEY.map(([title, body]) => (
                   <li key={title}>
@@ -156,7 +154,7 @@ export default function DevelopersPage() {
               </p>
 
               <div className="stack">
-                <h2 className={tocStyles.anchor} id={sections[2].id}>Public tooling</h2>
+                <h2 id={sections[2].id}>Public tooling</h2>
                 <h3>Start with the contract, then a scoped key.</h3>
                 <figure className="docs-code">
                   <figcaption>
@@ -213,14 +211,15 @@ export default function DevelopersPage() {
               </div>
 
               <div className="stack">
-                <h2 className={tocStyles.anchor} id={sections[3].id}>What is in a portable package</h2>
+                <h2 id={sections[3].id}>What is in a portable package</h2>
                 <p className="fine">
                   Every signed export contains these files, written by the exporter and named in
                   a manifest carrying a digest for each one. The two ontology files are the
                   Compiled World&rsquo;s RDF / JSON-LD semantic projection — a projection of the
                   compiled objects and relations, with no schema for you to author.
                 </p>
-                <table className={`docs-table ${tableStyles.stacked}`}>
+                <div className="table-scroll">
+                <table className="docs-table">
                   <thead><tr><th>Path</th><th>Use it for</th></tr></thead>
                   <tbody>
                     {/*
@@ -237,6 +236,7 @@ export default function DevelopersPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
 
               <h2>Next</h2>

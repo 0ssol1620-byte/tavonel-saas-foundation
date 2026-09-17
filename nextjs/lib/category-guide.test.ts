@@ -226,9 +226,26 @@ describe("the brand fix's structure", () => {
       reach a screen reader twice.
     */
     expect(diagramCss).toContain(".stack { display: none; }");
-    expect(diagramCss).toMatch(/@media \(max-width: 640px\) \{\s*\.diagram \{ display: none; \}/);
+    /*
+      Hidden at the scroller, not at the `<svg>` inside it. The drawing is pinned to its authored
+      viewBox width and pans in a `tabIndex` group, so hiding only the drawing would leave a
+      focusable empty box on a phone -- a tab stop that lands on nothing.
+    */
+    expect(diagramCss).toMatch(/@media \(max-width: 640px\) \{[^}]*\.scroller \{ display: none; \}/);
     expect(diagramCss, "a hidden-but-rendered list would double-announce the stages")
       .not.toMatch(/\.stack \{[^}]*clip-path/);
+  });
+
+  /*
+    WCAG 2.1.1, and the reason it is asserted on both drawings at once: the pan is only reachable
+    if something in it can take focus. `.figure` on this page is `overflow-x: auto` and nothing
+    else, so the group lives in the component, as it does on /product/continuous-knowledge.
+  */
+  it("makes the drawing's horizontal pan reachable from a keyboard", () => {
+    for (const component of ["knowledge-compiler-diagram", "compiler-contract-diagram"]) {
+      const source = readFileSync(resolve(import.meta.dirname, `../components/${component}.tsx`), "utf8");
+      expect(source, component).toMatch(/className=\{styles\.scroller\} tabIndex=\{0\} role="group" aria-label=/);
+    }
   });
 
   it("keeps the section index, one comparison and the reference sections collapsed", () => {

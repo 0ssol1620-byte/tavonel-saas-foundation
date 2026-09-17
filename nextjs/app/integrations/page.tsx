@@ -5,7 +5,6 @@ import PublicPrimaryCta from "@/components/public-primary-cta";
 import { activationPolicy } from "@/lib/activation-policy";
 import { OAUTH_CONNECTOR_PROVIDERS, OAUTH_CONNECTOR_SCOPES } from "@/lib/connector-oauth";
 import { PageToc, tocEntries } from "@/components/docs/page-toc";
-import tocStyles from "@/components/docs/page-toc.module.css";
 
 export const metadata: Metadata = {
   title: "Integrations — TAVONEL",
@@ -177,7 +176,7 @@ export default function IntegrationsPage() {
         </div>
 
         <div className="body">
-          <div className="stack"><h2 className={tocStyles.anchor} id={sections[0].id}>What connects today.</h2></div>
+          <div className="stack"><h2 id={sections[0].id}>What connects today.</h2></div>
           <div className="stack">
             {/*
               BQ-106. One presentation, not two.
@@ -228,7 +227,7 @@ export default function IntegrationsPage() {
         </div>
 
         <div className="body">
-          <div className="stack"><h2 className={tocStyles.anchor} id={sections[1].id}>Cloud document systems.</h2></div>
+          <div className="stack"><h2 id={sections[1].id}>Cloud document systems.</h2></div>
           <div className="stack">
             <div className="connector-public-grid">{OAUTH.map((connector) => (
               <article key={connector.name}>
@@ -252,7 +251,7 @@ export default function IntegrationsPage() {
         </div>
 
         <div className="body">
-          <div className="stack"><h2 className={tocStyles.anchor} id={sections[2].id}>File and object storage.</h2></div>
+          <div className="stack"><h2 id={sections[2].id}>File and object storage.</h2></div>
           <div className="stack">
             <p className="lede">Use a <a href="/developer/tavonel-source-agent.py" download>local source agent</a> for repositories that stay inside your network. We configure the first route with you.</p>
             <div className="chain">{INFRA.map(([name, level, description]) => <article className="link" key={name}><span className="st">{level}</span><h3>{name}</h3><p>{description}</p></article>)}</div>
