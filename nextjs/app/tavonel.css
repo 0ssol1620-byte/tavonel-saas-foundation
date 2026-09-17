@@ -448,10 +448,6 @@ h3 { font-size: 19px; letter-spacing: -0.014em; font-variation-settings: "wght" 
 .slate b { color: var(--text-lo); font-weight: 500; }
 .slate span { width: 34px; height: 1px; background: var(--hairline-hi); }
 
-.band-head { display: flex; flex-direction: column; gap: 6px; margin-top: 34px; }
-.band-head .kicker { font-family: var(--f-mono); font-size: 10px; letter-spacing: 0.18em; color: var(--text-xlo); }
-
-
 /*
   BA-239 -- the halo is scoped to the one page that has a canvas behind its type.
 
@@ -716,28 +712,6 @@ h3 { font-size: 19px; letter-spacing: -0.014em; font-variation-settings: "wght" 
 .bv.state[data-s="compiled"]::before, .bv.state[data-s="verified"]::before, .bv.state[data-s="current"]::before { background: var(--verified); }
 .bv.state[data-s="changed"]::before { background: var(--changed); }
 
-/* The bar's own control. It sits at the end of the row and reads as an instrument key rather
-   than a marketing button -- the same mono voice, the verified accent only on hover. */
-.bar-next {
-  flex: none;
-  margin-left: 16px;
-  padding: 5px 11px;
-  border: 1px solid var(--hairline-hi);
-  border-radius: 3px;
-  font-family: var(--f-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.12em;
-  color: var(--text-mid);
-  transition: color 200ms ease, border-color 200ms ease, background 200ms ease, transform 220ms var(--ease);
-  /*
-    D9 -- the lean lives in custom properties, not a bare `transform`, so `:active` below can
-    still win the property outright on click (a press should settle the button, not keep it
-    leaning) instead of the two effects fighting over one declaration.
-  */
-  transform: translate(var(--mx, 0px), var(--my, 0px));
-}
-.bar-next:hover { color: var(--verified); border-color: var(--verified-dim); background: var(--verified-deep); }
-
 /* The scene jumper only exists where the rail does not. */
 .bar-ticks { display: none; align-items: center; gap: 7px; padding: 0 16px; }
 .bt { width: 6px; height: 6px; border-radius: 50%; background: var(--decor); transition: background 220ms ease, transform 220ms ease; }
@@ -747,41 +721,6 @@ h3 { font-size: 19px; letter-spacing: -0.014em; font-variation-settings: "wght" 
 /* ============================================================ hero (01) */
 
 .scene.hero { min-height: 0; justify-content: flex-start; padding-top: 64px; padding-bottom: 12px; }
-/*
-  The hero film fits the space that is left, without being cropped.
-
-  Two wrong answers came before this one. Capping the height and letting `object-fit: cover`
-  crop the overflow cut 395px off an 827px frame — half of every column. Removing the cap
-  entirely made the frame 829px tall starting 362px down the page, so on a 900px screen it ran
-  291px past the bottom and the hero looked like it had lost its film.
-
-  The standard fix is to bound both axes and let the smaller one win: `aspect-ratio` keeps the
-  frame's shape while `max-height` stops it exceeding the viewport minus the copy above it.
-  `100dvh` rather than `100vh` so a mobile browser's collapsing toolbar does not reintroduce the
-  overflow. Nothing is cropped — a narrow window simply gets a smaller whole frame.
-*/
-.scene.hero .film-band {
-  margin-top: 18px;
-  max-height: calc(100dvh - 340px);
-  display: flex;
-  justify-content: center;
-  /*
-    Shrink the band to the frame, not the column.
-
-    `max-height` makes the video narrower than the content column, and a band that keeps the
-    column's full width then draws its background and border around a letterbox of empty space
-    on both sides. `width: fit-content` pulls the band in to whatever the height cap left.
-  */
-  width: fit-content;
-  max-width: min(100%, 1440px);
-  margin-inline: auto;
-}
-.scene.hero .film-band-video {
-  pointer-events: none;
-  max-height: calc(100dvh - 340px);
-  width: auto;
-  max-width: 100%;
-}
 @media (max-width: 640px) {
   /*
     The phone keeps the film.
@@ -793,8 +732,6 @@ h3 { font-size: 19px; letter-spacing: -0.014em; font-variation-settings: "wght" 
     rather than a screenful, and the deferred cuts below still load nothing until approached.
   */
   .scene.hero { min-height: 100svh; }
-  .scene.hero .film-band,
-  .scene.hero .film-band-video { max-height: calc(100svh - 330px); }
   /*
     BA-002 -- three families on one phone screen, and the brand's own was not among them.
 
@@ -813,55 +750,6 @@ h3 { font-size: 19px; letter-spacing: -0.014em; font-variation-settings: "wght" 
   }
 }
 .film-note { max-width: 72rem; margin: 12px auto 0; padding: 0 24px; }
-.film-band {
-  position: relative;
-  width: min(100%, 1440px);
-  margin: 18px auto 0;
-  background: #08090a;
-  border: 1px solid var(--hairline);
-}
-/*
-  The link is a block, and the band clips.
-
-  `film-band-link` wrapping the video was an inline anchor, so `width: 100%` on the video
-  resolved against the anchor's shrink-to-fit box rather than the band — and the video took its
-  intrinsic 1440px, pushing a 390px phone into a 1448px horizontal scroll. Both the block
-  display and the `max-width` are load-bearing; `overflow: hidden` on the band is the belt to
-  that braces.
-*/
-.film-band { overflow: hidden; }
-.film-band-link { display: block; width: 100%; }
-/*
-  Never crop a four-up.
-
-  `cover` fills the box by cutting whatever does not fit, and what does not fit in these frames
-  is always a column or the bottom of one. `contain` is the only honest fit for a film whose
-  entire claim is that four things are visible at once.
-
-  The ratio is the masters' 16:10 stage. The files are 2880x1800 — recorded at 2x so a HiDPI
-  display has real pixels to paint rather than a 1.7x upscale of a 1440 master, which is what
-  made the small mono type look mushy on one monitor and fine on another.
-*/
-.film-band-video {
-  display: block;
-  width: 100%;
-  max-width: 100%;
-  height: auto;
-  aspect-ratio: 1440 / 900;
-  object-fit: contain;
-  pointer-events: none;
-}
-/*
-  The film scene is one column, and the frame gets the whole shell.
-
-  `.body` is a 380px title beside the content, which is the right shape for prose and the wrong
-  one for a four-up — it left each cut roughly half the page wide and the columns inside it
-  illegible. Here the heading sits above at its natural measure and the frame runs the full
-  width, which is the only size at which "four things at once" is actually readable.
-*/
-.body.film-body { grid-template-columns: minmax(0, 1fr); gap: 20px; }
-.body.film-body > .stack:first-child { position: static; max-width: 46rem; }
-.film-scene { width: 100%; }
 .artifacts {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1039,20 +927,6 @@ h3 { font-size: 19px; letter-spacing: -0.014em; font-variation-settings: "wght" 
   margin-inline: auto;
 }
 .compile-film-caption p { margin: 0; color: var(--text-lo); font-size: 13px; }
-.compile-film-toggle {
-  appearance: none;
-  flex: none;
-  padding: 6px 12px;
-  border: 1px solid var(--hairline);
-  background: transparent;
-  color: var(--text-lo);
-  font: inherit;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: .14em;
-  cursor: pointer;
-}
-.compile-film-toggle:hover { color: var(--text-hi); }
 @media (prefers-reduced-motion: reduce) {
   .compile-film-video { transition: none; }
 }
@@ -1147,20 +1021,6 @@ h3 { font-size: 19px; letter-spacing: -0.014em; font-variation-settings: "wght" 
   footer.site { padding-top: 26px; padding-bottom: calc(var(--bar) + 22px); }
   .compile-film-viewport { max-height: calc(100svh - 260px); }
 }
-.evidence-path {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin: 24px 0 30px;
-}
-.evidence-path span {
-  padding: 10px 12px;
-  border: 1px solid var(--hairline);
-  color: var(--text-hi);
-  font-size: 12px;
-}
-.evidence-path i { color: var(--verified); font-style: normal; }
 .artifact { padding: 18px 20px; background: var(--g1); }
 .artifact code {
   display: block;
@@ -1305,19 +1165,6 @@ h3 { font-size: 19px; letter-spacing: -0.014em; font-variation-settings: "wght" 
   border: 1px solid var(--changed-dim);
   background: var(--changed-deep);
 }
-.offlist { margin: 0; padding: 0; list-style: none; display: grid; gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 4px; overflow: hidden; }
-.offlist li {
-  background: var(--g1);
-  padding: 12px 18px;
-  font-family: var(--f-mono);
-  font-size: 12px;
-  color: var(--text-lo);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-/* A crossed circle: this is a capability that is closed, not one that is coming. */
-.offlist li::before { content: ""; width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--text-xlo); flex: none; }
 .contact-page .document-title { max-width: 11ch; }
 .contact-address {
   display: flex;
@@ -1453,7 +1300,6 @@ h3 { font-size: 19px; letter-spacing: -0.014em; font-variation-settings: "wght" 
 .contact-checks input { width: 15px; height: 15px; min-height: 0; accent-color: var(--verified); }
 @media (max-width: 640px) { .contact-checks { grid-template-columns: 1fr; } }
 
-
 .contact-field input::placeholder,
 .contact-field textarea::placeholder { color: var(--decor); }
 .contact-field input:focus,
@@ -1484,47 +1330,6 @@ h3 { font-size: 19px; letter-spacing: -0.014em; font-variation-settings: "wght" 
   color: var(--text-lo);
 }
 .who b { color: var(--text-hi); font-weight: 500; }
-
-/*
-  C2 -- the rule, as a band rather than a paragraph.
-  Hairlines above and below stop the page for one sentence. It sits at the seam between the
-  hero and the first demonstration, so the claim is made before any of the evidence for it.
-*/
-.creed {
-  position: relative;
-  z-index: 5;
-  border-top: 1px solid var(--hairline);
-  border-bottom: 1px solid var(--hairline);
-  /* The rail inset every scene carries, so this band starts on the same vertical as the rest. */
-  padding: clamp(22px, 3.4vh, 34px) 0 clamp(22px, 3.4vh, 34px) var(--rail);
-}
-.creed .shell {
-  display: grid;
-  grid-template-columns: 96px minmax(0, 1fr);
-  gap: clamp(16px, 2.4vw, 34px);
-  align-items: start;
-}
-.creed-k {
-  font-family: var(--f-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.2em;
-  color: var(--verified);
-  padding-top: 4px;
-  white-space: nowrap;
-}
-.creed p {
-  margin: 0;
-  max-width: 74ch;
-  font-size: clamp(13.5px, 1.02vw, 15px);
-  line-height: 1.66;
-  color: var(--text-lo);
-}
-.creed p b { color: var(--text-hi); font-weight: 500; }
-
-@media (max-width: 700px) {
-  .creed .shell { grid-template-columns: minmax(0, 1fr); gap: 10px; }
-  .creed-k { padding-top: 0; }
-}
 
 .debris { display: flex; flex-wrap: wrap; gap: 7px; max-width: 900px; }
 .frag {
@@ -1580,9 +1385,6 @@ h3 { font-size: 19px; letter-spacing: -0.014em; font-variation-settings: "wght" 
   max-width: 1000px;
 }
 .ch { background: var(--g1); padding: 13px 15px; }
-.ch-v { display: block; font-size: clamp(21px, 2.3vw, 29px); line-height: 1.1; letter-spacing: -0.02em; color: var(--text-hi); font-variation-settings: "wght" 560; }
-.ch-v.warn { color: var(--changed); }
-.ch-k { display: block; font-family: var(--f-mono); font-size: 9.5px; letter-spacing: 0.13em; text-transform: uppercase; color: var(--text-xlo); margin-top: 6px; line-height: 1.5; }
 
 /* ============================================================ panels */
 
@@ -1601,30 +1403,6 @@ h3 { font-size: 19px; letter-spacing: -0.014em; font-variation-settings: "wght" 
 }
 .panel-head .right, .panel-head .mini { margin-left: auto; }
 .panel-head .right { color: var(--text-xlo); font-size: 9.5px; letter-spacing: 0.14em; }
-.panel-hierarchy {
-  margin: 0;
-  padding: 8px 16px;
-  border-bottom: 1px solid var(--hairline);
-  font-family: var(--f-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.16em;
-  color: var(--text-xlo);
-}
-.panel-note {
-  margin: 0;
-  padding: 9px 16px 11px;
-  border-top: 1px solid var(--hairline);
-  font-family: var(--f-mono);
-  font-size: 10px;
-  letter-spacing: 0.04em;
-  color: var(--text-xlo);
-}
-.panel-note b {
-  margin-right: 8px;
-  color: var(--unresolved);
-  font-weight: 400;
-  letter-spacing: 0.12em;
-}
 
 /* ---------------------------------------------------------- 02 sources */
 
@@ -1643,38 +1421,10 @@ h3 { font-size: 19px; letter-spacing: -0.014em; font-variation-settings: "wght" 
   background: var(--g1);
 }
 
-
-
 /* ---------------------------------------------------------- 03 compile pipeline */
 
 .pipe { display: grid; gap: 1px; background: var(--hairline); }
 .pl { background: var(--g1); overflow: hidden; }
-.pl-h {
-  display: grid;
-  grid-template-columns: 26px 1fr auto;
-  gap: 14px;
-  align-items: center;
-  padding: 12px 16px;
-  font-family: var(--f-mono);
-  font-size: 11.5px;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--text-xlo);
-  transition: color 300ms ease;
-}
-.pl.run .pl-h { color: var(--text-hi); }
-.pl.done .pl-h { color: var(--text-lo); }
-.pl-h .num { font-size: 10px; }
-.pl.run .pl-h .num, .pl.run .pl-h .st { color: var(--verified); }
-.pl-h .st { font-size: 9.5px; letter-spacing: 0.14em; color: var(--text-xlo); }
-.pl.done .pl-h .st { color: var(--reused); }
-.pl-b { display: none; flex-wrap: wrap; gap: 7px 22px; padding: 0 16px 14px 56px; }
-.pl.run .pl-b, .pl.done .pl-b { display: flex; }
-.pl-i { font-family: var(--f-mono); font-size: 11px; color: var(--text-lo); display: flex; gap: 8px; align-items: baseline; }
-.pl-i b { color: var(--text-mid); font-weight: 400; }
-.pl-bar { height: 1px; width: 0; background: var(--verified); opacity: 0.5; transition: width 620ms linear; }
-.pl.run .pl-bar { width: 100%; }
-.pl.done .pl-bar { width: 100%; background: var(--hairline-hi); opacity: 1; }
 
 /* ---------------------------------------------------------- 04 work that stops */
 
@@ -1704,12 +1454,6 @@ h3 { font-size: 19px; letter-spacing: -0.014em; font-variation-settings: "wght" 
 .js .rv.in .stop:nth-child(n + 7) span::after { transition-delay: 200ms; }
 .js .rv.in .stop:nth-child(n + 11) span::after { transition-delay: 320ms; }
 
-.beforeafter { display: flex; gap: 34px; padding-top: 4px; }
-.beforeafter span { display: flex; flex-direction: column; font-family: var(--f-mono); font-size: 9.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-xlo); }
-.beforeafter b { font-family: var(--f-sans); font-size: 26px; letter-spacing: -0.02em; text-transform: none; font-variation-settings: "wght" 600; margin-bottom: 2px; color: var(--text-mid); }
-.beforeafter b[data-tone="changed"] { color: var(--changed); }
-.beforeafter b[data-tone="verified"] { color: var(--verified); }
-
 /* ---------------------------------------------------------- 05 architecture */
 
 .arch { font-family: var(--f-mono); font-size: 12px; padding: 14px 18px; }
@@ -1718,9 +1462,6 @@ h3 { font-size: 19px; letter-spacing: -0.014em; font-variation-settings: "wght" 
 .arch .t1 { color: var(--text-hi); letter-spacing: 0.1em; }
 .arch .t2 { color: var(--text-mid); padding-left: 20px; position: relative; }
 .arch .t2::before { content: "└─"; position: absolute; left: 0; color: var(--decor); }
-
-.chain2 { padding: 4px 0; }
-.chain2 .fact { margin: 0; padding: 14px 18px 12px; color: var(--text-hi); font-size: 17px; letter-spacing: -0.012em; }
 .cr { display: grid; grid-template-columns: 118px minmax(0, 1fr); gap: 14px; padding: 9px 18px; border-top: 1px solid var(--hairline); font-family: var(--f-mono); font-size: 11px; }
 .cr .k { color: var(--text-xlo); letter-spacing: 0.09em; text-transform: uppercase; font-size: 9.5px; padding-top: 2px; }
 .cr .v { color: var(--text-mid); line-height: 1.7; }
@@ -1815,40 +1556,6 @@ h3 { font-size: 19px; letter-spacing: -0.014em; font-variation-settings: "wght" 
 .chain { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 4px; overflow: hidden; }
 @layer detail-completion {
   .chain > :last-child:nth-child(odd) { grid-column: 1 / -1; }
-  .input-guidance { margin: 0; max-width: 68ch; font-size: 14px; line-height: 1.75; color: var(--text-mid); }
-  .input-guidance a { color: var(--text-hi); text-underline-offset: 4px; }
-  .input-next { display: inline-flex; align-items: center; min-height: 44px; font-size: 14px; color: var(--text-hi); text-underline-offset: 4px; }
-  .intake-flow {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    padding: 0;
-    margin: 0;
-    list-style: none;
-    border-block: 1px solid var(--hairline);
-  }
-  .intake-flow li {
-    position: relative;
-    display: grid;
-    grid-template-columns: 30px minmax(0, 1fr);
-    gap: 12px;
-    min-width: 0;
-    padding: clamp(18px, 2vw, 26px) clamp(16px, 2vw, 28px);
-  }
-  .intake-flow li + li { border-left: 1px solid var(--hairline); }
-  /*
-    BA-011 -- the chevron and the 01/02/03 index are decoration, and one of them was spending the
-    accent.
-
-    A three-item list is already ordered and already short, so the numbers said nothing the
-    headings did not -- and painting them `--verified` claimed the accent, which rule 6.2 keeps
-    for state. The glyph also landed on the cell boundary rather than between cells. Both are
-    gone; the list's own order and its headings carry it. The index spans stay in the markup as
-    hidden ordinals until the lane that owns home-page-client.tsx removes them.
-  */
-  .intake-flow-index { display: none; }
-  .intake-flow div { display: grid; gap: 7px; min-width: 0; }
-  .intake-flow strong { color: var(--text-hi); font-size: clamp(15px, 1.2vw, 18px); font-weight: 520; line-height: 1.2; }
-  .intake-flow div span { color: var(--text-lo); font-size: 12.5px; line-height: 1.45; }
   .source-routes {
     display: grid;
     gap: 1px;
@@ -1866,17 +1573,8 @@ h3 { font-size: 19px; letter-spacing: -0.014em; font-variation-settings: "wght" 
     padding: clamp(20px, 2.2vw, 30px);
     background: var(--g1);
   }
-  .source-route-heading { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 13px; align-items: start; min-width: 0; }
-  /* BA-011 -- same decoration on /product's two source routes, same removal. */
-  .source-route-index { display: none; }
-  .source-route-kind { margin: 0 0 7px; color: var(--text-xlo); font: 500 9.5px/1.2 var(--f-mono); letter-spacing: 0.15em; text-transform: uppercase; }
   .source-route h3 { font-size: clamp(16px, 1.45vw, 20px); line-height: 1.25; letter-spacing: -0.018em; }
   .source-route > p { margin: 0; max-width: 62ch; color: var(--text-lo); font-size: 13px; line-height: 1.68; }
-  .source-route-facts { display: grid; gap: 10px; min-width: 0; margin: 0; }
-  .source-route-facts div { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 12px; padding-bottom: 9px; border-bottom: 1px solid var(--hairline); }
-  .source-route-facts dt { color: var(--text-xlo); font: 500 9px/1.4 var(--f-mono); letter-spacing: 0.11em; text-transform: uppercase; }
-  .source-route-facts dd { min-width: 0; margin: 0; color: var(--text-mid); font: 500 10.5px/1.4 var(--f-mono); }
-  .source-route .input-next { grid-column: 2 / -1; justify-self: start; margin-top: -8px; }
 }
 .link { background: var(--g1); padding: 16px 18px; display: flex; flex-direction: column; gap: 9px; align-items: flex-start; }
 .link .st { font-family: var(--f-mono); font-size: 10px; letter-spacing: 0.16em; color: var(--text-xlo); }
@@ -1885,25 +1583,12 @@ h3 { font-size: 19px; letter-spacing: -0.014em; font-variation-settings: "wght" 
 @media (max-width: 1120px) {
   @layer detail-completion {
     .source-route { grid-template-columns: minmax(240px, 0.8fr) minmax(0, 1.2fr); }
-    .source-route-facts { grid-column: 2; }
-    .source-route .input-next { grid-column: 2; }
   }
 }
 
 @media (max-width: 720px) {
   @layer detail-completion {
-    .intake-flow { grid-template-columns: 1fr; }
-    .intake-flow li + li { border-top: 1px solid var(--hairline); border-left: 0; }
-    .intake-flow li:not(:last-child)::after {
-      top: auto;
-      right: 24px;
-      bottom: -4px;
-      transform: rotate(135deg);
-    }
     .source-route { grid-template-columns: 1fr; gap: 15px; padding: 20px 18px; }
-    .source-route-facts,
-    .source-route .input-next { grid-column: 1; }
-    .source-route .input-next { margin-top: -2px; }
   }
 }
 
@@ -1998,17 +1683,6 @@ h3 { font-size: 19px; letter-spacing: -0.014em; font-variation-settings: "wght" 
 /* Nine cells -- see the .chaos note. */
 .caps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 4px; overflow: hidden; }
 .cap { background: var(--g1); padding: 13px 15px; display: flex; flex-direction: column; gap: 6px; }
-.cap-n { font-family: var(--f-mono); font-size: 11.5px; color: var(--text-mid); }
-.cap-s { display: inline-flex; align-items: center; gap: 7px; font-family: var(--f-mono); font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-xlo); }
-.cap-s::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--reused); flex: none; }
-.cap[data-tone="open"] .cap-s { color: var(--verified); }
-.cap[data-tone="open"] .cap-s::before { background: var(--verified); }
-.cap[data-tone="closed"] .cap-s { color: var(--text-lo); }
-.cap[data-tone="closed"] .cap-s::before { background: var(--reused); }
-.cap[data-tone="direction"] .cap-s { color: var(--unresolved); }
-.cap[data-tone="direction"] .cap-s::before { background: var(--unresolved); }
-.cap[data-tone="unknown"] .cap-s { color: var(--changed); }
-.cap[data-tone="unknown"] .cap-s::before { background: var(--changed); }
 
 /* The one line that connects the grid to the price. It is not a warning colour: these rows are
    the product working as designed, and the sentence exists so nobody reads a plan as a way to
@@ -2108,10 +1782,6 @@ footer.site .shell { display: flex; flex-direction: column; gap: 14px; }
 .brand { display: inline-flex; align-items: center; gap: 9px; color: var(--text-hi); font-family: var(--f-mono); font-size: 12.5px; letter-spacing: 0.2em; }
 .brand .logomark { flex: none; color: var(--text-lo); }
 
-.workspace-name { display: flex; flex-direction: column; gap: 3px; }
-.workspace-name strong { color: var(--text-hi); font-size: 15px; font-weight: 500; letter-spacing: -0.01em; }
-.workspace-name small { font-family: var(--f-mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-xlo); }
-
 .side nav { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
 .side nav button, .side nav a {
   text-align: left;
@@ -2125,10 +1795,6 @@ footer.site .shell { display: flex; flex-direction: column; gap: 14px; }
 .side nav button.on { color: var(--text-hi); background: var(--g2); }
 /* The current tab gets the verified accent as a spine, the same marker the scene rail uses. */
 .side nav button.on { box-shadow: inset 2px 0 0 var(--verified); }
-
-.side-foot { margin-top: auto; display: flex; flex-direction: column; gap: 2px; padding-top: 16px; border-top: 1px solid var(--hairline); }
-.side-foot button { text-align: left; padding: 7px 10px; border-radius: 3px; font-family: var(--f-mono); font-size: 10.5px; letter-spacing: 0.08em; color: var(--text-xlo); transition: color 180ms ease; }
-.side-foot button:hover { color: var(--text-mid); }
 
 .workspace-body { display: flex; flex-direction: column; min-width: 0; }
 .workspace-body > header {
@@ -2450,13 +2116,6 @@ footer.site .shell { display: flex; flex-direction: column; gap: 14px; }
 .document-meta li small { color: var(--text-xlo); font-size: 10px; line-height: 1.5; }
 /* The document is now named, so the name takes the weight and the id steps back to a caption. */
 .document-meta li strong { color: var(--text-hi); font-size: 12px; letter-spacing: 0; }
-.document-meta li .doc-id {
-  font-family: var(--f-mono);
-  font-size: 9.5px;
-  color: var(--text-xlo);
-  letter-spacing: 0.02em;
-  margin-top: -1px;
-}
 
 .compile-source-choice {
   display: flex;
@@ -2483,49 +2142,7 @@ footer.site .shell { display: flex; flex-direction: column; gap: 14px; }
 .compile-selection-actions small {
   color: var(--text-xlo);
 }
-
-/*
-  A receipt key: label, the key itself on one line, and a control that copies it whole.
-  `min-width: 0` on the code element is what keeps the elided string from widening the card --
-  a grid child's default `auto` minimum is its content, and these strings have no break
-  opportunities a browser will take.
-*/
-.key-line {
-  display: grid;
-  grid-template-columns: 78px minmax(0, 1fr) auto;
-  align-items: baseline;
-  gap: 8px;
-}
-.key-line.pending { display: block; }
-.key-k { font-family: var(--f-mono); font-size: 9px; letter-spacing: 0.12em; color: var(--decor); text-transform: uppercase; }
-.key-line code {
-  min-width: 0;
-  font-family: var(--f-mono);
-  font-size: 9.5px;
-  color: var(--text-lo);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.key-copy {
-  font-family: var(--f-mono);
-  font-size: 8.5px;
-  letter-spacing: 0.12em;
-  color: var(--text-xlo);
-  border: 1px solid var(--hairline);
-  border-radius: 2px;
-  padding: 2px 6px;
-  transition: color 180ms ease, border-color 180ms ease;
-}
-.key-copy:hover { color: var(--verified); border-color: var(--verified-dim); }
-
-@media (max-width: 620px) {
-  /* The label and the control keep their row; the key gets the full width underneath it. */
-  .key-line { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 8px; }
-  .key-line code { grid-column: 1 / -1; }
-}
 .empty { display: flex; flex-direction: column; gap: 8px; color: var(--text-xlo); }
-.collection-result { display: grid; gap: 8px; }
 .billing-hold { color: var(--changed); }
 .gates { gap: 9px; }
 .gate-list { display: grid; gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 3px; overflow: hidden; }
@@ -2542,10 +2159,6 @@ footer.site .shell { display: flex; flex-direction: column; gap: 14px; }
 .billing-card dt { font-family: var(--f-mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-xlo); }
 .billing-card dd { margin: 0; font-family: var(--f-mono); font-size: 12px; color: var(--text-hi); font-variant-numeric: tabular-nums; text-align: right; }
 .billing-card small { font-family: var(--f-mono); font-size: 10px; color: var(--text-xlo); }
-/* The pack grid inside the workspace sits on the card ground, not the page ground. */
-.workspace-packs { border-color: var(--hairline); }
-.workspace-packs .pack { background: var(--ground); padding: 14px; gap: 8px; }
-.workspace-packs .price { font-size: 22px; }
 .billing-card > div:first-child { display: flex; flex-direction: column; gap: 7px; }
 
 /* The guardrail line is a paragraph, not a toast: it stays in flow and its lead-in stays
@@ -2571,11 +2184,6 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
    is driven by acknowledged bytes -- everything else changes when an object appears. */
 
 .board { gap: 14px; }
-.board-zone { display: grid; gap: 8px; }
-/* A5 -- these two are read, not decoration. --decor is 2.65:1 on the panel ground and belongs
-   to marks nobody has to read; a zone heading and a page/line marker are both labels a person
-   uses to find their place, so both take the faintest tone that still passes AA. */
-.board-zone-k { color: var(--text-xlo); }
 /* Finished and stopped panels are four short cells; they pack tighter and do not need the width
    a page and a column of text do. */
 .board-rows[data-zone="rest"] { grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr)); }
@@ -2614,25 +2222,6 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
 /* A held document is the one thing on this board that wants a person, so it is the one thing
    marked. It is marked in the "changed" tone, not a failure tone: nothing is broken. */
 .board-rows > li[data-held="1"] { border-left-color: var(--changed); }
-
-.board-id { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.board-id strong { color: var(--text-hi); font-weight: 500; font-size: 14px; overflow-wrap: anywhere; }
-.board-id small { font-family: var(--f-mono); font-size: 10px; color: var(--text-xlo); }
-
-/* One word for the whole panel. It repeats what the stage strip proves, at a size that survives
-   being one of twenty on screen. */
-.board-now {
-  align-self: flex-start;
-  font-family: var(--f-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.13em;
-  color: var(--unresolved);
-  border: 1px solid var(--unresolved-dim);
-  border-radius: 2px;
-  padding: 2px 7px;
-  font-variant-numeric: tabular-nums;
-}
-.board-now[data-held="1"] { color: var(--changed); border-color: var(--changed-dim); }
 
 .board-transfer { height: 2px; background: var(--hairline); border-radius: 2px; overflow: hidden; }
 .board-transfer i { display: block; height: 100%; background: var(--verified); transition: width 140ms linear; }
@@ -3044,7 +2633,6 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
   .side { border-right: 0; border-bottom: 1px solid var(--hairline); }
   .side nav { flex-direction: row; flex-wrap: wrap; }
   .side nav button.on { box-shadow: inset 0 -2px 0 var(--verified); }
-  .side-foot { flex-direction: row; margin-top: 4px; }
   .arch-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .connection-layout, .developer-layout { grid-template-columns: minmax(0, 1fr); }
 }
@@ -3088,22 +2676,12 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
   .meter { grid-template-columns: minmax(0, 1fr) auto; }
   .meter .mb { grid-column: 1 / -1; }
   .log, .diff, .arch { font-size: 10.5px; }
-  .beforeafter { gap: 20px; }
   /* At this width the bar keeps only the two things a phone can act on -- where you are in the
      sequence, and what to do next. The readouts measure out wider than the viewport once the
      control is in the row, and a clipped control is worse than an absent readout. */
   .bc { display: none; }
   .bar { justify-content: space-between; padding: 0 14px; }
   .bar-ticks { padding: 0; }
-  .bar-next { margin-left: 12px; }
-  /*
-    Not in the hero.
-    On a wide screen the bar's control and the hero's own control are a screen apart and offer
-    the same move at two different moments. On a phone they are both on the first screen saying
-    the identical words, which is the four-CTA fold the hero was just cleaned of, reappearing at
-    a narrower width. The bar keeps its control everywhere the hero's is not on screen.
-  */
-  .bar[data-scene="1"] .bar-next { display: none; }
   .studio-heading { flex-direction: column; gap: 10px; }
   .token-reveal { grid-template-columns: minmax(0, 1fr); }
   .developer-tools { grid-template-columns: minmax(0, 1fr); }
@@ -3167,8 +2745,6 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
   */
   .chaos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ch { padding: 11px 12px; }
-  .ch-v { font-size: 19px; }
-  .ch-k { font-size: 8.5px; letter-spacing: 0.1em; margin-top: 4px; }
 }
 
 /*
@@ -3192,7 +2768,6 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
 @media (pointer: coarse), (max-width: 1079px) {
   .page .btn, .page .nav a { min-height: 44px; }
   body .skip { min-height: 44px; display: inline-flex; align-items: center; }
-  .page .bar-next { min-height: 44px; display: inline-flex; align-items: center; }
   .page .bar-ticks { gap: 0; }
   .page .bar-ticks .bt {
     width: auto;
@@ -3274,15 +2849,6 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
   way a caption does, not in a column the way a paragraph does.
 */
 .film-page { min-height: 100vh; background: var(--ground); }
-.film-nav { background: transparent; border-bottom: 0; }
-.film-nav nav a {
-  font-family: var(--f-mono);
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  color: var(--text-xlo);
-  transition: color 200ms ease;
-}
-.film-nav nav a:hover { color: var(--text-hi); }
 
 .film { position: relative; width: 100%; height: 100vh; overflow: hidden; }
 .film-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; view-transition-name: world-canvas; }
@@ -3310,88 +2876,17 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
   background: linear-gradient(to top, rgba(7, 8, 9, 0.72) 0%, rgba(7, 8, 9, 0.18) 70%, transparent 100%);
   pointer-events: none;
 }
-.film-caption.is-end {
-  background: linear-gradient(to top, rgba(7, 8, 9, 0.82) 0%, rgba(7, 8, 9, 0.22) 70%, transparent 100%);
-}
 
 /* One entrance, used by every caption. The key on the wrapper restarts it per line. */
 @keyframes film-caption-in {
   from { opacity: 0; transform: translateY(18px); }
   to { opacity: 1; transform: none; }
 }
-/*
-  The measure is set in px, not ch.
-  `ch` resolves against this element's own font-size -- the inherited body size -- while the
-  line inside it is up to 88px, so a `22ch` wrapper was about 176px wide and broke a
-  three-word title across three lines.
-*/
-.film-caption-in { animation: film-caption-in 480ms var(--ease) both; max-width: min(640px, 72vw); }
-
-.film-kicker {
-  margin: 0 0 6px;
-  font-family: var(--f-mono);
-  font-size: 10px;
-  letter-spacing: 0.22em;
-  color: var(--verified);
-}
-.film-line {
-  margin: 0;
-  font-size: clamp(16px, 1.7vw, 22px);
-  line-height: 1.25;
-  letter-spacing: -0.02em;
-  color: var(--text-hi);
-  font-weight: 500;
-}
-.film-caption.is-end .film-line {
-  font-size: clamp(16px, 1.7vw, 22px);
-  line-height: 1.25;
-  letter-spacing: -0.02em;
-}
-.film-sub {
-  margin: 8px 0 0;
-  max-width: 62ch;
-  font-size: 13px;
-  line-height: 1.4;
-  color: var(--text-lo);
-}
-
-.film-bar {
-  position: absolute;
-  inset: auto clamp(24px, 7vw, 120px) 10px clamp(24px, 7vw, 120px);
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  z-index: 2;
-}
-.film-meter { flex: 1; height: 1px; background: var(--hairline-hi); }
-.film-meter i { display: block; height: 100%; background: var(--verified); transition: width 90ms linear; }
-.film-btn {
-  font-family: var(--f-mono);
-  font-size: 10px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--text-lo);
-  border: 1px solid var(--hairline-hi);
-  border-radius: 2px;
-  padding: 8px 16px;
-  transition: color 200ms ease, border-color 200ms ease;
-}
-.film-btn:hover { color: var(--verified); border-color: var(--verified-dim); }
-.film-btn-hi {
-  color: var(--text-hi);
-  border-color: var(--verified-dim);
-  text-decoration: none;
-}
-.film-btn-hi:hover { color: var(--verified); }
 
 /* A phone holds the film in the upper half and the words in the lower, rather than shrinking
    both until neither works. */
 @media (max-width: 620px) {
   .film-caption { inset: auto 0 64px 0; padding-bottom: 12px; }
-  .film-caption-in { max-width: 100%; }
-  .film-sub { max-width: 100%; }
-  .film-line,
-  .film-caption.is-end .film-line { font-size: 16px; }
 }
 
 /* ============================================================ evidence tether + identity resolve */
@@ -3769,20 +3264,6 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
 .src-legend dt { margin: 0; }
 .src-legend dd { margin: 0; font-size: 13px; line-height: 1.65; color: var(--text-mid); }
 
-.src-state {
-  margin: 0;
-  padding: 14px 16px;
-  border: 1px solid var(--hairline-hi);
-  /* --unresolved: nothing regressed, the question is simply still open. */
-  border-left: 2px solid var(--unresolved);
-  background: var(--g1);
-  font-size: 13px;
-  line-height: 1.65;
-  color: var(--text-mid);
-  max-width: 76ch;
-}
-.src-state b { color: var(--text-hi); font-weight: 500; }
-
 .src-refusal {
   margin: 0;
   font-family: var(--f-mono);
@@ -3791,8 +3272,6 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
   text-transform: uppercase;
   color: var(--text-lo);
 }
-
-.src-section { font-variation-settings: "wght" 500; text-wrap: initial; }
 .src-para { margin: 0; max-width: 72ch; font-size: 13.5px; line-height: 1.66; color: var(--text-mid); }
 .src-para b { color: var(--text-hi); font-weight: 500; }
 
@@ -3876,97 +3355,6 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
 .site-nav-trigger:focus-visible,
 .nav .site-nav-panel a:focus-visible { outline: 2px solid var(--verified); outline-offset: 3px; }
 
-/*
-   The panel hangs off the header, edge to edge, for the same reason the phone panel does.
-
-   `header.nav` is `position: fixed`, so it is the containing block for any absolutely positioned
-   descendant as long as nothing in between takes that job -- which is why `.site-nav-group` is
-   deliberately not `position: relative`. Pinning the panel to the trigger instead would put a
-   wide panel off the left edge under the first trigger and off the right under the last, and the
-   arithmetic that avoids that has to be redone at every width. `left: 0; right: 0` has no
-   arithmetic in it, and `.site-nav-panel-inner` carries the reading width.
-
-   `.site-nav-group` gets no rule at all, which is the point: the moment it is given
-   `position: relative` it becomes the containing block and the panel is pinned to the trigger
-   again.
-*/
-.site-nav-panel {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  /* Opaque, not a 97% tint with a blur behind it. Measured on this build at 1280: the page's h1
-     fell inside the panel's box and stayed legible through it. The header above already
-     establishes a backdrop root, and a second `backdrop-filter` nested inside one does not
-     composite the way the first does. A menu is not a glass surface -- it is the thing being
-     read -- so the ground is solid and there is no filter left to reason about. */
-  background: var(--ground);
-  border-top: 1px solid var(--hairline-hi);
-  border-bottom: 1px solid var(--hairline-hi);
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.46);
-  /* Bounded by the viewport rather than by shrinking anything: a long panel on a short laptop
-     scrolls, and `contain` keeps that scroll from chaining out to the page underneath. */
-  max-height: calc(100svh - 68px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-/* `display` on the panel would otherwise beat the `[hidden]` default and leave every panel open. */
-.site-nav-panel[hidden] { display: none; }
-.site-nav-panel-inner {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 10px 40px;
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 22px clamp(16px, 3vw, 30px) 20px;
-}
-.site-nav-column { display: grid; align-content: start; gap: 2px; min-width: 0; }
-.site-nav-column-title {
-  font-family: var(--f-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--text-xlo);
-  margin-bottom: 6px;
-}
-.nav .site-nav-panel a {
-  display: grid;
-  gap: 1px;
-  padding: 7px 10px;
-  margin-left: -10px;
-  border-radius: 3px;
-  font-family: var(--f-sans);
-  font-size: 13px;
-  letter-spacing: 0;
-  color: var(--text-lo);
-  transition: background 160ms ease, color 160ms ease;
-}
-.nav .site-nav-panel a:hover,
-.nav .site-nav-panel a:focus-visible { color: var(--text-hi); background: var(--g1); }
-.nav .site-nav-panel a b { font-weight: 500; color: inherit; }
-.nav .site-nav-panel a i {
-  font-style: normal;
-  font-family: var(--f-mono);
-  font-size: 10px;
-  letter-spacing: 0.04em;
-  color: var(--text-xlo);
-}
-/* The hub reads first even where it is the last thing in the panel. */
-.nav .site-nav-panel a[data-overview] b { color: var(--text-hi); }
-.site-nav-featured {
-  grid-column: 1 / -1;
-  border-top: 1px solid var(--hairline);
-  padding-top: 12px;
-  margin-top: 4px;
-}
-.nav .site-nav-panel .site-nav-featured a {
-  display: inline-flex;
-  font-family: var(--f-mono);
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  color: var(--verified);
-}
-
 /* ---- the phone accordion. The outer panel's grid already draws a hairline between its rows
    through `gap: 1px` on a hairline ground, so a group needs no border of its own. */
 /*
@@ -4008,14 +3396,6 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
 .mobile-primary-nav .mobile-nav-group > summary:focus-visible { outline: 2px solid var(--verified); outline-offset: -2px; }
 .mobile-primary-nav .mobile-nav-group > summary[aria-current="true"] { color: var(--text-hi); }
 .mobile-primary-nav .mobile-nav-group[open] > summary { color: var(--text-hi); background: var(--g1); }
-.mobile-nav-links { display: grid; }
-/* Indented, quieter, and still a 44px row -- the indent is what says these belong to the group
-   above rather than to the list of categories. */
-.mobile-primary-nav .mobile-nav-links a {
-  padding-left: clamp(28px, 8vw, 40px);
-  font-size: 11.5px;
-  border-top: 1px solid var(--hairline);
-}
 .mobile-primary-nav nav > a[aria-current="true"],
 .mobile-primary-nav .mobile-nav-links a[aria-current="true"] { color: var(--text-hi); }
 /* END wg-ia-nav */
