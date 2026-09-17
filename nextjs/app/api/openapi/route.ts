@@ -95,7 +95,7 @@ export function GET(request: Request) {
     info: {
       title: "TAVONEL Knowledge Compiler API",
       version: API_VERSION,
-      description: "Tenant-scoped access to immutable documents, candidate knowledge packages, active Worlds, grounded retrieval and durable connector cursors. Promotion and rollback remain human-session-only.",
+      description: "Tenant-scoped access to immutable documents, candidate knowledge packages, active Worlds, grounded retrieval and durable connector cursors. Activation and rollback remain human-session-only.",
     },
     servers: [{ url: v1 }],
     security: [{ TavonelApiKey: [] }],
@@ -107,7 +107,7 @@ export function GET(request: Request) {
       { name: "Capabilities", description: "What this deployment can read, and who signs what it exports. No key required." },
       { name: "Documents", description: "Direct-to-storage upload, and the immutable document inventory it produces." },
       { name: "Compile", description: "Turning a document set into a candidate Compiled World, and following the run." },
-      { name: "Worlds", description: "Reading a promoted World, its lenses, its retrieval index and its version state." },
+      { name: "Worlds", description: "Reading an active World, its lenses, its retrieval index and its version state." },
       { name: "Questions", description: "Grounded answers and retrieval-only search over the active World." },
       { name: "Review", description: "Append-only human decisions over evidence, and the observed run-event stream." },
       { name: "Connections", description: "Durable source connections, their cursors, and the OAuth connectors that create them." },
@@ -288,7 +288,7 @@ export function GET(request: Request) {
           summary: "Compile one document set, synchronously",
           tags: ["Compile"],
           "x-tavonel-scope": "collections:compile",
-          description: "Compiles a single document set and waits for the artifact. Bounded to what one compile carries; a larger selection belongs on POST /compile-jobs, which partitions it server-side and survives a closed tab. The result is a candidate: `candidatePromotion` is always false, because promotion is a human decision in a signed-in session and no key holds it.",
+          description: "Compiles a single document set and waits for the artifact. Bounded to what one compile carries; a larger selection belongs on POST /compile-jobs, which partitions it server-side and survives a closed tab. The result is a candidate: `candidatePromotion` is always false, because activation is a human decision in a signed-in session and no key holds it.",
           requestBody: {
             required: true,
             content: {
@@ -610,7 +610,7 @@ export function GET(request: Request) {
           tags: ["Worlds"],
           "x-tavonel-scope": "collections:read",
           parameters: [{ $ref: "#/components/parameters/CollectionId" }],
-          description: "The reviewable candidate artifact — the raw compile package, before anyone promoted it. This is not the World read model: GET /world/{id} is that, and it answers only for a version a person activated.",
+          description: "The reviewable candidate artifact — the raw compile package, before anyone activated it. This is not the World read model: GET /world/{id} is that, and it answers only for a version a person activated.",
           responses: {
             "200": ok(
               "The candidate artifact and its validation report.",
@@ -638,7 +638,7 @@ export function GET(request: Request) {
           tags: ["Worlds"],
           "x-tavonel-scope": "collections:compile",
           parameters: [{ $ref: "#/components/parameters/CollectionId" }],
-          description: "Compiles the retrieval index for the collection's ACTIVE World, and is a no-op returning alreadyCompiled: true when a completed run for that World version already exists. The manifest comes from the active pointer, so this cannot index an unpromoted candidate. Requires the workspace owner or admin role in addition to the scope, and the same plan bar activating a World takes. A rebuild that does not reach a queryable index answers 503 with RETRIEVAL_INDEX_NOT_COMPILED and the failure class in retrievalIndex.errorClass -- never 200.",
+          description: "Compiles the retrieval index for the collection's ACTIVE World, and is a no-op returning alreadyCompiled: true when a completed run for that World version already exists. The manifest comes from the active pointer, so this cannot index a candidate nobody activated. Requires the workspace owner or admin role in addition to the scope, and the same plan bar activating a World takes. A rebuild that does not reach a queryable index answers 503 with RETRIEVAL_INDEX_NOT_COMPILED and the failure class in retrievalIndex.errorClass -- never 200.",
           responses: {
             "200": ok(
               "The index state after the run. `alreadyCompiled: true` means nothing was recompiled.",
@@ -977,7 +977,7 @@ export function GET(request: Request) {
           summary: "Check whether a held version is still current",
           tags: ["Worlds"],
           "x-tavonel-scope": "worlds:read",
-          description: "Whether a manifest digest is the one this workspace currently answers from. `active: false` means a different version is active now; it does not mean the held copy was withdrawn or deleted, and this endpoint deletes nothing. `knownToWorkspace: false` means this workspace has no record of ever promoting that digest, which is a different answer from 'it was superseded'.",
+          description: "Whether a manifest digest is the one this workspace currently answers from. `active: false` means a different version is active now; it does not mean the held copy was withdrawn or deleted, and this endpoint deletes nothing. `knownToWorkspace: false` means this workspace has no record of ever activating that digest, which is a different answer from 'it was superseded'.",
           parameters: [
             { $ref: "#/components/parameters/CollectionId" },
             { name: "digest", in: "query", required: true, schema: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" } },
@@ -1370,7 +1370,7 @@ export function GET(request: Request) {
           properties: {
             code: { const: "COLLECTION_CANDIDATE_READY" },
             collectionId: str, manifestDigest: str,
-            candidatePromotion: { const: false, description: "Always false. Promotion is a human decision in a signed-in session; no key holds it." },
+            candidatePromotion: { const: false, description: "Always false. Activation is a human decision in a signed-in session; no key holds it." },
             documentsTotal: int,
           },
           ...bestEffort,

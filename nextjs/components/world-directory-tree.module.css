@@ -20,14 +20,33 @@
   gap: 8px;
   align-items: baseline;
   padding: 4px 6px;
+  /* WCAG 2.5.8 spacing: two stacked disclosure targets cannot overlap each other if the row is
+     as tall as the target is. */
+  min-height: 32px;
   min-width: 0;
 }
 
+/*
+  WCAG 2.5.8. The glyph stays 16px so the tree indentation does not move; the pointer target is a
+  32px square centred on it, painted by a pseudo-element so it costs no layout at all. The button
+  keeps its own aria-expanded -- only the hit area grew.
+*/
 .disclosure {
+  position: relative;
   width: 16px;
+  padding: 0;
   color: var(--dir-faint);
   font: 12px var(--f-mono, monospace);
   text-align: center;
+}
+.disclosure::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 32px;
+  height: 32px;
+  transform: translate(-50%, -50%);
 }
 .disclosure:focus-visible { color: var(--dir-ink); }
 .leafMark { width: 16px; color: var(--dir-faint); font: 12px var(--f-mono, monospace); text-align: center; }

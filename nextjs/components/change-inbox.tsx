@@ -259,7 +259,7 @@ export default function ChangeInbox({ model, collectionId, names }: Props) {
                 {inspecting && diff && pair ? (
                   <div className={styles.impact}>
                     <section aria-labelledby="change-source-diff">
-                      <h4 id="change-source-diff">SOURCE DIFF</h4>
+                      <h4 id="change-source-diff">Source diff</h4>
                       {sourceLines.length === 0 ? (
                         <p className={styles.note}>No evidence region differs between these versions.</p>
                       ) : (
@@ -279,7 +279,7 @@ export default function ChangeInbox({ model, collectionId, names }: Props) {
                     </section>
 
                     <section aria-labelledby="change-knowledge-impact">
-                      <h4 id="change-knowledge-impact">KNOWLEDGE IMPACT</h4>
+                      <h4 id="change-knowledge-impact">Knowledge impact</h4>
                       {knowledgeLines.length === 0 ? (
                         <p className={styles.note}>No compiled object or relation differs between these versions.</p>
                       ) : (
@@ -296,7 +296,7 @@ export default function ChangeInbox({ model, collectionId, names }: Props) {
                     </section>
 
                     <div className={styles.full}>
-                      <h4>FIELD-LEVEL COMPARISON</h4>
+                      <h4>Field-level comparison</h4>
                       {/*
                         The comparison panel the Versions lens already uses, opened on this pair
                         rather than on its own default. It reads the older side itself, from the
