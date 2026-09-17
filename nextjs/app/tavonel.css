@@ -941,7 +941,16 @@
     width: min(100%, var(--compile-film-width, 1440px));
     margin-inline: auto;
     aspect-ratio: 1440 / 900;
-    max-height: calc(100dvh - 300px);
+    /*
+      landing-03: `max-height: calc(100dvh - 300px)` used to sit here.
+
+      Two shape rules in one box, and the cap won: at the commonest laptop height (900) it held
+      the frame to 600px while the width stayed 1280, making the box 2.13:1 against a 16:10
+      recording. `object-fit: contain` then pillarboxed the film to 957px inside a 1280px frame
+      -- 320px, a quarter of the hero asset's frame, empty ground. Expressing the cap as a
+      max-WIDTH instead would have shrunk the hero film to 960px and broken the direction's other
+      rule (the hero asset is never the smaller one), so the cap goes and the ratio governs.
+    */
     background: var(--ground);
     border: 1px solid var(--hairline);
     overflow: hidden;

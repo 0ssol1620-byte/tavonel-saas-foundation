@@ -320,16 +320,21 @@
 */
 .one-path-jump { display: none; }
 @media (max-width: 800px) {
+  /*
+    landing-12: it wraps rather than scrolls.
+
+    As a hidden-scrollbar overflow rail the fifth chip -- "Ready for AI", the destination the rail
+    exists to reach -- was cut at the viewport edge with a 1px border sliver showing and no fade,
+    scrollbar or partial label to say the row moved. A border width is not a scroll cue. Five
+    short labels fit two rows at every phone width, so nothing is hidden and there is no nested
+    horizontal scroller inside a nine-screen page scroll.
+  */
   .one-path-jump {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
     margin: 28px 0 0;
-    padding-bottom: 4px;
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    scrollbar-width: none;
   }
-  .one-path-jump::-webkit-scrollbar { display: none; }
   .one-path-jump a {
     flex: 0 0 auto;
     display: inline-flex;
@@ -409,7 +414,19 @@
   right edge came from. The section's own measure governs; the film fills it.
 */
 .one-path-works-film { width: 100%; max-width: 100%; min-width: 0; }
-.one-path-works-film .compile-film-sequence { opacity: 1; transform: none; visibility: visible; }
+/*
+  landing-04 / D33. One film measure on the page, and one left edge.
+
+  The hero sequence took `width: 100%` of `.one-path-wrap` (1280 at x=80); the works sequence
+  fell through to `.landing-page .compile-film-sequence`, which is `min(94vw, 1580px)` with a
+  negative centring margin -- 1354 at x=43 on the English page, breaking the 80px gutter every
+  other section holds, and making the hero asset the narrower of the two. /ko had both at 1280
+  because it never carried that class combination, so the two locales disagreed as well.
+
+  The section's own measure governs, the same as the hero's. The custom property stays declared
+  for any surface that mounts the player outside this wrap.
+*/
+.one-path-works-film .compile-film-sequence { width: 100%; max-width: 100%; min-width: 0; margin: 0; opacity: 1; transform: none; visibility: visible; }
 
 .one-path-source-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--hairline-hi); border-bottom: 1px solid var(--hairline-hi); }
 .one-path-source-options article { padding: 30px 28px; display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
@@ -595,8 +612,25 @@
     aspect-ratio: 16 / 10;
     object-fit: contain;
   }
-  /* The one motion control may not scroll out of the frame with the film. */
-  .one-path-home .compile-film-motion-control { position: sticky; left: calc(100% - 56px); }
+  /*
+    The one motion control may not scroll out of the frame with the film -- and it may not push
+    the film out of the frame either.
+
+    landing-13: `position: sticky` is in flow, so the button stopped being the absolutely
+    positioned overlay it is above 900px and claimed an implicit 44px grid row of its own. The
+    frame's only explicit row is `minmax(0, 1fr)`, so the media lost exactly that 44px: a 460px
+    frame painted a 414px film top-aligned with a 46px empty band under it and the control
+    floating in the band. Placing it in row 1 alongside the media keeps the sticky pan behaviour
+    and gives the film the whole frame back.
+  */
+  .one-path-home .compile-film-motion-control {
+    position: sticky;
+    grid-area: 1 / 1;
+    align-self: end;
+    justify-self: start;
+    left: calc(100% - 56px);
+    margin-bottom: 12px;
+  }
   /* The frame moves, so the page says so rather than leaving a reader to find out. */
   .one-path-hero-film-v2::after,
   .one-path-works-film::after {
