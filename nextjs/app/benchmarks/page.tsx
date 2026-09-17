@@ -188,7 +188,7 @@ export default function BenchmarksPage() {
                 Dates come from the receipts rather than from a constant somebody has to
                 remember to move.
               */}
-              <h2 className={`slate ${styles.sectionTitle}`}><span />What exists today</h2>
+              <h2 className={styles.sectionTitle}>What exists today</h2>
               <p className={styles.para}>
                 No run has yet qualified under the protocol above, so the Results table below is
                 empty and says so by being absent. What has been measured and published is two
@@ -211,7 +211,7 @@ export default function BenchmarksPage() {
                 ))}
               </div>
 
-              <h2 className={`slate ${styles.sectionTitle}`}><span />The eight metric families</h2>
+              <h2 className={styles.sectionTitle}>The eight metric families</h2>
               <div className="tiles">
                 {BENCHMARK_FAMILIES.map((family) => (
                   <article className="tile" key={family.id}>
@@ -225,12 +225,23 @@ export default function BenchmarksPage() {
                       the ones that were identifiers and leaves the ones that were already
                       English alone.
                     */}
-                    <p className={styles.taxonomy}>{family.metrics.map(metricLabel).join(" · ")}</p>
+                    {/*
+                      BQ-112. A list of metrics is a list, not a middot-joined mono string.
+
+                      Four to six names in 10px tracked mono joined by " · " read as one machine
+                      identifier at a glance, and 10px is under the type floor. They are the
+                      family's members, so they are a `<ul>` in sans -- and a screen reader
+                      announces "list, five items" rather than one long sentence whose separators
+                      it does not speak.
+                    */}
+                    <ul className={styles.taxonomy}>
+                      {family.metrics.map((metric) => <li key={metric}>{metricLabel(metric)}</li>)}
+                    </ul>
                   </article>
                 ))}
               </div>
 
-              <h2 className={`slate ${styles.sectionTitle}`}><span />What a result has to carry</h2>
+              <h2 className={styles.sectionTitle}>What a result has to carry</h2>
               {/*
                 BA-093. Twenty-one rows of our internal receipt schema, field by field, in
                 tracked uppercase mono, as the largest section of the page. A buyer arriving
@@ -276,7 +287,7 @@ export default function BenchmarksPage() {
                 </dl>
               </details>
 
-              <h2 className={`slate ${styles.sectionTitle}`}><span />Qualification rules</h2>
+              <h2 className={styles.sectionTitle}>Qualification rules</h2>
               <div className="chain">
                 {QUALIFICATION.map(([title, body]) => (
                   <article className="link" key={title}>
@@ -286,7 +297,7 @@ export default function BenchmarksPage() {
                 ))}
               </div>
 
-              <h2 className={`slate ${styles.sectionTitle}`}><span />North Star metric</h2>
+              <h2 className={styles.sectionTitle}>North Star metric</h2>
               <div className={styles.north}>
                 {/*
                   BA-077. The label read "DEFINITION · NO VALUE PUBLISHED ON THIS DEPLOYMENT",
@@ -311,7 +322,7 @@ export default function BenchmarksPage() {
               */}
               {records.length > 0 ? (
                 <>
-                  <h2 className={`slate ${styles.sectionTitle}`}><span />Results</h2>
+                  <h2 className={styles.sectionTitle}>Results</h2>
                   {records.map((record) => (
                     <div className={styles.resultsScroll} key={record.runReceiptDigest}>
                       <table className={styles.results}>

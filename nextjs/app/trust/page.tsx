@@ -187,14 +187,17 @@ export default function TrustCenterPage() {
           <div className="body policy-copy"><IndexedPolicyBody>
             <div className="stack">
               {/*
-                BA-150. The eyebrow named this page's two sections. It now names the page's
-                subject, which is what a procurement reader scanning for it is looking for.
+                BA-150 put the page's subject in the heading, which is what a procurement reader
+                scanning for it is looking for. BA-176 was about the `<br/>` that fused
+                "publishabout" in the accessible name; BQ-097 removed the break entirely.
 
-                BA-176: the trailing space before the break has to be a string literal. JSX drops
-                the whitespace at the end of a text line, so the accessible name and the document
-                outline both read "publishabout" without it.
+                BQ-112. "Everything we publish" opened on a completeness claim and then spent the
+                page qualifying it -- including a section called "What is not published yet". A
+                heading that has to be withdrawn three screens later is not a heading, and
+                completeness was never the page's argument: its job is to be the one address
+                where the handling answers are, which is what it says now.
               */}
-              <h1 className="document-title">Everything we publish about handling your documents.</h1>
+              <h1 className="document-title">What we publish about handling your documents.</h1>
               {/* G2-040 / G2-041: one jump index for long documents, from the shared component. */}
               <PolicyJumpIndex />
             </div>

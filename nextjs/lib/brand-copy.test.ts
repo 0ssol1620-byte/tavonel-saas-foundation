@@ -677,12 +677,25 @@ describe("public copy", () => {
     expect(families.length, "the model is eight families: one shipped, seven contracted").toBe(7);
     expect(families).not.toContain(shipped![1]);
 
-    // The status is in the grid, not folded under it, and it says what it is.
-    expect(page, "an unshipped locator needs its state on its own tile")
-      .toContain("Reading today");
-    expect(page).toContain("Reader not shipped");
+    /*
+      The status is above the grid, not folded under it, and it says what it is.
+
+      BQ-112 moved it off the tiles: the same four words on all seven of them was one fact
+      printed seven times as the loudest element in the section. What BA-078 was defending is
+      the position, not the repetition -- the correction must be read before the grid rather
+      than discovered behind a click -- so that is what is pinned. It is prose in the heading's
+      block, and it is not inside a `<details>`.
+    */
+    expect(page, "the locator that reads today is marked as the one that does").toContain("Reading today");
+    expect([...page.matchAll(/Reader not shipped/g)], "one statement, not one per tile").toHaveLength(1);
+    expect(
+      page.slice(page.indexOf("Reader not shipped")).indexOf("CONTRACTED_LOCATORS.map"),
+      "the state is read before the grid, not after it",
+    ).toBeGreaterThan(0);
     expect(page, "the correction may not go back into a fold")
       .not.toContain("See current locator coverage");
+    // And may not be put inside one: nothing above the statement opens a disclosure at all.
+    expect(page.slice(0, page.indexOf("Reader not shipped"))).not.toContain("<details");
 
     /*
       And the claim is the one `/sources` supports. `LIVE_PRESERVED` is the manifest's own list,

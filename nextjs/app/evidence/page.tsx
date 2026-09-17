@@ -180,13 +180,31 @@ export default function EvidencePage() {
                 </p>
               </div>
               {/* BA-113: one heading level per card grid, in document order. This is h3's grid. */}
-              <h2>What the contract is built to hold</h2>
-              <div className="tiles">
+              <h2 id="contracted-locators">What the contract is built to hold</h2>
+              {/*
+                BQ-112. The state, once, above the grid.
+
+                BA-078 moved it out of a fold and onto every tile, and it was right about the
+                fold: a correction hidden under a grid of present-tense capability panels is the
+                brand contradicting itself one click away from where it does so. It got there by
+                putting the same four words on all seven tiles, and seven identical chips is not
+                seven facts -- it is one fact, typeset as the loudest thing in the section.
+
+                So the fact keeps its position and loses its repetition. It is prose, above the
+                grid, in the heading's own block: not folded, not a chip, and read before the
+                first tile rather than again after each one.
+              */}
+              <p className={styles.locatorState}>
+                Reader not shipped: none of these seven is read in this deployment today. They are
+                the locator shapes the evidence contract is defined for, so a format that gains a
+                reader gains a locator that was already specified rather than one invented at the
+                time.
+              </p>
+              <div className="tiles" aria-describedby="contracted-locators">
                 {CONTRACTED_LOCATORS.map(([family, locator]) => (
                   <article className="tile" key={family}>
                     <h3>{family}</h3>
                     <p>{locator}</p>
-                    <p className={styles.locatorState}>Reader not shipped</p>
                   </article>
                 ))}
               </div>
