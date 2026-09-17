@@ -360,7 +360,6 @@ const RENDERERS = [
   "../components/explore/technical-details.tsx",
   "../components/world-visual/world-canvas.tsx",
   "../components/world-visual/source-sheet.tsx",
-  "../components/world-visual/page-region.tsx",
 ];
 
 describe("the page renders the artifact rather than a copy of it", () => {

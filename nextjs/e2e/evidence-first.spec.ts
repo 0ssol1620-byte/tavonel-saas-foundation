@@ -13,15 +13,14 @@ test("the hero explains the value while the published sample remains a separate 
   const proof = page.locator('#proof .one-path-source-proof[aria-label="Published sample and its source"]');
   await proof.scrollIntoViewIfNeeded();
   await expect(proof).toBeVisible();
-  const sample = proof.locator(".solution-proof-sample");
+  const sample = proof.locator('[data-proof-variant="canonical"]');
   await expect(sample).toHaveCount(1);
   await expect(sample).toHaveAttribute("data-proof-kind", "source-passage");
   await expect(sample).toContainText("Public compiled World · Apple SEC corpus");
-  await expect(sample).toContainText("Source passage · excerpt");
+  await expect(sample).toContainText("What the compiler read from this page");
   await expect(sample.locator("[data-original-source]")).toBeVisible();
 
-  const claim = sample.locator(".solution-proof-claim");
-  const regionId = await claim.getAttribute("data-evidence-id");
+  const regionId = await sample.getAttribute("data-evidence-id");
   expect(regionId).toBeTruthy();
   const href = await sample.getByRole("link", { name: "Inspect the evidence" }).getAttribute("href");
   const destination = new URL(href!, page.url());
@@ -60,9 +59,9 @@ test("the hero and source proof each fit the viewport at the active product-QA w
 test("the proof opens Explore on the same source region and both representations remain inspectable", async ({ page }) => {
   await page.goto("/");
   await dismissOptionalAnalytics(page);
-  const proof = page.locator("#proof .solution-proof-sample");
+  const proof = page.locator('#proof [data-proof-variant="canonical"]');
   await proof.scrollIntoViewIfNeeded();
-  const regionId = await proof.locator(".solution-proof-claim").getAttribute("data-evidence-id");
+  const regionId = await proof.getAttribute("data-evidence-id");
   expect(regionId).toBeTruthy();
   await proof.getByRole("link", { name: "Inspect the evidence" }).click();
   await expect(page).toHaveURL(url => url.pathname === "/explore"
@@ -70,7 +69,6 @@ test("the proof opens Explore on the same source region and both representations
   await expect(page.locator('[data-visual-world="explore"]')).toHaveAttribute("data-world-act", "evidence");
   const sheet = page.locator("[data-source-sheet]");
   await expect(sheet.locator("[data-original-source]")).toBeVisible();
-  await sheet.getByRole("tab", { name: "Parsed text" }).click();
   await expect(sheet.locator("[data-active-region]")).toHaveAttribute("data-region-id", regionId!);
 });
 
@@ -78,10 +76,10 @@ test("Korean visitors get the same one-path story and the same real public proof
   await page.goto("/ko");
   await expect(page.locator("#ko-one-path-title")).toContainText("자료를 가져오세요.");
   await expect(page.locator("#ko-one-path-title")).toContainText("AI가 쓰는 지식으로 만듭니다.");
-  await expect(page.locator(".one-path-hero .one-path-source-proof")).toHaveCount(0);
-  const proof = page.locator('.one-path-source-proof[aria-label="공개 샘플과 원문"]');
+  await expect(page.locator(".one-path-hero [data-proof-variant]")).toHaveCount(0);
+  const proof = page.locator('[data-proof-variant="canonical"]');
   await proof.scrollIntoViewIfNeeded();
-  await expect(proof.locator(".solution-proof-sample")).toHaveCount(1);
+  await expect(proof).toHaveCount(1);
   await expect(proof).toContainText("Apple SEC corpus");
   await expect(page.getByRole("link", { name: "공개 샘플 열기" })).toHaveAttribute("href", "/explore");
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);

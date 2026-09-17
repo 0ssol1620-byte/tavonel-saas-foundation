@@ -13,7 +13,7 @@ test("the original page is rendered from the same public bytes and has a matchin
   const original = sheet.locator("[data-original-source]");
   await expect(original).toHaveAttribute("data-render-state", "ready", { timeout: 20_000 });
   await expect(original).toHaveAttribute("data-source-digest", `sha256:${DIGEST}`);
-  await expect(sheet.getByRole("tab", { name: "Original page", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(sheet.locator("[data-parsed-source-page]")).toBeVisible();
   const region = await sheet.locator("[data-active-region]").getAttribute("data-region-id");
   await expect(original.locator("[data-original-region]")).toHaveAttribute("data-original-region", region!);
   const pixels = await original.locator("canvas").evaluate((canvas: HTMLCanvasElement) => {
@@ -39,7 +39,7 @@ test("the original page is rendered from the same public bytes and has a matchin
   }
 });
 
-test("zoom is confined to the reader and parsed text keeps the same selection", async ({ page }) => {
+test("zoom is confined to the reader and the passage keeps the same selection", async ({ page }) => {
   await page.goto("/");
   const sheet = page.locator("[data-source-sheet]").first();
   await sheet.scrollIntoViewIfNeeded();
@@ -51,11 +51,9 @@ test("zoom is confined to the reader and parsed text keeps the same selection", 
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   await original.getByRole("button", { name: "Fit page", exact: true }).click();
   await expect.poll(async () => (await original.locator("canvas").boundingBox())!.width).toBeLessThanOrEqual(before + 1);
+  // BQ-014: the passage is on screen with the page rather than behind a tab, so the selection is
+  // never something a reader has to navigate a tablist to see.
   const selected = await sheet.locator("[data-active-region]").getAttribute("data-region-id");
-  const tab = sheet.getByRole("tab", { name: "Original page", exact: true });
-  await tab.focus(); await page.keyboard.press("ArrowRight");
-  await expect(sheet.getByRole("tab", { name: "Parsed text", exact: true })).toBeFocused();
-  await page.keyboard.press("Enter");
   await expect(sheet.locator("[data-active-region]")).toBeVisible();
   await expect(sheet.locator("[data-active-region]")).toHaveAttribute("data-region-id", selected!);
 });
@@ -68,5 +66,5 @@ test("a mismatched source fails closed and still offers the committed PDF", asyn
   await expect(sheet.locator("[data-original-source]")).toHaveAttribute("data-render-state", "error");
   await expect(sheet).toContainText("does not match the recorded source");
   await expect(sheet.locator("[data-original-region]")).toHaveCount(0);
-  await expect(sheet.getByRole("link", { name: "Open committed PDF" })).toBeVisible();
+  await expect(sheet.getByRole("link", { name: "Open the original PDF" })).toBeVisible();
 });

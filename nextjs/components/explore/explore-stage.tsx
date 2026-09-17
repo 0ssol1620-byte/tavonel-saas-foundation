@@ -29,6 +29,7 @@ import { Search } from "lucide-react";
 import Logomark from "@/components/logomark";
 import { trackFunnel } from "@/lib/funnel-events";
 import { chooseExploreEntryProof, excerptPreview } from "@/lib/explore-entry-proof";
+import { sourcePageQualifier } from "@/lib/source-page-rasters";
 import WorldAct from "./world-act";
 import EvidenceAct from "./evidence-act";
 import ChangeAct from "./change-act";
@@ -264,7 +265,7 @@ export default function ExploreStage({ model, layout, change, answers, technical
   };
 
   return (
-    <main className={styles.page}>
+    <main id="main" className={styles.page}>
       <header className={styles.header}>
         <Link href="/" className={styles.brand}>
           <Logomark size={20} />
@@ -345,7 +346,6 @@ export default function ExploreStage({ model, layout, change, answers, technical
               onOpen={openNode}
               reduced={reduced}
               settled={settled}
-              dimmed={act === "entry"}
             />
           ) : null}
 
@@ -358,7 +358,6 @@ export default function ExploreStage({ model, layout, change, answers, technical
               onSelectObject={selectNode}
               onOpenSource={() => enter("evidence")}
               onBack={() => enter(scene === "evidence" && narrow ? "object_focus" : "world")}
-              reduced={reduced}
               step={scene}
             />
           ) : null}
@@ -382,30 +381,31 @@ export default function ExploreStage({ model, layout, change, answers, technical
           <div className={styles.entry}>
             <div className={styles.entryLayout}>
               <div className={styles.entryCopy}>
-                <p className={styles.entryEyebrow}>EXPLORE · NO LOGIN REQUIRED</p>
+                <p className={styles.entryEyebrow}>Explore · no login required</p>
                 <h1>{EXPLORE_COPY.hero}</h1>
                 <p className={styles.entrySub}>{EXPLORE_COPY.sub}</p>
                 <button type="button" className={styles.entryCta} onClick={() => enter("world")}>
-                  {EXPLORE_COPY.enter}<span aria-hidden="true">↗</span>
+                  {EXPLORE_COPY.enter}
                 </button>
                 <div className={styles.entryPaths} aria-label="Other ways to explore">
-                  <button type="button" onClick={() => enter("change_compare")}>Compare filings <span aria-hidden="true">→</span></button>
-                  <button type="button" onClick={openAsk}>Try sample questions <span aria-hidden="true">→</span></button>
+                  <button type="button" onClick={() => enter("change_compare")}>Compare filings</button>
+                  <button type="button" onClick={openAsk}>Try sample questions</button>
                 </div>
               </div>
               {entryProof && proofPreview ? (
                 <aside className={styles.entryProof} aria-label="Excerpt from the sample source" data-entry-proof="source-bound">
                   <div className={styles.proofHeading}>
-                    <span>FROM THE SOURCE</span><span aria-hidden="true">↗</span>
+                    <span>From the source</span>
                   </div>
                   <p className={styles.proofFiling}>
                     {entryProof.form ?? "Public filing"}
                     {entryProof.filingDate ? <span>Filed {entryProof.filingDate}</span> : null}
                   </p>
-                  <blockquote>{proofPreview.text}{proofPreview.truncated ? <span aria-label="excerpt continues"> …</span> : null}</blockquote>
+                  {/* BQ-072: the excerpt stops on a word boundary and says so with an ellipsis. */}
+                  <blockquote>{proofPreview.text}{proofPreview.truncated ? "…" : ""}</blockquote>
                   <div className={styles.proofFoot}>
-                    <span>Page {entryProof.page} · {entryProof.representationKind === "reference_render" ? "Reference render" : "Source document"}</span>
-                    <button type="button" onClick={() => openRegion(entryProof.id)}>Inspect this source <span aria-hidden="true">↗</span></button>
+                    <span>Page {entryProof.page} · {sourcePageQualifier(entryProof.representationKind)}</span>
+                    <button type="button" onClick={() => openRegion(entryProof.id)}>Open this source page</button>
                   </div>
                 </aside>
               ) : null}

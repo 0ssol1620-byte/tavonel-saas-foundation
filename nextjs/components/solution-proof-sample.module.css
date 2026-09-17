@@ -1,0 +1,166 @@
+/*
+  The proof block's own styling, in its own module.
+
+  It used to be spread across two global polish sheets, which is how it ended up as a card with a
+  cream claim panel inside a card inside a hero card, each with a different radius. One container,
+  one frame, tokens only.
+*/
+
+.block {
+  display: grid;
+  gap: clamp(16px, 2vw, 24px);
+  min-width: 0;
+  margin: 0;
+  padding: clamp(16px, 2vw, 24px);
+  background: var(--ground);
+  border: 1px solid var(--hairline-hi);
+  border-radius: var(--r-inst-lg, 8px);
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 18px;
+  min-height: 44px;
+  color: var(--text-mid);
+  font: 500 12px/1.4 var(--f-sans);
+  letter-spacing: 0.06em;
+}
+
+/* The card's only link was 115x11px on a phone (BA-056): it is a 44px row target. */
+.head a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--verified);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.framing {
+  margin: 0;
+  max-width: 680px;
+  color: var(--text-mid);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/*
+  Beat 4: the objects this region supports.
+
+  Names only, read off the compiled World. Not a claim about them, not a count of them dressed as
+  a result -- the list of what a reader would find in the World above this passage.
+*/
+.linked {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.linked dt {
+  color: var(--text-mid);
+  font: 500 12px/1.4 var(--f-sans);
+  letter-spacing: 0.06em;
+}
+
+.linked dd { margin: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+
+.linked dd span {
+  padding: 5px 9px;
+  color: var(--text-hi);
+  background: var(--g2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-paper-lg, 4px);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.counts {
+  margin: 0;
+  color: var(--text-lo);
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.digest { color: var(--text-lo); font-family: var(--f-mono); }
+
+/*
+  The two-line variant, for a route that links to the proof rather than repeating it (BQ-019/D4).
+  One excerpt, its filing and page, and the link to the region on /explore.
+*/
+.excerpt {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  padding: clamp(14px, 1.6vw, 20px);
+  background: var(--g1);
+  border: 1px solid var(--hairline-hi);
+  border-radius: var(--r-inst-lg, 8px);
+}
+
+.excerptLabel {
+  margin: 0;
+  color: var(--text-mid);
+  font: 500 12px/1.4 var(--f-sans);
+  letter-spacing: 0.06em;
+}
+
+.excerptText {
+  margin: 0;
+  max-width: 680px;
+  /* Two lines, cut on a word boundary above and clamped here, so a long region cannot grow a rail. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  color: var(--text-hi);
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.excerptFoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  color: var(--text-lo);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.excerptFoot a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--verified);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/*
+  BQ-077. On /product/document-understanding the block sat in the 420px title rail, so the one
+  thing the page is arguing about -- what a read recovers from a printed statement -- was
+  unreadable there. This wrapper spans the two-column body so the crop gets the content width.
+*/
+.fullWidth { grid-column: 1 / -1; min-width: 0; margin-top: clamp(24px, 3vw, 40px); }
+
+/* The page-crop variant: the region, at the width of the content it is placed in. */
+.crop {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+}
+
+.crop img {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: var(--paper, #f4f1ea);
+  border: 1px solid var(--verified-dim);
+  border-radius: var(--r-paper-lg, 4px);
+}

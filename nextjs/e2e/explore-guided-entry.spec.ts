@@ -9,7 +9,7 @@ test("entry offers real source evidence without requiring graph navigation", asy
   await expect(proof.locator("blockquote")).not.toBeEmpty();
   await expect(proof).toContainText(/Page \d+/);
   await expect(proof).not.toContainText(/sha256:|100%|verified answer/);
-  const inspect=proof.getByRole("button",{name:"Inspect this source"});
+  const inspect=proof.getByRole("button",{name:"Open this source page"});
   expect((await inspect.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   await inspect.click();
   await expect(page.locator(STAGE)).toHaveAttribute("data-world-act","evidence");
