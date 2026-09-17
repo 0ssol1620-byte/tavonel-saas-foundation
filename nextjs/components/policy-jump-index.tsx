@@ -1,4 +1,5 @@
 import { Children, Fragment, cloneElement, isValidElement, type ReactElement, type ReactNode } from "react";
+import PageTocList from "@/components/docs/page-toc-list";
 
 /*
   G2-040 / G2-041. Two findings, one cause.
@@ -54,18 +55,19 @@ function count(node: ReactNode, level: "h2" | "h3"): number {
   return n;
 }
 
+/*
+  pages-13. One "On this page", not five.
+
+  The index this file derives is the right index; the list it drew was a fifth rendering of a
+  component the site already has -- a numbered list with full-width hairline rules, measured at
+  582px on /status, 1,253 on /research, 1,173 on /trust and 1,336 on /enterprise, each rule
+  spanning a kilopixel for a 150px label. `PageTocList` is the boxed form the documentation
+  routes use, and it marks the section being read, which this list never did. Only the reading of
+  the document tree stays here.
+*/
 function JumpNav({ entries }: { entries: Entry[] }) {
   if (entries.length < 3) return null;
-  return (
-    <nav className="policy-jump" aria-label="On this page">
-      <p className="policy-jump-title">On this page</p>
-      <ol>
-        {entries.map((entry) => (
-          <li key={entry.id}><a href={`#${entry.id}`}>{entry.text}</a></li>
-        ))}
-      </ol>
-    </nav>
-  );
+  return <PageTocList entries={entries.map((entry) => ({ id: entry.id, label: entry.text }))} />;
 }
 
 export function IndexedPolicyBody({ children }: { children: ReactNode }) {

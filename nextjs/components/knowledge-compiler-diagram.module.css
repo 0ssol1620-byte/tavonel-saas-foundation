@@ -13,8 +13,20 @@
   That was a 640-to-760px window while the drawing still scaled above it; pinning the width
   widened it to every laptop, so the pan is a `tabIndex` group here as it is there.
 */
-.scroller { width: 100%; overflow-x: auto; }
+.scroller { width: 100%; overflow-x: auto; scrollbar-width: thin; scrollbar-color: var(--hairline-hi) transparent; }
 .scroller:focus-visible { outline-offset: 4px; }
+/*
+  pages-01. Where the drawing is still wider than its container -- below about 1040px, once the
+  row gives it the full content width -- the cut has to read as a pan and not as truncation. The
+  mask is the affordance; the thin scrollbar above is the second one, for a reader who does not
+  see the fade.
+*/
+@media (max-width: 1039px) {
+  .scroller {
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 44px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 44px), transparent);
+  }
+}
 
 .diagram { width: 100%; height: auto; min-width: 980px; max-width: 980px; overflow: visible; }
 

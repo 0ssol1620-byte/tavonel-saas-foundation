@@ -24,7 +24,6 @@
   justify-content: flex-start;
   padding-top: clamp(110px, 12vw, 168px);
 }
-.product-overview .shell { max-width: 1280px; }
 .product-overview .stack { gap: var(--product-inner); }
 .product-hero { align-items: end; padding-bottom: clamp(54px, 7vw, 96px); border-bottom: 1px solid var(--hairline); }
 /*
@@ -378,13 +377,43 @@
   `grid-column: 1` on `.trust-next` is the other half: `tavonel.css` places it in column two,
   which in a one-column grid would mint an implicit second one and put it back where it was.
 */
-.scene.doc .body:has(> .stack:first-child > .document-title:only-child) {
-  grid-template-columns: minmax(0, 72ch);
+/*
+  D32. One reading column, full-width instruments.
+
+  BQ-100 collapsed these routes to a single 72ch track and stopped there, so a 582px measure hugged
+  the left edge of a full-bleed shell and left ~800px of black beside it for the whole height of
+  /security, /benchmarks, /evidence, /resources, /solutions, /sources and /status. The track is the
+  content width now; the measure moves onto the prose itself, where it belongs, and the card grids,
+  tables, figures and code blocks spend the width they were always sized for.
+*/
+/*
+  regressions-11. A breadcrumb above the H1 is still a column holding only the heading.
+
+  The condition below reads ":only-child" because a stack with something beside the title is a
+  composition. A breadcrumb is not: on /product/document-understanding it left the hero's left
+  track holding 158px of content against a 650px grid, which is the exact hole this block was
+  written to close.
+*/
+.scene.doc .body:has(> .stack:first-child > .document-title:only-child),
+.scene.doc .body:has(> .stack:first-child > .doc-breadcrumb + .document-title:last-child) {
+  grid-template-columns: minmax(0, 1fr);
 }
-.scene.doc .body:has(> .stack:first-child > .document-title:only-child) > .stack:first-child {
+/* Prose keeps a 68ch measure and headings their own; everything else is an instrument and takes
+   the column. `p` is already capped site-wide by `.public-page .body p`; these are the rest. */
+.scene.doc .body:has(> .stack:first-child > .document-title:only-child) :is(li, dd, blockquote),
+.scene.doc .body:has(> .stack:first-child > .doc-breadcrumb + .document-title:last-child) :is(li, dd, blockquote) {
+  max-width: 68ch;
+}
+.scene.doc .body:has(> .stack:first-child > .document-title:only-child) > .stack > :is(h2, h3),
+.scene.doc .body:has(> .stack:first-child > .doc-breadcrumb + .document-title:last-child) > .stack > :is(h2, h3) {
+  max-width: 34ch;
+}
+.scene.doc .body:has(> .stack:first-child > .document-title:only-child) > .stack:first-child,
+.scene.doc .body:has(> .stack:first-child > .doc-breadcrumb + .document-title:last-child) > .stack:first-child {
   position: static;
 }
-.scene.doc .body:has(> .stack:first-child > .document-title:only-child) > .trust-next {
+.scene.doc .body:has(> .stack:first-child > .document-title:only-child) > .trust-next,
+.scene.doc .body:has(> .stack:first-child > .doc-breadcrumb + .document-title:last-child) > .trust-next {
   grid-column: 1;
 }
 
@@ -476,20 +505,12 @@
   BQ-136. A section number is a number, not an identifier.
 
   `decimal-leading-zero` turns 1 into 01, which is the form a machine writes -- a build number, a
-  take, a track. On a policy page's jump index it made a nine-item list read as a catalogue of
-  part numbers, in 10px tracked mono two sizes under the floor, in the faintest ink on the page.
-  The counter is plain, the face is the one the list is set in, and the size is on the floor.
+  take, a track. The counter is plain, the face is the one the list is set in, and the size is on
+  the floor. (The policy jump index this also covered renders `PageTocList` since pages-13.)
 
   These rules live here rather than in app/ux-polish.css because that sheet belongs to another
   lane; it is imported before this one, so ordering carries the override.
 */
-.policy-jump a::before {
-  content: counter(policy-jump) ".";
-  flex: none;
-  color: var(--text-lo);
-  font: 12px var(--f-sans);
-  letter-spacing: 0;
-}
 .dev-journey li::before {
   content: counter(devstep) ".";
   font-family: var(--f-sans);
@@ -499,14 +520,14 @@
 }
 
 /*
-  BQ-137. Three one-line titles, each reserving two lines, on /developers.
+  BQ-137. Aligning the bodies of a card row without reserving a line in every card.
 
-  `.chain .link > h2 { min-height: 2.4em }` in app/tavonel.css reserves a second line on every
-  card heading so the bodies in a row start together. It is the right rule for a grid where one
-  title wraps and its neighbour does not; on this row none of the three wraps, so all it does is
-  open 20px of empty space under each title, three times. Subgrid gives the four parts of the
-  card a row each measured across the row, which aligns the bodies whatever the titles do -- and
-  then the reserved line is not needed by anything.
+  `.chain .link > h2 { min-height: 2.4em }` in app/tavonel.css used to buy that alignment by
+  reserving a second line on EVERY card heading, which opened 20px of empty space under each
+  one-line title -- three times on this row, where none of the three wraps. pages-06 deleted it.
+  Subgrid is what replaces it, here and on any row where a title does wrap: the four parts of the
+  card get a row each, measured across the row, so the bodies start together whatever the titles
+  do, and nothing reserves a line it does not use.
 */
 .dev-paths { grid-template-rows: repeat(4, auto); }
 .dev-paths > .link {
@@ -515,7 +536,6 @@
   grid-template-rows: subgrid;
   align-content: start;
 }
-.dev-paths > .link > h2 { min-height: 0; }
 @media (max-width: 760px) {
   .dev-paths { grid-template-rows: auto; }
   .dev-paths > .link { grid-row: auto; grid-template-rows: none; }
