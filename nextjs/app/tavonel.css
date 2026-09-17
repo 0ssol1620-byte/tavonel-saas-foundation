@@ -741,7 +741,14 @@
     .tab:hover, [role="tab"]:hover { color: var(--text-hi); }
   }
 
-  .btn.small { min-height: 36px; padding: 0 14px; font-size: var(--t-1); }
+  /*
+    BQ-060. `.small` is the header's access action and nothing else -- components/public-site-chrome.tsx
+    is its only emitter -- so it is not a size variant, it is one control that had drifted off the
+    system: 12px in a 36px box, in the row a phone visitor reads first. It takes the 44px target and
+    the 14px face; the narrow padding is the only thing the header row actually needs from it.
+    `.btn-sm` is still there for a genuinely small control.
+  */
+  .btn.small { padding: 0 14px; }
   .nav .btn { white-space: nowrap; flex-shrink: 0; }
 
   .mini {
@@ -1087,7 +1094,17 @@
     .site-footer-groups a:hover { color: var(--text-hi); }
   }
   .nav-actions { display: inline-flex; align-items: center; gap: 14px; }
-  .nav-signin { color: var(--text-lo); font-size: 13px; text-decoration: none; }
+  /* BQ-060. A link in the header row is still a control: 44px of height and the same 14px face as
+     the action beside it, rather than 13px of bare text with no box at all. Below 520px it is
+     hidden where the access action is present, so the width this costs is width the row has. */
+  .nav-signin {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    color: var(--text-lo);
+    font-size: var(--t-3);
+    text-decoration: none;
+  }
   @media (hover: hover) and (pointer: fine) {
     .nav-signin:hover { color: var(--text-hi); }
   }
@@ -1308,7 +1325,6 @@
     color: var(--text-hi);
     font: inherit;
     font-size: 14px;
-    outline: none;
     transition: border-color var(--dur-2) var(--ease-out), background var(--dur-2) var(--ease-out);
   }
   .contact-field select,
@@ -2032,7 +2048,6 @@
   .docs-search { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; gap: 10px; }
   .docs-search-field { display: flex; min-width: 0; max-width: 100%; align-items: center; gap: 9px; padding: 10px 12px; border: 1px solid var(--hairline-hi); color: var(--text-lo); }
   .docs-search-field input { flex: 1; min-width: 0; color: var(--text-hi); background: none; border: 0; font: inherit; font-size: 13px; }
-  .docs-search-field input:focus { outline: none; }
   .docs-search-results ul { display: grid; gap: 1px; margin: 0; padding: 0; list-style: none; background: var(--seam); border: 1px solid var(--hairline); }
   .docs-search-results a { display: grid; gap: 3px; padding: 10px 12px; background: var(--ground); }
   .docs-search-results strong { font-size: 13px; font-weight: 500; color: var(--text-hi); }
@@ -2829,8 +2844,12 @@
        was the one row on the site under it. The gap absorbs the two pixels. */
     .nav { gap: 7px; padding: 10px 16px; }
     /* The access verb stays. Hiding it here would undo the split it exists for: a phone visitor
-       would again be offered only "Sign in", the one control a first-time reader cannot use. */
-    .nav .btn.small { padding: 10px 10px; font-size: var(--t-1); letter-spacing: 0; }
+       would again be offered only "Sign in", the one control a first-time reader cannot use.
+       BQ-060: it is no longer shrunk to get it here. The size override that sat on this line was
+       written when the desktop nav switched to the phone sheet at 860px and this control was a
+       desktop afterthought; the switch is at 1079px now, so this is the header CTA on a phone and
+       it keeps the 44px box and the 14px face. Only the tracking is still trimmed for width. */
+    .nav .btn.small { letter-spacing: 0; }
     .caps, .checks, .plans, .packs, .stops, .legend { grid-template-columns: minmax(0, 1fr); }
     .contact-pair { grid-template-columns: minmax(0, 1fr); }
     .contact-submit { align-items: stretch; flex-direction: column; }
