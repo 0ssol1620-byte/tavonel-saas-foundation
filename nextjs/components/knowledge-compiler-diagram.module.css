@@ -6,9 +6,16 @@
   A user unit is a CSS pixel only while the drawing renders at its authored width. The column it
   sits in is about 800px wide at 1440, which put every size below at four fifths of what it says
   -- the stage labels at 11px and the span notes at 10.5px. The drawing is pinned to its viewBox
-  width instead and its `<figure>` pans it, which is the treatment the contract diagram on
-  /product/continuous-knowledge gets.
+  width instead and `.scroller` pans it, which is the treatment the contract diagram on
+  /product/continuous-knowledge gets -- including the half that makes the pan reachable. The
+  `<figure>` this sits in on /knowledge-compiler is `overflow-x: auto` and nothing else, and a
+  scroll container with no focusable child cannot be reached from a keyboard at all (WCAG 2.1.1).
+  That was a 640-to-760px window while the drawing still scaled above it; pinning the width
+  widened it to every laptop, so the pan is a `tabIndex` group here as it is there.
 */
+.scroller { width: 100%; overflow-x: auto; }
+.scroller:focus-visible { outline-offset: 4px; }
+
 .diagram { width: 100%; height: auto; min-width: 980px; max-width: 980px; overflow: visible; }
 
 .eyebrow { fill: var(--verified); font: 12px var(--f-mono); letter-spacing: .08em; }
@@ -49,7 +56,9 @@
 .stack { display: none; }
 
 @media (max-width: 640px) {
-  .diagram { display: none; }
+  /* The scroller, not just the drawing inside it: a hidden drawing in a focusable empty box is a
+     tab stop that lands on nothing. */
+  .scroller { display: none; }
   .stack {
     display: grid;
     gap: 1px;
