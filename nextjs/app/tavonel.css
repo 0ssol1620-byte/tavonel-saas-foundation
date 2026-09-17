@@ -1385,7 +1385,6 @@
   .changelog-entry header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; margin-bottom: 10px; }
   .changelog-entry header time { color: var(--text-lo); font: var(--t-1) var(--f-mono); letter-spacing: .09em; }
   .changelog-entry header b { color: var(--verified); font: var(--t-1) var(--f-mono); letter-spacing: .09em; }
-  .changelog-entry header em { padding: 2px 7px; border: 1px solid var(--hairline); color: var(--text-lo); font: normal var(--t-1) var(--f-mono); letter-spacing: .1em; text-transform: uppercase; }
   .changelog-entry header a { margin-left: auto; color: var(--text-lo); font: 12px var(--f-mono); }
   .changelog-breaking { display: grid; gap: 6px; margin: 12px 0; padding: 12px 14px; border-left: 2px solid var(--changed); background: var(--g1); }
   .changelog-breaking b { color: var(--changed); font: var(--t-1) var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; }
@@ -2070,7 +2069,10 @@
   .docs-endpoint, .docs-body > * { min-width: 0; }
   /* Running docs text carries paths, URLs and identifiers with no break opportunity; at 360px one of them widened /docs/mcp by 38px. */
   .docs-body :is(p, li, dd, td, th, h2, h3, figcaption) { overflow-wrap: anywhere; min-width: 0; }
-  .docs-code figcaption { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding: 8px 12px; border-bottom: 1px solid var(--hairline); color: var(--text-lo); font: var(--t-1) var(--f-mono); letter-spacing: .1em; text-transform: uppercase; }
+  /* The caption names the block -- "Request body", "Example response", the language tabs. Those
+     are words, not identifiers, and they were set in tracked monospace capitals. The code inside
+     the figure is still the mono voice; its label is not. */
+  .docs-code figcaption { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding: 8px 12px; border-bottom: 1px solid var(--hairline); color: var(--text-lo); font: var(--t-1) var(--f-sans); letter-spacing: .06em; }
   /* Language tabs sit in the code block's caption, where the single label used to be. */
   .docs-langs { display: flex; flex-wrap: wrap; gap: 2px; min-width: 0; }
   .docs-langs button { padding: 3px 8px; border: 1px solid transparent; color: var(--text-lo); font: var(--t-1) var(--f-sans); letter-spacing: 0.06em; }
@@ -2088,7 +2090,10 @@
   .docs-endpoint header b[data-method="GET"] { color: var(--verified); }
   .docs-endpoint header b[data-method="POST"] { color: var(--changed); }
   .docs-endpoint header code { min-width: 0; max-width: 100%; color: var(--text-hi); overflow-wrap: anywhere; white-space: normal; }
-  .docs-endpoint header em { color: var(--text-lo); font-style: normal; }
+  /* `<em>Scope <code>collections:read</code></em>`: the word is prose and the scope is an
+     identifier, so only the inner code keeps the header's mono voice. */
+  .docs-endpoint header em { color: var(--text-lo); font-style: normal; font-family: var(--f-sans); }
+  .docs-endpoint header em code { font-family: var(--f-mono); }
 
   /*
     A table stays a table.
@@ -3420,74 +3425,23 @@
 }
 
 @layer overrides {
-  /* ============================================================ BA-236 · the 12px floor
+  /* ============================================================ BA-236 -- the 12px floor, retired here
 
-     The design system sets its own minimum at 12px for body and UI text (7.3 [CONFIRMED], and
-     decision.md:438 agrees), and a measurement across the public routes found 138 text nodes under
-     it on /explore alone, 37 of them at 8px, plus 9px link labels on /product, 9px table headers on
-     /pricing and a 10px footer heading. Two of them failed WCAG AA for ordinary text as well.
+     This was the floor: one `.page :is(...)` block naming thirty selectors, setting each to 12px
+     and re-tracking it, because the sizes it corrected were authored in thirty rules across 3,800
+     lines. It has been replaced twice over. `scripts/check-type-floor.mjs` greps every stylesheet
+     in the repository -- modules included, which a selector list can never reach -- and the token
+     pass raised each of those rules at its source, so every selector named here already declared
+     `var(--t-1)` before this block reached it.
 
-     This block is the floor, applied where visitors read -- the public chrome and the landing page,
-     not the authenticated workspace, whose dense instrument surfaces are a separate argument. It is
-     one block on purpose: the sizes it corrects were set in thirty different rules across 3,800
-     lines, and a reader trying to find out what the floor is should find it in one place. Tracking
-     comes down with each size, because letter-spacing authored for 9px is 40% too wide at 12px.
+     Keeping it was not free. `letter-spacing: 0.1em` is tracking authored for 9px, and in the
+     overrides layer it beat the 0.02em--0.08em the same pass had just set on `.docs-table th`,
+     `.tag`, `.tile .n` and a dozen more: the values in the rules a reader would go and read were
+     the ones not applying. It also flattened two deliberate sizes on /pricing -- `.plan ul` at
+     13px and `.price small` -- back to 12px from a later, equally specific selector.
 
-     A label that does not fit at 12px is a label that is too long.
-     -------------------------------------------------------------------------------------------- */
-  .page :is(
-    .mode,
-    .tick,
-    .site-footer-title,
-    .tile .n,
-    .tag,
-    .cap-s,
-    .link .st,
-    .interlude-sub,
-    .source-route-kind,
-    .changelog-filter button,
-    .changelog-entry header time,
-    .changelog-entry header b,
-    .changelog-breaking b,
-    .changelog-group > p,
-    .integration-facts dt,
-    .docs-code figcaption,
-    .docs-langs button,
-    .docs-endpoint header,
-    .docs-table th,
-    .docs-pager,
-    .src-matrix thead th,
-    .document-meta li small,
-    .price small,
-    .plan ul,
-    .cap-n,
-    .src-none,
-    .usage-estimator label,
-    .usage-estimator dt,
-    .gate-list p
-  ) {
-    font-size: var(--t-1);
-  }
-  .page :is(
-    .mode,
-    .tick,
-    .site-footer-title,
-    .tile .n,
-    .tag,
-    .cap-s,
-    .link .st,
-    .source-route-kind,
-    .changelog-filter button,
-    .changelog-breaking b,
-    .changelog-group > p,
-    .integration-facts dt,
-    .docs-code figcaption,
-    .docs-langs button,
-    .docs-table th,
-    .src-matrix thead th
-  ) {
-    letter-spacing: 0.1em;
-  }
+     The tone rule below it stays: it is a colour decision, not a size one. */
+
   /* The /explore node labels the audit measured at 8px in the faintest tone -- one step up as well,
      because the graph is meant to be an argument and it was annotated in the faintest ink there is. */
   .page :is(.tile .n, .link .st, .source-route-kind, .site-footer-title) {
