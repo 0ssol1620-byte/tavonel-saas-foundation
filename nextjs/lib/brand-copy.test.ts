@@ -386,6 +386,27 @@ describe("public copy", () => {
     expect(page.indexOf("<CompileStagePlayer")).toBeLessThan(page.indexOf("{proof}"));
     expect(page).not.toContain("evidence back to the page");
   });
+  /*
+    D26. One tab-title pattern with one named exception, so the pattern is a rule rather than the
+    six spellings the audit counted. Every advertised page is "X — TAVONEL"; the home page is
+    "TAVONEL — <descriptor>" because it has no section to name, and both halves of it are
+    BRAND_LINE rather than a positioning sentence typed into the page.
+  */
+  it("writes one tab-title pattern and names its one exception", () => {
+    const home = read("app/page.tsx");
+    expect(home).toContain("title: `TAVONEL — ${BRAND_LINE.descriptor}`");
+    expect(home).toContain("title: BRAND_LINE.headline");
+    expect(home, "the home exception does not write its own positioning sentence")
+      .not.toContain("Make your knowledge ready for AI");
+    expect(read("app/layout.tsx"), "the inherited fallback follows the site pattern")
+      .toContain('title: "Knowledge Compiler for AI — TAVONEL"');
+    for (const file of ["app/explore/page.tsx", "app/contact/page.tsx"]) {
+      const titles = [...read(file).matchAll(/title: "([^"]*TAVONEL[^"]*)"/g)].map((match) => match[1]!);
+      expect(titles.length, `${file} declares a title`).toBeGreaterThan(0);
+      for (const title of titles) expect(title, file).toMatch(/ — TAVONEL$/);
+    }
+  });
+
   it("puts the locked hero proof and three motion cuts on the landing page", () => {
     const page = landingSource();
     expect(page).toContain("/film/poster-1.webp");
