@@ -3609,7 +3609,9 @@
     background: color-mix(in srgb, var(--ground) 92%, transparent);
     color: var(--text-hi);
   }
-  .compile-film-motion-control span { font: 12px/1 var(--f-sans); transform: translateY(-.5px); }
+  /* type-09: the mark is an inline 16x16 SVG on fill: currentColor, so it needs no text face and
+     no optical nudge -- the control is a 44px grid with place-items: center. */
+  .compile-film-motion-mark { display: block; }
   .compile-film-caption { align-items: center; }
   .compile-film-caption p { margin-right: auto; }
   .compile-film-progress { color: var(--text-lo); font: var(--t-1) var(--f-mono); letter-spacing: 0.08em; white-space: nowrap; }

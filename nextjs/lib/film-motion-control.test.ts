@@ -45,9 +45,16 @@ describe("film motion control", () => {
     expect(FILM_CONTROL_LABEL.play.label).toMatch(/^Play\b/);
     expect(FILM_CONTROL_LABEL.resume.label).toMatch(/^Resume\b/);
     expect(FILM_CONTROL_LABEL.pause.label).toMatch(/^Pause\b/);
-    for (const control of ["play", "resume", "pause"] as const) {
-      expect(FILM_CONTROL_LABEL[control].glyph.length).toBeGreaterThan(0);
-    }
+    /*
+      type-09. The mark is drawn, not typed: the record carries no glyph any more, so the guard
+      follows it to the SVG the control renders. A text glyph coming back would fail here.
+    */
+    expect(source).toContain("<FilmControlMark control={control} />");
+    expect(source).toMatch(/<svg className="compile-film-motion-mark"[^>]*fill="currentColor"/);
+    expect(source).toContain('<path d="M4 2.5 13 8 4 13.5Z" />');
+    expect(source.match(/<rect x="[49]" y="2.5"/g)).toHaveLength(2);
+    const rendered = source.replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(rendered, "no typed play/pause glyph in the control").not.toMatch(/[\u25AE\u25B6\u2161]/);
   });
 
   it("is rendered in every state, and never behind a reduced-motion branch", () => {
