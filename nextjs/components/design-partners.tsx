@@ -18,13 +18,19 @@ import Link from "next/link";
   changed by a word; the frame around them names the programme instead of naming what the
   programme is not. The sentence that has to stay -- that nothing on this site belongs to a
   customer -- stays, as the fine print it always was.
+
+  What it may not do is write a new claim. The first draft of the lede here read "TAVONEL is set
+  up with an early partner rather than sold to one" -- present tense, on a page whose previous
+  copy said there are no customers to show. Whether a design partner exists is a fact about the
+  business and a public claim, which is the founder's to make, not an implementer's. The lede is
+  the surviving half of the sentence that was already here.
 */
 export default function DesignPartners({ className }: { className?: string }) {
   return (
     <section className={className ? `design-partners ${className}` : "design-partners"} aria-labelledby="design-partners-title">
       <h2 id="design-partners-title">Working with a design partner.</h2>
       <p className="design-partners-lede">
-        TAVONEL is set up with an early partner rather than sold to one. What that looks like:
+        What an early partner works with:
       </p>
       <ul className="design-partners-list">
         <li>
