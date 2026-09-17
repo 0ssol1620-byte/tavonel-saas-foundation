@@ -1,5 +1,7 @@
 .page { min-height: 100vh; background: var(--ground); color: var(--text); }
-.hero { width: min(100%, 1664px); min-height: clamp(520px, 58vh, 700px); margin: 0 auto; display: grid; grid-template-columns: minmax(0, .94fr) minmax(0, 1.06fr); align-items: center; gap: clamp(48px, 7vw, 112px); padding: clamp(112px, 10vw, 156px) clamp(24px, 7vw, 112px) clamp(64px, 7vw, 104px); border-bottom: 1px solid var(--hairline-hi); }
+/* D33 -- one container. The 7vw side padding put this page's H1 at x=101 while its own header
+   wordmark sat at x=30; the shared shell formula puts them on the same gutter. */
+.hero { width: min(100%, var(--shell-wide)); min-height: clamp(520px, 58vh, 700px); margin: 0 auto; display: grid; grid-template-columns: minmax(0, .94fr) minmax(0, 1.06fr); align-items: center; gap: clamp(48px, 7vw, 112px); padding: clamp(112px, 10vw, 156px) var(--gutter) clamp(64px, 7vw, 104px); border-bottom: 1px solid var(--hairline-hi); }
 /* The kicker is the global `.eyebrow`; what belongs to this layout is the gap under it. */
 .heroLead { display: grid; gap: 18px; }
 /*
@@ -14,8 +16,18 @@
 .hero aside { width: min(100%, 620px); display: grid; gap: 20px; padding-bottom: 4px; }
 .hero aside p { max-width: 62ch; margin: 0; color: var(--text-lo); font-size: 15px; line-height: 1.72; text-wrap: pretty; }
 .status { width: fit-content; max-width: 100%; padding: 5px 8px; border: 1px solid var(--changed); color: var(--changed); font: 12px/1.5 var(--f-mono); letter-spacing: .12em; overflow-wrap: anywhere; }
-.body { max-width: 1440px; margin: 0 auto; padding: 0 clamp(24px, 7vw, 112px) 110px; }
+.body { max-width: var(--shell-wide); margin: 0 auto; padding: 0 var(--gutter) 110px; }
 .row { display: grid; grid-template-columns: minmax(180px, .38fr) minmax(0, 1fr); gap: 8vw; padding: 42px 0; border-bottom: 1px solid var(--hairline); }
+/*
+  pages-01 / regressions-04. A row carrying a figure is one column.
+
+  The compile-pipeline drawing is 980 user units wide and is pinned there because scaling it takes
+  its labels under the 12px floor. In a .38fr + 8vw + 1fr row its column measured 814px at 1440, so
+  the PROJECTIONS stage was off-screen entirely and two captions ended mid-word -- published copy
+  lost at the flagship desktop width. Prose keeps the two-column reading; an instrument takes the
+  content width, which is the same rule D32 applies to the rest of the site.
+*/
+.row:has(> * > figure) { grid-template-columns: minmax(0, 1fr); gap: 22px; }
 .row h2 { margin: 0; color: var(--text-hi); font-size: clamp(23px, 3vw, 42px); letter-spacing: -.035em; }
 .rowBody { min-width: 0; display: grid; gap: 18px; }
 .rowBody > p { max-width: 760px; margin: 0; color: var(--text-lo); font-size: 13px; line-height: 1.7; }

@@ -24,7 +24,6 @@
   justify-content: flex-start;
   padding-top: clamp(110px, 12vw, 168px);
 }
-.product-overview .shell { max-width: 1280px; }
 .product-overview .stack { gap: var(--product-inner); }
 .product-hero { align-items: end; padding-bottom: clamp(54px, 7vw, 96px); border-bottom: 1px solid var(--hairline); }
 /*
@@ -378,13 +377,43 @@
   `grid-column: 1` on `.trust-next` is the other half: `tavonel.css` places it in column two,
   which in a one-column grid would mint an implicit second one and put it back where it was.
 */
-.scene.doc .body:has(> .stack:first-child > .document-title:only-child) {
-  grid-template-columns: minmax(0, 72ch);
+/*
+  D32. One reading column, full-width instruments.
+
+  BQ-100 collapsed these routes to a single 72ch track and stopped there, so a 582px measure hugged
+  the left edge of a full-bleed shell and left ~800px of black beside it for the whole height of
+  /security, /benchmarks, /evidence, /resources, /solutions, /sources and /status. The track is the
+  content width now; the measure moves onto the prose itself, where it belongs, and the card grids,
+  tables, figures and code blocks spend the width they were always sized for.
+*/
+/*
+  regressions-11. A breadcrumb above the H1 is still a column holding only the heading.
+
+  The condition below reads ":only-child" because a stack with something beside the title is a
+  composition. A breadcrumb is not: on /product/document-understanding it left the hero's left
+  track holding 158px of content against a 650px grid, which is the exact hole this block was
+  written to close.
+*/
+.scene.doc .body:has(> .stack:first-child > .document-title:only-child),
+.scene.doc .body:has(> .stack:first-child > .doc-breadcrumb + .document-title:last-child) {
+  grid-template-columns: minmax(0, 1fr);
 }
-.scene.doc .body:has(> .stack:first-child > .document-title:only-child) > .stack:first-child {
+/* Prose keeps a 68ch measure and headings their own; everything else is an instrument and takes
+   the column. `p` is already capped site-wide by `.public-page .body p`; these are the rest. */
+.scene.doc .body:has(> .stack:first-child > .document-title:only-child) :is(li, dd, blockquote),
+.scene.doc .body:has(> .stack:first-child > .doc-breadcrumb + .document-title:last-child) :is(li, dd, blockquote) {
+  max-width: 68ch;
+}
+.scene.doc .body:has(> .stack:first-child > .document-title:only-child) > .stack > :is(h2, h3),
+.scene.doc .body:has(> .stack:first-child > .doc-breadcrumb + .document-title:last-child) > .stack > :is(h2, h3) {
+  max-width: 34ch;
+}
+.scene.doc .body:has(> .stack:first-child > .document-title:only-child) > .stack:first-child,
+.scene.doc .body:has(> .stack:first-child > .doc-breadcrumb + .document-title:last-child) > .stack:first-child {
   position: static;
 }
-.scene.doc .body:has(> .stack:first-child > .document-title:only-child) > .trust-next {
+.scene.doc .body:has(> .stack:first-child > .document-title:only-child) > .trust-next,
+.scene.doc .body:has(> .stack:first-child > .doc-breadcrumb + .document-title:last-child) > .trust-next {
   grid-column: 1;
 }
 

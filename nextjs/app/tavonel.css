@@ -344,6 +344,10 @@
     padding: 96px 0 96px var(--rail);
     position: relative;
   }
+  /* D33. `.rail` is rendered by no component on this site -- the 76px it reserves is the reason
+     /pricing, /status and the policy pages start their shell at x=78 while their own header
+     wordmark sits at x=30. The landing keeps the inset; its scenes are composed against it. */
+  .page:not(.landing-page) .scene { padding-left: 0; }
 
   .body {
     display: grid;
@@ -1227,25 +1231,13 @@
      primary buttons rendered cream on cream, 1.00:1, with no readable label. */
   .policy-copy a:not(.btn) { color: var(--text-hi); text-decoration-thickness: 1px; text-underline-offset: 3px; }
   .processor-list, .status-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; margin: 8px 0 18px; background: var(--seam); border: 1px solid var(--hairline); }
-  /* BA-242 -- as in .tiles: the odd last row spends its width instead of holding a column
-     measure with 590px of empty card beside it. */
+  /* pages-07. The odd last card keeps the span -- an unfilled cell in a seam grid paints as a
+     hairline block -- but not the second layout. Deciding a card's inner shape by whether the
+     list length happens to be even is what made the final item on /status, /resources,
+     /evidence, /research and /developers the one card that matched none of its siblings. */
   .processor-list > :last-child:nth-child(odd),
-  .status-list > :last-child:nth-child(odd) {
-    grid-column: 1 / -1;
-    display: flex;
-    flex-flow: row wrap;
-    align-items: baseline;
-    column-gap: clamp(20px, 3vw, 44px);
-  }
-  .processor-list > :last-child:nth-child(odd) > :is(h2, h3),
-  .status-list > :last-child:nth-child(odd) > :is(h2, h3) { flex: 0 0 auto; max-width: 24ch; }
-  .processor-list > :last-child:nth-child(odd) > p,
-  .status-list > :last-child:nth-child(odd) > p { flex: 1 1 30ch; max-width: 64ch; }
+  .status-list > :last-child:nth-child(odd) { grid-column: 1 / -1; }
   .processor-list article, .status-list article { padding: 20px; background: var(--ground); }
-  /* Takeover regression: the full-width final processor card still split its paragraphs into
-     narrow flex items. Keep each disclosure in the reading column; do not shorten or hide it. */
-  .processor-list > :last-child:nth-child(odd) { display: block; }
-  .processor-list > :last-child:nth-child(odd) > p { max-width: none; }
   /* Long export filenames must wrap inside their table cell, including WebKit on phones. */
   .docs-table code { overflow-wrap: anywhere; }
 
@@ -1688,23 +1680,17 @@
 
   .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--seam); border: 1px solid var(--hairline); border-radius: var(--r-paper-lg); overflow: hidden; }
   /*
-    BA-242 -- a stretched last tile that keeps a single-column measure reads as a missing tile.
+    BA-242 keeps its half: an odd last tile still spans the row, because these grids draw their
+    seams with a hairline background behind a 1px gap and an unfilled cell paints as a hairline
+    block.
 
-    Odd counts happen (/solutions, /trust's seven pages, /research/notes, /resources), and in a
-    bordered grid the reader sees a full-width card that is half empty. Removing the stretch is
-    worse rather than better here: these grids draw their seams with a hairline background behind
-    a 1px gap, so an unfilled cell paints as a hairline block. The stretched tile becomes a row
-    instead -- heading and prose side by side -- and spends the width it took.
+    pages-07 / regressions-07b take the other half back. Turning the stretched tile into a
+    heading-beside-prose row gave it a layout none of its siblings had, decided by nothing but
+    whether the list length was even -- and on /solutions what landed beside the three-line
+    heading was the meta line, floating in the gap. It stacks like every other tile now; its
+    prose keeps the measure, so spending the row costs nothing.
   */
-  .tiles > :last-child:nth-child(odd) {
-    grid-column: 1 / -1;
-    flex-flow: row wrap;
-    align-items: baseline;
-    column-gap: clamp(20px, 3vw, 44px);
-  }
-  .tiles > :last-child:nth-child(odd) > .n { flex: 0 0 100%; }
-  .tiles > :last-child:nth-child(odd) > :is(h2, h3) { flex: 0 0 auto; max-width: 22ch; }
-  .tiles > :last-child:nth-child(odd) > p { flex: 1 1 30ch; max-width: 64ch; }
+  .tiles > :last-child:nth-child(odd) { grid-column: 1 / -1; }
   .tile { background: var(--g1); padding: 16px 18px; display: flex; flex-direction: column; gap: 9px; }
   .tile .n { font-family: var(--f-sans); font-size: var(--t-1); letter-spacing: 0.06em; color: var(--text-lo); }
   /* A card heading is a card heading at any level. The landing tiles are h2 because they are the
@@ -3415,10 +3401,12 @@
   .page :is(.tiles, .chain, .solution-outcomes) :is(.tile, .link, article) {
     align-content: start;
   }
-  .page :is(.tiles, .chain) :is(.tile, .link) > :is(h2, h3) {
-    /* Two lines at the 19px card size and 1.2 leading, so a one-line title holds the same block. */
-    min-height: 2.4em;
-  }
+  /* pages-06. The reserved second line is gone. It was written when these grids were 582px wide
+     and titles wrapped; at the content width D32 gives them they do not, so all the rule did was
+     open ~40px of dead space under every heading on /trust, /evidence, /research, /resources,
+     /benchmarks and /enterprise -- and leave the one-line Terms card almost empty. Bodies align
+     because the titles are one line, not because a line is held for them. /developers keeps the
+     subgrid in product-polish.css for the row where one title does wrap. */
   .page :is(.tiles, .chain) :is(.tile, .link) > a:last-child {
     margin-top: auto;
   }
@@ -3487,7 +3475,6 @@
   .scene.doc .actions { margin-top: clamp(40px, 5vw, 72px); }
 
   .solution-page { min-height: auto; justify-content: flex-start; padding-top: clamp(104px, 11vw, 158px); }
-  .solution-page .shell { max-width: 1280px; }
   .solution-hero {
     grid-template-columns: minmax(460px, .94fr) minmax(480px, 1.06fr);
     align-items: center;
@@ -4176,8 +4163,12 @@
      already knows and replaces it with a 26px SVG that has to be decoded on every pointer move. */
 
   /* Marketing canvas: text retains readable measure, product visuals get the pixels they deserve. */
-  .landing-page .shell,
-  .public-page .shell { max-width: var(--shell-wide); }
+  /* D33 -- one container. Every public route's body and footer take the same shell the 18
+     aligned routes already used, so the H1, the first body block and the footer lockup sit at
+     the same gutter as the header wordmark on all 27 routes. The per-page caps (1280 on
+     /product and /solutions, the 1360 default on /pricing, /status and the policy pages) are
+     what put four routes 70-80px to the right of their own wordmark. */
+  .page .shell { max-width: var(--shell-wide); }
   .landing-page .lede,
   .public-page .lede,
   .public-page .body p { max-width: 68ch; }
@@ -4229,7 +4220,16 @@
   .public-page .scene.doc .body { gap: var(--content-gap); }
   .public-page .scene.doc .body + .body { margin-top: var(--section-gap); }
   .public-page .scene.doc .actions { margin-top: clamp(56px, 6vw, 88px); }
-  .public-page .body > .stack:first-child { position: static; top: auto; }
+  /* pages-08. The index column emptied out after its first block and stayed empty for the rest of
+     the page -- 3,500px of it on /developers, with the closing CTA row orphaned beside 520px of
+     nothing. `.body > .stack:first-child` is sticky above 1321px for exactly that reason, and a
+     blanket `position: static` on every public route cancelled it.
+
+     It stays static on the two shapes that are not two columns: `.policy-copy` turns `.body` into
+     a flex column (`.policy-copy { display: flex; flex-direction: column }` below), so pinning its
+     first child lays the heading over the sections under it; and the one-column D32 routes, which
+     the BQ-100 block in product-polish.css pins static with more specificity. */
+  .public-page .body.policy-copy > .stack:first-child { position: static; top: auto; }
 
   /* Integration cards: three real connectors means three real columns. Never paint a fourth empty
      cell. Security-review details stay available without dominating the buyer-facing surface. */
