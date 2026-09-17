@@ -50,8 +50,16 @@ describe("one scroll offset for a fragment jump", () => {
     expect(read("../app/tavonel.css")).toContain("scroll-padding-top: calc(var(--header) + 16px)");
   });
 
+  /*
+    The declaration, not the word. `resources.module.css` explains in prose why a
+    `scroll-margin-top` here would be wrong, so the colon is what separates a declaration from the
+    sentence about it -- and it is matched anywhere on the line rather than at the head of one,
+    because the offset `continuous-knowledge.module.css` carried was written inline in a
+    single-line rule. The previous spelling, `/^s*scroll-margin-top:/m`, was missing the backslash
+    on `\s` and therefore matched only a declaration at column zero, which no CSS rule has.
+  */
   it.each(sheets)("adds no second offset in %s", (sheet) => {
-    expect(read(sheet)).not.toMatch(/^s*scroll-margin-top:/m);
+    expect(read(sheet)).not.toMatch(/scroll-margin-top:/);
   });
 
   it.each(["../app/docs/[section]/page.tsx", "../app/cookbooks/[slug]/page.tsx", "../app/api/page.tsx", "../app/developers/page.tsx", "../app/docs/page.tsx", "../app/integrations/page.tsx"])(
@@ -122,9 +130,9 @@ describe("in-page table of contents", () => {
     That route shipped its own `<nav aria-label="Sections on this page">` with ids typed as
     `#cookbook-${section.key}` -- a second jump list with a second set of slug rules, and two
     strings that had to agree for a link to land. It now derives both halves from one
-    `tocEntries` call, so the anchor and the link that names it cannot disagree, and the
-header clearance comes with it instead of being rediscovered. The last assertion is the one
-    that stops the old list growing back beside the new one.
+    `tocEntries` call, so the anchor and the link that names it cannot disagree, and the header
+    clearance comes with it instead of being rediscovered. The last assertion is the one that
+    stops the old list growing back beside the new one.
   */
   it("is reused by the cookbook route rather than copied", () => {
     const cookbook = read("../app/cookbooks/[slug]/page.tsx");
