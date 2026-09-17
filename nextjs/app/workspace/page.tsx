@@ -190,7 +190,8 @@ const GATE_LABELS: Record<ActivationCapability, string> = {
   customerIntake: "Document intake",
   cdr: "Content disarm",
   ocrGpu: "OCR on scans",
-  candidatePromotion: "Promotion to the live world",
+  // D31: the key is frozen, the label is not. One verb site-wide, and it is "activate".
+  candidatePromotion: "World activation",
   customerData: "Customer-data compilation",
 };
 
@@ -1901,7 +1902,6 @@ export default function WorkspacePage() {
         </header>
         <div className="auth-body">
           <div className="auth-card">
-            <p className="eyebrow">Workspace</p>
             <h1>{session === "checking" ? "Checking your session." : "Sign-in required."}</h1>
             <p className="lead" role="status">
               {session === "checking"
@@ -2146,7 +2146,6 @@ export default function WorkspacePage() {
           {tab === "overview" && surface === "home" && attentionItems.length > 0 ? (
             <section className="workspace-attention" role="alert" aria-labelledby="workspace-attention-title">
               <div>
-                <p className="eyebrow">Needs attention</p>
                 <h2 id="workspace-attention-title">{attentionItems.length === 1 ? "1 thing needs a decision" : `${attentionItems.length} things need a decision`}</h2>
                 <ul className="workspace-attention-items">
                   {attentionItems.map((item) => (
@@ -2197,7 +2196,6 @@ export default function WorkspacePage() {
             */
             <section className="workspace-complete" aria-labelledby="workspace-complete-title">
               <div>
-                <p className="eyebrow">{activeWorld ? "Active World" : "Candidate ready"}</p>
                 <h2 id="workspace-complete-title">
                   {activeWorld ? "Your Compiled World is ready." : "Your compiled candidate is ready for review."}
                 </h2>
@@ -2282,9 +2280,6 @@ export default function WorkspacePage() {
                 </div>
               ) : (
               <div className="workspace-intake-copy">
-                <p className="eyebrow">
-                  {workspaceState.mode === "new" ? "Add knowledge" : "Add more knowledge"}
-                </p>
                 {/*
                   One h1 per page. The shell prints the surface title as an h1 on every surface
                   except Home, so the drop box may only claim the h1 on Home -- and only on a new
@@ -2478,7 +2473,6 @@ export default function WorkspacePage() {
           </div>
           <div className="workspace-grid">
             <section id="workspace-sources" className="card document-card">
-              <p className="eyebrow">Next candidate</p>
               <h2>{documents && documents.length > 0 ? "Sources ready for your next World" : "Bring your first source"}</h2>
               {documents && documents.length > 0 ? (
                 <>
@@ -2507,7 +2501,6 @@ export default function WorkspacePage() {
             */}
             {collectionResult && !collectionResult.coreExecution ? (
               <section className="card">
-                <p className="eyebrow">Compiled candidate</p>
                 <h2>This candidate has not been run through Core.</h2>
                 <p>{collectionResult.validation.counts.documents} documents · {collectionResult.validation.counts.entities} entities · {collectionResult.validation.counts.claims} claims · {collectionResult.validation.counts.relations} relations</p>
                 <div className="billing-actions">
@@ -2613,7 +2606,6 @@ export default function WorkspacePage() {
                 />
               </section>
               <section className="card review-comparison" aria-labelledby="review-comparison-title">
-                <p className="eyebrow">Review</p>
                 <h2 id="review-comparison-title">Compare the compiled result with its source.</h2>
                 {worldReadModel?.evidence.length ? (
                   <>
@@ -2833,7 +2825,6 @@ export default function WorkspacePage() {
                     downloading={downloading} onOpen={() => trackFunnel("workspace_ai_connect_opened")} />
                 </div>
                 <div>
-                  <p className="eyebrow">Try a question</p>
                   <h2 id="ask-title">Ask your knowledge. Check the source.</h2>
                   <p>Retrieval runs only against the active world. If no page-and-bbox evidence matches, TAVONEL abstains.</p>
                 </div>
@@ -2987,7 +2978,6 @@ export default function WorkspacePage() {
 
           {tab === "integrity" ? (
           <section className="card gates">
-            <p className="eyebrow">Processing integrity</p>
             <h2>Processing gates</h2>
             {/* Written labels, not the policy keys: "ocrGpu" split on capitals rendered as
                 "ocr Gpu" in the UI. The state marker is the same pill the public capability
