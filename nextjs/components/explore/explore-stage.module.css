@@ -43,7 +43,7 @@
   color: var(--text-lo);
 }
 
-.badge { color: var(--verified); }
+.badge { color: var(--text-mid); }
 
 .headerActions {
   display: flex;
@@ -345,6 +345,20 @@
 */
 .objectCard[data-linked="1"],
 .sourcePane[data-linked="1"] [data-source-sheet] { border-color: var(--verified-dim); }
+
+/*
+  The sheet scrolls inside its own box, which is what the pane above said it did.
+
+  `.sourcePane` bounds itself to the viewport and lets the sheet be its one flexible child, but
+  the sheet had no `overflow`: the page raster reserves the filing's own aspect ratio, so at 1440
+  it computed 464px of page inside a 533px box that also carries a toolbar, a region cut and a
+  ledger -- and the surplus spilled out of the bottom of the sheet. Because `.viewport` is
+  `position: relative` and Previous/Next is not, the spill painted OVER the pager:
+  `elementFromPoint` on the centre of "Next →" returned the viewport, so the control a reader
+  uses to walk an object's regions could not be clicked at all. Giving the sheet the scroll it
+  was always described as having keeps the whole page reachable and puts the pager back on top.
+*/
+.sourcePane [data-source-sheet] { overflow: auto; overscroll-behavior: contain; }
 
 .objectLocator {
   margin: 12px 0 0;
@@ -753,7 +767,7 @@
 
 .entryEyebrow {
   margin: 0;
-  color: var(--verified);
+  color: var(--text-mid);
   font: 12px var(--f-sans);
   letter-spacing: 0.06em;
 }
@@ -1051,7 +1065,7 @@
 
 .next p {
   margin: 0;
-  color: var(--verified);
+  color: var(--text-mid);
   font: 12px var(--f-sans);
   letter-spacing: 0.06em;
 }

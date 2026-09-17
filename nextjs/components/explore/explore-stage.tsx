@@ -267,7 +267,14 @@ export default function ExploreStage({ model, layout, change, answers, technical
   return (
     <main id="main" className={styles.page}>
       <header className={styles.header}>
-        <Link href="/" className={styles.brand}>
+        {/*
+          chrome-01. One wordmark everywhere. The header, the footer and the share card set
+          TAVONEL in the mono lockup; here it was a bare `<b>` inheriting this header's 12px
+          sans, which made /explore the one page where the brand mark is a different typeface.
+          `.wordmark` is the global lockup and carries the face; `.brand` keeps the stage's own
+          colour and its 44px target.
+        */}
+        <Link href="/" className={`wordmark ${styles.brand}`}>
           <Logomark size={20} />
           <b>TAVONEL</b>
         </Link>
