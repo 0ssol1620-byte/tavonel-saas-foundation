@@ -51,7 +51,14 @@ const STOPPED: readonly CompileState[] = ["failed", "cancelled"];
 
 /** Token names read off the mounted element, so the canvas cannot hold a second palette. */
 const TOKENS = ["--ground", "--g1", "--g2", "--g3", "--hairline", "--hairline-hi", "--text-hi", "--text-mid", "--text-lo", "--verified", "--changed", "--failed", "--paper"] as const;
-type Palette = Record<(typeof TOKENS)[number], string>;
+/* Type comes off the element too, or the canvas paints in a different family from the panel it
+   sits in. A font token's fallback is a stack, not a colour, so it carries its own. */
+const FONT_TOKENS = {
+  "--f-sans": "ui-sans-serif, system-ui, sans-serif",
+  "--f-mono": "ui-monospace, Menlo, monospace",
+} as const;
+
+type Palette = Record<(typeof TOKENS)[number] | keyof typeof FONT_TOKENS, string>;
 
 /* Only reached when a token is not defined yet; a readable neutral beats an invisible one. */
 const FALLBACK = "#78828a";
@@ -136,6 +143,9 @@ export default function CompileStage({ rows, reading = {}, names = {}, world = n
       const computed = window.getComputedStyle(section);
       const palette = {} as Palette;
       for (const token of TOKENS) palette[token] = computed.getPropertyValue(token).trim() || FALLBACK;
+      for (const [token, stack] of Object.entries(FONT_TOKENS)) {
+        palette[token as keyof typeof FONT_TOKENS] = computed.getPropertyValue(token).trim() || stack;
+      }
       return palette;
     };
     let colour = readPalette();
@@ -149,8 +159,8 @@ export default function CompileStage({ rows, reading = {}, names = {}, world = n
       context.setTransform(ratio, 0, 0, ratio, 0, 0);
     };
 
-    const sans = (size: number, weight = 400) => `${weight} ${size}px ui-sans-serif, system-ui, sans-serif`;
-    const mono = (size: number, weight = 400) => `${weight} ${size}px ui-monospace, Menlo, monospace`;
+    const sans = (size: number, weight = 400) => `${weight} ${size}px ${colour["--f-sans"]}`;
+    const mono = (size: number, weight = 400) => `${weight} ${size}px ${colour["--f-mono"]}`;
 
     const pane = (x: number, y: number, w: number, h: number, title: string, live: string) => {
       roundRect(context, x, y, w, h, 8);

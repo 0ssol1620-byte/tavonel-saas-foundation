@@ -41,12 +41,12 @@
 .workspace-attention-items strong { color: var(--text-hi); font: 12px var(--f-mono); letter-spacing: .06em; text-transform: uppercase; }
 .workspace-attention-items button {
   justify-self: start; min-height: 44px; margin-top: 4px; padding: 8px 12px;
-  border: 1px solid var(--hairline-hi); border-radius: 6px; color: var(--text-hi); font-size: 13px;
+  border: 1px solid var(--hairline-hi); border-radius: var(--r-inst, 6px); color: var(--text-hi); font-size: 13px;
 }
 .workspace-attention:has(.workspace-attention-items) { grid-template-columns: 1fr; }
 
 /* "Use with AI": the journey, then the exact files the export writes. */
-.workspace-ai-use-guide { margin-top: 14px; border: 1px solid var(--hairline); border-radius: 6px; background: var(--ground); }
+.workspace-ai-use-guide { margin-top: 14px; border: 1px solid var(--hairline); border-radius: var(--r-inst, 6px); background: var(--ground); }
 .workspace-ai-use-guide > summary { min-height: 44px; display: flex; align-items: center; padding: 11px 14px; color: var(--text-hi); font-size: 14px; cursor: pointer; }
 .workspace-ai-use-guide > div { display: grid; gap: 8px; padding: 0 14px 14px; }
 .workspace-ai-use-guide p { margin: 0; color: var(--text-lo); font-size: 13px; line-height: 1.6; }
@@ -58,7 +58,7 @@
 .workspace-ai-use-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
 .workspace-ai-use-actions button, .workspace-ai-use-actions a {
   min-height: 44px; display: inline-flex; align-items: center; padding: 8px 12px;
-  border: 1px solid var(--hairline-hi); border-radius: 6px; color: var(--text-hi); font-size: 13px;
+  border: 1px solid var(--hairline-hi); border-radius: var(--r-inst, 6px); color: var(--text-hi); font-size: 13px;
 }
 
 /* The checklist row states are words, not only a tick colour. */

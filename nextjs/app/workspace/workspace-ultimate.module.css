@@ -13,11 +13,11 @@
   background: var(--ground);
 }
 .rail { position: sticky; top: 0; height: 100vh; z-index: 12; display: flex; flex-direction: column; padding: 14px 12px 12px; border-right: 1px solid var(--hairline); background: var(--g1); }
-.brand { width: 40px; height: 40px; display: grid; place-items: center; margin: 0 0 18px 4px; color: var(--text-hi); border: 1px solid var(--hairline); border-radius: 6px; }
+.brand { width: 40px; height: 40px; display: grid; place-items: center; margin: 0 0 18px 4px; color: var(--text-hi); border: 1px solid var(--hairline); border-radius: var(--r-inst, 6px); }
 .nav { display: grid; gap: 2px; }
 .nav > div { min-width: 0; }
-.nav button { width: 100%; min-height: 40px; display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 10px; color: var(--text-lo); text-align: left; border: 1px solid transparent; border-radius: 6px; font: 500 14px/1.2 var(--f-sans); transition: color 140ms var(--ease), background-color 140ms var(--ease); }
-.nav button:hover, .nav button:focus-visible { color: var(--text-hi); background: var(--g2); }
+.nav button { width: 100%; min-height: 40px; display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 10px; color: var(--text-lo); text-align: left; border: 1px solid transparent; border-radius: var(--r-inst, 6px); font: 500 14px/1.2 var(--f-sans); transition: color 140ms var(--ease), background-color 140ms var(--ease); }
+.nav button:focus-visible { color: var(--text-hi); background: var(--g2); }
 .nav button.current { color: var(--text-hi); background: var(--g3); }
 .nav button.current svg { color: var(--verified); }
 .nav button b { min-width: 20px; padding: 1px 6px; color: var(--changed); border: 1px solid var(--changed); border-radius: 999px; font: 12px var(--f-mono); text-align: center; font-variant-numeric: tabular-nums; }
@@ -29,13 +29,13 @@
 .topbar { position: sticky; top: 0; z-index: 10; min-height: var(--ultimate-bar); display: grid; grid-template-columns: minmax(160px, 1fr) repeat(2, minmax(0, auto)) auto auto; align-items: stretch; padding: 0; border-bottom: 1px solid var(--hairline); background: color-mix(in srgb, var(--ground) 94%, transparent); backdrop-filter: blur(14px); }
 .workspaceIdentity, .topStatus, .commandButton { border-right: 1px solid var(--hairline); }
 .workspaceIdentity { display: flex; align-items: center; gap: 10px; padding: 8px 18px; color: var(--text-hi); }
-.topStatus small { color: var(--text-lo); font: 500 12px var(--f-mono); letter-spacing: .08em; }
+.topStatus small { color: var(--text-lo); font: 500 12px var(--f-sans); letter-spacing: .06em; }
 .workspaceIdentity strong, .topStatus b { color: var(--text-hi); font-size: 14px; font-weight: 500; }
 .topStatus { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 2px; padding: 8px 16px; text-align: left; }
-.topStatus:hover { background: var(--g1); }
+
 .topStatus b { font-variant-numeric: tabular-nums; }
 .commandButton { display: flex; align-items: center; gap: 10px; min-width: 240px; padding: 0 16px; color: var(--text-lo); font: 14px var(--f-sans); }
-.commandButton:hover { color: var(--text-hi); background: var(--g1); }
+
 .commandButton span { flex: 1; text-align: left; }
 .commandButton kbd, .palette kbd { color: var(--text-lo); font: 12px var(--f-mono); }
 .headerAction { display: flex; align-items: center; justify-content: center; padding: 8px 16px; }
@@ -46,8 +46,8 @@
 .accessStrip strong { color: var(--text-hi); font-size: 13px; font-weight: 550; }
 .accessStrip span, .ownerStrip span { color: var(--verified); font: 500 12px var(--f-mono); letter-spacing: .06em; }
 .accessStrip p, .ownerStrip p { margin: 0; color: var(--text-lo); font-size: 13px; }
-.accessStrip a { min-height: 32px; display: inline-flex; align-items: center; padding: 0 12px; border: 1px solid var(--hairline-hi); border-radius: 6px; color: var(--text-hi); font: 500 13px var(--f-sans); white-space: nowrap; }
-.accessStrip a:hover { border-color: var(--text-lo); }
+.accessStrip a { min-height: 32px; display: inline-flex; align-items: center; padding: 0 12px; border: 1px solid var(--hairline-hi); border-radius: var(--r-inst, 6px); color: var(--text-hi); font: 500 13px var(--f-sans); white-space: nowrap; }
+
 .ownerStrip { grid-template-columns: auto minmax(0, 1fr); min-height: 36px; padding-block: 6px; }
 .ownerStrip span { color: var(--text-lo); }
 
@@ -61,20 +61,20 @@
 .stateHero span { max-width: 62ch; color: var(--text-lo); font-size: 15px; line-height: 1.55; }
 .stateFacts { color: var(--text-lo); font: 13px var(--f-mono); font-variant-numeric: tabular-nums; }
 .stateHero > button[disabled] { background: var(--g2); border-color: var(--hairline-hi); color: var(--text-lo); opacity: 1; }
-.stateHero > button { min-width: 180px; min-height: 40px; padding: 0 16px; background: var(--text-hi); color: var(--ground); border: 1px solid var(--text-hi); border-radius: 6px; font: 500 14px var(--f-sans); transition: background-color 140ms var(--ease), transform 140ms var(--ease); }
-.stateHero > button:hover:not(:disabled) { background: #fff; color: var(--ground); }
+.stateHero > button { min-width: 180px; min-height: 40px; padding: 0 16px; background: var(--text-hi); color: var(--ground); border: 1px solid var(--text-hi); border-radius: var(--r-inst, 6px); font: 500 14px var(--f-sans); transition: background-color 140ms var(--ease), transform 140ms var(--ease); }
+
 .stateHero > button:active { transform: scale(.98); }
 .stateHero > button:disabled { color: var(--text-lo); background: transparent; border-color: var(--hairline); cursor: not-allowed; opacity: 1; }
 
 .paletteBackdrop { position: fixed; inset: 0; z-index: 80; display: grid; place-items: start center; padding: 12vh 18px 18px; background: color-mix(in srgb, var(--ground) 64%, transparent); backdrop-filter: blur(7px); }
-.palette { width: min(620px, 100%); border: 1px solid var(--hairline-hi); border-radius: 8px; background: var(--ground); box-shadow: 0 28px 90px rgb(0 0 0 / .28); overflow: hidden; }
+.palette { width: min(620px, 100%); border: 1px solid var(--hairline-hi); border-radius: var(--r-inst-lg, 8px); background: var(--ground); box-shadow: 0 28px 90px rgb(0 0 0 / .28); overflow: hidden; }
 .paletteSearch { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 13px 15px; border-bottom: 1px solid var(--hairline); }
 .paletteSearch input { width: 100%; color: var(--text-hi); background: transparent; border: 0; outline: 0; font-size: 15px; }
 .paletteSearch button { color: var(--text-lo); }
 .palette > p { margin: 0; padding: 12px 15px 6px; color: var(--text-lo); font: 500 12px var(--f-mono); letter-spacing: .1em; }
 .paletteResults { display: grid; padding: 0 7px 9px; }
-.paletteResults button { display: flex; justify-content: space-between; align-items: center; min-height: 40px; padding: 8px 9px; color: var(--text-lo); text-align: left; border-radius: 6px; font-size: 14px; }
-.paletteResults button:hover, .paletteResults button:focus-visible { color: var(--text-hi); background: var(--g2); }
+.paletteResults button { display: flex; justify-content: space-between; align-items: center; min-height: 40px; padding: 8px 9px; color: var(--text-lo); text-align: left; border-radius: var(--r-inst, 6px); font-size: 14px; }
+.paletteResults button:focus-visible { color: var(--text-hi); background: var(--g2); }
 .paletteResults button > span { display: flex; align-items: center; gap: 12px; }
 .paletteResults button small { min-width: 64px; color: var(--text-lo); font: 12px var(--f-mono); letter-spacing: .06em; }
 .paletteResults > span { padding: 18px 9px; color: var(--text-lo); font-size: 13px; }
@@ -133,4 +133,15 @@
 @media (prefers-reduced-motion: reduce) {
   .paletteBackdrop { backdrop-filter: none; }
   .nav button, .stateHero button { transition: none; }
+}
+
+/* Hover, in one gated place (TOKEN_CONTRACT_0917): a tap on a phone must not leave a control
+   stuck in its hover face. Focus and selected faces stay ungated above. */
+@media (hover: hover) and (pointer: fine) {
+  .nav button:hover:not(.current) { color: var(--text-hi); background: var(--g2); }
+  .topStatus:hover { background: var(--g1); }
+  .commandButton:hover { color: var(--text-hi); background: var(--g1); }
+  .accessStrip a:hover { border-color: var(--text-lo); }
+  .stateHero > button:hover:not(:disabled) { background: #fff; color: var(--ground); }
+  .paletteResults button:hover { color: var(--text-hi); background: var(--g2); }
 }

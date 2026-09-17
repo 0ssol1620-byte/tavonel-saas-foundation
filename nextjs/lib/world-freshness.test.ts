@@ -51,7 +51,9 @@ describe("the rendered block", () => {
 
   it("names the four times and prints the waiting-candidate notice verbatim", () => {
     const markup = renderToStaticMarkup(createElement(WorldFreshness, { freshness: full }));
-    for (const label of ["OBSERVED", "PROCESSED", "REVIEWED", "ACTIVE SINCE"]) expect(markup).toContain(label);
+    for (const label of ["Observed", "Processed", "Reviewed", "Active since"]) expect(markup).toContain(label);
+    // BQ-088: the four labels are prose, so they are sentence case in sans -- not mono caps.
+    for (const shout of ["OBSERVED", "PROCESSED", "REVIEWED", "ACTIVE SINCE"]) expect(markup).not.toContain(shout);
     expect(markup).toContain("A newer candidate is waiting for activation; consumers are reading the previous active World");
     expect(markup).toContain("10 Sept 2026, 08:00 UTC");
   });
@@ -76,6 +78,6 @@ describe("the rendered block", () => {
       freshness: { ...full, candidateAwaitingActivation: false, candidateManifestDigest: null },
     }));
     expect(markup).not.toContain("waiting for activation");
-    expect(markup).toContain("ACTIVE SINCE");
+    expect(markup).toContain("Active since");
   });
 });
