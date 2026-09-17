@@ -101,8 +101,8 @@ export default function AuthCallbackPage() {
 
       <div className="auth-body">
         <div className="auth-card">
-          <p className="eyebrow">SIGN IN</p>
-
+          {/* BQ-099. The kicker said SIGN IN above "Signing you in." -- the heading, again,
+              in capitals, above every one of the four states this page has. */}
           {phase === "working" ? (
             <>
               <h1>Signing you in.</h1>
