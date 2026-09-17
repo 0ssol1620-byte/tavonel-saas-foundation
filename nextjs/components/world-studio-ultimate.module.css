@@ -45,7 +45,13 @@
 .fileList { display: grid; gap: 1px; margin: 0; padding: 0; list-style: none; background: var(--studio-line); border: 1px solid var(--studio-line); }
 .evidenceGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1px; background: var(--studio-line); border: 1px solid var(--studio-line); max-height: 520px; overflow: auto; scrollbar-gutter: stable; }
 .evidenceCard { min-height: 150px; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 15px; color: var(--studio-muted); text-align: left; background: var(--ground, #11120f); }
-.evidenceCard:focus-visible, .evidenceCard[data-selected="true"] { position: relative; z-index: 1; outline: 1px solid var(--verified, #9bb8a4); }
+/* Selection and hover are inset rings, not outlines, so `outline` stays free for the one
+   global :focus-visible ring: a focused card that is also selected still shows both. */
+.evidenceCard[data-selected="true"] { box-shadow: inset 0 0 0 2px var(--verified, #9bb8a4); }
+/* The cards are opaque and paint in DOM order, so the global ring's 2px offset on a focused card
+   is painted over by its right and lower neighbours unless the focused card is lifted. This is
+   the lift the deleted shared `outline` rule carried; the ring itself is still the global one. */
+.evidenceCard:focus-visible { position: relative; z-index: 1; }
 .evidenceCard span, .evidenceCard small { color: var(--studio-faint); font: 12px var(--f-mono, monospace); letter-spacing: .06em; }
 .evidenceCard span { color: var(--verified, #9bb8a4); }
 .evidenceCard strong { flex: 1; color: var(--studio-ink); font-size: 12px; font-weight: 400; line-height: 1.55; }
@@ -65,5 +71,5 @@
 @media (hover: hover) and (pointer: fine) {
   .lenses button:hover { color: var(--studio-ink); }
   .overviewActions button:hover { border-color: color-mix(in srgb, var(--verified) 50%, var(--studio-line)); background: color-mix(in srgb, var(--verified) 5%, var(--studio-panel)); }
-  .evidenceCard:hover { position: relative; z-index: 1; outline: 1px solid var(--verified, #9bb8a4); }
+  .evidenceCard:hover:not([data-selected="true"]) { box-shadow: inset 0 0 0 1px var(--verified, #9bb8a4); }
 }

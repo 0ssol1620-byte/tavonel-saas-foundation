@@ -9,7 +9,7 @@
   min-width: 0;
 }
 
-.summary { margin: 0; color: var(--dir-faint); font: 12px var(--f-mono, monospace); letter-spacing: .04em; }
+.summary { margin: 0; color: var(--dir-faint); font: 13px var(--f-sans, sans-serif); font-variant-numeric: tabular-nums; }
 
 .root, .children { margin: 0; padding: 0; list-style: none; }
 .children { margin-left: 14px; border-left: 1px solid var(--dir-line); }
@@ -22,7 +22,6 @@
   padding: 4px 6px;
   min-width: 0;
 }
-.rowHead:hover { background: var(--g1, rgb(255 255 255 / 0.035)); }
 
 .disclosure {
   width: 16px;
@@ -30,7 +29,7 @@
   font: 12px var(--f-mono, monospace);
   text-align: center;
 }
-.disclosure:hover, .disclosure:focus-visible { color: var(--dir-ink); }
+.disclosure:focus-visible { color: var(--dir-ink); }
 .leafMark { width: 16px; color: var(--dir-faint); font: 12px var(--f-mono, monospace); text-align: center; }
 
 .name {
@@ -42,10 +41,11 @@
   white-space: nowrap;
 }
 button.name { text-decoration: underline; text-underline-offset: 2px; }
-button.name:hover, button.name:focus-visible { color: var(--dir-accent); }
+button.name:focus-visible { color: var(--dir-accent); }
 button.name[data-selected="true"] { color: var(--dir-accent); }
 
-.kind, .count, .sources { color: var(--dir-faint); font: 12px var(--f-mono, monospace); letter-spacing: .06em; }
+.kind, .count { color: var(--dir-faint); font: 12px var(--f-mono, monospace); letter-spacing: .06em; }
+.sources { color: var(--dir-faint); font: 12px var(--f-sans, sans-serif); }
 .kind { text-transform: uppercase; }
 .count { margin-left: auto; }
 /* Sources sit after the count so the eye reads name, kind, size, provenance in one pass. */
@@ -59,4 +59,12 @@ button.name[data-selected="true"] { color: var(--dir-accent); }
 @media (max-width: 720px) {
   .count { margin-left: 0; }
   .rowHead { flex-wrap: wrap; }
+}
+
+/* Hover, in one gated place (TOKEN_CONTRACT_0917): a tap on a phone fires :hover and leaves the
+   row wearing that face until something else is tapped. Focus and selected faces stay above. */
+@media (hover: hover) and (pointer: fine) {
+  .rowHead:hover { background: var(--g1, rgb(255 255 255 / 0.035)); }
+  .disclosure:hover { color: var(--dir-ink); }
+  button.name:hover { color: var(--dir-accent); }
 }

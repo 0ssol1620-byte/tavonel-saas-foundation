@@ -20,13 +20,13 @@
 .nav button:focus-visible { color: var(--text-hi); background: var(--g2); }
 .nav button.current { color: var(--text-hi); background: var(--g3); }
 .nav button.current svg { color: var(--verified); }
-.nav button b { min-width: 20px; padding: 1px 6px; color: var(--changed); border: 1px solid var(--changed); border-radius: 999px; font: 12px var(--f-mono); text-align: center; font-variant-numeric: tabular-nums; }
+.nav button b { min-width: 20px; padding: 1px 6px; color: var(--changed); border: 1px solid var(--changed); border-radius: var(--r-full, 999px); font: 12px var(--f-mono); text-align: center; font-variant-numeric: tabular-nums; }
 .secondaryStart { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--hairline); }
 /* Privacy mode (FINAL_WEB §41): customer content blurs, status and motion stay legible. */
 .shell[data-privacy="true"] :global(.document-meta strong), .shell[data-privacy="true"] :global(.document-meta code), .shell[data-privacy="true"] :global(.ask-result q), .shell[data-privacy="true"] :global(.collection-result > strong),
 .shell[data-privacy="true"] :global([data-sensitive="content"]) { filter: blur(12px); opacity: .18; pointer-events: none; user-select: none; }
 .body { min-width: 0; }
-.topbar { position: sticky; top: 0; z-index: 10; min-height: var(--ultimate-bar); display: grid; grid-template-columns: minmax(160px, 1fr) repeat(2, minmax(0, auto)) auto auto; align-items: stretch; padding: 0; border-bottom: 1px solid var(--hairline); background: color-mix(in srgb, var(--ground) 94%, transparent); backdrop-filter: blur(14px); }
+.topbar { position: sticky; top: 0; z-index: 10; min-height: var(--ultimate-bar); display: grid; grid-template-columns: minmax(160px, 1fr) repeat(2, minmax(0, auto)) auto auto; align-items: stretch; padding: 0; border-bottom: 1px solid var(--hairline); background: var(--ground); }
 .workspaceIdentity, .topStatus, .commandButton { border-right: 1px solid var(--hairline); }
 .workspaceIdentity { display: flex; align-items: center; gap: 10px; padding: 8px 18px; color: var(--text-hi); }
 .topStatus small { color: var(--text-lo); font: 500 12px var(--f-sans); letter-spacing: .06em; }
@@ -44,7 +44,9 @@
 .accessStrip, .ownerStrip { min-height: 44px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 18px; padding: 8px 24px; border-bottom: 1px solid var(--hairline); background: var(--g1); }
 .accessStrip > div { display: flex; align-items: baseline; gap: 10px; }
 .accessStrip strong { color: var(--text-hi); font-size: 13px; font-weight: 550; }
-.accessStrip span, .ownerStrip span { color: var(--verified); font: 500 12px var(--f-mono); letter-spacing: .06em; }
+.accessStrip span { color: var(--verified); font: 500 12px var(--f-sans); letter-spacing: .06em; }
+/* The owner strip's span is the global .state-label -- a machine state, and the one mono here. */
+.ownerStrip span { font: 500 12px var(--f-mono); letter-spacing: .06em; }
 .accessStrip p, .ownerStrip p { margin: 0; color: var(--text-lo); font-size: 13px; }
 .accessStrip a { min-height: 32px; display: inline-flex; align-items: center; padding: 0 12px; border: 1px solid var(--hairline-hi); border-radius: var(--r-inst, 6px); color: var(--text-hi); font: 500 13px var(--f-sans); white-space: nowrap; }
 
@@ -66,19 +68,20 @@
 .stateHero > button:active { transform: scale(.98); }
 .stateHero > button:disabled { color: var(--text-lo); background: transparent; border-color: var(--hairline); cursor: not-allowed; opacity: 1; }
 
-.paletteBackdrop { position: fixed; inset: 0; z-index: 80; display: grid; place-items: start center; padding: 12vh 18px 18px; background: color-mix(in srgb, var(--ground) 64%, transparent); backdrop-filter: blur(7px); }
-.palette { width: min(620px, 100%); border: 1px solid var(--hairline-hi); border-radius: var(--r-inst-lg, 8px); background: var(--ground); box-shadow: 0 28px 90px rgb(0 0 0 / .28); overflow: hidden; }
+.paletteBackdrop { position: fixed; inset: 0; z-index: 80; display: grid; place-items: start center; padding: 12vh 18px 18px; background: color-mix(in srgb, var(--ground) 64%, transparent); }
+.palette { width: min(620px, 100%); border: 1px solid var(--hairline-hi); border-radius: var(--r-media, 12px); background: var(--ground); box-shadow: var(--depth-overlay); overflow: hidden; }
 .paletteSearch { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 13px 15px; border-bottom: 1px solid var(--hairline); }
-.paletteSearch input { width: 100%; color: var(--text-hi); background: transparent; border: 0; outline: 0; font-size: 15px; }
+.paletteSearch input { width: 100%; color: var(--text-hi); background: transparent; border: 0; font-size: 15px; }
 .paletteSearch button { color: var(--text-lo); }
-.palette > p { margin: 0; padding: 12px 15px 6px; color: var(--text-lo); font: 500 12px var(--f-mono); letter-spacing: .1em; }
+/* The group heading is a <p class="eyebrow">; this places it and leaves the Kicker its type. */
+.palette > p { margin: 0; padding: 12px 15px 6px; }
 .paletteResults { display: grid; padding: 0 7px 9px; }
 .paletteResults button { display: flex; justify-content: space-between; align-items: center; min-height: 40px; padding: 8px 9px; color: var(--text-lo); text-align: left; border-radius: var(--r-inst, 6px); font-size: 14px; }
 .paletteResults button:focus-visible { color: var(--text-hi); background: var(--g2); }
 .paletteResults button > span { display: flex; align-items: center; gap: 12px; }
-.paletteResults button small { min-width: 64px; color: var(--text-lo); font: 12px var(--f-mono); letter-spacing: .06em; }
+.paletteResults button small { min-width: 64px; color: var(--text-lo); font: 12px var(--f-sans); letter-spacing: .06em; }
 .paletteResults > span { padding: 18px 9px; color: var(--text-lo); font-size: 13px; }
-.palette footer { display: flex; align-items: center; gap: 7px; padding: 9px 15px; border-top: 1px solid var(--hairline); color: var(--text-lo); font: 12px var(--f-mono); }
+.palette footer { display: flex; align-items: center; gap: 7px; padding: 9px 15px; border-top: 1px solid var(--hairline); color: var(--text-lo); font: 12px var(--f-sans); }
 
 /* 1024–1279: icon rail with a short label under each icon. */
 @media (max-width: 1279px) {
@@ -131,7 +134,6 @@
   .stateHero > button { width: 100%; min-height: 44px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .paletteBackdrop { backdrop-filter: none; }
   .nav button, .stateHero button { transition: none; }
 }
 
