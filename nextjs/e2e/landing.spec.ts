@@ -74,7 +74,7 @@ test("renders the hero plus the five-step customer journey in the approved order
   // The retired persistent World canvas is not mounted behind the simplified customer journey.
   await expect(page.locator(".world-field")).toHaveCount(0);
   await expect(page.getByTestId("one-path-hero-film")).toBeVisible();
-  await expect(page.locator("#proof .one-path-source-proof")).toHaveCount(1);
+  await expect(page.locator('#proof [data-proof-variant="canonical"]')).toHaveCount(1);
 });
 
 test("hero leads with one commercial start path and keeps evidence out of the hero", async ({ page }) => {

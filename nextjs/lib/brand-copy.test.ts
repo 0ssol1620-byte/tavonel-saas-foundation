@@ -377,9 +377,16 @@ describe("public copy", () => {
     // Comments stripped: the rationale for deleting them names the strings it deleted.
     expect(page.replace(/\{?\/\*[\s\S]*?\*\/\}?/g, ""), "a numbered section kicker is not a section name")
       .not.toMatch(/0\d \/ /);
-    expect(page).toContain("Public Apple SEC sample, source included");
+    /*
+      BQ-076 / n39 moves this assertion rather than deleting it. The wrapper it named is gone --
+      it framed a figure that brings its own frame, above an eyebrow that restated the figure's
+      own figcaption -- so what is guarded is the same two things without it: the label is not
+      written twice, and the hero film still comes before the proof block.
+    */
+    expect(page, "the proof block's figcaption names the sample; a wrapper eyebrow restated it")
+      .not.toContain("Public Apple SEC sample, source included");
     expect(page).toContain("{proof}");
-    expect(page.indexOf("<CompileStagePlayer")).toBeLessThan(page.indexOf('className="one-path-source-proof"'));
+    expect(page.indexOf("<CompileStagePlayer")).toBeLessThan(page.indexOf("{proof}"));
     expect(page).not.toContain("evidence back to the page");
   });
   it("puts the locked hero proof and three motion cuts on the landing page", () => {
@@ -850,7 +857,10 @@ describe("public copy", () => {
   it("moves source proof below the film without adding invented result figures", () => {
     const page = read("components/home-page-client.tsx");
     expect(page).not.toContain('className="hero-proof"');
-    expect(page).toContain('aria-label="Published sample and its source"');
+    // n39: the wrapper that carried this label is gone; what it guarded is that the proof renders
+    // in the proof section rather than in the hero, which is the ordering asserted here instead.
+    expect(page.indexOf('id="proof"')).toBeLessThan(page.indexOf('{proof}'));
+    expect(page.indexOf('data-scene="1"')).toBeLessThan(page.indexOf('id="proof"'));
     expect(page).toContain("/explore?act=source");
     expect(page).toContain('href="/sources"');
     expect(page).not.toMatch(/\d[\d,.]*\s*(?:million|billion|% accuracy|customers served|pages processed)/i);

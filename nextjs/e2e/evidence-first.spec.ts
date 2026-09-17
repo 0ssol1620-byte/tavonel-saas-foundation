@@ -8,9 +8,9 @@ async function dismissOptionalAnalytics(page: Page) {
 test("the hero explains the value while the published sample remains a separate proof surface", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator("#one-path-title")).toContainText("ready for AI.");
-  await expect(page.locator("#s1 .one-path-source-proof")).toHaveCount(0);
+  await expect(page.locator("#s1 [data-proof-variant]")).toHaveCount(0);
 
-  const proof = page.locator('#proof .one-path-source-proof[aria-label="Published sample and its source"]');
+  const proof = page.locator('#proof [data-proof-variant="canonical"]');
   await proof.scrollIntoViewIfNeeded();
   await expect(proof).toBeVisible();
   const sample = proof.locator('[data-proof-variant="canonical"]');
@@ -46,7 +46,7 @@ test("the hero and source proof each fit the viewport at the active product-QA w
   expect(heroFilm!.x + heroFilm!.width).toBeLessThanOrEqual(width + 1);
   expect(heroFilm!.y).toBeLessThan(page.viewportSize()?.height ?? 900);
 
-  const proof = page.locator("#proof .one-path-source-proof");
+  const proof = page.locator('#proof [data-proof-variant="canonical"]');
   await proof.scrollIntoViewIfNeeded();
   await expect(proof).toBeVisible();
   const proofBox = await proof.boundingBox();

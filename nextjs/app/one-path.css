@@ -400,22 +400,6 @@
 .one-path-details p { font-size: var(--t-3, 14px); line-height: 1.65; color: var(--text-mid); max-width: 78ch; }
 .one-path-links { display: flex; flex-wrap: wrap; gap: 12px 28px; margin-top: 20px; }
 
-.one-path-source-proof {
-  border: 1px solid var(--hairline-hi);
-  padding: 24px;
-  border-radius: var(--r-inst-lg, 8px);
-  background: var(--g1);
-  min-width: 0;
-}
-/*
-  The proof block's label. `.eyebrow` is L1's rule (sans 12px, +.06em, `--text-mid`, sentence
-  case); the floor and the case are restated here only until that lands, because `tavonel.css`
-  still sets this class to 10px monospace caps and a 10px label is under the site's type floor.
-  Delete these two declarations when L1's `.eyebrow` is in.
-*/
-.one-path-source-proof > .eyebrow { margin: 0 0 20px; font-size: var(--t-1, 12px); text-transform: none; }
-.one-path-source-proof .rv { opacity: 1; transform: none; visibility: visible; }
-
 /* BQ-129: one column, because a heading and three short steps are one column of content. */
 .one-path-update-steps { margin: 0; padding: 0; list-style: none; max-width: 780px; counter-reset: one-path-update; }
 .one-path-update-steps > li { position: relative; padding: 22px 0 22px 48px; border-bottom: 1px solid var(--hairline-hi); }
@@ -440,8 +424,6 @@
 .one-path-output-options a:first-child { padding-left: 0; }
 .one-path-output-options strong { font-size: var(--t-6, 20px); font-weight: 500; }
 .one-path-output-options span { font-size: var(--t-3, 14px); color: var(--text-mid); }
-.one-path-trust { display: flex; align-items: center; gap: 10px; font-size: var(--t-3, 14px); line-height: 1.6; color: var(--text-mid); margin-top: 24px; }
-.one-path-trust svg { flex-shrink: 0; }
 
 /*
   BQ-129. The standing deployment fact, bounded by a hairline rather than a coloured bar.
@@ -465,7 +447,6 @@
 
 .one-path-footer { padding-block: 48px 68px; }
 .one-path-footer .site-footer-groups { margin-top: 30px; }
-.one-path-home :is(a, button, summary):focus-visible, .one-path-workspace :is(button, summary):focus-visible { outline: 2px solid var(--verified); outline-offset: 2px; }
 /*
   BQ-129: `overflow-wrap: anywhere` on every text element of the landing page is deleted.
 
@@ -473,19 +454,16 @@
   that breaks mid-word wherever the column runs out is the most avoidable way to make display
   type look accidental. The two places that actually carry a long unbroken token keep it.
 */
-.one-path-tier-note code, .one-path-source-proof code { overflow-wrap: anywhere; }
+.one-path-tier-note code { overflow-wrap: anywhere; }
 
 /* ================================================== optional tools (authenticated shell only) */
 
-/* Optional tools remain real controls, not hidden/deleted destinations. */
+/* n42: the optional-tools disclosure is `app/workspace-no1.css`'s, on the token system. What was
+   here was the second copy -- its own green palette and its own 12px/9px radii -- and it only won
+   because this sheet is imported after globals.css. The one declaration that has no counterpart
+   there stays: the panel is absolutely positioned, so its details element has to be the
+   containing block or the panel anchors to whatever ancestor happens to be positioned. */
 .one-path-workspace .one-path-more { position: relative; width: 100%; }
-.one-path-workspace .one-path-more > summary { list-style: none; cursor: pointer; min-height: 54px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; border-radius: var(--r-inst-lg, 8px); font-size: var(--t-1, 12px); }
-.one-path-workspace .one-path-more > summary::-webkit-details-marker { display: none; }
-.one-path-workspace .one-path-more[open] > summary { background: var(--g3); color: var(--text-hi); }
-.one-path-workspace .one-path-more-panel { position: absolute; left: calc(100% + 12px); bottom: 0; width: 236px; max-height: min(600px, 75svh); overflow: auto; z-index: 90; background: var(--g2); border: 1px solid var(--hairline-hi); border-radius: var(--r-media, 12px); padding: 8px; box-shadow: var(--depth-overlay, 0 16px 50px rgba(0, 0, 0, .4)); }
-.one-path-workspace .one-path-more-panel button { display: flex; flex-direction: row; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 10px 12px; text-align: left; font-size: var(--t-3, 14px); }
-.one-path-workspace .one-path-more-panel button span { font-size: var(--t-3, 14px); }
-.one-path-workspace .one-path-more-panel p { font-size: var(--t-1, 12px); padding: 8px 12px; margin: 0; color: var(--text-lo); }
 .one-path-workspace .one-path-ai-options { margin-bottom: 24px; }
 .one-path-ai-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0; }
 .one-path-ai-tabs button { min-height: 44px; padding: 10px 16px; border: 1px solid var(--hairline-hi); border-radius: var(--r-inst, 6px); font-size: var(--t-3, 14px); }
@@ -645,9 +623,6 @@
   .one-path-source-options p { max-width: 52ch; }
   .one-path-output-options a, .one-path-output-options a:first-child { padding: 22px 0; min-height: 92px; }
   .one-path-output-options a + a { border-top: 1px solid var(--hairline-hi); }
-  .one-path-source-proof { padding: 16px; }
-  .one-path-workspace .one-path-more-panel { position: fixed; left: auto; right: 12px; bottom: 84px; width: min(300px, calc(100vw - 24px)); }
-  .one-path-workspace .one-path-more > summary { min-height: 52px; }
 }
 @media (max-width: 360px) {
   /* Keep the film inside the first phone viewport without changing the 390px+ composition. */

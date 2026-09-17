@@ -18,8 +18,8 @@ for (const width of widths) {
     expect(bounds!.y).toBeLessThan(width < 768 ? 500 : 380);
     expect(bounds!.width).toBeGreaterThan(width < 768 ? width - 60 : width * .4);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
-    await expect(page.locator("#s1 .one-path-source-proof")).toHaveCount(0);
-    await expect(page.locator("#proof .one-path-source-proof")).toHaveCount(1);
+    await expect(page.locator("#s1 [data-proof-variant]")).toHaveCount(0);
+    await expect(page.locator('#proof [data-proof-variant="canonical"]')).toHaveCount(1);
     await expect(page.locator(".one-path-film-note")).toContainText("not a screen recording");
     const sectionOrder = await page.locator("main > section[data-scene]").evaluateAll(nodes => nodes.map(node => node.id));
     expect(sectionOrder).toEqual(["s1", "how-it-works", "connect", "proof", "stays-current", "ready-for-ai"]);
