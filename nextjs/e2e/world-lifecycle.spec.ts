@@ -365,7 +365,9 @@ test("the workspace World offers the same composition as an accessible list", as
   await table.getByRole("button", { name: "Apple Inc.", exact: true }).click();
   const inspector = page.getByRole("complementary", { name: "World selection inspector" });
   await expect(inspector).toContainText("Apple Inc.");
-  await expect(inspector).toContainText("SELECTED OBJECT");
+  // The inspector's label is sentence case now -- mono caps are reserved for machine state, and
+  // "Selected object" is a section label, not one. Same label, same place.
+  await expect(inspector).toContainText("Selected object");
 });
 
 test("the World arrives as a list on a phone and for a reader who asked for stillness", async ({ page }) => {
@@ -473,20 +475,25 @@ test("renders governed promotion, retained rollback and region-grounded Ask", as
   await expect(page.locator(".binding-list span", { hasText: "Sources" })).toContainText("2");
   await expect(page.locator(".binding-list span", { hasText: "Validation" })).toContainText("Passed");
   await expect(page.locator("body")).not.toContainText(candidateManifest);
-  const promote = page.getByRole("button", {
-    name: "Promote reviewed candidate",
+  /*
+    D31: the rendered verb is *activate*. The gate this asserts is unchanged -- the control is
+    disabled until a human review record exists, and activating asks for a confirmation -- only
+    the word on the button moved.
+  */
+  const activate = page.getByRole("button", {
+    name: "Activate reviewed candidate",
   });
-  await expect(promote).toBeDisabled();
+  await expect(activate).toBeDisabled();
   await page
     .getByLabel("Human review record")
     .fill("Verified ontology, graph and evidence bindings.");
-  await expect(promote).toBeEnabled();
+  await expect(activate).toBeEnabled();
   let confirmationSeen = false;
   page.once("dialog", async dialog => {
     confirmationSeen = dialog.type() === "confirm";
     await dialog.dismiss();
   });
-  await promote.click();
+  await activate.click();
   expect(confirmationSeen).toBe(true);
 
   const rollback = page.getByRole("button", {
@@ -500,7 +507,8 @@ test("renders governed promotion, retained rollback and region-grounded Ask", as
 
   await page.goto(`/workspace/ask?collection=${collectionId}`);
   await page.getByLabel("Question").fill("분기 매출은 얼마인가요?");
-  await page.getByRole("button", { name: "Ask active world" }).click();
+  // One noun per concept: the World is capitalised, so the control reads "Ask the active World".
+  await page.getByRole("button", { name: "Ask the active World" }).click();
   await expect(page.getByText("Grounded answer")).toBeVisible();
   await expect(
     page.getByText("Page 2 · bbox [100, 200, 900, 300] · official")
@@ -539,11 +547,12 @@ test("keeps review-required packages downloadable and promotion-closed", async (
   await expect(page.getByRole("button", { name: "Download signed knowledge package" })).toBeEnabled();
   // The signed download sits with the collection result on Home; the review record now has a
   // dedicated Review surface. Crossing those surfaces proves that review-required packages stay
-  // downloadable while promotion remains closed.
+  // downloadable while activation remains closed.
   await page.getByRole("button", { name: "Review & activate" }).click();
-  const promote = page.getByRole("button", { name: "Promote reviewed candidate" });
+  // D31: the button reads "Activate reviewed candidate" now; the closed gate is the same gate.
+  const activate = page.getByRole("button", { name: "Activate reviewed candidate" });
   await page.getByLabel("Human review record").fill("Reviewed contradiction evidence and retained the gate.");
-  await expect(promote).toBeDisabled();
+  await expect(activate).toBeDisabled();
 
   expect(browserErrors).toEqual([]);
   await testInfo.attach("review-required-gate", {

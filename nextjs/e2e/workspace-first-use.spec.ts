@@ -163,7 +163,14 @@ test.describe("workspace first use — desktop", () => {
     await expect(page.getByRole("heading", { name: "Drop files, folders or ZIP here" })).toHaveCount(0);
 
     await expect(page.getByRole("heading", { name: "Drop files, folders or ZIP here" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Add your knowledge." })).toBeVisible();
+    /*
+      `31cb972` -- "the hero belongs to Home, the drop box is always a box" -- stopped drawing the
+      state hero on a brand-new workspace (`stateHero={workspaceState.mode !== "new"}`), so its
+      "Add your knowledge." heading is no longer a second heading above the drop box saying the
+      same thing. The empty state is the drop box asserted on the line above; the guard here is
+      that nothing restates it.
+    */
+    await expect(page.getByRole("heading", { name: "Add your knowledge." })).toHaveCount(0);
     const guide = page.getByRole("button", { name: /Getting started 0 of 6 complete/ });
     await expect(guide).toHaveAttribute("aria-expanded", "false");
     await guide.click();
