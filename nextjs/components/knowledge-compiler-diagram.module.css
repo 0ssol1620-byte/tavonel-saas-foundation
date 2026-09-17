@@ -59,7 +59,7 @@
     padding: 0;
     list-style: none;
     border: 1px solid var(--hairline-hi);
-    border-radius: 6px;
+    border-radius: var(--r-inst);
     overflow: hidden;
     background: var(--hairline);
   }

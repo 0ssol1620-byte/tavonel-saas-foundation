@@ -4,7 +4,7 @@
   min-width: 0;
   padding: 18px;
   border: 1px solid var(--hairline-hi);
-  border-radius: 4px;
+  border-radius: var(--r-paper-lg);
   background: var(--g1);
 }
 
@@ -26,9 +26,9 @@
 
 .label { margin: 0 0 4px; font-size: 14px; color: var(--text-hi); }
 
-.path { font: 11px var(--f-mono); color: var(--text-mid); overflow-wrap: anywhere; }
+.path { font: 12px var(--f-mono); color: var(--text-mid); overflow-wrap: anywhere; }
 
-.note { margin: 0; font-size: 12px; line-height: 1.6; color: var(--text-xlo); }
+.note { margin: 0; font-size: 12px; line-height: 1.6; color: var(--text-lo); }
 
 .result { display: grid; gap: 8px; min-width: 0; }
 
@@ -39,13 +39,13 @@
   overflow: auto;
   border: 1px solid var(--hairline);
   color: var(--text-hi);
-  font: 11.5px/1.65 var(--f-mono);
+  font: 12px/1.65 var(--f-mono);
   /* G3-024: a visible track, so a wide or long body reads as scrollable rather than clipped. */
   scrollbar-width: thin;
   scrollbar-color: var(--hairline-hi) transparent;
 }
 
-.status { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0; font: 11px var(--f-mono); color: var(--text-xlo); }
+.status { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0; font: 12px var(--f-mono); color: var(--text-lo); }
 
 /*
   Status colour carries no meaning on its own: the number is right beside it and is the thing

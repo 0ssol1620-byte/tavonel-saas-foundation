@@ -73,7 +73,10 @@
   text-decoration: none;
 }
 
-.filters a:hover { border-color: var(--hairline-hi); color: var(--text-hi); }
+/* Hover is gated: on a touch screen an un-gated :hover sticks after a tap (token contract). */
+@media (hover: hover) and (pointer: fine) {
+  .filters a:hover { border-color: var(--hairline-hi); color: var(--text-hi); }
+}
 
 /* "Everything" is the state on arrival, so it looks like the state on arrival. */
 .filters a:first-of-type { border-color: var(--text-mid); color: var(--text-hi); }

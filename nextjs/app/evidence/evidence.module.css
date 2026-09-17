@@ -19,7 +19,7 @@
   border: 1px solid var(--hairline-hi);
   border-left: 2px solid var(--verified);
   background: var(--g1);
-  border-radius: 4px;
+  border-radius: var(--r-paper-lg);
 }
 
 .leadLocator h3 {
@@ -40,7 +40,7 @@
 
 .leadMark {
   font-family: var(--f-mono);
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--verified);

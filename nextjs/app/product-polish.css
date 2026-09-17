@@ -65,7 +65,10 @@
 .doc-breadcrumb ol { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; align-items: baseline; }
 .doc-breadcrumb li { display: flex; align-items: baseline; min-width: 0; }
 .doc-breadcrumb a { color: var(--text-mid); }
-.doc-breadcrumb a:hover { color: var(--text-hi); }
+/* Hover is gated: on a touch screen an un-gated :hover sticks after a tap (token contract). */
+@media (hover: hover) and (pointer: fine) {
+  .doc-breadcrumb a:hover { color: var(--text-hi); }
+}
 .doc-breadcrumb [aria-current="page"] { color: var(--text-lo); }
 .doc-breadcrumb [aria-hidden="true"] { margin: 0 6px; color: var(--text-lo); }
 .product-close { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 24px; }
@@ -315,7 +318,7 @@
   min-height: 44px;
   padding: 0 12px;
   border: 1px solid var(--hairline-hi);
-  border-radius: var(--r-inst, 6px);
+  border-radius: var(--r-inst);
   background: var(--g1);
   color: var(--text-hi);
   font: 14px/1.4 var(--f-sans);
@@ -514,6 +517,8 @@
   mono to the type floor: a rendered date is prose, and the machine form is already in `datetime`.
 */
 .changelog-entry header a { margin-left: 0; color: var(--text-mid); font: inherit; }
-.changelog-entry header a:hover { color: var(--text-hi); }
+@media (hover: hover) and (pointer: fine) {
+  .changelog-entry header a:hover { color: var(--text-hi); }
+}
 .changelog-entry header time { color: inherit; font: inherit; font-size: 13px; letter-spacing: 0; }
 .changelog-entry header b { font: 500 12px var(--f-sans); letter-spacing: 0; color: var(--verified); }
