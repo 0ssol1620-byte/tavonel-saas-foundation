@@ -46,7 +46,9 @@ export default function MobilePrimaryNav({ korean = false }: { korean?: boolean 
         is the whole navigation on a phone. It is the page's own face at 13px now, in a 44px
         target, and it says "메뉴" on /ko like everything else around it.
       */}
-      <summary>{korean ? KO_CHROME.menu : "Menu"}</summary>
+      {/* The span is the hook one-path.css uses below 400px to keep the word as the name while the
+          toggle is drawn as a 44px icon. */}
+      <summary><span>{korean ? KO_CHROME.menu : "Menu"}</span></summary>
       <nav aria-label={korean ? "모바일 섹션" : "Mobile sections"}>
         {CUSTOMER_NAV.map((item) => (
           <a key={item.href} className="mobile-nav-direct" href={item.href}

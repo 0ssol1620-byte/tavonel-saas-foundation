@@ -15,7 +15,10 @@ for (const width of widths) {
     const film = page.getByTestId("one-path-hero-film");
     await expect(film).toBeVisible();
     const bounds = await film.boundingBox();
-    expect(bounds!.y).toBeLessThan(width < 768 ? 500 : 380);
+    // D3 put the title above the film. The film still has to start in the upper half of the
+    // 900px desktop fold (measured 347 / 367 / 381 at 1024 / 1280 / 1440+); 380 was the two-column
+    // layout's number.
+    expect(bounds!.y).toBeLessThan(width < 768 ? 500 : 450);
     expect(bounds!.width).toBeGreaterThan(width < 768 ? width - 60 : width * .4);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
     await expect(page.locator("#s1 [data-proof-variant]")).toHaveCount(0);

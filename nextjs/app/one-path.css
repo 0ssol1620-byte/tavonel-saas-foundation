@@ -111,6 +111,51 @@
   letter-spacing: 0;
   text-transform: none;
 }
+/*
+  Below 400px the header row holds four things: the wordmark (104px), this toggle, Request access
+  (109px) and Sign in (44px). With the word on screen the toggle is 76px and the row measures 379px
+  in a 360px viewport -- Sign in was clipped on every English route. The toggle becomes the 44px
+  square every phone reader knows; the word stays in the DOM as the control's name and is what a
+  screen reader announces. Open state turns the three bars into a cross.
+*/
+@media (max-width: 400px) {
+  .one-path-mobile-nav > summary {
+    position: relative;
+    width: 44px;
+    min-height: 44px;
+    padding: 0;
+  }
+  .one-path-mobile-nav > summary > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .one-path-mobile-nav > summary::before,
+  .one-path-mobile-nav > summary::after,
+  .one-path-mobile-nav[open] > summary::after {
+    content: "";
+    position: absolute;
+    left: 13px;
+    top: 50%;
+    width: 16px;
+    height: 1.5px;
+    margin: 0;
+    background: currentColor;
+    color: var(--text-hi);
+    transition: transform .18s ease, box-shadow .18s ease;
+  }
+  .one-path-mobile-nav > summary::before { transform: translateY(-5.5px); box-shadow: 0 5px 0 currentColor; }
+  .one-path-mobile-nav > summary::after { transform: translateY(4.5px); }
+  .one-path-mobile-nav[open] > summary::before { transform: rotate(45deg); box-shadow: none; }
+  .one-path-mobile-nav[open] > summary::after { transform: rotate(-45deg); }
+  @media (prefers-reduced-motion: reduce) {
+    .one-path-mobile-nav > summary::before,
+    .one-path-mobile-nav > summary::after { transition: none; }
+  }
+}
 
 /* ================================================================================ the landing */
 
@@ -120,24 +165,28 @@
   margin-inline: auto;
   min-width: 0;
 }
-.one-path-hero { padding: 116px 0 54px; }
+/* Title above the film (D3) costs fold height; the spacing under the fixed header and between the
+   four hero rows is the minimum that still reads as a composition, so the film starts inside the
+   upper half of a 900px fold. */
+.one-path-hero { padding: 92px 0 54px; }
 /*
   D3 / BQ-009. The hero is one column.
 
   Deleted here: `grid-template-columns: minmax(0,.72fr) minmax(0,1.5fr)`. The measure on the
-  intro is what keeps the headline readable now -- 680px, about fifty characters at the display
-  size -- and the film below it takes the full content width, which is the width it was composed
-  for and the same width the works film runs at.
+  intro is what keeps the headline readable now -- 760px, two lines of the 52-character title at
+  the 56px display size (680px broke it into three and pushed the film to y=490 in a 900px fold) --
+  and the film below it takes the full content width, which is the width it was composed for and
+  the same width the works film runs at.
 */
 .one-path-hero > .one-path-wrap { display: block; }
-.one-path-intro { min-width: 0; max-width: 680px; }
+.one-path-intro { min-width: 0; max-width: 760px; }
 .one-path-home h1 {
   font-size: var(--t-9, clamp(38px, 4vw, 56px));
   line-height: 1.05;
   letter-spacing: -.04em;
   font-weight: 500;
-  margin: 0 0 24px;
-  max-width: 680px;
+  margin: 0 0 18px;
+  max-width: 760px;
   text-wrap: balance;
 }
 .one-path-lede {
@@ -145,10 +194,12 @@
   line-height: 1.55;
   color: var(--text-mid);
   max-width: 46ch;
-  margin: 0 0 28px;
+  margin: 0 0 20px;
 }
-.one-path-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin: 26px 0 0; }
-.one-path-home .btn {
+.one-path-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin: 18px 0 0; }
+/* Scoped to the two CTA rows: `.one-path-home` wraps the header too, and this padding made the
+   header's Request access 148px wide on / (109px elsewhere) -- the row overflowed 360px. */
+.one-path-home .one-path-actions .btn {
   min-height: 44px;
   display: inline-flex;
   gap: 10px;
@@ -170,7 +221,7 @@
 
 /* --------------------------------------------------------------------------------- the films */
 
-.one-path-hero-film { min-width: 0; margin-top: 44px; }
+.one-path-hero-film { min-width: 0; margin-top: 32px; }
 .one-path-hero-film .compile-film-sequence { width: 100%; max-width: 100%; min-width: 0; margin: 0; opacity: 1; transform: none; visibility: visible; }
 .one-path-hero-film-v2 { position: relative; }
 /*
@@ -394,7 +445,7 @@
 .one-path-film-note summary::before { content: "+"; width: 1ch; color: var(--verified); }
 .one-path-details[open] > summary::before,
 .one-path-film-note details[open] summary::before { content: "−"; }
-.one-path-film-note summary { min-height: 36px; font-size: var(--t-1, 12px); }
+.one-path-film-note summary { min-height: 44px; font-size: var(--t-1, 12px); }
 .one-path-details p { font-size: var(--t-3, 14px); line-height: 1.65; color: var(--text-mid); max-width: 78ch; }
 .one-path-links { display: flex; flex-wrap: wrap; gap: 12px 28px; margin-top: 20px; }
 
