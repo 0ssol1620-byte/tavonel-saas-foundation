@@ -131,10 +131,10 @@ export default function KnowledgeCompilerPage() {
       { key: "EVIDENCE REGION", description: "A source version, an exact location inside it, an excerpt and a digest. What a citation resolves to. The location takes whatever form the source has; in a PDF it is a page and a box measured in thousandths of it.", state: "PROVENANCE" },
       { key: "STABLE ID", description: "An identifier derived from content, so recompiling the same source lands on the same object rather than a new one.", state: "IDENTITY" },
       { key: "MANIFEST DIGEST", description: "The sha256 of the canonical form of a World. Two Worlds with the same digest are the same World.", state: "IDENTITY" },
-      { key: "ABSTENTION", description: "The answer given when the sources do not support one. It is a result, not a failure.", state: "BEHAVIOUR" },
+      { key: "ABSTENTION", description: "The answer given when the sources do not support one. It is a result the contract requires.", state: "BEHAVIOUR" },
       { key: "PACKAGE", description: "The portable form: canonical model, Turtle, JSON-LD, CSV, retrieval JSONL, provenance and a validation report.", state: "PORTABILITY" },
     ] },
-    { title: "Questions people ask", collapsed: "open", body: "Short answers about what the product does today, not what a category could do in principle.", faq: [...QUESTIONS] },
+    { title: "Questions people ask", collapsed: "open", body: "Short answers about what the product does today.", faq: [...QUESTIONS] },
     {
       title: "The package is the contract",
       body: "Portability is only real if someone outside can check it. The package format, its required files and the two verifiers — one for the archive's signature, one for what is inside it — are documented, and a compiled sample is open without an account.",

@@ -160,7 +160,7 @@ export default function DevelopersPage() {
                     NFS, SFTP and S3-compatible connector" put four connectors on a page that
                     has none.
                   */}
-                  <article className="tile"><h3>Source agent</h3><p>Runs inside your network and pushes to TAVONEL, which reaches into nothing. Reads a mounted directory — an SMB, NFS or SFTP mount included — or an S3-compatible bucket. An assisted import route, not a self-serve connector.</p><a className="btn ghost" href="/developer/tavonel-source-agent.py" download>Download source agent</a></article>
+                  <article className="tile"><h3>Source agent</h3><p>Runs inside your network and pushes to TAVONEL, which reaches into nothing. Reads a mounted directory — an SMB, NFS or SFTP mount included — or an S3-compatible bucket. We set this route up with you.</p><a className="btn ghost" href="/developer/tavonel-source-agent.py" download>Download source agent</a></article>
                   {/*
                     The two reference verifiers, added when channel.json went from four assets to
                     six (devx CROSS-LANE 1). A customer who could not find them here could still
@@ -197,7 +197,7 @@ export default function DevelopersPage() {
                   Every signed export contains these files, written by the exporter and named in
                   a manifest carrying a digest for each one. The two ontology files are the
                   Compiled World&rsquo;s RDF / JSON-LD semantic projection — a projection of the
-                  compiled objects and relations, not a hand-authored OWL schema.
+                  compiled objects and relations, with no schema for you to author.
                 </p>
                 <table className={`docs-table ${tableStyles.stacked}`}>
                   <thead><tr><th>Path</th><th>Use it for</th></tr></thead>

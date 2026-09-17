@@ -61,7 +61,7 @@ export default function ErrorBoundary({
               </div>
               <div className="stack">
                 <p className="lede">
-                  The failure is in the screen, not in your data. Uploaded documents are
+                  Your data is untouched by this. Uploaded documents are
                   immutable, usage changes only when a signed event is persisted, and nothing
                   is activated into a live world without a person deciding it &mdash; none of
                   which a rendering failure can reach.

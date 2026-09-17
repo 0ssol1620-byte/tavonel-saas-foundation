@@ -33,7 +33,7 @@ export async function generateMetadata({ params }: { params: Promise<{ section: 
   const entry = findDocsSection(section);
   if (!entry) return {};
   return {
-    title: `${entry.title} — TAVONEL docs`,
+    title: `${entry.title} — TAVONEL`,
     description: entry.summary,
     alternates: { canonical: `/docs/${section}` },
     openGraph: { url: `/docs/${section}` },
@@ -240,18 +240,26 @@ export default async function DocsSectionPage({ params }: { params: Promise<{ se
               {next ? <Link href={`/docs/${next.slug}` as Route}>Next: {next.title}</Link> : null}
             </nav>
             <p className="fine">
-              API version {DOCS_VERSION} · reviewed {formatReviewDate(DOCS_REVIEWED)} ·{" "}
-              {/*
-                Feedback goes to an address that exists and is read. A form posting to an endpoint
-                nobody had built would look like feedback and be a hole in the floor.
+              API version {DOCS_VERSION} · reviewed {formatReviewDate(DOCS_REVIEWED)}
+            </p>
+            {/*
+              BQ-137. The way to tell us a page is wrong, on its own line.
 
-                BA-221: the label asked "Something wrong on this page?", which opens by assuming
-                the page is wrong. It is the same mailto, phrased as an action.
-              */}
-              {/* BQ-134: the arrow is gone. It went nowhere the label did not already say. */}
+              It was the third item in a middot-separated meta row, after the API version and
+              the review date -- so the one element on the page that asks the reader for
+              something was formatted as a footnote about the page's edition. Feedback goes to
+              an address that exists and is read; a form posting to an endpoint nobody had
+              built would look like feedback and be a hole in the floor.
+
+              BA-221: the label asked "Something wrong on this page?", which opens by assuming
+              the page is wrong. It is the same mailto, phrased as an action.
+            */}
+            <p className="fine">
+              Something here out of date or wrong?{" "}
               <a href={`mailto:support@tavonel.com?subject=${encodeURIComponent(`Docs feedback: ${entry.title}`)}`}>
                 Report an issue with this page
               </a>
+              .
             </p>
           </div>
         </div>

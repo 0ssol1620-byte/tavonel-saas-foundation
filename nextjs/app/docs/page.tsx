@@ -76,7 +76,16 @@ export default function DocsPage() {
           <p className="fine">
             API version {DOCS_VERSION} · documentation reviewed {formatReviewDate(DOCS_REVIEWED)} ·{" "}
             <a href="/api/openapi">OpenAPI contract</a> ·{" "}
-            <a href="/llms.txt">llms.txt</a>
+            {/*
+              BQ-137. The file said its own name and nothing else.
+
+              "llms.txt" in a row of meta is a filename with no reader: the people who know
+              the convention do not need the link, and everybody else sees a broken-looking
+              token beside a version number. The link says what is on the other end; the
+              filename stays in it, because that is what somebody looking for the convention
+              is scanning for.
+            */}
+            <a href="/llms.txt">Site index for AI agents (llms.txt)</a>
           </p>
           {/*
             §22: this page's next action is "run the first flow", not "open a page".
