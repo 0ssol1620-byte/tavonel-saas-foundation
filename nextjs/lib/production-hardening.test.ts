@@ -39,20 +39,39 @@ describe("2026-09-05 production hardening", () => {
     expect(workspace).toContain('navigateSurface("connections")');
   });
 
+  /*
+    Moved 2026-09-17 with BQ-021/BQ-022/BQ-083, same intent: the workspace shows the real
+    lifecycle, from the durable record, the moment a compile exists.
+
+    The four-literal array and the bare WAITING return were
+    the shape the stage had when it drew four panes and computed each pane's label from the
+    state the job was in this second. Both are gone by design -- one chapter plays at a time,
+    its names come from PIPELINE_STAGES, and the label comes from how far the run has got.
+  */
   it("shows the real four-stage lifecycle as soon as a durable compile exists", () => {
     const workspace = read("app/workspace/page.tsx");
     const stage = read("components/compile-stage.tsx");
     expect(workspace).toContain("compileJob || pipelineRows.length > 0");
-    expect(stage).toContain('["sources", "read", "structure", "world"]');
     expect(stage).toContain("state?: CompileState | null");
-    expect(stage).toContain('return "WAITING"');
+    // Four chapters, and a position in them taken from the job record.
+    expect(stage).toContain("const STAGE_OF_STATE: Record<CompileState, number>");
+    expect(stage).toContain("PIPELINE_STAGES.forEach((stage, i)");
+    expect(stage).toContain('stopped ? "STOPPED" : "WAITING"');
   });
 
+  /*
+    Moved 2026-09-17 with BQ-025: "Add sources" is no longer in this list because it was one of
+    four controls performing one act. The drop box directly below the completion panel is that
+    control, and the panel's job -- making the export and the evidence reachable rather than
+    buried -- is what is still asserted here.
+  */
   it("makes completion actions explicit instead of burying the export", () => {
     const workspace = read("app/workspace/page.tsx");
-    for (const label of ["Open World", "Ask", "Download signed package", "View evidence", "Verify export", "Add sources"]) {
+    for (const label of ["Open World", "Ask", "Download signed package", "View evidence", "Verify export"]) {
       expect(workspace, label).toContain(label);
     }
+    // And the act the panel no longer duplicates still has its one control on the same screen.
+    expect(workspace).toContain('id="workspace-intake-title"');
   });
 
   it("prevents empty grid cells and document-wide mobile code overflow", () => {
@@ -117,15 +136,29 @@ describe("2026-09-05 production hardening", () => {
 
     Both halves are asserted, because either one alone leaves the bar unreadable as a target.
   */
-  it("keeps the compact workspace intake readable as a drop target", () => {
+  /*
+    Moved 2026-09-17 with BQ-023/D6, and the intent is now stronger than the rule it replaces.
+
+    This used to assert that a returning workspace's intake kept a dashed edge, because a
+    dashed edge was the cheapest thing left that still said "target" after two passes had
+    compacted the box into an action bar. The box is not compacted any more: it is a real box
+    with a solid border on its own ground at every width, which is what the dashed edge was
+    standing in for. The assertions move to the sheet that now owns the geometry.
+  */
+  it("keeps the workspace intake readable as a drop target", () => {
     // Newlines are normalised: this repository checks CSS out with CRLF on Windows and LF in CI.
-    const css = read("app/workspace-final-polish.css").replace(/\r\n/g, "\n");
-    expect(css).toContain('.workspace-intake[data-existing-documents="1"] {\n  border: 1px dashed var(--text-xlo);\n}');
-    expect(css).toContain('.workspace-intake[data-existing-documents="1"][data-active="true"] {\n  border-style: solid;\n  border-color: var(--verified);');
-    expect(css).not.toContain(':has(.document-meta li) .workspace-intake');
-    expect(css).toContain('.workspace-intake[data-existing-documents="1"] .workspace-intake-copy {');
-    expect(css).not.toContain('[data-existing-documents="1"]-copy');
-    expect(css).not.toContain('[data-existing-documents="1"]-actions');
+    const css = read("app/workspace-no1.css").replace(/\r\n/g, "\n");
+    const polish = read("app/workspace-final-polish.css").replace(/\r\n/g, "\n");
+    // A visible border and a ground of its own, never a bare hairline rule.
+    expect(css).toContain("border: 1px solid var(--hairline-hi); border-radius: var(--ws-radius); background: var(--g1);");
+    // The drag highlight still wins over the returning-workspace variant.
+    expect(css).toContain('.one-path-workspace .workspace-intake[data-active="true"] { border-color: var(--verified); background: var(--verified-deep); }');
+    // A returning workspace gets a shorter box, not a toolbar.
+    expect(css).toContain('.one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-copy { min-height: 200px; }');
+    expect(css).not.toContain("var(--text-xlo)");
+    // And nothing compacts it back by reading an English button title.
+    expect(polish).not.toContain(':has(.document-meta li) .workspace-intake');
+    expect(polish.replace(/\/\*[\s\S]*?\*\//g, "")).not.toContain("button[title^=");
   });
 
   it("removes the full-viewport floor from short landing scenes but keeps the film immersive", () => {

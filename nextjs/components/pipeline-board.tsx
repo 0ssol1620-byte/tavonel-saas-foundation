@@ -9,6 +9,7 @@ import { trackFunnel } from "@/lib/funnel-events";
 // The rejection sentence names the formats the server actually accepts, so it cannot fall
 // behind the whitelist that produced the rejection. Both come from the Capability Manifest.
 import { acceptedFormatSentence } from "@/lib/qualified-input";
+import { PIPELINE_STAGES } from "@/lib/pipeline-vocabulary";
 
 type Filter = "all" | "attention" | "processing" | "ready" | "failed";
 /*
@@ -24,6 +25,15 @@ type Filter = "all" | "attention" | "processing" | "ready" | "failed";
 */
 function statusOf(row: PipelineRow): Exclude<Filter, "all"> { if (row.stages.some((stage) => stage.state === "failed")) return "failed"; if (row.needsPerson) return "attention"; if (row.transfer || row.stages.slice(0, 3).some((stage) => stage.state === "active")) return "processing"; return "ready"; }
 function statusLabel(row: PipelineRow, reading: Record<string, OcrProgress>): string { const status = statusOf(row); if (status === "attention") return "Needs review"; if (status === "failed") return "Failed"; if (row.transfer) return "Uploading"; if (row.stages[2].state === "active") return reading[row.id]?.pagesRead ? `Reading page ${reading[row.id].pagesRead}` : "Reading"; if (row.stages[1].state === "active") return "Preparing"; if (row.stages[3].state === "active") return "Ready to compile"; if (row.stages[3].state === "done") return "Compiled"; return status === "processing" ? "Processing" : "Ready"; }
+/* Which chapter this source is in. The board's four internal stage keys collapse onto the
+   four the rest of the product says out loud. */
+function stageLabel(row: PipelineRow): string {
+  if (row.stages[3].state === "done") return PIPELINE_STAGES[3].label;
+  if (row.stages[3].state === "active" || row.stages[3].state === "held") return PIPELINE_STAGES[2].label;
+  if (row.stages[2].state === "active" || row.stages[2].state === "done") return PIPELINE_STAGES[1].label;
+  return PIPELINE_STAGES[0].label;
+}
+
 function failureCopy(detail: string) {
   if (detail.includes("TRIAL_FILE_TOO_LARGE")) return "Free Evaluation accepts files up to 50 MB. Use a smaller source or upgrade for larger manuals.";
   if (detail.includes("FILE_TOO_LARGE") || detail.includes("INTAKE_FILE_TOO_LARGE")) return "This file exceeds the 250 MB direct-upload limit. Connect the source system instead of uploading it directly.";
@@ -68,7 +78,7 @@ export default function PipelineBoard({ rows, reading = {}, names = {}, onDismis
       <div className="board-list-wrap"><ol className="board-list board-rows" aria-label={`${filtered.length} matching sources`}>
         {visible.map((row) => { const rowStatus = statusOf(row); const expanded = expandedId === row.id; const progress = reading[row.id]; return (
           <li key={row.id} data-status={rowStatus} data-document-id={row.id} data-held={row.needsPerson ? "1" : "0"}>
-            <button type="button" className="board-row-summary" aria-expanded={expanded} onClick={() => setExpandedId(expanded ? null : row.id)}><span className="board-row-name" data-sensitive="content">{displayName(row.id, names, row.filename)}</span><span className="board-row-status" data-status={rowStatus}>{statusLabel(row, reading)}</span><span className="board-row-chevron" aria-hidden="true">{expanded ? "−" : "+"}</span></button>
+            <button type="button" className="board-row-summary" aria-expanded={expanded} onClick={() => setExpandedId(expanded ? null : row.id)}><span className="board-row-name" data-sensitive="content">{displayName(row.id, names, row.filename)}</span><span className="board-row-stage">{stageLabel(row)}</span><span className="board-row-status" data-status={rowStatus}>{statusLabel(row, reading)}</span><span className="board-row-chevron" aria-hidden="true">{expanded ? "−" : "+"}</span></button>
             {row.transfer ? <div className="board-transfer compact" aria-label="Upload progress"><i style={{ width: `${row.transfer.total > 0 ? (row.transfer.loaded / row.transfer.total) * 100 : 0}%` }} /></div> : null}
             <div className="board-row-detail" hidden={!expanded}>
               {progress && row.stages[2].state === "active" ? <ReadingView progress={progress} /> : null}

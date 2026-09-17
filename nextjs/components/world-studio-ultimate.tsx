@@ -26,6 +26,9 @@ type Props = {
   rollbackBusy?: boolean;
 };
 
+/* What the stat strip prints before there is anything to count. Not "--", and not "0":
+   a count of zero and a count nobody has taken are different facts. */
+const NOT_YET = "not yet";
 const LENSES: Array<{ id: WorldStudioLens; label: string }> = [
   { id: "overview", label: "Overview" },
   { id: "graph", label: "Graph" },
@@ -107,12 +110,12 @@ export default function WorldStudioUltimate({ model, initialLens = "overview", s
   return (
     <section className={styles.studio} aria-labelledby="world-studio-title">
       <header className={styles.header}>
-        <div><span>COMPILED WORLD</span><h2 id="world-studio-title">World Studio</h2><p>Inspect the current World first, then open the graph, directory, ontology or exact source evidence when you need the detail.</p></div>
+        <div><span className="eyebrow">Compiled World</span><h2 id="world-studio-title">World Studio</h2><p>Inspect the current World first, then open the graph, directory, ontology or exact source evidence when you need the detail.</p></div>
         <dl>
-          <div><dt>STATE</dt><dd>{model?.world.status.toUpperCase() ?? "NOT READY"}</dd></div>
-          <div><dt>SOURCES</dt><dd>{overview?.sources ?? "--"}</dd></div>
-          <div><dt>OBJECTS</dt><dd>{model ? model.objects.length : "--"}</dd></div>
-          <div><dt>RELATIONS</dt><dd>{model ? model.relations.length : "--"}</dd></div>
+          <div><dt>State</dt><dd>{model ? model.world.status : "Not compiled"}</dd></div>
+          <div><dt>Sources</dt><dd>{overview ? overview.sources : NOT_YET}</dd></div>
+          <div><dt>Objects</dt><dd>{model ? model.objects.length : NOT_YET}</dd></div>
+          <div><dt>Relations</dt><dd>{model ? model.relations.length : NOT_YET}</dd></div>
         </dl>
       </header>
 
