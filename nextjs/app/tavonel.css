@@ -3903,7 +3903,9 @@
     .solution-flow li:last-child { grid-column: 1 / -1; }
     .solution-notes { margin-top: 54px; }
     .board-row-summary { grid-template-columns: minmax(0, 1fr) auto 18px; gap: 8px; }
-    .board-row-status { max-width: 112px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* workspace-04: the 112px cap that used to sit here cut "Ready to compile" to "Ready to comp…"
+       with 280px of the row still free. workspace-no1.css:398 already drops the status onto its own
+       row below 768px, so the state is read in full rather than ellipsed. */
     .compile-stage { aspect-ratio: 1 / 1; }
   }
 
@@ -4496,8 +4498,10 @@
       text-align: center;
     }
 
+    /* workspace-03: the 14ch cap that used to open this rule broke "Add files, folders or ZIP"
+       over two lines inside a 700px box. A measure belongs to prose, not to a five-word heading
+       -- the same reason workspace-no1.css's BQ-133 dropped its own 16ch cap. */
     .workspace-intake-copy h2 {
-      max-width: 14ch;
       margin: 10px auto 8px;
       font-size: clamp(28px, 6.4vw, 34px);
       line-height: 1.06;

@@ -97,8 +97,9 @@ test("a billing read that failed prints no number at all", async ({ page }) => {
   await expect(card.locator("dl")).toContainText("not read yet");
   await expect(card).toContainText("These are not zeroes");
   await expect(card.getByRole("button", { name: "Manage billing" })).toBeDisabled();
-  // Fail closed: no zero balance, no invented plan name.
-  await expect(card.getByRole("heading", { name: "Usage & billing" })).toBeVisible();
+  // Fail closed: no zero balance, no invented plan name. The card is still headed, and the heading
+  // is the neutral one -- not a plan, and not a repeat of the tab above it (workspace-18).
+  await expect(card.getByRole("heading", { level: 2 })).toHaveText("Access and balance");
   await expect(card.locator("dl")).not.toContainText("active");
   // And the read is retryable rather than terminal.
   await expect(card.getByRole("button", { name: "Refresh billing" })).toBeEnabled();

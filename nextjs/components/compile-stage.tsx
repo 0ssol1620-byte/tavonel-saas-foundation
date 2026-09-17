@@ -48,6 +48,9 @@ const STAGE_OF_STATE: Record<CompileState, number> = {
 };
 
 const STOPPED: readonly CompileState[] = ["failed", "cancelled"];
+/* A run that has started but has not yet produced a page. The frame is reserved for these too, so
+   the panel does not resize under the reader one beat after they press compile. */
+const STARTING: readonly CompileState[] = ["uploading", "sanitizing"];
 
 /** Token names read off the mounted element, so the canvas cannot hold a second palette. */
 const TOKENS = ["--ground", "--g1", "--g2", "--g3", "--hairline", "--hairline-hi", "--text-hi", "--text-mid", "--text-lo", "--verified", "--changed", "--failed", "--paper"] as const;
@@ -129,6 +132,18 @@ export default function CompileStage({ rows, reading = {}, names = {}, world = n
   const stopped = state !== null && STOPPED.includes(state);
   const reached = stopped ? observed : Math.max(observed, state ? STAGE_OF_STATE[state] : 0);
   const settled = state === "ready";
+  /*
+    D39. The 16:9 frame is space reserved for a picture: a page raster, the extracted text, the
+    World. Before any of that exists the pane draws a tab strip and one line per source, and the
+    reserved frame left 490px of black under it at 1440 (workspace-01). Reserve the frame while a
+    run is playing; idle, take the height of what is actually drawn.
+
+    The geometry below is `draw()`'s: 12px pad, the 46px strip, a 10px gap, the pane's 52px header,
+    22px a row and a 14px tail. Capped so a long list does not grow without end -- past the cap the
+    pane scrolls its own window, as it already does inside the reserved frame.
+  */
+  const framed = reached > 0 || (state !== null && STARTING.includes(state));
+  const idleHeight = 132 + Math.min(Math.max(rows.length, 1), 8) * 22;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -346,7 +361,8 @@ export default function CompileStage({ rows, reading = {}, names = {}, world = n
   const observedRegions = Object.values(reading).reduce((sum, item) => sum + (item.regionsFound ?? 0), 0);
 
   return (
-    <section className="compile-stage" aria-label="Live compilation view" ref={sectionRef} data-stage={PIPELINE_STAGES[reached].key}>
+    <section className="compile-stage" aria-label="Live compilation view" ref={sectionRef} data-stage={PIPELINE_STAGES[reached].key}
+      data-framed={framed ? "true" : "false"} style={framed || !drawable ? undefined : { height: idleHeight }}>
       <canvas ref={canvasRef} className="compile-stage-canvas" data-sensitive="content" aria-hidden="true" hidden={!drawable} />
       <p className={drawable ? "sr-only" : "compile-stage-text"} role="status">
         {world

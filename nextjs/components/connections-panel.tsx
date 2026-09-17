@@ -333,6 +333,8 @@ export default function ConnectionsPanel() {
       </header>
       <p className="connection-notice" role="status">{notice}</p>
       <div className="connection-form">
+        {/* workspace-16: this panel had no title, so a paragraph and a field floated on their own. */}
+        <h3>Connect a provider account</h3>
         <p className="field-help">TAVONEL requests read-only access and stores refresh credentials only in the encrypted secret broker. Disconnecting removes the broker credential.</p>
         {/*
           The optional name sits ABOVE the provider buttons: each button leaves the page for the

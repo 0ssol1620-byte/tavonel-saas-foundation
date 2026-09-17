@@ -29,10 +29,14 @@ export default function WorkspaceUseWithAi({ open = false, onDownload, onOpen, d
     setDestination(id);
     document.getElementById(`${uid}-${id}`)?.focus();
   };
-  return (
-    <details className="workspace-ai-use-guide" data-testid="workspace-ai-use-guide" open={open}
-      onToggle={(event) => { if (event.currentTarget.open) onOpen?.(); }}>
-      <summary>Use with AI</summary>
+  /*
+    workspace-08. On /workspace/ask this renders `open`, under an h1 that already says "Use with
+    AI" -- so the disclosure contributed a summary repeating the page heading and, above it, the
+    hairline of a closed box nobody would ever close. A disclosure that cannot be collapsed is not
+    a disclosure: on that surface the panel is the panel. Everywhere else (Home) it stays a real
+    `<details>`, which is where the `onOpen` funnel event comes from.
+  */
+  const body = (
       <div>
         <p>Where would you like to use your knowledge?</p>
         <div className="one-path-ai-tabs" role="tablist" aria-label="AI destination" onKeyDown={changeWithKeyboard}>
@@ -42,16 +46,16 @@ export default function WorkspaceUseWithAi({ open = false, onDownload, onOpen, d
           {destination === "assistant" ? <>
             <h3>Connect a supported assistant</h3>
             <p>Follow the MCP setup guide, then make a test request from your assistant. Live access requires an activated version and valid account permissions.</p>
-            <Link href="/docs/mcp">Open assistant setup</Link>
+            <Link className="btn btn-ghost" href="/docs/mcp">Open assistant setup</Link>
           </> : destination === "application" ? <>
             <h3>Use the API from your application</h3>
             <p>Set up a scoped connection and test a request against your active knowledge. Keep credentials on your server, not in public client code.</p>
-            <Link href="/docs/quickstart">Open the API quickstart</Link>
+            <Link className="btn btn-ghost" href="/docs/quickstart">Open the API quickstart</Link>
           </> : <>
             <h3>Take the knowledge with you</h3>
             <p>Download the signed package, extract it, give your agent access to the folder, and ask it to read <code>AGENTS.md</code> first.</p>
             <small>A folder path alone grants no access. Your AI needs permission and a file-reading tool. A downloaded package is a snapshot, not a live connection.</small>
-            {onDownload ? <button type="button" disabled={downloading} onClick={onDownload}>{downloading ? "Preparing…" : "Download signed package"}</button> : <Link href="/docs/cli">See package setup</Link>}
+            {onDownload ? <button type="button" disabled={downloading} onClick={onDownload}>{downloading ? "Preparing…" : "Download signed package"}</button> : <Link className="btn btn-ghost" href="/docs/cli">See package setup</Link>}
           </>}
           <small className="one-path-ai-not-connected">Setup guidance only. An external AI connection has not been verified by this panel.</small>
         </div>
@@ -62,6 +66,14 @@ export default function WorkspaceUseWithAi({ open = false, onDownload, onOpen, d
           <div className="workspace-ai-use-actions"><Link href="/docs/use-with-ai">AI integration guide</Link><Link href="/docs/ontology-output">Use ontology output</Link></div>
         </details>
       </div>
+  );
+  return open ? (
+    <div className="workspace-ai-use-guide" data-testid="workspace-ai-use-guide">{body}</div>
+  ) : (
+    <details className="workspace-ai-use-guide" data-testid="workspace-ai-use-guide"
+      onToggle={(event) => { if (event.currentTarget.open) onOpen?.(); }}>
+      <summary>Use with AI</summary>
+      {body}
     </details>
   );
 }

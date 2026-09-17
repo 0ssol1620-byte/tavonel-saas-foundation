@@ -1,8 +1,12 @@
 .studio { --studio-ink: var(--text-hi, #e8e7e2); --studio-muted: var(--text-lo, #a5a49d); --studio-faint: var(--text-lo, #a5a49d); --studio-line: var(--hairline, rgb(255 255 255 / 0.12)); --studio-panel: var(--g1, rgb(255 255 255 / 0.035)); color: var(--studio-ink); border: 1px solid var(--studio-line); border-radius: var(--r-inst-lg, 8px); overflow: hidden; background: var(--ground, #11120f); }
 .header { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 28px; padding: 24px; border-bottom: 1px solid var(--studio-line); }
 .header > div { display: grid; gap: 7px; }
-.header span, .inspectorTitle span, .inspectorHint span { color: var(--verified, #9bb8a4); font: 500 12px var(--f-sans); letter-spacing: .06em; text-transform: none; }
-.header h2 { margin: 0; font-size: clamp(28px, 4vw, 52px); line-height: .95; letter-spacing: -.045em; }
+/* workspace-19: colour encodes state. "Compiled World" and "World overview" are kickers, not a
+   verified state, so they take the kicker tone the contract gives every other one. */
+.header span, .inspectorTitle span, .inspectorHint span { color: var(--text-mid); font: 500 12px var(--f-sans); letter-spacing: .06em; text-transform: none; }
+/* workspace-12: a card heading rendered at 52px above a 26px page h1 inverted the hierarchy. The
+   card sits under the h1, so it takes the step below it. */
+.header h2 { margin: 0; font-size: var(--t-7, 24px); line-height: 1.15; letter-spacing: -.02em; }
 .header p { max-width: 700px; margin: 0; color: var(--studio-muted); font-size: 12px; line-height: 1.6; }
 .header dl { display: grid; grid-template-columns: repeat(4, minmax(86px, auto)); margin: 0; border: 1px solid var(--studio-line); border-radius: var(--r-paper-lg, 4px); overflow: hidden; }
 .header dl div { display: grid; gap: 6px; align-content: center; padding: 10px 12px; border-left: 1px solid var(--studio-line); }

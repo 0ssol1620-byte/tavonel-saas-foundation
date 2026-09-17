@@ -5,6 +5,7 @@ import { judgeCorpusSet } from "./corpus-batching";
 
 const workspace = readFileSync(new URL("../app/workspace/page.tsx", import.meta.url), "utf8");
 const compileStage = readFileSync(new URL("../components/compile-stage.tsx", import.meta.url), "utf8");
+const workspaceCss = readFileSync(new URL("../app/workspace-no1.css", import.meta.url), "utf8");
 
 /*
   Two limits, both of which were wrong on the primary intake path while every other layer
@@ -75,6 +76,20 @@ describe("workspace compile floor and ceiling", () => {
     expect(compileStage).toContain('import { PIPELINE_STAGES } from "@/lib/pipeline-vocabulary"');
     expect(compileStage).toContain("PIPELINE_STAGES.forEach((stage, i)");
     expect(compileStage).not.toContain('const labels = ["SOURCES", "READ", "STRUCTURE", "WORLD"]');
+  });
+
+  /*
+    D39. The reserved frame is space for a picture. Before a run has drawn one, the pane is a tab
+    strip over a short source list, and the reservation left 490px of black under it at 1440
+    (workspace-01). Asserted against the source for the same reason the two below are: what has to
+    stay true is a branch in a client component and a selector in a sheet no DOM test reads.
+  */
+  it("reserves the aspect-ratio frame only while a run is playing", () => {
+    expect(compileStage).toContain("const framed = reached > 0 || (state !== null && STARTING.includes(state));");
+    expect(compileStage).toContain('data-framed={framed ? "true" : "false"}');
+    // Idle it carries its own drawn height, and the sheet stops reserving a ratio.
+    expect(compileStage).toContain("style={framed || !drawable ? undefined : { height: idleHeight }}");
+    expect(workspaceCss).toContain('.compile-stage[data-framed="false"] { aspect-ratio: auto; min-height: 0; }');
   });
 
   /*
