@@ -102,7 +102,14 @@ test("phone and tablet use real navigation targets instead of clickable decorati
     const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
     return { width: r.width, height: r.height, inside: hit === e || e.contains(hit) };
   }));
-  expect(targets.length).toBe(4);
+  /*
+    Three, not four. BQ-059 stopped drawing the header's commercial action a second time inside
+    the sheet, forty pixels below the first copy of it -- `e2e/mobile-landing.spec.ts` and
+    `e2e/production-hardening.spec.ts` both assert `a.mobile-nav-cta` is gone. What this test
+    measures is unchanged: every row a thumb lands on is a real target, and the point at its
+    centre belongs to the row.
+  */
+  expect(targets.length).toBe(3);
   for (const target of targets) {
     expect(target.width).toBeGreaterThan(44);
     expect(target.height).toBeGreaterThanOrEqual(44);

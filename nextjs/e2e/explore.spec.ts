@@ -243,7 +243,9 @@ test("Act 2 opens an object onto the page region it was compiled from", async ({
     this pinned; what the line has to say is unchanged.
   */
   await expect(provenance.getByText(/^(reference render|original PDF) · apple-/)).toBeVisible();
-  await expect(provenance.getByText(/bbox \(per mille\) \d+, \d+, \d+, \d+/)).toBeVisible();
+  // `proofCopy().bbox` spells the unit out for a reader on this surface; the parenthesised form
+  // is the technical drawer's label and is still asserted there. Same four numbers either way.
+  await expect(provenance.getByText(/bbox, per mille of the page · \d+, \d+, \d+, \d+/)).toBeVisible();
   await expect(provenance.getByText(/^\d{10}-\d{2}-\d{6}$/)).toBeVisible();
   await expect(provenance.getByText("official")).toBeVisible();
   const digests = await provenance.getByText(/^sha256:[a-f0-9]{64}$/).count();

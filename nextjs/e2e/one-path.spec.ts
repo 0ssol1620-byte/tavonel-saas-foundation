@@ -120,7 +120,14 @@ async function localWorkspace(page: Page, baseURL: string | undefined, source: "
 test("empty workspace has four primary choices and optional tools remain reachable", async ({ page, baseURL }) => {
   await localWorkspace(page, baseURL);
   await page.goto("/workspace");
-  await expect(page.locator("#workspace-state-title")).toHaveText("Add your knowledge.");
+  /*
+    `31cb972` -- "the hero belongs to Home, the drop box is always a box" -- stops drawing the
+    state hero on a brand-new workspace, so `#workspace-state-title` and its "Add your knowledge."
+    no longer exist there: the drop box is the page's own heading. Same precondition, read off the
+    heading that is actually on screen.
+  */
+  await expect(page.locator("#workspace-state-title")).toHaveCount(0);
+  await expect(page.locator("#workspace-intake-title")).toHaveText("Drop files, folders or ZIP here");
   const rail = page.getByRole("complementary", { name: "Workspace navigation" });
   await expect(rail.locator("nav > div")).toHaveCount(4);
   for (const label of ["Home", "Knowledge", "Use with AI"]) await expect(rail.getByRole("button", { name: label, exact: true })).toBeVisible();
@@ -148,7 +155,8 @@ test("trial tools stay restricted inside the simplified More menu", async ({ pag
 test("AI destination setup is reachable without claiming a verified connection", async ({ page, baseURL }) => {
   await localWorkspace(page, baseURL);
   await page.goto("/workspace");
-  await expect(page.locator("#workspace-state-title")).toHaveText("Add your knowledge.");
+  // `31cb972` again: the empty workspace's heading is the drop box, not a state hero above it.
+  await expect(page.locator("#workspace-intake-title")).toHaveText("Drop files, folders or ZIP here");
   await page.getByRole("complementary", { name: "Workspace navigation" }).getByRole("button", { name: "Use with AI", exact: true }).click();
   const guide = page.locator("#workspace-ask").getByTestId("workspace-ai-use-guide");
   await expect(guide).toBeVisible();

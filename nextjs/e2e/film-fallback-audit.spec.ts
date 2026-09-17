@@ -18,8 +18,14 @@ test("the approved Hero V2 stays on the encoded-film path across the former canv
       await expect(hero.locator(".compile-film-live canvas")).toHaveCount(0);
       const video = hero.locator(".compile-film-video");
       await expect(video).toBeVisible();
-      await expect(video.locator("source")).toHaveCount(1);
-      await expect(video.locator("source")).toHaveAttribute("src", "/film/compile-cut.mp4");
+      /*
+        One decoder, one element: the player sets `src` on the <video> rather than swapping
+        `<source>` children, because replacing a live element's children does nothing until
+        `load()` is called -- which is what let a stage change silently keep the previous cut.
+        The bytes pinned here are the same bytes.
+      */
+      await expect(video.locator("source")).toHaveCount(0);
+      await expect(video).toHaveAttribute("src", "/film/compile-cut.mp4");
       await expect(video).toHaveAttribute("poster", "/film/poster-1-hero.webp");
     } finally {
       await context.close();

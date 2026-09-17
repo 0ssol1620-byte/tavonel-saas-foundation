@@ -107,7 +107,10 @@ const progress = (page: import("@playwright/test").Page) => page.locator("sectio
   count first is what makes this deterministic.
 */
 async function selectBothAndCompile(page: import("@playwright/test").Page) {
-  const boxes = page.getByRole("checkbox", { name: "Include in the next candidate" });
+  // The board names each tick box after the source it ticks -- "Include <filename> in the next
+  // candidate" -- so a reader hearing the row knows which one they are including. The fixed
+  // string this used matches none of them; the pattern matches each, and only those.
+  const boxes = page.getByRole("checkbox", { name: /^Include .+ in the next candidate$/ });
   await expect(boxes).toHaveCount(DOCUMENTS.length);
   for (const box of await boxes.all()) await box.check({ timeout: 15_000 });
   const start = page.getByRole("button", { name: "Compile selected documents" });
