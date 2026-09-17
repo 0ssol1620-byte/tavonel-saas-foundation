@@ -59,6 +59,7 @@ nextjs/scripts/secret-scan.mjs text eol=lf
 nextjs/scripts/fetch-explore-sec-corpus.mjs text eol=lf
 nextjs/scripts/verify-developer-clean-install.mjs text eol=lf
 nextjs/scripts/journey/*.mjs text eol=lf
+nextjs/scripts/check-type-floor.mjs text eol=lf
 
 # The two reference verifiers are copied verbatim to nextjs/public/developer/ as
 # tavonel-verify-export.mjs and tavonel-verify-package.mjs, pinned by sha256 in
