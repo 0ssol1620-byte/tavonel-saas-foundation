@@ -34,9 +34,6 @@ const COPY_SURFACES = [
   "app/layout.tsx",
   "app/workspace/page.tsx",
   "app/auth/callback/page.tsx",
-  "components/answer-switch.tsx",
-  "components/change-lattice.tsx",
-  "components/identity-resolve.tsx",
   "components/world-explorer.tsx",
   "app/login/page.tsx",
   "app/not-found.tsx",
@@ -377,11 +374,39 @@ describe("public copy", () => {
     // Comments stripped: the rationale for deleting them names the strings it deleted.
     expect(page.replace(/\{?\/\*[\s\S]*?\*\/\}?/g, ""), "a numbered section kicker is not a section name")
       .not.toMatch(/0\d \/ /);
-    expect(page).toContain("Public Apple SEC sample, source included");
+    /*
+      BQ-076 / n39 moves this assertion rather than deleting it. The wrapper it named is gone --
+      it framed a figure that brings its own frame, above an eyebrow that restated the figure's
+      own figcaption -- so what is guarded is the same two things without it: the label is not
+      written twice, and the hero film still comes before the proof block.
+    */
+    expect(page, "the proof block's figcaption names the sample; a wrapper eyebrow restated it")
+      .not.toContain("Public Apple SEC sample, source included");
     expect(page).toContain("{proof}");
-    expect(page.indexOf("<CompileStagePlayer")).toBeLessThan(page.indexOf('className="one-path-source-proof"'));
+    expect(page.indexOf("<CompileStagePlayer")).toBeLessThan(page.indexOf("{proof}"));
     expect(page).not.toContain("evidence back to the page");
   });
+  /*
+    D26. One tab-title pattern with one named exception, so the pattern is a rule rather than the
+    six spellings the audit counted. Every advertised page is "X — TAVONEL"; the home page is
+    "TAVONEL — <descriptor>" because it has no section to name, and both halves of it are
+    BRAND_LINE rather than a positioning sentence typed into the page.
+  */
+  it("writes one tab-title pattern and names its one exception", () => {
+    const home = read("app/page.tsx");
+    expect(home).toContain("title: `TAVONEL — ${BRAND_LINE.descriptor}`");
+    expect(home).toContain("title: BRAND_LINE.headline");
+    expect(home, "the home exception does not write its own positioning sentence")
+      .not.toContain("Make your knowledge ready for AI");
+    expect(read("app/layout.tsx"), "the inherited fallback follows the site pattern")
+      .toContain('title: "Knowledge Compiler for AI — TAVONEL"');
+    for (const file of ["app/explore/page.tsx", "app/contact/page.tsx"]) {
+      const titles = [...read(file).matchAll(/title: "([^"]*TAVONEL[^"]*)"/g)].map((match) => match[1]!);
+      expect(titles.length, `${file} declares a title`).toBeGreaterThan(0);
+      for (const title of titles) expect(title, file).toMatch(/ — TAVONEL$/);
+    }
+  });
+
   it("puts the locked hero proof and three motion cuts on the landing page", () => {
     const page = landingSource();
     expect(page).toContain("/film/poster-1.webp");
@@ -548,13 +573,28 @@ describe("public copy", () => {
     }
   });
 
+  /*
+    n15. Five of these were still files with no importer: `answer-switch`, `change-lattice` and
+    `identity-resolve` were reached only by the copy-surface list in this test, and
+    `canvas-transition-link` and `reading-demo` by nothing at all. A component that renders
+    nowhere is copy nobody reviews and a widget the next reader assumes is live, so the guard that
+    kept them off the landing page now keeps them out of the repository -- which is the same rule,
+    stated where it cannot be satisfied by deleting one import.
+  */
   it("does not restage widgets the films already show", () => {
     const page = landingSource();
-    expect(page).not.toContain("ReadingDemo");
     expect(page).not.toContain("CompilePipeline");
     expect(page).not.toContain("RebuildConsole");
-    expect(page).not.toContain("ChangeLattice");
-    expect(page).not.toContain("IdentityResolve");
+    for (const orphan of [
+      "components/answer-switch.tsx",
+      "components/canvas-transition-link.tsx",
+      "components/change-lattice.tsx",
+      "components/identity-resolve.tsx",
+      "components/reading-demo.tsx",
+      "lib/demo-reading.ts",
+    ]) {
+      expect(existsSync(join(root, orphan)), `${orphan} renders nowhere`).toBe(false);
+    }
   });
 
   it("keeps the six-scene final narrative and makes original-source proof reachable without teaching locator jargon", () => {
@@ -850,7 +890,10 @@ describe("public copy", () => {
   it("moves source proof below the film without adding invented result figures", () => {
     const page = read("components/home-page-client.tsx");
     expect(page).not.toContain('className="hero-proof"');
-    expect(page).toContain('aria-label="Published sample and its source"');
+    // n39: the wrapper that carried this label is gone; what it guarded is that the proof renders
+    // in the proof section rather than in the hero, which is the ordering asserted here instead.
+    expect(page.indexOf('id="proof"')).toBeLessThan(page.indexOf('{proof}'));
+    expect(page.indexOf('data-scene="1"')).toBeLessThan(page.indexOf('id="proof"'));
     expect(page).toContain("/explore?act=source");
     expect(page).toContain('href="/sources"');
     expect(page).not.toMatch(/\d[\d,.]*\s*(?:million|billion|% accuracy|customers served|pages processed)/i);

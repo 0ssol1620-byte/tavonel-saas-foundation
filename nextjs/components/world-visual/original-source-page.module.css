@@ -55,9 +55,6 @@
   .message button:hover { border-color: var(--verified-dim); }
 }
 
-.root button:focus-visible,
-.viewport:focus-visible { outline: 2px solid var(--verified); outline-offset: 2px; }
-
 /*
   BQ-015. The frame was landscape while the page is portrait, so the one thing this block exists
   to show rendered 275px wide inside a 1226px panel. The viewport now reserves the page's own

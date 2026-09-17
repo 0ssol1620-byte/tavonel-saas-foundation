@@ -149,7 +149,15 @@
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
 }
-.settings:hover, .settings:focus-visible { color: var(--text-hi); }
+/*
+  The token contract gates every :hover, so a touch device never keeps a hover state on the one
+  control that withdraws consent. Focus is not gated -- a keyboard has no hover -- which is the
+  same split `.floating` documents below.
+*/
+.settings:focus-visible { color: var(--text-hi); }
+@media (hover: hover) and (pointer: fine) {
+  .settings:hover { color: var(--text-hi); }
+}
 
 .floating {
   position: fixed;
@@ -173,11 +181,6 @@
 .floating:focus-visible { color: var(--text-hi); border-color: var(--text-lo); }
 @media (hover: hover) and (pointer: fine) {
   .floating:hover { color: var(--text-hi); border-color: var(--text-lo); }
-}
-
-.panel button:focus-visible, .panel a:focus-visible, .settings:focus-visible {
-  outline: 2px solid var(--text-hi);
-  outline-offset: 3px;
 }
 
 @media (max-width: 720px) {

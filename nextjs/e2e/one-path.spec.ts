@@ -18,8 +18,8 @@ for (const width of widths) {
     expect(bounds!.y).toBeLessThan(width < 768 ? 500 : 380);
     expect(bounds!.width).toBeGreaterThan(width < 768 ? width - 60 : width * .4);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
-    await expect(page.locator("#s1 .one-path-source-proof")).toHaveCount(0);
-    await expect(page.locator("#proof .one-path-source-proof")).toHaveCount(1);
+    await expect(page.locator("#s1 [data-proof-variant]")).toHaveCount(0);
+    await expect(page.locator('#proof [data-proof-variant="canonical"]')).toHaveCount(1);
     await expect(page.locator(".one-path-film-note")).toContainText("not a screen recording");
     const sectionOrder = await page.locator("main > section[data-scene]").evaluateAll(nodes => nodes.map(node => node.id));
     expect(sectionOrder).toEqual(["s1", "how-it-works", "connect", "proof", "stays-current", "ready-for-ai"]);
@@ -94,7 +94,7 @@ test("failed video keeps a usable poster instead of a blank hero", async ({ page
 test("Korean entry keeps film first and the live example distinct", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/ko");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("AI가 쓰는 지식으로 만듭니다.");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("AI가 사용하는 지식으로 만듭니다.");
   await expect(page.locator(".one-path-hero-film")).toBeVisible();
   await expect(page.locator(".one-path-film-note")).toContainText("실제 서비스 화면 녹화가 아닙니다");
   // G1-043: the "TAVONEL handles the hard part" promise moved from a section heading into the lede.

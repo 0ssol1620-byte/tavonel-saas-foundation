@@ -8,9 +8,9 @@ async function dismissOptionalAnalytics(page: Page) {
 test("the hero explains the value while the published sample remains a separate proof surface", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator("#one-path-title")).toContainText("ready for AI.");
-  await expect(page.locator("#s1 .one-path-source-proof")).toHaveCount(0);
+  await expect(page.locator("#s1 [data-proof-variant]")).toHaveCount(0);
 
-  const proof = page.locator('#proof .one-path-source-proof[aria-label="Published sample and its source"]');
+  const proof = page.locator('#proof [data-proof-variant="canonical"]');
   await proof.scrollIntoViewIfNeeded();
   await expect(proof).toBeVisible();
   const sample = proof.locator('[data-proof-variant="canonical"]');
@@ -46,7 +46,7 @@ test("the hero and source proof each fit the viewport at the active product-QA w
   expect(heroFilm!.x + heroFilm!.width).toBeLessThanOrEqual(width + 1);
   expect(heroFilm!.y).toBeLessThan(page.viewportSize()?.height ?? 900);
 
-  const proof = page.locator("#proof .one-path-source-proof");
+  const proof = page.locator('#proof [data-proof-variant="canonical"]');
   await proof.scrollIntoViewIfNeeded();
   await expect(proof).toBeVisible();
   const proofBox = await proof.boundingBox();
@@ -75,12 +75,14 @@ test("the proof opens Explore on the same source region and both representations
 test("Korean visitors get the same one-path story and the same real public proof", async ({ page }) => {
   await page.goto("/ko");
   await expect(page.locator("#ko-one-path-title")).toContainText("자료를 가져오세요.");
-  await expect(page.locator("#ko-one-path-title")).toContainText("AI가 쓰는 지식으로 만듭니다.");
+  await expect(page.locator("#ko-one-path-title")).toContainText("AI가 사용하는 지식으로 만듭니다.");
   await expect(page.locator(".one-path-hero [data-proof-variant]")).toHaveCount(0);
   const proof = page.locator('[data-proof-variant="canonical"]');
   await proof.scrollIntoViewIfNeeded();
   await expect(proof).toHaveCount(1);
-  await expect(proof).toContainText("Apple SEC corpus");
+  // n34: the block reads in Korean on /ko now; the corpus keeps its own name.
+  await expect(proof).toContainText("Apple SEC");
+  await expect(proof).toContainText("컴파일러가 이 페이지에서 읽은 내용");
   await expect(page.getByRole("link", { name: "공개 샘플 열기" })).toHaveAttribute("href", "/explore");
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
 });

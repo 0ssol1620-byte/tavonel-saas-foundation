@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { useEffect, useState, type ReactNode } from "react";
-import { ArrowUpRight, Cloud, Files, Server, ShieldCheck } from "lucide-react";
+import { ArrowUpRight, Cloud, Files, Server } from "lucide-react";
 import CompileStagePlayer, { COMPILE_STAGES } from "@/components/compile-stage-player";
 import DesignPartners from "@/components/design-partners";
 import { PublicSiteFooter, PublicSiteHeader } from "@/components/public-site-chrome";
@@ -206,7 +206,16 @@ export default function HomePageClient({ liveCommerce, proof }: { liveCommerce: 
         <section className="one-path-section one-path-proof" id="proof" data-scene="4" aria-labelledby="one-path-proof-title">
           <div className="one-path-wrap">
             <div className="one-path-section-heading"><h2 id="one-path-proof-title">Every result keeps a path back to the source.</h2><p>Open the original page beside the extracted passage. Check what survived instead of trusting a marketing claim.</p></div>
-            {proof ? <div className="one-path-source-proof" aria-label="Published sample and its source"><p className="eyebrow">Public Apple SEC sample, source included</p>{proof}</div> : null}
+            {/*
+              BQ-076 / n39. The proof block is the proof block, not a card inside a card.
+
+              The wrapper drew a second border at a second radius around a figure that already
+              brings its own frame, ground and radius, and its eyebrow restated the figcaption
+              inside it word for word ("Public compiled World · Apple SEC corpus"). A kicker that
+              restates the thing under it is deleted rather than restyled. `figure` already
+              labels itself through `aria-labelledby`, so the wrapper's aria-label went with it.
+            */}
+            {proof}
             <div className="one-path-links"><Link href={"/explore?act=source" as Route} prefetch={false}>Inspect the public source</Link><Link href="/sources" prefetch={false}>What is preserved</Link></div>
           </div>
         </section>
@@ -237,7 +246,13 @@ export default function HomePageClient({ liveCommerce, proof }: { liveCommerce: 
             <div className="one-path-section-heading"><h2 id="one-path-output-title">Ready for your AI.</h2><p>Use the same reviewed, source-traceable knowledge from an assistant, agent, application or portable workflow.</p></div>
             <div className="one-path-output-options"><Link href="/docs/use-with-ai" prefetch={false}><strong>AI assistant</strong><span>Set up a supported connection</span></Link><Link href="/docs/quickstart" prefetch={false}><strong>Your application</strong><span>Build with the API</span></Link><Link href="/docs/cli" prefetch={false}><strong>Portable files</strong><span>Use and verify the package</span></Link></div>
             <div className="one-path-actions actions"><Link className="btn" href={startHref} onClick={() => trackFunnel("cta_clicked", { cta: "closing_start", scene: "6" })}>{signedIn ? "Use with AI" : access.label}<ArrowUpRight size={17} aria-hidden="true" /></Link><Link className="one-path-text-link" href="/pricing" prefetch={false}>See pricing</Link></div>
-            <p className="one-path-trust"><ShieldCheck size={16} aria-hidden="true" /> You choose the source access and approve what becomes active.</p>
+            {/*
+              BQ-134 / n55. "You choose the source access and approve what becomes active." is
+              step three of the section above it ("Activate the new version — your approval changes
+              the active version") and the first half of the policy line below it. A shield icon
+              beside a sentence the page has already made twice is the eighth element of a closing
+              scene the ledger asks to be three.
+            */}
             {/*
               Cross-lane from `truth`: the closing scene states what is open today.
 
@@ -248,7 +263,7 @@ export default function HomePageClient({ liveCommerce, proof }: { liveCommerce: 
               module constant, so it costs the client bundle a string and nothing else.
             */}
             <p className="one-path-state" data-customer-data={activationPolicy.customerData.enabled ? "open" : "arranged"}>{activationPolicy.customerData.reason}</p>
-            <details className="one-path-details"><summary>Setup and availability</summary><p>Live AI access requires an activated version and the appropriate account access. A package download or opening the setup guide does not verify an external AI connection.</p><div className="one-path-links"><Link href="/docs/use-with-ai" prefetch={false}>Integration guide</Link><Link href="/pricing" prefetch={false}>Plan limits</Link><Link href="/trust" prefetch={false}>Trust Center</Link></div></details>
+            <details className="one-path-details"><summary>Setup and availability</summary><p>Live AI access requires an activated version and the appropriate account access. A package download or opening the setup guide does not verify an external AI connection.</p><div className="one-path-links"><Link href="/trust" prefetch={false}>Trust Center</Link></div></details>
             {/*
               BQ-065. Below the close, which is where a logo wall would go.
 

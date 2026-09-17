@@ -48,11 +48,17 @@ export type SourceRegionRaster = {
  */
 export const SOURCE_PAGE_NOUN = "Source page" as const;
 
-export function sourcePageLabel(representationKind?: string): string {
+/*
+  n34: the noun and the qualifier in the one other language this site publishes. `korean` is
+  optional and false is the English this function already returned, so no English surface moves.
+*/
+export function sourcePageLabel(representationKind?: string, korean?: boolean): string {
+  if (korean) return representationKind === "reference_render" ? "원문 페이지 · 기준 렌더" : "원문 페이지";
   return representationKind === "reference_render" ? "Source page · reference render" : SOURCE_PAGE_NOUN;
 }
 
-export function sourcePageQualifier(representationKind?: string): string {
+export function sourcePageQualifier(representationKind?: string, korean?: boolean): string {
+  if (korean) return representationKind === "reference_render" ? "기준 렌더" : "원본 PDF";
   return representationKind === "reference_render" ? "reference render" : "original PDF";
 }
 

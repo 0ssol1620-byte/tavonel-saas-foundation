@@ -384,7 +384,7 @@ export default function ExploreStage({ model, layout, change, answers, technical
                 <p className={styles.entryEyebrow}>Explore · no login required</p>
                 <h1>{EXPLORE_COPY.hero}</h1>
                 <p className={styles.entrySub}>{EXPLORE_COPY.sub}</p>
-                <button type="button" className={styles.entryCta} onClick={() => enter("world")}>
+                <button type="button" className={`btn ${styles.entryCta}`} onClick={() => enter("world")}>
                   {EXPLORE_COPY.enter}
                 </button>
                 <div className={styles.entryPaths} aria-label="Other ways to explore">

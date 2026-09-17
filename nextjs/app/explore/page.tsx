@@ -26,7 +26,7 @@ import {
 import secCorpusManifest from "@/public/explore-sample/sec-corpus-manifest.json";
 
 export const metadata: Metadata = {
-  title: "Explore a Compiled World | TAVONEL",
+  title: "Explore a Compiled World — TAVONEL",
   description:
     "Step inside a compiled World: open any object to the filing, the page and the exact region it came from, and see what four newly filed documents rebuilt.",
   alternates: { canonical: "/explore" },

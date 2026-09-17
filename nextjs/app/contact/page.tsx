@@ -1,10 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
-import Logomark from "@/components/logomark";
 import ContactForm from "@/components/contact-form";
-import MobilePrimaryNav from "@/components/mobile-primary-nav";
-import DesktopPrimaryNav from "@/components/site-nav/desktop-primary-nav";
+import { PublicSitePage } from "@/components/public-site-chrome";
 import { readLegalOperator } from "@/lib/legal-operator";
 import { SUPPORT_ACKNOWLEDGEMENT } from "@/lib/support-targets";
 
@@ -17,24 +14,24 @@ export const metadata: Metadata = {
   description: "Tell us what your documents need to become, without sending the documents themselves.",
 };
 
+/*
+  BQ-012 / n32. The shared chrome, not a third copy of it.
+
+  This page hand-rolled a header with no action in it and a footer with neither the navigation
+  groups nor the legal row -- so the one route the whole site's "Request access" button points at
+  was the route where a visitor could not get back to pricing, the Korean entry, the security
+  inbox or the consent withdrawal. Nothing in `PublicSitePage` had to change to take it: the
+  header resolves its own commercial action, and the `<main id="main">` the skip link targets is
+  the one this page used to declare itself.
+
+  The footer sentence this page did own -- what happens to an inquiry after it is sent -- is not
+  chrome, so it moves up beside the addresses it is about rather than going with the shell.
+*/
 export default function ContactPage() {
   const operator = readLegalOperator();
   return (
-    <div className="page">
-      <header className="nav" data-stuck={1}>
-        <Link href="/" className="wordmark" aria-label="TAVONEL home">
-          <Logomark />
-          <b>TAVONEL</b>
-        </Link>
-        <DesktopPrimaryNav />
-        <MobilePrimaryNav />
-        <span className="nav-actions">
-          <Link className="nav-signin" href="/login">Sign in</Link>
-        </span>
-      </header>
-
-      <main id="main" tabIndex={-1}>
-        <section className="scene doc contact-page">
+    <PublicSitePage>
+      <section className="scene doc contact-page">
           <div className="shell">
             <div className="body">
               <div className="stack">
@@ -84,6 +81,13 @@ export default function ContactPage() {
                   one business day (KST) acknowledgement target.
                   {operator ? " The telephone is answered during Korean business hours; outside them, email reaches us sooner." : null}
                 </p>
+                {/*
+                  This read "Personal mailbox addresses are never published", which 13.4 asks to
+                  delete: it is a sentence about our internal address policy on a page whose reader
+                  wants to know what happens to their inquiry. What replaces it is that. It sat in
+                  this page's own footer until n32 gave the page the site's footer instead.
+                */}
+                <p className="fine">Every inquiry is read by a person, and the reply comes from an address on this domain.</p>
               </div>
               <div className="stack">
                 {/*
@@ -100,20 +104,7 @@ export default function ContactPage() {
               </div>
             </div>
           </div>
-        </section>
-      </main>
-
-      <footer className="site">
-        <div className="shell">
-          <span className="wordmark"><Logomark /><b>TAVONEL</b></span>
-          {/*
-            This read "Personal mailbox addresses are never published", which 13.4 asks to
-            delete: it is a sentence about our internal address policy on a page whose reader
-            wants to know what happens to their inquiry. What replaces it is that.
-          */}
-          <p className="fine">Every inquiry is read by a person, and the reply comes from an address on this domain.</p>
-        </div>
-      </footer>
-    </div>
+      </section>
+    </PublicSitePage>
   );
 }

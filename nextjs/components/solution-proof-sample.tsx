@@ -2,6 +2,7 @@ import Link from "next/link";
 import SourceSheet from "@/components/world-visual/source-sheet";
 import styles from "./solution-proof-sample.module.css";
 import { chooseExploreEntryProof, excerptPreview } from "@/lib/explore-entry-proof";
+import { proofCopy } from "@/lib/proof-copy";
 import {
   EXPLORE_SAMPLE_DIGEST,
   exploreSampleDocuments,
@@ -50,14 +51,23 @@ function regionHref(region: VisualEvidence) {
   return { pathname: "/explore", query: { act: "evidence", evidence: region.id } } as const;
 }
 
-function filingLabel(region: VisualEvidence) {
-  return region.form ? `${region.form}${region.filingDate ? ` · filed ${region.filingDate}` : ""}` : region.filename;
+function filingLabel(region: VisualEvidence, korean?: boolean) {
+  const filed = proofCopy(korean).filed;
+  return region.form ? `${region.form}${region.filingDate ? ` · ${filed(region.filingDate)}` : ""}` : region.filename;
 }
 
-export default function SolutionProofSample({ pick, variant = "canonical" }: {
+/*
+  BQ-063 / n34. `korean` reaches `SourceSheet` and the page frame under it, so /ko's proof block
+  reads in Korean instead of being the one place on that page a Korean reader cannot follow. It
+  is optional and English is the default: /explore, the five solution pages and the crop variant
+  are byte-identical, and no e2e selector built on their text moves.
+*/
+export default function SolutionProofSample({ pick, variant = "canonical", korean }: {
   pick?: ProofPick;
   variant?: ProofVariant;
+  korean?: boolean;
 } = {}) {
+  const copy = proofCopy(korean);
   const region = selectRegion(pick);
   if (!region) return null;
   const onPage = world.evidence.filter(
@@ -79,13 +89,13 @@ export default function SolutionProofSample({ pick, variant = "canonical" }: {
   if (variant === "excerpt") {
     return (
       <figure className={styles.excerpt} data-proof-kind="source-passage" data-proof-variant="excerpt">
-        <figcaption className={styles.excerptLabel}>From the source</figcaption>
+        <figcaption className={styles.excerptLabel}>{copy.fromSource}</figcaption>
         <p className={styles.excerptText} data-evidence-id={region.id}>
           {preview.text}{preview.truncated ? "…" : ""}
         </p>
         <div className={styles.excerptFoot}>
-          <span>{filingLabel(region)} · page {region.page}</span>
-          <Link href={regionHref(region)}>Open this region on /explore</Link>
+          <span>{filingLabel(region, korean)} · {copy.page(region.page)}</span>
+          <Link href={regionHref(region)}>{copy.openRegion}</Link>
         </div>
       </figure>
     );
@@ -103,16 +113,16 @@ export default function SolutionProofSample({ pick, variant = "canonical" }: {
         {/* eslint-disable-next-line @next/next/no-img-element -- the committed raster is
             served byte for byte: next/image would re-encode it, and the manifest's sha256 of
             these bytes is what makes the render checkable against its source. */}
-        <img src={crop.file} alt={`${filingLabel(region)}, the region read from page ${region.page}`} width={crop.width} height={crop.height} decoding="async" />
+        <img src={crop.file} alt={`${filingLabel(region, korean)}, ${copy.cropAlt(region.page)}`} width={crop.width} height={crop.height} decoding="async" />
         <figcaption className={styles.excerptFoot}>
-          <span>{filingLabel(region)} · page {region.page} of {region.pageCount}</span>
-          <Link href={regionHref(region)}>Open this region on /explore</Link>
+          <span>{filingLabel(region, korean)} · {copy.pageOf(region.page, region.pageCount)}</span>
+          <Link href={regionHref(region)}>{copy.openRegion}</Link>
         </figcaption>
       </figure>
     );
   }
   if (variant === "crop") {
-    return <SolutionProofSample pick={pick} variant="excerpt" />;
+    return <SolutionProofSample pick={pick} variant="excerpt" korean={korean} />;
   }
 
   /*
@@ -129,28 +139,27 @@ export default function SolutionProofSample({ pick, variant = "canonical" }: {
   return (
     <figure className={styles.block} aria-labelledby="solution-proof-sample-title" data-proof-kind="source-passage" data-proof-variant="canonical" data-evidence-id={region.id}>
       <figcaption className={styles.head}>
-        <span id="solution-proof-sample-title">Public compiled World · Apple SEC corpus</span>
-        <Link href={regionHref(region)}>Inspect the evidence</Link>
+        <span id="solution-proof-sample-title">{copy.head}</span>
+        <Link href={regionHref(region)}>{copy.inspect}</Link>
       </figcaption>
 
       {pick ? <p className={styles.framing}>{pick.framing}</p> : null}
 
       {/* Beats 1-3: the page, the region on it, the passage read from that region. */}
-      <SourceSheet regions={onPage} activeId={region.id} ledger="disclosure" />
+      <SourceSheet regions={onPage} activeId={region.id} ledger="disclosure" korean={korean} />
 
       {/* Beat 4: what this passage is attached to in the compiled World. */}
       {linked.length > 0 ? (
         <dl className={styles.linked}>
-          <dt>Objects compiled from this region</dt>
+          <dt>{copy.linkedObjects}</dt>
           <dd>{linked.map((node) => <span key={node.id}>{node.label}</span>)}</dd>
         </dl>
       ) : null}
 
       {/* Beat 5: the World this is one region of, and the counts it publishes. */}
       <p className={styles.counts}>
-        {exploreSampleSources.length} filings · {pageCount.toLocaleString("en-US")} pages ·{" "}
-        {world.totals.regions.toLocaleString("en-US")} regions · {first.id.toUpperCase()} →{" "}
-        {last.id.toUpperCase()} ·{" "}
+        {copy.counts(exploreSampleSources.length, pageCount.toLocaleString("en-US"), world.totals.regions.toLocaleString("en-US"))}
+        {" · "}{first.id.toUpperCase()} → {last.id.toUpperCase()} ·{" "}
         <span className={styles.digest}>
           {EXPLORE_SAMPLE_DIGEST.replace(/^sha256:/, "sha256 ").slice(0, 18)}…
         </span>
