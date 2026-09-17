@@ -34,14 +34,26 @@ export function MarketingConsentLink() {
   const pathname = usePathname();
   if (!publicPageLocation(pathname)) return null;
   return (
-    <button
-      type="button"
-      className={styles.settings}
-      {...{ [CONSENT_ANCHOR_ATTRIBUTE]: "" }}
-      onClick={() => window.dispatchEvent(new CustomEvent(CONSENT_EDIT_EVENT))}
-    >
-      {consentCopy(pathname).settings}
-    </button>
+    <>
+      {/*
+        BQ-051. The separator belongs to the link, not to the row that holds it.
+
+        The footer wrote `{" · "}<MarketingConsentLink />`, and this component returns null on an
+        unmeasured path -- /404 and every workspace and auth route -- so the legal row rendered
+        "security@tavonel.comAnalytics preferences", the address running straight into the next
+        label. Four separate review lenses reported the same string. Owning the separator here
+        means it cannot outlive the thing it separates.
+      */}
+      {" · "}
+      <button
+        type="button"
+        className={styles.settings}
+        {...{ [CONSENT_ANCHOR_ATTRIBUTE]: "" }}
+        onClick={() => window.dispatchEvent(new CustomEvent(CONSENT_EDIT_EVENT))}
+      >
+        {consentCopy(pathname).settings}
+      </button>
+    </>
   );
 }
 

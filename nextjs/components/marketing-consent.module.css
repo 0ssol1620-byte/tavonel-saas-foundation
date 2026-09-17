@@ -20,12 +20,12 @@
   high, with `body` padding equal to its height while it is up. It overlaps nothing at any scroll
   position, because it is not over the page -- the page ends above it.
 
-  G1-024's height cap is the other half, and it is what decides the copy: 56px on a phone, which
-  is one 44px control row plus its padding. Three constraints meet in that number and none of
-  them may give -- the bar is at most 56px, every control is at least 44px on a coarse pointer
-  (`e2e/mobile-landing.spec.ts:330`), and the sentence has to name the vendor, the cookies, the
-  scope and the exclusion (`lib/marketing-analytics.test.ts`). The sentence is therefore as short
-  as those four facts allow, and is set beside the buttons at 11px rather than above them.
+  G1-024 capped the phone height at 56px, and BQ-054 is where that cap stops being worth its
+  price: it only held because the sentence was set at 11px, under the site's 12px floor, on the
+  one paragraph every visitor is asked to read before answering. Three constraints meet here --
+  the 12px floor, the 44px control on a coarse pointer (`e2e/mobile-landing.spec.ts:330`), and
+  the four facts the sentence must name (`lib/marketing-analytics.test.ts`). The height is the
+  only one of the three that may move, so on a phone the row becomes two rows.
 */
 .panel, .settings {
   color: var(--text-hi);
@@ -35,12 +35,14 @@
 /*
   Docked to the bottom edge, full width, one row.
 
-  It sits above `--bar` -- the landing page's fixed instrument bar -- rather than on top of it,
-  so the one row that reports the product's state is never covered by a cookie notice.
+  It used to sit `var(--bar)` above the bottom -- 46px, reserved for the landing page's fixed
+  instrument bar. That bar is gone (`brand-copy.test.ts` fails if it returns), so what the offset
+  reserved was a 46px strip of page visible *under* a bar that is supposed to be docked: the one
+  detail that makes a system notice read as a floating advert. BQ-054: bottom is 0.
 */
 .panel {
   position: fixed;
-  inset: auto 0 var(--bar) 0;
+  inset: auto 0 0 0;
   z-index: 55;
   display: flex;
   align-items: center;
@@ -59,7 +61,7 @@
   signal, so the padding cannot outlive it or be forgotten when the choice is made. The value is
   the bar's height, which this file now fixes rather than guessing at how the sentence wrapped.
 */
-:global(body):has(.panel) { padding-bottom: calc(var(--bar) + 76px); }
+:global(body):has(.panel) { padding-bottom: 76px; }
 
 .panel p {
   flex: 1 1 auto;
@@ -91,12 +93,22 @@
   text-underline-offset: 3px;
 }
 
+/*
+  BQ-054. Both answers, drawn the same.
+
+  "Refusing is as easy as allowing, and quieter only in weight" was the old note, and the weight
+  was the problem: refuse was a transparent box with a transparent border and `--text-mid` text
+  beside an accept button with a filled ground and a visible edge. Two controls of the same size
+  are not equally easy to press when only one of them looks like a control. Identical geometry,
+  identical border, identical colour -- if a reader has to look twice to tell which is which,
+  that is the correct outcome for a choice the site is not entitled to nudge.
+*/
 .actions { display: flex; flex: 0 0 auto; gap: 8px; }
 .actions button {
   min-height: 44px;
   padding: 10px 16px;
   border: 1px solid var(--hairline-hi);
-  border-radius: 3px;
+  border-radius: var(--r-inst, 6px);
   background: var(--g2);
   color: var(--text-hi);
   font: inherit;
@@ -104,13 +116,9 @@
   white-space: nowrap;
   cursor: pointer;
 }
-/* Refusing is as easy as allowing, and quieter only in weight -- never in reach. */
-.actions button:first-child {
-  border-color: transparent;
-  background: none;
-  color: var(--text-mid);
+@media (hover: hover) and (pointer: fine) {
+  .actions button:hover { border-color: var(--text-lo); }
 }
-.actions button:hover { color: var(--text-hi); border-color: var(--hairline-hi); }
 
 /*
   The reopen control, in the footer's own link row.
@@ -145,18 +153,18 @@
 
 .floating {
   position: fixed;
-  inset: auto auto calc(var(--bar) + 12px) 1rem;
+  inset: auto auto 12px 1rem;
   z-index: 54;
   padding: 8px 12px;
   border: 1px solid var(--hairline-hi);
-  border-radius: 3px;
+  border-radius: var(--r-inst, 6px);
   background: var(--g1);
   color: var(--text-lo);
   font-size: 13px;
   text-decoration: none;
   opacity: 0.6;
 }
-.floating:hover, .floating:focus-visible { opacity: 1; color: var(--text-hi); }
+.floating:hover, .floating:focus-visible { color: var(--text-hi); border-color: var(--text-lo); }
 
 .panel button:focus-visible, .panel a:focus-visible, .settings:focus-visible {
   outline: 2px solid var(--text-hi);
@@ -165,19 +173,28 @@
 
 @media (max-width: 720px) {
   /*
-    The 56px cap. 44px of control, 6px above and below it, and the sentence set beside the buttons
-    at 11px so three lines of it still fit inside that row.
+    BQ-054. The 56px cap gives way to the 12px floor, and the row becomes two rows.
+
+    The cap was 44px of control plus 6px above and below, which only held because the sentence
+    was set at 11px -- below the site's floor, on the one paragraph every visitor is asked to
+    read before answering. The three constraints that meet here are the floor, the 44px control
+    and the four facts the sentence has to name; the height is the one that may move, so it does.
+
+    `height` becomes `min-height`, the sentence sits above the buttons rather than beside them,
+    and `:has()` pays the page back the exact room the bar takes (BQ-055) so nothing -- including
+    the footer's own links -- ends up underneath it.
   */
   .panel {
-    gap: 10px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
     min-height: 0;
-    height: 56px;
-    padding: 6px clamp(12px, 3vw, 20px);
+    padding: 10px clamp(12px, 3vw, 20px) 12px;
   }
-  .panel p { font-size: 11px; line-height: 1.25; }
-  .panel p a { padding-block: 16px; margin-block: -16px; } /* 11px type: 13.75px line + 32px = 45.75px, above the 44px floor */
-  .actions { gap: 6px; }
-  .actions button { padding: 10px; font-size: 12px; }
-  :global(body):has(.panel) { padding-bottom: calc(var(--bar) + 56px); }
-  .floating { inset: auto auto calc(var(--bar) + 8px) 0.5rem; }
+  .panel p { font-size: 12px; line-height: 1.4; }
+  .panel p a { padding-block: 15px; margin-block: -15px; } /* 12px type: 16.8px line + 30px = 46.8px, above the 44px floor */
+  .actions { gap: 8px; }
+  .actions button { flex: 1 1 0; justify-content: center; padding: 10px; font-size: 12px; }
+  :global(body):has(.panel) { padding-bottom: 136px; }
+  .floating { inset: auto auto 8px 0.5rem; }
 }

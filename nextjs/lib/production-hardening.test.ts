@@ -86,7 +86,14 @@ describe("2026-09-05 production hardening", () => {
     const nav = read("components/mobile-primary-nav.tsx");
     expect(css).toContain(".mobile-primary-nav { display: block; }");
     expect(nav).toContain("CUSTOMER_NAV.map");
-    expect(nav).toContain('aria-label="Mobile sections"');
+    /*
+      BQ-013. The landmark still has a name; the name is now in the language of the page.
+
+      `/ko` rendered an English `aria-label` around Korean links, which is the same half-applied
+      localisation the visible labels had. The guard checks that the label exists in both, rather
+      than pinning the English literal and so requiring the Korean page to keep it.
+    */
+    expect(nav).toContain('aria-label={korean ? "모바일 섹션" : "Mobile sections"}');
     // The accordion is a disclosure, not a dialog: Tab must leave it. A focus trap imported here
     // would pass every geometry assertion in the suite. The import, not the word: both
     // components explain in prose why they do not reach for that hook.
@@ -96,7 +103,8 @@ describe("2026-09-05 production hardening", () => {
   it("keeps the simplified desktop section row as direct links, not false menu controls", () => {
     const nav = read("components/site-nav/desktop-primary-nav.tsx");
     expect(nav).toContain("CUSTOMER_NAV.map");
-    expect(nav).toContain('aria-label="Sections"');
+    // BQ-013: the landmark keeps its name, in the language of the page it is on.
+    expect(nav).toContain('aria-label={korean ? "섹션" : "Sections"}');
     // `aria-expanded`/`aria-controls` on a `<button>`, and no `role="menu"` promising arrow keys
     // this navigation does not implement.
     expect(nav).toContain("href={item.href as Route}");

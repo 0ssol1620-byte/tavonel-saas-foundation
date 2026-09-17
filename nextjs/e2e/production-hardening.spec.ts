@@ -24,7 +24,9 @@ test("mobile public navigation remains reachable", async ({ page }, testInfo) =>
   const direct = menu.locator(":scope > nav a.mobile-nav-direct");
   await expect(direct).toHaveCount(3);
   await expect(direct).toHaveText(["How it works", "Connect", "Pricing"]);
-  await expect(menu.locator(":scope > nav a.mobile-nav-cta")).toHaveCount(1);
+  // BQ-059: the header keeps the action at every width; the sheet is the three sections.
+  await expect(menu.locator(":scope > nav a.mobile-nav-cta")).toHaveCount(0);
+  await expect(page.locator("header .nav-actions .btn")).toHaveCount(1);
   await expect(menu.locator("details.mobile-nav-group")).toHaveCount(0);
 });
 

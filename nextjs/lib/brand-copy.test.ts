@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { activationPolicy } from "./activation-policy";
 import { primaryCallToAction } from "./commercial-state";
 import { EXPLORE_COPY } from "./explore-story";
-import { ACCESS_CTA, EXPLORE_CTA, PRODUCT_NOUNS, SELF_SERVE_CTA } from "./site-navigation";
+import { ACCESS_CTA, BRAND_LINE, EXPLORE_CTA, PRODUCT_NOUNS, SELF_SERVE_CTA } from "./site-navigation";
 
 /**
  * SPEC 13.3 -- phrases the product may not use, enforced.
@@ -343,13 +343,23 @@ describe("public copy", () => {
     RESOLVED A-1 retires across the site. A lock is not a claim that the string is right
     forever; it is a claim that the string does not drift without a decision. This is that
     decision, so the lock moves with it instead of being deleted.
+
+    D8 / BQ-056 move it again, for the same reason and in the same way. The headline is no longer
+    typed into the page at all -- it is `BRAND_LINE.headline`, the one constant the share card,
+    the footer tagline and the root metadata description also derive from -- so the lock is on the
+    constant, and the landing page is checked for reading it rather than for repeating it. The
+    "03 / PROOF" kicker is gone with the other four numbered section kickers, and the proof
+    block's own label is sentence case rather than monospace caps with a middle dot.
   */
   it("keeps the approved film-first hero and the separately identified public source proof", () => {
     const page = read("components/home-page-client.tsx");
-    expect(page).toContain("Bring your knowledge.");
-    expect(page).toContain("TAVONEL makes it ready for AI.");
-    expect(page).toContain("03 / PROOF");
-    expect(page).toContain("PUBLIC APPLE SEC SAMPLE · SOURCE INCLUDED");
+    expect(BRAND_LINE.headline).toBe("Bring your knowledge. TAVONEL makes it ready for AI.");
+    expect(BRAND_LINE.descriptor).toBe("Knowledge compiled with a traceable path back to every source.");
+    expect(page).toContain("{BRAND_LINE.headline}");
+    // Comments stripped: the rationale for deleting them names the strings it deleted.
+    expect(page.replace(/\{?\/\*[\s\S]*?\*\/\}?/g, ""), "a numbered section kicker is not a section name")
+      .not.toMatch(/0\d \/ /);
+    expect(page).toContain("Public Apple SEC sample, source included");
     expect(page).toContain("{proof}");
     expect(page.indexOf("<CompileStagePlayer")).toBeLessThan(page.indexOf('className="one-path-source-proof"'));
     expect(page).not.toContain("evidence back to the page");
@@ -393,8 +403,19 @@ describe("public copy", () => {
     }
     const player = read("components/compile-stage-player.tsx");
     expect(player, "the player owns exactly one <video> template").toMatch(/<video/);
-    expect(player, "only the active and admitted stages may hold a source")
-      .toContain("admitted.has(position) ?");
+    /*
+      BQ-130. The guard moved with the mechanism it guards.
+
+      It used to pin `admitted.has(position) ?` -- the `<source>` children filter that kept every
+      stage but the active one out of the element. The element takes `src` from the active stage
+      directly now, so there are no `<source>` children to filter and nothing to admit. What the
+      guard is for -- one decoder, open on the active cut, not remounted per stage, which is what
+      cancelled `compile-cut-2.mp4` mid-fetch on every advance -- is what it asserts.
+    */
+    expect(player, "the one decoder plays the active stage and nothing else")
+      .toContain("src={active.src}");
+    expect(player, "and is not remounted per stage, which aborted the fetch in flight")
+      .not.toContain("<video key=");
   });
 
   /*
@@ -1031,10 +1052,18 @@ describe("the site's own vocabulary", () => {
     for (const literal of ["Request access", "Start with your files"]) {
       expect(chrome, `the header writes "${literal}" instead of reading it`).not.toContain(literal);
     }
-    expect(chrome, "and hands the same action to the phone sheet, with the label it is showing")
-      .toContain("<MobilePrimaryNav cta={{ ...cta, label: ctaLabel }} />");
+    /*
+      BQ-059. The phone sheet no longer carries the action, so the guard stops asking it to.
+
+      It used to be handed `{...cta, label: ctaLabel}` and drew the button a second time, forty
+      pixels below the one in the header that is visible at every width. The header keeps the
+      action -- it is the one thing that may not sit behind a disclosure -- and the sheet is the
+      three sections it was always for. What this still has to guarantee is the thing the row was
+      opened about: neither chrome writes an action label of its own.
+    */
+    expect(chrome, "the phone sheet is given no action to draw twice")
+      .not.toContain("<MobilePrimaryNav cta=");
     const sheet = prose("components/mobile-primary-nav.tsx");
-    expect(sheet, "the sheet renders the object, not a label of its own").toContain("{cta.label}");
     for (const literal of ["Contact<", "Request access", "Start with your files"]) {
       expect(sheet, `the phone sheet writes "${literal}" instead of reading it`).not.toContain(literal);
     }
