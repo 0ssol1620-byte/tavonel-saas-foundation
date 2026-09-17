@@ -2908,7 +2908,6 @@ export default function WorkspacePage() {
           {tab === "billing" ? (
           <section className="card billing-card">
             <div>
-              <p className="eyebrow">Billing & capacity</p>
               <h2>{billingAccount?.accessPlan ? `${billingAccount.accessPlan.replace("_access", "")} access` : "Usage & billing"}</h2>
               <p>Included usage is granted only from a signed subscription transaction and settled from observed processing.</p>
             </div>
