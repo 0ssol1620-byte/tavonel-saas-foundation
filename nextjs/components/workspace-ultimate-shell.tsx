@@ -317,7 +317,9 @@ export default function WorkspaceUltimateShell({
           {surface === "home" && stateHero ? (
             <section className={styles.stateHero} aria-labelledby="workspace-state-title" data-activity={activityCount > 0 ? "running" : "quiet"}>
               <div>
-                <p className="eyebrow">Your knowledge</p>
+                {/* BQ-099: "Your knowledge" sat above "Loading your knowledge." / "Your published
+                    knowledge · v3" / "Add your knowledge." It restated the heading in every branch,
+                    so it is deleted rather than restyled. */}
                 <h1 id="workspace-state-title">{stateTitle}</h1>
                 <span>{stateDescription}</span>
                 {stateFacts ? <small className={styles.stateFacts}>{stateFacts}</small> : null}
