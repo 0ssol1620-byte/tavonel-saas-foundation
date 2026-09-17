@@ -140,7 +140,8 @@ export default function SolutionProofSample({ pick, variant = "canonical", korea
     <figure className={styles.block} aria-labelledby="solution-proof-sample-title" data-proof-kind="source-passage" data-proof-variant="canonical" data-evidence-id={region.id}>
       <figcaption className={styles.head}>
         <span id="solution-proof-sample-title">{copy.head}</span>
-        <Link href={regionHref(region)}>{copy.inspect}</Link>
+        {/* D34: a link that opens a verification surface wears .link-verify (--verified + the underline). */}
+        <Link className="link-verify" href={regionHref(region)}>{copy.inspect}</Link>
       </figcaption>
 
       {pick ? <p className={styles.framing}>{pick.framing}</p> : null}

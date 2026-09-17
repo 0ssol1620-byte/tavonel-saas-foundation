@@ -72,8 +72,9 @@ function JumpNav({ entries }: { entries: Entry[] }) {
 
 export function IndexedPolicyBody({ children }: { children: ReactNode }) {
   /*
-    `h2` where the document has them, `h3` where it does not. /status writes its three sections
-    as `h3` under an `h1` and /subprocessors has a single `h2` over an `h3` list -- a heading
+    `h2` where the document has them, `h3` where it does not. (/status left this layout for the
+    public site page in the pass-3 fix wave and now carries five `h2`s.) /subprocessors-style
+    documents put a single `h2` over an `h3` list, and /subprocessors has a single `h2` over an `h3` list -- a heading
     level is that page's to fix, and until it is, an index keyed only to `h2` silently skips the
     longest page in the set. The two levels are never mixed.
   */
