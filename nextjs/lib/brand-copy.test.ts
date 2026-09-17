@@ -34,9 +34,6 @@ const COPY_SURFACES = [
   "app/layout.tsx",
   "app/workspace/page.tsx",
   "app/auth/callback/page.tsx",
-  "components/answer-switch.tsx",
-  "components/change-lattice.tsx",
-  "components/identity-resolve.tsx",
   "components/world-explorer.tsx",
   "app/login/page.tsx",
   "app/not-found.tsx",
@@ -555,13 +552,28 @@ describe("public copy", () => {
     }
   });
 
+  /*
+    n15. Five of these were still files with no importer: `answer-switch`, `change-lattice` and
+    `identity-resolve` were reached only by the copy-surface list in this test, and
+    `canvas-transition-link` and `reading-demo` by nothing at all. A component that renders
+    nowhere is copy nobody reviews and a widget the next reader assumes is live, so the guard that
+    kept them off the landing page now keeps them out of the repository -- which is the same rule,
+    stated where it cannot be satisfied by deleting one import.
+  */
   it("does not restage widgets the films already show", () => {
     const page = landingSource();
-    expect(page).not.toContain("ReadingDemo");
     expect(page).not.toContain("CompilePipeline");
     expect(page).not.toContain("RebuildConsole");
-    expect(page).not.toContain("ChangeLattice");
-    expect(page).not.toContain("IdentityResolve");
+    for (const orphan of [
+      "components/answer-switch.tsx",
+      "components/canvas-transition-link.tsx",
+      "components/change-lattice.tsx",
+      "components/identity-resolve.tsx",
+      "components/reading-demo.tsx",
+      "lib/demo-reading.ts",
+    ]) {
+      expect(existsSync(join(root, orphan)), `${orphan} renders nowhere`).toBe(false);
+    }
   });
 
   it("keeps the six-scene final narrative and makes original-source proof reachable without teaching locator jargon", () => {
