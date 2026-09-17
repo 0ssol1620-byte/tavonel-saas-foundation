@@ -2908,10 +2908,11 @@ export default function WorkspacePage() {
           {tab === "billing" ? (
           <section className="card billing-card">
             <div>
-              {/* workspace-18 (C1): the selected tab directly above already says "Usage & billing".
-                  A heading is written only when it says something the tab did not -- the plan the
-                  account is actually on. */}
-              {billingAccount?.accessPlan ? <h2>{`${billingAccount.accessPlan.replace("_access", "")} access`}</h2> : null}
+              {/* workspace-18 (C1): the selected tab directly above already says "Usage & billing",
+                  so the card does not repeat it. It is still headed -- by the plan the account is
+                  actually on, or, when that has not been read, by a neutral name for the card.
+                  Never by a plan name this panel does not have. */}
+              <h2>{billingAccount?.accessPlan ? `${billingAccount.accessPlan.replace("_access", "")} access` : "Access and balance"}</h2>
               <p>Included usage is granted only from a signed subscription transaction and settled from observed processing.</p>
             </div>
             {/*

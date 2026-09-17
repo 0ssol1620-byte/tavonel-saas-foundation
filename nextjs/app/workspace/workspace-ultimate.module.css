@@ -64,7 +64,6 @@
 /* workspace-07: "being read", "need review" and "No active World" are prose. Mono is for hashes,
    paths, ids and codes; the counts keep their alignment with tabular-nums instead. */
 .stateFacts { color: var(--text-lo); font: 13px var(--f-sans); font-variant-numeric: tabular-nums; }
-.stateHero > button[disabled] { background: var(--g2); border-color: var(--hairline-hi); color: var(--text-lo); opacity: 1; }
 .stateHero > button { min-width: 180px; min-height: 40px; padding: 0 16px; background: var(--text-hi); color: var(--ground); border: 1px solid var(--text-hi); border-radius: var(--r-inst, 6px); font: 500 14px var(--f-sans); transition: background-color 140ms var(--ease), transform 140ms var(--ease); }
 
 .stateHero > button:active { transform: scale(.98); }

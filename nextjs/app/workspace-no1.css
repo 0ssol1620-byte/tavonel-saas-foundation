@@ -301,7 +301,7 @@
   read backwards ("Manage billing" heavier than "Refresh billing"). Disabled is a colour pair with
   no fill; the live action in that row takes the secondary fill.
 */
-.one-path-workspace .workspace-body button:disabled { background: transparent; border-color: var(--hairline); color: var(--text-lo); }
+.one-path-workspace .billing-card button:disabled { background: transparent; border-color: var(--hairline); color: var(--text-lo); }
 .one-path-workspace .billing-card .billing-actions button:not(:disabled) { background: var(--g2); border-color: var(--hairline-hi); color: var(--text-hi); }
 /* One tab face site-wide: a bare label with a 2px inset underline when selected. Settings used
    to render its two views as filled buttons, which is the third control face on that surface. */
@@ -424,7 +424,7 @@
   .one-path-workspace .workspace-preflight dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   /* workspace-23: at 360 the surface h1 is 24px and this subtitle came out at 26 -- two headings,
      no step. It sits under the h1, so it takes the step below it. */
-  .one-path-workspace .studio-heading h2 { font-size: 18px; line-height: 1.35; }
+  .one-path-workspace .studio-heading h2 { font-size: var(--t-5); line-height: 1.35; }
 }
 @media (max-width: 420px) {
   .one-path-workspace .workspace-content { padding-inline: 14px; }
