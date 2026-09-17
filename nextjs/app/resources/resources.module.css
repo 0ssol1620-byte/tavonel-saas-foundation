@@ -49,7 +49,18 @@
   padding: 0;
 }
 
+/*
+  BQ-111. The control the reader just pressed is scrolled to, and the sticky header is 62px
+  tall.
+
+  Selecting a filter navigates to that control’s own fragment, which is what makes the
+  narrowing work without script -- and the browser then puts the fragment at the very top of
+  the viewport, i.e. underneath the header, with the tiles it filtered pushed off the bottom.
+  It reads as the page jumping and the selection disappearing. A scroll margin lands the
+  filter row under the header with its results already in view.
+*/
 .filters a {
+  scroll-margin-top: 96px;
   display: inline-flex;
   align-items: center;
   min-height: 44px;

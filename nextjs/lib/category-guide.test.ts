@@ -88,7 +88,14 @@ describe("what 13.11 asked to be added", () => {
       which is the same rule `lib/brand-copy.test.ts` applies to the header.
     */
     expect(page, "the closing row reads the resolved access action").toContain("ACCESS.href");
-    expect(page, "and its label, rather than writing one").toContain("ACCESS.label.toUpperCase()");
+    /*
+      BQ-111 took the upper-casing off it. The rule this line holds is that the label is read
+      from the resolved action rather than typed on the page, and `.toUpperCase()` was the
+      shouting, not the reading -- 10px tracked mono capitals on the two controls that matter
+      most here. What is asserted is the read; the casing is the stylesheet's business.
+    */
+    expect(page, "and its label, rather than writing one").toContain("label: ACCESS.label }");
+    expect(page, "and does not shout it").not.toContain("toUpperCase()");
     expect(page).toContain("const ACCESS = primaryCallToAction();");
   });
 });
@@ -252,8 +259,14 @@ describe("the brand fix's structure", () => {
   it("ends on one primary and one secondary, with the references as a list", () => {
     const closing = page.slice(page.indexOf('title: "The package is the contract"'));
     expect(closing).toContain("readNext: [");
-    // Five written labels and one read from `ACCESS`; see the G1-010 note above.
-    expect((closing.match(/label: "/g) ?? []).length).toBe(5);
+    /*
+      Four written labels, one read from `EXPLORE_CTA` and one from `ACCESS`; see the G1-010
+      note above. It was five written labels until BQ-111: "OPEN A COMPILED WORLD" was a fifth
+      spelling of the Explore action, typed here, while every other surface reads the one in
+      `lib/site-navigation.ts`. One name per action means this row reads it too.
+    */
+    expect((closing.match(/label: "/g) ?? []).length).toBe(4);
+    expect(closing).toContain("label: EXPLORE_CTA.label }");
     expect((closing.match(/label: ACCESS.label/g) ?? []).length).toBe(1);
     // BA-016: the door describes the protocol behind it rather than announcing an absence.
     expect(rendered(page)).not.toContain("WHAT WOULD BE MEASURED");

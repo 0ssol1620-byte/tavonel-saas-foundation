@@ -3,6 +3,7 @@ import KnowledgeCompilerDiagram from "@/components/knowledge-compiler-diagram";
 import PublicProofRegistry from "@/components/public-proof-registry";
 import { primaryCallToAction } from "@/lib/commercial-state";
 import { jsonLdHtml } from "@/lib/structured-data";
+import { EXPLORE_CTA } from "@/lib/site-navigation";
 
 export const metadata: Metadata = { title: "What Is a Knowledge Compiler? — TAVONEL", description: "A practical guide to Knowledge Compilers, RAG, knowledge graphs and enterprise search.", alternates: { canonical: "/knowledge-compiler" }, openGraph: { url: "/knowledge-compiler" } };
 
@@ -94,7 +95,7 @@ export default function KnowledgeCompilerPage() {
     { title: "The compile contract", body: "The unit of value is not a chat response. It is a Compiled World with immutable inputs, structured objects, exact evidence, review state, retrieval material and portable files.", links: [
       // One action, not the closing pair repeated: a reader convinced by the contract wants to
       // see one, and the page's two-button close is three thousand pixels below this.
-      { href: "/explore", label: "OPEN A COMPILED WORLD" },
+      { href: "/explore", label: EXPLORE_CTA.label },
     ], rows: [
       { key: "INPUT", description: "Versioned source files and connector cursors.", state: "IMMUTABLE" },
       { key: "STRUCTURE", description: "Directory, ontology, entities, claims and relations.", state: "REVIEWABLE" },
@@ -160,11 +161,15 @@ export default function KnowledgeCompilerPage() {
         G1-010. This page carried both of the site's access actions at once -- the header offered
         "Start with your files" and the closing row offered it again beside "Open a Compiled
         World", while /product and /solutions offered "Request access". One action, from the one
-        object that decides which it is, upper-cased to match the row it sits in.
+        object that decides which it is, written the way it is spoken.
+
+        BQ-111 took the upper-casing off both labels in this row. They were 10px tracked mono
+        in capitals, which is the treatment this system gives a machine identifier, and the
+        two most important controls on the page are neither machine nor identifier.
       */
       links: [
-        { href: "/explore", label: "OPEN A COMPILED WORLD" },
-        { href: ACCESS.href as Route, label: ACCESS.label.toUpperCase() },
+        { href: "/explore", label: EXPLORE_CTA.label },
+        { href: ACCESS.href as Route, label: ACCESS.label },
       ],
       readNext: [
         { href: "/evidence", label: "How evidence is bound" },
