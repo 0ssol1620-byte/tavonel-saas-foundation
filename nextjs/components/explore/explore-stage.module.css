@@ -43,7 +43,7 @@
   color: var(--text-lo);
 }
 
-.badge { color: var(--verified); }
+.badge { color: var(--text-mid); }
 
 .headerActions {
   display: flex;
@@ -345,6 +345,20 @@
 */
 .objectCard[data-linked="1"],
 .sourcePane[data-linked="1"] [data-source-sheet] { border-color: var(--verified-dim); }
+
+/*
+  The sheet scrolls inside its own box, which is what the pane above said it did.
+
+  `.sourcePane` bounds itself to the viewport and lets the sheet be its one flexible child, but
+  the sheet had no `overflow`: the page raster reserves the filing's own aspect ratio, so at 1440
+  it computed 464px of page inside a 533px box that also carries a toolbar, a region cut and a
+  ledger -- and the surplus spilled out of the bottom of the sheet. Because `.viewport` is
+  `position: relative` and Previous/Next is not, the spill painted OVER the pager:
+  `elementFromPoint` on the centre of "Next →" returned the viewport, so the control a reader
+  uses to walk an object's regions could not be clicked at all. Giving the sheet the scroll it
+  was always described as having keeps the whole page reachable and puts the pager back on top.
+*/
+.sourcePane [data-source-sheet] { overflow: auto; overscroll-behavior: contain; }
 
 .objectLocator {
   margin: 12px 0 0;
@@ -753,7 +767,7 @@
 
 .entryEyebrow {
   margin: 0;
-  color: var(--verified);
+  color: var(--text-mid);
   font: 12px var(--f-sans);
   letter-spacing: 0.06em;
 }
@@ -1051,7 +1065,7 @@
 
 .next p {
   margin: 0;
-  color: var(--verified);
+  color: var(--text-mid);
   font: 12px var(--f-sans);
   letter-spacing: 0.06em;
 }
@@ -1220,4 +1234,23 @@
   .askBar:hover { color: var(--text-hi); }
   .askRegions button:hover { color: var(--text-hi); border-color: var(--verified); }
   .nextSourceNote a:hover { color: var(--text-hi); }
+}
+
+/* ------------------------------------------------------------------ footer */
+
+/*
+  chrome-02 / chrome-03 on /explore.
+
+  The site footer arrived under a stage whose chrome edge is this file's `clamp(14px, 3vw, 40px)`,
+  not the site's `--gutter`: at 1440 the header wordmark sat at x = 40 and the footer's at x = 70
+  (the shared `.shell`'s 1360px cap plus a 30px gutter), and at 412 they were 14 and 16. /explore
+  is the one route with both an instrument header and site chrome, so the two lockups have to agree
+  on one edge, and the edge the reader already sees is the stage's.
+
+  Scoped through this wrapper rather than through `footer.site .shell`, which is shared chrome:
+  the rule reaches only the footer this page renders, and it holds whatever the shared cap becomes.
+*/
+.siteFooter :global(footer.site .shell) {
+  max-width: none;
+  padding-inline: clamp(14px, 3vw, 40px);
 }

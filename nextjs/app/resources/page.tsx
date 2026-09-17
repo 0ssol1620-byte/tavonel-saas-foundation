@@ -43,11 +43,20 @@ const DESCRIPTIONS: Record<string, string> = {
   filter state (WG-074). Nothing here links to a page that does not exist: `/cookbooks/*` is a
   proposal, and a draft cookbook is not linked from this hub as a representative case.
 */
+/*
+  pages-17: "Everything" is the clear-all, not a filter group of one.
+
+  It sat under a label reading SHOW, above BY PURPOSE (four chips) and BY WORKFLOW (three) -- a
+  group whose other options look as though they failed to render, over a control that cannot
+  change anything by itself. The chip is what it always was; the label over it is gone, so it
+  reads as the reset at the head of the row that it is.
+*/
 const FILTERS: readonly { tag: ResourceTag | null; group: string | null }[] = [
-  // type-02: these three labels are kickers, and a kicker is sentence case. `.groupLabel` already
+  // type-02: the group labels are kickers, and a kicker is sentence case. `.groupLabel` already
   // draws the canonical face (sans 12px / 500 / .06em / --text-mid, `text-transform: none`), so
   // the shouting was never in the CSS -- it was in the string literals. Fixed where it lived.
-  { tag: null, group: "Show" },
+  // pages-17: "Everything" is the clear-all chip, not a filter group of one -- it carries no label.
+  { tag: null, group: null },
   ...RESOURCE_PURPOSES.map((tag, index) => ({ tag, group: index === 0 ? "By purpose" : null })),
   ...RESOURCE_WORKFLOWS.map((tag, index) => ({ tag, group: index === 0 ? "By workflow" : null })),
 ];
@@ -66,6 +75,13 @@ export default function ResourcesPage() {
                 A sample world you can take apart, the documentation and API you build against,
                 and the research and evidence behind the compiler.
               </p>
+              {/*
+                pages-22: the page had no second-level heading at all, so the hierarchy went from
+                the 56px H1 straight to 20px card titles with three 12px filter labels as the only
+                thing in between -- the flat hierarchy the design direction names as the tell. One
+                real h2 over the grid is the middle step; the filter row narrows what is under it.
+              */}
+              <h2>All resources</h2>
               <div className={styles.hub}>
                 {/*
                   One selection at a time, and never an empty result: every control names a tag

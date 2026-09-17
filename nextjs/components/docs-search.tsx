@@ -140,11 +140,18 @@ export function DocsSearch({ entries }: { entries: Entry[] }) {
     <div className="docs-search">
       <label className="docs-search-field">
         <Search size={14} aria-hidden="true" />
+        {/*
+          pages-15: the placeholder rendered as "Search every pag" in the 209px sidebar rail --
+          the input is `flex: 1; min-width: 0` beside the search glyph, the live count and the
+          ⌘K badge, so it takes whatever is left and clips its own text with no ellipsis. Two
+          fewer words is the fix that cannot come back at any rail width; the full sentence is in
+          the accessible name, which is what a screen reader reads out anyway.
+        */}
         <input
           ref={field}
           type="search"
           value={query}
-          placeholder="Search every page"
+          placeholder="Search docs"
           aria-label="Search every documentation page, including page bodies"
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={(event) => move(event, -1)}

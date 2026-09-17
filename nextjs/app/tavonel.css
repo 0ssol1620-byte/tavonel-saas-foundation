@@ -1236,6 +1236,15 @@
      1,183px inside a 1,380px column, a third measure on a page that should have one. */
   .policy-copy { display: flex; flex-direction: column; align-items: stretch; gap: 14px; }
   .policy-copy h2 { margin: 20px 0 0; font-size: 18px; letter-spacing: -0.01em; }
+  /*
+    pages-23. `/status` now renders this document inside the public chrome, and its five sections
+    are real `<h2>`s rather than `<h3>`s under an `<h1>` -- which exposed that the 18px above is
+    smaller than the site's own `h3` (20px), so promoting a heading made it shrink. On the public
+    variant the h2 takes the h2 step and the page reads 56 / 30 / 20. The four legal documents
+    keep their dense 18px: they are read as contracts, not scanned as product pages, and changing
+    them is not this finding.
+  */
+  .public-page .policy-copy h2 { font-size: var(--t-h2-sm); }
   .policy-copy p { margin: 0; color: var(--text-lo); line-height: 1.72; }
   /* `:not(.btn)`: the closing CTA rows on /trust, /enterprise and /research sit inside this
      block, and the link colour (0,1,1) outranked `.btn`'s `color: var(--ground)` (0,1,0) -- three
@@ -1298,12 +1307,28 @@
     text-transform: uppercase;
     color: var(--text-lo);
   }
+  /*
+    pages-18 / D34. The affordance belongs to the text, not to the box around it.
+
+    At 412 the 44px-target rule (`a[href^="mailto:"]` further down) makes this anchor a block with
+    12.5px of block padding, so its `border-bottom` landed on the box edge ~15px under the address
+    and read as a stray green rule between the address and the section hairline. An underline that
+    detaches from its link is not an underline. `text-decoration` travels with the text at every
+    width, and the colour is the link contract's hairline rather than `--verified`, which is
+    reserved for links that open a verification surface.
+  */
   .contact-address a {
     width: fit-content;
     color: var(--text-hi);
     font-family: var(--f-sans);
     font-size: 13px;
-    border-bottom: 1px solid var(--verified-dim);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    text-decoration-color: var(--hairline-hi);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .contact-address a:hover { text-decoration-color: var(--text-hi); }
   }
   .contact-form { display: grid; gap: 16px; }
   .contact-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
@@ -1408,6 +1433,24 @@
   .contact-qualification-fold > summary span { margin-left: auto; color: var(--text-lo); font-size: var(--t-1); text-transform: uppercase; letter-spacing: .1em; }
   .contact-qualify > legend { padding: 0 0 4px; color: var(--text-lo); font: var(--t-1) var(--f-sans); letter-spacing: 0.06em; }
   .contact-field > legend, .contact-field > small { padding: 0; color: var(--text-lo); font: var(--t-1) var(--f-sans); letter-spacing: 0.06em; }
+  /*
+    pages-11. The requirement marker, distinguishable from the label it qualifies.
+
+    The label is 12px tracked caps; the marker inherited every one of those properties, so
+    "Name Required" was one string in one face and the field read as being called that. It keeps
+    its word -- the sentence above the form says the fields are marked Required, and a screen
+    reader needs it inside the label -- and gains a separator, sentence case and the eyebrow tone
+    against the label's dimmer caps.
+  */
+  .contact-field > span > .contact-required {
+    color: var(--text-lo);
+    font: var(--t-1) var(--f-sans);
+    letter-spacing: 0.02em;
+    text-transform: none;
+  }
+  /* The separator is generated so the accessible name stays "Name Required" -- the space before
+     it is a real one in the markup, not this. */
+  .contact-field > span > .contact-required::before { content: "·"; margin-right: 0.4em; }
   .contact-field > small { text-transform: none; letter-spacing: .02em; }
   .contact-checks { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px 16px; }
   .contact-checks label { display: flex; align-items: center; gap: 9px; color: var(--text-lo); font-size: 13px; }
@@ -2092,7 +2135,24 @@
   .docs-langs { display: flex; flex-wrap: wrap; gap: 2px; min-width: 0; }
   .docs-langs button { padding: 3px 8px; border: 1px solid transparent; color: var(--text-lo); font: var(--t-1) var(--f-sans); letter-spacing: 0.06em; }
   .docs-langs button[aria-selected="true"] { border-color: var(--hairline-hi); color: var(--text-hi); }
-  .docs-code pre { width: 100%; max-width: 100%; min-width: 0; margin: 0; padding: 14px 12px; overflow-x: auto; color: var(--text-hi); font: 12px/1.65 var(--f-mono); }
+  /*
+    pages-14. A code line cut dead at the panel border reads as truncated sample code, not as a
+    block that scrolls: "…collections:compile + collection" stopped mid-identifier with no
+    ellipsis, no fade and no scrollbar on the page whose whole job is copy-pasteable commands.
+    A thin, always-drawn scrollbar is the affordance -- it appears only when a block actually
+    overflows, so the blocks that fit are unchanged, and unlike a mask it never dims the last
+    characters of a line that was never cut.
+
+    Both spellings, and both are needed. `scrollbar-width`/`scrollbar-color` is the standard one
+    and the only one Firefox reads; on Blink it leaves the overlay scrollbar in place, which is
+    transparent until you touch it -- invisible in exactly the static view the finding is about.
+    Styling `::-webkit-scrollbar` opts that block out of overlay scrollbars into a classic one
+    that is painted whenever the content overflows, which is the whole point here.
+  */
+  .docs-code pre { width: 100%; max-width: 100%; min-width: 0; margin: 0; padding: 14px 12px; overflow-x: auto; scrollbar-width: thin; scrollbar-color: var(--hairline-hi) transparent; color: var(--text-hi); font: 12px/1.65 var(--f-mono); }
+  .docs-code pre::-webkit-scrollbar { height: 8px; }
+  .docs-code pre::-webkit-scrollbar-track { background: transparent; }
+  .docs-code pre::-webkit-scrollbar-thumb { background: var(--hairline-hi); }
   .docs-copy { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 44px; min-height: 44px; padding: 8px 12px; color: var(--text-mid); border: 1px solid var(--hairline-hi); background: var(--g1); font: 12px var(--f-sans); letter-spacing: 0; }
   .docs-copy[data-state="copied"] { color: var(--verified); border-color: var(--verified); }
 
@@ -3334,6 +3394,16 @@
     }
     .src-legend > div { grid-template-columns: minmax(0, 1fr); gap: 5px; }
   }
+
+  /*
+    pages-19. The pricing hero writes its H1 and its two ledes as direct children of `.shell`
+    rather than inside the `.stack` every other `.doc` scene uses, so it got none of that
+    element's 18px rhythm: measured at 1440, the H1 bottom and the lede top were both at y=210
+    and the second paragraph started where the first ended, which is three blocks reading as one
+    wall of text on the commercial page. Same 18px, applied where this hero actually is.
+  */
+  .pricing-page .scene.doc > .shell > .document-title { margin-bottom: 18px; }
+  .pricing-page .scene.doc > .shell > .lede + .lede { margin-top: 18px; }
 
   /* Pricing is an editorial choice surface, not a wall of equal technical cards.
      The same catalog remains the sole source of amounts, entitlements and actions. */

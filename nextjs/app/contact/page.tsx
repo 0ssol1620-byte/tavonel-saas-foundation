@@ -43,15 +43,15 @@ export default function ContactPage() {
                 */}
                 <div className="contact-address">
                   <span>General inquiries</span>
-                  <a href="mailto:hello@tavonel.com">hello@tavonel.com</a>
+                  <a className="link" href="mailto:hello@tavonel.com">hello@tavonel.com</a>
                 </div>
                 <div className="contact-address">
                   <span>Product support</span>
-                  <a href="mailto:support@tavonel.com">support@tavonel.com</a>
+                  <a className="link" href="mailto:support@tavonel.com">support@tavonel.com</a>
                 </div>
                 <div className="contact-address">
                   <span>Vulnerability reports</span>
-                  <a href="mailto:security@tavonel.com">security@tavonel.com</a>
+                  <a className="link" href="mailto:security@tavonel.com">security@tavonel.com</a>
                 </div>
                 {/*
                   G2-034. The telephone number, on the page whose job is to be reachable.
@@ -65,7 +65,7 @@ export default function ContactPage() {
                 {operator ? (
                   <div className="contact-address">
                     <span>Telephone</span>
-                    <a href={`tel:${operator.phone}`}>{operator.phone}</a>
+                    <a className="link" href={`tel:${operator.phone}`}>{operator.phone}</a>
                   </div>
                 ) : null}
                 {/* One constant, printed here and on /status. See lib/support-targets.ts. */}

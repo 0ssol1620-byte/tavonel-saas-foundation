@@ -5,14 +5,7 @@ import PolicyJumpIndex, { IndexedPolicyBody } from "@/components/policy-jump-ind
 import { PublicSiteHeader } from "@/components/public-site-chrome";
 import { primaryCallToAction } from "@/lib/commercial-state";
 
-export default function PolicyLayout({
-  title,
-  effective,
-  lastUpdated,
-  intro,
-  children,
-  closing,
-}: {
+type PolicyDocumentProps = {
   title: string;
   effective?: string;
   lastUpdated?: string;
@@ -20,22 +13,27 @@ export default function PolicyLayout({
   children: React.ReactNode;
   /** One extra ghost action, for a page that has a second obvious next step. */
   closing?: React.ReactNode;
-}) {
-  return (
-    <div className="page">
-      {/*
-        The site's header, not a two-link one of its own.
+};
 
-        `/privacy`, `/terms`, `/refunds`, `/subprocessors` and `/status` are pages a reader lands
-        on from a search result or a contract, and the nav here offered them two links and no way
-        back into the product -- the fourth chrome `site-navigation.ts` describes, still standing.
-        The two destinations it did carry, Service status and Contact, moved into the legal footer
-        below so nothing on these pages became harder to reach.
-      */}
-      {/* BA-232 (nav-global CROSS-LANE 1): the header's action is resolved here now. The
-          placeholder-then-replace client fallback that used to supply it is gone. */}
-      <PublicSiteHeader cta={primaryCallToAction()} />
-      <main id="main" tabIndex={-1}>
+/**
+ * The document itself, without a chrome around it.
+ *
+ * chrome-05 / pages-23: `/status` used this layout for its two-column reading composition and
+ * inherited the legal chrome with it -- a seven-link row ending in "Questions about this policy",
+ * on a page that is not a policy and that every other route links to from the Trust group. It
+ * renders this inside `PublicSitePage` now and gets the site footer, BRAND_LINE and the five
+ * groups like every other public route. The four real policies keep `PolicyLayout` below, which
+ * is this document plus the legal header and footer, so nothing about them changed.
+ */
+export function PolicyDocument({
+  title,
+  effective,
+  lastUpdated,
+  intro,
+  children,
+  closing,
+}: PolicyDocumentProps) {
+  return (
         <section className="scene doc policy-page">
           <div className="shell"><div className="body"><IndexedPolicyBody>
             <div className="stack">
@@ -71,6 +69,26 @@ export default function PolicyLayout({
             </div>
           </IndexedPolicyBody></div></div>
         </section>
+  );
+}
+
+export default function PolicyLayout(props: PolicyDocumentProps) {
+  return (
+    <div className="page">
+      {/*
+        The site's header, not a two-link one of its own.
+
+        `/privacy`, `/terms`, `/refunds` and `/subprocessors` are pages a reader lands on from a
+        search result or a contract, and the nav here offered them two links and no way back into
+        the product -- the fourth chrome `site-navigation.ts` describes, still standing. The two
+        destinations it did carry, Service status and Contact, moved into the legal footer below
+        so nothing on these pages became harder to reach.
+      */}
+      {/* BA-232 (nav-global CROSS-LANE 1): the header's action is resolved here now. The
+          placeholder-then-replace client fallback that used to supply it is gone. */}
+      <PublicSiteHeader cta={primaryCallToAction()} />
+      <main id="main" tabIndex={-1}>
+        <PolicyDocument {...props} />
       </main>
       <footer className="site"><div className="shell"><span className="wordmark"><Logomark /><b>TAVONEL</b></span><nav className="site-links" aria-label="Legal"><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link><Link href="/refunds">Refunds</Link><Link href="/subprocessors">Subprocessors</Link><Link href="/security">Security</Link><Link href="/status">Service status</Link><Link href="/contact">Contact</Link></nav><LegalOperatorDisclosure compact /><p className="fine">Questions about this policy: <a href="mailto:privacy@tavonel.com">privacy@tavonel.com</a></p></div></footer>
     </div>
