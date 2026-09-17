@@ -1,0 +1,138 @@
+{
+  "generator": "scripts/render-source-pages.mjs",
+  "pageWidth": 1400,
+  "regionScale": 2,
+  "quality": 82,
+  "pages": [
+    {
+      "sourceFile": "apple-2025-form-10-k.pdf",
+      "sourceSha256": "sha256:108590052c3ba5400c63660d787fe7ed4e43868292946d7a7facebe9ab7d1aab",
+      "page": 4,
+      "pageCount": 80,
+      "file": "/explore-sample/pages/apple-2025-form-10-k-p004.webp",
+      "width": 1400,
+      "height": 1812,
+      "bytes": 219326,
+      "sha256": "sha256:724a5e9ce55ea3c85c80d3181590964aea760a19713afe94cee2003afa3c6938",
+      "regions": [
+        {
+          "bbox1000": [
+            30,
+            291,
+            971,
+            380
+          ],
+          "file": "/explore-sample/pages/apple-2025-form-10-k-p004-r30-291-971-380.webp",
+          "width": 2635,
+          "height": 323,
+          "bytes": 42812,
+          "sha256": "sha256:ccf98fd2a8ac5f4399eac4b72fcee18c3b975284ba2c0fe3bf5afc1742bf6d45"
+        }
+      ]
+    },
+    {
+      "sourceFile": "apple-2026-proxy-def14a-reference.pdf",
+      "sourceSha256": "sha256:aa84ce73eb0f181844ccd0bb8a4a53f670fae6a007c086ccdb55f705f8d7a0c2",
+      "page": 11,
+      "pageCount": 103,
+      "file": "/explore-sample/pages/apple-2026-proxy-def14a-reference-p011.webp",
+      "width": 1400,
+      "height": 1812,
+      "bytes": 78514,
+      "sha256": "sha256:e563a47d41e1e5b2caba421143d103506e93b229709bb082c60efe10bfb203dd",
+      "regions": [
+        {
+          "bbox1000": [
+            62,
+            40,
+            949,
+            518
+          ],
+          "file": "/explore-sample/pages/apple-2026-proxy-def14a-reference-p011-r62-40-949-518.webp",
+          "width": 2484,
+          "height": 1732,
+          "bytes": 168952,
+          "sha256": "sha256:ced149b0ab31c48c2f83829807a01b0306ffd3f5e0e92fa411a649a37964db75"
+        }
+      ]
+    },
+    {
+      "sourceFile": "apple-2026-proxy-def14a-reference.pdf",
+      "sourceSha256": "sha256:aa84ce73eb0f181844ccd0bb8a4a53f670fae6a007c086ccdb55f705f8d7a0c2",
+      "page": 17,
+      "pageCount": 103,
+      "file": "/explore-sample/pages/apple-2026-proxy-def14a-reference-p017.webp",
+      "width": 1400,
+      "height": 1812,
+      "bytes": 108070,
+      "sha256": "sha256:e0a222bbbe188c8ef7445e3331eb342a76c14dbbf386df3f0c11f2943bcd5ee1",
+      "regions": [
+        {
+          "bbox1000": [
+            62,
+            40,
+            949,
+            521
+          ],
+          "file": "/explore-sample/pages/apple-2026-proxy-def14a-reference-p017-r62-40-949-521.webp",
+          "width": 2484,
+          "height": 1743,
+          "bytes": 251962,
+          "sha256": "sha256:0577cb91dd07727898bbab18450e8ae920f2a263208e4109b10df6ccab97f195"
+        }
+      ]
+    },
+    {
+      "sourceFile": "apple-2026-q1-10-q-reference.pdf",
+      "sourceSha256": "sha256:7fe2683c59e0b48f6c112bc17b3900d907f64236c138d1dd32f40d544b1ba89f",
+      "page": 4,
+      "pageCount": 30,
+      "file": "/explore-sample/pages/apple-2026-q1-10-q-reference-p004.webp",
+      "width": 1400,
+      "height": 1812,
+      "bytes": 82026,
+      "sha256": "sha256:6a47c4402f4c9543a1aae16de926ad149b4384c3b4f4dc308f296efe0c7a3f10",
+      "regions": [
+        {
+          "bbox1000": [
+            188,
+            174,
+            813,
+            224
+          ],
+          "file": "/explore-sample/pages/apple-2026-q1-10-q-reference-p004-r188-174-813-224.webp",
+          "width": 1750,
+          "height": 181,
+          "bytes": 25308,
+          "sha256": "sha256:bfa0f23a26d8f9db96c940780aca6cbb7bf8eae8647089b22d38d5fca6c49f84"
+        }
+      ]
+    },
+    {
+      "sourceFile": "apple-2026-q1-10-q-reference.pdf",
+      "sourceSha256": "sha256:7fe2683c59e0b48f6c112bc17b3900d907f64236c138d1dd32f40d544b1ba89f",
+      "page": 19,
+      "pageCount": 30,
+      "file": "/explore-sample/pages/apple-2026-q1-10-q-reference-p019.webp",
+      "width": 1400,
+      "height": 1812,
+      "bytes": 232548,
+      "sha256": "sha256:8f7669b51a1af8e89a02b7e0c2caac6a94cd34e0c273f1d6b25b82167be899dc",
+      "regions": [
+        {
+          "bbox1000": [
+            62,
+            392,
+            939,
+            584
+          ],
+          "file": "/explore-sample/pages/apple-2026-q1-10-q-reference-p019-r62-392-939-584.webp",
+          "width": 2456,
+          "height": 696,
+          "bytes": 70614,
+          "sha256": "sha256:3040e96f06b6b4d15059c02967e47e4248269a119079cee5eabbd417cae6c388"
+        }
+      ]
+    }
+  ]
+}
