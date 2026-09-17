@@ -3,13 +3,7 @@ import { Fragment } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { PublicSitePage } from "@/components/public-site-chrome";
-import {
-  RESOURCE_LINKS,
-  RESOURCE_PURPOSES,
-  RESOURCE_TAG_LABELS,
-  RESOURCE_WORKFLOWS,
-  type ResourceTag,
-} from "@/lib/site-navigation";
+import { EXPLORE_CTA, RESOURCE_LINKS, RESOURCE_PURPOSES, RESOURCE_TAG_LABELS, RESOURCE_WORKFLOWS, type ResourceTag } from "@/lib/site-navigation";
 import styles from "./resources.module.css";
 
 export const metadata: Metadata = {
@@ -17,7 +11,7 @@ export const metadata: Metadata = {
   openGraph: { url: "/resources" },
   title: "Resources — TAVONEL",
   description:
-    "Explore a compiled world, read the documentation and API, and inspect the research and evidence behind the compiler.",
+    "Explore a Compiled World, read the documentation and API, and inspect the research and evidence behind the compiler.",
 };
 
 /*
@@ -31,7 +25,7 @@ export const metadata: Metadata = {
 
 const DESCRIPTIONS: Record<string, string> = {
   "/explore": "Follow a result from an answer back to the exact source location it came from, without signing in.",
-  "/knowledge-compiler": "What a knowledge compiler is, and how it differs from a parser, a RAG pipeline and a graph database.",
+  "/knowledge-compiler": "What a Knowledge Compiler is, and how it differs from a parser, a RAG pipeline and a graph database.",
   "/docs": "Quickstart, concepts, supported files, compiling, review, and using a world through Ask, the API and MCP.",
   "/api": "Endpoints, authentication, errors and limits, with the machine-readable OpenAPI document alongside.",
   "/changelog": "What changed, in the order it changed, written for the people using it.",
@@ -62,8 +56,7 @@ export default function ResourcesPage() {
         <div className="shell">
           <div className="body">
             <div className="stack">
-              <p className="slate"><b>RESOURCES</b><span />TAVONEL</p>
-              <h1 className="document-title">Everything that explains<br />how this works.</h1>
+              <h1 className="document-title">Everything that explains how this works.</h1>
             </div>
             <div className="stack">
               <p className="lede">
@@ -107,12 +100,15 @@ export default function ResourcesPage() {
                           look like the tiles' words.
 
                           The filter already encodes what these said, so they are gone rather
-                          than restyled, and the space goes to the card's action link -- the card
-                          anatomy /product already uses.
+                          than restyled, and the space went to a card action link.
+
+                          BQ-111 / BQ-134 takes that away too. It was the ninth copy of "Open →"
+                          on the page: a verb that names no destination, with an arrow appended,
+                          pointing at the href the card's own heading already links to. Two links
+                          to one page inside one card is one link and a decoration -- and it is
+                          the decoration a screen reader reads out nine times. The heading is the
+                          card's way in.
                         */}
-                        <p className={styles.tileAction}>
-                          <Link href={link.href as Route}>Open →</Link>
-                        </p>
                       </article>
                     );
                   })}
@@ -126,7 +122,7 @@ export default function ResourcesPage() {
                 and nothing to do with them. The action row is the one its sibling pages carry.
               */}
               <div className="actions">
-                <Link className="btn" href="/explore">Explore a compiled world</Link>
+                <Link className="btn" href={EXPLORE_CTA.href as Route}>{EXPLORE_CTA.label}</Link>
                 <Link className="btn ghost" href={"/docs/quickstart" as Route}>Read the quickstart</Link>
               </div>
               <p className="fine">

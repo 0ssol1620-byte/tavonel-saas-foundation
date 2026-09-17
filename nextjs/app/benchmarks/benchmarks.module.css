@@ -65,15 +65,22 @@
   `margin-top: auto` pushes the strip to the foot of the tile, so the two tiles in a row line
   their rules up with each other however long their definitions run.
 */
+/*
+  BQ-112: a list, in sans, at the type floor. Five names in 10px tracked mono joined by middots
+  read as one machine identifier, and `--text-xlo` is deleted by the token contract. The
+  `margin-top: auto` above still does its job.
+*/
 .taxonomy {
   margin: auto 0 0;
-  padding-top: 11px;
+  padding: 11px 0 0;
   border-top: 1px solid var(--hairline);
-  font-family: var(--f-mono);
-  font-size: 10px;
-  line-height: 1.75;
-  letter-spacing: 0.04em;
-  color: var(--text-xlo);
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-lo);
 }
 
 /* ---------------------------------------------------------------- receipt */
@@ -85,7 +92,7 @@
   padding: 0;
   background: var(--hairline);
   border: 1px solid var(--hairline);
-  border-radius: 4px;
+  border-radius: var(--r-paper-lg);
   overflow: hidden;
 }
 .receiptRow {
@@ -103,7 +110,7 @@
   gap: 7px;
   min-width: 0;
   font-family: var(--f-mono);
-  font-size: 10.5px;
+  font-size: 12px;
   letter-spacing: 0.13em;
   text-transform: uppercase;
   color: var(--text-lo);
@@ -111,7 +118,7 @@
 /* What the field has to be, beside the field's name. Not decoration: it is the check. */
 .receiptRow dt em {
   font-style: normal;
-  font-size: 9px;
+  font-size: 12px;
   letter-spacing: 0.1em;
   color: var(--decor);
 }
@@ -139,7 +146,7 @@
   padding: 18px 20px;
   border: 1px solid var(--hairline-hi);
   background: var(--g1);
-  border-radius: 4px;
+  border-radius: var(--r-paper-lg);
 }
 .north h3 {
   font-size: 21px;
@@ -156,10 +163,10 @@
 .northMark {
   margin: 0;
   font-family: var(--f-mono);
-  font-size: 9.5px;
+  font-size: 12px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--text-xlo);
+  color: var(--text-lo);
 }
 .supporting {
   display: flex;
@@ -173,10 +180,10 @@
   padding: 4px 9px;
   border: 1px solid var(--hairline-hi);
   font-family: var(--f-mono);
-  font-size: 9.5px;
+  font-size: 12px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-xlo);
+  color: var(--text-lo);
 }
 
 /* ---------------------------------------------------------------- results */
@@ -192,7 +199,7 @@
   min-width: 0;
   overflow-x: auto;
   border: 1px solid var(--hairline);
-  border-radius: 4px;
+  border-radius: var(--r-paper-lg);
 }
 .results {
   width: 100%;
@@ -203,10 +210,10 @@
   padding: 12px 16px;
   text-align: left;
   font-family: var(--f-mono);
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--text-xlo);
+  color: var(--text-lo);
   border-bottom: 1px solid var(--hairline);
 }
 .results th,
@@ -219,11 +226,11 @@
 }
 .results thead th {
   font-family: var(--f-mono);
-  font-size: 9.5px;
+  font-size: 12px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   font-weight: 400;
-  color: var(--text-xlo);
+  color: var(--text-lo);
 }
 .results tbody th {
   font-weight: 500;

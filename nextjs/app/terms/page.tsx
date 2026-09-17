@@ -43,7 +43,6 @@ export default function TermsPage() {
 
   return (
     <PolicyLayout
-      label="TERMS"
       title="Terms of service."
       effective={LEGAL_EFFECTIVE_DATE}
       lastUpdated={LEGAL_LAST_UPDATED}

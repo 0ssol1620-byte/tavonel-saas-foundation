@@ -1,4 +1,4 @@
-import styles from "./page-toc.module.css";
+import { PageTocList } from "./page-toc-list";
 
 export type TocEntry = { id: string; label: string };
 
@@ -39,23 +39,18 @@ export function tocEntries(labels: readonly string[]): TocEntry[] {
 /**
  * "On this page" -- the jump list for a page long enough to need one.
  *
- * Plain anchors, no script, no scroll observer: a highlighted "current" entry needs JavaScript
- * and an IntersectionObserver to be accurate, and it is not what the list is for. Rendering
- * nothing below three entries is deliberate -- a two-item table of contents costs a screenful
- * and saves nobody a scroll.
+ * Rendering nothing below three entries is deliberate: a two-item table of contents costs a
+ * screenful and saves nobody a scroll.
+ *
+ * BQ-104. It marks the section being read now. The argument that used to stand here -- a current
+ * entry needs JavaScript, and that is not what the list is for -- was fair for three entries and
+ * is not for fourteen, which is what the longer documentation sections produce. `DocsToc` already
+ * marks the section being read with `aria-current`, so this is the same device one level down
+ * rather than a second idea. The observer lives in `page-toc-list.tsx`; that file says why.
  */
 export function PageToc({ entries }: { entries: readonly TocEntry[] }) {
   if (entries.length < 3) return null;
-  return (
-    <nav className={styles.toc} aria-label="On this page">
-      <p className={styles.title}>ON THIS PAGE</p>
-      <ul>
-        {entries.map((entry) => (
-          <li key={entry.id}><a href={`#${entry.id}`}>{entry.label}</a></li>
-        ))}
-      </ul>
-    </nav>
-  );
+  return <PageTocList entries={entries} />;
 }
 
 export default PageToc;

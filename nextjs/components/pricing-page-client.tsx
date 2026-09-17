@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { useEffect, useRef, useState } from "react";
 import { PublicSiteFooter, PublicSiteHeader } from "@/components/public-site-chrome";
+import tableStyles from "@/components/docs/docs-table.module.css";
 import { useCheckout } from "@/lib/use-checkout";
 import { loginUrlForOffer } from "@/lib/checkout-intent";
 import {
@@ -62,7 +63,6 @@ const PAID_PLANS = (Object.entries(BILLING_OFFERS) as Array<[BillingOfferCode, (
     name: offer.label,
     price: `$${offer.priceUsd} USD`,
     unit: "per month",
-    tag: offer.saleChannel === "self_serve" ? "START HERE" : null,
     description: offer.description,
     features: offer.features as readonly string[],
     notYetSold: offer.notYetSold as readonly string[],
@@ -79,7 +79,6 @@ const EVALUATION = {
   name: "Evaluation",
   price: "$0 USD",
   unit: "for 7 days",
-  tag: "TRY IT FREE",
   description: "Try TAVONEL with your own files. No card required.",
   features: [
     "Up to 3 files and 50 standard pages",
@@ -101,7 +100,6 @@ const ENTERPRISE = {
   name: "Enterprise",
   price: "Custom",
   unit: "scoped with you",
-  tag: null,
   description: "An assisted pilot for larger corpora and knowledge operations run by a team, scoped in a conversation.",
   features: ["Custom volume", "Custom retention review", "Audit export", "Dedicated onboarding and support"],
   notYetSold: [],
@@ -133,8 +131,6 @@ const PLANS: ReadonlyArray<{
   price: string;
   /** The qualifier under the price. Every card has one, so the four cards share a shape. */
   unit: string;
-  /** Rendered only when it exists: an empty tag used to reserve blank space above a title. */
-  tag: string | null;
   description: string;
   features: readonly string[];
   /** Named on the card, never implied by its absence. See `notYetSold` in the billing catalog. */
@@ -710,19 +706,30 @@ export default function PricingPageClient({
       <main id="main">
         <section className="scene doc">
           <div className="shell">
-            {/* BA-129. The kicker restated the headline word for word, so it is gone. */}
-            <h1 className="document-title">Pages and dollars.<br />No credit arithmetic.</h1>
+            {/*
+              BA-129. The kicker restated the headline word for word, so it is gone.
+
+              BQ-028 / BQ-097: the H1 is the noun phrase, and the second half of it is the first
+              sentence of the lede. A `<br/>` with no space either side of it merges the words on
+              both sides in the accessible name -- "arithmetic.Processing" -- and a two-sentence
+              H1 is two claims at display size when one of them is the page's subject and the
+              other is the argument for it.
+            */}
+            <h1 className="document-title">Pages and dollars.</h1>
             {/*
               BA-122. The rate line used to open on {liveCheckout ? "Standard" : "Pilot"}, which in
               this deployment renders "Pilot" -- telling a buyer the unit price is provisional. It
               is not: the standard rate is what the reservation code charges, whatever the posture
               is. Posture belongs to the plan CTAs and to /refunds, never to the unit price.
+
+              BQ-134: the two figures are no longer bolded mid-sentence. A price set in bold inside
+              a paragraph of prose is a heading pretending to be emphasis, and this paragraph is
+              two sentences long -- there is nothing in it a reader has to be steered past.
             */}
             <p className="lede">
-              Processing rate:{" "}
-              <b>{formatUsd(STANDARD_PAGE_USD)} per standard page</b>. Complex pages are escalated
-              only when a page needs it, and never exceed
-              <b> {formatUsd(MAXIMUM_PAGE_USD)} per page</b> without a new confirmation.
+              No credit arithmetic. The processing rate is {formatUsd(STANDARD_PAGE_USD)} per
+              standard page; complex pages are escalated only when a page needs it, and never
+              exceed {formatUsd(MAXIMUM_PAGE_USD)} per page without a new confirmation.
             </p>
             {/*
               §12.3's sentence, with this deployment's own values in it.
@@ -752,46 +759,62 @@ export default function PricingPageClient({
               {PLANS.map((plan) => (
                 <article className="plan" key={plan.name} data-featured={plan.name === "Developer" ? 1 : 0}>
                   {/*
-                    BA-125. The tag element used to render a literal " " for Team and Enterprise,
-                    reserving about 40px of unexplained space above those two titles. An element
-                    with nothing to say is not rendered.
+                    BQ-027. Four cards, four shared baselines.
 
-                    BA-131. Every card now carries a unit beside its price, so the four price lines
-                    sit on one baseline instead of three: "$0" and "Custom" used to have none,
-                    because the suffix was suppressed unless the string started with "$" and was
-                    not "$0".
+                    The cards were a flex column each, so every one of them stacked from its own
+                    top and the four titles, prices, bodies and buttons landed wherever their
+                    neighbours' content left them -- 32px apart at 1440. They are a subgrid now:
+                    `.plans` owns four rows and each card spans them, so the row heights are the
+                    tallest card's and each of the four slots below starts on the same line in
+                    all four cards. It is four wrappers rather than a `min-height` per part,
+                    because a fixed height is a measurement of today's copy.
+
+                    BA-125's tag is gone rather than re-reserved (BQ-028). It said "START HERE"
+                    and "TRY IT FREE" on two of four cards, shouted in caps above a heading that
+                    already names the plan, and it was the element whose presence on two cards
+                    and absence on two was half of the misalignment. The featured plan is still
+                    marked -- `data-featured` fills its ground and its button.
+
+                    BA-131 stands: every card carries a unit under its price, so "$0" and
+                    "Custom" line up with the two that have one.
                   */}
-                  {plan.tag ? <span className="tag">{plan.tag}</span> : null}
-                  <h2>{plan.name}</h2>
-                  {/*
-                    G2-009 and G2-039. The currency is part of the price and the qualifier is a
-                    block under it. As a trailing `<small>` the Enterprise card's "/ scoped with
-                    you" wrapped mid-phrase and left "you" alone on its own line.
-                  */}
-                  <span className="price">{plan.price}</span>
-                  <p className="fine">{plan.unit}</p>
+                  <div className="plan-head">
+                    <h2>{plan.name}</h2>
+                    {/*
+                      G2-009 and G2-039. The currency is part of the price and the qualifier is a
+                      block under it. As a trailing `<small>` the Enterprise card's "/ scoped with
+                      you" wrapped mid-phrase and left "you" alone on its own line.
+                    */}
+                    <span className="price">{plan.price}</span>
+                    <p className="fine">{plan.unit}</p>
+                  </div>
                   {/*
                     SD-01 (G1-001 on this page). The Evaluation card promised "your own files"
                     while `customerData` is closed. The card now reads the same gate the fine
                     print under the grid reads, and describes what the trial reaches today.
                   */}
-                  <p>{plan.name === EVALUATION.name && !ownFilesOpen ? EVALUATION_GATED_DESCRIPTION : plan.description}</p>
-                  <ul>{plan.features.map((feature) => <li key={feature}>{feature}</li>)}</ul>
-                  {/*
-                    SD-02 (G2-002). What this plan does not include, on the card, in the same type
-                    as the rest of it. Team's differentiator used to be shared membership, which
-                    `/security` and `/trust` deny; a buyer now reads that here instead of after
-                    they have paid.
-                  */}
-                  {plan.notYetSold.length > 0 ? (
-                    <>
-                      <p className="fine"><b>Coming, not yet sold</b></p>
-                      <ul>{plan.notYetSold.map((item) => <li key={item}>{item}</li>)}</ul>
-                    </>
-                  ) : null}
-                  {plan.note ? (
-                    <p className="fine"><Link href={plan.note.href}>{plan.note.label}</Link></p>
-                  ) : null}
+                  <p className="plan-body">
+                    {plan.name === EVALUATION.name && !ownFilesOpen ? EVALUATION_GATED_DESCRIPTION : plan.description}
+                  </p>
+                  <div className="plan-features">
+                    <ul>{plan.features.map((feature) => <li key={feature}>{feature}</li>)}</ul>
+                    {/*
+                      SD-02 (G2-002). What this plan does not include, on the card, in the same
+                      type as the rest of it. Team's differentiator used to be shared membership,
+                      which `/security` and `/trust` deny; a buyer now reads that here instead of
+                      after they have paid.
+                    */}
+                    {plan.notYetSold.length > 0 ? (
+                      <>
+                        <p className="fine"><b>Coming, not yet sold</b></p>
+                        <ul>{plan.notYetSold.map((item) => <li key={item}>{item}</li>)}</ul>
+                      </>
+                    ) : null}
+                    {plan.note ? (
+                      <p className="fine"><Link href={plan.note.href}>{plan.note.label}</Link></p>
+                    ) : null}
+                  </div>
+                  <div className="plan-action">
                   {/*
                     BA-120. The page where the purchase is decided had no primary action: every
                     plan button was `btn ghost`, so the buy control carried exactly the weight of
@@ -823,9 +846,10 @@ export default function PricingPageClient({
                           ? `Request ${plan.name} access`
                           : billingBusy === plan.offerCode
                             ? "Opening checkout…"
-                            : signedIn ? `Get ${plan.name} access` : `Get ${plan.name} access → sign in`}
+                            : signedIn ? `Get ${plan.name} access` : `Get ${plan.name} access, via sign-in`}
                   </a>
                   <p className="fine">{planPath(plan, { liveCheckout, selfService })}</p>
+                  </div>
                 </article>
               ))}
             </div>
@@ -847,6 +871,27 @@ export default function PricingPageClient({
                 <Link href={"/status" as Route}>Current deployment state</Link>
               </p>
             ))}
+            {/*
+              BQ-135. The way down a 13,000px page.
+
+              Measured on a phone the document below this point is about twenty-five screens, and
+              the only way through it was the thumb. This is the strip `/security` already uses:
+              plain anchors to headings that already carry ids, in fine print, no component and
+              no second list to keep in step -- a section that loses its id loses its link in the
+              same edit. It sits under the grid rather than above it, because the first thing on
+              a pricing page should be the prices.
+            */}
+            <nav className="fine pricing-jump" aria-label="On this page">
+              <a href="#pricing-details-title">How your plan works</a>
+              <a href="#plan-differences-title">What the step between plans buys</a>
+              <a href="#pricing-limits-title">Limits</a>
+              <a href="#page-classes-title">What makes a page complex</a>
+              <a href="#plan-capability-title">What each plan can do</a>
+              <a href="#pricing-scenarios-title">What four volumes cost</a>
+              <a href="#usage-estimator-title">Estimate your corpus</a>
+              <a href="#enterprise-pricing-title">Enterprise</a>
+              <a href="#pricing-faq-title">Questions before you buy</a>
+            </nav>
             <section className="pricing-details" aria-labelledby="pricing-details-title">
               <h2 id="pricing-details-title">How your plan works</h2>
             <div className="tiles pricing-glance">
@@ -874,7 +919,7 @@ export default function PricingPageClient({
             */}
             <h3 id="plan-differences-title">What the step between the two plans buys</h3>
             <div className="table-scroll">
-            <table className="docs-table" aria-labelledby="plan-differences-title">
+            <table className={`docs-table ${tableStyles.stacked}`} aria-labelledby="plan-differences-title">
               <thead>
                 <tr>
                   <th scope="col">&nbsp;</th>
@@ -886,8 +931,8 @@ export default function PricingPageClient({
                 {PLAN_DIFFERENCES.map(([label, developer, team]) => (
                   <tr key={label}>
                     <th scope="row">{label}</th>
-                    <td>{developer}</td>
-                    <td>{team}</td>
+                    <td data-label={BILLING_OFFERS.observer_access.label}>{developer}</td>
+                    <td data-label={BILLING_OFFERS.studio_access.label}>{team}</td>
                   </tr>
                 ))}
               </tbody>
@@ -895,7 +940,7 @@ export default function PricingPageClient({
             </div>
             <p className="fine">
               Those are the differences. Everything else — compiling, evidence, Ask, signed export,
-              API and MCP access, reviewing a candidate, promoting a World and rolling one back —
+              API and MCP access, reviewing a candidate, activating a World and rolling one back —
               is reached by both plans, at the same per-page rate past the included pages, under
               the same limits below. The capability table under this one is the proof: it is
               answered by the function the API calls, and it reads the same for both.
@@ -980,7 +1025,7 @@ export default function PricingPageClient({
             */}
             <h3 id="plan-capability-title">What each plan can do</h3>
             <div className="table-scroll">
-            <table className="docs-table" aria-labelledby="plan-capability-title">
+            <table className={`docs-table ${tableStyles.stacked}`} aria-labelledby="plan-capability-title">
               <thead>
                 <tr>
                   <th scope="col">Capability</th>
@@ -1003,7 +1048,7 @@ export default function PricingPageClient({
                   <tr key={row.capability}>
                     <th scope="row">{row.capability}</th>
                     {row.plans.map((plan) => (
-                      <td key={plan.label} data-allowed={plan.allowed ? 1 : 0} aria-label={plan.allowed ? "Yes" : "No"}>
+                      <td key={plan.label} data-label={plan.label} data-allowed={plan.allowed ? 1 : 0} aria-label={plan.allowed ? "Yes" : "No"}>
                         {plan.allowed ? "✓" : "—"}
                       </td>
                     ))}
@@ -1034,7 +1079,7 @@ export default function PricingPageClient({
             */}
             <h3 id="pricing-scenarios-title">What four volumes cost</h3>
             <div className="table-scroll">
-            <table className="docs-table" aria-labelledby="pricing-scenarios-title">
+            <table className={`docs-table ${tableStyles.stacked}`} aria-labelledby="pricing-scenarios-title">
               <thead>
                 <tr>
                   <th scope="col">Pages read in a month</th>
@@ -1046,8 +1091,8 @@ export default function PricingPageClient({
                 {SCENARIOS.map((scenario) => (
                   <tr key={scenario.pages}>
                     <th scope="row">{scenario.pages.toLocaleString("en-US")}</th>
-                    <td>{formatUsd(scenario.developer)}</td>
-                    <td>{formatUsd(scenario.team)}</td>
+                    <td data-label={BILLING_OFFERS.observer_access.label}>{formatUsd(scenario.developer)}</td>
+                    <td data-label={BILLING_OFFERS.studio_access.label}>{formatUsd(scenario.team)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1155,13 +1200,22 @@ export default function PricingPageClient({
               answers it rather than at a sales conversation. "Refunds" is the cancellation and
               refund terms page.
             */}
-            <div className="actions">
-              <Link className="btn ghost" href="/security">Where your documents go</Link>
-              <Link className="btn ghost" href={"/privacy" as Route}>Data handling</Link>
-              <Link className="btn ghost" href={"/sources" as Route}>What we can read</Link>
-              <Link className="btn ghost" href="/evidence">How evidence is bound</Link>
-              <Link className="btn ghost" href={"/refunds" as Route}>Cancellation and refunds</Link>
-            </div>
+            {/*
+              BQ-110. Five ghost buttons in a row is five equal-weight controls and no decision.
+
+              They are not actions -- none of them buys, starts or cancels anything; each is a
+              page that answers one of the four questions that stop a purchase. So they read as
+              what they are: a sentence of links in fine print. The page's actual primary control
+              is the plan button, four rows above, and it stops competing with five neighbours
+              that look exactly like it.
+            */}
+            <p className="fine">
+              Before you buy: <Link href="/security">where your documents go</Link> ·{" "}
+              <Link href={"/privacy" as Route}>how data is handled</Link> ·{" "}
+              <Link href={"/sources" as Route}>what we can read</Link> ·{" "}
+              <Link href="/evidence">how evidence is bound</Link> ·{" "}
+              <Link href={"/refunds" as Route}>cancellation and refunds</Link>.
+            </p>
             {notice ? <p className="notice" role="status">{notice}</p> : null}
           </div>
         </section>

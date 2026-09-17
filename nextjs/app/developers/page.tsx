@@ -6,6 +6,8 @@ import type { Route } from "next";
 import { PublicSitePage } from "@/components/public-site-chrome";
 import { DocsCopyButton } from "@/components/docs-copy-button";
 import { TrackedLink } from "@/components/tracked-link";
+import { PageToc, tocEntries } from "@/components/docs/page-toc";
+import tocStyles from "@/components/docs/page-toc.module.css";
 import { PACKAGE_CONTENTS } from "@/lib/package-contents";
 import { MCP_TOOL_COUNT_WORD, MCP_TOOL_NAMES } from "@/lib/mcp-tools";
 
@@ -88,15 +90,33 @@ function breakable(path: string) {
 }
 
 
+/*
+  BQ-100. The four sections of this page, in order, as the title column's navigation.
+
+  The decision puts navigation beside the heading on a reference route and collapses every other
+  route to one reading measure; the collapse in `app/product-polish.css` is written as the
+  condition -- an H1 alone in that column -- so naming the sections here is the whole of the fix.
+  "Next" is not in the list: it is the closing action row, and a jump list whose last entry is
+  "the end of the page" is a scrollbar with words on it.
+*/
+const SECTIONS = [
+  "Three ways to use a Compiled World",
+  "From sources to a grounded answer",
+  "Public tooling",
+  "What is in a portable package",
+] as const;
+
 export default function DevelopersPage() {
+  const sections = tocEntries(SECTIONS);
+
   return (
     <PublicSitePage>
       <section className="scene doc">
         <div className="shell">
           <div className="body">
             <div className="stack">
-              <p className="slate"><b>DEVELOPERS</b><span aria-hidden="true" />· ONE WORLD</p>
               <h1 className="document-title">Give every model the same grounded world.</h1>
+              <PageToc entries={sections} />
             </div>
             <div className="stack">
               <p className="lede">
@@ -105,7 +125,7 @@ export default function DevelopersPage() {
                 the asset.
               </p>
 
-              <p className="slate"><span aria-hidden="true" />THREE WAYS TO USE A COMPILED WORLD</p>
+              <h2 className={tocStyles.anchor} id={sections[0].id}>Three ways to use a Compiled World</h2>
               <div className="chain dev-paths">
                 {PATHS.map((path) => (
                   <article className="link" key={path.kind}>
@@ -117,7 +137,7 @@ export default function DevelopersPage() {
                 ))}
               </div>
 
-              <p className="slate"><span aria-hidden="true" />FROM SOURCES TO A GROUNDED ANSWER</p>
+              <h2 className={tocStyles.anchor} id={sections[1].id}>From sources to a grounded answer</h2>
               <ol className="dev-journey">
                 {JOURNEY.map(([title, body]) => (
                   <li key={title}>
@@ -136,7 +156,7 @@ export default function DevelopersPage() {
               </p>
 
               <div className="stack">
-                <p className="slate"><b>PUBLIC TOOLING</b><span aria-hidden="true" />· VERSIONED FILES</p>
+                <h2 className={tocStyles.anchor} id={sections[2].id}>Public tooling</h2>
                 <h3>Start with the contract, then a scoped key.</h3>
                 <figure className="docs-code">
                   <figcaption>
@@ -193,12 +213,12 @@ export default function DevelopersPage() {
               </div>
 
               <div className="stack">
-                <p className="slate"><b>PORTABLE PACKAGE</b><span aria-hidden="true" />· WHAT IS IN THE ARCHIVE</p>
+                <h2 className={tocStyles.anchor} id={sections[3].id}>What is in a portable package</h2>
                 <p className="fine">
                   Every signed export contains these files, written by the exporter and named in
                   a manifest carrying a digest for each one. The two ontology files are the
                   Compiled World&rsquo;s RDF / JSON-LD semantic projection — a projection of the
-                  compiled objects and relations, not a hand-authored OWL schema.
+                  compiled objects and relations, with no schema for you to author.
                 </p>
                 <table className={`docs-table ${tableStyles.stacked}`}>
                   <thead><tr><th>Path</th><th>Use it for</th></tr></thead>
@@ -219,7 +239,7 @@ export default function DevelopersPage() {
                 </table>
               </div>
 
-              <p className="slate"><span aria-hidden="true" />NEXT</p>
+              <h2>Next</h2>
               <div className="actions">
                 <Link className="btn" href={"/docs/quickstart" as Route}>Run the quickstart</Link>
                 {/* BA-184 is reversed here: /api is a rendered reference now, not a stub. G3-004. */}

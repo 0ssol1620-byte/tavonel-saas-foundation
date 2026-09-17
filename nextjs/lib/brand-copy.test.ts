@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -279,6 +279,25 @@ const OVERCLAIMS = ["generally available", "production-ready", "fully automated 
 
 function read(surface: string): string {
   return readFileSync(join(root, surface), "utf8");
+}
+
+/**
+ * Every marketing `page.tsx`, walked rather than listed (BQ-029).
+ *
+ * `app/api` is route handlers, `app/workspace` and `app/dev` are behind sign-in, and neither is
+ * a surface a first-time reader meets. Everything else under `app/` is.
+ */
+function marketingPageFiles(directory = "app", found: string[] = []): string[] {
+  for (const entry of readdirSync(join(root, directory), { withFileTypes: true })) {
+    const path = `${directory}/${entry.name}`;
+    if (entry.isDirectory()) {
+      if (["api", "workspace", "dev", "auth"].includes(entry.name) && directory === "app") continue;
+      marketingPageFiles(path, found);
+    } else if (entry.name === "page.tsx") {
+      found.push(path);
+    }
+  }
+  return found;
 }
 
 /*
@@ -689,12 +708,25 @@ describe("public copy", () => {
     expect(families.length, "the model is eight families: one shipped, seven contracted").toBe(7);
     expect(families).not.toContain(shipped![1]);
 
-    // The status is in the grid, not folded under it, and it says what it is.
-    expect(page, "an unshipped locator needs its state on its own tile")
-      .toContain("Reading today");
-    expect(page).toContain("Reader not shipped");
+    /*
+      The status is above the grid, not folded under it, and it says what it is.
+
+      BQ-112 moved it off the tiles: the same four words on all seven of them was one fact
+      printed seven times as the loudest element in the section. What BA-078 was defending is
+      the position, not the repetition -- the correction must be read before the grid rather
+      than discovered behind a click -- so that is what is pinned. It is prose in the heading's
+      block, and it is not inside a `<details>`.
+    */
+    expect(page, "the locator that reads today is marked as the one that does").toContain("Reading today");
+    expect([...page.matchAll(/Reader not shipped/g)], "one statement, not one per tile").toHaveLength(1);
+    expect(
+      page.slice(page.indexOf("Reader not shipped")).indexOf("CONTRACTED_LOCATORS.map"),
+      "the state is read before the grid, not after it",
+    ).toBeGreaterThan(0);
     expect(page, "the correction may not go back into a fold")
       .not.toContain("See current locator coverage");
+    // And may not be put inside one: nothing above the statement opens a disclosure at all.
+    expect(page.slice(0, page.indexOf("Reader not shipped"))).not.toContain("<details");
 
     /*
       And the claim is the one `/sources` supports. `LIVE_PRESERVED` is the manifest's own list,
@@ -1004,6 +1036,11 @@ describe("the site's own vocabulary", () => {
     // is held to. `RETIRED_NAMES` below is the other half of the same rule.
     expect(PRODUCT_NOUNS).toContain("Compiled World");
     expect(PRODUCT_NOUNS).toContain("Trust Center");
+    // BQ-098: the category noun is in the table too, and no public page writes it in lower case.
+    expect(PRODUCT_NOUNS).toContain("Knowledge Compiler");
+    for (const file of marketingPageFiles()) {
+      expect(prose(file), `${file} lower-cases the category noun`).not.toMatch(/knowledge compiler/);
+    }
     // The commercial posture chooses between the two; it does not write a third.
     expect(primaryCallToAction({})).toEqual(ACCESS_CTA);
     /*
@@ -1024,6 +1061,31 @@ describe("the site's own vocabulary", () => {
   });
 
   /*
+    D9. One verb for the act, in the copy a reader sees: a candidate is *activated*, never
+    *promoted*.
+
+    The decision lets the code keep the older name -- the route is still
+    `app/api/collections/[id]/promote/route.ts` and the gate is still `candidatePromotion`, and
+    renaming either is a migration rather than a copy fix -- so a line naming one of those two
+    is not reader copy and does not count here. /privacy and /terms are the founder's legal
+    text and are not an implementer's to rewrite at all.
+
+    Comments are stripped by `prose`, which is what makes the rule checkable: the pages are full
+    of paragraphs explaining which word was there before.
+  */
+  it("activates a candidate, and never promotes one, in reader copy (D9)", () => {
+    const LEGAL = ["app/privacy/page.tsx", "app/terms/page.tsx"];
+    for (const file of marketingPageFiles()) {
+      if (LEGAL.includes(file)) continue;
+      const lines = prose(file)
+        .split(/\r?\n/)
+        .filter((line) => !/candidatePromotion|promote\/route/.test(line))
+        .filter((line) => /\bpromot/i.test(line));
+      expect(lines, `${file} writes the promote verb in copy a reader sees`).toEqual([]);
+    }
+  });
+
+  /*
     G1-001: /explore's closing action is the site's access action, not a fourth spelling of it.
 
     `lib/explore-story.ts` is reachable from the client bundle, where the commercial flags inline
@@ -1041,6 +1103,49 @@ describe("the site's own vocabulary", () => {
     for (const name of RETIRED_NAMES) {
       expect(source, `"${name}" is a retired spelling; the table is PRODUCT_NOUNS`).not.toContain(name);
     }
+  });
+
+  /*
+    BQ-029, and the widening the comment above `RETIRED_NAMES` promised.
+
+    The audit counted thirteen spellings of the contact action and fourteen of the Explore
+    action across the marketing routes: "Open the read-only sample", "Explore a World", "See a
+    compiled World", "See a page and its regions", "Talk to us about your corpus", "Talk to us
+    about your sources", "Talk about a pilot". None of them was wrong on its own page; together
+    they meant a reader could not learn one name for one thing.
+
+    This walks the marketing routes rather than a list of surfaces, so a page added tomorrow is
+    checked without anybody remembering to add it. A **button** to either destination reads its
+    label from the constant. Prose is deliberately not covered: a link inside a sentence is part
+    of the sentence, and forcing a constant into one produces English nobody writes.
+
+    A context variant is still allowed where the destination is a genuinely different
+    conversation, and it is allowed by being named here rather than by not being noticed --
+    today, scoping an Enterprise pilot and asking a security-review question.
+  */
+  const CTA_VARIANTS = [
+    "Scope an Enterprise pilot",
+    "Ask a security review question",
+    "Ask a privacy question",
+    // BQ-136: /status closes on the thing it asks for twice in its own prose -- report what
+    // you are seeing rather than wait for it to appear here. "Request access" on a page a
+    // reader opened because something looks broken is a different conversation from this one.
+    "Report an outage",
+  ];
+
+  it("names the two site-wide actions from their constants on every marketing route", () => {
+    const routes = marketingPageFiles();
+    expect(routes.length, "no marketing routes found -- the walk is out of date").toBeGreaterThan(10);
+    const offenders: string[] = [];
+    for (const file of routes) {
+      const source = prose(file);
+      for (const [, label] of source.matchAll(
+        /<Link className="btn[^"]*" href=(?:"\/(?:explore|contact)"|\{"\/(?:explore|contact)" as Route\})>([^<{][^<]*)<\/Link>/g,
+      )) {
+        if (!CTA_VARIANTS.includes(label.trim())) offenders.push(`${file}: "${label.trim()}"`);
+      }
+    }
+    expect(offenders, "a button writes its own label for an action that has a constant").toEqual([]);
   });
 
   /*

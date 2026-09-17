@@ -187,15 +187,17 @@ export default function TrustCenterPage() {
           <div className="body policy-copy"><IndexedPolicyBody>
             <div className="stack">
               {/*
-                BA-150. The eyebrow named this page's two sections. It now names the page's
-                subject, which is what a procurement reader scanning for it is looking for.
+                BA-150 put the page's subject in the heading, which is what a procurement reader
+                scanning for it is looking for. BA-176 was about the `<br/>` that fused
+                "publishabout" in the accessible name; BQ-097 removed the break entirely.
 
-                BA-176: the trailing space before the break has to be a string literal. JSX drops
-                the whitespace at the end of a text line, so the accessible name and the document
-                outline both read "publishabout" without it.
+                BQ-112. "Everything we publish" opened on a completeness claim and then spent the
+                page qualifying it -- including a section called "What is not published yet". A
+                heading that has to be withdrawn three screens later is not a heading, and
+                completeness was never the page's argument: its job is to be the one address
+                where the handling answers are, which is what it says now.
               */}
-              <p className="slate"><b>TRUST CENTER</b><span />SECURITY AND COMPLIANCE</p>
-              <h1 className="document-title">{"Everything we publish "}<br />about handling your documents.</h1>
+              <h1 className="document-title">What we publish about handling your documents.</h1>
               {/* G2-040 / G2-041: one jump index for long documents, from the shared component. */}
               <PolicyJumpIndex />
             </div>
@@ -267,7 +269,7 @@ export default function TrustCenterPage() {
                 be seven destinations, that is the defect. Making the tile the anchor also gives a
                 phone a target the size of the card rather than the size of two words.
               */}
-              <p className="slate"><span />THE PAGES</p>
+              <h2>The pages</h2>
               <div className="tiles">
                 {DESTINATIONS.map(([title, body, href]) => (
                   <Link className="tile trust-link" key={title} href={href}>
@@ -294,7 +296,7 @@ export default function TrustCenterPage() {
                 </a>
               </div>
 
-              <p className="slate"><span />WHAT A REVIEW ASKS, AND WHERE IT IS ANSWERED</p>
+              <h2>What a review asks, and where it is answered</h2>
               <div className="chain">
                 {/*
                   BA-160. Each row is the anchor, for the same reason the tiles above are: the row
@@ -316,7 +318,7 @@ export default function TrustCenterPage() {
               </div>
 
               {/* BA-150. The section label states its subject rather than declaring a hole. */}
-              <p className="slate"><span />WHAT IS NOT PUBLISHED YET</p>
+              <h2>What is not published yet</h2>
               <div className="tiles">
                 {NOT_PUBLISHED.map(([title, body, href]) => (
                   <article className="tile" key={title}>
@@ -336,7 +338,7 @@ export default function TrustCenterPage() {
                 again in their checklist position, which is where somebody comparing vendors goes
                 looking for them.
               */}
-              <TrustDisclosures heading="THE CHECKLIST, ROW BY ROW" on="/trust" />
+              <TrustDisclosures heading="The checklist, row by row" on="/trust" />
 
               {/*
                 BA-173. The first sentence answered an accusation nobody made ("nothing here is a

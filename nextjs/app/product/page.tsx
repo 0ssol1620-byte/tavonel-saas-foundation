@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import type { Route } from "next";
 import { PublicPageShell } from "@/components/public-page-shell";
 import PublicPrimaryCta from "@/components/public-primary-cta";
+import { EXPLORE_CTA } from "@/lib/site-navigation";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/product" },
@@ -21,17 +23,17 @@ const SURFACES = [
   ["/product/continuous-knowledge", "CONTRACT", "Continuous recompilation", "What a compile promises when a source changes: eight clauses, each carrying the state it holds in this deployment."],
 ] as const;
 
-const PRODUCT_FLOW = [
-  ["SOURCE", "Files, folders, ZIP and connected systems"],
-  // "Pages, tables, regions and coordinates" said a table is read as a table. Audit M01: what
-  // survives the read is the paragraph, the page and the box it sat in, and
-  // /product/document-understanding now derives that sentence from the capability manifest. This
-  // row stops contradicting it.
-  ["READ", "Pages, paragraphs, regions and coordinates"],
-  ["STRUCTURE", "Entities, claims, relations and review"],
-  ["WORLD", "Evidence, graph, retrieval and portable export"],
-] as const;
+/*
+  BQ-109. The flow strip that used to stand here is gone, and the surface cards are the one
+  representation of the path left on this page.
 
+  It printed SOURCE / READ / STRUCTURE / WORLD directly above four cards reading CATEGORY /
+  READING / OUTPUT / CONTRACT -- the same four beats, the same order, two visual systems, and
+  a reader asking which of the two to follow. The cards win because they are the only half
+  that goes anywhere: each one is a link to the page that answers it. What the strip carried
+  and the cards do not is the sentence under the H1 ("Documents, scans and connected systems
+  go in") and the list of sources, which is a link in the closing row.
+*/
 /*
   Audit ST03. Which layer this replaces and which it plugs into, said once, with no competitor
   named and no competitor's number quoted.
@@ -58,7 +60,7 @@ const PRODUCT_FLOW = [
 */
 const LAYERS = [
   ["Document parsing and OCR", "Replaced", "Reading is a compile step here: sanitize, read, keep the location and the uncertainty, and carry both into review."],
-  ["Ingestion and cleanup scripts", "Replaced", "One compile over a collection, versioned, producing a candidate a person promotes, with the revision it replaces still readable."],
+  ["Ingestion and cleanup scripts", "Replaced", "One compile over a collection, versioned, producing a candidate a person activates, with the revision it replaces still readable."],
   ["Enterprise search", "Connects to", "The package carries a retrieval corpus, and the API and MCP are read-only. An existing search product keeps its index; what changes is that a result can name the source version behind it."],
   ["Ontology and knowledge platforms", "Connects to", "Turtle, JSON-LD and CSV leave in a signed package that a graph database or an ontology tool imports, so modelling and business rules stay in the tool your team already runs."],
   ["Agent and workflow orchestration", "Connects to", "Eight read-only MCP tools and an HTTP API: an agent reads a World, and the actions it takes stay in the orchestrator that took them."],
@@ -71,7 +73,6 @@ export default function ProductPage() {
         <div className="shell">
           <div className="body product-hero">
             <div className="stack">
-              <p className="slate"><b>PRODUCT</b><span />KNOWLEDGE COMPILER</p>
               {/*
                 BA-023. "actually" was doing the reader's arguing for them -- it concedes that
                 they arrived expecting the opposite. The home page's headline already carries the
@@ -81,17 +82,8 @@ export default function ProductPage() {
             </div>
             <div className="stack">
               <p className="lede">Documents, scans and connected systems go in. A source-grounded, versioned Compiled World comes out — with evidence still attached.</p>
-              <div className="actions"><PublicPrimaryCta className="btn" /><Link className="btn ghost" href="/explore">Explore a World</Link></div>
+              <div className="actions"><PublicPrimaryCta className="btn" /><Link className="btn ghost" href={EXPLORE_CTA.href as Route}>{EXPLORE_CTA.label}</Link></div>
             </div>
-          </div>
-
-          <div className="product-flow" aria-label="TAVONEL product flow" data-visual>
-            {PRODUCT_FLOW.map(([stage, detail], index) => (
-              <article key={stage}>
-                <span>{String(index + 1).padStart(2, "0")} · {stage}</span>
-                <strong>{detail}</strong>
-              </article>
-            ))}
           </div>
 
           <div className="product-surface-grid">
@@ -100,18 +92,23 @@ export default function ProductPage() {
                 <span>{state}</span>
                 <h2>{title}</h2>
                 <p>{body}</p>
-                <b>Open →</b>
+                {/*
+                  BQ-134: "Open →" is gone from all four cards. The whole `<article>` is the
+                  anchor, so it was a second label for a link the reader is already inside, set
+                  in 9px tracked mono -- below the type floor, and the least useful four
+                  characters on the card. The heading names the destination.
+                */}
               </Link>
             ))}
           </div>
 
           <section className="product-boundary" aria-labelledby="product-layers-title">
-            <p className="slate"><b>BOUNDARY</b><span />WHAT THIS REPLACES, WHAT IT CONNECTS TO</p>
             {/*
               BA-027. "Two of these layers are ours. Three of them are yours." was a riddle whose
               answer was the table under it, and on the page where the other question a buyer
               brings is who holds their data, ours-versus-yours is the wrong axis to be ambiguous
-              about. The eyebrow above already says it; this says it in a sentence.
+              about. BQ-099 deleted the eyebrow that used to say it above this; the heading says
+              it in a sentence, and it is the only heading this section has.
             */}
             <h2 id="product-layers-title">What we replace, and what we plug into.</h2>
             <table className="docs-table">
@@ -149,7 +146,7 @@ export default function ProductPage() {
             */}
             <h2>{SURFACES.map(([, state]) => state.charAt(0) + state.slice(1).toLowerCase()).join(" · ")} — one compiled World.</h2>
             <div className="actions">
-              <Link className="btn" href="/explore">Explore a Compiled World</Link>
+              <Link className="btn" href={EXPLORE_CTA.href as Route}>{EXPLORE_CTA.label}</Link>
               <Link className="btn ghost" href="/sources">See supported sources</Link>
             </div>
           </section>

@@ -49,12 +49,23 @@
   padding: 0;
 }
 
+/*
+  BQ-111. The control the reader just pressed is scrolled to, and the sticky header is 62px
+  tall.
+
+  Selecting a filter navigates to that control’s own fragment, which is what makes the
+  narrowing work without script -- and the browser then puts the fragment at the very top of
+  the viewport, i.e. underneath the header, with the tiles it filtered pushed off the bottom.
+  It reads as the page jumping and the selection disappearing. A scroll margin lands the
+  filter row under the header with its results already in view.
+*/
 .filters a {
+  scroll-margin-top: 96px;
   display: inline-flex;
   align-items: center;
   min-height: 44px;
   border: 1px solid var(--hairline);
-  border-radius: 3px;
+  border-radius: var(--r-inst);
   padding: 6px 13px;
   font-size: 12px;
   line-height: 1.3;
@@ -62,7 +73,10 @@
   text-decoration: none;
 }
 
-.filters a:hover { border-color: var(--hairline-hi); color: var(--text-hi); }
+/* Hover is gated: on a touch screen an un-gated :hover sticks after a tap (token contract). */
+@media (hover: hover) and (pointer: fine) {
+  .filters a:hover { border-color: var(--hairline-hi); color: var(--text-hi); }
+}
 
 /* "Everything" is the state on arrival, so it looks like the state on arrival. */
 .filters a:first-of-type { border-color: var(--text-mid); color: var(--text-hi); }
@@ -87,23 +101,24 @@
 */
 .hub .filters .groupLabel { max-width: none; }
 
+/*
+  BQ-111 / type floor: 12px sans, not 10px tracked mono. These three words label a group of
+  controls a reader chooses between; they are not a machine identifier, and 10px was under the
+  floor the token contract sets. `--text-xlo` is deleted by that contract, so the colour is the
+  one the eyebrow uses.
+*/
 .groupLabel {
   flex-basis: 100%;
   margin: 10px 0 0;
-  font-family: var(--f-mono);
-  font-size: 10px;
-  letter-spacing: 0.16em;
-  color: var(--text-xlo);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--text-mid);
 }
 
 .groupLabel:first-child { margin-top: 0; }
 
-/* BA-083: the card's way in, where the tracked-uppercase tag repetition used to be. */
-.tileAction { margin: 0; font-size: 12px; }
-.tileAction a { color: var(--text-mid); text-decoration: none; }
-.tileAction a:hover { color: var(--text-hi); }
-
-.representative { margin: 0; font-size: 11.5px; color: var(--text-mid); }
+.representative { margin: 0; font-size: 12px; color: var(--text-mid); }
 
 .hub:has(:global(#find-evaluate):target) [data-tags]:not([data-tags~="evaluate"]),
 .hub:has(:global(#find-build):target) [data-tags]:not([data-tags~="build"]),

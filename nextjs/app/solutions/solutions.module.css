@@ -18,7 +18,7 @@
 .card .audience {
   /* Mono at this size wraps badly at 360px for the longest of the five audiences, so it stays
      in the text face and just drops a step in size and contrast. */
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--text-mid);
 }
 
@@ -31,8 +31,8 @@
 */
 .card .problem {
   margin: 0;
-  font-size: 11.5px;
-  color: var(--text-xlo);
+  font-size: 12px;
+  color: var(--text-lo);
 }
 
 /*
@@ -69,9 +69,12 @@
   inset: 0;
 }
 
-.card:hover {
-  background: var(--g2);
-  box-shadow: inset 0 0 0 1px var(--hairline-hi);
+/* Hover is gated: on a touch screen it sticks after a tap and reads as a selection. */
+@media (hover: hover) and (pointer: fine) {
+  .card:hover {
+    background: var(--g2);
+    box-shadow: inset 0 0 0 1px var(--hairline-hi);
+  }
 }
 
 .card:focus-within {

@@ -34,7 +34,7 @@
 
 .frame { fill: var(--g1); stroke: var(--hairline-hi); }
 .title { fill: var(--text-hi); font: 12.5px var(--f-mono); letter-spacing: 0.1em; text-anchor: middle; }
-.detail { fill: var(--text-xlo); font: 10.5px var(--f-mono); letter-spacing: 0.04em; text-anchor: middle; }
+.detail { fill: var(--text-lo); font: 10.5px var(--f-mono); letter-spacing: 0.04em; text-anchor: middle; }
 
 /*
   Dashed is the whole honesty mechanism of this drawing, so it is one rule and not a per-box
@@ -58,7 +58,7 @@
 
 /* -------------------------------------------------------------------- legend */
 
-.legend text { fill: var(--text-xlo); font: 9.5px var(--f-mono); letter-spacing: 0.14em; }
+.legend text { fill: var(--text-lo); font: 9.5px var(--f-mono); letter-spacing: 0.14em; }
 .legendBuilt { stroke: var(--hairline-hi); fill: none; }
 .legendDirection { stroke: var(--hairline); stroke-dasharray: 4 3; fill: none; }
 

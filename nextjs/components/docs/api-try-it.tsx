@@ -98,8 +98,19 @@ export function ApiTryIt({ routes }: { routes: TryItRoute[] }) {
                 </button>
               </div>
               <p className={styles.note}>{route.note}</p>
+              {/*
+                BQ-137. The live region is the one-line outcome, not the response body.
+
+                `role="status"` was on the whole result block, and that block holds up to
+                4,000 characters of JSON in a <pre>. A screen reader announced the entire
+                body on every run, uninterruptibly, for a control whose news is "200, 143
+                ms". The region is also mounted from the start rather than inserted with the
+                result: a live region that appears at the same moment as its content is not
+                reliably announced at all, which is the other half of the same bug.
+              */}
+              <p className={styles.announce} role="status">{announcement(route.label, pending === route.path, result)}</p>
               {result ? (
-                <div className={styles.result} role="status">
+                <div className={styles.result}>
                   {"error" in result ? (
                     <p className={styles.failed}>The request did not complete: {result.error}</p>
                   ) : (
@@ -120,4 +131,12 @@ export function ApiTryIt({ routes }: { routes: TryItRoute[] }) {
       </ul>
     </section>
   );
+}
+
+/** What a run is worth saying out loud: the outcome, never the body it returned. */
+function announcement(label: string, running: boolean, result: Result | undefined) {
+  if (running) return `${label}: running.`;
+  if (!result) return "";
+  if ("error" in result) return `${label}: the request did not complete.`;
+  return `${label}: ${result.status} in ${result.ms} ms.`;
 }

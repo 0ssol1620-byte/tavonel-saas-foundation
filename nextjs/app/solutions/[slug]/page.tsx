@@ -5,7 +5,7 @@ import { PublicPageShell } from "@/components/public-page-shell";
 import PublicPrimaryCta from "@/components/public-primary-cta";
 import SolutionProofSample from "@/components/solution-proof-sample";
 import DesignPartners from "@/components/design-partners";
-import { RESOURCE_TAG_LABELS, resourceFilterHref, type ResourceTag } from "@/lib/site-navigation";
+import { EXPLORE_CTA, RESOURCE_TAG_LABELS, resourceFilterHref, type ResourceTag } from "@/lib/site-navigation";
 import styles from "../solutions.module.css";
 
 /*
@@ -106,7 +106,7 @@ export const SOLUTIONS = {
       this deployment does not do automatically -- and step 04's "Create actual relations" was not
       English anyone writes. Both steps now name the behaviour a buyer plans around.
     */
-    flow: ["Create semantic objects", "Hold uncertain identities for review", "Bind source evidence", "Emit evidence-bound relations", "Promote a reviewed World"],
+    flow: ["Create semantic objects", "Hold uncertain identities for review", "Bind source evidence", "Emit evidence-bound relations", "Activate a reviewed World"],
     headings: {
       flow: "From filing text to objects and edges.",
       outcomes: "What loads into the store you already run.",
@@ -162,7 +162,7 @@ export const SOLUTIONS = {
     outcomes: ["Answer and evidence share one World version", "Citation inspection at the exact source location", "Declines when nothing matched", "Model-independent knowledge"],
     limitations: [
       "The World returns the regions that matched and their locators, and declines when nothing matched at all. Judging whether what matched answers the question is the reader’s call, and the evidence is there to make it.",
-      "Ask, the API and MCP read the same active revision, so an assistant is as current as the last promotion.",
+      "Ask, the API and MCP read the same active revision, so an assistant is as current as the last activation.",
       "Model choice is yours; the World is the contract.",
     ],
   },
@@ -171,10 +171,10 @@ export const SOLUTIONS = {
     audience: "Knowledge owners and security reviewers",
     eyebrow: "KNOWLEDGE OPERATIONS",
     name: "Knowledge operations",
-    title: "Review, promote and govern knowledge as an operational asset.",
+    title: "Review, activate and govern knowledge as an operational asset.",
     lede: "Separate candidate compilation from the active World, preserve change history and keep human decisions explicit.",
     problem: "Automated extraction becomes operational risk when updates silently replace the knowledge used by production systems.",
-    flow: ["Compile a candidate", "Route review reasons", "Inspect source versus result", "Promote explicitly", "Rollback when needed"],
+    flow: ["Compile a candidate", "Route review reasons", "Inspect source versus result", "Activate explicitly", "Rollback when needed"],
     headings: {
       flow: "From a new filing to an approved revision.",
       outcomes: "What a reviewer signs, and what stays on record.",
@@ -182,11 +182,11 @@ export const SOLUTIONS = {
     proof: {
       form: "DEF 14A",
       match: /Audit Committee Ron Sugar/,
-      framing: "A governance passage from the proxy — the kind of region a reviewer opens beside the compiled result before promoting a candidate to active.",
+      framing: "A governance passage from the proxy — the kind of region a reviewer opens beside the compiled result before activating a candidate.",
     },
-    outcomes: ["Candidate-to-active lifecycle", "Human promotion gate", "Activity and audit records", "Budget and retention controls"],
+    outcomes: ["Candidate-to-active lifecycle", "Human activation gate", "Activity and audit records", "Budget and retention controls"],
     limitations: [
-      "Promotion is a human decision by design.",
+      "Activation is a human decision by design.",
       /*
         BA-049. "Membership is not available yet for shared workspaces; Team remains contact-only
         until tenancy is complete" put an internal engineering milestone in front of knowledge
@@ -244,7 +244,6 @@ export default async function SolutionPage({ params }: { params: Promise<{ slug:
       <section className="scene doc solution-page"><div className="shell">
         <div className="body solution-hero">
           <div className="stack">
-            <p className="slate"><b>SOLUTION</b><span />{solution.eyebrow}</p>
             <h1 className="document-title">{solution.title}</h1>
           </div>
           <div className="stack solution-hero-copy">
@@ -265,7 +264,6 @@ export default async function SolutionPage({ params }: { params: Promise<{ slug:
 
         <section className="solution-section" aria-labelledby="solution-flow-title">
           <div className="solution-section-heading">
-            <p className="slate"><b>WORKFLOW</b><span />FROM SOURCE TO WORLD</p>
             {/* G1-016. Five pages shared these two headings verbatim; each now names its own
                 corpus and audience, so the outline of one page is not the outline of five. */}
             <h2 id="solution-flow-title">{solution.headings.flow}</h2>
@@ -291,7 +289,6 @@ export default async function SolutionPage({ params }: { params: Promise<{ slug:
 
         <section className="solution-section" aria-labelledby="solution-outcomes-title">
           <div className="solution-section-heading">
-            <p className="slate"><b>OUTCOMES</b><span />WHAT YOU CAN USE</p>
             <h2 id="solution-outcomes-title">{solution.headings.outcomes}</h2>
           </div>
           {/*
@@ -351,7 +348,7 @@ export default async function SolutionPage({ params }: { params: Promise<{ slug:
 
         <div className="actions solution-actions">
           <PublicPrimaryCta className="btn" />
-          <Link className="btn ghost" href="/explore">Explore a World</Link>
+          <Link className="btn ghost" href={EXPLORE_CTA.href as Route}>{EXPLORE_CTA.label}</Link>
         </div>
       </div></section>
     </PublicPageShell>

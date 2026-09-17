@@ -29,7 +29,20 @@ export function DocsCopyButton({ value, label = "Copy" }: { value: string; label
       }}
     >
       {state === "copied" ? <Check size={12} /> : <Copy size={12} />}
-      {state === "copied" ? "Copied" : state === "failed" ? "Select and copy" : label}
+      {/*
+        BQ-137. The label changes width when the state does -- "Copy cURL" to "Copied" to
+        "Select and copy" -- and the button sits at the right end of a figcaption, so each change
+        moved the control out from under the pointer that had just pressed it. The longest of the
+        three states holds the width open and the visible one is laid over it.
+      */}
+      <span className="docs-copy-label">
+        <span aria-hidden="true" className="docs-copy-reserve">
+          {label.length > "Select and copy".length ? label : "Select and copy"}
+        </span>
+        <span className="docs-copy-text">
+          {state === "copied" ? "Copied" : state === "failed" ? "Select and copy" : label}
+        </span>
+      </span>
     </button>
   );
 }

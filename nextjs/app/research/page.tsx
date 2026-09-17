@@ -40,7 +40,7 @@ const AREAS = [
   ],
   [
     "Evidence coverage",
-    "Measuring how much of a compiled world is actually supported by a source region, rather than assuming coverage from the absence of errors.",
+    "Measuring how much of a Compiled World is actually supported by a source region, rather than assuming coverage from the absence of errors.",
   ],
   [
     "Temporal integrity",
@@ -69,11 +69,11 @@ const AREAS = [
   */
   [
     "Cost of staying current",
-    "Sources keep arriving, and a world nobody can afford to update stops being worth having. What it costs to keep a compiled world faithful to changing sources is the question this work is aimed at.",
+    "Sources keep arriving, and a world nobody can afford to update stops being worth having. What it costs to keep a Compiled World faithful to changing sources is the question this work is aimed at.",
   ],
   [
     "Model independence",
-    "The worth of a compiled world should not rest on which model produced it. Holding the product's guarantees stable while the models underneath change is what this work is for.",
+    "The worth of a Compiled World should not rest on which model produced it. Holding the product's guarantees stable while the models underneath change is what this work is for.",
   ],
 ] as const;
 
@@ -91,8 +91,7 @@ export default function ResearchPage() {
         <div className="shell">
           <div className="body policy-copy"><IndexedPolicyBody>
             <div className="stack">
-              <p className="slate"><b>RESEARCH</b><span />KNOWLEDGE COMPILATION</p>
-              <h1 className="document-title">The hard parts of turning<br />documents into knowledge.</h1>
+              <h1 className="document-title">The hard parts of turning documents into knowledge.</h1>
               {/* G2-040 / G2-041: one jump index for long documents, from the shared component. */}
               <PolicyJumpIndex />
             </div>
@@ -111,12 +110,12 @@ export default function ResearchPage() {
                 Parsing a document is a solved-enough problem. Deciding what the document is
                 about, which of its statements are the same statement as one in another document,
                 what supports them, and what a change to page 40 invalidates three files away — is
-                not. This page is <b>which problems are still open, and how we work on them</b>;
+                not. This page is which problems are still open, and how we work on them;
                 the results themselves are on{" "}
                 <Link href={"/research/notes" as Route}>Research notes</Link>.
               </p>
 
-              <p className="slate"><span />RESEARCH AREAS</p>
+              <h2>Research areas</h2>
               <div className="tiles">
                 {AREAS.map(([title, body]) => (
                   <article className="tile" key={title}>
@@ -133,7 +132,7 @@ export default function ResearchPage() {
                 missing was the sentence saying so, which is why a reader met the same four rules
                 twice and could not tell which page enforced them.
               */}
-              <p className="slate"><span />HOW WE REPORT</p>
+              <h2>How we report</h2>
               <p className="fine">
                 Each rule below is enforced on a published figure by the validator described on{" "}
                 <Link href={"/benchmarks" as Route}>Benchmarks</Link>, which refuses a record that

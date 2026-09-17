@@ -4,6 +4,7 @@ import { PublicPageShell } from "@/components/public-page-shell";
 import PublicPrimaryCta from "@/components/public-primary-cta";
 import { SOLUTIONS } from "./[slug]/page";
 import styles from "./solutions.module.css";
+import { EXPLORE_CTA } from "@/lib/site-navigation";
 
 export const metadata: Metadata = {
   title: "Solutions — TAVONEL",
@@ -39,8 +40,7 @@ export default function SolutionsPage() {
             which fills the slot with the brand and so says nothing -- the pattern everywhere else
             on the site is the section plus what it holds.
           */}
-          <p className="slate"><b>SOLUTIONS</b><span />FIVE DOCUMENTED USES</p>
-          <h1 className="document-title">What people use<br />the compiler for.</h1>
+          <h1 className="document-title">What people use the compiler for.</h1>
         </div>
         <div className="stack">
           {/*
@@ -86,7 +86,7 @@ export default function SolutionsPage() {
           </div>
           <div className="actions">
             <PublicPrimaryCta className="btn" />
-            <Link className="btn ghost" href="/explore">Explore a World</Link>
+            <Link className="btn ghost" href={EXPLORE_CTA.href as Route}>{EXPLORE_CTA.label}</Link>
           </div>
           <p className="fine">
             Next: the guides, samples and research in the{" "}

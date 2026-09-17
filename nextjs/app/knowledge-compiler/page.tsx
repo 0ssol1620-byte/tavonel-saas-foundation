@@ -3,6 +3,7 @@ import KnowledgeCompilerDiagram from "@/components/knowledge-compiler-diagram";
 import PublicProofRegistry from "@/components/public-proof-registry";
 import { primaryCallToAction } from "@/lib/commercial-state";
 import { jsonLdHtml } from "@/lib/structured-data";
+import { EXPLORE_CTA } from "@/lib/site-navigation";
 
 export const metadata: Metadata = { title: "What Is a Knowledge Compiler? — TAVONEL", description: "A practical guide to Knowledge Compilers, RAG, knowledge graphs and enterprise search.", alternates: { canonical: "/knowledge-compiler" }, openGraph: { url: "/knowledge-compiler" } };
 
@@ -55,7 +56,7 @@ const QUESTIONS = [
       },
       {
         question: "What happens when a source document changes?",
-        answer: "The new bytes are a new version, and compiling produces a new candidate rather than editing the World in place. The active revision moves only when a person promotes it, and the previous revision stays readable so an older answer remains explainable.",
+        answer: "The new bytes are a new version, and compiling produces a new candidate rather than editing the World in place. The active revision moves only when a person activates it, and the previous revision stays readable so an older answer remains explainable.",
       },
       {
         question: "What does it do when it does not know?",
@@ -94,7 +95,7 @@ export default function KnowledgeCompilerPage() {
     { title: "The compile contract", body: "The unit of value is not a chat response. It is a Compiled World with immutable inputs, structured objects, exact evidence, review state, retrieval material and portable files.", links: [
       // One action, not the closing pair repeated: a reader convinced by the contract wants to
       // see one, and the page's two-button close is three thousand pixels below this.
-      { href: "/explore", label: "OPEN A COMPILED WORLD" },
+      { href: "/explore", label: EXPLORE_CTA.label },
     ], rows: [
       { key: "INPUT", description: "Versioned source files and connector cursors.", state: "IMMUTABLE" },
       { key: "STRUCTURE", description: "Directory, ontology, entities, claims and relations.", state: "REVIEWABLE" },
@@ -120,20 +121,20 @@ export default function KnowledgeCompilerPage() {
     { title: "When it is not the right tool", collapsed: "open", body: "A category page that cannot say where its category stops is an advertisement. These are cases this product does not serve, and saying so here is cheaper for everyone than finding out after a pilot.", rows: [
       { key: "ONE DOCUMENT", description: "A single file you will read once. Open it. The compile buys nothing you do not already have.", state: "USE A READER" },
       { key: "LIVE RECORDS", description: "Answers that are a query over a database or a ticket queue, not a claim written in a document.", state: "QUERY THE SYSTEM" },
-      { key: "NO REVIEWER", description: "Nobody who can decide whether a candidate World is correct. Promotion is a human decision by design, and without one the World never becomes active.", state: "NEEDS A PERSON" },
+      { key: "NO REVIEWER", description: "Nobody who can decide whether a candidate World is correct. Activation is a human decision by design, and without one the World never becomes active.", state: "NEEDS A PERSON" },
       { key: "BEYOND THE SOURCES", description: "Questions whose answer is not in the material. Retrieval here is a matching test, not a judgement about whether what matched answers you: it declines only when nothing matched at all, so a question the corpus cannot answer comes back as the nearest matching regions with their locators rather than as a refusal. Deciding they do not answer it is the reader\u2019s work, and buying a compiler to do that work is the wrong purchase.", state: "OUT OF SCOPE" },
     ] },
     { title: "Glossary", collapsed: true, body: "The words this product uses in the exact sense it uses them. Where a term has a looser industry meaning, the narrower one here is deliberate.", rows: [
       { key: "COMPILED WORLD", description: "The output of one compile: objects, relations, evidence, retrieval material and a validation report, addressed by a digest.", state: "THE ARTIFACT" },
-      { key: "CANDIDATE", description: "A compiled result that has not been promoted. It can be read, downloaded and reviewed; nothing answers from it.", state: "LIFECYCLE" },
-      { key: "ACTIVE", description: "The one revision a workspace answers from. It changes only when a person promotes a candidate or rolls back to a prior revision.", state: "LIFECYCLE" },
+      { key: "CANDIDATE", description: "A compiled result that has not been activated. It can be read, downloaded and reviewed; nothing answers from it.", state: "LIFECYCLE" },
+      { key: "ACTIVE", description: "The one revision a workspace answers from. It changes only when a person activates a candidate or rolls back to a prior revision.", state: "LIFECYCLE" },
       { key: "EVIDENCE REGION", description: "A source version, an exact location inside it, an excerpt and a digest. What a citation resolves to. The location takes whatever form the source has; in a PDF it is a page and a box measured in thousandths of it.", state: "PROVENANCE" },
       { key: "STABLE ID", description: "An identifier derived from content, so recompiling the same source lands on the same object rather than a new one.", state: "IDENTITY" },
       { key: "MANIFEST DIGEST", description: "The sha256 of the canonical form of a World. Two Worlds with the same digest are the same World.", state: "IDENTITY" },
       { key: "ABSTENTION", description: "The answer given when the sources do not support one. It is a result, not a failure.", state: "BEHAVIOUR" },
       { key: "PACKAGE", description: "The portable form: canonical model, Turtle, JSON-LD, CSV, retrieval JSONL, provenance and a validation report.", state: "PORTABILITY" },
     ] },
-    { title: "Questions people ask", collapsed: "open", body: "Short answers about what the product does today, not what a category could do in principle.", faq: [...QUESTIONS] },
+    { title: "Questions people ask", collapsed: "open", body: "Short answers about what the product does today.", faq: [...QUESTIONS] },
     {
       title: "The package is the contract",
       body: "Portability is only real if someone outside can check it. The package format, its required files and the two verifiers — one for the archive's signature, one for what is inside it — are documented, and a compiled sample is open without an account.",
@@ -160,11 +161,15 @@ export default function KnowledgeCompilerPage() {
         G1-010. This page carried both of the site's access actions at once -- the header offered
         "Start with your files" and the closing row offered it again beside "Open a Compiled
         World", while /product and /solutions offered "Request access". One action, from the one
-        object that decides which it is, upper-cased to match the row it sits in.
+        object that decides which it is, written the way it is spoken.
+
+        BQ-111 took the upper-casing off both labels in this row. They were 10px tracked mono
+        in capitals, which is the treatment this system gives a machine identifier, and the
+        two most important controls on the page are neither machine nor identifier.
       */
       links: [
-        { href: "/explore", label: "OPEN A COMPILED WORLD" },
-        { href: ACCESS.href as Route, label: ACCESS.label.toUpperCase() },
+        { href: "/explore", label: EXPLORE_CTA.label },
+        { href: ACCESS.href as Route, label: ACCESS.label },
       ],
       readNext: [
         { href: "/evidence", label: "How evidence is bound" },

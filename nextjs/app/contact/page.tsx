@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   // canonical ("/"), so a crawler was told 22 distinct pages were all the homepage.
   alternates: { canonical: "/contact" },
   openGraph: { url: "/contact" },
-  title: "Talk to TAVONEL",
+  title: "Contact — TAVONEL",
   description: "Tell us what your documents need to become, without sending the documents themselves.",
 };
 
@@ -86,11 +86,15 @@ export default function ContactPage() {
                 </p>
               </div>
               <div className="stack">
+                {/*
+                  BQ-113. The warning that governs the message box was printed here and again
+                  inside the box as placeholder text, and the placeholder is the copy that
+                  disappears the moment somebody starts typing. It is said once now, beside the
+                  field it governs, where it stays legible while the field is being filled in.
+                */}
                 <p className="lede">
-                  Open <b>Help us prepare a better reply</b> and the first answer comes back with
-                  specifics rather than a request for more detail. Every question in it is
-                  optional.
-                  <b> Do not attach or paste customer documents here.</b>
+                  The optional questions above the message box are what let the first reply come
+                  back with specifics rather than a request for more detail.
                 </p>
                 <ContactForm />
               </div>

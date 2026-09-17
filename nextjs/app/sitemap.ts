@@ -42,7 +42,14 @@ import { DOCS_SECTIONS } from "@/lib/docs-content";
   `lib/seo-surface.test.ts` allows an llms-only URL only when the page declares itself noindex,
   and a redirect declares nothing.
 */
-const ROUTES = ["", "/api", "/arena", "/benchmarks", "/changelog", "/contact", "/developers", "/docs", "/enterprise", "/evidence", "/explore", "/integrations", "/knowledge-compiler", "/ko", "/pricing", "/privacy", "/product", "/product/compiled-world", "/product/continuous-knowledge", "/product/document-understanding", "/refunds", "/research", "/research/notes", "/resources", "/security", "/solutions", "/solutions/ai-ready-knowledge", "/solutions/document-intelligence", "/solutions/knowledge-graph", "/solutions/source-grounded-assistants", "/solutions/knowledge-operations", "/sources", "/status", "/subprocessors", "/terms", "/trust"];
+/*
+  BQ-112 / D11: `/arena` is not here. The page publishes no comparison yet and answers
+  `robots: { index: false }`, which is the same discipline `/reproducibility` above describes --
+  the sitemap entry and the page's own metadata move together, in one commit. `public/llms.txt`
+  keeps it, because a reading map is not a request to index and `lib/seo-surface.test.ts` allows
+  an llms-only URL exactly where the page declares itself noindex.
+*/
+const ROUTES = ["", "/api", "/benchmarks", "/changelog", "/contact", "/developers", "/docs", "/enterprise", "/evidence", "/explore", "/integrations", "/knowledge-compiler", "/ko", "/pricing", "/privacy", "/product", "/product/compiled-world", "/product/continuous-knowledge", "/product/document-understanding", "/refunds", "/research", "/research/notes", "/resources", "/security", "/solutions", "/solutions/ai-ready-knowledge", "/solutions/document-intelligence", "/solutions/knowledge-graph", "/solutions/source-grounded-assistants", "/solutions/knowledge-operations", "/sources", "/status", "/subprocessors", "/terms", "/trust"];
 /*
   The documentation sections come from the documentation rather than being listed again here.
 

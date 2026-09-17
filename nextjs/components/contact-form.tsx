@@ -59,7 +59,7 @@ export default function ContactForm() {
         <Field label="Name" name="name" autoComplete="name" minLength={2} maxLength={80} required />
         <Field label="Work email" name="email" type="email" autoComplete="email" maxLength={254} required />
       </div>
-      <Field label="Company or organisation" name="company" autoComplete="organization" maxLength={120} />
+      <Field label="Company or organization" name="company" autoComplete="organization" maxLength={120} />
       <label className="contact-field">
         <span>Inquiry type</span>
         <select name="topic" defaultValue="sales">
@@ -108,12 +108,21 @@ export default function ContactForm() {
       <label className="contact-field">
         {/* BA-141. The abstract question asked for an essay; the concrete one gets an answer. */}
         <span>What are you trying to do? <RequiredMark /></span>
+        {/*
+          BQ-113. The one rule about this field, said once and kept on screen.
+
+          It was in the placeholder and again in the page lede above the form. A placeholder is
+          gone as soon as there is a character in the box, so the copy that mattered most was the
+          copy that vanished first. The description is tied to the field for a screen reader.
+        */}
+        <small className="fine" id="contact-message-rule">Do not attach or paste customer documents here.</small>
         <textarea
           name="message"
           rows={8}
           minLength={20}
           maxLength={5000}
-          placeholder="What the material is, who needs to answer from it, and anything the questions above did not cover. Do not paste customer documents."
+          aria-describedby="contact-message-rule"
+          placeholder="What the material is, who needs to answer from it, and anything the questions above did not cover."
           required
         />
       </label>

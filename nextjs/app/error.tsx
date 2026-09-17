@@ -31,36 +31,56 @@ export default function ErrorBoundary({
     console.error("Render failed", error.digest ?? "", error);
   }, [error]);
 
+  /*
+    BQ-136. The same page shape as app/not-found.tsx, which is the other page a reader lands
+    on when something did not work.
+
+    This rendered inside `.auth` -- the sign-in shell: a centred card with a wordmark and
+    nothing else, so a render failure on a documentation page looked like being logged out.
+    The 404 was moved off that shell for the same reason (G2-030) and onto the document
+    layout every public page uses, and these two pages are read by the same person on the
+    same bad afternoon. They look like one thing now.
+
+    What it does not take from the 404 is the navigation. An error boundary can be rendering
+    precisely because something in the chrome threw, and a recovery page that re-renders the
+    failing component is not a recovery. The wordmark is a plain link home, which is the one
+    piece of navigation that cannot fail.
+  */
   return (
-    <main id="main" className="auth" tabIndex={-1}>
-      <header>
-        <Link href="/" className="wordmark"><Logomark /><b>TAVONEL</b></Link>
+    <div className="page">
+      <header className="nav" data-stuck={1}>
+        <Link href="/" className="wordmark" aria-label="TAVONEL home"><Logomark /><b>TAVONEL</b></Link>
       </header>
 
-      <div className="auth-body">
-        <div className="auth-card">
-          <p className="eyebrow">SOMETHING FAILED</p>
-          <h1>This page stopped rendering.</h1>
-          <p className="lead">
-            The failure is in the screen, not in your data. Uploaded documents are immutable,
-            usage changes only when a signed event is persisted, and nothing is promoted into a
-            live world without a person deciding it &mdash; none of which a rendering failure can
-            reach.
-          </p>
-
-          <div className="auth-actions">
-            <button className="btn" type="button" onClick={reset}>Try again</button>
-            <Link className="btn ghost" href="/">Back to the site</Link>
+      <main id="main" tabIndex={-1}>
+        <section className="scene doc">
+          <div className="shell">
+            <div className="body">
+              <div className="stack">
+                <h1 className="document-title">This page stopped rendering.</h1>
+              </div>
+              <div className="stack">
+                <p className="lede">
+                  Your data is untouched by this. Uploaded documents are
+                  immutable, usage changes only when a signed event is persisted, and nothing
+                  is activated into a live world without a person deciding it &mdash; none of
+                  which a rendering failure can reach.
+                </p>
+                <div className="actions">
+                  <button className="btn" type="button" onClick={reset}>Try again</button>
+                  <Link className="btn ghost" href="/">Back to the site</Link>
+                </div>
+                {error.digest ? (
+                  <p className="fine">
+                    Reference <code>{error.digest}</code>. Quote it if you report the problem
+                    &mdash; it identifies this exact failure in the server log.
+                  </p>
+                ) : null}
+              </div>
+            </div>
           </div>
-
-          {error.digest ? (
-            <p className="notice static" role="status">
-              <strong>Reference {error.digest}.</strong> Quote this if you report the problem
-              &mdash; it identifies this exact failure in the server log.
-            </p>
-          ) : null}
-        </div>
-      </div>
-    </main>
+        </section>
+      </main>
+    </div>
   );
 }

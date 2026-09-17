@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import type { Route } from "next";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { Search } from "lucide-react";
 import styles from "./docs-search.module.css";
 
-type Entry = { slug: string; title: string; group: string; summary: string; text: string };
+type Chunk = { anchor: string | null; display: string };
+type Entry = { slug: string; title: string; group: string; summary: string; chunks: Chunk[]; code: string };
 
 /**
  * Search across the documentation, in the page.
@@ -45,7 +46,7 @@ type Entry = { slug: string; title: string; group: string; summary: string; text
  * offsets are taken there and the slice is taken from the original text.
  */
 function excerpt(text: string, term: string, span = 110) {
-  const at = text.indexOf(term);
+  const at = text.toLowerCase().indexOf(term);
   if (at < 0) return null;
   const from = Math.max(0, at - Math.floor((span - term.length) / 2));
   const to = Math.min(text.length, from + span);
@@ -59,14 +60,36 @@ function excerpt(text: string, term: string, span = 110) {
     after: body.slice(start + term.length) + (to < text.length ? "…" : ""),
   };
 }
+/**
+ * The passage a query matched, and the anchor it lives under (BQ-105).
+ *
+ * `chunks` is split at each heading, so the first chunk carrying the term names the heading the
+ * passage sits under -- which is the address a reader wants, rather than the top of a page that
+ * runs to twenty screens. A term that matches only inside a snippet body has no passage to show:
+ * `code` is matched and never excerpted, and the result falls back to the section summary with
+ * no anchor, which is honest about what it found.
+ */
+function locate(entry: Entry, term: string) {
+  for (const chunk of entry.chunks) {
+    const hit = excerpt(chunk.display, term);
+    if (hit?.match) return { hit, anchor: chunk.anchor };
+  }
+  return { hit: null, anchor: null };
+}
+
 export function DocsSearch({ entries }: { entries: Entry[] }) {
   const [query, setQuery] = useState("");
   const field = useRef<HTMLInputElement>(null);
+  const links = useRef<Array<HTMLAnchorElement | null>>([]);
   const trimmed = query.trim().toLowerCase();
 
   const matched = useMemo(() => {
     if (trimmed.length < 2) return [];
-    return entries.filter((entry) => entry.text.includes(trimmed));
+    return entries.filter(
+      (entry) =>
+        entry.code.includes(trimmed) ||
+        entry.chunks.some((chunk) => chunk.display.toLowerCase().includes(trimmed)),
+    );
   }, [entries, trimmed]);
   // The count is over every match; the list is the first eight, so the two cannot disagree.
   const results = matched.slice(0, 8);
@@ -81,6 +104,38 @@ export function DocsSearch({ entries }: { entries: Entry[] }) {
     return () => window.removeEventListener("keydown", focus);
   }, []);
 
+  /*
+    BQ-105. The results were reachable only by tabbing through every one of them from the field,
+    and Escape did nothing -- so a reader who opened the panel by accident had eight extra tab
+    stops between them and the rest of the page.
+
+    Down from the field enters the list, Down and Up move inside it, Up from the first result
+    returns to the field, and Escape clears the query and puts the caret back. It is the pattern
+    the browser's own address bar uses, and it needs no roles beyond the ones already here: these
+    are ordinary links in an ordinary list, so `aria-activedescendant` and a combobox contract
+    would be describing a control this is not.
+  */
+  const move = (event: ReactKeyboardEvent, from: number) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setQuery("");
+      field.current?.focus();
+      return;
+    }
+    const step = event.key === "ArrowDown" ? 1 : event.key === "ArrowUp" ? -1 : 0;
+    if (step === 0) return;
+    const next = from + step;
+    if (next < 0) {
+      event.preventDefault();
+      field.current?.focus();
+      return;
+    }
+    const target = links.current[next];
+    if (!target) return;
+    event.preventDefault();
+    target.focus();
+  };
+
   return (
     <div className="docs-search">
       <label className="docs-search-field">
@@ -92,22 +147,38 @@ export function DocsSearch({ entries }: { entries: Entry[] }) {
           placeholder="Search every page"
           aria-label="Search every documentation page, including page bodies"
           onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={(event) => move(event, -1)}
         />
-        {trimmed.length >= 2
-          ? <span className="docs-search-count">{matched.length} {matched.length === 1 ? "section" : "sections"}</span>
-          : <kbd className="docs-search-hint" aria-hidden="true">⌘K</kbd>}
+        {/*
+          BQ-137. The live region is the count, not the result list.
+
+          `role="status"` was on the results container, so every keystroke past two characters
+          announced every matching section title and summary -- the whole panel, re-read, while
+          the reader was still typing. The count is the sentence a person wants said out loud,
+          it is already on screen, and it is one line. It is mounted from the start so the
+          region exists before it has anything to say.
+        */}
+        <span className="docs-search-count" role="status">
+          {trimmed.length >= 2 ? `${matched.length} ${matched.length === 1 ? "section" : "sections"}` : ""}
+        </span>
+        {trimmed.length >= 2 ? null : <kbd className="docs-search-hint" aria-hidden="true">⌘K</kbd>}
       </label>
       {trimmed.length >= 2 ? (
-        <div className="docs-search-results" role="status">
+        <div className="docs-search-results">
           {results.length === 0 ? (
             <p className="fine">Nothing here matches “{query.trim()}”.</p>
           ) : (
             <ul>
-              {results.map((entry) => {
-                const hit = excerpt(entry.text, trimmed);
+              {results.map((entry, index) => {
+                const { hit, anchor } = locate(entry, trimmed);
+                const href = anchor ? `/docs/${entry.slug}#${anchor}` : `/docs/${entry.slug}`;
                 return (
                   <li key={entry.slug}>
-                    <Link href={`/docs/${entry.slug}` as Route}>
+                    <Link
+                      href={href as Route}
+                      ref={(node) => { links.current[index] = node; }}
+                      onKeyDown={(event) => move(event, index)}
+                    >
                       <strong>{entry.title}</strong>
                       <span>
                         {hit && hit.match

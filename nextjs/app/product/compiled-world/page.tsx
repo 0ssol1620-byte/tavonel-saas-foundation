@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { Route } from "next";
 import { PublicSitePage } from "@/components/public-site-chrome";
-import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
+import BreadcrumbJsonLd, { DocBreadcrumb } from "@/components/breadcrumb-json-ld";
 import { clause } from "@/lib/compiler-contract";
 import WorldDiffSample from "@/components/world-diff-sample";
 import { CAPABILITY_MANIFEST, isAcceptedAtUpload } from "../../../../shared/capabilityManifest";
+import { EXPLORE_CTA } from "@/lib/site-navigation";
 
 /*
   G1-005. What an "exact location" is on this deployment, in the sentence rather than a link away.
@@ -188,8 +189,7 @@ export default function CompiledWorldPage() {
                 a reader arriving on this page from that same search had no visible way back to
                 /product except the navigation's disclosure menu.
               */}
-              <p className="doc-breadcrumb"><Link href={"/product" as Route}>Product</Link> <span aria-hidden="true">/</span> Compiled World</p>
-              <p className="slate"><b>PRODUCT</b><span />COMPILED WORLD</p>
+              <DocBreadcrumb trail={[{ name: "Product", path: "/product" }, { name: "Compiled World", path: "/product/compiled-world" }]} />
               {/*
                 BA-024. The headline spent its first two words on what the product is not, and
                 repeated the home page's contrast instead of advancing it. Six cards under it
@@ -208,7 +208,7 @@ export default function CompiledWorldPage() {
               <p className="lede">
                 The output of a compile is a Compiled World: objects, relations, evidence,
                 versions and the artifacts that project them.
-                <b> One world, used by retrieval, agents, MCP, APIs and applications.</b>
+                 One world, used by retrieval, agents, MCP, APIs and applications.
               </p>
               <div className="tiles">
                 {PARTS.map((part) => (
@@ -247,7 +247,7 @@ export default function CompiledWorldPage() {
                 <Link href="/docs/use-with-ai">Use the result with AI</Link>.
               </p>
               <div className="actions">
-                <Link className="btn" href={"/explore" as Route}>Explore a Compiled World</Link>
+                <Link className="btn" href={EXPLORE_CTA.href as Route}>{EXPLORE_CTA.label}</Link>
                 <Link className="btn ghost" href="/developers">Read it from your code</Link>
               </div>
             </div>

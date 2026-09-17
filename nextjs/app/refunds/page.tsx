@@ -30,7 +30,7 @@ export function generateMetadata(): Metadata {
     title: "Cancellation and refunds — TAVONEL",
     description: liveChargesEnabled
       ? "How to cancel TAVONEL access and when a charge is refundable. Checkout is processed by Paddle as merchant of record."
-      : "TAVONEL is a private pilot: nothing can be charged, so there is nothing to cancel. How to end access and export your compiled worlds.",
+      : "TAVONEL is a private pilot: nothing can be charged, so there is nothing to cancel. How to end access and export your Compiled Worlds.",
   };
 }
 
@@ -45,7 +45,6 @@ export default function RefundsPage() {
   if (!liveChargesEnabled) {
     return (
       <PolicyLayout
-        label="CANCELLATION AND REFUNDS"
         title="Cancellation and refunds."
         effective={LEGAL_EFFECTIVE_DATE}
         lastUpdated={LEGAL_LAST_UPDATED}
@@ -76,7 +75,6 @@ export default function RefundsPage() {
 
   return (
     <PolicyLayout
-      label="CANCELLATION AND REFUNDS"
       title="Cancellation and refunds."
       effective={LEGAL_EFFECTIVE_DATE}
       lastUpdated={LEGAL_LAST_UPDATED}

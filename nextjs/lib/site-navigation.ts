@@ -129,6 +129,10 @@ export const KO_CHROME = {
  * ordinary casing -- "a real-world thing" is not this noun.
  */
 export const PRODUCT_NOUNS = [
+  // BQ-098. The category noun, which the guide, the product page, the 404 and the root layout
+  // all capitalise and one resource description did not: "what a knowledge compiler is" on the
+  // card that links to the page titled "What is a Knowledge Compiler?".
+  "Knowledge Compiler",
   "World",
   "Compiled World",
   "Trust Center",
@@ -254,7 +258,12 @@ export const RESOURCE_LINKS: readonly ResourceLink[] = [
   },
   { href: "/api", label: "API", purposes: ["build"], workflows: ["use-elsewhere"] },
   { href: "/changelog", label: "Changelog", purposes: ["build"], workflows: [], column: "verify" },
-  { href: "/arena", label: "TAVONEL Arena", purposes: ["evaluate", "verify"], workflows: [], column: "verify" },
+  /*
+    BQ-112 / D11: `/arena` is not listed here. The route still answers -- an existing link does
+    not 404 -- but it publishes no comparison yet, carries `robots: { index: false }` and is out
+    of `app/sitemap.ts`. A hub entry and a menu column are offers to read something, and the
+    protocol a reader was being sent there for is `/benchmarks`, two lines below.
+  */
   { href: "/research", label: "Research", purposes: ["learn"], workflows: [], column: "verify" },
   { href: "/benchmarks", label: "Benchmark protocol", purposes: ["verify"], workflows: [], column: "verify" },
   {

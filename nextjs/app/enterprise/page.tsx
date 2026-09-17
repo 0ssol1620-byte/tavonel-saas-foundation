@@ -4,6 +4,7 @@ import type { Route } from "next";
 import PolicyJumpIndex, { IndexedPolicyBody } from "@/components/policy-jump-index";
 import { PublicSitePage } from "@/components/public-site-chrome";
 import { TrustDisclosures } from "@/components/trust-disclosures";
+import { EXPLORE_CTA } from "@/lib/site-navigation";
 
 export const metadata: Metadata = {
   title: "Enterprise — TAVONEL",
@@ -71,8 +72,7 @@ export default function EnterprisePage() {
         <div className="shell">
           <div className="body policy-copy"><IndexedPolicyBody>
             <div className="stack">
-              <p className="slate"><b>ENTERPRISE</b><span />KNOWLEDGE COMPILER</p>
-              <h1 className="document-title">Compile enterprise knowledge<br />without giving up control.</h1>
+              <h1 className="document-title">Compile enterprise knowledge without giving up control.</h1>
               {/* G2-040 / G2-041: one jump index for long documents, from the shared component. */}
               <PolicyJumpIndex />
             </div>
@@ -91,7 +91,7 @@ export default function EnterprisePage() {
                 ))}
               </div>
 
-              <p className="slate"><span />HOW IT IS RUN</p>
+              <h2>How it is run</h2>
               <div className="chain">
                 {OPERATIONS.map(([title, body]) => (
                   <article className="link" key={title}>
@@ -124,7 +124,7 @@ export default function EnterprisePage() {
                 the founder's to set, and the withdrawn sheet is why an invented one is worse
                 than none.
               */}
-              <p className="slate"><span />WHAT AN ENGAGEMENT COSTS</p>
+              <h2>What an engagement costs</h2>
               <p>
                 The published plans and the per-page rate above them are on{" "}
                 <Link href={"/pricing#enterprise-pricing" as Route}>Pricing</Link>, in US dollars and excluding tax.
@@ -134,8 +134,8 @@ export default function EnterprisePage() {
               </p>
 
               <div className="actions">
-                <Link className="btn" href={"/contact" as Route}>Talk about a pilot</Link>
-                <Link className="btn ghost" href={"/explore" as Route}>Explore a Compiled World</Link>
+                <Link className="btn" href={"/contact" as Route}>Scope an Enterprise pilot</Link>
+                <Link className="btn ghost" href={EXPLORE_CTA.href as Route}>{EXPLORE_CTA.label}</Link>
                 <Link className="btn ghost" href="/security">How your documents are handled</Link>
               </div>
             </div>

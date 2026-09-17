@@ -129,8 +129,7 @@ export default function BenchmarksPage() {
         <div className="shell">
           <div className="body">
             <div className="stack">
-              <p className="slate"><b>BENCHMARK</b><span />KNOWLEDGE COMPILATION</p>
-              <h1 className="document-title">Measure the compile,<br />not the page read.</h1>
+              <h1 className="document-title">How a compile is measured.</h1>
             </div>
 
             <div className="stack">
@@ -139,8 +138,8 @@ export default function BenchmarksPage() {
                 knowledge also has to bind each statement to the region that supports it, decide
                 when two mentions are one thing, keep track of which revision is current, work out
                 what a change to page 40 invalidates three files away, and refuse to answer what
-                the world cannot support. <b>The Knowledge Compilation Benchmark is the protocol
-                for measuring all of it</b> — eight families, one receipt, four rules.
+                the world cannot support. The Knowledge Compilation Benchmark is the protocol
+                for measuring all of it — eight families, one receipt, four rules.
               </p>
 
               {/*
@@ -189,7 +188,7 @@ export default function BenchmarksPage() {
                 Dates come from the receipts rather than from a constant somebody has to
                 remember to move.
               */}
-              <h2 className={`slate ${styles.sectionTitle}`}><span />What exists today</h2>
+              <h2 className={styles.sectionTitle}>What exists today</h2>
               <p className={styles.para}>
                 No run has yet qualified under the protocol above, so the Results table below is
                 empty and says so by being absent. What has been measured and published is two
@@ -212,7 +211,7 @@ export default function BenchmarksPage() {
                 ))}
               </div>
 
-              <h2 className={`slate ${styles.sectionTitle}`}><span />The eight metric families</h2>
+              <h2 className={styles.sectionTitle}>The eight metric families</h2>
               <div className="tiles">
                 {BENCHMARK_FAMILIES.map((family) => (
                   <article className="tile" key={family.id}>
@@ -226,12 +225,30 @@ export default function BenchmarksPage() {
                       the ones that were identifiers and leaves the ones that were already
                       English alone.
                     */}
-                    <p className={styles.taxonomy}>{family.metrics.map(metricLabel).join(" · ")}</p>
+                    {/*
+                      BQ-112. A list of metrics is a list, not a middot-joined mono string.
+
+                      Four to six names in 10px tracked mono joined by " · " read as one machine
+                      identifier at a glance, and 10px is under the type floor. They are the
+                      family's members, so they are a `<ul>` in sans -- and a screen reader
+                      announces "list, five items" rather than one long sentence whose separators
+                      it does not speak.
+
+                      The row says "render metrics as a real table" and this is deliberately not
+                      one. What the row is against is the mono middot string, and a table here
+                      would have two columns -- family and its metrics -- of which the second is
+                      still a list of names, beside a definition that is a paragraph. At 390px it
+                      would stack back into exactly these cards. The list is the table's honest
+                      shape for this data; the divergence is on the record rather than silent.
+                    */}
+                    <ul className={styles.taxonomy}>
+                      {family.metrics.map((metric) => <li key={metric}>{metricLabel(metric)}</li>)}
+                    </ul>
                   </article>
                 ))}
               </div>
 
-              <h2 className={`slate ${styles.sectionTitle}`}><span />What a result has to carry</h2>
+              <h2 className={styles.sectionTitle}>What a result has to carry</h2>
               {/*
                 BA-093. Twenty-one rows of our internal receipt schema, field by field, in
                 tracked uppercase mono, as the largest section of the page. A buyer arriving
@@ -277,7 +294,7 @@ export default function BenchmarksPage() {
                 </dl>
               </details>
 
-              <h2 className={`slate ${styles.sectionTitle}`}><span />Qualification rules</h2>
+              <h2 className={styles.sectionTitle}>Qualification rules</h2>
               <div className="chain">
                 {QUALIFICATION.map(([title, body]) => (
                   <article className="link" key={title}>
@@ -287,7 +304,7 @@ export default function BenchmarksPage() {
                 ))}
               </div>
 
-              <h2 className={`slate ${styles.sectionTitle}`}><span />North Star metric</h2>
+              <h2 className={styles.sectionTitle}>North Star metric</h2>
               <div className={styles.north}>
                 {/*
                   BA-077. The label read "DEFINITION · NO VALUE PUBLISHED ON THIS DEPLOYMENT",
@@ -312,7 +329,7 @@ export default function BenchmarksPage() {
               */}
               {records.length > 0 ? (
                 <>
-                  <h2 className={`slate ${styles.sectionTitle}`}><span />Results</h2>
+                  <h2 className={styles.sectionTitle}>Results</h2>
                   {records.map((record) => (
                     <div className={styles.resultsScroll} key={record.runReceiptDigest}>
                       <table className={styles.results}>

@@ -42,7 +42,7 @@ const CAPABILITY_LABELS = {
   customerIntake: "Customer document intake",
   cdr: "Content disarm and reconstruction",
   ocrGpu: "Isolated GPU document reading",
-  candidatePromotion: "Candidate promotion into a live world",
+  candidatePromotion: "Candidate activation into a live world",
   customerData: "Compiling customer data",
 } as const;
 
@@ -98,7 +98,7 @@ const CONTROLS = [
     two-users-with-different-permissions case the audit wants tested is not a state this
     deployment can be put into: a workspace has one member.
   */
-  ["Source-level access", "A suspended or unreachable source is refused on the same requests that would otherwise use it: an answer, a source-byte read, an export and a promotion each re-check it, and a check that cannot complete counts as a refusal rather than a pass. The grain of that decision is the workspace, not the person — a source is reachable for the whole workspace or for none of it, and a workspace has exactly one member here. Per-member source permissions arrive with membership, which this deployment does not have."],
+  ["Source-level access", "A suspended or unreachable source is refused on the same requests that would otherwise use it: an answer, a source-byte read, an export and an activation each re-check it, and a check that cannot complete counts as a refusal rather than a pass. The grain of that decision is the workspace, not the person — a source is reachable for the whole workspace or for none of it, and a workspace has exactly one member here. Per-member source permissions arrive with membership, which this deployment does not have."],
   /*
     §17.1 asks two more questions this page did not answer: which model providers see a document,
     and what a model is allowed to do with it.
@@ -182,15 +182,14 @@ export default function SecurityPage() {
         <div className="shell">
           <div className="body">
             <div className="stack">
-              <p className="slate"><b>SECURITY</b><span />DATA PATH AND CONTROLS</p>
-              <h1 className="document-title">{"Where your documents go, "}<br />and what never sees them.</h1>
+              <h1 className="document-title">Where your documents go, and what never sees them.</h1>
             </div>
             <div className="stack">
               <p className="lede">
                 Your sources move through a tenant-scoped processing path, and activation remains
                 under human control. Browser-direct upload → quarantine → sanitize and disarm →
                 isolated analysis → candidate world → your approval.
-                <b> Every external operation fails closed.</b>
+                 Every external operation fails closed.
               </p>
 
               {/*
@@ -213,7 +212,7 @@ export default function SecurityPage() {
                 <a href="#deployment">Current deployment controls</a>
               </nav>
 
-              <p className="slate" id="boundary"><span />THE BOUNDARY, IN THE ORDER IT IS ENFORCED</p>
+              <h2 id="boundary">The boundary, in the order it is enforced</h2>
               <div className="chain">
                 {BOUNDARY.map(([num, name, text]) => (
                   <article className="link" key={num}>
@@ -224,15 +223,26 @@ export default function SecurityPage() {
                 ))}
               </div>
 
-              <p className="slate" id="what-holds-what"><span />WHAT HOLDS WHAT</p>
-              <div className="chain">
+              <h2 id="what-holds-what">What holds what</h2>
+              {/*
+                BQ-136. Four names and what each one holds is a definition list.
+
+                It was four cards in a two-column grid, each with an <h2> inside it -- so the
+                page's heading outline carried "The browser", "Object storage", "The
+                application" and "The database" as siblings of its real sections, and a
+                reader walking the page by heading met four nouns with no question above them.
+                A <dl> says the relationship the cards were drawing: this term, that
+                definition. `.connector-legend` is the same list /integrations uses for the
+                same shape, so this adds no CSS.
+              */}
+              <dl className="connector-legend">
                 {PATH.map(([name, text]) => (
-                  <article className="link" key={name}>
-                    <h2>{name}</h2>
-                    <p>{text}</p>
-                  </article>
+                  <div key={name}>
+                    <dt>{name}</dt>
+                    <dd>{text}</dd>
+                  </div>
                 ))}
-              </div>
+              </dl>
 
               {/*
                 BA-155. One grid, not a controls grid followed by a section labelled "NOT ANSWERED
@@ -250,7 +260,7 @@ export default function SecurityPage() {
                 Two tiles is an even grid. `trust-page-answers.test.ts` still holds both rows'
                 contents, and both `CONTROLS.map` and `UNANSWERED.map` are still what renders.
               */}
-              <p className="slate" id="controls"><span />CONTROLS</p>
+              <h2 id="controls">Controls</h2>
               <div className="tiles">
                 {CONTROLS.map(([title, body]) => (
                   <article className="tile" key={title}>
@@ -300,7 +310,7 @@ export default function SecurityPage() {
                 and the one component no configuration pins says so rather than being given a
                 plausible region.
               */}
-              <p className="slate" id="regions"><span />WHERE THE WORK HAPPENS</p>
+              <h2 id="regions">Where the work happens</h2>
               <p>
                 No data residency is guaranteed, and that is a separate statement from where the
                 work is configured to run. Below is the second one. Which provider is permitted to
@@ -325,13 +335,13 @@ export default function SecurityPage() {
                 states, so a reader who never opens it has still been told that some of these
                 answers are "not in place".
               */}
-              <p className="slate" id="review"><span />WHAT A SECURITY REVIEW WILL FIND</p>
+              <h2 id="review">What a security review will find</h2>
               <details className="status-fold">
                 <summary>The full checklist: what is in place, what is planned, and what is not in place</summary>
-                <TrustDisclosures on="/security" heading="IN THE ORDER A REVIEW ASKS THEM" />
+                <TrustDisclosures on="/security" heading="In the order a review asks them" />
               </details>
 
-              <p className="slate" id="deployment"><span />CURRENT DEPLOYMENT CONTROLS</p>
+              <h2 id="deployment">Current deployment controls</h2>
               <div className="status-list">
                 {Object.entries(activationPolicy)
                   .filter(([key]) => key !== "customerData")
@@ -348,11 +358,13 @@ export default function SecurityPage() {
                 checkout: {activationPolicy.customerData.reason}
               </p>
               <p className="fine">
-                Promotion is closed by design: a candidate world becomes active only after an
+                Activation is closed by design: a candidate world becomes active only after an
                 authenticated person approves it. Retention and deletion are set out step by step
-                in the <Link href={"/privacy" as Route}>privacy notice</Link>, and a security
-                review or a vulnerability report reaches us{" "}
-                <Link href={"/contact" as Route}>here</Link>.
+                in the <Link href={"/privacy" as Route}>privacy notice</Link>. A security review or
+                a vulnerability report reaches us through{" "}
+                {/* BQ-134: a link named "here" says nothing out of its sentence, and a screen
+                    reader's link list is exactly that. */}
+                <Link href={"/contact" as Route}>the contact page</Link>.
               </p>
 
               <div className="actions">

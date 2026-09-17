@@ -6,6 +6,9 @@ import { DocsCopyButton } from "@/components/docs-copy-button";
 import { DocsSnippet } from "@/components/docs-snippet";
 import { ApiTryIt, type TryItRoute } from "@/components/docs/api-try-it";
 import { withMarks } from "@/components/docs/marks";
+import { CodeTokens } from "@/components/docs/code-tokens";
+import { PageToc, tocEntries } from "@/components/docs/page-toc";
+import tocStyles from "@/components/docs/page-toc.module.css";
 import tableStyles from "@/components/docs/docs-table.module.css";
 import { API_VERSION } from "@/lib/api-version";
 import { readApiReference, type ReferenceEndpoint } from "@/lib/api-reference";
@@ -131,7 +134,7 @@ function Operation({ endpoint }: { endpoint: ReferenceEndpoint }) {
           {response.example ? (
             <figure className="docs-code">
               <figcaption><span>Example response</span><DocsCopyButton value={response.example} /></figcaption>
-              <pre><code>{response.example}</code></pre>
+              <pre tabIndex={0} role="group" aria-label={`Example ${response.status} response`}><code><CodeTokens body={response.example} /></code></pre>
             </figure>
           ) : null}
           {response.bestEffort ? (
@@ -152,12 +155,29 @@ function Operation({ endpoint }: { endpoint: ReferenceEndpoint }) {
 export default async function ApiReferencePage() {
   const reference = await readApiReference();
 
+  /*
+    BQ-100 / BQ-101. The group list is what goes beside the heading on a reference route.
+
+    Two things turn on it. The decision splits `.body` by surface -- a reference route puts
+    navigation in the title column, every other route collapses to one measure -- and the collapse
+    in `app/product-polish.css` is written as the condition (an H1 alone in that column), so this
+    list is both the navigation the decision asks for and what keeps the rule off this page. That
+    matters more here than anywhere: `styles.full` spans `1 / -1`, so a collapsed grid would take
+    thirty-three operation groups, their parameter tables and their request examples down to one
+    72ch column.
+
+    The groups also get ids from the same list, which is the "heading ids and a generated TOC"
+    half of BQ-101. The per-endpoint index below stays where it is: it is one entry per operation
+    and it needs the full width, which is the column it is already in.
+  */
+  const groups = tocEntries(reference.groups.map((group) => group.name));
+
   return (
     <PublicPageShell>
       <section className="scene doc"><div className="shell"><div className="body">
         <div className="stack">
-          <p className="slate"><b>API REFERENCE</b><span aria-hidden="true" />· {API_VERSION}</p>
           <h1 className="document-title">Every operation, from the contract itself.</h1>
+          <PageToc entries={groups} />
         </div>
         <div className="stack">
           <p className="lede">
@@ -173,7 +193,7 @@ export default async function ApiReferencePage() {
             <code>{reference.unversionedServer}</code>, declared per path in the document so a
             generated client resolves each operation against the right one. Send a key as{" "}
             <code>Authorization: Bearer tvnl_live_…</code>; keys are created in the workspace
-            under Developers and the plaintext is shown once. Promotion and rollback are absent
+            under Developers and the plaintext is shown once. Activation and rollback are absent
             from this page because they are absent from the contract — they are browser-session
             decisions, and no scope grants them.
           </p>
@@ -200,7 +220,7 @@ export default async function ApiReferencePage() {
                 <ul>
                   {group.endpoints.map((endpoint) => (
                     <li key={endpoint.operationId}>
-                      <a href={`#${endpoint.operationId}`}>
+                      <a className={styles.indexLink} href={`#${endpoint.operationId}`}>
                         <b data-method={endpoint.method}>{endpoint.method}</b>
                         <span>{endpoint.summary}</span>
                       </a>
@@ -211,9 +231,9 @@ export default async function ApiReferencePage() {
             ))}
           </nav>
 
-          {reference.groups.map((group) => (
+          {reference.groups.map((group, index) => (
             <div className={styles.group} key={group.name}>
-              <h2>{group.name}</h2>
+              <h2 className={tocStyles.anchor} id={groups[index].id}>{group.name}</h2>
               <p className={styles.prose}>{group.description}</p>
               {group.endpoints.map((endpoint) => (
                 <Operation endpoint={endpoint} key={endpoint.operationId} />

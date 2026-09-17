@@ -57,7 +57,6 @@ export default function NotFound() {
         <div className="shell">
           <div className="body">
             <div className="stack">
-              <p className="slate"><b>404</b><span />NOT FOUND</p>
               <h1 className="document-title">There is nothing at this address.</h1>
             </div>
             <div className="stack">
@@ -65,7 +64,7 @@ export default function NotFound() {
                 The link may be out of date, or the page may never have existed. Nothing is wrong
                 with your account, and nothing has been changed.
               </p>
-              <p className="slate"><span />WHERE YOU MIGHT HAVE BEEN GOING</p>
+              <h2>Where you might have been going</h2>
               <div className="tiles">
                 {RECOVERY.map(([title, body, href]) => (
                   <Link className="tile trust-link" key={href} href={href}>
