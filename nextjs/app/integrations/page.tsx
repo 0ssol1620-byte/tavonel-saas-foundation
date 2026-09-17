@@ -4,6 +4,8 @@ import { PublicPageShell } from "@/components/public-page-shell";
 import PublicPrimaryCta from "@/components/public-primary-cta";
 import { activationPolicy } from "@/lib/activation-policy";
 import { OAUTH_CONNECTOR_PROVIDERS, OAUTH_CONNECTOR_SCOPES } from "@/lib/connector-oauth";
+import { PageToc, tocEntries } from "@/components/docs/page-toc";
+import tocStyles from "@/components/docs/page-toc.module.css";
 
 export const metadata: Metadata = {
   title: "Integrations — TAVONEL",
@@ -127,12 +129,27 @@ const SUPPORT_ROWS: ReadonlyArray<readonly [string, string, string]> = [
 */
 const NO_CONNECTOR = ["Confluence", "Notion", "Slack", "GitHub", "Box", "Jira"] as const;
 
+/*
+  BQ-100. The connector sections, as the title column's navigation.
+
+  The decision puts navigation beside the heading on a reference route and collapses every other
+  route to one reading measure; the collapse in `app/product-polish.css` is the condition itself,
+  so naming the three sections is the whole of the fix. The section headings below already sit in
+  their own title columns -- only the H1 column was empty.
+*/
+const SECTIONS = ["What connects today", "Cloud document systems", "File and object storage"] as const;
+
 export default function IntegrationsPage() {
+  const sections = tocEntries(SECTIONS);
+
   return (
     <PublicPageShell>
       <section className="scene doc"><div className="shell">
         <div className="body">
-          <div className="stack"><h1 className="document-title">Compile where your knowledge already lives.</h1></div>
+          <div className="stack">
+            <h1 className="document-title">Compile where your knowledge already lives.</h1>
+            <PageToc entries={sections} />
+          </div>
           <div className="stack">
             <p className="lede">Connect a source once. TAVONEL discovers and imports read-only, then tracks revisions so the compiled World can stay traceable to the system it came from.</p>
             {/*
@@ -160,7 +177,7 @@ export default function IntegrationsPage() {
         </div>
 
         <div className="body">
-          <div className="stack"><h2>What connects today.</h2></div>
+          <div className="stack"><h2 className={tocStyles.anchor} id={sections[0].id}>What connects today.</h2></div>
           <div className="stack">
             {/*
               BQ-106. One presentation, not two.
@@ -211,7 +228,7 @@ export default function IntegrationsPage() {
         </div>
 
         <div className="body">
-          <div className="stack"><h2>Cloud document systems.</h2></div>
+          <div className="stack"><h2 className={tocStyles.anchor} id={sections[1].id}>Cloud document systems.</h2></div>
           <div className="stack">
             <div className="connector-public-grid">{OAUTH.map((connector) => (
               <article key={connector.name}>
@@ -235,7 +252,7 @@ export default function IntegrationsPage() {
         </div>
 
         <div className="body">
-          <div className="stack"><h2>File and object storage.</h2></div>
+          <div className="stack"><h2 className={tocStyles.anchor} id={sections[2].id}>File and object storage.</h2></div>
           <div className="stack">
             <p className="lede">Use a <a href="/developer/tavonel-source-agent.py" download>local source agent</a> for repositories that stay inside your network. We configure the first route with you.</p>
             <div className="chain">{INFRA.map(([name, level, description]) => <article className="link" key={name}><span className="st">{level}</span><h3>{name}</h3><p>{description}</p></article>)}</div>

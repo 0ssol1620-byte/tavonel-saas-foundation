@@ -3,6 +3,8 @@ import Link from "next/link";
 import type { Route } from "next";
 import { PublicPageShell } from "@/components/public-page-shell";
 import { DocsSearch } from "@/components/docs-search";
+import { PageToc, tocEntries } from "@/components/docs/page-toc";
+import tocStyles from "@/components/docs/page-toc.module.css";
 import { DOCS_GROUPS, DOCS_REVIEWED, DOCS_SECTIONS, DOCS_VERSION, docsSearchIndex, findDocsSection, formatReviewDate } from "@/lib/docs-content";
 
 /*
@@ -31,11 +33,23 @@ export const metadata: Metadata = {
   with every section reachable and every number on it imported from the code that enforces it.
 */
 export default function DocsPage() {
+  /*
+    BQ-100. The title column carries the chapter list, which is what this surface has to put there.
+
+    The decision splits the `.body` grid by surface type: a reference route puts navigation beside
+    its heading, every other route collapses to one reading measure. The collapse is expressed in
+    `app/product-polish.css` as the condition rather than as a list of routes -- a `.body` whose
+    first column holds nothing but the H1 is one column -- so the whole of the fix here is putting
+    the real navigation in that column. The rule lets go of the page the moment it does.
+  */
+  const groups = tocEntries(DOCS_GROUPS);
+
   return (
     <PublicPageShell>
       <section className="scene doc"><div className="shell"><div className="body">
         <div className="stack">
           <h1 className="document-title">From sources to a Compiled World.</h1>
+          <PageToc entries={groups} />
         </div>
         <div className="stack">
           <p className="lede">
@@ -57,9 +71,9 @@ export default function DocsPage() {
             })}
           </div>
           <div className="docs-groups">
-            {DOCS_GROUPS.map((group) => (
+            {groups.map(({ id, label: group }) => (
               <div className="stack" key={group}>
-                <h2>{group}</h2>
+                <h2 className={tocStyles.anchor} id={id}>{group}</h2>
                 <ul className="docs-index">
                   {DOCS_SECTIONS.filter((section) => section.group === group).map((section) => (
                     <li key={section.slug}>
