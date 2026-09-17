@@ -93,7 +93,7 @@ const READING_A_NUMBER = [
   ],
   [
     "The failures the run produced",
-    "Published with the run that produced them. A table that survives only because its worst row was left out is worth less than no table.",
+    "Published with the run, not summarised out of it. A table that survives only because its worst row was left out is worth less than no table.",
   ],
 ] as const;
 
@@ -157,7 +157,7 @@ export default function BenchmarksPage() {
                 condition for a row arriving is a forward statement rather than a confession.
               */}
               <p className={styles.state}>
-                <b>This page is the protocol.</b> It defines
+                <b>This page is the protocol, not a scoreboard.</b> It defines
                 what a knowledge-compilation result has to carry before anyone — including us —
                 may publish it as a number. A result appears here with its digests, its
                 denominator and the failures the run produced, or it does not appear.

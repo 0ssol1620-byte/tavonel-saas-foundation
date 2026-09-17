@@ -72,7 +72,7 @@ export default function ReproducibilityPage() {
       <Link href={"/trust" as Route}>Trust</Link>
     </p>
     <TrustNext from="/reproducibility" />
-  </>} eyebrow="PUBLIC PROOF PROTOCOL" title="Rebuild the evidence yourself." state="PUBLIC SAMPLE · DIGEST-BOUND" summary="One question: can you rerun the same input and get the same bytes. A digest proves bytes — it does not prove semantic quality, and this page does not claim it does." sections={[
+  </>} eyebrow="PUBLIC PROOF PROTOCOL" title="Rebuild the evidence, not the claim." state="PUBLIC SAMPLE · DIGEST-BOUND" summary="One question: can you rerun the same input and get the same bytes. A digest proves bytes — it does not prove semantic quality, and this page does not claim it does." sections={[
     { title: "Frozen inputs", body: "The downloadable manifest names three public proof PDFs already shipped with the product and pins each byte sequence by SHA-256. The complete digests are in the manifest.", rows: FIXTURES.map((fixture) => (
       { key: fixture.key, description: `${fixture.name} · sha256 ${short(fixture.digest)}`, state: "PUBLIC SAMPLE" }
     )), download: { href: "/reproducibility/sample", label: "Download reproducibility manifest" } },
