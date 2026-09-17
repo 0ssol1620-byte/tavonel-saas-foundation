@@ -257,41 +257,6 @@
   .skip:focus, .skip:focus-visible { transform: translateY(0); }
 
   /*
-    D9 -- a stamp, not a spinner. See components/route-boot.tsx: this never gates the page, it
-    only confirms a route change already happened, in the bar's own instrument voice.
-  */
-  .route-boot {
-    position: fixed;
-    top: 14px;
-    right: 14px;
-    z-index: 150;
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    padding: 6px 12px;
-    background: var(--g2);
-    border: 1px solid var(--hairline-hi);
-    border-radius: var(--r-inst);
-    font-family: var(--f-mono);
-    font-size: var(--t-1);
-    letter-spacing: 0.1em;
-    color: var(--text-lo);
-    text-transform: uppercase;
-    pointer-events: none;
-    animation: boot-flash var(--dur-4) var(--ease-out) both;
-  }
-  .route-boot-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--verified); flex: none; }
-  @keyframes boot-flash {
-    0% { opacity: 0; transform: translateY(-4px); }
-    18% { opacity: 1; transform: translateY(0); }
-    78% { opacity: 1; }
-    100% { opacity: 0; }
-  }
-  @media (max-width: 620px) {
-    .route-boot { top: auto; bottom: calc(var(--bar) + 12px); right: 12px; font-size: var(--t-1); padding: 5px 10px; }
-  }
-
-  /*
     A detent, not a hover.
     A click had no confirmation beyond whatever state change followed it -- often a second later.
     This is the switch's own click standing in, and it fires on real activation (`:active` covers
@@ -3085,136 +3050,13 @@
     .film-caption { inset: auto 0 64px 0; padding-bottom: 12px; }
   }
 
-  /* ============================================================ evidence tether + identity resolve */
-
-  /*
-    Hairline and luminance only. Colour stays reserved for state: a lit tether is verified
-    evidence, not decoration. No glow, no sparkle, no serif pull-quote.
-  */
-
-  .tether {
-    position: relative;
-    display: grid;
-    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.25fr) minmax(0, 1fr);
-    grid-template-areas:
-      "source fact contract"
-      "source fact po";
-    gap: 16px 40px;
-    padding: 20px 18px 8px;
-    min-height: 228px;
-  }
-
-  .tether-edges {
-    position: absolute;
-    inset: 0;
-    grid-column: 1 / -1;
-    grid-row: 1 / -1;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    overflow: visible;
-    z-index: 0;
-  }
-
-  .tether-node {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 6px;
-    width: 100%;
-    text-align: left;
-    background: var(--g1);
-    border: 1px solid var(--hairline);
-    border-radius: var(--r-paper);
-    padding: 12px 13px;
-    color: inherit;
-    cursor: pointer;
-    transition: border-color var(--dur-3) var(--ease-out), background var(--dur-3) var(--ease-out);
-  }
-
-  .tether-node[data-id="source"] { grid-area: source; align-self: center; }
-  .tether-node[data-id="fact"] { grid-area: fact; align-self: center; }
-  .tether-node[data-id="contract"] { grid-area: contract; }
-  .tether-node[data-id="po"] { grid-area: po; }
-
-  .tether-node[data-hot="1"] {
-    background: var(--g2);
-    border-color: var(--hairline-hi);
-  }
-
-  .tether[data-lit="1"] .tether-node[data-hot="1"] {
-    border-color: var(--verified-dim);
-  }
-
-  .tether-k {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    font-family: var(--f-sans);
-    font-size: var(--t-1);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text-lo);
-  }
-
-  .tether-k i {
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: var(--reused);
-    flex: none;
-  }
-
-  .tether-node[data-tone="verified"] .tether-k i { background: var(--verified); }
-  .tether-node[data-tone="changed"] .tether-k i { background: var(--changed); }
-  .tether-node[data-tone="held"] .tether-k i { background: var(--unresolved); }
-  .tether-node[data-tone="unused"] .tether-k i { background: var(--reused); }
-
-  .tether-node b {
-    color: var(--text-hi);
-    font-size: 15px;
-    letter-spacing: -0.015em;
-    font-variation-settings: "wght" 560;
-    font-weight: 500;
-  }
-
-  .tether-d {
-    font-family: var(--f-sans);
-    font-size: var(--t-1);
-    line-height: 1.55;
-    color: var(--text-lo);
-  }
-
-  .tether-edge {
-    fill: none;
-    stroke: var(--hairline-hi);
-    stroke-width: 1;
-    vector-effect: non-scaling-stroke;
-    stroke-dasharray: 1;
-    stroke-dashoffset: 0;
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    .tether:not([data-drawn="1"]) .tether-edge { stroke-dashoffset: 1; }
-    .tether[data-drawn="1"] .tether-edge {
-      stroke-dashoffset: 0;
-      transition: stroke-dashoffset 700ms var(--ease), stroke var(--dur-3) var(--ease-out);
-    }
-  }
-
-  .tether[data-lit="1"] .tether-edge { stroke: var(--verified-dim); }
-  .tether[data-lit="1"] .tether-edge[data-direct="1"] { stroke: var(--verified); }
-
-  .tether-cite {
-    margin: 0;
-    padding: 12px 18px 16px;
-    border-top: 1px solid var(--hairline);
-    font-size: 12.5px;
-    color: var(--text-lo);
-    line-height: 1.6;
-  }
+  /* ============================================================ identity resolve
+     The evidence tether that stood beside it -- .tether, .tether-edges, .tether-node and its
+     data-id/data-hot/data-tone variants, .tether-k, .tether-d, .tether-edge, the SVG edge-draw
+     animation and .tether-cite -- is deleted with BQ-018: components/evidence-tether.tsx and
+     world-visual/provenance-tether.tsx are gone and nothing emits any of those class names. The
+     relationship between a source and its region is drawn as a shared --verified ring and a
+     matching locator label at both ends instead, which needs no curve. */
 
   .resolve {
     display: flex;
@@ -3343,17 +3185,6 @@
   .panel-head .right + .mini { margin-left: 0; }
 
   @media (max-width: 720px) {
-    .tether {
-      grid-template-columns: minmax(0, 1fr);
-      grid-template-areas:
-        "source"
-        "fact"
-        "contract"
-        "po";
-      gap: 28px;
-      min-height: 0;
-      padding-bottom: 16px;
-    }
     .resolve-row { grid-template-columns: minmax(0, 1fr); }
     .resolve-join { display: none; }
   }
@@ -3518,80 +3349,14 @@
     .pricing-page .pricing-glance { gap: 20px; }
   }
 
-  /* ============================================================ site navigation (IA redesign, 2026-09-11)
-     BEGIN wg-ia-nav. Appended as one block so the rules that need to out-specify `.nav > nav a`
-     (0,1,2) can do it with `.nav .site-nav-panel a` (0,2,1) instead of by reordering anything above.
-     END marker at the bottom of the file. */
-
-  /* The trigger is a control, so it gets the row's link treatment plus a caret and a state. The
-     caret is inside the button, not beside it: a 10px arrow is not a click target. */
-  .site-nav-trigger {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: none;
-    border: 0;
-    padding: 0;
-    cursor: pointer;
-    font: inherit;
-  }
-  .site-nav-trigger::after {
-    content: "";
-    width: 5px;
-    height: 5px;
-    border-right: 1px solid currentColor;
-    border-bottom: 1px solid currentColor;
-    transform: translateY(-2px) rotate(45deg);
-    transition: transform var(--dur-2) var(--ease-out);
-  }
-  .site-nav-trigger[aria-expanded="true"]::after { transform: translateY(1px) rotate(225deg); }
-  .nav > nav .site-nav-trigger[aria-expanded="true"],
-  .nav > nav [aria-current="true"] { color: var(--text-hi); }
-  .nav > nav [aria-current="true"] { box-shadow: inset 0 -1px 0 var(--verified); }
-
-  /* ---- the phone accordion. The outer panel's grid already draws a hairline between its rows
-     through `gap: 1px` on a hairline ground, so a group needs no border of its own. */
-  /*
-     Every rule here is qualified with `.mobile-primary-nav`, which is not decoration.
-
-     The panel's own controls are styled by `.mobile-primary-nav summary` (0,1,1) and
-     `.mobile-primary-nav[open] summary` (0,2,1), and both are *descendant* selectors, so they
-     reach the nested group summaries too. Measured on this build at 390: every collapsed group
-     drew the open marker, because that second rule out-specified a bare
-     `.mobile-nav-group[open] > summary::after` (0,1,1) and applied its "−" to all five summaries
-     whenever the outer disclosure was open -- which is whenever any of them is on screen. These
-     are (0,2,1) and (0,3,1) and come later, so a group's marker is its own.
-
-     The same inheritance hands a nested summary the MENU button's border, radius and ground,
-     which inside a flush list of rows reads as five stacked boxes. They are reset rather than
-     overridden one property at a time by a more specific selector somewhere else.
-  */
-  .mobile-nav-group { background: var(--ground); }
-  .mobile-primary-nav .mobile-nav-group > summary {
-    /* Same 44px floor as a link row: a category is the only way to that category's links. */
-    min-height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    padding: 0 clamp(14px, 4vw, 24px);
-    border: 0;
-    border-radius: 0;
-    background: transparent;
-    color: var(--text-lo);
-    font: 500 12px var(--f-sans);
-    letter-spacing: 0.06em;
-    cursor: pointer;
-    list-style: none;
-  }
-  .mobile-primary-nav .mobile-nav-group > summary::-webkit-details-marker { display: none; }
-  .mobile-primary-nav .mobile-nav-group > summary::after { content: "+"; margin-left: 0; color: var(--verified); }
-  .mobile-primary-nav .mobile-nav-group[open] > summary::after { content: "−"; }
-  .mobile-primary-nav .mobile-nav-group > summary[aria-current="true"] { color: var(--text-hi); }
-  .mobile-primary-nav .mobile-nav-group[open] > summary { color: var(--text-hi); background: var(--g1); }
-  .mobile-primary-nav nav > a[aria-current="true"],
-  .mobile-primary-nav .mobile-nav-links a[aria-current="true"] { color: var(--text-hi); }
-  /* END wg-ia-nav */
+  /* ============================================================ site navigation
+     The 2026-09-11 IA nav (a `.site-nav-trigger` disclosure per section on the desktop row, a
+     `.mobile-nav-group` accordion inside the phone sheet) was replaced by five direct links in
+     both navs. Nothing emits `.site-nav-trigger` or `.mobile-nav-group` any more -- three e2e
+     specs assert their count is zero -- and the two `[aria-current="true"]` rules that styled the
+     active row never matched at all: `customerNavOwns` sets `aria-current="page"`, which is what
+     `app/one-path.css` now keys both navs' active styling on. The whole block is deleted rather
+     than repointed, because the markup it was written against is gone. */
 
 }
 
@@ -3779,103 +3544,11 @@
   .solution-hero > .stack:first-child { position: static; }
   .solution-hero .document-title { width: 100%; max-width: 17ch; }
   .solution-hero-copy { width: 100%; max-width: 680px; justify-self: end; align-self: center; }
-  .solution-proof-sample {
-    grid-column: 1 / -1;
-    margin: clamp(42px, 5vw, 68px) 0 0;
-    border: 1px solid var(--hairline-hi);
-    border-radius: var(--r-inst-lg);
-    overflow: hidden;
-    background: var(--ground);
-  }
-  /*
-    BA-041 / BA-043 / BA-056 -- the four drawn tiles are gone, and with them the icon stack, the
-    striped fake page, the empty dot grid under a candidate count, and the glowing timeline dot.
-    What is left holds one real region rendered by /explore's own `SourceSheet`, so the styling
-    here is a frame and a caption; the evidence inside brings its own.
-  */
-  .solution-proof-sample-head {
-    min-height: 44px;
-    padding: 10px 16px;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 6px 18px;
-    border-bottom: 1px solid var(--hairline);
-    color: var(--text-lo);
-    font-size: 12px;
-    letter-spacing: .01em;
-  }
-  /* The card's only link was 115x11px on a phone (BA-056): it is now a 44px row target. */
-  .solution-proof-sample-head a {
-    display: inline-flex;
-    align-items: center;
-    min-height: 44px;
-    color: var(--verified);
-    font-size: 12px;
-    text-decoration: underline;
-    text-underline-offset: 3px;
-  }
-  .solution-proof-sample-body {
-    display: grid;
-    gap: 0;
-    background: var(--g1);
-  }
-  .solution-proof-claim {
-    margin: 0;
-    padding: 16px;
-    border-bottom: 1px solid var(--hairline);
-    color: var(--text-hi);
-    font-size: 14px;
-    line-height: 1.55;
-  }
-  .solution-proof-claim span {
-    display: block;
-    margin-bottom: 6px;
-    color: var(--text-lo);
-    font: 12px var(--f-sans);
-    letter-spacing: .1em;
-    text-transform: uppercase;
-  }
-  /* The sheet is a flex child in /explore's stage; here it is a block in a figure. */
-  .solution-proof-sample-body > article {
-    border: 0;
-    border-radius: 0;
-  }
-  .solution-proof-counts {
-    margin: 0;
-    padding: 12px 16px;
-    border-top: 1px solid var(--hairline);
-    color: var(--text-lo);
-    font: 12px/1.6 var(--f-mono);
-    overflow-wrap: anywhere;
-  }
-  .solution-proof-digest { color: var(--text-lo); }
-
-  /*
-    G1-037. Three things in this panel were too small to be evidence.
-
-    The page render was fitted into a 420px frame inside a ~690px panel, so the page itself came out
-    about 145px wide -- a reader could see that something was highlighted and nothing else, which is
-    the opposite of what an evidence surface is for. The frame is taller now and the region overlay
-    is legible at arm's length. The provenance list was 9px mono at the dimmest text token on the
-    scale; 11px and one step up in contrast is still quiet and is now readable. The sha256 already
-    wraps (`.digest`), so it no longer runs off as one line.
-  */
-  .solution-proof-sample [data-source-viewport] { height: clamp(460px, 44vw, 620px); }
-  .solution-proof-sample [data-source-provenance] { font-size: var(--t-1); line-height: 1.6; }
-  .solution-proof-sample [data-source-provenance] dt { color: var(--text-lo); }
-  .solution-proof-sample [data-source-provenance] dd { color: var(--text-hi); }
-
-  /* G1-016. Why this page opens on this filing rather than on the same one five times. */
-  .solution-proof-framing {
-    margin: 0;
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--hairline);
-    color: var(--text-mid);
-    font-size: 13px;
-    line-height: 1.6;
-  }
+  /* BA-041/G1-016/G1-037. The `.solution-proof-*` rules that framed this block are deleted: the
+     proof renders components/solution-proof-sample.module.css's hashed classes now, so the frame,
+     the head row, the claim with its cream ground and left border, the counts, the digest, the
+     provenance sizing and the framing note were all styling nothing. The 44px-target assertion
+     that read the head link moved to the module in lib/solution-proof-sample.test.ts. */
 
   .solution-section {
     display: grid;
@@ -4165,7 +3838,6 @@
     .solution-flow li { min-height: 132px; }
     .solution-flow li:last-child { grid-column: 1 / -1; }
     .solution-notes { margin-top: 54px; }
-    .solution-proof-sample-head { align-items: flex-start; flex-direction: column; justify-content: center; gap: 5px; padding-block: 12px; }
     .board-row-summary { grid-template-columns: minmax(0, 1fr) auto 18px; gap: 8px; }
     .board-row-status { max-width: 112px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .compile-stage { aspect-ratio: 1 / 1; }
@@ -4436,9 +4108,17 @@
 
     `text-underline-offset` rather than the default, because at 13px the baseline underline cuts
     through the descenders of the mono face the digests are set in.
+
+    BQ-030. The `.scene` half used to reach `li`, `dd`, `td`, `figcaption` and `summary` too, and a
+    list of links is not prose: three navigation lists rendered as underlined body copy because
+    their anchors happened to carry no class, and the fix on the day was to invent a class for each
+    of them. Outside a prose container only a paragraph counts, which is the one element that can
+    never be a list of destinations. Inside one -- the docs body, a policy page, the fine print --
+    every running-text element still qualifies.
   */
-  .scene :is(p, li, dd, td, figcaption, summary) > a:not([class]),
+  .scene p > a:not([class]),
   .policy-copy :is(p, li, dd, td) a:not([class]),
+  .fine :is(p, li, dd, td) a:not([class]),
   .docs-body :is(p, li, dd, td) a:not([class]) {
     text-decoration: underline;
     text-underline-offset: 3px;
@@ -4463,16 +4143,10 @@
     `activationPolicy.customerData.reason`'s own words. Quiet: it is a standing fact beside the
     action, not a warning, and the header carries the same string.
   */
-  .one-path-state {
-    margin: 14px 0 0;
-    padding-left: 14px;
-    border-left: 2px solid var(--hairline-hi, #435046);
-    max-width: 68ch;
-    color: var(--text-lo, #9aaba1);
-    font-size: 13px;
-    line-height: 1.65;
-  }
-  .one-path-state[data-customer-data="open"] { border-left-color: var(--verified, #7fb08a); }
+  /* BQ-129. The coloured-left-border callout that `.one-path-state` used to be -- a 2px bar that
+     turned green when the gate opened, a state colour spent on a sentence that is not a state --
+     is not carried forward from ux-polish.css. `app/one-path.css` draws it as a hairline panel on
+     its one emitter (components/home-page-client.tsx, inside `.one-path-home`). */
 
   /* ---------------------------------------------------------------- folded from responsive-polish.css */
 
@@ -4486,9 +4160,10 @@
     content-visibility: auto;
     contain-intrinsic-size: auto 72px;
   }
-  /* The product surfaces sit above the fold on /product, where deferring the paint buys nothing
-     and costs a shift; they keep the reserved size and drop the deferral. */
-  .product-surface { contain-intrinsic-size: auto 260px; }
+  /* `.product-surface` used to be in that list. A size-contained element contributes no row to its
+     parent grid, which silently disabled the subgrid those cards now use, and the reserved size it
+     kept afterwards did nothing on its own -- `contain-intrinsic-size` applies only while size
+     containment is active. Both are gone from here, so app/product-polish.css needs no override. */
 
   /* Interactive surfaces move subtly; no decorative animation competes with the product film.
      `.btn` is not in this list any more: it carries its own transition and its own press state in
@@ -4850,54 +4525,22 @@
   .landing-page .hero .actions { gap: 12px 20px; flex-wrap: wrap; }
   .landing-page .hero .hero-proof { font-size: var(--t-3); line-height: 1.5; }
 
-  .home-proof-label {
-    display: flex;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 8px 16px;
-    margin: 0 0 12px;
-    font-size: var(--t-3);
-    line-height: 1.5;
-    color: var(--text-hi);
-  }
-  .home-proof-label > span { color: var(--text-mid); }
-  .home-evidence-preview { min-width: 0; }
-  .home-evidence-preview .solution-proof-sample { margin: 0; min-width: 0; }
-  .home-evidence-preview .solution-proof-sample-head { gap: 10px; flex-wrap: wrap; }
-  /* The claim is printed on the one light surface in the system, because it is a passage from a
-     page. --paper and --paper-ink are that surface; the cream and the ink used to be two literals. */
-  .home-evidence-preview .solution-proof-claim {
-    background: var(--paper);
-    color: var(--paper-ink);
-    border-left: 3px solid var(--verified-dim);
-    padding: 20px;
-    font-size: var(--t-5);
-    line-height: 1.55;
-  }
-  .home-evidence-preview .solution-proof-claim > span { color: var(--text-lo); }
-  .home-evidence-preview .solution-proof-counts { font-size: var(--t-2); line-height: 1.6; overflow-wrap: anywhere; }
-
-  /* Entry-page preview: one selected passage, with the original-PDF and SEC links retained.
-     Explore still exposes the whole page and full provenance; this is not a full-page rendition.
-     Only nonselected evidence paragraphs are trimmed; notices and source disclosures remain. */
-  :is(.home-evidence-preview, .ko-published-proof) [data-source-sheet] p[data-region-id]:not([data-active-region]) { display: none; }
-  :is(.home-evidence-preview, .ko-published-proof) [data-source-provenance] { display: none; }
-  :is(.home-evidence-preview, .ko-published-proof) a { min-height: 44px; display: inline-flex; align-items: center; white-space: normal; }
+  /* BQ-070/BQ-076. The landing proof is no longer wrapped: `.home-evidence-preview`,
+     `.ko-published-proof` and `.home-proof-label` are not emitted by any page, and the block
+     brings its own frame from components/solution-proof-sample.module.css. The rule that mattered
+     most here was `[data-source-provenance] { display: none; }`, which hid the sha256 ledger on /
+     and /ko by attribute -- so it also hid the collapsed "Verify this source" disclosure that
+     replaced it, removing the verify path from both entry pages. Deleted with the wrapper. */
 
   .landing-page .hero .tile { min-width: 0; overflow-wrap: anywhere; }
   .landing-page .hero .tile > * { min-width: 0; max-width: 100%; }
   .landing-page .hero .tiles .tile > h2 { width: 100%; max-width: 100%; min-width: 0; text-wrap: wrap; align-self: stretch; }
   .landing-page .hero .tile h2 { font-size: var(--t-7); line-height: 1.2; }
   .landing-page .hero .tile p { font-size: var(--t-4); line-height: 1.55; }
-  .ko-published-proof { min-width: 0; margin: 16px 0 24px; }
-  .ko-published-proof .solution-proof-sample { margin-inline: 0; }
 
   @media (max-width: 600px) {
     .landing-page .hero .lede { font-size: var(--t-4); line-height: 1.55; }
     .landing-page .hero .tile h2 { font-size: var(--t-7); }
-    .home-proof-label { font-size: var(--t-2); }
-    .home-evidence-preview .solution-proof-claim { font-size: var(--t-4); padding: 16px; }
-    .home-evidence-preview .solution-proof-sample-head { align-items: flex-start; }
   }
 
 }

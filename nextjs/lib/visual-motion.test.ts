@@ -23,7 +23,7 @@ describe("the interaction budget", () => {
   });
 
   it("keeps every reveal inside 250-600ms", () => {
-    for (const name of ["fade", "tether", "pulse", "dim", "rewrite"] as const) {
+    for (const name of ["fade", "pulse", "dim", "rewrite"] as const) {
       expect(MOTION[name].ms, name).toBeGreaterThanOrEqual(REVEAL_MIN_MS);
       expect(MOTION[name].ms, name).toBeLessThanOrEqual(REVEAL_MAX_MS);
     }
