@@ -2,11 +2,16 @@
   The diagram borrows the page's type and hairlines rather than bringing its own palette, so it
   reads as part of the record it sits in. Every size is in user units on the viewBox: the drawing
   scales as one piece and there is no separate small-screen version to fall out of step.
-*/
-.diagram { width: 100%; height: auto; max-width: 980px; overflow: visible; }
 
-/* Sizes are user units on a 980-wide viewBox, so each renders about four fifths as large. */
-.eyebrow { fill: var(--verified); font: 11px var(--f-mono); letter-spacing: .16em; }
+  A user unit is a CSS pixel only while the drawing renders at its authored width. The column it
+  sits in is about 800px wide at 1440, which put every size below at four fifths of what it says
+  -- the stage labels at 11px and the span notes at 10.5px. The drawing is pinned to its viewBox
+  width instead and its `<figure>` pans it, which is the treatment the contract diagram on
+  /product/continuous-knowledge gets.
+*/
+.diagram { width: 100%; height: auto; min-width: 980px; max-width: 980px; overflow: visible; }
+
+.eyebrow { fill: var(--verified); font: 12px var(--f-mono); letter-spacing: .08em; }
 
 .stage { fill: none; stroke: var(--hairline-hi); }
 .stageLabel { fill: var(--text-hi); font: 13.5px var(--f-mono); letter-spacing: .1em; text-anchor: middle; }
@@ -42,14 +47,6 @@
 */
 .stack { display: none; }
 
-@media (max-width: 760px) {
-  /*
-    Between 640 and 760 the drawing still reads at a legible width and its container scrolls --
-    the same treatment every other wide thing on this site gets.
-  */
-  .diagram { min-width: 700px; }
-}
-
 @media (max-width: 640px) {
   .diagram { display: none; }
   .stack {
@@ -64,7 +61,7 @@
     background: var(--hairline);
   }
   .stack li { display: grid; gap: 4px; padding: 12px 14px; background: var(--ground); }
-  .stack b { color: var(--text-hi); font: 11px var(--f-mono); letter-spacing: .12em; }
+  .stack b { color: var(--text-hi); font: 12px var(--f-mono); letter-spacing: .08em; }
   .stack span { color: var(--text-lo); font-size: 12px; line-height: 1.5; }
   .stackWhole b, .stackWhole span { color: var(--verified); }
 }

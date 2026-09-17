@@ -115,12 +115,16 @@
   text-transform: uppercase;
   color: var(--text-lo);
 }
-/* What the field has to be, beside the field's name. Not decoration: it is the check. */
+/*
+  What the field has to be, beside the field's name. Not decoration: it is the check -- which is
+  why it is not painted in `--decor`, a 2.2:1 surface tone that is never a text colour. A step
+  up from the `--text-lo` of the name it qualifies, not a step down into the background.
+*/
 .receiptRow dt em {
   font-style: normal;
   font-size: 12px;
   letter-spacing: 0.1em;
-  color: var(--decor);
+  color: var(--text-mid);
 }
 .receiptRow dd {
   margin: 0;
