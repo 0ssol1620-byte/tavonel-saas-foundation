@@ -27,13 +27,12 @@ Indexing: public product, documentation, research and trust pages are indexable.
 - [API reference](https://tavonel.com/api): The HTTP interface — its operations, parameters and error codes. The machine-readable specification it is rendered from is served at /openapi.json.
 - [Changelog](https://tavonel.com/changelog): What changed in the product and the public interfaces. The same entries are served as an Atom feed at /changelog/feed.xml.
 - [Pricing](https://tavonel.com/pricing): Free Evaluation, Developer, Team and Enterprise access.
-- [Sources](https://tavonel.com/sources): The capability manifest this deployment reads — every accepted format, its support tier, what survives into the compiled world, and what does not.
+- [Sources](https://tavonel.com/sources): The capability manifest this deployment reads — every accepted format, its support tier, what survives into the Compiled World, and what does not.
 - [Integrations](https://tavonel.com/integrations): Which source systems connect today, which are not supported, and how the customer-run agent behaves.
 - [Trust Center](https://tavonel.com/trust): The index of what this deployment publishes about itself, and what it does not.
 - [Security](https://tavonel.com/security): Data path, tenant isolation, retention and security controls.
 - [Enterprise](https://tavonel.com/enterprise): What an enterprise engagement covers today, and what is not provided.
 - [Benchmarks](https://tavonel.com/benchmarks): The metric families and receipt fields a knowledge-compilation result must satisfy before a number is published.
-- [Arena](https://tavonel.com/arena): The model-comparison protocol, and its current state.
 - [Reproducibility](https://tavonel.com/reproducibility): Frozen public fixtures and digest-bound sample artifacts.
 - [Resources](https://tavonel.com/resources): The hub over the reading, verification and comparison material.
 - [Status](https://tavonel.com/status): Current service status.

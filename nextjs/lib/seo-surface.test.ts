@@ -206,6 +206,10 @@ const READER_CONTROLS = [
   "/film",
   "/benchmarks",
   "/reproducibility",
+  // D11 delisted `/arena` from all three files while the route kept answering, so it is read
+  // here for the same reason the drafts are: a page nothing advertises is the case this reader
+  // exists for.
+  "/arena",
   // The index (BA-210) for the same reason as its entries: advertised nowhere, so read here.
   "/cookbooks",
   ...COOKBOOK_SLUGS.map((slug) => `/cookbooks/${slug}`),
@@ -287,6 +291,21 @@ describe("public surface: robots, sitemap and llms.txt agree", () => {
     expect(isNoindex("/solutions"), "the hub is advertised, so it may not opt out of search").toBe(false);
   });
 
+  /*
+    D11. `/arena` publishes no comparison yet, so it is delisted rather than noindexed-and-still-
+    advertised. The sitemap and `RESOURCE_LINKS` dropped it and the footer dropped it; `llms.txt`
+    kept offering it, and the guard above admits that because the page declares itself noindex --
+    the exemption written for `/reproducibility`, which is the one deliberate llms-only URL.
+
+    The route still answers so an existing link does not 404. `/cookbooks` is held to the same
+    rule in `lib/cookbook-content.test.ts`: out of the sitemap and out of llms.txt, both.
+  */
+  it("delists /arena everywhere it would be advertised, and keeps it answering", () => {
+    expect(isRealRoute("/arena"), "an existing link must not 404").toBe(true);
+    expect(isNoindex("/arena")).toBe(true);
+    expect(sitemapPaths).not.toContain("/arena");
+    expect(llmsPaths).not.toContain("/arena");
+  });
   it("reads noindex from the page rather than assuming it", () => {
     expect(isNoindex("/reproducibility"), "the one deliberate llms-only URL no longer reads as noindex").toBe(true);
     expect(isNoindex("/benchmarks"), "an indexable page reads as noindex, so the exemption admits anything").toBe(false);
