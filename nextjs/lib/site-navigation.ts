@@ -60,6 +60,21 @@ export const SELF_SERVE_CTA: SiteLink = { href: "/login", label: "Start with you
 /** The one name for the public sample, everywhere it is linked. */
 export const EXPLORE_CTA: SiteLink = { href: "/explore", label: "Explore a Compiled World" };
 
+/**
+ * The positioning line, once.
+ *
+ * Five different sentences were carrying it — one in the hero, one in the footer, one in the OG
+ * card, one in the metadata description and one on /ko — so the answer to "what is this" changed
+ * depending on which surface a reader landed on first. These two strings are the answer; every OG
+ * card, footer tagline and metadata description derives from them, and the other four go.
+ *
+ * Changing either string is a founder call: it is a public claim, not a copy edit.
+ */
+export const BRAND_LINE = {
+  headline: "Bring your knowledge. TAVONEL makes it ready for AI.",
+  descriptor: "Knowledge compiled with a traceable path back to every source.",
+} as const;
+
 /* ============================================================ G1-043 / G1-044: the Korean chrome
 
   One page, one map, and deliberately not an i18n layer.

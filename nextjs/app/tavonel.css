@@ -466,21 +466,48 @@ h3 { font-size: 19px; letter-spacing: -0.014em; font-variation-settings: "wght" 
 }
 .fine a:hover { color: var(--text-hi); }
 
-/* BA-236 -- 10.5px was under the system's own 12px floor, and 0.16em tracking at that size is
-   16% of the em. 12px with the tracking cut to 0.1em. */
-.slate {
+/*
+  One kicker, one state label. Emitted by `components/kicker.tsx`.
+
+  There were four of these -- `.eyebrow`, `.slate`, `.kicker` and one-path's `.one-path-eyebrow`
+  -- at four sizes in two typefaces with two separator syntaxes, sitting above 108 headings. Four
+  spellings of the same small line above a heading is the clearest template tell the site has.
+
+  `.eyebrow` is the kicker: sans, at the floor, sentence case, no dot, no rule line. `.slate` and
+  `.kicker` are aliases so existing markup renders the one face while the call sites are swapped
+  over to <Kicker>. `.state-label` is the other thing these classes were being used for -- a
+  machine state, READY · 3 -- and it is the one that stays monospace.
+
+  A kicker that restates the heading under it is deleted, not restyled.
+*/
+.eyebrow,
+.slate,
+.kicker {
   margin: 0;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  font-family: var(--f-sans);
+  font-size: var(--t-1);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: none;
+  color: var(--text-mid);
+}
+.eyebrow b, .slate b, .kicker b { color: var(--text-hi); font-weight: 500; }
+/* The 34px rule beside every kicker was an ornament, and 108 of them is a pattern, not a detail. */
+
+.state-label {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-family: var(--f-mono);
-  font-size: 12px;
-  letter-spacing: 0.1em;
+  font-size: var(--t-1);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-lo);
 }
-.slate b { color: var(--text-lo); font-weight: 500; }
-.slate span { width: 34px; height: 1px; background: var(--hairline-hi); }
 
 /*
   BA-239 -- the halo is scoped to the one page that has a canvas behind its type.
@@ -1885,7 +1912,6 @@ footer.site .shell { display: flex; flex-direction: column; gap: 14px; }
 .workspace-content h1 { font-size: clamp(28px, 3.6vw, 46px); letter-spacing: -0.03em; }
 .workspace-content h2 { font-size: 17px; letter-spacing: -0.012em; }
 
-.eyebrow { margin: 0; font-family: var(--f-mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-lo); }
 .lead { margin: 0; font-size: 15px; color: var(--text-mid); max-width: 66ch; }
 
 .workspace-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 360px); gap: 18px; align-items: start; margin-top: 8px; }
