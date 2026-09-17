@@ -91,8 +91,7 @@ export default function ResearchPage() {
         <div className="shell">
           <div className="body policy-copy"><IndexedPolicyBody>
             <div className="stack">
-              <p className="slate"><b>RESEARCH</b><span />KNOWLEDGE COMPILATION</p>
-              <h1 className="document-title">The hard parts of turning<br />documents into knowledge.</h1>
+              <h1 className="document-title">The hard parts of turning documents into knowledge.</h1>
               {/* G2-040 / G2-041: one jump index for long documents, from the shared component. */}
               <PolicyJumpIndex />
             </div>
@@ -116,7 +115,7 @@ export default function ResearchPage() {
                 <Link href={"/research/notes" as Route}>Research notes</Link>.
               </p>
 
-              <p className="slate"><span />RESEARCH AREAS</p>
+              <h2>Research areas</h2>
               <div className="tiles">
                 {AREAS.map(([title, body]) => (
                   <article className="tile" key={title}>
@@ -133,7 +132,7 @@ export default function ResearchPage() {
                 missing was the sentence saying so, which is why a reader met the same four rules
                 twice and could not tell which page enforced them.
               */}
-              <p className="slate"><span />HOW WE REPORT</p>
+              <h2>How we report</h2>
               <p className="fine">
                 Each rule below is enforced on a published figure by the validator described on{" "}
                 <Link href={"/benchmarks" as Route}>Benchmarks</Link>, which refuses a record that

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { Route } from "next";
 import { PublicSitePage } from "@/components/public-site-chrome";
-import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
+import BreadcrumbJsonLd, { DocBreadcrumb } from "@/components/breadcrumb-json-ld";
 import SolutionProofSample, { type ProofPick } from "@/components/solution-proof-sample";
 import { CAPABILITY_MANIFEST, isAcceptedAtUpload } from "../../../../shared/capabilityManifest";
 
@@ -158,8 +158,7 @@ export default function DocumentUnderstandingPage() {
           <div className="body">
             <div className="stack">
               {/* BA-026. The trail BreadcrumbJsonLd already declares, rendered for the reader. */}
-              <p className="doc-breadcrumb"><Link href={"/product" as Route}>Product</Link> <span aria-hidden="true">/</span> Document understanding</p>
-              <p className="slate"><b>PRODUCT</b><span />DOCUMENT UNDERSTANDING</p>
+              <DocBreadcrumb trail={[{ name: "Product", path: "/product" }, { name: "Document understanding", path: "/product/document-understanding" }]} />
               <h1 className="document-title">Reading is the first compile step.</h1>
               {/*
                 G1-019 / G1-020 (marketing-visual). The page about reading documents had no

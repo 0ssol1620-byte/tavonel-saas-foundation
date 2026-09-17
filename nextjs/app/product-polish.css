@@ -49,13 +49,18 @@
 /*
   BA-026. The trail `BreadcrumbJsonLd` already declares, rendered.
 
-  12px sans rather than the 9px mono the eyebrow under it uses: this is a navigation a reader
-  taps, not a label. Its own line above the eyebrow, so the eyebrow still introduces the title.
+  12px sans: this is a navigation a reader taps, not a label. BQ-137 makes it a real `<nav>` with
+  an ordered list, on every reference route rather than on two /product pages, so these rules
+  address the list rather than a paragraph's bare children. `--text-xlo` and `--decor` are gone
+  from it: the first is deleted by the token contract and the second is never a text colour.
 */
-.doc-breadcrumb { margin: 0; color: var(--text-xlo); font-size: 12px; letter-spacing: -.005em; }
+.doc-breadcrumb { margin: 0; font-size: 12px; letter-spacing: -.005em; }
+.doc-breadcrumb ol { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; align-items: baseline; }
+.doc-breadcrumb li { display: flex; align-items: baseline; min-width: 0; }
 .doc-breadcrumb a { color: var(--text-mid); }
 .doc-breadcrumb a:hover { color: var(--text-hi); }
-.doc-breadcrumb span { margin: 0 6px; color: var(--decor); }
+.doc-breadcrumb [aria-current="page"] { color: var(--text-lo); }
+.doc-breadcrumb [aria-hidden="true"] { margin: 0 6px; color: var(--text-lo); }
 .product-close { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 24px; }
 .product-close h2 { margin: 0; color: var(--text-hi); font-size: clamp(22px, 2.4vw, 34px); letter-spacing: -.03em; }
 .product-flow {

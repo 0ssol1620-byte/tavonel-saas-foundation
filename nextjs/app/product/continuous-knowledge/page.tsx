@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import CompilerContractDiagram from "@/components/compiler-contract-diagram";
 import { PublicSitePage } from "@/components/public-site-chrome";
-import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
+import BreadcrumbJsonLd, { DocBreadcrumb } from "@/components/breadcrumb-json-ld";
 import {
   CONTRACT_CLAUSES,
   CONTRACT_STATE,
@@ -69,23 +69,35 @@ const CLAUSE_HALVES = [
   [MID_CLAUSE, CONTRACT_CLAUSES.slice(MID_CLAUSE)],
 ] as const;
 
+/** One trail, read by the crawler and by the reader. See `DocBreadcrumb` (BQ-137). */
+const TRAIL = [
+  { name: "Product", path: "/product" },
+  { name: "Continuous knowledge", path: "/product/continuous-knowledge" },
+];
+
 export default function ContinuousKnowledgePage() {
   return (
     <PublicSitePage>
-      <BreadcrumbJsonLd trail={[{ name: "Product", path: "/product" }, { name: "Continuous knowledge", path: "/product/continuous-knowledge" }]} />
+      <BreadcrumbJsonLd trail={TRAIL} />
       <section className="scene doc">
         <div className="shell">
           <div className="body">
             <div className="stack">
-              <p className="slate"><b>PRODUCT</b><span />CONTINUOUS RECOMPILATION</p>
+              <DocBreadcrumb trail={TRAIL} />
               <h1 className="document-title">Continuous recompilation — the Compiler Contract.</h1>
             </div>
             <div className="stack">
+              {/*
+                BQ-109 / BQ-134: the lede reads at one weight. The bold ran from the middle of the
+                paragraph to the end of the next sentence, which is not emphasis -- it is a second
+                heading typeset inside a paragraph, on the sentence a reader was going to read
+                anyway. The sentence is unchanged; only the weight is.
+              */}
               <p className="lede">
                 Knowledge is not compiled once. Sources keep moving, and a compiler that cannot say
                 what a change did to the knowledge standing on it is an indexer with extra steps.
-                <b> The Compiler Contract is the eight promises a compile has to keep</b> — and,
-                on this page, the state each one actually holds here.
+                The Compiler Contract is the eight promises a compile has to keep — and, on this
+                page, the state each one actually holds here.
               </p>
               <dl className={styles.key}>
                 {STATE_KEY.map((state) => (

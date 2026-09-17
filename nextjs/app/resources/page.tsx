@@ -62,8 +62,7 @@ export default function ResourcesPage() {
         <div className="shell">
           <div className="body">
             <div className="stack">
-              <p className="slate"><b>RESOURCES</b><span />TAVONEL</p>
-              <h1 className="document-title">Everything that explains<br />how this works.</h1>
+              <h1 className="document-title">Everything that explains how this works.</h1>
             </div>
             <div className="stack">
               <p className="lede">

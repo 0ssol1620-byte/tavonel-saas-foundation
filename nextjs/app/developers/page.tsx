@@ -95,7 +95,6 @@ export default function DevelopersPage() {
         <div className="shell">
           <div className="body">
             <div className="stack">
-              <p className="slate"><b>DEVELOPERS</b><span aria-hidden="true" />· ONE WORLD</p>
               <h1 className="document-title">Give every model the same grounded world.</h1>
             </div>
             <div className="stack">
@@ -105,7 +104,7 @@ export default function DevelopersPage() {
                 the asset.
               </p>
 
-              <p className="slate"><span aria-hidden="true" />THREE WAYS TO USE A COMPILED WORLD</p>
+              <h2>Three ways to use a Compiled World</h2>
               <div className="chain dev-paths">
                 {PATHS.map((path) => (
                   <article className="link" key={path.kind}>
@@ -117,7 +116,7 @@ export default function DevelopersPage() {
                 ))}
               </div>
 
-              <p className="slate"><span aria-hidden="true" />FROM SOURCES TO A GROUNDED ANSWER</p>
+              <h2>From sources to a grounded answer</h2>
               <ol className="dev-journey">
                 {JOURNEY.map(([title, body]) => (
                   <li key={title}>
@@ -136,7 +135,7 @@ export default function DevelopersPage() {
               </p>
 
               <div className="stack">
-                <p className="slate"><b>PUBLIC TOOLING</b><span aria-hidden="true" />· VERSIONED FILES</p>
+                <h2>Public tooling</h2>
                 <h3>Start with the contract, then a scoped key.</h3>
                 <figure className="docs-code">
                   <figcaption>
@@ -193,7 +192,7 @@ export default function DevelopersPage() {
               </div>
 
               <div className="stack">
-                <p className="slate"><b>PORTABLE PACKAGE</b><span aria-hidden="true" />· WHAT IS IN THE ARCHIVE</p>
+                <h2>What is in a portable package</h2>
                 <p className="fine">
                   Every signed export contains these files, written by the exporter and named in
                   a manifest carrying a digest for each one. The two ontology files are the
@@ -219,7 +218,7 @@ export default function DevelopersPage() {
                 </table>
               </div>
 
-              <p className="slate"><span aria-hidden="true" />NEXT</p>
+              <h2>Next</h2>
               <div className="actions">
                 <Link className="btn" href={"/docs/quickstart" as Route}>Run the quickstart</Link>
                 {/* BA-184 is reversed here: /api is a rendered reference now, not a stub. G3-004. */}

@@ -19,6 +19,9 @@ export const metadata: Metadata = {
   title: "TAVONEL Arena — not yet published",
   description: "The public model-comparison results are not published yet. The benchmark protocol is.",
   alternates: { canonical: "/arena" },
+  // Still its own address when someone shares the link. `noindex` governs the crawl; it does not
+  // make the page preview as the homepage.
+  openGraph: { url: "/arena" },
   robots: { index: false, follow: true },
 };
 

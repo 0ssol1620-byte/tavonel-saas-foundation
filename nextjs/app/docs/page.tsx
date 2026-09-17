@@ -35,7 +35,6 @@ export default function DocsPage() {
     <PublicPageShell>
       <section className="scene doc"><div className="shell"><div className="body">
         <div className="stack">
-          <p className="slate"><b>DOCUMENTATION</b><span aria-hidden="true" />· API {DOCS_VERSION}</p>
           <h1 className="document-title">From sources to a Compiled World.</h1>
         </div>
         <div className="stack">
@@ -60,7 +59,7 @@ export default function DocsPage() {
           <div className="docs-groups">
             {DOCS_GROUPS.map((group) => (
               <div className="stack" key={group}>
-                <p className="slate"><b>{group.toUpperCase()}</b></p>
+                <h2>{group}</h2>
                 <ul className="docs-index">
                   {DOCS_SECTIONS.filter((section) => section.group === group).map((section) => (
                     <li key={section.slug}>

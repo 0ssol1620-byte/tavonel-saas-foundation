@@ -132,8 +132,7 @@ export default function EvidencePage() {
         <div className="shell">
           <div className="body">
             <div className="stack">
-              <p className="slate"><b>EVIDENCE</b><span />SOURCE BINDING</p>
-              <h1 className="document-title">Follow grounded results<br />back to the source.</h1>
+              <h1 className="document-title">Follow grounded results back to the source.</h1>
             </div>
             <div className="stack">
               {/*
@@ -159,7 +158,7 @@ export default function EvidencePage() {
                 /trust, as one. What is gone is the count.
               */}
 
-              <p className="slate"><span />WHAT AN EXACT SOURCE LOCATION IS</p>
+              <h2>What an exact source location is</h2>
               <p className="fine">
                 A location is whatever addresses one place inside that kind of source. One of
                 these forms is what TAVONEL reads today; the rest are the shape the evidence
@@ -181,7 +180,7 @@ export default function EvidencePage() {
                 </p>
               </div>
               {/* BA-113: one heading level per card grid, in document order. This is h3's grid. */}
-              <p className="slate"><span />THE CONTRACT IS BUILT TO HOLD THESE TOO</p>
+              <h2>What the contract is built to hold</h2>
               <div className="tiles">
                 {CONTRACTED_LOCATORS.map(([family, locator]) => (
                   <article className="tile" key={family}>
@@ -192,7 +191,7 @@ export default function EvidencePage() {
                 ))}
               </div>
 
-              <p className="slate"><span />HOW EVIDENCE IS BOUND</p>
+              <h2>How evidence is bound</h2>
               <div className="tiles">
                 {MECHANISM.map(([title, body, href, label]) => (
                   <article className="tile" key={title}>
@@ -203,7 +202,7 @@ export default function EvidencePage() {
                 ))}
               </div>
 
-              <p className="slate"><span />VERIFY IT YOURSELF</p>
+              <h2>Verify it yourself</h2>
               <div className="chain">
                 {VERIFY.map(([title, body], index) => (
                   <article className="link" key={title}>

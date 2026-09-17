@@ -108,10 +108,18 @@ describe("the solutions hub", () => {
     expect(css, "and a keyboard").toMatch(/\.card:focus-within/);
   });
 
-  it("fills the eyebrow's descriptor slot with what the section holds", () => {
-    expect(shipped).toContain("<b>SOLUTIONS</b><span />FIVE DOCUMENTED USES");
-    expect(shipped, "the brand name is not a descriptor")
-      .not.toContain("<b>SOLUTIONS</b><span />TAVONEL");
+  /*
+    BA-054 was that the eyebrow's descriptor slot held our own brand name -- "SOLUTIONS ·
+    TAVONEL" -- so the first line of the page said nothing. BQ-099 settles it by deleting the
+    slot rather than refilling it: the hub's own H1 is the first thing on the page, and there is
+    no label above the label.
+
+    The guard moves with the change rather than being dropped, because a restating eyebrow above
+    the H1 is exactly the shape that grew back last time.
+  */
+  it("leads with the heading rather than a label above it", () => {
+    expect(shipped, "no eyebrow above the H1").not.toMatch(/<p className="slate">[\s\S]*?<\/p>\s*<h1/);
+    expect(shipped).toContain('<h1 className="document-title">');
   });
 
   it("ends at the resources hub and the documentation", () => {

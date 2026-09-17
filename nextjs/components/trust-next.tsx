@@ -87,7 +87,7 @@ export function TrustNext({ from, emphasis = "primary" }: { from: TrustStep; emp
   if (!next) return null;
   return (
     <div className="stack trust-next">
-      <p className="slate"><span />NEXT · {next.label.toUpperCase()}</p>
+      <h2>Next: {next.label}</h2>
       <p className="fine">{next.question}</p>
       <div className="actions">
         <Link className={emphasis === "quiet" ? "btn ghost" : "btn"} href={next.href as Route}>

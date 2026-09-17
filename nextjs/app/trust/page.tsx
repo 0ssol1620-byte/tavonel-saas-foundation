@@ -194,8 +194,7 @@ export default function TrustCenterPage() {
                 the whitespace at the end of a text line, so the accessible name and the document
                 outline both read "publishabout" without it.
               */}
-              <p className="slate"><b>TRUST CENTER</b><span />SECURITY AND COMPLIANCE</p>
-              <h1 className="document-title">{"Everything we publish "}<br />about handling your documents.</h1>
+              <h1 className="document-title">Everything we publish about handling your documents.</h1>
               {/* G2-040 / G2-041: one jump index for long documents, from the shared component. */}
               <PolicyJumpIndex />
             </div>
@@ -267,7 +266,7 @@ export default function TrustCenterPage() {
                 be seven destinations, that is the defect. Making the tile the anchor also gives a
                 phone a target the size of the card rather than the size of two words.
               */}
-              <p className="slate"><span />THE PAGES</p>
+              <h2>The pages</h2>
               <div className="tiles">
                 {DESTINATIONS.map(([title, body, href]) => (
                   <Link className="tile trust-link" key={title} href={href}>
@@ -294,7 +293,7 @@ export default function TrustCenterPage() {
                 </a>
               </div>
 
-              <p className="slate"><span />WHAT A REVIEW ASKS, AND WHERE IT IS ANSWERED</p>
+              <h2>What a review asks, and where it is answered</h2>
               <div className="chain">
                 {/*
                   BA-160. Each row is the anchor, for the same reason the tiles above are: the row
@@ -316,7 +315,7 @@ export default function TrustCenterPage() {
               </div>
 
               {/* BA-150. The section label states its subject rather than declaring a hole. */}
-              <p className="slate"><span />WHAT IS NOT PUBLISHED YET</p>
+              <h2>What is not published yet</h2>
               <div className="tiles">
                 {NOT_PUBLISHED.map(([title, body, href]) => (
                   <article className="tile" key={title}>

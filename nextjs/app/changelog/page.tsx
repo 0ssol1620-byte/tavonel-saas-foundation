@@ -25,7 +25,6 @@ export const metadata: Metadata = {
 export default function ChangelogPage() {
   return <PublicPageShell><section className="scene doc"><div className="shell"><div className="body">
     <div className="stack">
-      <p className="slate"><b>CHANGELOG</b><span />PRODUCT</p>
       <h1 className="document-title">What changed, without the noise.</h1>
       {/*
         BA-108. The feed link moved out of the lede and into the action row below, because

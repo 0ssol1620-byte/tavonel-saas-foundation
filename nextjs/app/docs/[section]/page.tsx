@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { notFound } from "next/navigation";
 import { PublicPageShell } from "@/components/public-page-shell";
-import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
+import BreadcrumbJsonLd, { DocBreadcrumb } from "@/components/breadcrumb-json-ld";
 import { DocsCopyButton } from "@/components/docs-copy-button";
 import { DocsSnippet } from "@/components/docs-snippet";
 import { withMarks } from "@/components/docs/marks";
@@ -178,20 +178,20 @@ export default async function DocsSectionPage({ params }: { params: Promise<{ se
     .filter((item): item is { position: number; label: string } => item.label !== null);
   const toc = tocEntries(labelled.map((item) => item.label));
   const anchorIds = new Map(labelled.map((item, order) => [item.position, toc[order]!.id]));
+  // One trail, read by the crawler and by the reader. See `DocBreadcrumb`.
+  const trail = [{ name: "Documentation", path: "/docs" }, { name: entry.title, path: `/docs/${section}` }];
   const index = DOCS_SECTIONS.findIndex((item) => item.slug === section);
   const previous = DOCS_SECTIONS[index - 1];
   const next = DOCS_SECTIONS[index + 1];
 
   return (
     <PublicPageShell>
-      <BreadcrumbJsonLd trail={[{ name: "Documentation", path: "/docs" }, { name: entry.title, path: `/docs/${section}` }]} />
+      <BreadcrumbJsonLd trail={trail} />
       <section className="scene doc"><div className="shell"><div className={layout.layout}>
         <DocsToc current={section} />
         <div className="body">
           <div className="stack">
-            <p className="slate">
-              <b>DOCUMENTATION</b><span aria-hidden="true" />· <Link href="/docs">All sections</Link>
-            </p>
+            <DocBreadcrumb trail={trail} />
             <h1 className="document-title">{entry.title}</h1>
           </div>
 

@@ -244,7 +244,6 @@ export default async function SolutionPage({ params }: { params: Promise<{ slug:
       <section className="scene doc solution-page"><div className="shell">
         <div className="body solution-hero">
           <div className="stack">
-            <p className="slate"><b>SOLUTION</b><span />{solution.eyebrow}</p>
             <h1 className="document-title">{solution.title}</h1>
           </div>
           <div className="stack solution-hero-copy">
@@ -265,7 +264,6 @@ export default async function SolutionPage({ params }: { params: Promise<{ slug:
 
         <section className="solution-section" aria-labelledby="solution-flow-title">
           <div className="solution-section-heading">
-            <p className="slate"><b>WORKFLOW</b><span />FROM SOURCE TO WORLD</p>
             {/* G1-016. Five pages shared these two headings verbatim; each now names its own
                 corpus and audience, so the outline of one page is not the outline of five. */}
             <h2 id="solution-flow-title">{solution.headings.flow}</h2>
@@ -291,7 +289,6 @@ export default async function SolutionPage({ params }: { params: Promise<{ slug:
 
         <section className="solution-section" aria-labelledby="solution-outcomes-title">
           <div className="solution-section-heading">
-            <p className="slate"><b>OUTCOMES</b><span />WHAT YOU CAN USE</p>
             <h2 id="solution-outcomes-title">{solution.headings.outcomes}</h2>
           </div>
           {/*

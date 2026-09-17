@@ -5,17 +5,7 @@ import PolicyJumpIndex, { IndexedPolicyBody } from "@/components/policy-jump-ind
 import { PublicSiteHeader } from "@/components/public-site-chrome";
 import { primaryCallToAction } from "@/lib/commercial-state";
 
-/*
-  BA-174. The eyebrow group was PUBLIC RECORD, which is a registry's word for a filing and not a
-  company's word for its own terms. It is LEGAL by default, and /status passes its own.
-
-  BA-167. Effective and last-updated are a labelled pair under the H1 rather than a date buried in
-  an intro sentence, because four documents shared one effective date that was older than their
-  contents. Each page passes its own.
-*/
 export default function PolicyLayout({
-  group = "LEGAL",
-  label,
   title,
   effective,
   lastUpdated,
@@ -23,8 +13,6 @@ export default function PolicyLayout({
   children,
   closing,
 }: {
-  group?: string;
-  label: string;
   title: string;
   effective?: string;
   lastUpdated?: string;
@@ -51,21 +39,24 @@ export default function PolicyLayout({
         <section className="scene doc policy-page">
           <div className="shell"><div className="body"><IndexedPolicyBody>
             <div className="stack">
-              <p className="slate"><b>{group}</b><span />{label}</p>
               <h1 className="document-title">{title}</h1>
               {effective ? (
                 <p className="fine">Effective {effective}{lastUpdated ? <> &middot; Last updated {lastUpdated}</> : null}</p>
               ) : null}
-              {/*
-                G2-040 / G2-041. This column was empty from the H1 to the footer -- 2,300px of it
-                on /status -- and on a phone the document below it had no way in at all. The index
-                is read from the rendered `<h2>`s, so the five pages using this layout declare
-                nothing and cannot fall out of step with it.
-              */}
-              <PolicyJumpIndex />
             </div>
             <div className="stack">
               <p className="lede">{intro}</p>
+              {/*
+                G2-040 / G2-041. The index is read from the rendered `<h2>`s, so the five pages
+                using this layout declare nothing and cannot fall out of step with it.
+
+                BQ-108: it sits after the lede rather than in the title column. In the title
+                column it was the first thing under the H1 at every width the two columns
+                collapse at -- a reader met the table of contents before the sentence saying what
+                the document is. The lede is one paragraph; the index reads as a way into the
+                document once you know what document it is.
+              */}
+              <PolicyJumpIndex />
               <div className="policy-copy">{children}</div>
               {/*
                 BA-159. A reader who arrives on a policy page from a search result or from a

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { Route } from "next";
 import { PublicSitePage } from "@/components/public-site-chrome";
-import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
+import BreadcrumbJsonLd, { DocBreadcrumb } from "@/components/breadcrumb-json-ld";
 import { clause } from "@/lib/compiler-contract";
 import WorldDiffSample from "@/components/world-diff-sample";
 import { CAPABILITY_MANIFEST, isAcceptedAtUpload } from "../../../../shared/capabilityManifest";
@@ -188,8 +188,7 @@ export default function CompiledWorldPage() {
                 a reader arriving on this page from that same search had no visible way back to
                 /product except the navigation's disclosure menu.
               */}
-              <p className="doc-breadcrumb"><Link href={"/product" as Route}>Product</Link> <span aria-hidden="true">/</span> Compiled World</p>
-              <p className="slate"><b>PRODUCT</b><span />COMPILED WORLD</p>
+              <DocBreadcrumb trail={[{ name: "Product", path: "/product" }, { name: "Compiled World", path: "/product/compiled-world" }]} />
               {/*
                 BA-024. The headline spent its first two words on what the product is not, and
                 repeated the home page's contrast instead of advancing it. Six cards under it

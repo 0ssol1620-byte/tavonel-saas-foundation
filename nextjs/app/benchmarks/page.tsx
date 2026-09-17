@@ -129,8 +129,7 @@ export default function BenchmarksPage() {
         <div className="shell">
           <div className="body">
             <div className="stack">
-              <p className="slate"><b>BENCHMARK</b><span />KNOWLEDGE COMPILATION</p>
-              <h1 className="document-title">Measure the compile,<br />not the page read.</h1>
+              <h1 className="document-title">Measure the compile, not the page read.</h1>
             </div>
 
             <div className="stack">

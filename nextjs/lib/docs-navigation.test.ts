@@ -127,27 +127,32 @@ describe("in-page table of contents", () => {
   text extraction read the two clauses as one word -- "DEVELOPERSONE WORLD",
   "DOCUMENTATIONAPI 2026-09-02.1", "DOCUMENTATIONAll sections".
 
-  The fix is the audit's second option: mark the rule decorative, and put a real separator in the
-  text. So the pattern this pins is the absence of a bare `<span />` between two clauses.
+  The fix was the audit's second option: mark the rule decorative, and put a real separator in
+  the text.
+
+  BQ-099 removes the cause instead of managing it. An eyebrow that restated the page name above
+  the H1 is deleted, and one that was carrying a section's name is the `<h2>` it was acting as,
+  so most of these pages have no eyebrow left at all -- the "renders no eyebrow" precondition
+  this used to assert is now the intended state, not a sign the pattern moved.
+
+  What still has to hold is the accessible name: whatever eyebrow survives may not fuse two
+  clauses together with a rule that reads as nothing. So the assertion is the same and the
+  precondition is inverted -- the surfaces are read for any eyebrow they still carry, and a page
+  with none passes.
 */
-describe("eyebrow labels read as two clauses", () => {
+describe("an eyebrow that survives reads as its own clauses", () => {
   const SURFACES = [
     "../app/developers/page.tsx",
     "../app/docs/page.tsx",
     "../app/docs/[section]/page.tsx",
     "../app/cookbooks/[slug]/page.tsx",
+    "../app/cookbooks/page.tsx",
     "../app/ko/page.tsx",
   ];
 
   it.each(SURFACES)("%s separates the label from the text it sits beside", (surface) => {
     const source = read(surface);
-    /*
-      Every `.slate` eyebrow on the page, and what follows the rule inside it. A two-clause
-      eyebrow (one with a <b>) has to carry a separator; a one-clause eyebrow, where the rule
-      leads and there is nothing before it, needs none -- but the rule is decorative either way.
-    */
     const eyebrows = [...source.matchAll(/<p className="(?:slate|one-path-eyebrow)">([\s\S]*?)<\/p>/g)].map((match) => match[1]!);
-    expect(eyebrows.length, surface + " renders no eyebrow -- the pattern has moved").toBeGreaterThan(0);
     for (const eyebrow of eyebrows) {
       expect(eyebrow, "the rule is decorative and says so: " + eyebrow).not.toContain("<span />");
       // A separator is owed only where there are two clauses: a label, the rule, and text after
@@ -156,6 +161,22 @@ describe("eyebrow labels read as two clauses", () => {
       if (!eyebrow.includes("<b>") || after.trim() === "") continue;
       expect(eyebrow, "two clauses fused into one accessible name: " + eyebrow).toMatch(/\/>·/);
     }
+  });
+
+  /*
+    The other half of BQ-099, which is what stops the deleted eyebrows growing back: no page in
+    this set may put an eyebrow immediately above its own H1 again. That is the shape the audit
+    counted nineteen of, and every one of them restated the page's own name.
+  */
+  it.each(SURFACES)("%s does not restate its own name above the H1", (surface) => {
+    /*
+      /cookbooks/<slug> is the one page in the set that keeps a label above its title, and the
+      label is the workflow family the record declares -- a fact the title does not carry, pinned
+      by `lib/cookbook-content.test.ts`. So the shape allowed here is that expression and nothing
+      else: a literal string above an H1 on this page fails like it does on the other five.
+    */
+    const source = read(surface).replace('<p className="slate">{WORKFLOW_LABEL[record.workflowId]}</p>', "");
+    expect(source).not.toMatch(/<p className="(?:slate|one-path-eyebrow)">[\s\S]*?<\/p>\s*<h1/);
   });
 });
 
@@ -204,7 +225,14 @@ describe("documentation section index", () => {
 
   it("keeps the pager and the way back to the index", () => {
     expect(sectionPage).toContain('className="docs-pager"');
-    expect(sectionPage).toContain('<Link href="/docs">All sections</Link>');
+    /*
+      BQ-137: the way back is the breadcrumb now, not a link inside the eyebrow. It is the same
+      destination from the same declaration the page already emits for a crawler -- `trail`, read
+      by both `BreadcrumbJsonLd` and `DocBreadcrumb` -- so the reader's path up and the machine
+      graph cannot disagree.
+    */
+    expect(sectionPage).toContain("<DocBreadcrumb trail={trail} />");
+    expect(sectionPage).toContain('{ name: "Documentation", path: "/docs" }');
   });
 
   it("swaps column for disclosure at the width the site header does", () => {

@@ -50,7 +50,7 @@ export function TrustDisclosures({
 }) {
   return (
     <>
-      <p className="slate"><span />{heading}</p>
+      <h2>{heading}</h2>
       <div className="status-list">
         {TRUST_DISCLOSURES.map((row) => (
           <article key={row.subject} data-state={STATE_TOKEN[row.status]}>

@@ -71,7 +71,6 @@ export default function ProductPage() {
         <div className="shell">
           <div className="body product-hero">
             <div className="stack">
-              <p className="slate"><b>PRODUCT</b><span />KNOWLEDGE COMPILER</p>
               {/*
                 BA-023. "actually" was doing the reader's arguing for them -- it concedes that
                 they arrived expecting the opposite. The home page's headline already carries the
@@ -106,7 +105,7 @@ export default function ProductPage() {
           </div>
 
           <section className="product-boundary" aria-labelledby="product-layers-title">
-            <p className="slate"><b>BOUNDARY</b><span />WHAT THIS REPLACES, WHAT IT CONNECTS TO</p>
+            <h2 id="product-layers-title">What this replaces, and what it connects to</h2>
             {/*
               BA-027. "Two of these layers are ours. Three of them are yours." was a riddle whose
               answer was the table under it, and on the page where the other question a buyer

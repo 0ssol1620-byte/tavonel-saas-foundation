@@ -156,7 +156,6 @@ export default async function ApiReferencePage() {
     <PublicPageShell>
       <section className="scene doc"><div className="shell"><div className="body">
         <div className="stack">
-          <p className="slate"><b>API REFERENCE</b><span aria-hidden="true" />· {API_VERSION}</p>
           <h1 className="document-title">Every operation, from the contract itself.</h1>
         </div>
         <div className="stack">

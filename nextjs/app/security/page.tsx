@@ -182,8 +182,7 @@ export default function SecurityPage() {
         <div className="shell">
           <div className="body">
             <div className="stack">
-              <p className="slate"><b>SECURITY</b><span />DATA PATH AND CONTROLS</p>
-              <h1 className="document-title">{"Where your documents go, "}<br />and what never sees them.</h1>
+              <h1 className="document-title">Where your documents go, and what never sees them.</h1>
             </div>
             <div className="stack">
               <p className="lede">
@@ -213,7 +212,7 @@ export default function SecurityPage() {
                 <a href="#deployment">Current deployment controls</a>
               </nav>
 
-              <p className="slate" id="boundary"><span />THE BOUNDARY, IN THE ORDER IT IS ENFORCED</p>
+              <h2 id="boundary">The boundary, in the order it is enforced</h2>
               <div className="chain">
                 {BOUNDARY.map(([num, name, text]) => (
                   <article className="link" key={num}>
@@ -224,7 +223,7 @@ export default function SecurityPage() {
                 ))}
               </div>
 
-              <p className="slate" id="what-holds-what"><span />WHAT HOLDS WHAT</p>
+              <h2 id="what-holds-what">What holds what</h2>
               <div className="chain">
                 {PATH.map(([name, text]) => (
                   <article className="link" key={name}>
@@ -250,7 +249,7 @@ export default function SecurityPage() {
                 Two tiles is an even grid. `trust-page-answers.test.ts` still holds both rows'
                 contents, and both `CONTROLS.map` and `UNANSWERED.map` are still what renders.
               */}
-              <p className="slate" id="controls"><span />CONTROLS</p>
+              <h2 id="controls">Controls</h2>
               <div className="tiles">
                 {CONTROLS.map(([title, body]) => (
                   <article className="tile" key={title}>
@@ -300,7 +299,7 @@ export default function SecurityPage() {
                 and the one component no configuration pins says so rather than being given a
                 plausible region.
               */}
-              <p className="slate" id="regions"><span />WHERE THE WORK HAPPENS</p>
+              <h2 id="regions">Where the work happens</h2>
               <p>
                 No data residency is guaranteed, and that is a separate statement from where the
                 work is configured to run. Below is the second one. Which provider is permitted to
@@ -325,13 +324,13 @@ export default function SecurityPage() {
                 states, so a reader who never opens it has still been told that some of these
                 answers are "not in place".
               */}
-              <p className="slate" id="review"><span />WHAT A SECURITY REVIEW WILL FIND</p>
+              <h2 id="review">What a security review will find</h2>
               <details className="status-fold">
                 <summary>The full checklist: what is in place, what is planned, and what is not in place</summary>
                 <TrustDisclosures on="/security" heading="IN THE ORDER A REVIEW ASKS THEM" />
               </details>
 
-              <p className="slate" id="deployment"><span />CURRENT DEPLOYMENT CONTROLS</p>
+              <h2 id="deployment">Current deployment controls</h2>
               <div className="status-list">
                 {Object.entries(activationPolicy)
                   .filter(([key]) => key !== "customerData")

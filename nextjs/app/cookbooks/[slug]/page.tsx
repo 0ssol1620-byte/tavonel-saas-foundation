@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { notFound } from "next/navigation";
 import { PublicPageShell } from "@/components/public-page-shell";
-import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
+import BreadcrumbJsonLd, { DocBreadcrumb } from "@/components/breadcrumb-json-ld";
 import {
   COOKBOOK_SLUGS,
   SECTION_LABEL,
@@ -132,15 +132,22 @@ export default async function CookbookPage({ params }: { params: Promise<{ slug:
     which is exactly the order rendered below.
   */
   const toc = tocEntries([...ready.map((section) => SECTION_LABEL[section.key]), PENDING_HEADING]);
+  // One trail, read by the crawler and by the reader. See `DocBreadcrumb` (BQ-137).
+  const trail = [{ name: "Cookbooks", path: "/cookbooks" }, { name: record.title, path: `/cookbooks/${record.slug}` }];
 
   return (
     <PublicPageShell>
-      <BreadcrumbJsonLd
-        trail={[{ name: "Cookbooks", path: "/cookbooks" }, { name: record.title, path: `/cookbooks/${record.slug}` }]}
-      />
+      <BreadcrumbJsonLd trail={trail} />
       <section className="scene doc"><div className="shell"><div className="body">
         <div className="stack">
-          <p className="slate"><b>COOKBOOK</b><span aria-hidden="true" />· {WORKFLOW_LABEL[record.workflowId]}</p>
+          <DocBreadcrumb trail={trail} />
+          {/*
+            BQ-099: the "COOKBOOK" half is gone and the workflow family stays. A reader who is on
+            /cookbooks/<slug> knows what kind of page they are on; what the title does not tell
+            them is which of the three workflow families this guide belongs to, and that is the
+            half `lib/cookbook-content.test.ts` holds here.
+          */}
+          <p className="slate">{WORKFLOW_LABEL[record.workflowId]}</p>
           <h1 className="document-title">{record.title}</h1>
         </div>
 

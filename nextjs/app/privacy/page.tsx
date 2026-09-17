@@ -94,7 +94,7 @@ export const metadata: Metadata = {
   openGraph: { url: "/privacy" }, title: "Privacy notice — TAVONEL", description: "How TAVONEL handles account, document, billing and inquiry data." };
 
 export default function PrivacyPage() {
-  return <PolicyLayout label="PRIVACY" title="Your documents are inputs, not training material." effective={LEGAL_EFFECTIVE_DATE} lastUpdated={LEGAL_LAST_UPDATED} closing={<Link className="btn ghost" href="/contact">Ask a privacy question</Link>} intro={<>This notice explains the production data path for the TAVONEL service. TAVONEL does not sell personal data or use customer document contents to train shared models.</>}>
+  return <PolicyLayout title="Your documents are inputs, not training material." effective={LEGAL_EFFECTIVE_DATE} lastUpdated={LEGAL_LAST_UPDATED} closing={<Link className="btn ghost" href="/contact">Ask a privacy question</Link>} intro={<>This notice explains the production data path for the TAVONEL service. TAVONEL does not sell personal data or use customer document contents to train shared models.</>}>
     <BreadcrumbJsonLd trail={[{ name: "Privacy notice", path: "/privacy" }]} />
     <p className="fine">{LEGAL_DRAFT_NOTICE}</p>
     {/*

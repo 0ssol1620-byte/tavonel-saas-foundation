@@ -51,7 +51,6 @@ export default function CookbooksIndexPage() {
       <BreadcrumbJsonLd trail={[{ name: "Cookbooks", path: "/cookbooks" }]} />
       <section className="scene doc"><div className="shell"><div className="body">
         <div className="stack">
-          <p className="slate"><b>COOKBOOKS</b><span aria-hidden="true" />· SIX TASKS</p>
           <h1 className="document-title">One task, start to finish.</h1>
         </div>
         <div className="stack">

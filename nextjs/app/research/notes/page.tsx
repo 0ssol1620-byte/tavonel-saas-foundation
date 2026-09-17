@@ -51,8 +51,7 @@ export default function ResearchNotesPage() {
         <div className="shell">
           <div className="body">
             <div className="stack">
-              <p className="slate"><b>RESEARCH</b><span />NOTES AND FINDINGS</p>
-              <h1 className="document-title">What we measured,<br />and how.</h1>
+              <h1 className="document-title">What we measured, and how.</h1>
             </div>
             <div className="stack">
               <p className="lede">

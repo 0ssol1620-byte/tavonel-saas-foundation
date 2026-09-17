@@ -70,8 +70,7 @@ export default function SourcesPage() {
         <div className="shell">
           <div className="body">
             <div className="stack">
-              <p className="slate"><b>SOURCES</b><span />CAPABILITY MANIFEST</p>
-              <h1 className="document-title">Every source TAVONEL reads,<br />and what survives the read.</h1>
+              <h1 className="document-title">Every source TAVONEL reads, and what survives the read.</h1>
             </div>
 
             <div className="stack">

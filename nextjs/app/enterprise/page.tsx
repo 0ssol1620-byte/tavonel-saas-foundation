@@ -71,8 +71,7 @@ export default function EnterprisePage() {
         <div className="shell">
           <div className="body policy-copy"><IndexedPolicyBody>
             <div className="stack">
-              <p className="slate"><b>ENTERPRISE</b><span />KNOWLEDGE COMPILER</p>
-              <h1 className="document-title">Compile enterprise knowledge<br />without giving up control.</h1>
+              <h1 className="document-title">Compile enterprise knowledge without giving up control.</h1>
               {/* G2-040 / G2-041: one jump index for long documents, from the shared component. */}
               <PolicyJumpIndex />
             </div>
@@ -91,7 +90,7 @@ export default function EnterprisePage() {
                 ))}
               </div>
 
-              <p className="slate"><span />HOW IT IS RUN</p>
+              <h2>How it is run</h2>
               <div className="chain">
                 {OPERATIONS.map(([title, body]) => (
                   <article className="link" key={title}>
@@ -124,7 +123,7 @@ export default function EnterprisePage() {
                 the founder's to set, and the withdrawn sheet is why an invented one is worse
                 than none.
               */}
-              <p className="slate"><span />WHAT AN ENGAGEMENT COSTS</p>
+              <h2>What an engagement costs</h2>
               <p>
                 The published plans and the per-page rate above them are on{" "}
                 <Link href={"/pricing#enterprise-pricing" as Route}>Pricing</Link>, in US dollars and excluding tax.

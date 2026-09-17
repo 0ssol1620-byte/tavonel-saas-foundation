@@ -132,7 +132,7 @@ export default function IntegrationsPage() {
     <PublicPageShell>
       <section className="scene doc"><div className="shell">
         <div className="body">
-          <div className="stack"><p className="slate"><b>INTEGRATIONS</b><span />SOURCE SYSTEMS</p><h1 className="document-title">Compile where your knowledge already lives.</h1></div>
+          <div className="stack"><h1 className="document-title">Compile where your knowledge already lives.</h1></div>
           <div className="stack">
             <p className="lede">Connect a source once. TAVONEL discovers and imports read-only, then tracks revisions so the compiled World can stay traceable to the system it came from.</p>
             {/*
@@ -160,7 +160,7 @@ export default function IntegrationsPage() {
         </div>
 
         <div className="body">
-          <div className="stack"><p className="slate"><b>SUPPORT</b><span />WHAT IS CONNECTED TODAY</p><h2>What connects today.</h2></div>
+          <div className="stack"><h2>What connects today.</h2></div>
           <div className="stack">
             <table className="docs-table">
               <thead>
@@ -191,7 +191,7 @@ export default function IntegrationsPage() {
         </div>
 
         <div className="body">
-          <div className="stack"><p className="slate"><b>OAUTH</b><span />MANAGED CONNECTIONS</p><h2>Cloud document systems.</h2></div>
+          <div className="stack"><h2>Cloud document systems.</h2></div>
           <div className="stack">
             <div className="connector-public-grid">{OAUTH.map((connector) => (
               <article key={connector.name}>
@@ -215,7 +215,7 @@ export default function IntegrationsPage() {
         </div>
 
         <div className="body">
-          <div className="stack"><p className="slate"><b>PRIVATE SOURCES</b><span />YOUR NETWORK</p><h2>File and object storage.</h2></div>
+          <div className="stack"><h2>File and object storage.</h2></div>
           <div className="stack">
             <p className="lede">Use a <a href="/developer/tavonel-source-agent.py" download>local source agent</a> for repositories that stay inside your network. We configure the first route with you.</p>
             <div className="chain">{INFRA.map(([name, level, description]) => <article className="link" key={name}><span className="st">{level}</span><h3>{name}</h3><p>{description}</p></article>)}</div>

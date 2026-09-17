@@ -45,7 +45,6 @@ export default function RefundsPage() {
   if (!liveChargesEnabled) {
     return (
       <PolicyLayout
-        label="CANCELLATION AND REFUNDS"
         title="Cancellation and refunds."
         effective={LEGAL_EFFECTIVE_DATE}
         lastUpdated={LEGAL_LAST_UPDATED}
@@ -76,7 +75,6 @@ export default function RefundsPage() {
 
   return (
     <PolicyLayout
-      label="CANCELLATION AND REFUNDS"
       title="Cancellation and refunds."
       effective={LEGAL_EFFECTIVE_DATE}
       lastUpdated={LEGAL_LAST_UPDATED}
