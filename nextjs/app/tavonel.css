@@ -1222,7 +1222,10 @@
   .policy-copy { display: flex; flex-direction: column; gap: 14px; }
   .policy-copy h2 { margin: 20px 0 0; font-size: 18px; letter-spacing: -0.01em; }
   .policy-copy p { margin: 0; color: var(--text-lo); line-height: 1.72; }
-  .policy-copy a { color: var(--text-hi); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  /* `:not(.btn)`: the closing CTA rows on /trust, /enterprise and /research sit inside this
+     block, and the link colour (0,1,1) outranked `.btn`'s `color: var(--ground)` (0,1,0) -- three
+     primary buttons rendered cream on cream, 1.00:1, with no readable label. */
+  .policy-copy a:not(.btn) { color: var(--text-hi); text-decoration-thickness: 1px; text-underline-offset: 3px; }
   .processor-list, .status-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; margin: 8px 0 18px; background: var(--seam); border: 1px solid var(--hairline); }
   /* BA-242 -- as in .tiles: the odd last row spends its width instead of holding a column
      measure with 590px of empty card beside it. */

@@ -42,7 +42,9 @@ function stylesheets(dir, found = []) {
     if (entry === "node_modules" || entry === ".next" || entry.startsWith(".")) continue;
     const full = join(dir, entry);
     if (statSync(full).isDirectory()) stylesheets(full, found);
-    else if (entry.endsWith(".css")) found.push(full);
+    // `.tsx` too: an inline `style={{ fontSize: 11 }}` is a font-size the stylesheet grep cannot
+    // see, and the root error boundary carried one for a full integration cycle.
+    else if (entry.endsWith(".css") || entry.endsWith(".tsx")) found.push(full);
   }
   return found;
 }
@@ -74,6 +76,8 @@ for (const file of stylesheets(root)) {
     for (const match of line.matchAll(/font-size:\s*([0-9.]+)px/g)) sizes.push(Number(match[1]));
     // `font: 500 9px/1.4 var(--f-mono)` — the size is the px value in the shorthand.
     for (const match of line.matchAll(/font:\s*[^;{}]*?([0-9.]+)px/g)) sizes.push(Number(match[1]));
+    // React inline style: `fontSize: 11` or `fontSize: "11px"` (a bare number is px).
+    for (const match of line.matchAll(/fontSize:\s*"?([0-9.]+)(?:px)?"?\s*[,}]/g)) sizes.push(Number(match[1]));
 
     const small = sizes.filter((size) => size < FLOOR_PX);
     if (small.length) {

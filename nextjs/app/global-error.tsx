@@ -34,7 +34,7 @@ export default function GlobalError({
             <p
               style={{
                 fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-                fontSize: 11,
+                fontSize: 12,
                 letterSpacing: "0.16em",
                 color: "#7D878D",
                 margin: "0 0 14px",
