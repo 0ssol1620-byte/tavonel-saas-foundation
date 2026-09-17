@@ -3,20 +3,23 @@
 /*
   Act 2 -- EVIDENCE.
 
-  One object on the left, the page it was compiled from on the right, and a drawn line between
-  them. §18's composition, with §48's rule about what is on screen by default: the object's
-  meaning, its state, how many regions support it and the page itself. The digest, the box
-  coordinates, the evidence id and the compiler version are all real and all one button away in
-  the technical drawer, which is where a reader who wants them will look and where a reader who
-  does not will never be stopped by them.
+  One object on the left and the page it was compiled from on the right. §18's composition, with
+  §48's rule about what is on screen by default: the object's meaning, its state, how many regions
+  support it and the page itself. The digest, the box coordinates, the evidence id and the
+  compiler version are all real and all one button away in the technical drawer, which is where a
+  reader who wants them will look and where a reader who does not will never be stopped by them.
+
+  BQ-018. What used to join the two was a 1px bezier drawn between them -- which vanished on
+  scroll, was hidden outright below 820px, and had to be redrawn on every selection to say a thing
+  the reader could not verify from it anyway. The relationship is now stated the way the rest of
+  the site states it: both ends carry the same --verified ring and the same locator, so the pair is
+  legible at any width, in any scroll position, and in the markup rather than in a canvas.
 
   On a narrow screen this is two steps rather than two columns: the object, then its source.
   `act` is the step -- the same state machine, read differently by the stylesheet.
 */
 
-import { useRef } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
-import ProvenanceTether from "@/components/world-visual/provenance-tether";
 import SourceSheet from "@/components/world-visual/source-sheet";
 import { chooseExploreEntryProof } from "@/lib/explore-entry-proof";
 import { STATE_WORD } from "./parallel-view";
@@ -41,7 +44,6 @@ export default function EvidenceAct({
   onSelectObject,
   onOpenSource,
   onBack,
-  reduced,
   step,
 }: {
   model: VisualWorldModel;
@@ -51,10 +53,8 @@ export default function EvidenceAct({
   onSelectObject: (id: string) => void;
   onOpenSource: () => void;
   onBack: () => void;
-  reduced: boolean;
   step: "object_focus" | "evidence";
 }) {
-  const hostRef = useRef<HTMLDivElement | null>(null);
   const node = model.nodes.find((item) => item.id === selectedId);
   if (!node) return null;
 
@@ -86,7 +86,7 @@ export default function EvidenceAct({
     .filter((entry) => entry.other !== undefined);
 
   return (
-    <div className={styles.evidenceAct} ref={hostRef} data-step={step}>
+    <div className={styles.evidenceAct} data-step={step}>
       <article className={styles.objectPane}>
         <header>
           {/* Named for what it does, not for where it lands: the rail already has a "WORLD"
@@ -96,9 +96,15 @@ export default function EvidenceAct({
           </button>
           <span>WORLD</span>
         </header>
-        <div className={styles.objectCard} data-object-card="">
+        <div className={styles.objectCard} data-object-card="" data-linked={active ? "1" : "0"}>
           <p className={styles.objectKind}>{KIND_WORD[node.kind] ?? node.kind.toUpperCase()}</p>
           <h2>{node.label}</h2>
+          {/* The locator, at this end of the pair. The same words sit on the source pane. */}
+          {active ? (
+            <p className={styles.objectLocator} data-source-locator="">
+              {active.form ?? active.filename} · page {active.page}
+            </p>
+          ) : null}
           <dl className={styles.objectFacts}>
             <div>
               <dt>State</dt>
@@ -146,8 +152,13 @@ export default function EvidenceAct({
         ) : null}
       </article>
 
-      <div className={styles.sourcePane}>
-        <p className={styles.paneLabel}>SOURCE</p>
+      <div className={styles.sourcePane} data-linked={active ? "1" : "0"}>
+        <p className={styles.paneLabel}>Source</p>
+        {active ? (
+          <p className={styles.objectLocator} data-source-locator="">
+            {active.form ?? active.filename} · page {active.page}
+          </p>
+        ) : null}
         {active ? <p className={styles.evidenceLead}>{EXPLORE_COPY.evidenceLead}</p> : null}
         {active ? (
           <SourceSheet regions={regions} activeId={active.id} onSelectRegion={onSelectRegion} />
@@ -172,7 +183,7 @@ export default function EvidenceAct({
               disabled={activeIndex <= 0}
               onClick={() => onSelectRegion(regions[activeIndex - 1].id)}
             >
-              ← PREVIOUS
+              ← Previous
             </button>
             {/*
               "of 12" is the number of regions this browser was sent, and when the compiler bound
@@ -180,27 +191,19 @@ export default function EvidenceAct({
               one pass for the larger.
             */}
             <span aria-live="polite">
-              REGION {activeIndex + 1} OF {regions.length}
-              {node.evidenceCount > regions.length ? ` SHOWN · ${node.evidenceCount} COMPILED` : ""}
+              Region {activeIndex + 1} of {regions.length}
+              {node.evidenceCount > regions.length ? ` shown · ${node.evidenceCount} compiled` : ""}
             </span>
             <button
               type="button"
               disabled={activeIndex >= regions.length - 1}
               onClick={() => onSelectRegion(regions[activeIndex + 1].id)}
             >
-              NEXT →
+              Next →
             </button>
           </div>
         ) : null}
       </div>
-
-      <ProvenanceTether
-        hostRef={hostRef}
-        from="[data-object-card]"
-        to={'[data-source-sheet][data-source-view="original"] [data-original-region], [data-source-sheet][data-source-view="text"] [data-active-region]'}
-        activeKey={`${node.id}:${active?.id ?? ""}:${step}`}
-        reduced={reduced}
-      />
     </div>
   );
 }

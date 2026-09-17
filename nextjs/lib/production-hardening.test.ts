@@ -1,5 +1,5 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const root = resolve(import.meta.dirname, "..");
@@ -65,11 +65,23 @@ describe("2026-09-05 production hardening", () => {
     expect(css).toContain(".docs-endpoint { width: 100%; max-width: 100%; min-width: 0;");
   });
 
-  it("removes the desktop provenance tether from the narrow Explore composition", () => {
+  /*
+    BQ-018. This guard used to require the provenance tether to be hidden below 820px, which was
+    the right rule for a device that only worked on a wide screen. The device is gone: a 1px
+    bezier drawn between two boxes vanished on scroll, could not be read by anything but an eye on
+    a desktop, and stood in for a relationship rather than stating one. What replaced it is a
+    shared --verified ring and a matching locator at both ends, which is why the guard now checks
+    that neither the drawing nor its component can come back.
+  */
+  it("states the source relationship at both ends rather than drawing a line between them", () => {
     const css = read("components/world-visual/world-visual.module.css").replace(/\r\n/g, "\n");
-    const narrow = css.slice(css.indexOf("@media (max-width: 820px)"));
-    expect(narrow).toContain(".tether { display: none; }");
-    expect(narrow).toContain(".edges { display: none; }");
+    expect(css).not.toContain(".tether");
+    expect(css.slice(css.indexOf("@media (max-width: 820px)"))).toContain(".edges { display: none; }");
+    expect(existsSync(join(root, "components/world-visual/provenance-tether.tsx"))).toBe(false);
+    expect(existsSync(join(root, "components/evidence-tether.tsx"))).toBe(false);
+    const stage = read("components/explore/explore-stage.module.css");
+    expect(stage).toContain('.sourcePane[data-linked="1"] [data-source-sheet]');
+    expect(read("components/explore/evidence-act.tsx")).toContain('data-source-locator=""');
   });
 
   /*

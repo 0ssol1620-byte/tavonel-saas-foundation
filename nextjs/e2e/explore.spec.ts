@@ -181,9 +181,9 @@ test("a dialog keeps focus and gives it back", async ({ page }) => {
   // §20: focus enters the drawer, Tab does not walk the world behind it, Escape returns focus to
   // the control that opened it.
   await enterWorld(page);
-  const opener = page.getByRole("button", { name: "TECHNICAL DETAILS" });
+  const opener = page.getByRole("button", { name: "Technical details" });
   await opener.click();
-  const drawer = page.getByRole("dialog", { name: "TECHNICAL DETAILS" });
+  const drawer = page.getByRole("dialog", { name: "Technical details" });
   await expect(drawer).toBeVisible();
 
   for (let step = 0; step < 6; step += 1) {
@@ -302,8 +302,8 @@ test("a filing says how much of itself is in the World", async ({ page }) => {
     sheet.getByText(/^(FULL FILING COMPILED · \d+ PAGES|CURATED PAGE SLICE · \d+ OF \d+ PAGES COMPILED)$/),
   ).toBeVisible();
 
-  await page.getByRole("button", { name: "TECHNICAL DETAILS" }).click();
-  const drawer = page.getByRole("dialog", { name: "TECHNICAL DETAILS" });
+  await page.getByRole("button", { name: "Technical details" }).click();
+  const drawer = page.getByRole("dialog", { name: "Technical details" });
   // Compiled pages against document pages, per filing, and no declared slice on any of the five.
   await expect(drawer.getByText(/\d+ of \d+ pages compiled/).first()).toBeVisible();
   await expect(drawer.getByText(/every page declared/)).toHaveCount(5);
@@ -424,8 +424,8 @@ test("the technical drawer holds everything the stage keeps out of the way", asy
   await enterWorld(page);
   await expect(page.locator("body")).not.toContainText(/sha256:/);
 
-  await page.getByRole("button", { name: "TECHNICAL DETAILS" }).click();
-  const drawer = page.getByRole("dialog", { name: "TECHNICAL DETAILS" });
+  await page.getByRole("button", { name: "Technical details" }).click();
+  const drawer = page.getByRole("dialog", { name: "Technical details" });
   await expect(drawer).toBeVisible();
   await expect(drawer.getByText(/^sha256:[a-f0-9]{64}$/).first()).toBeVisible();
   await expect(drawer.getByText("Manifest digest")).toBeVisible();

@@ -4,6 +4,7 @@ import type { Route } from "next";
 import { PublicSitePage } from "@/components/public-site-chrome";
 import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
 import SolutionProofSample, { type ProofPick } from "@/components/solution-proof-sample";
+import proofStyles from "@/components/solution-proof-sample.module.css";
 import { CAPABILITY_MANIFEST, isAcceptedAtUpload } from "../../../../shared/capabilityManifest";
 
 /*
@@ -161,14 +162,6 @@ export default function DocumentUnderstandingPage() {
               <p className="doc-breadcrumb"><Link href={"/product" as Route}>Product</Link> <span aria-hidden="true">/</span> Document understanding</p>
               <p className="slate"><b>PRODUCT</b><span />DOCUMENT UNDERSTANDING</p>
               <h1 className="document-title">Reading is the first compile step.</h1>
-              {/*
-                G1-019 / G1-020 (marketing-visual). The page about reading documents had no
-                document on it, and this column was blank for about 1,000px below the H1. The
-                surface here is /explore's own source sheet over the published Apple corpus: a
-                real page render with the compiled region drawn on it, the parsed text beside it
-                and the digests underneath. No copy on this page changes.
-              */}
-              <SolutionProofSample pick={READ_PROOF} />
             </div>
             <div className="stack">
               <p className="lede">
@@ -207,6 +200,16 @@ export default function DocumentUnderstandingPage() {
                 <Link className="btn" href={"/explore" as Route}>See a page and its regions</Link>
                 <Link className="btn ghost" href="/knowledge-compiler">What happens after the read</Link>
               </div>
+            </div>
+            {/*
+              G1-019 / G1-020 (marketing-visual). The page about reading documents had no document
+              on it. BQ-077 / D4: it had one, but in the 420px title rail, where the page render
+              was too small to read -- which is a demonstration of the opposite of the claim. It
+              spans the body now, and it is the region itself, cut from the committed render of the
+              printed statement: the grid on the page, and the passage the read left behind.
+            */}
+            <div className={proofStyles.fullWidth}>
+              <SolutionProofSample pick={READ_PROOF} variant="crop" />
             </div>
           </div>
         </div>

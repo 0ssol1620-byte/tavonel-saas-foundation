@@ -21,7 +21,6 @@
 import Link from "next/link";
 import type { Route } from "next";
 import WorldCanvas from "@/components/world-visual/world-canvas";
-import PageRegion from "@/components/world-visual/page-region";
 import ParallelView from "./parallel-view";
 import styles from "./explore-stage.module.css";
 import { EXPLORE_COPY, type ExploreChangeArrivalView, type ExploreChangeView } from "@/lib/explore-story";
@@ -52,7 +51,13 @@ function ArrivalCard({ arrival }: { arrival: ExploreChangeArrivalView }) {
         {arrival.accession}
       </p>
       <p className={styles.revisionText}>{arrival.excerpt}</p>
-      <PageRegion bbox1000={arrival.bbox1000} page={arrival.page} pageCount={arrival.pageCount} tone="changed" />
+      {/*
+        BQ-016. This was an outlined rectangle with a highlight box in it -- a drawing of where a
+        region sits on a page, standing in for the region. The card already carries the passage,
+        the filing and a link to the committed bytes; the one thing the drawing added that the
+        card did not say is the locator, so the locator is said.
+      */}
+      <p className={styles.revisionLocator}>Page {arrival.page} of {arrival.pageCount}</p>
       <footer>
         <Link className={styles.sourceLink} href={arrival.href as Route} target="_blank" rel="noreferrer">
           {rendered ? "Open reference render ↗" : "Open committed PDF ↗"}

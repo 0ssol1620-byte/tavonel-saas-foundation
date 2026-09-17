@@ -260,7 +260,7 @@ export default async function SolutionPage({ params }: { params: Promise<{ slug:
             <p className="lede">{solution.lede}</p>
             <p>{solution.problem}</p>
           </div>
-          <SolutionProofSample pick={solution.proof} />
+          <SolutionProofSample pick={solution.proof} variant="excerpt" />
         </div>
 
         <section className="solution-section" aria-labelledby="solution-flow-title">

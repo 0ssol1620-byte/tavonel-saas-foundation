@@ -54,7 +54,6 @@ const SURFACES = [
   "components/explore/technical-details.tsx",
   "components/world-visual/world-canvas.tsx",
   "components/world-visual/source-sheet.tsx",
-  "components/world-visual/page-region.tsx",
 ];
 
 const BARRED = ["unlock your data", "second brain", "100% accurate", "never hallucinates", "better than rag", "ai brain"];

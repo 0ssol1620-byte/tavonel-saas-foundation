@@ -1,17 +1,26 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { PDFDocumentProxy, PDFDocumentLoadingTask, RenderTask } from "pdfjs-dist";
 import type { VisualEvidence } from "@/lib/visual-world-model";
 import { boundedPixelRatio, publicPdfPath, sameSourcePage, sourceRectStyle, sourceScale } from "@/lib/source-page-geometry";
+import { sourcePageLabel, sourcePageRaster } from "@/lib/source-page-rasters";
 import styles from "./original-source-page.module.css";
 
-type Props = { active: VisualEvidence; regions: VisualEvidence[]; onSelectRegion?: (id: string) => void; compact?: boolean };
+type Props = { active: VisualEvidence; regions: VisualEvidence[]; onSelectRegion?: (id: string) => void };
 type Phase = "idle" | "loading" | "ready" | "error";
 const MAX_BYTES = 16 * 1024 * 1024;
 
-/** A real, hash-checked PDF page. No extracted text is typeset into the page canvas. */
-export default function OriginalSourcePage({ active, regions, onSelectRegion, compact = false }: Props) {
+/*
+  A real, hash-checked PDF page. No extracted text is ever typeset into the page canvas.
+
+  BQ-069. The committed raster of this page paints first, so the frame holds the page from the
+  first frame rather than a grey rectangle for the length of a 1 MB fetch -- and it still holds the
+  page when the fetch or the hash check fails, with the failure said over it rather than in place
+  of it. The live reader remains the authority: it hashes the committed bytes before painting,
+  which a picture cannot, and its canvas replaces the raster the moment it is ready.
+*/
+export default function OriginalSourcePage({ active, regions, onSelectRegion }: Props) {
   const root = useRef<HTMLDivElement>(null);
   const viewport = useRef<HTMLDivElement>(null);
   const paper = useRef<HTMLDivElement>(null);
@@ -23,11 +32,12 @@ export default function OriginalSourcePage({ active, regions, onSelectRegion, co
   const [error, setError] = useState("");
   const [generation, setGeneration] = useState(0);
   const [loaded, setLoaded] = useState(0);
-  const [size, setSize] = useState({ width: 640, height: compact ? 420 : 560 });
+  const [size, setSize] = useState({ width: 640, height: 828 });
   const [zoom, setZoom] = useState(1);
   const [overlay, setOverlay] = useState(true);
   const [rotationSupported, setRotationSupported] = useState(false);
   const [renderedKey, setRenderedKey] = useState("");
+  const raster = sourcePageRaster(active.digest, active.page);
   const path = publicPdfPath(active.href);
   const sourceKey = `${path}:${active.digest}`;
   const pageKey = `${sourceKey}:${active.sourceVersionId}:${active.page}`;
@@ -139,7 +149,7 @@ export default function OriginalSourcePage({ active, regions, onSelectRegion, co
 
   return <section ref={root} className={styles.root} data-original-source="" data-render-state={ready ? "ready" : phase === "ready" ? "loading" : phase} data-source-page={active.page} data-source-digest={active.digest}>
     <div className={styles.toolbar} aria-label="Original page controls">
-      <span className={styles.kind}>{active.representationKind === "reference_render" ? "Reference-render PDF" : "Original PDF"}</span>
+      <span className={styles.kind}>{sourcePageLabel(active.representationKind)}</span>
       <div className={styles.controls}>
         <button type="button" aria-label="Zoom out" disabled={zoom <= 1} onClick={() => setZoom(value => Math.max(1, value - .5))}>−</button>
         <button type="button" onClick={() => { setZoom(1); viewport.current?.scrollTo({ top: 0, left: 0 }); }}>Fit page</button>
@@ -149,9 +159,24 @@ export default function OriginalSourcePage({ active, regions, onSelectRegion, co
     </div>
     {/* G1-037: a stable hook so a host surface can size this frame without depending on a hashed
         CSS-module class name. Layout only -- nothing about the render changes. */}
-    <div ref={viewport} className={styles.viewport} data-source-viewport="" data-compact={compact ? "1" : "0"} tabIndex={0} aria-label="Original document page; use the zoom controls to read and the parsed-text view to select a passage">
-      {!ready ? <div className={styles.message} role="status">
-        {phase === "error" ? <><strong>Original preview unavailable</strong><span>{error}</span><button type="button" onClick={() => setGeneration(value => value + 1)}>Retry preview</button></> : <span>Loading the source page…</span>}
+    <div
+      ref={viewport}
+      className={styles.viewport}
+      data-source-viewport=""
+      data-zoomed={zoom > 1 ? "1" : "0"}
+      style={raster ? ({ "--page-aspect": `${raster.width} / ${raster.height}` } as CSSProperties) : undefined}
+      tabIndex={0}
+      aria-label="Source page; use the zoom controls to read it and the extracted passage below to select a region"
+    >
+      {/* The committed render: painted under the live canvas, and left in place under any message. */}
+      {/* eslint-disable-next-line @next/next/no-img-element -- the committed raster is
+          served byte for byte: next/image would re-encode it, and the manifest's sha256 of
+          these bytes is what makes the render checkable against its source. */}
+      {raster && !ready ? <img className={styles.raster} src={raster.file} alt={`${active.filename}, page ${active.page} of ${active.pageCount}`} width={raster.width} height={raster.height} decoding="async" /> : null}
+      {!ready && (phase === "error" || !raster) ? <div className={styles.message} role="status" data-tone={phase === "error" ? "error" : "loading"}>
+        {phase === "error"
+          ? <><strong>The live check of this file did not finish</strong><span>{error}{raster ? " The page above is this repository’s committed render of the same source." : ""}</span><button type="button" onClick={() => setGeneration(value => value + 1)}>Check again</button></>
+          : <span>Loading the source page…</span>}
       </div> : null}
       <div ref={paper} className={styles.page} style={{ visibility: ready ? "visible" : "hidden" }} onPointerUp={event => {
         if (!ready || !rotationSupported || !onSelectRegion) return;
@@ -165,7 +190,7 @@ export default function OriginalSourcePage({ active, regions, onSelectRegion, co
         {ready && overlay && rectangle ? <span className={styles.selection} style={rectangle} data-original-region={active.id} aria-hidden="true" /> : null}
       </div>
     </div>
-    <div className={styles.caption}><span>PDF page {active.page} / {active.pageCount}</span><span>{ready ? "Source bytes verified" : "Original remains available below"}</span></div>
+    <div className={styles.caption}><span>Page <b>{active.page}</b> of {active.pageCount}</span><span>{ready ? "Source bytes verified in this browser" : raster ? "Committed render · verifying the source bytes" : "Verifying the source bytes"}</span></div>
     {ready && !rotationSupported ? <p className={styles.notice}>This rotated page is shown without a region overlay.</p> : null}
   </section>;
 }

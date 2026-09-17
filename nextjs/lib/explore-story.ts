@@ -156,7 +156,8 @@ export const EXPLORE_COPY = {
     two of the three consumers are reachable from a client bundle.
   */
   countsQualifier: "as this repository’s TypeScript collection compiler emits them",
-  technical: "TECHNICAL DETAILS",
+  /* BQ-132: sentence case. Shouting a label does not make the drawer behind it more technical. */
+  technical: "Technical details",
   /*
     The Entity qualifier, moved here from the object list by §49.
 
