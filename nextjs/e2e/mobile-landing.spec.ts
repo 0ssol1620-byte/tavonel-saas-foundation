@@ -205,9 +205,16 @@ test("Connect owns the Sources route and using a mobile customer link closes the
 test.describe("on a touch screen", () => {
   test.use({ hasTouch: true });
 
-  test("every reachable control keeps the 44px touch floor", async ({ page }, testInfo) => {
+  /*
+    BQ-043. The floor rule is unscoped CSS, so measuring it on the landing page alone proved the
+    home route and nothing else -- and the routes that actually failed the audit were /pricing,
+    /docs and /integrations. One test, six routes: if a route-scoped sheet undercuts the floor it
+    is that route that names itself in the failure.
+  */
+  for (const route of ["/", "/pricing", "/resources", "/docs/errors", "/integrations", "/knowledge-compiler"]) {
+  test(`every reachable control on ${route} keeps the 44px touch floor`, async ({ page }, testInfo) => {
     test.skip(!PHONE.includes(testInfo.project.name), "the touch floor is a phone contract");
-    await page.goto("/");
+    await page.goto(route);
     await page.evaluate(async () => {
       for (let y = 0; y < document.body.scrollHeight; y += 480) {
         window.scrollTo(0, y);
@@ -221,4 +228,5 @@ test.describe("on a touch screen", () => {
       .map(({ element, rect }) => ({ tag: element.tagName, text: (element.textContent ?? "").trim().slice(0, 30), height: rect.height })));
     expect(short).toEqual([]);
   });
+  }
 });
