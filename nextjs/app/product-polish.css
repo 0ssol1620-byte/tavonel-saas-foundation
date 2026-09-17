@@ -283,7 +283,12 @@
   of every line that fits.
 */
 .docs-code pre { scrollbar-width: thin; scrollbar-gutter: stable; }
-.docs-code pre:focus-visible { outline: 2px solid var(--verified); outline-offset: -2px; }
+/*
+  The offset only. The ring itself is the one global `:focus-visible` rule in `app/tavonel.css`
+  and is not redeclared here -- what this block needs is the ring drawn inside its own edge, as
+  `<pre>` fills a bordered `<figure>` and an outward ring lands on the figure's rule.
+*/
+.docs-code pre:focus-visible { outline-offset: -2px; }
 
 /*
   BQ-103, the other half of the row: a code block that is not one flat tone.
@@ -323,8 +328,22 @@
   color: var(--text-hi);
   font: 14px/1.4 var(--f-sans);
 }
-.docs-table-filter input:focus-visible { outline: 2px solid var(--verified); outline-offset: 2px; }
+/* No focus rule here: the input is an ordinary control and the global `:focus-visible` ring in
+   `app/tavonel.css` is already exactly what this file used to restate. */
 .docs-table-filter p { margin: 0; min-height: 1.4em; }
+
+/*
+  And the row it hides stays hidden on a phone.
+
+  `components/docs/docs-table-filter.tsx` filters by setting `row.hidden`, whose entire effect is
+  the user-agent's `[hidden] { display: none }`. The stacked rendering below 620px sets
+  `tr { display: block }`, which outranks a user-agent rule -- so on the narrow screen the filter
+  was written for ("the browser's own find, which on a stacked phone rendering matches text a
+  reader cannot see the row for") every filtered-out row stayed on screen and in the accessibility
+  tree. This file is unlayered and `app/tavonel.css` is not, so this wins wherever the stacking
+  rule lives.
+*/
+.docs-table tr[hidden] { display: none; }
 
 /*
   BQ-105. The search panel had no focus ring at all.
@@ -336,9 +355,19 @@
 
   The excerpt goes to 12px: at 11px it was under the floor, on the line that is the whole reason
   the result is legible.
+
+  The wrapper rule is the one place on these pages that paints an indicator of its own rather
+  than taking the global `:focus-visible` ring. It has to: the focusable element is a borderless
+  `<input>` inside the `<label>` that is the visible control, and `app/tavonel.css` suppresses
+  that input's own outline. It is a 2px outline at every zoom, the same ring drawn one element
+  out. If the suppression in `app/tavonel.css` goes, this rule goes with it -- the two are one
+  decision, and leaving both would draw two concentric rings.
+
+  The result rows take only the offset; the ring is the global one. They sit on a 1px seam inside
+  a bordered list, where an outward ring would cross into the neighbouring row.
 */
 .docs-search-field:focus-within { outline: 2px solid var(--verified); outline-offset: 2px; }
-.docs-search-results a:focus-visible { outline: 2px solid var(--verified); outline-offset: -2px; }
+.docs-search-results a:focus-visible { outline-offset: -2px; }
 .docs-search-results span { font-size: 12px; }
 .docs-search-field { color: var(--text-mid); }
 
