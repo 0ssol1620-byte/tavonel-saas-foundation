@@ -25,8 +25,9 @@
   never a new sentence written for the card.
 */
 import { ImageResponse } from "next/og";
+import { BRAND_LINE } from "./site-navigation";
 
-export const alt = "TAVONEL — compile your own sources into a current, traceable world";
+export const alt = `TAVONEL share card — ${BRAND_LINE.descriptor}`;
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -35,8 +36,26 @@ const INK = "#EDEAE4";
 const MID = "#9AA3A8";
 const VERIFIED = "#7BE0BE";
 
-function Cell({ lit }: { lit?: boolean }) {
-  return <div style={{ width: 16, height: 16, borderRadius: 2, background: lit ? VERIFIED : "#3A4245" }} />;
+/*
+  BQ-008. One mark, one geometry, one place it is drawn.
+
+  This was a 3x3 grid of cells with the middle one lit -- the nine-cell AI/ML mark BA-230 banned
+  and `lib/brand-marks.test.ts` already refused in `components/logomark.tsx` and `app/icon.svg`.
+  It was still shipping on twenty-nine share cards, which are the only place most readers meet
+  the brand at all, so the site had two logos and the wrong one travelled.
+
+  Decision A-06's paths, scaled 24 -> 48: verso with its corner cut, a shorter recto, one thread
+  between them at -34.2 degrees. Stroke widths scale with it (1.9 -> 3.8, 1.6 -> 3.2).
+  `brand-marks.test.ts` pins the arithmetic so this cannot drift from the nav mark again.
+*/
+export function OgLogomark({ size: px = 48 }: { size?: number }) {
+  return (
+    <svg width={px} height={px} viewBox="0 0 24 24" fill="none" stroke={INK} strokeLinecap="square">
+      <path d="M2.5 5.5H7.4L9.5 7.6V18.5H2.5Z" strokeWidth={1.9} opacity={0.66} />
+      <path d="M14.5 8.2H21.5V18.5H14.5Z" strokeWidth={1.9} opacity={0.66} />
+      <path d="M9.5 15.5L14.5 12.1" strokeWidth={1.6} />
+    </svg>
+  );
 }
 
 /**
@@ -63,11 +82,7 @@ export function renderOgCard(title: string, summary: string) {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <div style={{ display: "flex", flexWrap: "wrap", width: 54, gap: 3 }}>
-              <Cell /><Cell /><Cell />
-              <Cell /><Cell lit /><Cell />
-              <Cell /><Cell /><Cell />
-            </div>
+            <OgLogomark size={48} />
             <div style={{ display: "flex", fontSize: 22, letterSpacing: 5, color: MID }}>TAVONEL</div>
           </div>
 

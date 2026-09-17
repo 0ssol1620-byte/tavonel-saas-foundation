@@ -60,6 +60,21 @@ export const SELF_SERVE_CTA: SiteLink = { href: "/login", label: "Start with you
 /** The one name for the public sample, everywhere it is linked. */
 export const EXPLORE_CTA: SiteLink = { href: "/explore", label: "Explore a Compiled World" };
 
+/*
+  L1 owns this export (TOKEN_CONTRACT_0917, "Positioning line"). It is declared here so this
+  lane's surfaces can derive from it; the integrator keeps L1's copy if both landed.
+
+  One positioning line, and nothing writes its own. The landing H1, the root share card, the
+  footer tagline and the root metadata description each carried a different sentence -- "Your AI
+  needs more than searchable files", "Your knowledge already exists. Compile it.", "Turn
+  documents and connected systems into a source-grounded world" and two more -- so the product
+  introduced itself differently depending on which surface a reader met first.
+*/
+export const BRAND_LINE = {
+  headline: "Bring your knowledge. TAVONEL makes it ready for AI.",
+  descriptor: "Knowledge compiled with a traceable path back to every source.",
+} as const;
+
 /* ============================================================ G1-043 / G1-044: the Korean chrome
 
   One page, one map, and deliberately not an i18n layer.

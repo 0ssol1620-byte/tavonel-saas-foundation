@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -14,6 +14,7 @@ import { describe, expect, it } from "vitest";
 const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 const mark = read("components/logomark.tsx");
 const favicon = read("app/icon.svg");
+const shareCard = read("lib/og-card.tsx");
 
 describe("the logomark", () => {
   it("is not a dot grid", () => {
@@ -59,5 +60,33 @@ describe("the logomark", () => {
       expect(Math.abs(nav * (32 / 24) - tab), `${nav} -> ${tab}`).toBeLessThan(0.15);
       expect(favicon).toContain(String(tab));
     }
+  });
+
+  /*
+    BQ-008. The guard above pinned two of the three files that drew a mark, and the third was the
+    one most readers actually saw.
+
+    `lib/og-card.tsx` and `app/opengraph-image.tsx` each drew the banned nine-cell grid, on
+    twenty-nine share cards; `app/icon.tsx` drew a fourth mark again -- the retired cream tile
+    with a blue/teal T -- and shipped it as `/icon` beside `app/icon.svg`. Three marks, one
+    brand. The assertions follow the files rather than the pictures: a second drawing has to go
+    somewhere, and these are the somewheres.
+  */
+  it("draws the same mark on the share cards, from the same geometry", () => {
+    expect(shareCard.match(/<rect/g)).toBeNull();
+    expect(shareCard).not.toContain("Cell lit");
+    expect(shareCard).toContain("M2.5 5.5H7.4L9.5 7.6V18.5H2.5Z");
+    expect(shareCard).toContain("M14.5 8.2H21.5V18.5H14.5Z");
+    expect(shareCard).toContain("M9.5 15.5L14.5 12.1");
+    // The root card is the same `ogCard` as the other twenty-nine, not a second drawing.
+    expect(read("app/opengraph-image.tsx")).toContain("ogCard(BRAND_LINE.headline");
+    expect(read("app/opengraph-image.tsx")).not.toContain("ImageResponse");
+  });
+
+  it("ships exactly one favicon source", () => {
+    // `app/icon.tsx` drew the retired cream/teal tile and Next served it as `/icon` alongside
+    // `app/icon.svg`. Two icon files at one route segment is two brands on one tab.
+    expect(existsSync(join(process.cwd(), "app/icon.tsx"))).toBe(false);
+    expect(existsSync(join(process.cwd(), "app/icon.svg"))).toBe(true);
   });
 });
