@@ -55,6 +55,14 @@ describe("design token contract", () => {
     expect(css).not.toContain(":focus-visible::after");
     const rings = [...css.matchAll(/:focus-visible[^{]*\{[^}]*outline:/g)];
     expect(rings, "one ring, not eight").toHaveLength(1);
+    /*
+      Widened 2026-09-18. The guard read only the rings a sheet paints, so the three declarations
+      that painted nothing -- two `outline: none` and one `outline: 0`, on a contact input, the
+      docs search field and the board search -- passed it while taking the ring off three keyboard
+      paths. A suppressed outline is the failure this rule exists to catch, not a second ring.
+    */
+    const suppressed = [...css.matchAll(/outline: *(?:none|0);/g)].map((match) => match[0]);
+    expect(suppressed, `outline suppressed in ${suppressed.length} place(s)`).toEqual([]);
   });
 
   it("gates every hover on a pointer that can hover", () => {
