@@ -73,8 +73,10 @@
     /*
       Three text tones, down from four. --text-lo and --text-xlo differed by 1.03:1 -- a distinction
       no reader can see and every author had to choose between -- and the fainter of the two failed
-      AA at 4.23:1 on --g3. --text-xlo is gone; its call sites read --text-lo, lightened here to
-      5.42:1 on --g3, the darkest ground it is set on.
+      AA at 4.23:1 on --g3. --text-xlo is gone, alias included: its call sites read --text-lo,
+      lightened here to 5.42:1 on --g3, the darkest ground it is set on.
+      scripts/check-type-floor.mjs fails the build on a stylesheet that still reads the old name,
+      because there is no longer anything behind it.
 
       --decor is for marks that are not text a reader needs: a strikethrough rule, a tree glyph, an
       inert control. It and --reused are surface tones and never a `color:` for words.
@@ -85,10 +87,6 @@
     --text-mid: #9aa3a8;
     --text-lo: #8b959b;
     --decor: #4c565c;
-    /* Deprecated alias. Kept for one integration cycle only, so a module stylesheet another lane
-       owns still resolves to a colour instead of to nothing. Nothing new reads it; the remaining
-       call sites are listed in the L1 lane report. */
-    --text-xlo: var(--text-lo);
 
     /* State. The entire chromatic vocabulary of the product. */
     --verified: #7be0be;
@@ -128,6 +126,14 @@
     --t-7: 24px;
     --t-8: 32px;
     --t-9: clamp(38px, 4vw, 56px);
+    /*
+      BQ-006. Two display sizes that sit between the h1 and `--t-8`, because a landing section
+      heading is a band that owns a screen and a card heading is not. They are named rather than
+      left literal in app/one-path.css: four call sites there were carrying the same two clamps
+      and a comment explaining why they had no token.
+    */
+    --t-h2: clamp(28px, 3.3vw, 44px);
+    --t-h2-sm: clamp(22px, 2.1vw, 30px);
 
     /*
       Radius, by material rather than by eye (DESIGN_MASTER_V3 §6). Five values, and --r-full is a
@@ -161,6 +167,13 @@
     /* The fixed header's own height, so an in-page anchor can clear it without a magic number at
        every jump target. */
     --header: 68px;
+    /*
+      BQ-053. The one side gutter the page has. `header.nav` and `.one-path-wrap` already consumed
+      it by name with this as their fallback, while `.shell` -- which lays out the body and the
+      footer of every route other than / and /ko -- carried `clamp(20px, 4vw, 64px)` of its own.
+      Above about 1000px that put a 64px body edge against a 30px header edge on 28 routes.
+    */
+    --gutter: clamp(16px, 3vw, 30px);
     /* The workspace has a bottom instrument bar; a marketing page does not, and reserved 46px of
        nothing at the foot of every public page. Set where the bar actually exists. */
     --bar: 0px;
@@ -316,7 +329,7 @@
     width: 100%;
     max-width: var(--shell);
     margin: 0 auto;
-    padding: 0 clamp(20px, 4vw, 64px);
+    padding: 0 var(--gutter);
     position: relative;
     z-index: 10;
   }
@@ -530,7 +543,7 @@
     display: flex;
     align-items: center;
     gap: 14px;
-    padding: 12px clamp(16px, 3vw, 30px);
+    padding: 12px var(--gutter);
     transition: background var(--dur-4) var(--ease-out), border-color var(--dur-4) var(--ease-out);
     border-bottom: 1px solid transparent;
   }
@@ -3360,6 +3373,33 @@
 
 }
 
+@layer utilities {
+  /*
+    D25 -- the accessible-name utility, defined once.
+
+    Nothing in this repository defined `.sr-only`, so every use of it rendered as visible text: the
+    board's search label sat beside its own placeholder, each row checkbox printed a full sentence
+    next to it, and the compile stage's `role="status"` readout -- which exists so a screen reader
+    is told what the film is showing -- was drawn over the film. A lane defined a copy scoped to
+    `.one-path-workspace` as a stopgap; this is the unscoped one it is dropped for.
+
+    `clip-path: inset(50%)` rather than the old `clip: rect(...)`, and `white-space: nowrap` so a
+    long name is not wrapped into a 1px column, which is what makes some engines announce it one
+    character per line.
+  */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+}
+
 @layer overrides {
   /* ============================================================ BA-236 · the 12px floor
 
@@ -3429,7 +3469,7 @@
   ) {
     letter-spacing: 0.1em;
   }
-  /* The /explore node labels the audit measured at 8px on --text-xlo: one step up in tone as well,
+  /* The /explore node labels the audit measured at 8px in the faintest tone -- one step up as well,
      because the graph is meant to be an argument and it was annotated in the faintest ink there is. */
   .page :is(.tile .n, .link .st, .source-route-kind, .site-footer-title) {
     color: var(--text-lo);
