@@ -162,31 +162,51 @@ export default function IntegrationsPage() {
         <div className="body">
           <div className="stack"><h2>What connects today.</h2></div>
           <div className="stack">
-            <table className="docs-table">
-              <thead>
-                <tr>
-                  <th scope="col">Source system</th>
-                  <th scope="col">How it connects</th>
-                  <th scope="col">What that means</th>
-                </tr>
-              </thead>
-              <tbody>
-                {SUPPORT_ROWS.map(([name, how, meaning]) => (
-                  <tr key={name}>
-                    <th scope="row">{name}</th>
-                    <td>{how}</td>
-                    <td>{meaning}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            {/*
+              BQ-106. One presentation, not two.
+
+              This section rendered a five-row table of exactly the connectors the two card grids
+              below it describe -- source system, how it connects, what that means -- and then
+              described each of them again. At 390px the table stacked, so a reader met every
+              connector twice, in twelve rows, before reaching the cards that answer the question
+              they came with. The cards are the presentation: they carry the scopes, the deletion
+              behaviour and the cursor, which is what a reviewer is actually here for. What stays
+              is the part the table was for and the cards are not -- the count and the absences.
+
+              `SUPPORT_ROWS` is still derived from `OAUTH_CONNECTOR_PROVIDERS` and still throws
+              when a provider has no row, so the completeness check is untouched by not rendering
+              it, and the count below is read from it rather than typed.
+            */}
+            <p>
+              {SUPPORT_ROWS.length} source systems connect today:{" "}
+              {SUPPORT_ROWS.slice(0, -1).map(([name]) => name).join(", ")} and{" "}
+              {SUPPORT_ROWS.at(-1)![0]}. Each is described below, with the access it is given and
+              what happens when a file moves or disappears.
+            </p>
             <p className="fine">
-              The table is the whole list. {NO_CONNECTOR.slice(0, -1).join(", ")} and{" "}
+              That is the whole list. {NO_CONNECTOR.slice(0, -1).join(", ")} and{" "}
               {NO_CONNECTOR.at(-1)} have no connector here, none of them is on a published roadmap,
               and nothing on this site says when one would arrive. Where such a system keeps its
-              files in one of the cloud drives above, or exports to a directory or a bucket, that
+              files in one of the cloud drives below, or exports to a directory or a bucket, that
               path works today; the system&rsquo;s own API is not read.
             </p>
+            {/*
+              BQ-106. The legend for the tier chip every card below carries.
+
+              It was an eight-character label in the corner of a card with nothing anywhere saying
+              what its two values mean -- and they mean the thing a security reviewer opened the
+              page to find out, which is who holds the credential.
+            */}
+            <dl className="connector-legend">
+              <div>
+                <dt>Read-only</dt>
+                <dd>We hold an OAuth grant scoped to reading, run the sync, and never write back.</dd>
+              </div>
+              <div>
+                <dt>Customer-run</dt>
+                <dd>You run the import agent inside your network, and the storage credential never leaves it.</dd>
+              </div>
+            </dl>
           </div>
         </div>
 

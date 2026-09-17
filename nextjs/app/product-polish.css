@@ -307,3 +307,71 @@
 .docs-search-results a:focus-visible { outline: 2px solid var(--verified); outline-offset: -2px; }
 .docs-search-results span { font-size: 12px; }
 .docs-search-field { color: var(--text-mid); }
+
+/* ================================================================= the editorial body
+
+  BQ-100. A title column holding nothing but the H1 is not a column.
+
+  `.body` is a two-column grid -- a 420-480px title rail and a reading column -- and it is the
+  right composition for a page that puts a jump index, a date pair or a "For:" line beside its
+  heading. On the routes that put *only* the H1 there, it is 480px of nothing next to a reading
+  column squeezed to make room for it: the sticky rule in `tavonel.css` pins the heading above
+  1321px and below that there is nothing to pin.
+
+  The decision (design-direction, BQ-100) splits by surface: the reference routes -- /docs, /api,
+  /sources, /integrations, /developers -- put navigation in that column, and every other route
+  collapses to a single reading measure. This is that rule written as the condition itself rather
+  than as a list of routes: a `.body` whose first column holds an H1 and nothing else is one
+  column, and the moment a page puts something beside the heading the composition comes back. No
+  page file carries a modifier class, and none can fall out of step with the list.
+
+  `grid-column: 1` on `.trust-next` is the other half: `tavonel.css` places it in column two,
+  which in a one-column grid would mint an implicit second one and put it back where it was.
+*/
+.scene.doc .body:has(> .stack:first-child > .document-title:only-child) {
+  grid-template-columns: minmax(0, 72ch);
+}
+.scene.doc .body:has(> .stack:first-child > .document-title:only-child) > .stack:first-child {
+  position: static;
+}
+.scene.doc .body:has(> .stack:first-child > .document-title:only-child) > .trust-next {
+  grid-column: 1;
+}
+
+/*
+  BQ-106. The legend for the connector tier chip, on /integrations.
+
+  A definition list rather than two chips with sentences beside them: it is a term and its
+  meaning, which is what a `<dl>` is, and it puts the two answers on one line each at every width
+  instead of inventing a second card grid above the card grid it explains.
+*/
+.connector-legend { display: grid; gap: 10px; margin: 0; }
+.connector-legend > div { display: grid; grid-template-columns: minmax(0, 10rem) minmax(0, 1fr); gap: 4px 16px; }
+.connector-legend dt { color: var(--verified); font-size: 12px; font-weight: 500; letter-spacing: .04em; }
+.connector-legend dd { margin: 0; color: var(--text-lo); font-size: 13px; line-height: 1.6; }
+@media (max-width: 620px) {
+  .connector-legend > div { grid-template-columns: minmax(0, 1fr); }
+}
+
+/*
+  BQ-137. A MIME type breaks between tokens or not at all, on /sources.
+
+  `application/vnd.openxmlformats-officedocument.wordprocessingml.document` is 74 characters with
+  no space in it, and the cell it sits in is a narrow column: it was wrapping mid-token, so a
+  reader trying to copy the type read half of "wordprocessi" on one line and "ngml" on the next.
+  `word-break: break-word` put the break wherever the line ran out. `overflow-wrap: anywhere`
+  breaks only when the token genuinely cannot fit, after the browser has already tried the
+  boundaries the string has of its own -- the slash, the dots, the hyphens -- so the common case
+  wraps at `officedocument.` rather than inside it.
+
+  It is also the last sub-floor label on this page: 10px tracked mono goes to 12px. The face
+  stays mono, because a MIME type is exactly the machine identifier that face is reserved for.
+*/
+.src-matrix tbody th i,
+.src-matrix td > i {
+  font-size: 12px;
+  letter-spacing: 0;
+  color: var(--text-lo);
+  word-break: normal;
+  overflow-wrap: anywhere;
+}
