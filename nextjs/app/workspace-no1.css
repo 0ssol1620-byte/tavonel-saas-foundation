@@ -117,9 +117,14 @@
 .one-path-workspace .workspace-complete h2 { max-width: 20ch; margin: 6px 0 10px; font: 600 clamp(22px, 2vw, 28px)/1.2 var(--f-sans); letter-spacing: -.02em; }
 .one-path-workspace .workspace-complete p { color: var(--text-mid); font-size: 15px; line-height: 1.55; }
 .one-path-workspace .workspace-complete p.fine { font-size: 13px; color: var(--text-lo); }
+/* D29, one filled control per viewport. `.workspace-complete` renders only on Home, and the
+   shell state hero -- always above it there, because a compiled result means the workspace is
+   not `new` -- already holds a filled next action, and holds the SAME one: "Review & activate"
+   over "Review items", "Use with AI" over "Ask your World". Two filled buttons a few hundred
+   pixels apart saying the same thing is the ambiguity D29 names, so the restatement steps back
+   and these five actions read as one bordered row. Hit area and height are unchanged. */
 .one-path-workspace .workspace-complete-actions { display: flex; flex-wrap: wrap; gap: 8px; align-content: start; }
 .one-path-workspace .workspace-complete-actions button { min-height: 40px; padding: 0 14px; border: 1px solid var(--hairline-hi); border-radius: var(--ws-radius); background: transparent; color: var(--text-hi); }
-.one-path-workspace .workspace-complete-actions button:first-child { background: var(--text-hi); border-color: var(--text-hi); color: var(--ground); }
 .one-path-workspace .workspace-complete .workspace-ai-use-guide { grid-column: 1 / -1; margin-top: 4px; border-radius: var(--ws-radius-sm); }
 .one-path-workspace .workspace-ai-use-guide > summary { font-size: 14px; }
 .one-path-workspace .workspace-ai-use-guide p, .one-path-workspace .workspace-ai-journey { font-size: 13px; }
@@ -160,12 +165,20 @@
 }
 /* The connectors live inside the box. Availability text is WORKSPACE_SOURCE_CHOICES verbatim. */
 .one-path-workspace .workspace-source-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--hairline); text-align: left; }
-/* D6/BQ-023: the connectors are in the box at every width and in every mode. The folded
-   ux-120-final rule in tavonel.css still hides them at [data-compact="1"] -- a returning
-   workspace, which is exactly the visitor most likely to be connecting a system rather than
-   dragging a file. Restated here at matching specificity rather than editing another lane's
-   sheet; the tavonel.css rule should be deleted outright (cross-lane request n46). */
-.one-path-workspace .workspace-intake[data-compact="1"] .workspace-source-choices { display: grid; }
+/* D6/BQ-023: the connectors are in the box at every width and in every mode. A returning
+   workspace is the visitor most likely to be connecting a system rather than dragging a file,
+   and tavonel.css hides the connectors there TWICE -- both off the same markup condition, since
+   `data-compact` and `data-existing-documents` are both set from `mode === "returning"`:
+
+     tavonel.css:1982  [data-compact="1"] ...            @layer components -- loses to this sheet
+     tavonel.css:4019  [data-existing-documents="1"] ... @layer overrides  -- this sheet's layer
+
+   The second is the one that actually hid them: same layer, and (0,3,0) beats the unqualified
+   `.one-path-workspace .workspace-source-choices` above. So this rule is NOT redundant once I1
+   deletes 1982 -- it is safe to delete only when both are gone. Both attributes are listed so
+   the guarantee does not hinge on which of the two a later edit keeps. */
+.one-path-workspace .workspace-intake[data-compact="1"] .workspace-source-choices,
+.one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-source-choices { display: grid; }
 .one-path-workspace .workspace-source-choices button { min-height: 56px; display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--hairline); border-radius: var(--ws-radius-sm); background: var(--ground); color: var(--text-hi); text-align: left; font-size: 14px; }
 .one-path-workspace .workspace-source-choices small { color: var(--text-lo); font: 12px var(--f-sans); }
 /* Loading and unavailable stay honest and quiet. */
@@ -488,7 +501,6 @@
 @media (hover: hover) and (pointer: fine) {
   .one-path-workspace .workspace-body > header > div:last-child > button:hover:not(:disabled) { background: var(--g2); border-color: var(--text-lo); }
   .one-path-workspace .workspace-complete-actions button:hover:not(:disabled) { border-color: var(--text-lo); background: var(--g2); }
-  .one-path-workspace .workspace-complete-actions button:first-child:hover:not(:disabled) { background: #fff; }
   .one-path-workspace .workspace-intake-actions button:hover:not(:disabled) { background: var(--g2); border-color: var(--text-lo); }
   .one-path-workspace .workspace-intake-copy .workspace-intake-actions button:first-child:hover:not(:disabled),
   .one-path-workspace .workspace-preflight .workspace-intake-actions button:first-child:hover:not(:disabled) { background: #fff; }
