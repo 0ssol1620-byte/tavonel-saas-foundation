@@ -941,7 +941,16 @@
     width: min(100%, var(--compile-film-width, 1440px));
     margin-inline: auto;
     aspect-ratio: 1440 / 900;
-    max-height: calc(100dvh - 300px);
+    /*
+      landing-03: `max-height: calc(100dvh - 300px)` used to sit here.
+
+      Two shape rules in one box, and the cap won: at the commonest laptop height (900) it held
+      the frame to 600px while the width stayed 1280, making the box 2.13:1 against a 16:10
+      recording. `object-fit: contain` then pillarboxed the film to 957px inside a 1280px frame
+      -- 320px, a quarter of the hero asset's frame, empty ground. Expressing the cap as a
+      max-WIDTH instead would have shrunk the hero film to 960px and broken the direction's other
+      rule (the hero asset is never the smaller one), so the cap goes and the ratio governs.
+    */
     background: var(--ground);
     border: 1px solid var(--hairline);
     overflow: hidden;
@@ -1824,7 +1833,31 @@
     .site-links a:hover { color: var(--text-hi); border-color: var(--verified-dim); }
   }
   footer.site { position: relative; z-index: 10; border-top: 1px solid var(--hairline); padding: 40px 0 calc(var(--bar) + 40px) var(--rail); background: var(--ground); }
-  footer.site .shell { display: flex; flex-direction: column; gap: 14px; }
+  /*
+    chrome-03 / D33. The same footer lockup sat at four different left edges.
+
+    The footer's wrapper is `.shell`, which inherits `max-width: var(--shell-wide)` only through
+    `.public-page .shell` -- so on the routes that do not carry that class it stayed at the 1360px
+    `--shell` default and the brand mark moved: x=30 on 22 routes, x=70 on /pricing and
+    /knowledge-compiler, x=108 on /status, x=80 on / (which wraps in `.one-path-wrap`, widened to
+    the same formula in one-path.css). The header wordmark is at x=30 on all of them. The footer
+    is shared chrome; it takes one measure wherever it is rendered.
+  */
+  footer.site .shell { max-width: var(--shell-wide); }
+  footer.site .shell,
+  footer.site .one-path-wrap { display: flex; flex-direction: column; gap: 14px; }
+  /*
+    landing-09: the tagline is the footer's positioning line, not a sixth link.
+
+    It inherited the link columns' left edge and their 29px rhythm, so it read as one more item of
+    the Product list, and at 412 its gap to the copyright row equalled its own leading, so the two
+    read as one paragraph. Its own air above and below, and the body tone rather than the link
+    tone, separate it from both.
+  */
+  .site-footer-tagline { margin-top: 10px; color: var(--text-mid); }
+  .site-footer-legal { margin-top: 6px; }
+  /* landing-14: a separator never ends a line -- it travels with the link it introduces. */
+  .site-footer-legal-pair { white-space: nowrap; }
 
   .notice {
     position: fixed;
@@ -2920,10 +2953,19 @@
       .page .bar-ticks .bt:hover { background: transparent; }
     }
     .page .bar-ticks .bt.on::before { background: var(--verified); transform: scale(1.35); }
+    /*
+      chrome-12 / landing-14: a wrapped label may not re-centre its row partner.
+
+      `align-items: center` inside a grid row sized by a two-line sibling printed "Enterprise"
+      between "Knowledge" and "Compiler", and "Changelog" between "MCP and" and "agents". The
+      boxes were already aligned; the text inside them was not. The first lines share a baseline
+      now, and the 44px target is kept by padding rather than by centring.
+    */
     .site-footer-groups a {
       min-height: 44px;
       display: flex;
-      align-items: center;
+      align-items: flex-start;
+      padding-block: 12px;
     }
     .site-footer-groups nav { gap: 0; }
     /* "Sign in" is a two-word text link in a header row that is already full at 360px: the
@@ -3609,7 +3651,9 @@
     background: color-mix(in srgb, var(--ground) 92%, transparent);
     color: var(--text-hi);
   }
-  .compile-film-motion-control span { font: 12px/1 var(--f-sans); transform: translateY(-.5px); }
+  /* type-09: the mark is an inline 16x16 SVG on fill: currentColor, so it needs no text face and
+     no optical nudge -- the control is a 44px grid with place-items: center. */
+  .compile-film-motion-mark { display: block; }
   .compile-film-caption { align-items: center; }
   .compile-film-caption p { margin-right: auto; }
   .compile-film-progress { color: var(--text-lo); font: var(--t-1) var(--f-mono); letter-spacing: 0.08em; white-space: nowrap; }

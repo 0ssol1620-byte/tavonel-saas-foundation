@@ -96,6 +96,8 @@ export function PublicSiteHeader({
  * keeps the landing page's wider measure (`.one-path-wrap`); nothing else differs.
  */
 export function PublicSiteFooter({ korean = false, onePath = false }: { korean?: boolean; onePath?: boolean } = {}) {
+  /* chrome-06: the switch points at the language the reader is not reading. */
+  const language = korean ? FOOTER_LEGAL_ROW.languageBack : FOOTER_LEGAL_ROW.language;
   return (
     <footer className={`${onePath ? "site one-path-footer" : "site"} ${chrome.footer}`}>
       <div className={onePath ? "one-path-wrap" : "shell"}>
@@ -108,29 +110,47 @@ export function PublicSiteFooter({ korean = false, onePath = false }: { korean?:
               <p className="site-footer-title">{korean ? KO_CHROME.footerGroups[group.title] ?? group.title : group.title}</p>
               {/* T1-014: the footer is always below the fold; prefetching every group wasted ~185KB on a cold home load. */}
               {group.links.map((link) => (
-                <Link key={link.href} href={link.href as Route} prefetch={false}>{link.label}</Link>
+                <Link key={link.href} href={link.href as Route} prefetch={false}>{korean ? KO_CHROME.footerLinks[link.href] ?? link.label : link.label}</Link>
               ))}
             </nav>
           ))}
         </div>
-        {/* D8: the tagline is `BRAND_LINE.descriptor`, not a sixth copy of it. */}
-        <p className="fine">{korean ? KO_CHROME.tagline : BRAND_LINE.descriptor}</p>
+        {/*
+          D8: the tagline is `BRAND_LINE.descriptor`, not a sixth copy of it.
+
+          landing-09: it sat at the Product column's own left edge on the Product column's own
+          29px rhythm, so it read as a sixth item of that list rather than as the footer's
+          positioning line, and at 412 it ran straight into the copyright row. Its own class, its
+          own row, its own tone.
+        */}
+        <p className="fine site-footer-tagline">{korean ? KO_CHROME.tagline : BRAND_LINE.descriptor}</p>
         {/*
           BA-250: the row a procurement reader looks for. Copyright, the Korean entry and the
           security inbox -- the last two are pages and an address this site already publishes, so
           nothing here is a new commitment. The legal entity and the governing jurisdiction are
           deliberately absent; see `FOOTER_LEGAL_ROW`.
         */}
+        {/*
+          landing-14: every separator travels with the link after it.
+
+          The row wrapped between a " · " and its link, so the line ended on a dangling middle dot
+          and "Analytics preferences" was orphaned onto a row of its own at 412. Each pair is one
+          nowrap span, so the row breaks between pairs or not at all.
+        */}
         <p className="fine site-footer-legal">
-          {FOOTER_LEGAL_ROW.copyright}
-          {" · "}
-          <Link href={FOOTER_LEGAL_ROW.language.href as Route} hrefLang="ko">
-            {FOOTER_LEGAL_ROW.language.label}
-          </Link>
-          {" · "}
-          <a href={`mailto:${FOOTER_LEGAL_ROW.security}`}>{FOOTER_LEGAL_ROW.security}</a>
-          {/* G1-033 / G2-006: the consent-withdrawal path lives here after a choice, not in a floating pill. */}
-          <MarketingConsentLink />
+          <span className="site-footer-legal-pair">{FOOTER_LEGAL_ROW.copyright}</span>{" "}
+          <span className="site-footer-legal-pair">
+            {"· "}
+            <Link href={language.href as Route} hrefLang={korean ? "en" : "ko"}>{language.label}</Link>
+          </span>{" "}
+          <span className="site-footer-legal-pair">
+            {"· "}
+            <a href={`mailto:${FOOTER_LEGAL_ROW.security}`}>{FOOTER_LEGAL_ROW.security}</a>
+          </span>{" "}
+          {/* G1-033 / G2-006: the consent-withdrawal path lives here after a choice, not in a floating pill.
+              It owns its own separator (BQ-051, because it returns null off a measured path), so the
+              nowrap span goes around the component rather than inside the row. */}
+          <span className="site-footer-legal-pair"><MarketingConsentLink /></span>
         </p>
       </div>
     </footer>

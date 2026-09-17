@@ -106,9 +106,9 @@ export default function SourceSheet({ regions, activeId, onSelectRegion, ledger 
     <footer>
       <span>{active.compiledPageCount === undefined ? copy.asRead : active.compiledPageCount >= active.pageCount ? copy.fullyCompiled(active.pageCount) : copy.slice(active.compiledPageCount, active.pageCount)}</span>
       <span>
-        <Link className={styles.sourceLink} href={active.href as Route} target="_blank" rel="noreferrer">{copy.openQualified(sourcePageQualifier(active.representationKind, korean))}</Link>
-        {rendered && active.sourceHref ? <Link className={styles.sourceLink} href={active.sourceHref as Route} target="_blank" rel="noreferrer">{copy.openAcquired}</Link> : null}
-        {active.secHref ? <a className={styles.sourceLink} href={active.secHref} target="_blank" rel="noreferrer">{copy.verifyOnSec}</a> : null}
+        <Link className={`link-verify ${styles.sourceLink}`} href={active.href as Route} target="_blank" rel="noreferrer">{copy.openQualified(sourcePageQualifier(active.representationKind, korean))}</Link>
+        {rendered && active.sourceHref ? <Link className={`link-verify ${styles.sourceLink}`} href={active.sourceHref as Route} target="_blank" rel="noreferrer">{copy.openAcquired}</Link> : null}
+        {active.secHref ? <a className={`link-verify ${styles.sourceLink}`} href={active.secHref} target="_blank" rel="noreferrer">{copy.verifyOnSec}</a> : null}
       </span>
     </footer>
   </article>;

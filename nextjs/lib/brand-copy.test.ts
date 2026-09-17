@@ -303,12 +303,17 @@ function marketingPageFiles(directory = "app", found: string[] = []): string[] {
   Scene 3's four stacked bands became one pinned player, so the film sources, posters and stage
   labels moved into `compile-stage-player.tsx`. Every assertion below is about what a visitor
   sees at `/`, so the player is part of the landing source they read.
+
+  landing-01: the stage table moved again, out of the "use client" player and into
+  `lib/compile-stages.ts`, because a client-module export reaches a server component as a
+  reference rather than a value. Four files now.
 */
 function landingSource(): string {
   return [
     read("app/page.tsx"),
     read("components/home-page-client.tsx"),
     read("components/compile-stage-player.tsx"),
+    read("lib/compile-stages.ts"),
   ].join("\n");
 }
 
@@ -479,14 +484,17 @@ describe("public copy", () => {
       BQ-056. The labels are sentence case now, and this guard must read the strip rather than the
       file: the uppercase list it used to assert went on passing after the change because the
       commit note above `COMPILE_STAGES` quotes the old names. Assert the exported values.
+      landing-01: the strip moved to lib/compile-stages.ts, so the guard follows it there; the
+      player keeps the tab/reduced-motion half.
     */
     const player = read("components/compile-stage-player.tsx").replace(/\/\*[\s\S]*?\*\//g, "");
+    const strip = read("lib/compile-stages.ts");
     for (const stage of [`label: "Files"`, `label: "Updates"`, `label: "Use with AI"`]) {
-      expect(player, `the stage strip must offer ${stage}`).toContain(stage);
+      expect(strip, `the stage strip must offer ${stage}`).toContain(stage);
     }
-    expect(player, "the one stage that is a pipeline stage takes its name from the constant")
+    expect(strip, "the one stage that is a pipeline stage takes its name from the constant")
       .toContain("label: PIPELINE_STAGES[2].label");
-    expect(player, "and the strip is not set in the instrument voice any more")
+    expect(strip, "and the strip is not set in the instrument voice any more")
       .not.toContain(`label: "ORGANIZE"`);
     expect(player, "stages must be selectable, not decorative").toContain('role="tab"');
     expect(player, "reduced motion gets stills and no timer").toContain("prefers-reduced-motion");

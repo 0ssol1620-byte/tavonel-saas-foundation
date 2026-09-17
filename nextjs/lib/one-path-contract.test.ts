@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { COMPILE_STAGES } from "./compile-stages";
 import { CUSTOMER_NAV, customerNavOwns } from "./site-navigation";
 import films from "./locked-film-assets.json";
 
@@ -78,6 +79,33 @@ describe("approved one-path experience", () => {
     }
     expect(text("app/one-path.css"), "and the swipe caption is overridden on both Korean films")
       .toContain(".one-path-ko .one-path-works-film::after");
+  });
+  /*
+    landing-01 / regressions-01. A film stage that reaches a server component as a client
+    reference paints nothing.
+
+    /ko built its works stages by spreading COMPILE_STAGES out of the "use client" player
+    module. Every export of a client module arrives in a server component as a reference, not a
+    value, so id/src/poster came through undefined and the second Korean film rendered as a blank
+    panel with a src-less <img> and no <video> -- a silent fallback on a locked asset. The list is
+    a plain module now. Two halves to the guard: the values themselves are complete, and neither
+    page reads them back out of the player.
+  */
+  it("gives every film stage a real asset, from a module a server component can read", () => {
+    expect(COMPILE_STAGES.length).toBeGreaterThan(0);
+    for (const stage of COMPILE_STAGES) {
+      for (const field of ["id", "src", "poster"] as const) {
+        expect(stage[field], `stage ${stage.id || "?"} has no ${field}`).toBeTruthy();
+      }
+      expect(stage.src).toMatch(/^\/film\/.+\.mp4$/);
+      expect(stage.poster).toMatch(/^\/film\/.+\.webp$/);
+    }
+    expect(text("components/compile-stage-player.tsx"), "the strip may not live in the client module again")
+      .not.toContain("export const COMPILE_STAGES");
+    for (const page of ["app/ko/page.tsx", "components/home-page-client.tsx"]) {
+      expect(text(page), `${page} must read the stages from the plain module`)
+        .toContain('import { COMPILE_STAGES } from "@/lib/compile-stages"');
+    }
   });
   it("preserves state-controlled entry and actual public proof", () => {
     expect(text("components/home-page-client.tsx")).toContain("liveCommerce ? SELF_SERVE_CTA : ACCESS_CTA");

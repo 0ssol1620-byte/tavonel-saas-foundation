@@ -3,45 +3,7 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { FILM_DURATION } from "@/lib/film-script";
-import { PIPELINE_STAGES } from "@/lib/pipeline-vocabulary";
-
-export type CompileStage = {
-  id: string;
-  label: string;
-  line: string;
-  src: string;
-  poster: string;
-};
-
-/*
-  The caption reads the film that is playing, not a generic description of the stage.
-
-  STRUCTURE said "Entities, claims and relations form, each bound to the region that supports
-  it." That is true of cut 3, and it is also true of half the site — it describes a static
-  result. Cut 3 does something narrower and much harder to claim: it changes one clause in one
-  source, shows which documents that clause reaches, and stops. `CHANGED 1 + TOUCHED 3` is on
-  screen. The caption now says the part the viewer is actually watching, which is also the part
-  a RAG index cannot do. Nothing else about the film changes; the films are locked.
-*/
-/*
-  BQ-056. Sentence case, and the one stage name that is a pipeline stage comes from the constant.
-
-  These were set in monospace caps -- FILES / ORGANIZE / UPDATES / USE WITH AI -- which is the
-  instrument voice, and a tab label is not machine state. They are the page's own face now.
-
-  What they are *not* is `PIPELINE_STAGES` relabelled. Two of these cuts show something the
-  pipeline has no stage for: cut 3 changes one clause in one source and traces what it reaches,
-  and cut 4 shows three tools reading the same citations. Naming them "Read" and "Ready for AI"
-  to make one list out of two would put a stage name on a film that does not show that stage,
-  which is the mislabelling this row was opened about. The cut that *is* a pipeline stage takes
-  its name from the constant, so that one cannot drift.
-*/
-export const COMPILE_STAGES: readonly CompileStage[] = [
-  { id: "sources", label: "Files", line: "From the original page to extracted content and connected knowledge.", src: "/film/compile-cut.mp4", poster: "/film/poster-1.webp" },
-  { id: "read", label: PIPELINE_STAGES[2].label, line: "Related information is organized into a connected knowledge structure.", src: "/film/compile-cut-2.mp4", poster: "/film/poster-2.webp" },
-  { id: "structure", label: "Updates", line: "A changed source and its affected knowledge are shown together.", src: "/film/compile-cut-3.mp4", poster: "/film/poster-3.webp" },
-  { id: "world", label: "Use with AI", line: "An assistant, editor and terminal use the same knowledge and its citations.", src: "/film/compile-cut-4.mp4", poster: "/film/poster-4.webp" },
-] as const;
+import { COMPILE_STAGES, type CompileStage } from "@/lib/compile-stages";
 
 const LIVE_FILMS = [
   dynamic(() => import("./opening-film"), { ssr: false }),
@@ -123,15 +85,34 @@ export function filmMotionControl(state: {
 }
 
 /*
-  BQ-129: the pause glyph was `Ⅱ`, U+2161 -- the Roman numeral two. It renders in the text face
-  at text weight, sits on the baseline rather than centred, and a screen reader that reaches it
-  says "two". The two bars are `▮▮`, which is what a pause control is drawn with.
+  BQ-129 replaced the pause glyph `Ⅱ` (U+2161, the Roman numeral two) with `▮▮`, which is the
+  right mark and still the wrong way to put it on screen.
+
+  type-09: the webfont is subset. app/tavonel.css declares Wanted Sans Variable over ranges that
+  contain neither U+25AE nor U+25B6, so both marks ALWAYS came from the next entry in the stack --
+  -apple-system, Segoe UI, system-ui -- and their weight, size, baseline and colour were whatever
+  the viewer's OS supplied. On the landing hero that is mid-grey bars with subpixel fringing
+  instead of the declared cream, different on Windows, macOS and Android.
+
+  The site draws its own marks (components/logomark.tsx). These are drawn too: one 16x16 box,
+  `fill: currentColor` so the control's own colour and its states still reach them, and the
+  accessible name stays on the button where it always was.
 */
-export const FILM_CONTROL_LABEL: Record<FilmControl, { label: string; glyph: string }> = {
-  play: { label: "Play the compilation film", glyph: "▶" },
-  resume: { label: "Resume the compilation film", glyph: "▶" },
-  pause: { label: "Pause the compilation film", glyph: "▮▮" },
+export const FILM_CONTROL_LABEL: Record<FilmControl, { label: string }> = {
+  play: { label: "Play the compilation film" },
+  resume: { label: "Resume the compilation film" },
+  pause: { label: "Pause the compilation film" },
 };
+
+export function FilmControlMark({ control }: { control: FilmControl }) {
+  return (
+    <svg className="compile-film-motion-mark" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+      {control === "pause"
+        ? <><rect x="4" y="2.5" width="3" height="11" /><rect x="9" y="2.5" width="3" height="11" /></>
+        : <path d="M4 2.5 13 8 4 13.5Z" />}
+    </svg>
+  );
+}
 
 /*
   BQ-013. The half of the locale thread that is not visible copy.
@@ -437,7 +418,7 @@ export default function CompileStagePlayer({
             setPlayRequested(true);
           }}
         >
-          <span aria-hidden="true">{FILM_CONTROL_LABEL[control].glyph}</span>
+          <FilmControlMark control={control} />
         </button>
       </div>
 

@@ -233,7 +233,56 @@
 }
 
 @media (min-width: 1100px) {
-  .sheetBody { grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); align-items: start; }
+  /*
+    landing-05: `align-items: start` left the aside at its content height, so the passage's 522px
+    box sat in a 930px row with ~310px of empty ground under it beside a full-height page. The
+    aside takes the row; the region keeps its own height and the passage takes what is left, so
+    the two columns end together and the passage's end is the page's end.
+  */
+  .sheetBody { grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); align-items: stretch; }
+  /*
+    The row is the page column tall, and the aside fills it.
+
+    `height: 0` keeps the aside from sizing the row -- otherwise the passage, which is 1,800px of
+    text, would size the row and leave the same hole under the PAGE instead -- and `min-height:
+    100%` then stretches it to the height the page column resolved to.
+  */
+  .sheetAside {
+    height: 0;
+    min-height: 100%;
+    grid-template-rows: auto minmax(0, 1fr);
+    align-content: stretch;
+  }
+  .passage {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--text-lo) 60%, transparent) transparent;
+    scrollbar-gutter: stable;
+  }
+  /*
+    And it says it scrolls. A permanent thin bar plus a fade on the bottom edge: the cut-off line
+    that made this read as clipped text is now a soft edge with a scrollbar beside it. Where the
+    browser can drive an animation from the scroller itself the fade lifts at the end, so the last
+    line of the passage is never under it; where it cannot, the fade is simply always there.
+  */
+  .passage::after {
+    content: "";
+    position: sticky;
+    bottom: 0;
+    display: block;
+    height: 56px;
+    margin-top: -56px;
+    pointer-events: none;
+    background: linear-gradient(to top, var(--g2) 34%, transparent);
+  }
+  @supports (animation-timeline: scroll(self block)) {
+    .passage::after {
+      animation: passageEnd linear both;
+      animation-timeline: scroll(self block);
+    }
+  }
 }
 
 .sheetPage { min-width: 0; }
@@ -275,18 +324,30 @@
   text the compiler read, so it is set in the interface face on the interface ground, and the only
   page-like surface on screen is the actual rendered page.
 */
+/*
+  landing-05 / regressions-09: it had no end a reader could see.
+
+  `max-height: min(58svh, 620px)` with `overflow-y: auto` and an overlay scrollbar made a 520px
+  window onto 1,738px of text -- about 70% of the passage hidden, cut mid-sentence, with no
+  scrollbar, fade or more-affordance to say so, on the block captioned "What the compiler read
+  from this page". Under a page scroll on a phone it was also a touch trap.
+
+  Below the two-column break the passage simply flows: nothing is hidden and there is no nested
+  scroller. Beside the page it is bounded by the page's own height (see the 1100px block below),
+  which is what the row is for, and its scrollbar is a permanent thin one rather than an overlay
+  that appears only once you have already guessed.
+*/
 .passage {
   position: relative;
   min-height: 0;
-  max-height: min(58svh, 620px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
   padding: 14px 16px;
   color: var(--text-mid);
   background: var(--g2);
   border: 1px solid var(--hairline);
   border-radius: var(--r-inst, 6px);
 }
+
+@keyframes passageEnd { 0%, 88% { opacity: 1; } 100% { opacity: 0; } }
 
 .passageLabel {
   margin: 0 0 10px;

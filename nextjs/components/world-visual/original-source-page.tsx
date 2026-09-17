@@ -56,7 +56,15 @@ export default function OriginalSourcePage({ active, regions, onSelectRegion, ko
     if (!element) return;
     const observer = new IntersectionObserver(entries => {
       if (entries.some(entry => entry.isIntersecting)) { setVisible(true); observer.disconnect(); }
-    }, { rootMargin: "120px" });
+      /*
+        regressions-08: 120px meant the pdf.js fetch, hash check and render all started after the
+        block was already on screen, so a desktop visitor arrived on "Committed render · verifying
+        the source bytes" with no highlight drawn -- while the crop beside it captions itself "The
+        highlighted region above". One viewport of lead time instead: the work starts while the
+        block is still a screen away and the reader meets the verified state, not the waiting one.
+        It is still gated on approach, so a reader who never scrolls this far never pays for it.
+      */
+    }, { rootMargin: "1200px 0px" });
     observer.observe(element);
     return () => observer.disconnect();
   }, []);

@@ -60,6 +60,18 @@ describe("the logomark", () => {
       expect(Math.abs(nav * (32 / 24) - tab), `${nav} -> ${tab}`).toBeLessThan(0.15);
       expect(favicon).toContain(String(tab));
     }
+    /*
+      chrome-15. Faithful to the nav is not the same as sized for the tile.
+
+      Drawn at 24 -> 32 into a filled rounded tile the glyph covered 79% of the width and 54% of
+      the height and read as a blob at 16px. The scale is a transform about the tile centre, so
+      the coordinates above are untouched and this stays one mark -- and it is pinned here so it
+      cannot quietly go back to 1.
+    */
+    const scale = Number(favicon.match(/translate\(16 16\) scale\(([\d.]+)\)/)?.[1]);
+    expect(scale, "the glyph is scaled to the tile").toBeGreaterThan(1.1);
+    // The mark is 25.4 wide; anything past 1.26 puts it through the tile edge.
+    expect(scale * 25.4, "and stays inside the tile").toBeLessThan(32);
   });
 
   /*
