@@ -1,0 +1,108 @@
+import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+
+import { PIPELINE_STAGES } from "./pipeline-vocabulary";
+import { BRAND_LINE } from "./site-navigation";
+
+/*
+  The token contract, asserted where it can be asserted cheaply.
+
+  `scripts/check-type-floor.mjs` already fails the build on a sub-12px size or a --decor text
+  colour. What it cannot see is a value coming back: a sixth radius, the crosshair cursor, the
+  bracket focus ring, an ungated :hover, a second positioning line. Those are one grep each, and
+  each of them was a real regression once.
+
+  Newlines are normalised: this repository checks CSS out with CRLF on Windows and LF in CI.
+*/
+const css = readFileSync(new URL("../app/tavonel.css", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+const globals = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+
+describe("design token contract", () => {
+  it("declares the cascade before importing anything into it", () => {
+    // The header comment talks about @import order, so read past the comments before looking.
+    const code = globals.replace(/\/\*[\s\S]*?\*\//g, "");
+    const layerAt = code.indexOf("@layer reset, tokens, base, components, utilities, overrides;");
+    const importAt = code.indexOf("@import");
+    expect(layerAt, "the layer order is declared").toBeGreaterThan(-1);
+    expect(layerAt, "and declared before the first @import, or the order is whatever loads first").toBeLessThan(importAt);
+    // The four folded sheets are gone; an @import of one of them means the fold came undone.
+    for (const sheet of ["ux-polish.css", "responsive-polish.css", "ux-120-final.css", "evidence-first.css"]) {
+      expect(code, `${sheet} was folded into tavonel.css`).not.toContain(sheet);
+    }
+  });
+
+  it("keeps every global rule inside a named layer", () => {
+    for (const layer of ["@layer tokens {", "@layer reset {", "@layer base {", "@layer components {", "@layer overrides {"]) {
+      expect(css).toContain(layer);
+    }
+  });
+
+  it("has exactly five radius tokens and no radius literals", () => {
+    for (const token of ["--r-paper:", "--r-paper-lg:", "--r-inst:", "--r-inst-lg:", "--r-media:"]) {
+      expect(css).toContain(token);
+    }
+    // 50% is a circle and 0 is a square; every other literal is a sixth radius nobody agreed to.
+    const literals = [...css.matchAll(/border-radius:\s*([^;}]+)/g)]
+      .map((match) => match[1].trim())
+      .filter((value) => !value.startsWith("var(") && value !== "50%" && value !== "0" && value !== "inherit");
+    expect(literals, `radius literals: ${literals.join(", ")}`).toEqual([]);
+  });
+
+  it("uses the system cursor and one focus ring", () => {
+    expect(css, "no SVG cursor").not.toContain("cursor: url(");
+    expect(css).toContain(":focus-visible { outline: 2px solid var(--verified); outline-offset: 2px; }");
+    // The bracket ring forced position: relative onto every focusable element on the page.
+    expect(css).not.toContain(":focus-visible::after");
+    const rings = [...css.matchAll(/:focus-visible[^{]*\{[^}]*outline:/g)];
+    expect(rings, "one ring, not eight").toHaveLength(1);
+  });
+
+  it("gates every hover on a pointer that can hover", () => {
+    const ungated: string[] = [];
+    const stack: string[] = [];
+    for (const line of css.split("\n")) {
+      if (line.includes(":hover") && !/hover:\s*hover/.test(line) && !stack.some((open) => /hover:\s*hover/.test(open))) {
+        ungated.push(line.trim());
+      }
+      for (const character of line) {
+        if (character === "{") stack.push(line);
+        else if (character === "}") stack.pop();
+      }
+    }
+    expect(ungated, `ungated :hover rules:\n${ungated.join("\n")}`).toEqual([]);
+  });
+
+  it("has one reduced-motion block, and it zeroes the duration tokens", () => {
+    const blocks = [...css.matchAll(/@media \(prefers-reduced-motion: reduce\)/g)];
+    expect(blocks, "eight of these is not a contract, it is a search").toHaveLength(1);
+    expect(css).toContain("--dur-1: 0ms");
+  });
+
+  it("does not paint atmosphere", () => {
+    expect(css, "no backdrop blur").not.toContain("backdrop-filter");
+    expect(css, "no grain overlay").not.toContain("feTurbulence");
+    const shadows = [...css.matchAll(/box-shadow:\s*([^;}]+)/g)]
+      .map((match) => match[1].trim())
+      .filter((value) => !value.startsWith("var(--depth") && !value.startsWith("inset") && value !== "none");
+    expect(shadows, `shadows outside the three depth tokens: ${shadows.join(" | ")}`).toEqual([]);
+  });
+
+  it("defines --text-xlo only as a deprecated alias", () => {
+    expect(css).toContain("--text-xlo: var(--text-lo);");
+    const reads = css.split("var(--text-xlo)").length - 1;
+    expect(reads, "tavonel.css reads the deprecated alias").toBe(0);
+  });
+
+  it("names the pipeline stages once, and the positioning line once", () => {
+    expect(PIPELINE_STAGES.map((stage) => stage.key)).toEqual(["source", "read", "organize", "ready"]);
+    expect(PIPELINE_STAGES.every((stage) => stage.ko.length > 0)).toBe(true);
+    expect(BRAND_LINE.headline).toBe("Bring your knowledge. TAVONEL makes it ready for AI.");
+    expect(BRAND_LINE.descriptor).toBe("Knowledge compiled with a traceable path back to every source.");
+  });
+
+  it("keeps one kicker face and drops the rule ornament beside it", () => {
+    expect(css).toContain(".eyebrow,\n  .slate,\n  .kicker {");
+    expect(css, "the 34px rule beside every kicker").not.toContain(".slate span { width: 34px");
+    expect(css).toContain(".state-label {");
+  });
+});

@@ -393,21 +393,23 @@
   h1, h2, h3 { margin: 0; color: var(--text-hi); font-weight: 500; text-wrap: balance; }
 
   /*
-    BA-008 -- two display sizes, assigned rather than assumed.
+    Four levels, with a visible step between each.
 
-    Three were in use at once with no rule: /explore shouted at 71.68px, the landing page at 52,
-    and every other page at 48.64 -- the sample page larger than the landing page -- while the
-    home h1's 1.02 line-height sat under the 1.05 floor. Display 1 is the landing page's alone;
-    every other h1, /explore included, is Display 2. Heading leading is 1.08 throughout.
+    The scale had two display sizes and then a cliff: h1 52, h2 43, h3 19, body 15. The
+    h2-to-h3 drop was 24px with nothing in between, and on /docs it read as a 43px heading
+    followed immediately by 17px prose -- a flat hierarchy with a shout at the top of it, which is
+    the template tell. The steps are 56 / 32 / 20 / 15 now, each about 1.6x the one below, taken
+    from the --t-* scale. Display 1 is the landing page's alone; every other h1, /explore
+    included, is Display 2. Heading leading is 1.08 at display sizes.
   */
   h1 {
-    font-size: clamp(34px, 3.8vw, 52px);
+    font-size: var(--t-9);
     line-height: 1.08;
     letter-spacing: -0.032em;
     font-variation-settings: "wght" 600;
   }
   .landing-page h1 {
-    font-size: clamp(38px, 5.2vw, 72px);
+    font-size: clamp(40px, 5.2vw, 68px);
     line-height: 1.08;
     letter-spacing: -0.035em;
     font-variation-settings: "wght" 620;
@@ -417,13 +419,13 @@
   h1 .line.dim { color: var(--text-lo); }
 
   h2 {
-    font-size: clamp(27px, 3.3vw, 43px);
-    line-height: 1.08;
+    font-size: clamp(24px, 2.6vw, 32px);
+    line-height: 1.12;
     letter-spacing: -0.025em;
     font-variation-settings: "wght" 600;
   }
   .document-title {
-    font-size: clamp(34px, 3.8vw, 52px);
+    font-size: var(--t-9);
     line-height: 1.08;
     letter-spacing: -0.038em;
     font-variation-settings: "wght" 590;
@@ -435,15 +437,11 @@
     line-height: 1.65;
     max-width: 64ch;
   }
-  .scene.doc .tile p { font-size: 14px; line-height: 1.65; }
-  /*
-    BA-237 -- 17px card headings sat 2px above 15px body, so a card read as a paragraph with a bold
-    first line. 19px at wght 560 is the step that makes the grid legible as a set of cards, and it
-    is one number in one place rather than a size per surface.
-  */
-  h3 { font-size: 19px; letter-spacing: -0.014em; font-variation-settings: "wght" 560; }
+  .scene.doc .tile p { font-size: var(--t-3); line-height: 1.65; }
+  /* A card heading is the third level, not a bolder paragraph: 20px against 15px body. */
+  h3 { font-size: var(--t-6); line-height: 1.25; letter-spacing: -0.014em; font-variation-settings: "wght" 560; }
 
-  .lede { margin: 0; font-size: clamp(14.5px, 1.15vw, 16.5px); color: var(--text-mid); max-width: 62ch; }
+  .lede { margin: 0; font-size: clamp(15px, 1.15vw, 16px); color: var(--text-mid); max-width: 62ch; }
   .lede b { color: var(--text-hi); font-weight: 500; }
   .lede i { font-style: italic; }
 
@@ -2205,7 +2203,7 @@
   .workspace-complete p:last-child { max-width: 62ch; color: var(--text-lo); }
   .workspace-complete-actions { display: grid; gap: 8px; }
   .workspace-complete-actions button { min-height: 48px; }
-  @media (max-width: 768px) {
+  @media (max-width: 760px) {
     .workspace-source-choices { grid-template-columns: 1fr 1fr; }
     .workspace-complete { grid-template-columns: 1fr; }
   }
@@ -4016,7 +4014,7 @@
   .workspace-attention p:not(.eyebrow) { margin: 3px 0 0; color: var(--text-lo); font-size: var(--t-1); line-height: 1.55; }
   .workspace-attention-actions { display: grid; gap: 7px; min-width: 180px; }
   .workspace-attention-actions button { min-height: 38px; padding: 8px 11px; border: 1px solid var(--hairline-hi); border-radius: var(--r-inst); color: var(--text-hi); }
-  @media (max-width: 700px) { .workspace-attention { grid-template-columns: 1fr; } .workspace-attention-actions { min-width: 0; } }
+  @media (max-width: 720px) { .workspace-attention { grid-template-columns: 1fr; } .workspace-attention-actions { min-width: 0; } }
   .workspace-complete-actions a { min-height: 48px; display: grid; place-items: center; padding: 8px 12px; border: 1px solid var(--hairline-hi); border-radius: var(--r-inst); color: var(--text-hi); text-align: center; font-size: var(--t-1); }
 
   /* Large source sets stay inside the source surface instead of making the entire page enormous. */
@@ -4275,7 +4273,7 @@
     what the plans are. Three columns is two rows, and the cards come back up into view. Below
     1100px it inherits `.tiles` again, where two columns and then one is the right answer.
   */
-  @media (min-width: 1100px) {
+  @media (min-width: 1101px) {
     .pricing-glance { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   }
 
@@ -4469,7 +4467,7 @@
   .scene.doc p, .solution-page p, .product-overview p { text-wrap: pretty; }
 
   /* Tablet: dense multi-pane surfaces become one task at a time rather than four crushed columns. */
-  @media (min-width: 641px) and (max-width: 1024px) {
+  @media (min-width: 641px) and (max-width: 1023px) {
     .workspace-content { padding-inline: clamp(18px, 3vw, 30px); }
     .workspace-grid { grid-template-columns: minmax(0, 1fr); }
     .compile-stage { min-height: 360px; }
