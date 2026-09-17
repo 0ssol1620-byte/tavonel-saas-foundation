@@ -1972,7 +1972,6 @@
   .workspace-intake-copy, .workspace-preflight { padding: clamp(24px, 4vw, 50px); background: var(--ground); }
   .workspace-intake-copy { display: grid; place-content: center; min-height: 330px; text-align: center; }
   .workspace-intake[data-compact="1"] .workspace-intake-copy { min-height: 0; place-content: start center; padding-block: clamp(22px, 3vw, 34px); }
-  .workspace-intake[data-compact="1"] .workspace-source-choices { display: none; }
   .workspace-staged-summary { margin: 0 0 18px; color: var(--text-lo); line-height: 1.6; }
   .workspace-staged-summary strong { color: var(--text-hi); font-weight: 600; }
   .workspace-intake-copy h2 { margin: 10px 0 8px; font-size: clamp(24px, 3vw, 38px); }
@@ -3670,12 +3669,12 @@
     text-align: left;
     background: var(--g1);
   }
-  .workspace-intake[data-existing-documents="1"] .workspace-intake-copy .eyebrow { grid-column: 1; }
   .workspace-intake[data-existing-documents="1"] .workspace-intake-copy h2 { grid-column: 1; margin: 0; font-size: 19px; }
   .workspace-intake[data-existing-documents="1"] .workspace-intake-copy > p:not(.eyebrow) { grid-column: 1; margin: 0; max-width: none; font-size: var(--t-1); }
   .workspace-intake[data-existing-documents="1"] .workspace-intake-actions { grid-column: 2; grid-row: 1 / span 3; margin: 0; justify-content: flex-end; }
-  .workspace-intake[data-existing-documents="1"] .workspace-intake-copy > small,
-  .workspace-intake[data-existing-documents="1"] .workspace-source-choices { display: none; }
+  /* D6: the connector tiles stay inside the box on a returning workspace (workspace-no1.css owns
+     that layout); only the limits line yields to the compact row. */
+  .workspace-intake[data-existing-documents="1"] .workspace-intake-copy > small { display: none; }
   .workspace-intake[data-existing-documents="1"] .workspace-preflight,
   .workspace-intake[data-existing-documents="1"] .workspace-archive-progress { margin-top: 1px; }
 
@@ -3761,7 +3760,7 @@
   /* Nothing here suppresses the outline. The global :focus-visible ring is the one focus style on
      the site, and a search field that turns it off is a keyboard reader with no cursor. The border
      tint below is the resting affordance, not the indicator. */
-  .board-search input { width: 100%; min-height: 34px; padding: 7px 10px; border: 1px solid var(--hairline); border-radius: var(--r-inst); background: var(--ground); color: var(--text-hi); font-size: var(--t-1); }
+  .board-search input { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--hairline); border-radius: var(--r-inst); background: var(--ground); color: var(--text-hi); font-size: var(--t-1); }
   .board-search input:focus { border-color: var(--verified-dim); }
   .board-list-wrap { max-height: min(54vh, 560px); overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; margin-top: 10px; border: 1px solid var(--hairline); border-radius: var(--r-inst-lg); }
   .board-list { margin: 0; padding: 0; list-style: none; }
@@ -4422,10 +4421,6 @@
       text-align: center;
     }
 
-    .workspace-intake-copy .eyebrow {
-      line-height: 1.45;
-    }
-
     .workspace-intake-copy h2 {
       max-width: 14ch;
       margin: 10px auto 8px;
@@ -4472,11 +4467,6 @@
       max-width: 38ch;
       margin-top: 10px !important;
     }
-
-    /* Detailed connector cards are redundant on a narrow first-run surface because the adjacent
-       Connect a source action reaches the same destination. Hiding the cards avoids two squeezed
-       columns and keeps the primary upload path above the fixed rail. */
-    .workspace-source-choices { display: none; }
 
     .workspace-grid {
       grid-template-columns: minmax(0, 1fr);

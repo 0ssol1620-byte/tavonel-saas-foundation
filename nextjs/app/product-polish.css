@@ -121,18 +121,6 @@
 .product-surface h2 { margin: 0; align-self: end; color: var(--text-hi); font-size: 26px; }
 .product-surface p { margin: 0; color: var(--text-lo); font-size: 13px; line-height: 1.65; }
 @media (max-width: 900px) { .product-surface-grid { grid-template-columns: 1fr; } }
-/*
-  Subgrid and size containment cannot both be true of one card.
-
-  app/responsive-polish.css gives .product-surface content-visibility: auto with an intrinsic
-  size, which was a fair trade while each card was an independent flex column. It is not one
-  now: a size-contained element cannot contribute a row to the grid above it, so subgrid would
-  compute to none and the baselines would silently go back to where they were. Four cards at
-  the top of the page were never the reason that page paints -- this is the cheaper of the two.
-  Specificity rather than order, because that sheet is imported after this one.
-*/
-.product-surface-grid > .product-surface { content-visibility: visible; contain-intrinsic-size: auto; }
-
 /* ======================================================================== /pricing
 
   BQ-027. Four plan cards on four shared baselines, by subgrid rather than by min-height.
@@ -356,17 +344,13 @@
   The excerpt goes to 12px: at 11px it was under the floor, on the line that is the whole reason
   the result is legible.
 
-  The wrapper rule is the one place on these pages that paints an indicator of its own rather
-  than taking the global `:focus-visible` ring. It has to: the focusable element is a borderless
-  `<input>` inside the `<label>` that is the visible control, and `app/tavonel.css` suppresses
-  that input's own outline. It is a 2px outline at every zoom, the same ring drawn one element
-  out. If the suppression in `app/tavonel.css` goes, this rule goes with it -- the two are one
-  decision, and leaving both would draw two concentric rings.
+  2026-09-18: `app/tavonel.css` no longer suppresses the input's outline (the contract keeps one
+  focus style, the global `:focus-visible` ring), so the wrapper ring that stood in for it is
+  gone -- keeping both drew two concentric rings. The ring now sits on the `<input>` itself.
 
   The result rows take only the offset; the ring is the global one. They sit on a 1px seam inside
   a bordered list, where an outward ring would cross into the neighbouring row.
 */
-.docs-search-field:focus-within { outline: 2px solid var(--verified); outline-offset: 2px; }
 .docs-search-results a:focus-visible { outline-offset: -2px; }
 .docs-search-results span { font-size: 12px; }
 .docs-search-field { color: var(--text-mid); }

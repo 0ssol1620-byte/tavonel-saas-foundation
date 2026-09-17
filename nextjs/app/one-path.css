@@ -307,14 +307,12 @@
 .one-path-section { padding: 80px 0; border-top: 1px solid var(--hairline); }
 .one-path-section-heading { max-width: 730px; margin-bottom: 36px; }
 /*
-  BQ-006, the one deliberate exception. The contract's scale stops at `--t-9` (the h1), so the
-  two display sizes below the h1 -- the section h2 here and the design-partners h2 -- have no
-  token to consume and stay literal, as do the two narrow-width h1 overrides, which are
-  breakpoint tuning of `--t-9` rather than a fifth size. Everything else in this sheet is a
-  token. Filed to L1 as `--t-h2` / `--t-h2-sm`; when they exist these four sites take them.
+  BQ-006. The two display sizes below the h1 -- the section h2 here and the design-partners h2 --
+  read `--t-h2` / `--t-h2-sm` from tavonel.css. The two narrow-width h1 overrides stay literal:
+  they are breakpoint tuning of `--t-9`, not a fifth size.
 */
 .one-path-section-heading h2 {
-  font-size: clamp(28px, 3.3vw, 44px);
+  font-size: var(--t-h2);
   line-height: 1.12;
   font-weight: 500;
   letter-spacing: -.03em;
@@ -574,7 +572,7 @@
 
 /* SD-10. The design-partners block, on the landing page and on every solution page. */
 .design-partners { display: grid; gap: 14px; margin-top: 56px; }
-.design-partners h2 { margin: 0; font-size: clamp(22px, 2.1vw, 30px); line-height: 1.2; letter-spacing: -0.02em; }
+.design-partners h2 { margin: 0; font-size: var(--t-h2-sm); line-height: 1.2; letter-spacing: -0.02em; }
 .design-partners-lede { margin: 0; max-width: 62ch; line-height: 1.65; }
 .design-partners-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 0 28px; margin: 10px 0 0; padding: 0; list-style: none; }
 .design-partners-list li { display: grid; gap: 6px; align-content: start; padding: 18px 0; border-top: 1px solid var(--hairline); line-height: 1.6; font-size: var(--t-3, 14px); }
