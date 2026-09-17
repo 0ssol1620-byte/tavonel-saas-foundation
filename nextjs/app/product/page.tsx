@@ -4,6 +4,7 @@ import type { Route } from "next";
 import { PublicPageShell } from "@/components/public-page-shell";
 import PublicPrimaryCta from "@/components/public-primary-cta";
 import { EXPLORE_CTA } from "@/lib/site-navigation";
+import tableStyles from "@/components/docs/docs-table.module.css";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/product" },
@@ -111,25 +112,33 @@ export default function ProductPage() {
               it in a sentence, and it is the only heading this section has.
             */}
             <h2 id="product-layers-title">What we replace, and what we plug into.</h2>
+            {/*
+              BQ-049. Three columns, the last of them a sentence: on a phone the column that says
+              what the position means is the one off the right edge, which is the same as not
+              publishing it. `data-label` is the whole opt-in -- `app/tavonel.css` stacks any
+              `.docs-table` whose cells carry one below 620px -- and `rowHeader` is the half that
+              cannot be done from outside, because this table names its rows with `<th scope="row">`
+              rather than with a first cell.
+            */}
             <div className="table-scroll">
-            <table className="docs-table">
-              <thead>
-                <tr>
-                  <th scope="col">Layer</th>
-                  <th scope="col">Position</th>
-                  <th scope="col">What that means here</th>
-                </tr>
-              </thead>
-              <tbody>
-                {LAYERS.map(([layer, position, meaning]) => (
-                  <tr key={layer}>
-                    <th scope="row">{layer}</th>
-                    <td className="product-boundary-position">{position}</td>
-                    <td>{meaning}</td>
+              <table className={`docs-table ${tableStyles.rowHeader}`}>
+                <thead>
+                  <tr>
+                    <th scope="col">Layer</th>
+                    <th scope="col">Position</th>
+                    <th scope="col">What that means here</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {LAYERS.map(([layer, position, meaning]) => (
+                    <tr key={layer}>
+                      <th scope="row">{layer}</th>
+                      <td className="product-boundary-position" data-label="Position">{position}</td>
+                      <td data-label="What that means here">{meaning}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </section>
 
