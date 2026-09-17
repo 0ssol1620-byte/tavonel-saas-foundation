@@ -514,17 +514,32 @@
    containing block or the panel anchors to whatever ancestor happens to be positioned. */
 .one-path-workspace .one-path-more { position: relative; width: 100%; }
 .one-path-workspace .one-path-ai-options { margin-bottom: 24px; }
-.one-path-ai-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0; }
-.one-path-ai-tabs button { min-height: 44px; padding: 10px 16px; border: 1px solid var(--hairline-hi); border-radius: var(--r-inst, 6px); font-size: var(--t-3, 14px); }
-.one-path-ai-tabs button[aria-selected="true"] { background: var(--text-hi); color: var(--ground); }
-.one-path-ai-destination { border: 1px solid var(--hairline-hi); border-radius: var(--r-inst-lg, 8px); padding: 22px; min-width: 0; }
+/*
+  D38 (workspace-11): tabs are not buttons. The selected tab painted `--text-hi` on `--ground` --
+  the `.btn-primary` face -- on a `role="tab"`, which put two filled controls in one viewport and
+  disagreed with the underline tabs /workspace/world and /workspace/settings already use. One tab
+  face: a bare label with a 2px underline when selected.
+
+  workspace-20: the strip's own bottom rule is the seam under it, so the destination panel stops
+  being a bordered card inside the bordered card it already sits in.
+*/
+.one-path-ai-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin: 18px 0 0; border-bottom: 1px solid var(--hairline); }
+.one-path-ai-tabs button { min-height: 44px; margin-bottom: -1px; padding: 10px 12px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: var(--text-lo); font-size: var(--t-3, 14px); }
+.one-path-ai-tabs button[aria-selected="true"] { color: var(--text-hi); border-bottom-color: var(--verified); }
+.one-path-ai-destination { border: 0; border-radius: 0; padding: 22px 0 0; min-width: 0; }
 .one-path-ai-destination h3 { margin: 0 0 12px; font-size: var(--t-6, 20px); }
 .one-path-ai-destination p { max-width: 74ch; line-height: 1.65; }
 .one-path-ai-destination > :is(a, button) { display: inline-flex; align-items: center; min-height: 44px; margin-top: 16px; }
 .one-path-ai-destination > small { display: block; max-width: 80ch; line-height: 1.6; }
 .one-path-ai-not-connected { color: var(--text-mid); margin-top: 18px; }
 .one-path-ai-details { margin-top: 20px; }
-.one-path-ai-details > summary { min-height: 44px; padding: 12px 0; cursor: pointer; }
+/* workspace-09: the browser's default marker was here at 1440 and gone at 768, so the only sign
+   that this label opens anything disappeared on a phone. The workspace's own +/− marker, drawn at
+   every width rather than inherited from the UA. */
+.one-path-ai-details > summary { min-height: 44px; display: flex; align-items: center; padding: 12px 0; cursor: pointer; list-style: none; }
+.one-path-ai-details > summary::-webkit-details-marker { display: none; }
+.one-path-ai-details > summary::after { content: "+"; margin-left: auto; color: var(--text-lo); font: 16px var(--f-mono); }
+.one-path-ai-details[open] > summary::after { content: "−"; }
 
 /* ===================================================================================== 한국어 */
 
