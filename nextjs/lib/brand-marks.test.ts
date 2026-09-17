@@ -88,6 +88,10 @@ describe("the logomark", () => {
     // in the nav and #C8CED2 in the tab -- one mark, two greys, one of them under the floor.
     expect(mark).not.toContain("opacity={0.66}");
     expect(mark.match(/opacity=\{0\.8\}/g)).toHaveLength(2);
+    // The share-card copy -- twenty-nine cards, the apple icon and the root OG card -- kept 0.66
+    // when the other two moved. One number, and this is the third place it is pinned.
+    expect(shareCard).not.toContain("opacity={0.66}");
+    expect(shareCard.match(/opacity=\{0\.8\}/g)).toHaveLength(2);
     expect(read("app/one-path.css")).toContain(".wordmark .logomark { color: var(--text-mid); }");
     expect(favicon).toContain('stroke="#9AA3A8"');
     expect(favicon).not.toContain("#C8CED2");

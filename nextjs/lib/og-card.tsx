@@ -51,8 +51,8 @@ const VERIFIED = "#7BE0BE";
 export function OgLogomark({ size: px = 48 }: { size?: number }) {
   return (
     <svg width={px} height={px} viewBox="0 0 24 24" fill="none" stroke={INK} strokeLinecap="square">
-      <path d="M2.5 5.5H7.4L9.5 7.6V18.5H2.5Z" strokeWidth={1.9} opacity={0.66} />
-      <path d="M14.5 8.2H21.5V18.5H14.5Z" strokeWidth={1.9} opacity={0.66} />
+      <path d="M2.5 5.5H7.4L9.5 7.6V18.5H2.5Z" strokeWidth={1.9} opacity={0.8} />
+      <path d="M14.5 8.2H21.5V18.5H14.5Z" strokeWidth={1.9} opacity={0.8} />
       <path d="M9.5 15.5L14.5 12.1" strokeWidth={1.6} />
     </svg>
   );

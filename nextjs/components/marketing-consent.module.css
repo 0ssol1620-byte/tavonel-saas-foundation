@@ -162,9 +162,18 @@
   color: var(--text-lo);
   font-size: 13px;
   text-decoration: none;
-  opacity: 0.6;
 }
-.floating:hover, .floating:focus-visible { color: var(--text-hi); border-color: var(--text-lo); }
+/*
+  BQ-054 follow-up. The rest state was `opacity: 0.6` over `--text-lo`, which is under 4.5:1, and
+  the hover/focus rule that used to lift it back to 1 was dropped when the border came in -- so a
+  keyboard-focused control got a border change and nothing else. The opacity is gone rather than
+  re-lifted: `--text-lo` is already the quiet tone, and a second quieting multiplier on top of it
+  is what put this control under the floor. Hover is gated; focus is not (a keyboard has no hover).
+*/
+.floating:focus-visible { color: var(--text-hi); border-color: var(--text-lo); }
+@media (hover: hover) and (pointer: fine) {
+  .floating:hover { color: var(--text-hi); border-color: var(--text-lo); }
+}
 
 .panel button:focus-visible, .panel a:focus-visible, .settings:focus-visible {
   outline: 2px solid var(--text-hi);
