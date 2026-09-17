@@ -618,33 +618,99 @@ h3 { font-size: 19px; letter-spacing: -0.014em; font-variation-settings: "wght" 
 .mobile-primary-nav nav a:hover,
 .mobile-primary-nav nav a:focus-visible { color: var(--text-hi); background: var(--g1); }
 
-.btn {
+/*
+  One button. Four faces, three heights.
+
+  There were four competing definitions of "the primary button" -- here, in responsive-polish,
+  in the landing hero and in three module sheets -- resolving against each other by @import order
+  rather than by intent, at five radii, three weights and heights from 32 to 48. A control that
+  looks different on two pages is two controls as far as a reader is concerned.
+
+  The bare `.btn` is the filled one -- that is the convention 31 existing call sites already use,
+  and renaming them would be a diff in five lanes to say the same thing. `.btn-primary` is its
+  explicit name. There is one filled control per viewport; everything else is an outline or a
+  bare label, so the filled one always means "this is the thing to do here".
+*/
+.btn,
+.btn-primary {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 20px;
+  padding: 0 18px;
   min-height: 44px;
   min-width: 0;
   max-width: 100%;
   justify-content: center;
   text-align: center;
-  border: 1px solid var(--verified-dim);
-  border-radius: 3px;
-  background: var(--verified-deep);
-  color: var(--text-hi);
+  border: 1px solid var(--text-hi);
+  border-radius: var(--r-inst);
+  background: var(--text-hi);
+  color: var(--ground);
   font-family: var(--f-sans);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--t-3);
+  font-weight: 500;
   line-height: 1.4;
   letter-spacing: -0.005em;
   white-space: normal;
-  transition: background 220ms ease, border-color 220ms ease, color 220ms ease;
+  transition:
+    background-color var(--dur-2) var(--ease-out),
+    border-color var(--dur-2) var(--ease-out),
+    color var(--dur-2) var(--ease-out),
+    transform var(--dur-1) var(--ease-out);
 }
-.btn:hover { background: var(--verified-dim); border-color: var(--verified); }
-.btn:disabled { cursor: not-allowed; background: transparent; border-color: var(--hairline); color: var(--decor); }
-.btn.ghost { background: transparent; border-color: var(--hairline-hi); color: var(--text-mid); }
-.btn.ghost:hover { border-color: var(--text-lo); color: var(--text-hi); background: var(--g1); }
-.btn.small { padding: 10px 14px; font-size: 12px; }
+.btn:active, .btn-primary:active { transform: scale(0.97); }
+.btn-md { min-height: 40px; }
+.btn-sm { min-height: 36px; padding: 0 14px; font-size: var(--t-1); }
+
+.btn-secondary { background: var(--g2); border-color: var(--hairline-hi); color: var(--text-hi); }
+.btn-ghost, .btn.ghost { background: transparent; border-color: var(--hairline-hi); color: var(--text-mid); }
+.btn-danger { background: transparent; border-color: var(--failed); color: var(--failed); }
+
+/* Disabled is a colour pair, never an opacity: a translucent label over a textured ground is a
+   contrast failure that nobody can predict. */
+.btn:disabled, .btn[disabled], .btn[aria-disabled="true"] {
+  cursor: not-allowed;
+  background: var(--g2);
+  border-color: var(--hairline);
+  color: var(--text-lo);
+  transform: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover:not(:disabled), .btn-primary:hover:not(:disabled) { background: #fff; border-color: #fff; }
+  .btn-secondary:hover:not(:disabled) { background: var(--g3); border-color: var(--text-lo); }
+  .btn-ghost:hover:not(:disabled), .btn.ghost:hover:not(:disabled) { border-color: var(--text-lo); color: var(--text-hi); background: var(--g1); }
+  .btn-danger:hover:not(:disabled) { background: var(--failed-deep); border-color: var(--failed); }
+}
+
+/*
+  Tabs are not buttons.
+
+  `.workspace-body button` below gives every button in the workspace the instrument face, which
+  turned every tab and every menu row into a control that looks pressable in its own right. A tab
+  is a bare label that carries a 2px inset underline when it is the selected one.
+*/
+.tab,
+[role="tab"] {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--text-mid);
+  font: 500 var(--t-3) / 1.4 var(--f-sans);
+  box-shadow: none;
+  transition: color var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out);
+}
+.tab[aria-selected="true"],
+[role="tab"][aria-selected="true"] { color: var(--text-hi); box-shadow: inset 0 -2px 0 var(--verified); }
+@media (hover: hover) and (pointer: fine) {
+  .tab:hover, [role="tab"]:hover { color: var(--text-hi); }
+}
+
+.btn.small { min-height: 36px; padding: 0 14px; font-size: var(--t-1); }
 .nav .btn { white-space: nowrap; flex-shrink: 0; }
 
 .mini {
@@ -1778,11 +1844,16 @@ footer.site .shell { display: flex; flex-direction: column; gap: 14px; }
 .workspace-body > header strong { color: var(--text-hi); font-weight: 500; }
 .workspace-body > header small, .workspace-body > header span { font-family: var(--f-mono); font-size: 10.5px; color: var(--text-lo); letter-spacing: 0.06em; }
 
-/* Every control in the workspace is an instrument button; there is no second button style. */
-.workspace-body button:where(:not(.notice button)),
+/*
+  Every control in the workspace is an instrument button -- but a tab is not a control and a menu
+  row is not a control. Without the exclusions below this rule gave the button face to every
+  tablist and every nav row in the shell, which is why the workspace reads as a wall of buttons
+  where it should read as one surface with one action on it. `.tab` / `[role="tab"]` above owns
+  the selected-underline face instead.
+*/
+.workspace-body button:where(:not(.notice button):not([role="tab"]):not([role="menuitem"]):not(.tab)),
 .proof-actions button,
-.billing-actions button,
-.download-package {
+.billing-actions button {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -1795,11 +1866,20 @@ footer.site .shell { display: flex; flex-direction: column; gap: 14px; }
   font-size: 14px;
   font-weight: 500;
   white-space: nowrap;
-  transition: color 200ms ease, border-color 200ms ease, background 200ms ease;
+  transition:
+    color var(--dur-3) var(--ease-out),
+    border-color var(--dur-3) var(--ease-out),
+    background-color var(--dur-3) var(--ease-out);
 }
-.workspace-body button:where(:not(.notice button)):hover:not(:disabled),
-.download-package:hover:not(:disabled) { color: var(--text-hi); border-color: var(--text-lo); background: var(--g2); }
-.workspace-body button:disabled, .download-package:disabled { opacity: 0.45; cursor: not-allowed; }
+@media (hover: hover) and (pointer: fine) {
+  .workspace-body button:where(:not(.notice button):not([role="tab"]):not(.tab)):hover:not(:disabled) {
+    color: var(--text-hi);
+    border-color: var(--text-lo);
+    background: var(--g2);
+  }
+}
+/* A disabled control is a colour pair, not 45% of a colour pair. */
+.workspace-body button:disabled { cursor: not-allowed; background: var(--g2); border-color: var(--hairline); color: var(--text-lo); }
 
 .workspace-content { padding: clamp(24px, 3.4vw, 46px) clamp(20px, 3vw, 40px) 64px; display: flex; flex-direction: column; gap: 16px; }
 .workspace-content h1 { font-size: clamp(28px, 3.6vw, 46px); letter-spacing: -0.03em; }
@@ -1830,7 +1910,7 @@ footer.site .shell { display: flex; flex-direction: column; gap: 14px; }
 .workspace-intake-copy > small { margin-top: 18px; color: var(--text-lo); font: 9px var(--f-mono); letter-spacing: .08em; }
 .workspace-intake-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
 .workspace-intake-actions button {
-  min-height: 42px;
+  min-height: 44px;
   padding: 10px 15px;
   border: 1px solid var(--hairline-hi);
   color: var(--text-hi);
@@ -1938,14 +2018,25 @@ footer.site .shell { display: flex; flex-direction: column; gap: 14px; }
 .docs-endpoint header code { min-width: 0; max-width: 100%; color: var(--text-hi); overflow-wrap: anywhere; white-space: normal; }
 .docs-endpoint header em { color: var(--text-lo); font-style: normal; }
 
-.docs-table { width: 100%; max-width: 100%; min-width: 0; display: block; overflow-x: auto; border-collapse: collapse; font-size: 12px; }
+/*
+  A table stays a table.
+
+  `display: block` was here to give a wide table a horizontal scroll, and it takes the element's
+  table semantics with it: assistive tech stops announcing rows, columns and headers and reads a
+  stack of unrelated text instead. The scroll belongs to a wrapper -- `.table-scroll` -- and the
+  table keeps its own display type. Cells wrap rather than overflow, so a table that has not been
+  wrapped yet still fits its column instead of pushing the page sideways.
+*/
+.table-scroll { display: block; max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
+.docs-table { width: 100%; max-width: 100%; min-width: 0; border-collapse: collapse; font-size: var(--t-1); overflow-wrap: anywhere; }
 .scene.doc pre { width: 100%; max-width: 100%; min-width: 0; margin-inline: 0; overflow-x: auto; }
 .scene.doc pre code { display: block; width: max-content; min-width: 100%; }
 .scene.doc code { overflow-wrap: anywhere; }
 .docs-table th, .docs-table td { padding: 9px 10px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--hairline); }
-.docs-table th { color: var(--text-lo); font: 9px var(--f-mono); letter-spacing: .1em; text-transform: uppercase; font-weight: 400; }
+/* A column head is a label, not a machine identifier: sans, at the floor, not 9px mono caps. */
+.docs-table th { color: var(--text-lo); font: 500 var(--t-1) / 1.4 var(--f-sans); letter-spacing: 0.02em; }
 .docs-table td { color: var(--text-lo); }
-.docs-table code { color: var(--text-hi); font: 11px var(--f-mono); }
+.docs-table code { color: var(--text-hi); font: var(--t-2) var(--f-mono); }
 
 .docs-pager { display: flex; justify-content: space-between; gap: 16px; padding-top: 18px; border-top: 1px solid var(--hairline); font: 10px var(--f-mono); }
 .docs-pager a { color: var(--text-lo); }
@@ -2072,7 +2163,7 @@ footer.site .shell { display: flex; flex-direction: column; gap: 14px; }
 .card.canvas { background: var(--g2); }
 .card p { margin: 0; font-size: 13px; color: var(--text-lo); }
 
-.document-meta, .nodes, .collection-result, .download-package, .billing-hold, .empty {
+.document-meta, .nodes, .billing-hold, .empty {
   font-family: var(--f-mono);
   font-size: 11px;
   color: var(--text-lo);
@@ -2719,8 +2810,9 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
   Touch targets, measured rather than assumed.
 
   A pass over `/` at 360, 390, 412, 430 and 768 found 35 controls under 44px in either axis.
-  Most were 42px -- the floor `responsive-polish.css` sets under `(pointer: coarse)`, two short
-  of the 44px the guideline asks for -- but three groups were not close: the scene ticks in the
+  Most were 42px -- the floor `responsive-polish.css` used to set under `(pointer: coarse)`, two
+  short of the number in the guideline, since raised to 44 -- but three groups were not close:
+  the scene ticks in the
   instrument bar at 6x6 (12x6 including the gap that separates them), the bar's own next-step
   control at 27px tall, and the fifteen footer links at 21px.
 
@@ -2734,7 +2826,7 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
   These rules out-specify `responsive-polish.css`, which loads after this file.
 */
 @media (pointer: coarse), (max-width: 1079px) {
-  .page .btn, .page .nav a { min-height: 44px; }
+
   body .skip { min-height: 44px; display: inline-flex; align-items: center; }
   .page .bar-ticks { gap: 0; }
   .page .bar-ticks .bt {
@@ -3378,7 +3470,7 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
 
    A label that does not fit at 12px is a label that is too long.
    -------------------------------------------------------------------------------------------- */
-:is(.public-page, .landing-page) :is(
+.page :is(
   .mode,
   .tick,
   .band-head .kicker,
@@ -3413,7 +3505,7 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
 ) {
   font-size: 12px;
 }
-:is(.public-page, .landing-page) :is(
+.page :is(
   .mode,
   .tick,
   .band-head .kicker,
@@ -3437,7 +3529,7 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
 }
 /* The /explore node labels the audit measured at 8px on --text-xlo: one step up in tone as well,
    because the graph is meant to be an argument and it was annotated in the faintest ink there is. */
-:is(.public-page, .landing-page) :is(.tile .n, .link .st, .source-route-kind, .site-footer-title) {
+.page :is(.tile .n, .link .st, .source-route-kind, .site-footer-title) {
   color: var(--text-lo);
 }
 
@@ -3465,14 +3557,14 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
    copy -- one card carrying three paragraphs beside one carrying a sentence -- and it belongs to
    the lanes that own those pages; the patch is in the lane report.
    -------------------------------------------------------------------------------------------- */
-:is(.public-page, .landing-page) :is(.tiles, .chain, .solution-outcomes) :is(.tile, .link, article) {
+.page :is(.tiles, .chain, .solution-outcomes) :is(.tile, .link, article) {
   align-content: start;
 }
-:is(.public-page, .landing-page) :is(.tiles, .chain) :is(.tile, .link) > :is(h2, h3) {
+.page :is(.tiles, .chain) :is(.tile, .link) > :is(h2, h3) {
   /* Two lines at the 19px card size and 1.2 leading, so a one-line title holds the same block. */
   min-height: 2.4em;
 }
-:is(.public-page, .landing-page) :is(.tiles, .chain) :is(.tile, .link) > a:last-child {
+.page :is(.tiles, .chain) :is(.tile, .link) > a:last-child {
   margin-top: auto;
 }
 
@@ -3486,18 +3578,39 @@ main > header { display: flex; align-items: center; padding: 16px clamp(20px, 4v
    height and the paragraph does not reflow.
    -------------------------------------------------------------------------------------------- */
 @media (pointer: coarse), (max-width: 1079px) {
-  :is(.public-page, .landing-page) :is(.fine, .lede, .policy-copy, .input-guidance) a,
-  :is(.public-page, .landing-page) .faq a,
-  :is(.public-page, .landing-page) .tile a,
-  :is(.public-page, .landing-page) .link a,
-  :is(.public-page, .landing-page) .docs-pager a,
-  :is(.public-page, .landing-page) .src-matrix a {
+  /* Inline links inside running prose: grow the hit area with block padding and take it back
+     with an equal negative margin, so the line box keeps its text height and the paragraph does
+     not reflow. Unscoped -- the footer, the policy pages and the docs pager are exactly the
+     places that failed, and every one of them sat outside the wrapper this was scoped to. */
+  :is(.fine, .lede, .policy-copy, .input-guidance, .site-footer, .faq, .tile, .link, .docs-pager, .src-matrix, .doc-breadcrumb) a,
+  a[href^="mailto:"],
+  a[href^="tel:"] {
     display: inline-block;
     padding-block: 12.5px;
     margin-block: -12.5px;
   }
-  :is(.public-page, .landing-page) :is(.docs-langs button, .changelog-filter button, .tag) {
+  /* Real controls take a real floor. 44, not the 42 that was here: the number in the guideline
+     is the number. The wordmark, the sign-in link, the search input, every <summary> and every
+     <select> are on the list because each of them was measured under it. */
+  .btn,
+  .btn-primary,
+  .tab,
+  [role="tab"],
+  .nav a,
+  .nav button,
+  .wordmark,
+  .nav-signin,
+  .site-footer a,
+  .docs-langs button,
+  .changelog-filter button,
+  .tag,
+  summary,
+  select,
+  input[type="search"],
+  .skip {
     min-height: 44px;
+  }
+  :is(.docs-langs button, .changelog-filter button, .tag, summary) {
     display: inline-flex;
     align-items: center;
   }
