@@ -23,17 +23,17 @@ const SURFACES = [
   ["/product/continuous-knowledge", "CONTRACT", "Continuous recompilation", "What a compile promises when a source changes: eight clauses, each carrying the state it holds in this deployment."],
 ] as const;
 
-const PRODUCT_FLOW = [
-  ["SOURCE", "Files, folders, ZIP and connected systems"],
-  // "Pages, tables, regions and coordinates" said a table is read as a table. Audit M01: what
-  // survives the read is the paragraph, the page and the box it sat in, and
-  // /product/document-understanding now derives that sentence from the capability manifest. This
-  // row stops contradicting it.
-  ["READ", "Pages, paragraphs, regions and coordinates"],
-  ["STRUCTURE", "Entities, claims, relations and review"],
-  ["WORLD", "Evidence, graph, retrieval and portable export"],
-] as const;
+/*
+  BQ-109. The flow strip that used to stand here is gone, and the surface cards are the one
+  representation of the path left on this page.
 
+  It printed SOURCE / READ / STRUCTURE / WORLD directly above four cards reading CATEGORY /
+  READING / OUTPUT / CONTRACT -- the same four beats, the same order, two visual systems, and
+  a reader asking which of the two to follow. The cards win because they are the only half
+  that goes anywhere: each one is a link to the page that answers it. What the strip carried
+  and the cards do not is the sentence under the H1 ("Documents, scans and connected systems
+  go in") and the list of sources, which is a link in the closing row.
+*/
 /*
   Audit ST03. Which layer this replaces and which it plugs into, said once, with no competitor
   named and no competitor's number quoted.
@@ -84,15 +84,6 @@ export default function ProductPage() {
               <p className="lede">Documents, scans and connected systems go in. A source-grounded, versioned Compiled World comes out — with evidence still attached.</p>
               <div className="actions"><PublicPrimaryCta className="btn" /><Link className="btn ghost" href={EXPLORE_CTA.href as Route}>{EXPLORE_CTA.label}</Link></div>
             </div>
-          </div>
-
-          <div className="product-flow" aria-label="TAVONEL product flow" data-visual>
-            {PRODUCT_FLOW.map(([stage, detail], index) => (
-              <article key={stage}>
-                <span>{String(index + 1).padStart(2, "0")} · {stage}</span>
-                <strong>{detail}</strong>
-              </article>
-            ))}
           </div>
 
           <div className="product-surface-grid">

@@ -139,15 +139,23 @@ const LAYOUT_BODY = [
   which is the honest arrangement: the finding keeps its page, the product page describes the
   product.
 */
+/*
+  BQ-109 / BQ-099. The four cards lost their kickers, which said the heading again.
+
+  LOCATION stood over "The place, kept"; UNCERTAINTY over "Confidence travels with the
+  region"; LAYOUT over "Read in the order it was printed". A kicker that repeats the heading
+  in 9.5px tracked mono is two lines of type doing one line of work, and it was under the
+  floor besides. The heading was always the better of the two sentences.
+*/
 const PARTS = [
-  ["READ", "Text, scans, and what survives them", READ_BODY],
-  ["LOCATION", "The place, kept", "Every region keeps the address of where it was read — in a PDF, the page and the box on it. This is what later lets every compiled fact stay traceable to its exact source location."],
-  ["LAYOUT", "Read in the order it was printed", LAYOUT_BODY],
+  ["Text, scans, and what survives them", READ_BODY],
+  ["The place, kept", "Every region keeps the address of where it was read — in a PDF, the page and the box on it. This is what later lets every compiled fact stay traceable to its exact source location."],
+  ["Read in the order it was printed", LAYOUT_BODY],
   // "arrive in review" was not supported: ocr-review.json is written only when the read fails,
   // and no threshold on confidence routes anything. The confidence is recorded, and that is all.
   // BA-014 keeps both halves of that and leads with the one a reader can use: the confidence
   // travels with the region it belongs to, and a failed read opens review rather than passing.
-  ["UNCERTAINTY", "Confidence travels with the region", "Every region carries the read confidence recorded for it in the OCR output, and a failed read opens review rather than passing silently. No threshold routes on that confidence — it is recorded, and a reader that never reports doubt cannot be believed later."],
+  ["Confidence travels with the region", "Every region carries the read confidence recorded for it in the OCR output, and a failed read opens review rather than passing silently. No threshold routes on that confidence — it is recorded, and a reader that never reports doubt cannot be believed later."],
 ] as const;
 
 export default function DocumentUnderstandingPage() {
@@ -174,12 +182,11 @@ export default function DocumentUnderstandingPage() {
               <p className="lede">
                 Read scans and complex layouts while retaining the location of every region and
                 the uncertainty around it. The compiler has to recover text and coordinates
-                 before anything can be compiled into a world.
+                before anything can be compiled into a world.
               </p>
               <div className="tiles">
-                {PARTS.map(([state, title, body]) => (
+                {PARTS.map(([title, body]) => (
                   <article className="tile" key={title}>
-                    <span className="n">{state}</span>
                     {/*
                       BA-025. h2, not h3: the four cards are the first sections under the h1, and
                       an h3 here left the outline h1 -> h3 so the page could not be walked by
