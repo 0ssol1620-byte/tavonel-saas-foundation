@@ -2104,8 +2104,50 @@
     table keeps its own display type. Cells wrap rather than overflow, so a table that has not been
     wrapped yet still fits its column instead of pushing the page sideways.
   */
-  .table-scroll { display: block; max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
+  /* `scrollbar-gutter: stable` is the affordance. The site paints its own always-visible
+     scrollbar, so a table that scrolls says so rather than looking like a table that is cut off. */
+  .table-scroll {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-gutter: stable;
+  }
   .docs-table { width: 100%; max-width: 100%; min-width: 0; border-collapse: collapse; font-size: var(--t-1); overflow-wrap: anywhere; }
+
+  /*
+    Below 620px a table with column labels on its cells stops being a table and becomes a stack.
+
+    The pattern lived in `components/docs/docs-table.module.css` as a `.stacked` class applied on
+    three routes and forgotten on the rest, which is how /integrations ended up as four columns
+    scrolled sideways on a phone with two of them off screen -- the same as not publishing them.
+    Keying it on `:has(td[data-label])` is what makes it a default rather than a decision: a table
+    whose cells carry their column name stacks, and one whose cells do not is left alone instead
+    of being stacked into a list of unlabelled values.
+  */
+  @media (max-width: 620px) {
+    .docs-table:has(td[data-label]) { display: block; }
+    .docs-table:has(td[data-label]) thead {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+    }
+    .docs-table:has(td[data-label]) tr { display: block; padding: 14px 0; border-bottom: 1px solid var(--hairline-hi); }
+    .docs-table:has(td[data-label]) td { display: block; max-width: 100%; padding: 0; border: 0; }
+    .docs-table:has(td[data-label]) td + td { margin-top: 10px; }
+    .docs-table:has(td[data-label]) td::before {
+      content: attr(data-label);
+      display: block;
+      margin-bottom: 4px;
+      font-size: var(--t-1);
+      letter-spacing: 0.06em;
+      color: var(--text-lo);
+    }
+    /* An empty cell with only its label reads as a bug. */
+    .docs-table:has(td[data-label]) td:empty::after { content: "—"; color: var(--text-lo); }
+  }
   .scene.doc pre { width: 100%; max-width: 100%; min-width: 0; margin-inline: 0; overflow-x: auto; }
   .scene.doc pre code { display: block; width: max-content; min-width: 100%; }
   .scene.doc code { overflow-wrap: anywhere; }
