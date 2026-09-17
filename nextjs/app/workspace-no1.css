@@ -105,6 +105,9 @@
 .one-path-workspace .workspace-compile-block { display: grid; gap: 1px; border: 1px solid var(--hairline-hi); border-radius: var(--ws-radius); background: var(--hairline); overflow: hidden; }
 /* BQ-083: one pane at a time needs room for a pane, not a 16/6 letterbox split four ways. */
 .one-path-workspace .workspace-compile-block .compile-stage { margin: 0; border: 0; border-radius: 0; aspect-ratio: 16 / 9; max-height: none; background: var(--ground); }
+/* D39: the reserved frame is for a picture -- a page, the extracted text, the World. Idle the pane
+   draws a tab strip and one line per source, and `compile-stage.tsx` sets that content height. */
+.one-path-workspace .workspace-compile-block .compile-stage[data-framed="false"] { aspect-ratio: auto; min-height: 0; }
 .one-path-workspace .workspace-compile-block .workspace-compile-job { margin: 0; border: 0; border-radius: 0; background: var(--g1); }
 .one-path-workspace .workspace-compile-job h2 { font: 600 17px/1.35 var(--f-sans); }
 .one-path-workspace .workspace-compile-job .fine { color: var(--text-mid); font-size: 13px; }
@@ -232,8 +235,14 @@
 .one-path-workspace .board-head-compact h2 { font-size: 18px; }
 .one-path-workspace .board-summary-copy { color: var(--text-mid); font-size: 14px; }
 .one-path-workspace .board-toolbar { margin-top: 12px; }
-.one-path-workspace .board-filters button { min-height: 32px; padding: 0 12px; border: 1px solid var(--hairline); border-radius: 999px; color: var(--text-lo); font: 500 12px var(--f-mono); font-variant-numeric: tabular-nums; }
+/* workspace-14: these are interactive filters inside `role="group"`, not status pills. --r-full is
+   the pill radius and mono is for machine identifiers; "All" is neither. The counts keep their
+   column with tabular-nums, and a coarse pointer gets the 44px target the contract asks for. */
+.one-path-workspace .board-filters button { min-height: 36px; padding: 0 12px; border: 1px solid var(--hairline); border-radius: var(--r-inst); color: var(--text-lo); font: 500 12px var(--f-sans); font-variant-numeric: tabular-nums; }
 .one-path-workspace .board-filters button[data-active="true"] { color: var(--text-hi); background: var(--g3); border-color: var(--hairline-hi); }
+@media (pointer: coarse) {
+  .one-path-workspace .board-filters button { min-height: 44px; }
+}
 .one-path-workspace .board-search input { min-height: 36px; padding: 0 12px; border: 1px solid var(--hairline); border-radius: var(--ws-radius); background: var(--ground); color: var(--text-hi); font-size: 14px; }
 .one-path-workspace .board-list-wrap { border-radius: var(--ws-radius-sm); }
 /* BQ-093: the include-in-the-next-candidate tick sits on the row it applies to. It is a sibling
@@ -285,6 +294,15 @@
 .one-path-workspace .ask-result li b, .one-path-workspace .ask-result li span { font-size: 12px; }
 .one-path-workspace .ask-result button { min-height: 34px; padding: 0 12px; border: 1px solid var(--hairline-hi); font-size: 13px; }
 .one-path-workspace .billing-actions button, .one-path-workspace .billing-actions a { min-height: 38px; padding: 0 14px; border: 1px solid var(--hairline-hi); border-radius: var(--ws-radius); color: var(--text-hi); font: 500 14px var(--f-sans); }
+/*
+  workspace-17: the contract gives `.btn[disabled]` and `.btn-secondary` the same `--g2`, and
+  tavonel.css:1945 applied the disabled fill to every workspace button -- so a disabled action
+  carried a filled face while the live action beside it was a transparent ghost, and the weights
+  read backwards ("Manage billing" heavier than "Refresh billing"). Disabled is a colour pair with
+  no fill; the live action in that row takes the secondary fill.
+*/
+.one-path-workspace .workspace-body button:disabled { background: transparent; border-color: var(--hairline); color: var(--text-lo); }
+.one-path-workspace .billing-card .billing-actions button:not(:disabled) { background: var(--g2); border-color: var(--hairline-hi); color: var(--text-hi); }
 /* One tab face site-wide: a bare label with a 2px inset underline when selected. Settings used
    to render its two views as filled buttons, which is the third control face on that surface. */
 .one-path-workspace nav.billing-actions { gap: 0; border-bottom: 1px solid var(--hairline); }
@@ -377,7 +395,10 @@
   .one-path-workspace .workspace-intake-copy h1,
   .one-path-workspace .workspace-intake-copy h2 { margin: 10px auto 8px; font-size: 26px; text-wrap: balance; }
   .one-path-workspace .workspace-intake-copy > p:not(.eyebrow) { max-width: 44ch; margin-inline: auto; font-size: 15px; }
-  .one-path-workspace .workspace-intake-copy .workspace-intake-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; max-width: 520px; margin-inline: auto; gap: 8px; }
+  /* workspace-15: the 520px centred box this rule used to carry put three alignments in one drop
+     box at 768 -- heading, copy and connector tiles left, actions centred. The actions flow with
+     the rest of the box. */
+  .one-path-workspace .workspace-intake-copy .workspace-intake-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; gap: 8px; }
   .one-path-workspace .workspace-intake-copy .workspace-intake-actions button { width: 100%; min-height: 44px; text-align: center; justify-content: center; font-size: 14px; }
   .one-path-workspace .workspace-intake-copy .workspace-intake-actions button:last-child:nth-child(odd) { grid-column: 1 / -1; }
   .one-path-workspace .workspace-intake-copy > small { font-size: 12px; letter-spacing: .04em; }
@@ -401,6 +422,9 @@
   .one-path-workspace .board-search input { width: 100%; }
   .one-path-workspace .review-decision-actions button, .one-path-workspace .billing-actions button, .one-path-workspace .billing-actions a { min-height: 44px; }
   .one-path-workspace .workspace-preflight dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* workspace-23: at 360 the surface h1 is 24px and this subtitle came out at 26 -- two headings,
+     no step. It sits under the h1, so it takes the step below it. */
+  .one-path-workspace .studio-heading h2 { font-size: 18px; line-height: 1.35; }
 }
 @media (max-width: 420px) {
   .one-path-workspace .workspace-content { padding-inline: 14px; }
@@ -414,6 +438,9 @@
 .one-path-workspace .workspace-complete .workspace-ai-use-guide {
   margin: 0; border: 0; border-top: 1px solid var(--hairline); border-radius: 0; background: transparent;
 }
+/* workspace-08: on Ask this block is the first thing in the card, so the seam above it separated
+   it from nothing -- an orphan rule across the top of the card. A seam divides; it does not open. */
+.one-path-workspace .ask-studio .one-path-ai-options:first-child .workspace-ai-use-guide { border-top: 0; }
 .workspace.one-path-workspace .one-path-ai-options { margin-bottom: 0; }
 
 /* BQ-133: the settings tables are prose-and-number, not machine identifiers. */
@@ -475,6 +502,28 @@
    exists. Columns start at the top and size to what is in them. */
 .one-path-workspace .connection-layout, .one-path-workspace .developer-layout { align-items: start; }
 .one-path-workspace .connection-list, .one-path-workspace .api-key-list { min-height: 0; }
+
+/*
+  workspace-05. BQ-096 was right that the column sizes to its content, and it turned the grid's
+  own seam fill into the defect: `.connection-layout` paints `--seam` behind a 1px gap, and with
+  the columns no longer stretching, the leftover of the row was painted too -- 757x250px of flat
+  grey under the status line, where the BEFORE build showed ground. The seam becomes a hairline
+  between the two columns, so there is no fill left to leak.
+*/
+.one-path-workspace .connection-layout, .one-path-workspace .developer-layout { gap: 0; background: var(--ground); }
+.one-path-workspace .connection-list, .one-path-workspace .developer-readout { border-left: 1px solid var(--hairline); }
+@media (max-width: 1023px) {
+  .one-path-workspace .connection-list, .one-path-workspace .developer-readout { border-left: 0; border-top: 1px solid var(--hairline); }
+}
+
+/*
+  workspace-16: "Name this connection optional" read as one sentence because `<small>` inherited
+  the label's own size and colour. The label carries the field, the aside carries a separator and
+  the quieter tone.
+*/
+.one-path-workspace .connection-form > label, .one-path-workspace .api-key-form > label { color: var(--text-mid); }
+.one-path-workspace .connection-form label small::before { content: "· "; }
+.one-path-workspace .connection-form h3 { margin: 0 0 2px; color: var(--text-hi); font: 600 15px/1.35 var(--f-sans); }
 
 /* ---- focus, and the mobile origin of the More panel ---------------------------------------
    one-path.css sets a 5px-offset #dce9d8 ring on every workspace button, and anchors the More
