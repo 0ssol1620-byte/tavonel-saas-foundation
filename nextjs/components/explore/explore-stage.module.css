@@ -75,8 +75,6 @@
   white-space: nowrap;
 }
 
-.siteLinks a:focus-visible { outline: 2px solid var(--verified); outline-offset: 2px; }
-
 @media (max-width: 860px) { .siteLinks { display: none; } }
 
 /*
@@ -99,9 +97,6 @@
   letter-spacing: 0.02em;
   white-space: nowrap;
 }
-
-.technicalButton:focus-visible,
-.close:focus-visible { outline: 2px solid var(--verified); outline-offset: 2px; }
 
 /* ------------------------------------------------------------------ stage */
 
@@ -141,7 +136,6 @@
 
 .rail button:last-child { border-right: 0; }
 .rail button[aria-current="step"] { color: var(--text-hi); background: var(--g2); }
-.rail button:focus-visible { outline: 2px solid var(--verified); outline-offset: -2px; }
 
 .actCaption {
   flex: 1;
@@ -782,19 +776,8 @@
   line-height: 1.6;
 }
 
-.entryCta {
-  justify-self: start;
-  min-height: 44px;
-  margin-top: 10px;
-  padding: 14px 22px;
-  color: var(--ground);
-  background: var(--verified);
-  border: 0;
-  font: 12px var(--f-sans);
-  letter-spacing: 0.06em;
-}
-
-.entryCta:focus-visible { outline: 2px solid var(--text-hi); outline-offset: 3px; }
+/* Layout only: the face, the height and the press state are the global `.btn`'s. */
+.entryCta { justify-self: start; margin-top: 10px; }
 
 /* Narrative and source surfaces share one composition, not a fabricated PDF.
    All excerpt text, filing labels and page locations come from the bounded World. */
@@ -802,11 +785,9 @@
 .entryCopy { display: grid; gap: 22px; min-width: 0; }
 .entryCopy h1 { font-size: clamp(38px, 5.2vw, 68px); line-height: 1.05; letter-spacing: -0.045em; text-wrap: balance; }
 .entryCopy .entrySub { max-width: 46ch; font-size: clamp(16px, 1.25vw, 18px); line-height: 1.65; }
-.entryCopy .entryCta { display: inline-flex; align-items: center; justify-content: space-between; gap: 32px; min-height: 48px; font-family: inherit; font-size: 14px; font-weight: 600; letter-spacing: 0.035em; }
 .entryEyebrow { font-size: 12px; }
 .entryPaths { display: flex; flex-wrap: wrap; gap: 4px 22px; }
 .entryPaths button { display: inline-flex; align-items: center; gap: 14px; min-height: 44px; padding: 6px 0; color: var(--text-lo); border: 0; background: transparent; font-family: inherit; font-size: 14px; line-height: 1.4; text-align: left; }
-.entryPaths button:focus-visible, .entryProof button:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; }
 /*
   BQ-017. This was a cream card set in Georgia -- a third typeface typesetting an extracted
   passage so that it looked like a typeset page. It is an excerpt the compiler read, so it is set
@@ -885,7 +866,6 @@
   border: 1px solid var(--hairline-hi);
   font: 12px var(--f-mono);
 }
-.askBar:focus-visible { outline: 2px solid var(--verified); outline-offset: 2px; }
 
 .askPanel {
   position: absolute;

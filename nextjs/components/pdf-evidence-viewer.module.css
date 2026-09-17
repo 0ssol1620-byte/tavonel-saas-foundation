@@ -3,7 +3,7 @@
   width: 100%;
   min-height: 280px;
   overflow: hidden;
-  background: #f5f3ed;
+  background: var(--paper);
 }
 
 .viewer canvas {
@@ -18,8 +18,8 @@
   display: grid;
   place-items: center;
   padding: 20px;
-  color: #62696d;
-  font: 10px var(--f-mono, monospace);
+  color: var(--ground);
+  font: var(--t-1, 12px) / 1.5 var(--f-sans);
   text-align: center;
 }
 

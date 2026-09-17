@@ -175,11 +175,6 @@
   .floating:hover { color: var(--text-hi); border-color: var(--text-lo); }
 }
 
-.panel button:focus-visible, .panel a:focus-visible, .settings:focus-visible {
-  outline: 2px solid var(--text-hi);
-  outline-offset: 3px;
-}
-
 @media (max-width: 720px) {
   /*
     BQ-054. The 56px cap gives way to the 12px floor, and the row becomes two rows.
