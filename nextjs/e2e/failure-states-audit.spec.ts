@@ -100,7 +100,9 @@ test.describe("a compile that cannot start", () => {
 
   async function selectAndCompile(page: import("@playwright/test").Page) {
     await page.goto("/workspace/sources", { waitUntil: "domcontentloaded" });
-    await page.getByRole("checkbox", { name: "Include in the next candidate" }).first().check();
+    // The board names each tick box after the source it ticks: "Include <filename> in the next
+    // candidate". The fixed string this used matches none of them.
+    await page.getByRole("checkbox", { name: /^Include .+ in the next candidate$/ }).first().check();
     await page.getByRole("button", { name: "Compile selected documents" }).click();
   }
 

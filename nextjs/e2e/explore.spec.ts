@@ -236,8 +236,16 @@ test("Act 2 opens an object onto the page region it was compiled from", async ({
   */
   const provenance = page.locator("[data-source-provenance]");
   await expect(provenance).toBeVisible();
-  await expect(provenance.getByText(/^(Reference render|Original) · apple-/)).toBeVisible();
-  await expect(provenance.getByText(/bbox \(per mille\) \d+, \d+, \d+, \d+/)).toBeVisible();
+  /*
+    The two nouns are `sourcePageQualifier`'s, from `lib/source-page-rasters.ts` -- the one place
+    the representation is named, so a surface cannot invent a third spelling of it. They read as
+    running words now ("reference render", "original PDF") rather than the sentence-cased labels
+    this pinned; what the line has to say is unchanged.
+  */
+  await expect(provenance.getByText(/^(reference render|original PDF) · apple-/)).toBeVisible();
+  // `proofCopy().bbox` spells the unit out for a reader on this surface; the parenthesised form
+  // is the technical drawer's label and is still asserted there. Same four numbers either way.
+  await expect(provenance.getByText(/bbox, per mille of the page · \d+, \d+, \d+, \d+/)).toBeVisible();
   await expect(provenance.getByText(/^\d{10}-\d{2}-\d{6}$/)).toBeVisible();
   await expect(provenance.getByText("official")).toBeVisible();
   const digests = await provenance.getByText(/^sha256:[a-f0-9]{64}$/).count();
@@ -256,7 +264,8 @@ test("a reference render never presents itself as the acquired original", async 
   await page.getByRole("button", { name: "Open source evidence" }).click();
   const provenance = page.locator("[data-source-provenance]");
   await expect(provenance.locator('[data-representation="reference_render"]'))
-    .toContainText(/^Reference render · apple-2026-.*\.pdf/);
+    // `sourcePageQualifier` again: the noun is lower case in running text, the claim is the same.
+    .toContainText(/^reference render · apple-2026-.*\.pdf/);
   await expect(provenance.locator("[data-acquired-original]"))
     .toContainText(/^SEC EDGAR primary document · apple-2026-.*\.html/);
   await expect(provenance.getByText(/^sha256:[a-f0-9]{64}$/)).toHaveCount(2);
@@ -501,14 +510,24 @@ test("reduced motion removes the transitions and none of the content", async ({ 
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/explore?act=world");
   await expect(page.locator(STAGE)).toHaveAttribute("data-world-act", "world");
-  // The state swap is immediate; the objects are still all there.
+  /*
+    The state swap is immediate; the objects are still all there.
+
+    Read as a number, not as the string "0s". The eight reduced-motion blocks this site used to
+    carry were consolidated into one (`app/tavonel.css`, "One reduced-motion block for the whole
+    site"): it zeroes the duration tokens and then sweeps `animation-duration` and
+    `transition-duration` to `0.01ms !important` -- the standard form, which keeps `transitionend`
+    and `animationend` firing for anything that listens while leaving no frame a person can see.
+    `getComputedStyle` reports that as `1e-05s`, so the reading is "nothing visibly moves".
+  */
   const timings = await page.$$eval("[data-visual-node]", (elements) =>
     elements.map((element) => {
       const style = getComputedStyle(element);
-      return `${style.transitionDuration}|${style.animationDuration}`;
+      return [style.transitionDuration, style.animationDuration]
+        .flatMap((value) => value.split(",").map((part) => parseFloat(part)));
     }));
-  expect(timings.length).toBeGreaterThanOrEqual(7);
-  expect([...new Set(timings)]).toEqual(["0s|0s"]);
+  expect(timings.length, "the objects are still all there").toBeGreaterThanOrEqual(7);
+  expect(Math.max(...timings.flat()), "a node still runs a visible transition").toBeLessThanOrEqual(0.00001);
 
   await page.goto("/explore?act=change");
   await expect(page.locator(STAGE)).toHaveAttribute("data-world-act", "change_compare");

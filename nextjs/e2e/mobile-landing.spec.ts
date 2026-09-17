@@ -26,8 +26,10 @@ test("the hero uses the approved encoded film instead of mounting a crushed live
   await expect(hero.locator(".compile-film-live canvas")).toHaveCount(0);
   const video = hero.locator(".compile-film-video");
   await expect(video).toBeVisible();
-  await expect(video.locator("source")).toHaveCount(1);
-  await expect(video.locator("source")).toHaveAttribute("src", "/film/compile-cut.mp4");
+  // The player carries `src` on the <video> rather than a `<source>` child: one decoder, one
+  // element, and a stage change that actually swaps the cut. Same approved bytes.
+  await expect(video.locator("source")).toHaveCount(0);
+  await expect(video).toHaveAttribute("src", "/film/compile-cut.mp4");
   await expect(video).toHaveAttribute("poster", "/film/poster-1-hero.webp");
 });
 

@@ -1,300 +1,201 @@
 /**
- * The global menu, as a reader uses it: open one thing, click one link, arrive.
+ * The global menu, as a reader uses it: three destinations in the bar, the rest in the footer.
  *
- * The six questions below are the design document's own find-tasks (§12), and each is asserted
- * the way it is written there -- one menu open plus one link click, ending at the URL that
- * answers it. They are the reason the IA changed, so they come first; the disclosure mechanics
- * underneath them exist to make those six reachable with a keyboard.
+ * The five questions below are the design document's own find-tasks (§12) and they are still why
+ * this file exists. What changed is the IA that answers them. The 2026-09-17 brand-quality pass
+ * deleted the per-section disclosure nav -- the `#site-nav-trigger-<section>` buttons, the
+ * `#site-nav-<section>` panels and the phone's `details.mobile-nav-group` accordion -- in favour
+ * of `CUSTOMER_NAV`'s three direct links at every width (How it works, Connect, Pricing) plus the
+ * footer directory, which is the same markup on a phone and on a desktop. `app/tavonel.css`
+ * carries the note where those rules used to be.
+ *
+ * So each find-task is asserted the way it was written -- by clicking to its answer from the home
+ * page -- over the trail that exists now: the footer row first, then the section page's own link
+ * where the destination is one level down. Nothing here types a URL, because a destination that
+ * can only be reached by typing it is exactly what these five questions were written to catch.
+ * The disclosure machinery is not simply dropped from the file either: the scenario that used to
+ * drive it asserts its count is zero, so a revert shows up here rather than in a screenshot.
  *
  * Every scenario is written once, as a function over a `Page`, and run twice: in the project's
  * own Chromium and in a WebKit browser this file launches itself. The second run is not
- * decoration -- `<details>`, its summary box and the absolutely positioned panel that takes its
- * containing block from a `position: fixed` header are exactly where the engines differ, and the
- * phone the founder checks the site on is WebKit. It is launched from inside the spec because
- * Playwright refuses `test.use({ browserName })` in a describe: an engine per describe would
- * force a new worker, so the choice is a new project (config, which this lane does not own) or
- * one test that drives the second engine. `1280` and `390` are set per scenario for the same
- * reason -- the section row does not exist below 1080px and the accordion does not exist above
- * it, so each half has to be measured at a width where it is on screen.
+ * decoration -- `<details>`, its summary box and a header that takes its containing block from a
+ * `position: fixed` ancestor are exactly where the engines differ, and the phone the founder
+ * checks the site on is WebKit. It is launched from inside the spec because Playwright refuses
+ * `test.use({ browserName })` in a describe. `1440` and `390` are set per scenario because the
+ * bar and the phone sheet swap over at the same breakpoint, so each half has to be measured at a
+ * width where it is on screen.
  */
 
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, webkit, type Page } from "@playwright/test";
 
-/* Question -> panel -> link -> destination. Nothing here is a label this file invented: each
-   `link` is the label `lib/site-navigation.ts` publishes, and `lib/site-nav-model.test.ts` is
-   what keeps those labels tied to the pages they describe. */
+/*
+  Question -> the trail of hrefs a reader clicks to reach its answer.
+
+  The first hop is a footer row, because the footer is the directory every destination that left
+  the bar is listed in. A second hop is a link inside `main` on the page that row lands on. No
+  label is repeated here: `lib/site-nav-model.test.ts` is what keeps labels tied to the pages they
+  describe, and pinning the href is what keeps this file measuring reachability rather than copy.
+*/
 const TASKS = [
   {
     question: "which files can I put in, and what is preserved?",
-    section: "product",
-    /*
-      BA-248 moved this sentence off the label and into the row's description, so the label is
-      "Sources" -- the name the bar, the footer and the page's own metadata already used.
-
-      Two locators, because the two surfaces really are different. A desktop row's accessible
-      name is label plus description, where "Sources" alone also matches "Connect sources" two
-      rows below, so the desktop locator carries two words of the description -- which is what
-      separates them for a reader as well. The phone sheet renders labels only (BA-246: a
-      five-word sentence was the row that wrapped at 360), so there the exact label is the whole
-      name and matches one row.
-    */
-    link: "Sources",
-    desktopLink: "Sources What TAVONEL reads",
-    url: /\/sources$/,
+    trail: ["/sources"],
   },
   {
     question: "is there an example of answering a real question from my own manual?",
-    section: "solutions",
-    link: "Grounded assistants",
-    url: /\/solutions\/source-grounded-assistants$/,
+    trail: ["/solutions", "/solutions/source-grounded-assistants"],
   },
   {
     question: "how do I use this from an external agent?",
-    section: "developers",
-    link: "MCP",
-    url: /\/docs\/mcp$/,
+    trail: ["/docs", "/docs/mcp"],
   },
   {
     question: "where is my material stored, and how do I delete it?",
-    section: "product",
-    // BA-252: one spelling, and it is the footer's. The old one differed by a single letter,
-    // which is exactly the drift a case-insensitive locator would never have caught.
-    link: "Trust Center",
-    url: /\/trust$/,
+    trail: ["/trust"],
   },
   {
     question: "what worked example can I follow, and what does it produce?",
-    section: "resources",
-    link: "Explore a Compiled World",
-    url: /\/explore$/,
+    trail: ["/resources", "/explore"],
   },
 ] as const;
 
-/*
-  The label, not the whole accessible name.
+/** The three the header publishes, in the order `CUSTOMER_NAV` declares them. */
+const CUSTOMER_HREFS = ["/product", "/integrations", "/pricing"] as const;
 
-  A Solutions panel row is `<b>Grounded assistants</b><i>Application and agent developers</i>`, so
-  its accessible name is both halves and an exact match on the label alone finds nothing. Matching
-  the label as a substring inside the panel is what a reader does -- they look for the words, and
-  the audience line underneath is extra information, not a different link.
-*/
-const panelLink = (scope: ReturnType<Page["locator"]>, label: string, exact = false) =>
-  scope.getByRole("link", { name: label, exact });
+const BAR = 'header.nav nav[aria-label="Sections"]';
+const SHEET = "header.nav details.mobile-primary-nav";
 
-const openPhoneMenu = (page: Page) => page.locator("header.nav details.mobile-primary-nav > summary").click();
-const phoneGroup = (page: Page, section: string) =>
-  page.locator(`details.mobile-nav-group[data-section="${section}"]`);
-const isOpen = (locator: ReturnType<Page["locator"]>) =>
-  locator.evaluate((element: HTMLDetailsElement) => element.open);
+/** A route match that tolerates a query or hash the destination adds on arrival. */
+const arrivedAt = (href: string) => new RegExp(`${href.replace(/\//g, "\\/")}(?:[?#].*)?$`);
 
-type Scenario = { name: string; width: 1280 | 390; touch?: true; run: (page: Page) => Promise<void> };
+const followTrail = async (page: Page, trail: readonly string[]) => {
+  await page.goto("/");
+  await page.locator(`footer.site a[href="${trail[0]}"]`).first().click();
+  await expect(page).toHaveURL(arrivedAt(trail[0]));
+  for (const href of trail.slice(1)) {
+    await page.locator(`main a[href="${href}"]`).first().click();
+    await expect(page).toHaveURL(arrivedAt(href));
+  }
+};
+
+const openPhoneMenu = (page: Page) => page.locator(`${SHEET} > summary`).click();
+const hrefsOf = (locator: ReturnType<Page["locator"]>) =>
+  locator.evaluateAll((elements) => elements.map((element) => element.getAttribute("href")));
+
+type Scenario = { name: string; width: 1440 | 390; touch?: true; run: (page: Page) => Promise<void> };
 
 const DESKTOP: Scenario[] = [
   ...TASKS.map((task) => ({
-    name: `the section row answers "${task.question}" in one open and one click`,
-    width: 1280 as const,
-    run: async (page: Page) => {
-      await page.goto("/");
-      await page.locator(`#site-nav-trigger-${task.section}`).click();
-      const panel = page.locator(`#site-nav-${task.section}`);
-      await expect(panel).toBeVisible();
-      await panelLink(panel, "desktopLink" in task ? task.desktopLink : task.link).click();
-      await expect(page).toHaveURL(task.url);
-    },
+    name: `the chrome answers "${task.question}" without typing a URL`,
+    width: 1440 as const,
+    run: (page: Page) => followTrail(page, task.trail),
   })),
   {
-    name: 'the section row answers "which plan fits my usage?" with no panel at all',
-    width: 1280,
+    name: "the bar publishes the three customer destinations and nothing else",
+    width: 1440,
+    run: async (page) => {
+      await page.goto("/");
+      const links = page.locator(`${BAR} a.site-nav-direct`);
+      await expect(links).toHaveCount(CUSTOMER_HREFS.length);
+      expect(await hrefsOf(links)).toEqual([...CUSTOMER_HREFS]);
+    },
+  },
+  {
+    name: 'the bar answers "which plan fits my usage?" with no panel at all',
+    width: 1440,
     run: async (page) => {
       await page.goto("/");
       // Pricing is a destination, not a disclosure: the page owns the answer.
-      const pricing = page.locator('header.nav nav[aria-label="Sections"] a[href="/pricing"]');
-      await pricing.click();
+      await page.locator(`${BAR} a[href="/pricing"]`).click();
       await expect(page).toHaveURL(/\/pricing$/);
-      await expect(page.locator('header.nav nav[aria-label="Sections"] a[href="/pricing"]')).toHaveAttribute(
-        "aria-current",
-        "true",
-      );
+      await expect(page.locator(`${BAR} a[href="/pricing"]`)).toHaveAttribute("aria-current", "page");
     },
   },
   {
-    name: "the trigger that owns the page being read is marked, and no other is",
-    width: 1280,
+    /*
+      The old file pinned `aria-current="true"` on a trigger. `customerNavOwns` sets "page" -- the
+      value assistive technology acts on, and the reason the two CSS rules that styled "true"
+      never matched anything -- and /sources is owned by Connect, the row that carries it even
+      though the bar has no link with that page's name on it.
+    */
+    name: "the link that owns the page being read is marked, and no other is",
+    width: 1440,
     run: async (page) => {
       await page.goto("/sources");
-      // /sources is a Product panel item, so Product is where the reader is -- even though the
-      // bar no longer carries a link with that page's name on it.
-      await expect(page.locator("#site-nav-trigger-product")).toHaveAttribute("aria-current", "true");
-      await expect(page.locator("#site-nav-trigger-resources")).not.toHaveAttribute("aria-current", "true");
-    },
-  },
-  {
-    name: "a panel opens on Enter and on Space, not only on a pointer",
-    width: 1280,
-    run: async (page) => {
-      await page.goto("/product");
-      const panel = page.locator("#site-nav-developers");
-      /*
-        The press is retried, because a key press that lands before hydration is simply lost.
-
-        `toBeVisible` retries the *assertion*, not the gesture, so the one press this scenario
-        made was spent on a button whose click handler did not exist yet -- and WebKit failed here
-        intermittently, on the engine the founder's phone runs, for a reason that had nothing to
-        do with keyboard support. A press that has to be repeated once is still a keyboard-only
-        path; a press that is never re-sent is a flake pretending to be a feature test.
-      */
-      const pressToOpen = async (key: "Enter" | " ") => {
-        await expect(async () => {
-          await page.locator("#site-nav-trigger-developers").focus();
-          await page.keyboard.press(key === " " ? "Space" : key);
-          await expect(panel).toBeVisible({ timeout: 1000 });
-        }).toPass({ timeout: 20_000 });
-      };
-      await pressToOpen("Enter");
-      await page.keyboard.press("Escape");
-      await expect(panel).toBeHidden();
-      await pressToOpen(" ");
-    },
-  },
-  {
-    name: "Escape closes the panel and returns focus to the trigger that opened it",
-    width: 1280,
-    run: async (page) => {
-      await page.goto("/product");
-      await page.locator("#site-nav-trigger-product").click();
-      await expect(page.locator("#site-nav-product")).toBeVisible();
-      await page.keyboard.press("Escape");
-      await expect(page.locator("#site-nav-product")).toBeHidden();
-      await expect(page.locator("#site-nav-trigger-product")).toBeFocused();
-    },
-  },
-  {
-    name: "a press outside the panel closes it",
-    width: 1280,
-    run: async (page) => {
-      await page.goto("/product");
-      await page.locator("#site-nav-trigger-resources").click();
-      await expect(page.locator("#site-nav-resources")).toBeVisible();
-      /*
-        A raw press at a point, not a click on an element.
-
-        `main` starts at y = 0 under the fixed header, so Playwright's actionability check on it
-        resolves to a point the header intercepts -- which is the panel's own trigger area, the
-        one press that must not close it. This presses well below the header and below the panel,
-        which is what "outside" means to a reader.
-      */
-      await page.mouse.click(8, 600);
-      await expect(page.locator("#site-nav-resources")).toBeHidden();
-    },
-  },
-  {
-    name: "one panel is open at a time, so a second choice replaces the first",
-    width: 1280,
-    run: async (page) => {
-      await page.goto("/product");
-      await page.locator("#site-nav-trigger-product").click();
-      await expect(page.locator("#site-nav-product")).toBeVisible();
-      await page.locator("#site-nav-trigger-developers").click();
-      await expect(page.locator("#site-nav-developers")).toBeVisible();
-      await expect(page.locator("#site-nav-product")).toBeHidden();
+      await expect(page.locator(`${BAR} a[href="/integrations"]`)).toHaveAttribute("aria-current", "page");
+      await expect(page.locator(`${BAR} a[href="/pricing"]`)).not.toHaveAttribute("aria-current", "page");
       expect(
-        await page.locator('header.nav .site-nav-trigger[aria-expanded="true"]').count(),
-        "more than one trigger reports itself expanded",
+        await page.locator(`${BAR} a[aria-current]`).count(),
+        "more than one bar link claims to be the page being read",
       ).toBe(1);
     },
   },
   {
     /*
-      A disclosure is not a dialog.
+      The inverse guard for the deleted IA (brand-quality pass, 2026-09-17).
 
-      Tab from the last link in the panel must leave it and carry on through the header. The
-      repository has a real focus trap, for Explore's modals, and reaching for it here is the
-      regression this asserts against: a reader who opened a panel to look would then be unable
-      to tab past it.
+      Every scenario in this file used to open one of these; none of them exists now. Asserting
+      zero keeps the coverage pointed at the decision instead of deleting it, and it is the one
+      place that checks both chromes at once -- a re-introduced trigger would otherwise only be
+      caught by the phone specs.
     */
-    name: "Tab leaves the panel instead of trapping the keyboard in it",
-    width: 1280,
+    name: "no section disclosure survives in either chrome",
+    width: 1440,
     run: async (page) => {
       await page.goto("/product");
-      await page.locator("#site-nav-trigger-product").click();
-      await page.locator("#site-nav-product a").last().focus();
-      await page.keyboard.press("Tab");
-      const trapped = await page.evaluate(() => Boolean(document.activeElement?.closest("#site-nav-product")));
-      expect(trapped, "focus stayed inside the open panel").toBe(false);
-    },
-  },
-  {
-    name: "the panel is bounded by the viewport and never covers its trigger",
-    width: 1280,
-    run: async (page) => {
-      await page.goto("/product");
-      await page.locator("#site-nav-trigger-product").click();
-      const geometry = await page.locator("#site-nav-product").evaluate((element) => {
-        const rect = element.getBoundingClientRect();
-        return {
-          left: Math.round(rect.left),
-          right: Math.round(rect.right),
-          top: Math.round(rect.top),
-          height: Math.round(rect.height),
-          viewportWidth: window.innerWidth,
-          viewportHeight: window.innerHeight,
-          triggerBottom: Math.round(
-            document.querySelector("#site-nav-trigger-product")!.getBoundingClientRect().bottom,
-          ),
-        };
-      });
-      expect(geometry.left).toBeGreaterThanOrEqual(0);
-      expect(geometry.right).toBeLessThanOrEqual(geometry.viewportWidth);
-      expect(geometry.height, "the panel is taller than the viewport it hangs in").toBeLessThanOrEqual(
-        geometry.viewportHeight,
-      );
-      expect(
-        geometry.top,
-        `the panel at y=${geometry.top} covers the trigger ending at y=${geometry.triggerBottom}`,
-      ).toBeGreaterThanOrEqual(geometry.triggerBottom - 1);
+      await expect(page.locator("header.nav .site-nav-trigger")).toHaveCount(0);
+      await expect(page.locator('header.nav [id^="site-nav-"]')).toHaveCount(0);
+      await expect(page.locator("header.nav details.mobile-nav-group")).toHaveCount(0);
+      await expect(page.locator('header.nav [aria-current="true"]')).toHaveCount(0);
     },
   },
 ];
 
 const PHONE: Scenario[] = [
-  ...TASKS.map((task) => ({
-    name: `the accordion answers "${task.question}" from its own groups`,
-    width: 390 as const,
-    touch: true as const,
-    run: async (page: Page) => {
-      await page.goto("/");
-      await openPhoneMenu(page);
-      const group = phoneGroup(page, task.section);
-      await group.locator("> summary").click();
-      // The phone sheet renders labels only, so the label is the whole accessible name.
-      await panelLink(group, task.link, true).click();
-      await expect(page).toHaveURL(task.url);
-    },
-  })),
   {
-    name: 'the accordion answers "which plan fits my usage?" without opening a group',
+    name: "the phone sheet offers the same three destinations as the bar, flat",
     width: 390,
     touch: true,
     run: async (page) => {
       await page.goto("/");
       await openPhoneMenu(page);
-      await page.locator("header.nav .mobile-primary-nav nav > a.mobile-nav-direct").click();
+      const rows = page.locator(`${SHEET} > nav a.mobile-nav-direct`);
+      await expect(rows).toHaveCount(CUSTOMER_HREFS.length);
+      expect(await hrefsOf(rows)).toEqual([...CUSTOMER_HREFS]);
+      await expect(page.locator(`${SHEET} details.mobile-nav-group`)).toHaveCount(0);
+    },
+  },
+  {
+    name: "one row, one click, one arrival",
+    width: 390,
+    touch: true,
+    run: async (page) => {
+      await page.goto("/");
+      await openPhoneMenu(page);
+      await page.locator(`${SHEET} > nav a[href="/pricing"]`).click();
       await expect(page).toHaveURL(/\/pricing$/);
     },
   },
   {
-    name: "one group expands at a time, and the group owning the page starts open",
+    // The destinations the sheet no longer carries are reachable at this width too: the footer
+    // directory is one piece of markup, not a desktop-only one.
+    name: "a destination the sheet does not carry is still one footer row away",
+    width: 390,
+    touch: true,
+    run: (page: Page) => followTrail(page, ["/trust"]),
+  },
+  {
+    name: "Escape closes the sheet and returns focus to the control that opened it",
     width: 390,
     touch: true,
     run: async (page) => {
-      await page.goto("/product");
+      await page.goto("/");
+      const panel = page.locator(`${SHEET} > nav`);
       await openPhoneMenu(page);
-      const product = phoneGroup(page, "product");
-      const resources = phoneGroup(page, "resources");
-      expect(await isOpen(product), "the group that owns /product did not start open").toBe(true);
-      await resources.locator("> summary").click();
-      expect(await isOpen(resources)).toBe(true);
-      expect(await isOpen(product), "two groups were expanded at once").toBe(false);
+      await expect(panel).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(panel).toBeHidden();
+      await expect(page.locator(`${SHEET} > summary`)).toBeFocused();
     },
   },
   {
@@ -304,7 +205,6 @@ const PHONE: Scenario[] = [
     run: async (page) => {
       await page.goto("/");
       await openPhoneMenu(page);
-      await phoneGroup(page, "developers").locator("> summary").click();
       const short = await page.evaluate(() => {
         const found: { text: string; height: number; right: number }[] = [];
         const panel = document.querySelector("details.mobile-primary-nav");
@@ -336,8 +236,14 @@ test.describe("chromium", () => {
     test.describe(scenario.name, () => {
       test.use({ viewport: viewportFor(scenario), hasTouch: scenario.touch ?? false });
       test(scenario.name, async ({ page }, testInfo) => {
-        // One project runs this file; the widths and the second engine are the spec's variables.
-        test.skip(testInfo.project.name !== "1280", "site-nav drives its own viewport and browser");
+        /*
+          One project runs this file; the widths and the second engine are the spec's variables.
+
+          It was `1280`, the width the deleted section row needed. The bar is three direct links
+          at every width now, so the gate moves to `1440` -- the project the brand-quality run
+          actually drives, and the one where this file was silently skipping every scenario.
+        */
+        test.skip(testInfo.project.name !== "1440", "site-nav drives its own viewport and browser");
         await scenario.run(page);
       });
     });
@@ -349,14 +255,27 @@ test.describe("chromium", () => {
 
   A context per width rather than per scenario, because the viewport and the touch pointer are
   the only things that differ between them -- every scenario begins with its own `goto`, which is
-  what resets the header, so sharing a page costs nothing and saves nineteen context launches on
-  the slowest engine. The step name is the scenario's own, so a failure here reads the same as
-  the Chromium run above.
+  what resets the header, so sharing a page costs nothing and saves the context launches on the
+  slowest engine. The step name is the scenario's own, so a failure here reads the same as the
+  Chromium run above.
+
+  WebKit is imported rather than taken from the `playwright` fixture, and that is load-bearing.
+  A browser reached through the fixture has the runner's artifact instrumentation attached to
+  every context it opens, and `playwright.config.ts` already records what that costs here:
+  Playwright 1.62's Windows WebKit port deadlocks while recording a trace for a native
+  `<details>` interaction -- which every phone scenario below performs. Inside a width project
+  that deadlock is worse than one hung test: it takes the runner process down with exit 127 and
+  no reporter output, stopping the whole suite wherever this test happened to be scheduled. That
+  is what made the full set unfinishable. `test.use({ trace: "off" })` is not available -- trace
+  forces a new worker, so Playwright refuses it in a describe, the same rule that put this file
+  in charge of its own browser in the first place. The import is the one knob left. Every
+  assertion and the engine coverage the founder's phone depends on are unchanged; only the
+  instrumentation that hangs is skipped, and a failure still reports its call log and stack.
 */
-test("webkit answers the same questions", async ({ playwright, baseURL }, testInfo) => {
-  test.skip(testInfo.project.name !== "1280", "site-nav drives its own viewport and browser");
+test("webkit answers the same questions", async ({ baseURL }, testInfo) => {
+  test.skip(testInfo.project.name !== "1440", "site-nav drives its own viewport and browser");
   test.setTimeout(600_000);
-  const browser = await playwright.webkit.launch();
+  const browser = await webkit.launch();
   try {
     for (const group of [DESKTOP, PHONE]) {
       const context = await browser.newContext({

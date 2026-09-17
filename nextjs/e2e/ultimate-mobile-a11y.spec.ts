@@ -60,7 +60,14 @@ test("mobile Home intake stays inside the viewport and keeps the fixed rail clea
   const intake = page.locator(".workspace-intake");
   await expect(page.getByRole("heading", { name: "Drop files, folders or ZIP here" })).toBeVisible();
   await expect(intake).toBeVisible();
-  await expect(page.locator(".workspace-source-choices")).toBeHidden();
+  /*
+    D6 / BQ-023: the connectors live inside the drop box at every width and in every mode --
+    `app/workspace-no1.css` says so where the two rules that used to hide them were. A phone is
+    where a reader is most likely to be connecting a system rather than dragging a file, so
+    hiding them here was the regression. They are visible; what this test is named for is the
+    three assertions under it -- nothing leaves the viewport and the fixed rail stays clear.
+  */
+  await expect(page.locator(".workspace-source-choices")).toBeVisible();
   await expect(page.getByText("Knowledge workspace")).toBeHidden();
 
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);

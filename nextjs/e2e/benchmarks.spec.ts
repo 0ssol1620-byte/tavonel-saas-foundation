@@ -24,7 +24,9 @@ const FAMILIES = [
 
 test("publishes the compilation benchmark protocol and no results table", async ({ page }) => {
   await page.goto("/benchmarks");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Measure the compile");
+  // The 2026-09-17 copy pass rewrote the imperative headline ("Measure the compile...") as a
+  // statement. What this pins is unchanged: the H1 names the measurement, not a result.
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("How a compile is measured");
 
   for (const family of FAMILIES) {
     await expect(page.getByRole("heading", { name: family, exact: true })).toBeVisible();

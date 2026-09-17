@@ -58,7 +58,7 @@ test("pricing puts catalog-backed choices before detailed explanations", async (
   await expect(plans.locator(".plan")).toHaveCount(4);
   await expect(page.locator(".pricing-faq details")).toHaveCount(17);
   /*
-    Ten with the explicit human-promotion policy beside the nine plan details. Refunds states
+    Ten with the explicit human-activation policy beside the nine plan details. Refunds states
     the window and consumed share here rather than only in the FAQ below it.
 
     Still an exact count, not a floor -- this glance is the summary a buyer reads instead of the
@@ -77,10 +77,12 @@ test("pricing puts catalog-backed choices before detailed explanations", async (
     "Spreadsheets",
     "Refunds",
     "How to start",
-    "Human promotion",
+    // D31: the tile is "Human activation" now. The `candidatePromotion` gate key below is an
+    // identifier, not copy, so it stays exactly as the purchase gate publishes it.
+    "Human activation",
   ]);
   await expect(page.locator('[data-purchase-gate="candidatePromotion"]'))
-    .toContainText("Promotion is always an explicit human decision.");
+    .toContainText("Activation is always an explicit human decision.");
   const choice = await plans.boundingBox();
   const details = await page.locator(".pricing-details").boundingBox();
   expect(choice!.y + choice!.height).toBeLessThan(details!.y);
@@ -100,7 +102,14 @@ test("phone and tablet use real navigation targets instead of clickable decorati
     const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
     return { width: r.width, height: r.height, inside: hit === e || e.contains(hit) };
   }));
-  expect(targets.length).toBe(4);
+  /*
+    Three, not four. BQ-059 stopped drawing the header's commercial action a second time inside
+    the sheet, forty pixels below the first copy of it -- `e2e/mobile-landing.spec.ts` and
+    `e2e/production-hardening.spec.ts` both assert `a.mobile-nav-cta` is gone. What this test
+    measures is unchanged: every row a thumb lands on is a real target, and the point at its
+    centre belongs to the row.
+  */
+  expect(targets.length).toBe(3);
   for (const target of targets) {
     expect(target.width).toBeGreaterThan(44);
     expect(target.height).toBeGreaterThanOrEqual(44);
