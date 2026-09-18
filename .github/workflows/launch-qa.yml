@@ -18,6 +18,11 @@ jobs:
     name: Browser QA (${{ matrix.browser }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      # 480s, not playwright.config.ts's 300s default, for `pnpm build && pnpm start`: the firefox
+      # job timed out at 300s on a push-event runner while the same job passed on the pull_request
+      # event for the same commit. The job's own 20-minute budget is the real bound.
+      PLAYWRIGHT_WEB_SERVER_TIMEOUT: "480000"
     strategy:
       fail-fast: false
       matrix:
@@ -91,8 +96,12 @@ jobs:
           cache: pnpm
           cache-dependency-path: nextjs/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
-      - name: Install Chromium runtime
-        run: pnpm exec playwright install --with-deps chromium
+      # WebKit as well as Chromium: e2e/site-nav.spec.ts asks WebKit the same navigation
+      # questions from inside the 1440 project (see that file's header for why it launches its own
+      # browser). Until 2026-09-17 that test was gated on a project no job runs and never launched;
+      # once it did, this job failed at `browserType.launch: Executable doesn't exist`.
+      - name: Install Chromium and WebKit runtimes
+        run: pnpm exec playwright install --with-deps chromium webkit
       # One command, seven projects, one build.
       #
       # The webServer in playwright.config.ts runs `pnpm build && pnpm start` with

@@ -26,6 +26,7 @@
  * width where it is on screen.
  */
 
+import { existsSync } from "node:fs";
 import { test, expect, type Page } from "@playwright/test";
 
 /*
@@ -284,6 +285,14 @@ test.describe("chromium", () => {
 */
 test("webkit answers the same questions", async ({ playwright, baseURL }, testInfo) => {
   test.skip(testInfo.project.name !== "1440", "site-nav drives its own viewport and browser");
+  /*
+    Until the 2026-09-17 pass this file was gated on a "1280" project that no job runs, so this
+    test never launched anywhere. Re-pointed at "1440" it launched in Launch QA's Product QA job,
+    which installs Chromium only, and failed at `browserType.launch: Executable doesn't exist`.
+    That job installs WebKit now; a runner or a checkout without it says so and skips rather than
+    reporting a missing binary as a navigation failure.
+  */
+  test.skip(!existsSync(playwright.webkit.executablePath()), "WebKit is not installed in this runner (playwright install webkit)");
   test.setTimeout(600_000);
   const browser = await playwright.webkit.launch();
   try {
