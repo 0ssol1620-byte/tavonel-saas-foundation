@@ -72,15 +72,18 @@ const NARROW_FRAME = "(max-width: 899px), (pointer: coarse) and (max-width: 1023
 
   Pure, and exported, so both branches are tested without a DOM.
 */
-export type FilmControl = "play" | "pause" | "resume";
+export type FilmControl = "play" | "pause" | "resume" | "replay";
 
 export function filmMotionControl(state: {
   reducedMotion: boolean;
   saveData: boolean;
   paused: boolean;
   playRequested: boolean;
+  /** The single-stage film has run to its last frame (MED-12): the control offers a replay. */
+  ended?: boolean;
 }): FilmControl {
   if ((state.reducedMotion || state.saveData) && !state.playRequested) return "play";
+  if (state.ended) return "replay";
   return state.paused ? "resume" : "pause";
 }
 
@@ -101,6 +104,7 @@ export function filmMotionControl(state: {
 export const FILM_CONTROL_LABEL: Record<FilmControl, { label: string }> = {
   play: { label: "Play the compilation film" },
   resume: { label: "Resume the compilation film" },
+  replay: { label: "Replay the compilation film" },
   pause: { label: "Pause the compilation film" },
 };
 
@@ -129,6 +133,7 @@ export function FilmControlMark({ control }: { control: FilmControl }) {
 export const FILM_CONTROL_LABEL_KO: Record<FilmControl, string> = {
   play: "컴파일 영상 재생",
   resume: "컴파일 영상 이어서 재생",
+  replay: "컴파일 영상 다시 재생",
   pause: "컴파일 영상 일시정지",
 };
 
@@ -171,6 +176,8 @@ export default function CompileStagePlayer({
   const [reducedMotion, setReducedMotion] = useState(false);
   const [canvasReady, setCanvasReady] = useState(false);
   const [narrow, setNarrow] = useState(false);
+  // The single-stage film plays once and stops on its last frame; the control then offers a replay.
+  const [ended, setEnded] = useState(false);
   const [saveData, setSaveData] = useState(false);
   const [documentVisible, setDocumentVisible] = useState(true);
   const [videoError, setVideoError] = useState(false);
@@ -319,10 +326,12 @@ export default function CompileStagePlayer({
   */
   const onEnded = useCallback(() => {
     if (stages.length === 1) {
-      const element = videoRef.current;
-      if (!element) return;
-      element.currentTime = 0;
-      void element.play().catch(() => {});
+      /*
+        Landing replan, 2026-09-18 (MED-12). This restarted the cut, which made the hero an infinite
+        autoplay loop for as long as the tab was open. The film ends on the frame it was cut to end on,
+        and the control becomes a replay.
+      */
+      setEnded(true);
       return;
     }
     if (cycling) { go(index + 1); return; }
@@ -343,7 +352,7 @@ export default function CompileStagePlayer({
   */
   const live = !preferVideo && canvasReady && !narrow && !(reducedMotion && playRequested);
   const still = !autoplay || paused || !inView || !documentVisible || videoError;
-  const control = filmMotionControl({ reducedMotion, saveData, paused, playRequested });
+  const control = filmMotionControl({ reducedMotion, saveData, paused, playRequested, ended });
 
   return (
     /* Below 900px the horizontal gesture pans the film (G1-012), so it may not also change the
@@ -402,7 +411,7 @@ export default function CompileStagePlayer({
             survives, so nothing is torn down mid-fetch, and there is still exactly one decoder
             open on a phone.
           */
-          <video ref={videoRef} className="compile-film-video" src={active.src} data-active={1} muted autoPlay playsInline preload="metadata" poster={active.poster} aria-label={`${active.label} — ${active.line}`} onLoadedMetadata={(event) => { event.currentTarget.playbackRate = Math.max(0.1, playbackRate); }} onEnded={onEnded} onError={() => { setVideoError(true); setPaused(true); }} />
+          <video ref={videoRef} className="compile-film-video" src={narrow && active.phoneSrc ? active.phoneSrc : active.src} data-active={1} muted autoPlay playsInline preload="metadata" disablePictureInPicture disableRemotePlayback poster={active.poster} aria-label={`${active.label} — ${active.line}`} onLoadedMetadata={(event) => { event.currentTarget.playbackRate = Math.max(0.1, playbackRate); }} onEnded={onEnded} onError={() => { setVideoError(true); setPaused(true); }} />
         )}
         {/* Always rendered: the two states that most need it were the two that hid it. */}
         <button
@@ -413,6 +422,11 @@ export default function CompileStagePlayer({
           aria-pressed={control === "pause"}
           onClick={() => {
             if (control === "pause") { setPaused(true); return; }
+            if (control === "replay") {
+              const element = videoRef.current;
+              if (element) { element.currentTime = 0; void element.play().catch(() => {}); }
+              setEnded(false);
+            }
             setVideoError(false);
             setPaused(false);
             setPlayRequested(true);

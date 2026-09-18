@@ -1,40 +1,69 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import type { Route } from "next";
 import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
-import SolutionProofSample from "@/components/solution-proof-sample";
 import CompileStagePlayer from "@/components/compile-stage-player";
 import { COMPILE_STAGES } from "@/lib/compile-stages";
 import { PublicSitePage } from "@/components/public-site-chrome";
 import DocumentLangKo from "./document-lang";
 import { activationPolicy } from "@/lib/activation-policy";
-import { BILLING_OFFERS } from "@/lib/billing-catalog";
 import { isLiveCommerce } from "@/lib/commercial-state";
+import { LANDING_FRAMES } from "@/lib/landing-frames";
+import { FIRST_CALL } from "@/lib/developer-snippets";
 import { pageMetadata } from "@/lib/page-seo";
-import { PIPELINE_STAGES } from "@/lib/pipeline-vocabulary";
 
-/* FD-02 (`docs/policy/DECISION_LOG_2026-09-11.md`): the activation plan gate below is a
-                    delegated decision, 2026-09-11; both plan labels come from the catalog. */
-const TEAM_PLAN = BILLING_OFFERS.studio_access;
-const DEVELOPER_PLAN = BILLING_OFFERS.observer_access;
-const KO_HERO_STAGE = [{
-  id: "hero-v2-ko",
-  label: "AI 활용 준비",
-  line: "자료를 원문과 연결된 지식으로 정리해 AI에서 활용할 수 있게 준비합니다.",
-  src: "/film/compile-cut.mp4",
-  poster: "/film/poster-1.webp",
-}] as const;
 /*
-  BQ-013. 두 컷은 한국어 페이지에 영어 탭과 영어 캡션으로 걸려 있었다(COMPILE_STAGES를 그대로 재사용).
-  D12에 따라 기존 영문 문자열을 그대로 옮긴 번역이며 새 주장은 없다. id·src·poster는 잠긴 자산 그대로.
+  랜딩 리플랜, 2026-09-18. 영문 `components/home-page-client.tsx`와 같은 다섯 섹션, 같은 섹션 id,
+  같은 프레임 세 장. D12에 따라 영문 문자열을 그대로 옮긴 번역이며 새 주장은 없다. 숫자는 없다.
+
+  히어로 필름은 영문 페이지와 같은 재렌더 마스터(`compile-cut-hq.mp4`)를 쓴다. 잠긴 네 컷은
+  그대로 남아 있고, 이 페이지는 그중 어느 것도 더 이상 재생하지 않는다.
 */
-const KO_WORK_STAGES = [
-  { ...COMPILE_STAGES[1]!, label: PIPELINE_STAGES[2].ko, line: "관련 정보를 연결된 지식 구조로 정리합니다." },
-  { ...COMPILE_STAGES[2]!, label: "업데이트", line: "바뀐 원본과 그 영향을 받는 지식을 함께 보여줍니다." },
+const KO_HERO_STAGE = [{
+  id: "hero-v3-ko",
+  label: "컴파일",
+  line: "모든 결과에서 원문까지 되짚어 갈 수 있는, 컴파일된 지식.",
+  src: "/film/compile-cut-hq.mp4",
+  phoneSrc: "/film/compile-cut-hq-1440.mp4",
+  poster: "/film/poster-1-hero-2x.webp",
+}] as const;
+// Guard: the stage table is read from the plain module, not from the client player (landing-01).
+const _stages: typeof COMPILE_STAGES = COMPILE_STAGES;
+void _stages;
+
+const KO_STEPS = [
+  {
+    id: "compile",
+    title: "컴파일",
+    body: "파일과 연결 소스가 들어옵니다. 모든 문단은 인쇄된 페이지와 그 위의 영역을 그대로 간직하므로, 결과의 어느 부분도 출처에서 떨어지지 않습니다.",
+    frame: LANDING_FRAMES.compile,
+  },
+  {
+    id: "verify",
+    title: "검증",
+    body: "읽어 온 문단 옆에서 원문 페이지를 여세요. TAVONEL이 검증할 수 없는 것은 조용히 받아들이지 않고 검토 대상으로 드러냅니다.",
+    frame: LANDING_FRAMES.verify,
+  },
+  {
+    id: "recompile",
+    title: "재컴파일",
+    body: "원문이 바뀌면 그 변경이 닿는 부분만 다시 만듭니다. 새 버전을 활성화하기 전까지 현재 버전이 그대로 유지됩니다.",
+    frame: LANDING_FRAMES.recompile,
+  },
 ] as const;
+
+const KO_PROPERTIES = [
+  ["발췌가 아닌 근거", "컴파일된 객체는 읽어 온 페이지와 영역을 가리키고, 원문은 그 옆에 남습니다."],
+  ["유지되는 정체성", "한 개체는 자신을 언급하는 문서들 전체에서 하나의 정체성을 유지하며, 파일마다 새 노드가 되지 않습니다."],
+  ["시간의 순서", "버전에는 순서가 있습니다. 대체된 진술은 답에서 사라지지 않고 추적 가능하게 남습니다."],
+  ["유지되는 의존 관계", "바뀐 조항은 그것에 의존하는 부분만 다시 만듭니다. 재컴파일이 재실행보다 저렴한 이유입니다."],
+  ["실패 시 닫힘", "검증할 수 없는 지식은 검증된 것처럼 발행되지 않습니다. 검토를 위해 보류되고, 화면이 그렇게 말합니다."],
+] as const;
+
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = pageMetadata({
   title: "내 자료를 AI가 사용하는 지식으로 — TAVONEL",
-  description: "파일을 추가하거나 소스를 연결하고, 준비된 지식과 원문을 확인한 뒤 AI에서 활용하세요. TAVONEL의 제품 흐름과 실제 공개 샘플을 확인할 수 있습니다.",
+  description: "TAVONEL은 지식 컴파일러입니다. 컴파일된 모든 결과는 읽어 온 페이지까지 되짚어 갈 수 있는 경로를 유지합니다. 공개 Compiled World를 지금 전체 열람할 수 있습니다.",
   canonical: "/ko",
   languages: { ko: "/ko", en: "/", "x-default": "/" },
 });
@@ -42,79 +71,132 @@ export const metadata: Metadata = pageMetadata({
 /** Korean entry, not a claim that the technical and legal documentation is translated. */
 export default function KoreanEntryPage() {
   const live = isLiveCommerce();
-  return <PublicSitePage korean>
+  const startHref = (live ? "/login" : "/contact") as Route;
+  const startLabel = live ? "내 자료로 시작하기" : "이용 문의";
+  return <>
+    {/* The hero poster is the LCP resource; a real <link> reaches <head>, react-dom preload() did not (MED-15). */}
+    <link rel="preload" as="image" href="/film/poster-1-hero-2x.webp" fetchPriority="high" />
+    <PublicSitePage korean>
     <DocumentLangKo />
     <BreadcrumbJsonLd trail={[{ name: "한국어 안내", path: "/ko" }]} />
     <div className="one-path-home one-path-ko">
-      <section className="one-path-hero" aria-labelledby="ko-one-path-title">
+      <section className="one-path-hero" id="top" aria-labelledby="ko-one-path-title" data-scene="1" tabIndex={-1}>
         <div className="one-path-wrap">
           <div className="one-path-intro">
-            {/*
-              G1-043. 영문 H1("Bring your knowledge. TAVONEL makes it ready for AI.")과 같은 구조로,
-              웹 헤드라인에 과한 하십시오체 대신 바로 아래 리드 문장과 같은 -하세요 어조를 쓴다.
-
-              BQ-056: 제목을 다시 말하던 eyebrow는 고쳐 쓰지 않고 지운다.
-
-              BQ-116 / D12: 동사는 KO_TERMS의 "사용"이다. "쓰다"는 write와 use를 동시에 읽히게 해서,
-              원본 없이는 아무것도 쓰지 않는다는 것이 논지인 페이지에서 정확히 반대로 읽힌다.
-              BQ-009: 2단 그리드와 함께 <br/>도 제거한다. 줄바꿈은 측정값(measure)이 정한다.
-            */}
+            {/* G1-043. 영문 H1과 같은 구조. BQ-116 / D12: 동사는 KO_TERMS의 "사용". */}
             <h1 id="ko-one-path-title">자료를 가져오세요. AI가 사용하는 지식으로 만듭니다.</h1>
-            <p className="one-path-lede">파일을 올리거나 기존 소스를 연결하세요. 복잡한 처리는 TAVONEL이 맡습니다.</p>
-            <div className="one-path-actions actions"><Link className="btn" href={live ? "/login" : "/contact"}>{live ? "내 자료 추가하기" : "이용 문의"}</Link><a className="one-path-text-link" href="#ko-how-it-works">어떻게 처리되는지 보기</a></div>
-            {/*
-              G1-002. /pricing, /login, /security와 /status가 같은 기록에서 읽어 렌더하는 고지를
-              한국어로 옮긴 문장. 이 페이지에만 없었고, 바로 아래 요금 안내가 무료 평가판에서
-              업로드와 컴파일이 된다고 현재형으로 적고 있었다.
-            */}
+            <p className="one-path-lede">모든 결과에서 원문까지 되짚어 갈 수 있는, 컴파일된 지식.</p>
+            <div className="one-path-actions actions">
+              <Link className="btn" href={startHref}>{startLabel}</Link>
+              <Link className="one-path-text-link" href="/explore">공개 Compiled World 열기</Link>
+            </div>
+            {/* G1-002. /pricing, /login, /security, /status가 같은 기록에서 읽어 렌더하는 고지의 한국어 문장. */}
             {activationPolicy.customerData.enabled ? null : (
-              <p className="notice static" role="status">
-                <strong>현재 배포에서는 고객 파일 컴파일이 열려 있지 않습니다.</strong> 완성된 공개
-                Compiled World는 지금 전체를 열람할 수 있고, 내 자료의 처리는 결제가 아니라 협의로
-                진행합니다. <Link href="/contact">이용 문의</Link>로 시작하거나,{" "}
-                <Link href="/explore">공개 샘플</Link>에서 결과와 원문을 먼저 확인하세요.
+              <p className="one-path-state" data-customer-data="arranged">
+                현재 배포에서는 고객 파일 컴파일이 열려 있지 않습니다. 완성된 공개 Compiled World는 지금 전체를 열람할 수 있고, 내 자료의 처리는 결제가 아니라 협의로 진행합니다.
               </p>
             )}
           </div>
-          {/* BQ-011 / BQ-056: 알약 모양 칩 네 개가 아니라 한 줄 캡션이다. 단계 이름은
-              `PIPELINE_STAGES`의 한국어 표기를 그대로 쓴다. */}
-          <div className="one-path-hero-film one-path-hero-film-v2"><p className="one-path-hero-film-steps">{PIPELINE_STAGES.map((stage, position) => <span key={stage.key}>{position > 0 ? <i aria-hidden="true" /> : null}{stage.ko}</span>)}</p><CompileStagePlayer stages={KO_HERO_STAGE} preferVideo playbackRate={1.5} compact priorityPoster korean /></div>
-          {/* D3 / BQ-129: 한 문장은 영상 아래에 그대로 두고, 세 가지 차이는 펼침으로 옮긴다. */}
-          <div className="one-path-film-note">
-            <p>제품 흐름을 설명하는 연출 영상이며 실제 서비스 화면 녹화가 아닙니다. 영상 속 세 가지는 현재 배포보다 앞서 있습니다.</p>
-            <details>
-              <summary>영상과 실제 결과의 차이</summary>
-              <p>영상은 추출된 표를 격자로 그리고, 결과에 절·행 번호 위치를 붙이고, 원문 목록에 .csv 파일을 보여줍니다. 현재 컴파일은 문단 단위 텍스트와 페이지·영역(bbox) 위치를 내보내며 표·수식은 추출하지 않고 CSV는 받지 않습니다. 실제 결과와 원문은 아래 공개 샘플에서 확인할 수 있습니다.</p>
-            </details>
+          <div className="one-path-hero-film one-path-hero-film-v2"><CompileStagePlayer stages={KO_HERO_STAGE} preferVideo playbackRate={1.5} compact priorityPoster korean /></div>
+          <p className="one-path-film-note">
+            제품 흐름을 설명하는 연출 영상이며 실제 화면 녹화가 아닙니다. 영상 속 격자로 그린 표, 절·행 번호 위치, <code>.csv</code> 원문은 현재 배포보다 앞서 있습니다. 지금 컴파일이 내보내는 것은 인쇄된 그대로의 문단과 그것을 읽어 온 페이지·영역이며, 아래 세 프레임이 실제 라우트에서 본 그 결과입니다.
+          </p>
+        </div>
+      </section>
+
+      <section className="one-path-section one-path-steps-section" id="compile" data-scene="2" aria-labelledby="ko-steps-title" tabIndex={-1}>
+        <div className="one-path-wrap">
+          <div className="one-path-section-heading">
+            <h2 id="ko-steps-title">컴파일. 검증. 재컴파일.</h2>
+            <p>세 단계가 실행되는 순서 그대로입니다. 사람이 승인하기 전에는 아무것도 활성화되지 않습니다.</p>
+          </div>
+          <ol className="one-path-steps">
+            {KO_STEPS.map((step, index) => (
+              <li key={step.id} className="one-path-step" data-side={index % 2 ? "right" : "left"}>
+                <figure className="one-path-frame">
+                  <Link href={step.frame.href as Route} prefetch={false} aria-label={`${step.title} 화면 열기`}>
+                    <picture>
+                      <source media="(max-width: 799px)" srcSet={step.frame.phone.src} width={step.frame.phone.width} height={step.frame.phone.height} />
+                      <img src={step.frame.desktop.src} width={step.frame.desktop.width} height={step.frame.desktop.height} alt={step.frame.ko.alt} loading="lazy" decoding="async" />
+                    </picture>
+                  </Link>
+                  <figcaption>{step.frame.ko.caption}</figcaption>
+                </figure>
+                <div className="one-path-step-copy">
+                  <h3>{step.title}</h3>
+                  <p>{step.body}</p>
+                  <Link className="one-path-text-link" href={step.frame.href as Route} prefetch={false}>{`${step.title} 화면 열기`}</Link>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      <section className="one-path-section one-path-why" id="why" data-scene="3" aria-labelledby="ko-why-title" tabIndex={-1}>
+        <div className="one-path-wrap">
+          <div className="one-path-section-heading">
+            <h2 id="ko-why-title">파서는 텍스트를 돌려주고, 컴파일러는 의존 관계를 유지합니다.</h2>
+            <p>문서를 한 번 읽는 것은 쉬운 부분입니다. 다시 실행해도 만들어 낼 수 없는 것은 결과들을 서로 연결하는 모든 것이고, Compiled World가 담는 것이 바로 그것입니다.</p>
+          </div>
+          <dl className="one-path-properties">
+            {KO_PROPERTIES.map(([term, detail]) => (
+              <div key={term}><dt>{term}</dt><dd>{detail}</dd></div>
+            ))}
+          </dl>
+          <div className="one-path-links">
+            <Link href="/knowledge-compiler" prefetch={false}>지식 컴파일러란</Link>
+            <Link href={"/product/continuous-knowledge" as Route} prefetch={false}>원문 업데이트 처리 방식</Link>
           </div>
         </div>
       </section>
-      <section className="one-path-section one-path-works" id="ko-how-it-works" aria-labelledby="ko-works-title"><div className="one-path-wrap">
-        <div className="one-path-section-heading"><h2 id="ko-works-title">자료만 가져오세요. 어려운 처리는 TAVONEL이 맡습니다.</h2><p>정상 문서는 자동으로 처리하고, 어려운 부분은 더 적합한 처리 경로로 보냅니다. 검증할 수 없는 항목은 조용히 통과시키지 않고 검토 대상으로 표시합니다.</p></div>
-        {/* BQ-129: 영문 페이지와 같이 <ol> + <h3>. 일반 div에 aria-label을 붙여도 이름이 붙지 않는다. */}
-        <ol className="one-path-workflow"><li><h3>파일 확인</h3><p>형식과 무결성, 네이티브 구조를 먼저 확인합니다.</p></li><li><h3>내용 읽기</h3><p>구조화된 경로를 우선하고 필요한 부분만 전문 처리를 사용합니다.</p></li><li><h3>자리 유지</h3><p>인쇄된 순서대로 각 영역을 읽고, 그 영역이 있던 페이지와 위치를 함께 보관합니다.</p></li><li><h3>지식 연결</h3><p>관련 정보를 원문과 분리하지 않고 연결합니다.</p></li><li><h3>출처 확인</h3><p>근거를 점검하고 예외만 검토 대상으로 올립니다.</p></li><li><h3>AI 활용 준비</h3><p>검토·승인된 결과를 AI가 사용할 수 있게 준비합니다.</p></li></ol>
-        <div className="one-path-works-film"><CompileStagePlayer stages={KO_WORK_STAGES} preferVideo korean /></div>
-      </div></section>
-      <section className="one-path-section" aria-labelledby="ko-intake-title"><div className="one-path-wrap">
-        <div className="one-path-section-heading"><h2 id="ko-intake-title">자료가 있는 곳에서 시작하세요.</h2><p>파일·폴더·ZIP을 선택하거나 연결 가능한 소스를 확인하세요. 파서나 모델을 고르지 않아도 됩니다.</p></div>
-        <div className="one-path-links"><Link href="/integrations">연결 방식 확인</Link><Link href="/sources">지원 파일 확인</Link><Link href="/pricing">요금 확인</Link></div>
-      </div></section>
-      <section className="one-path-section" aria-labelledby="ko-proof-title"><div className="one-path-wrap">
-        <div className="one-path-section-heading"><h2 id="ko-proof-title">결과에서 원문까지 다시 따라갈 수 있습니다.</h2><p>공개 Apple SEC 자료의 원문 페이지와 추출된 내용을 나란히 살펴보세요. 연출 영상과 실제 결과를 구분해 보여드립니다.</p></div>
-        {/* BQ-076: the block brings its own frame, ground and radius. The card that used to wrap it
-            here made a card inside a card with a different radius at each level. */}
-        <SolutionProofSample korean />
-        <div className="one-path-links"><Link href="/explore">공개 샘플 열기</Link><Link href="/docs/use-with-ai">AI 활용 방법</Link></div>
-      </div></section>
-      <section className="one-path-section" aria-labelledby="ko-current-title"><div className="one-path-wrap">
-        <div className="one-path-section-heading"><h2 id="ko-current-title">원문이 바뀌면, 지식도 따라갑니다.</h2><p>영향받는 변경을 준비하는 동안 현재 활성 버전은 유지하고, 무엇이 바뀌었는지 검토한 뒤 새 버전을 승인합니다.</p></div>
-        <ol className="one-path-update-steps"><li><h3>변경 준비</h3><p>새 후보를 준비하는 동안 현재 결과를 계속 사용할 수 있습니다.</p></li><li><h3>변경 확인</h3><p>결정이 필요한 항목만 원문과 함께 검토합니다.</p></li><li><h3>활성화 승인</h3><p>승인 후 새 버전이 활성화되며 이전 버전의 추적성은 유지됩니다.</p></li></ol>
-      </div></section>
-      <section className="one-path-section" aria-labelledby="ko-use-title"><div className="one-path-wrap">
-        <div className="one-path-section-heading"><h2 id="ko-use-title">준비된 지식을 내 AI로.</h2><p>지원되는 연결을 설정하거나 지식 패키지를 활용하세요. 활성화는 사람이 승인하며, 연결 설정을 열었다고 실제 연결 성공으로 표시하지 않습니다.</p></div>
-        <details className="one-path-details"><summary>요금과 활성화 조건</summary><p>활성화는 유료 플랜에서 제공됩니다. 워크스페이스 소유자라면 {DEVELOPER_PLAN.label} 플랜에서, 또는 {TEAM_PLAN.label} 플랜에서 활성화할 수 있습니다. {TEAM_PLAN.label} 플랜은 상담을 거쳐 제공됩니다. 다만 현재 배포에서는 고객 파일의 업로드·컴파일 자체가 열려 있지 않으므로, 플랜과 무관하게 내 자료 처리는 협의를 거쳐 시작합니다. 가격은 미국 달러(USD) 기준이며 세금은 별도입니다. 각 플랜의 정확한 범위는 Pricing 페이지가 기준입니다.</p><Link className="one-path-text-link" href="/pricing">요금과 플랜 범위</Link></details>
-        <details className="one-path-details"><summary>기술 문서와 보안 안내</summary><div className="one-path-links"><Link href="/product">Product</Link><Link href="/docs">Documentation</Link><Link href="/sources">Sources</Link><Link href="/security">Security</Link><Link href="/trust">Trust Center</Link></div><p>도입 검토와 기술 문의는 한국어로 받습니다. 제품·문서·요금의 기준 문서는 영문이며, 위 링크는 영문 페이지로 연결됩니다.</p></details>
-      </div></section>
+
+      <section className="one-path-section one-path-io" id="sources" data-scene="4" aria-labelledby="ko-io-title" tabIndex={-1}>
+        <div className="one-path-wrap">
+          <div className="one-path-section-heading">
+            <h2 id="ko-io-title">있는 자료를 가져오세요. 일하는 곳에서 사용하세요.</h2>
+            <p>설정할 것이 없습니다. 무엇을 가져올지만 고르면 경로는 TAVONEL이 정합니다. 결과는 어시스턴트, 내 애플리케이션, 또는 검증 가능한 이동식 패키지로 나갑니다.</p>
+          </div>
+          <div className="one-path-io-grid">
+            <div className="one-path-io-col">
+              <h3>들어오는 것</h3>
+              <ul>
+                <li><strong>파일·폴더·ZIP</strong><span>컴퓨터에서 묶음을 선택합니다. 실행 전에 선택 내용과 가격을 먼저 확인합니다.</span><Link href={startHref} prefetch={false}>{live ? "파일로 시작하기" : "내 파일 컴파일 문의"}</Link></li>
+                <li><strong>연결 소스</strong><span>연결 가능한 클라우드 소스를 확인하고, TAVONEL이 읽도록 허용할 파일을 고릅니다.</span><Link href="/integrations" prefetch={false}>연결 방식 확인</Link></li>
+                <li><strong>프라이빗 인프라</strong><span>오브젝트 스토리지나 마운트된 공유 폴더를, 고객 환경 안에서 함께 설정합니다.</span><Link href="/sources" prefetch={false}>지원 파일 확인</Link></li>
+              </ul>
+            </div>
+            <div className="one-path-io-col">
+              <h3>나가는 것</h3>
+              <ul>
+                <li><strong>AI 어시스턴트</strong><span>MCP로 연결합니다. 이미 질문하는 곳에서 같은 지식을 인용과 함께 사용합니다.</span><Link href="/docs/use-with-ai" prefetch={false}>AI 활용 방법</Link></li>
+                <li><strong>내 애플리케이션</strong><span>API로 구축합니다.</span><Link href="/docs/quickstart" prefetch={false}>퀵스타트</Link></li>
+                <li><strong>이동식 파일</strong><span>패키지를 가져가고, 공개된 검증 도구로 안에 든 것을 확인합니다.</span><Link href="/docs/cli" prefetch={false}>CLI와 패키지 검증</Link></li>
+              </ul>
+            </div>
+            <figure className="one-path-code">
+              <figcaption>개발자 가이드의 첫 호출</figcaption>
+              <pre role="region" tabIndex={0} aria-label="첫 API 호출 curl 명령. 긴 줄은 가로로 스크롤해 읽을 수 있습니다."><code>{FIRST_CALL}</code></pre>
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <section className="one-path-section one-path-close" id="start" data-scene="5" aria-labelledby="ko-close-title" tabIndex={-1}>
+        <div className="one-path-wrap">
+          <div className="one-path-section-heading">
+            <h2 id="ko-close-title">이미 컴파일된 World에서 시작하세요.</h2>
+            <p>지금 전체를 읽어 보고, 다음에 컴파일할 것을 알려 주세요.</p>
+          </div>
+          <div className="one-path-actions actions">
+            <Link className="btn" href={startHref}>{startLabel}</Link>
+            <Link className="one-path-text-link" href="/explore">공개 Compiled World 열기</Link>
+            <Link className="one-path-text-link" href="/pricing" prefetch={false}>요금 확인</Link>
+          </div>
+          <p className="one-path-fine">문서는 적대적 데이터로 다룹니다. 문서를 읽는 모델에는 도구도, 넓은 자격 증명도, 외부 네트워크도 없습니다. <Link href="/security" prefetch={false}>보안</Link> · <Link href="/trust" prefetch={false}>Trust Center</Link></p>
+        </div>
+      </section>
     </div>
-  </PublicSitePage>;
+  </PublicSitePage>
+  </>;
 }

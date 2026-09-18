@@ -206,8 +206,27 @@
 .sheet {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  /* header · the three beats · ledger · footer. The beats are the one flexible row. */
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  /*
+    header · the three beats · ledger · footer. The beats are the one flexible row.
+
+    Every row carries a content floor, and the flexible one's minimum is `min-content` rather than
+    0. Where the sheet is handed a bounded height -- /explore does, through `.sourcePane`'s
+    viewport cap, with the sheet `flex: 1 1 auto` inside it -- `minmax(0, 1fr)` made the beats row
+    nothing but the leftover after the other three, and the open ledger alone is 203-373px of it.
+    At 390 the leftover reached exactly 0px: the row collapsed, `.sheetBody` (which is
+    `min-height: 0`, so it never pushes back) kept its ~2,400px of page and passage, and that
+    content painted straight over the ledger and the page toolbar laid out underneath -- both
+    boxes measured at the same y. The surplus now leaves through the sheet's own `overflow`, which
+    is where /explore already says it goes.
+
+    `min-content` on the other three rather than `auto` for the same reason one level down: `auto`
+    takes its floor from the *minimum contribution*, which is the declared `min-height: 44px` on
+    the header and footer, and grows to the content only out of positive free space. Once the
+    sheet overflows there is none, so `auto` would pin both bars at 44px and clip the text inside
+    them. `1fr` still takes the extra wherever there is any, so an unbounded sheet -- the landing
+    proof block -- is unchanged.
+  */
+  grid-template-rows: min-content minmax(min-content, 1fr) min-content min-content;
   flex: 1 1 auto;
   width: 100%;
   max-width: 100%;

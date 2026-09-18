@@ -1,31 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
   <!--
-    The logomark, redrawn for 16px.
+    The logomark (LOCUS, components/logomark.tsx), on the tab tile.
 
-    Decision A-06's geometry from components/logomark.tsx, scaled 24 -> 32 and drawn a little
-    heavier: a tab favicon is rendered at 16px, so the two pages take 2.5 and the thread 2.1
-    rather than the 1.9 / 1.6 the nav uses.
+    Same geometry as the nav mark, scaled 24 -> 32 (x 4/3) and then 1.12 about the tile centre so
+    the glyph fills the tile rather than floating in it (chrome-15). A tab renders this at 16px, so
+    the two strokes go a little heavier than the nav's 2.5 / 2.0: 3.3 / 2.7 before the scale.
 
-    chrome-15: and it is scaled to the tile it sits in.
-
-    The paths are the nav geometry scaled exactly 24 -> 32, which is faithful and too small: drawn
-    into a filled rounded tile the glyph covered 79% of the width and 54% of the height, leaving a
-    23% dead band above and below, and at the 16px a tab actually renders the two pages merged
-    into a blob. The mark is wide and short, so width is what binds -- 84% of the height is not
-    reachable without distorting it. The 1.12 scale about the tile centre takes the glyph to 89%
-    of the width and 61% of the height, and carries the strokes up with it, which is the other
-    half of what makes it read at 16px. Every path coordinate is untouched, so it is still the
-    same mark as the nav and lib/brand-marks.test.ts still checks it against the nav numbers.
-
-    BQ-131: this used a lighter grey of its own while the nav mark took `--text-mid` -- one mark
-    in two slightly different inks, which is the kind of drift nobody can point at and everybody
-    can see. Same ink in both now; the favicon keeps its heavier strokes and a higher opacity,
-    which is what carries it at 16px rather than a lighter colour.
+    BQ-131: one ink in both places. The tab and the nav mark both take --text-mid (#9AA3A8), so the
+    two never read as two slightly different greys.
   -->
   <rect width="32" height="32" rx="6" fill="#08090A"/>
   <g fill="none" stroke="#9AA3A8" stroke-linecap="square" transform="translate(16 16) scale(1.12) translate(-16 -16)">
-    <path d="M3.3 7.3H9.9L12.7 10.1V24.7H3.3Z" stroke-width="2.5" opacity="0.85"/>
-    <path d="M19.3 10.9H28.7V24.7H19.3Z" stroke-width="2.5" opacity="0.85"/>
-    <path d="M12.7 20.7L19.3 16.1" stroke-width="2.1"/>
+    <path d="M6 4.7H19.3L26 9.3V27.3H6Z" stroke-width="3.3"/>
+    <path d="M12.7 16V21.3H20" stroke-width="2.7"/>
   </g>
 </svg>

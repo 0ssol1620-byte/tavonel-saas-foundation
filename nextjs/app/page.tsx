@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
-import { preload } from "react-dom";
 import HomePageClient from "@/components/home-page-client";
-import SolutionProofSample from "@/components/solution-proof-sample";
 import { isLiveCommerce } from "@/lib/commercial-state";
 import { BRAND_LINE } from "@/lib/site-navigation";
 
@@ -56,9 +54,15 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default function HomePage() {
-  // The hero poster is the homepage LCP resource. Declare it before the client boundary so
-  // throttled browsers do not discover a 90 KB above-the-fold image only after other requests
-  // have already claimed the connection. The locked poster bytes are unchanged.
-  preload("/film/poster-1-hero.webp", { as: "image", fetchPriority: "high" });
-  return <HomePageClient liveCommerce={isLiveCommerce()} proof={<SolutionProofSample />} />;
+  // The hero poster is the homepage LCP resource. It is declared as a real <link> element, which
+  // React hoists into <head>, because `preload()` from react-dom never reached the shipped HTML
+  // here (audit MED-15, verified on the fixture build 2026-09-18: the only rel=preload in the
+  // document was a low-priority script). The poster is the re-rendered master's own frame at
+  // the size the hero paints it.
+  return (
+    <>
+      <link rel="preload" as="image" href="/film/poster-1-hero-2x.webp" fetchPriority="high" />
+      <HomePageClient liveCommerce={isLiveCommerce()} />
+    </>
+  );
 }

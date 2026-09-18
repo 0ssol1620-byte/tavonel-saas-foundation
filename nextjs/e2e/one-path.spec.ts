@@ -11,21 +11,26 @@ for (const width of widths) {
     await page.setViewportSize({ width, height: width < 768 ? 844 : 900 });
     await page.goto("/");
     await expect(page.locator("#one-path-title")).toContainText("ready for AI.");
-    await expect(page.locator("main > section[data-scene]")).toHaveCount(6);
+    await expect(page.locator("main > section[data-scene]")).toHaveCount(5);
     const film = page.getByTestId("one-path-hero-film");
     await expect(film).toBeVisible();
     const bounds = await film.boundingBox();
     // D3 put the title above the film. The film still has to start in the upper half of the
     // 900px desktop fold (measured 347 / 367 / 381 at 1024 / 1280 / 1440+); 380 was the two-column
-    // layout's number.
-    expect(bounds!.y).toBeLessThan(width < 768 ? 500 : 450);
+    // layout's number. On a phone the gate sentence now sits under the CTA (landing replan,
+    // 2026-09-18; measured 611 at 360-412, and 457 / 509 / 535 / 555 at 768 / 1024 / 1280 /
+    // 1440+), so the film starts lower everywhere and the fold still shows its top band. These
+    // are measured ceilings with a little slack; they ratchet down, never up.
+    expect(bounds!.y).toBeLessThan(width < 768 ? 660 : 580);
     expect(bounds!.width).toBeGreaterThan(width < 768 ? width - 60 : width * .4);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
-    await expect(page.locator("#s1 [data-proof-variant]")).toHaveCount(0);
-    await expect(page.locator('#proof [data-proof-variant="canonical"]')).toHaveCount(1);
-    await expect(page.locator(".one-path-film-note")).toContainText("not a screen recording");
+    // The interactive proof block moved off the landing (2026-09-18). What the page shows at this
+    // width instead is three frames of the live route, which is what is measured below.
+    await expect(page.locator("main [data-proof-variant]")).toHaveCount(0);
+    await expect(page.locator("#compile li.one-path-step figure.one-path-frame img")).toHaveCount(3);
+    await expect(page.locator("p.one-path-film-note")).toContainText("not a screen recording");
     const sectionOrder = await page.locator("main > section[data-scene]").evaluateAll(nodes => nodes.map(node => node.id));
-    expect(sectionOrder).toEqual(["s1", "how-it-works", "connect", "proof", "stays-current", "ready-for-ai"]);
+    expect(sectionOrder).toEqual(["top", "compile", "why", "sources", "start"]);
     const desktop = page.locator(".one-path-primary-nav");
     if (await desktop.isVisible()) {
       await expect(desktop.getByRole("link")).toHaveText(labels);
@@ -37,7 +42,7 @@ for (const width of widths) {
       await expect(menu).not.toHaveAttribute("open", "");
       await expect(menu.locator("summary")).toBeFocused();
     }
-    const smallTargets = await page.locator("#s1 a, #s1 button").evaluateAll(elements => elements.filter(element => {
+    const smallTargets = await page.locator("#top a, #top button").evaluateAll(elements => elements.filter(element => {
       const r = element.getBoundingClientRect();
       return r.width > 0 && r.height > 0 && r.height < 43;
     }).map(element => element.textContent));
@@ -48,26 +53,27 @@ for (const width of widths) {
   });
 }
 
-test("hero is the accelerated V2 presentation and Works uses the supporting locked cuts", async ({ page }) => {
+/*
+  Landing replan, 2026-09-18. One film, from the re-rendered master.
+
+  The half of this that clicked through the Works tablist is deleted with the second player: no
+  reference landing plays one film twice, and it was the single largest source of the assembled
+  feel. The hero keeps the accelerated presentation, on `compile-cut-hq.mp4` -- the same 450
+  frames at a lower CRF -- and the page offers no tab at all.
+*/
+test("the hero is the accelerated presentation and the page plays no second film", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   const hero = page.getByTestId("one-path-hero-film");
   await hero.scrollIntoViewIfNeeded();
   await expect(hero.locator("video")).toHaveCount(1);
-  await expect.poll(() => hero.locator("video").evaluate((video: HTMLVideoElement) => video.currentSrc)).toContain("compile-cut.mp4");
+  await expect.poll(() => hero.locator("video").evaluate((video: HTMLVideoElement) => video.currentSrc)).toMatch(/compile-cut-hq-1440.mp4$/);
   await expect.poll(() => hero.locator("video").evaluate((video: HTMLVideoElement) => video.playbackRate)).toBe(1.5);
   await expect(hero.getByRole("tab")).toHaveCount(0);
 
-  const film = page.getByTestId("one-path-works-film");
-  await film.scrollIntoViewIfNeeded();
-  const pairs = [["Organize", "compile-cut-2.mp4"], ["Updates", "compile-cut-3.mp4"]];
-  for (const [label, name] of pairs) {
-    await film.getByRole("tab", { name: label, exact: true }).click();
-    await expect(film.getByRole("tab", { name: label, exact: true })).toHaveAttribute("aria-selected", "true");
-    await expect(film.locator("video")).toHaveCount(1);
-    await expect.poll(() => film.locator("video").evaluate((video: HTMLVideoElement) => video.currentSrc)).toContain(name);
-    await expect.poll(() => film.locator("video").evaluate((video: HTMLVideoElement) => video.currentTime)).toBeGreaterThan(.05);
-  }
+  await expect(page.getByTestId("one-path-works-film")).toHaveCount(0);
+  await expect(page.locator("video")).toHaveCount(1);
+  await expect(page.getByRole("tab")).toHaveCount(0);
 });
 
 test("reduced motion starts as a poster and explicit play/pause works", async ({ page }) => {
@@ -91,7 +97,9 @@ test("failed video keeps a usable poster instead of a blank hero", async ({ page
   await film.scrollIntoViewIfNeeded();
   await expect(film).toContainText("could not play the film", { timeout: 15_000 });
   await expect(film.locator(".compile-film-still")).toBeVisible();
-  await expect(page.getByRole("link", { name: /Inspect the public source/ })).toBeVisible();
+  // The way through to the real route survives a dead decoder: the frames below the film are
+  // images, not video, and each one is still a link to the view it shows.
+  await expect(page.locator('#compile a[href^="/explore"]')).toHaveCount(6);
 });
 
 test("Korean entry keeps film first and the live example distinct", async ({ page }) => {
@@ -99,9 +107,13 @@ test("Korean entry keeps film first and the live example distinct", async ({ pag
   await page.goto("/ko");
   await expect(page.getByRole("heading", { level: 1 })).toContainText("AI가 사용하는 지식으로 만듭니다.");
   await expect(page.locator(".one-path-hero-film")).toBeVisible();
-  await expect(page.locator(".one-path-film-note")).toContainText("실제 서비스 화면 녹화가 아닙니다");
-  // G1-043: the "TAVONEL handles the hard part" promise moved from a section heading into the lede.
-  await expect(page.locator(".one-path-lede")).toContainText("TAVONEL이 맡습니다");
+  await expect(page.locator("p.one-path-film-note")).toContainText("실제 화면 녹화가 아닙니다");
+  // Landing replan: the lede is the brand descriptor in Korean, the same sentence the English
+  // page takes from `BRAND_LINE.descriptor`, rather than a promise written for this page alone.
+  await expect(page.locator(".one-path-lede")).toContainText("되짚어 갈 수 있는, 컴파일된 지식");
+  // /ko runs the same five scenes as `/`. It reaches them through `PublicSitePage`, which wraps
+  // its children in `div.one-path-home`, so the selector is a descendant one rather than `main >`.
+  await expect(page.locator("main section[data-scene]")).toHaveCount(5);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   await page.screenshot({ path: resolve(output, "ko-390.png") });
 });

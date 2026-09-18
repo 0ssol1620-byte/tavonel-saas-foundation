@@ -65,7 +65,9 @@ test("One-Path landing sections flow continuously without artificial viewport oc
     const rect = section.getBoundingClientRect();
     return { id: section.id, top: rect.top, bottom: rect.bottom, height: rect.height, minHeight: getComputedStyle(section).minHeight };
   }));
-  expect(geometry.map(item => item.id)).toEqual(["s1", "how-it-works", "connect", "proof", "stays-current", "ready-for-ai"]);
+  // Landing replan, 2026-09-18: five sections, not six. The rule is unchanged -- they butt up
+  // against each other and none of them is floored to a viewport height.
+  expect(geometry.map(item => item.id)).toEqual(["top", "compile", "why", "sources", "start"]);
   for (let index = 1; index < geometry.length; index += 1) {
     expect(Math.abs(geometry[index].top - geometry[index - 1].bottom), `${geometry[index - 1].id} → ${geometry[index].id}`).toBeLessThanOrEqual(2);
   }

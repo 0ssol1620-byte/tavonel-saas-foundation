@@ -10,13 +10,6 @@ async function openHome(page) {
   await expect(page.getByTestId("one-path-hero-film")).toBeVisible();
 }
 
-async function openWorksFilm(page) {
-  await page.goto("/");
-  const film = page.getByTestId("one-path-works-film");
-  await film.scrollIntoViewIfNeeded();
-  await expect(film.locator(".compile-film-sequence")).toBeVisible();
-  return film;
-}
 
 test("the hero uses the approved encoded film instead of mounting a crushed live canvas", async ({ page }, testInfo) => {
   test.skip(!NARROW.includes(testInfo.project.name), "the narrow encoded-film path is the risk under test");
@@ -29,8 +22,11 @@ test("the hero uses the approved encoded film instead of mounting a crushed live
   // The player carries `src` on the <video> rather than a `<source>` child: one decoder, one
   // element, and a stage change that actually swaps the cut. Same approved bytes.
   await expect(video.locator("source")).toHaveCount(0);
-  await expect(video).toHaveAttribute("src", "/film/compile-cut.mp4");
-  await expect(video).toHaveAttribute("poster", "/film/poster-1-hero.webp");
+  // Landing replan, 2026-09-18: the hero plays the re-rendered master (the same 450 frames at a
+  // lower CRF) behind a poster at the size the hero actually paints it. On a narrow frame the
+  // player picks the 1440-wide encode of that master (`phoneSrc`), not the 2880-wide one.
+  await expect(video).toHaveAttribute("src", "/film/compile-cut-hq-1440.mp4");
+  await expect(video).toHaveAttribute("poster", "/film/poster-1-hero-2x.webp");
 });
 
 /*
@@ -59,52 +55,26 @@ test("the hero film keeps its 16:10 source shape on a narrow screen", async ({ p
   }
 });
 
-test("the customer film vocabulary stays readable without reintroducing technical stage names", async ({ page }, testInfo) => {
-  test.skip(!NARROW.includes(testInfo.project.name), "the phone chip row is under test");
+/*
+  Landing replan, 2026-09-18. Three tests left this file with the things they measured.
+
+  The phone chip row (`.one-path-hero-film-steps`), the two-stage Works tablist and its
+  manual-hold state machine were all parts of the second player, which the replan removed: one
+  film, in the hero, and no tab anywhere on the page. `e2e/landing.spec.ts` asserts each of those
+  is absent, so nothing that was being guarded is now unguarded. What the phone still has to get
+  right -- the frame's shape, the overflow, the header row and the touch floor -- is below.
+
+  The tablist itself is not dead code: `CompileStagePlayer` still renders it wherever a caller
+  passes more than one stage, which `/film` does, and `lib/brand-copy.test.ts` pins the stage
+  strip and the player's `role="tab"` markup. What is gone is the landing's use of it.
+*/
+test("the landing offers no film tab and no chip row on a phone", async ({ page }, testInfo) => {
+  test.skip(!NARROW.includes(testInfo.project.name), "the phone composition is what the replan changed");
   await openHome(page);
-  const chips = page.locator(".one-path-hero-film-steps span");
-  await expect(chips).toHaveCount(4);
-  // BQ-011 / BQ-056: sentence case, from `PIPELINE_STAGES`, and no longer pill-shaped.
-  await expect(chips).toHaveText(["Source", "Read", "Organize", "Ready for AI"]);
-  const boxes = await chips.evaluateAll(elements => elements.map(element => {
-    const rect = element.getBoundingClientRect();
-    return { left: rect.left, right: rect.right, top: rect.top, width: rect.width };
-  }));
-  expect(new Set(boxes.map(box => Math.round(box.top))).size).toBe(1);
-  for (const box of boxes) {
-    expect(box.left).toBeGreaterThanOrEqual(-1);
-    expect(box.right).toBeLessThanOrEqual((page.viewportSize()?.width ?? 390) + 1);
-    // BQ-011: they are caption words now, not 999px pills. "Source" is the one span with no
-    // leading rule, so its box is the text: about 41px at 12px. The floor still catches a
-    // collapsed or clipped name, which is what this assertion was opened about.
-    expect(box.width).toBeGreaterThan(24);
-  }
-});
-
-test("the Works film remains a two-stage accessible tablist with readable caption and progress", async ({ page }, testInfo) => {
-  test.skip(!NARROW.includes(testInfo.project.name), "the supporting film is checked where labels have the least room");
-  const film = await openWorksFilm(page);
-  const tabs = film.locator('.compile-film-stages[role="tablist"] [role="tab"]');
-  await expect(tabs).toHaveCount(2);
-  await expect(tabs).toHaveText(["Organize", "Updates"]);
-  await expect(film.locator('.compile-film-viewport[role="tabpanel"]')).toHaveCount(1);
-  await expect(film.locator(".compile-film-caption p")).toContainText(/knowledge|source/i);
-  await expect(film.locator(".compile-film-progress")).toHaveText(/^\d\d \/ 02$/);
-  const size = await film.locator(".compile-film-caption p").evaluate(element => Number.parseFloat(getComputedStyle(element).fontSize));
-  expect(size).toBeGreaterThanOrEqual(12);
-});
-
-test("a visitor-selected Works stage stays selected when the current cut ends", async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== "390", "one phone width is enough for the manual-hold state machine");
-  const film = await openWorksFilm(page);
-  const updates = film.getByRole("tab", { name: "Updates" });
-  await updates.click();
-  await expect(updates).toHaveAttribute("aria-selected", "true");
-  const video = film.locator(".compile-film-video");
-  await expect(video).toBeVisible();
-  await video.dispatchEvent("ended");
-  await expect(updates).toHaveAttribute("aria-selected", "true");
-  await expect(film.locator(".compile-film-caption p")).toContainText("changed source");
+  await expect(page.locator(".one-path-hero-film-steps")).toHaveCount(0);
+  await expect(page.getByTestId("one-path-works-film")).toHaveCount(0);
+  await expect(page.getByRole("tab")).toHaveCount(0);
+  await expect(page.locator("video")).toHaveCount(1);
 });
 
 test("reduced motion starts from a still and provides explicit playback", async ({ page }, testInfo) => {

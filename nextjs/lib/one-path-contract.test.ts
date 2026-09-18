@@ -29,22 +29,28 @@ describe("approved one-path experience", () => {
     expect(data.length).toBe(bytes);
     expect(createHash("sha256").update(data).digest("hex")).toBe(sha256);
   });
-  it("orders the customer story as Hero → Works → Connect → Proof → Current → AI", () => {
+  /*
+    Landing replan, 2026-09-18. Five sections, one film.
+
+    What this used to pin -- two players, "You bring the source.", and the
+    how-it-works → connect → proof → stays-current → ready-for-ai order -- is the page the replan
+    deleted. The rule it was written for is unchanged and is what is asserted here: the landing
+    runs one ordered story, the hero owns the only decoder on the page, and the sentence that
+    separates the directed film from what a compile emits travels with the film.
+  */
+  it("orders the landing as Hero → Compile → Why → Sources → Start, with one film", () => {
     const page = text("components/home-page-client.tsx");
-    expect(page.match(/<CompileStagePlayer/g)).toHaveLength(2);
-    expect(page).toContain("playbackRate={1.5} compact");
-    expect(page).toContain("You bring the source.");
-    const works = page.indexOf('id="how-it-works"');
-    const connect = page.indexOf('id="connect"');
-    const proof = page.indexOf('id="proof"');
-    const current = page.indexOf('id="stays-current"');
-    const ready = page.indexOf('id="ready-for-ai"');
-    expect(works).toBeGreaterThan(0);
-    expect(works).toBeLessThan(connect);
-    expect(connect).toBeLessThan(proof);
-    expect(proof).toBeLessThan(current);
-    expect(current).toBeLessThan(ready);
-    expect(page.indexOf("<CompileStagePlayer")).toBeLessThan(proof);
+    expect(page.match(/<CompileStagePlayer/g), "one decoder on the page, in the hero").toHaveLength(1);
+    expect(page).toContain("playbackRate={1.5} compact priorityPoster");
+    const sections = [...page.matchAll(/<section[^>]*\bid="([a-z-]+)"[^>]*\bdata-scene="(\d)"/g)];
+    expect(sections.map((match) => match[1])).toEqual(["top", "compile", "why", "sources", "start"]);
+    expect(sections.map((match) => match[2])).toEqual(["1", "2", "3", "4", "5"]);
+    // Each section is a named, focusable landmark -- the skip-target contract the audit checks in
+    // a browser, pinned here so a refactor that never opens the page cannot lose it.
+    expect(page.match(/tabIndex=\{-1\}/g)?.length ?? 0, "main plus five sections").toBeGreaterThanOrEqual(6);
+    for (const id of ["one-path-title", "one-path-steps-title", "one-path-why-title", "one-path-io-title", "one-path-close-title"]) {
+      expect(page, `${id} names its section`).toContain(`aria-labelledby="${id}"`);
+    }
     /*
       G1-003 / G1-004. The note this used to pin -- "the approved source film is preserved and
       presented at a faster 12-second pace" -- disclosed the *edit* and not the thing a visitor
@@ -56,7 +62,10 @@ describe("approved one-path experience", () => {
     */
     expect(page).toContain("A directed film, not a screen recording");
     expect(page).toContain("the page it was read from");
-    expect(page).toContain("/explore?act=source");
+    // The retired page's own landmarks, so none of them returns by copy-paste.
+    for (const gone of ['id="proof"', 'id="how-it-works"', 'id="connect"', "/explore?act=source", "data-proof-variant", "one-path-works-film"]) {
+      expect(page, `${gone} belongs to the retired landing`).not.toContain(gone);
+    }
   });
   /*
     BQ-013. The locale thread reached the chrome and stopped at the film.
@@ -67,18 +76,20 @@ describe("approved one-path experience", () => {
     marketing copy, which is why it survived every copy pass; all of it is the accessible name of
     a control. The guard follows the prop rather than the strings: a film that stops taking the
     locale fails here.
+
+    Landing replan, 2026-09-18: /ko plays one film, not two, so the count moves with the page.
+    The Korean works film, its `KO_WORK_STAGES` table and the swipe caption that film needed are
+    all gone; the locale wiring the row exists for is not.
   */
   it("names the film and its controls in the language of the page they are on", () => {
     const ko = text("app/ko/page.tsx");
-    expect(ko.match(/<CompileStagePlayer[^>]*korean/g)).toHaveLength(2);
-    expect(ko, "the Korean works film may not reuse the English stage labels verbatim")
-      .not.toContain("const KO_WORK_STAGES = [COMPILE_STAGES[1]!, COMPILE_STAGES[2]!]");
+    expect(ko.match(/<CompileStagePlayer[^>]*korean/g)).toHaveLength(1);
+    expect(ko, "the Korean film may not reuse the English stage labels verbatim")
+      .not.toContain("const KO_WORK_STAGES");
     const player = text("components/compile-stage-player.tsx");
     for (const wired of ["aria-label={text.stages}", "FILM_CONTROL_LABEL_KO[control]", "{text.error}", "text.errorLong"]) {
       expect(player, `${wired} must read the locale, not a literal`).toContain(wired);
     }
-    expect(text("app/one-path.css"), "and the swipe caption is overridden on both Korean films")
-      .toContain(".one-path-ko .one-path-works-film::after");
   });
   /*
     landing-01 / regressions-01. A film stage that reaches a server component as a client
@@ -107,10 +118,17 @@ describe("approved one-path experience", () => {
         .toContain('import { COMPILE_STAGES } from "@/lib/compile-stages"');
     }
   });
-  it("preserves state-controlled entry and actual public proof", () => {
+  it("preserves state-controlled entry and keeps the two locales on one story", () => {
     expect(text("components/home-page-client.tsx")).toContain("liveCommerce ? SELF_SERVE_CTA : ACCESS_CTA");
     expect(text("app/page.tsx")).toContain("isLiveCommerce()");
-    expect(text("app/page.tsx")).toContain("<SolutionProofSample");
+    /*
+      The interactive proof block moved off the landing (founder decision, 2026-09-18) and
+      `app/page.tsx` no longer renders `<SolutionProofSample>`. What replaces it is the thing it
+      was proving -- three screenshots of the live /explore route, each linked to the view it
+      shows -- so the guard follows the evidence rather than the component that used to carry it.
+    */
+    expect(text("app/page.tsx"), "the proof block is not on the landing any more").not.toContain("<SolutionProofSample");
+    expect(text("components/home-page-client.tsx")).toContain('import { LANDING_FRAMES } from "@/lib/landing-frames"');
     expect(text("app/ko/page.tsx")).toContain("playbackRate={1.5} compact");
     /*
       BQ-056. This pinned "01 / TAVONEL WORKS" -- one of five numbered section kickers that made a
@@ -122,11 +140,14 @@ describe("approved one-path experience", () => {
     // Comments stripped: the rationale for deleting them names the strings it deleted.
     expect(korean.replace(/\{?\/\*[\s\S]*?\*\/\}?/g, ""), "a numbered section kicker is not a section name")
       .not.toMatch(/0\d \/ /);
-    for (const heading of ["ko-works-title", "ko-intake-title", "ko-proof-title", "ko-current-title", "ko-use-title"]) {
-      expect(korean).toContain(`id="${heading}"`);
-    }
-    expect(korean.indexOf("ko-works-title")).toBeLessThan(korean.indexOf("ko-proof-title"));
-    expect(korean.indexOf("ko-proof-title")).toBeLessThan(korean.indexOf("ko-use-title"));
+    const KO_HEADINGS = ["ko-one-path-title", "ko-steps-title", "ko-why-title", "ko-io-title", "ko-close-title"];
+    for (const heading of KO_HEADINGS) expect(korean).toContain(`id="${heading}"`);
+    // Same five sections, same order, same ids as `/` -- checked as positions so a reordered
+    // translation fails here rather than in a screenshot.
+    expect(KO_HEADINGS.map((heading) => korean.indexOf(`id="${heading}"`)))
+      .toEqual([...KO_HEADINGS.map((heading) => korean.indexOf(`id="${heading}"`))].sort((a, b) => a - b));
+    expect([...korean.matchAll(/<section[^>]*\bid="([a-z-]+)"/g)].map((match) => match[1]))
+      .toEqual(["top", "compile", "why", "sources", "start"]);
     expect(korean).toContain('canonical: "/ko"');
   });
   it("keeps low-motion, Save-Data and hidden-tab playback protections", () => {

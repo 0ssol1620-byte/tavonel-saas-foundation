@@ -14,9 +14,9 @@ const { expect, test } = "test" in playwrightModule ? playwrightModule : playwri
   stacked phone flow and the drawer's coordinates are checked in the new file, against the new
   page, rather than restated here against a page that no longer exists.
 */
-test("homepage Proof opens the no-login Compiled World sample on its real evidence", async ({ page }) => {
+test("the homepage Verify frame opens the no-login Compiled World sample on its real evidence", async ({ page }) => {
   await page.goto("/");
-  const cta = page.locator('#proof [data-proof-variant="canonical"]').getByRole("link", { name: "Inspect the evidence" });
+  const cta = page.locator("#compile").getByRole("link", { name: "Open the Verify view" }).last();
   await cta.scrollIntoViewIfNeeded();
   await expect(cta).toBeVisible();
   await cta.click();

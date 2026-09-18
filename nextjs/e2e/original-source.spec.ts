@@ -6,8 +6,21 @@ import { createHash } from "node:crypto";
 const FILE = "apple-2025-form-10-k.pdf";
 const DIGEST = "108590052c3ba5400c63660d787fe7ed4e43868292946d7a7facebe9ab7d1aab";
 
+/*
+  Landing replan, 2026-09-18. The interactive proof block left the landing, so the source sheet
+  under test is opened where it lives: the public /explore route. Its entry card quotes the same
+  region the landing block used to select (the sample World's entry proof) and opens it, so the
+  reader is opened from that link rather than from a pinned id -- same bytes, same digest, same
+  reader; only the page that hosts it changed.
+*/
+async function openEntrySheet(page: import("@playwright/test").Page) {
+  await page.goto("/explore");
+  await page.getByRole("button", { name: "Open this source page" }).first().click();
+  await expect(page.locator("[data-source-sheet]").first()).toBeVisible({ timeout: 20_000 });
+}
+
 test("the original page is rendered from the same public bytes and has a matching region", async ({ page }) => {
-  await page.goto("/");
+  await openEntrySheet(page);
   const sheet = page.locator("[data-source-sheet]").first();
   await sheet.scrollIntoViewIfNeeded();
   const original = sheet.locator("[data-original-source]");
@@ -40,7 +53,7 @@ test("the original page is rendered from the same public bytes and has a matchin
 });
 
 test("zoom is confined to the reader and the passage keeps the same selection", async ({ page }) => {
-  await page.goto("/");
+  await openEntrySheet(page);
   const sheet = page.locator("[data-source-sheet]").first();
   await sheet.scrollIntoViewIfNeeded();
   const original = sheet.locator("[data-original-source]");
@@ -60,7 +73,7 @@ test("zoom is confined to the reader and the passage keeps the same selection", 
 
 test("a mismatched source fails closed and still offers the committed PDF", async ({ page }) => {
   await page.route(`**/explore-sample/${FILE}`, route => route.fulfill({ status: 200, contentType: "application/pdf", body: "%PDF-1.7\nwrong public fixture" }));
-  await page.goto("/");
+  await openEntrySheet(page);
   const sheet = page.locator("[data-source-sheet]").first();
   await sheet.scrollIntoViewIfNeeded();
   await expect(sheet.locator("[data-original-source]")).toHaveAttribute("data-render-state", "error");
