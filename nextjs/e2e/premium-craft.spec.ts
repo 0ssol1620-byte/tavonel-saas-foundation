@@ -9,27 +9,40 @@ async function dismissConsent(page: import("@playwright/test").Page) {
   await expect(panel).toBeHidden();
 }
 
-test("the One-Path Connect routes fill their cards and provide usable next actions", async ({ page }) => {
+/*
+  Landing replan, 2026-09-18. The three Connect cards became three rows of one list.
+
+  Four equal grids in a row was the composition the replan was opened about, and this one is the
+  survivor: three ways in, three ways out and the first call, in a single grid. So the assertions
+  move from card geometry to what the rows still owe a reader -- every one of them ends on a real
+  destination, at a target a thumb can hit.
+*/
+test("the input and output routes fill their grid and provide usable next actions", async ({ page }) => {
   await page.goto("/");
   await dismissConsent(page);
-  const routes = page.locator("#connect .one-path-source-options");
-  await expect(routes).toHaveCount(1);
-  await routes.scrollIntoViewIfNeeded();
-  const panels = routes.locator(":scope > article");
-  await expect(panels).toHaveCount(3);
-  for (const panel of await panels.all()) {
-    const panelBox = await panel.boundingBox();
-    expect(panelBox).not.toBeNull();
-    expect(panelBox!.width).toBeGreaterThan(100);
-    expect(panelBox!.height).toBeGreaterThan(120);
-    const action = panel.getByRole("link");
+  const grid = page.locator("#sources .one-path-io-grid");
+  await expect(grid).toHaveCount(1);
+  await grid.scrollIntoViewIfNeeded();
+  const columns = grid.locator(".one-path-io-col");
+  await expect(columns).toHaveCount(2);
+  await expect(grid.locator("figure.one-path-code pre code")).toHaveCount(1);
+
+  const rows = columns.locator("li");
+  await expect(rows).toHaveCount(6);
+  for (const row of await rows.all()) {
+    const rowBox = await row.boundingBox();
+    expect(rowBox).not.toBeNull();
+    expect(rowBox!.width).toBeGreaterThan(100);
+    const action = row.getByRole("link");
+    await expect(action).toHaveCount(1);
     // Reveal transforms can produce 43.999969 for a CSS 44px target.
     // Preserve the 44px threshold at hundredth-pixel measurement precision.
     expect(Math.round((await action.boundingBox())!.height * 100) / 100).toBeGreaterThanOrEqual(44);
+    expect(await action.getAttribute("href"), "a row that ends nowhere is not a route").toMatch(/^\//);
   }
-  await expect(panels.nth(0).getByRole("link")).toHaveAttribute("href", /\/(login|contact)$/);
-  await expect(panels.nth(1).getByRole("link")).toHaveAttribute("href", "/integrations");
-  await expect(panels.nth(2).getByRole("link")).toHaveAttribute("href", "/integrations");
+  await expect(rows.nth(0).getByRole("link")).toHaveAttribute("href", /\/(login|contact)$/);
+  await expect(rows.nth(1).getByRole("link")).toHaveAttribute("href", "/integrations");
+  await expect(rows.nth(2).getByRole("link")).toHaveAttribute("href", "/sources");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 

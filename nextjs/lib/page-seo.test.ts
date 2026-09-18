@@ -142,20 +142,29 @@ describe("pageMetadata refuses a verification date that verifies nothing", () =>
 describe("the Korean entry page stands on a fact, not a translation", () => {
   const source = readFileSync(new URL("../app/ko/page.tsx", import.meta.url), "utf8");
 
+  /*
+    Landing replan, 2026-09-18 (evening). The Korean pricing fold is back on this page, as a closed
+    <details> in the closing section rather than a card in the middle: the Team consultation step,
+    the owner-activation condition and the plan-independent gate are published in Korean nowhere
+    else, so removing the fold had removed the facts. Both plan labels still come from the catalog
+    rather than being written again in Korean, which is the property this file exists to keep.
+  */
   it("reads both plan labels from the catalog instead of writing them again in Korean", () => {
-    expect(source).toContain("BILLING_OFFERS.studio_access");
-    expect(source).toContain("BILLING_OFFERS.observer_access");
-    expect(source).toContain("{TEAM_PLAN.label} 플랜");
-    expect(source).toContain("{DEVELOPER_PLAN.label} 플랜");
+    expect(source).toContain("{BILLING_OFFERS.studio_access.label} 플랜");
+    expect(source).toContain("{BILLING_OFFERS.observer_access.label} 플랜");
+    expect(source, "the fold is a disclosure in the close, not a card").toContain('<details className="one-path-details one-path-plan-details">');
   });
 
-  it("says which plans activate, that Team goes through a conversation, and who is refused", () => {
-    expect(BILLING_OFFERS.studio_access.saleChannel, "Team is self-serve now -- the Korean page says it is not").toBe("contact");
-    expect(BILLING_OFFERS.observer_access.saleChannel, "Developer is not self-serve now -- the Korean page says it is").toBe("self_serve");
-    expect(source, "the page must state the consultation step before any call to action").toContain("상담");
-    // Activation is the owner's on Developer, and a free evaluation is refused. Both in Korean.
-    expect(source, "the owner condition is what stops this reading as any Developer seat").toContain("워크스페이스");
-    expect(source, "the owner condition, in the sentence itself").toContain("소유자라면");
+  it("says which plans activate, that Team goes through a conversation, and that no plan opens the gate", () => {
+    expect(source, "the page must state the consultation step").toContain("상담을 거쳐 제공됩니다");
+    expect(source, "the owner condition is what stops this reading as any Developer seat").toContain("워크스페이스 소유자라면");
+    expect(source, "and the gate is stated as plan-independent").toContain("플랜과 무관하게 내 자료 처리는 협의를 거쳐 시작합니다");
+    expect(source, "and offers the page that maintains the plans").toContain('href="/pricing"');
+  });
+
+  it("carries the one commercial fact it states, and states it as the catalog does", () => {
+    expect(BILLING_OFFERS.studio_access.saleChannel, "Team is self-serve now -- /pricing must be revisited").toBe("contact");
+    expect(BILLING_OFFERS.observer_access.saleChannel, "Developer is not self-serve now -- /pricing must be revisited").toBe("self_serve");
     /*
       G1-002. The refusal moved up a level, and got broader rather than softer.
 
@@ -167,11 +176,10 @@ describe("the Korean entry page stands on a fact, not a translation", () => {
       this deployment, which is a strictly stronger statement than the one this pinned.
     */
     expect(activationPolicy.customerData.enabled, "the assertion below turns on the closed gate").toBe(false);
-    expect(source, "the closed gate is stated in the pricing fold, not only in the hero notice")
-      .toContain("플랜과 무관하게 내 자료 처리는 협의를 거쳐 시작합니다");
-    expect(source, "and the hero carries the same notice a reader meets first")
+    expect(source, "the hero carries the notice a Korean reader meets first")
       .toContain("현재 배포에서는 고객 파일 컴파일이 열려 있지 않습니다");
-    expect(source, "a paid plan is the bar, and the page must say so").toContain("유료 플랜");
+    expect(source, "and it is rendered only while the gate is closed")
+      .toContain("activationPolicy.customerData.enabled ? null : (");
   });
 
   /*
@@ -193,14 +201,15 @@ describe("the Korean entry page stands on a fact, not a translation", () => {
     // Approved one-path revision: film first, state-controlled start, public sample alongside.
     expect(copy, "the Korean entry page needs its own action row").toContain('className="one-path-actions actions"');
     expect(copy).toContain('playbackRate={1.5} compact');
-    expect(copy).toContain('id="ko-how-it-works"');
-    expect(copy.indexOf('id="ko-how-it-works"')).toBeLessThan(copy.indexOf('aria-labelledby="ko-intake-title"'));
-    expect(copy).toContain('href="/explore">공개 샘플 열기');
-    expect(copy).toContain('href={live ? "/login" : "/contact"}');
-    expect(copy).toContain('live ? "내 자료 추가하기" : "이용 문의"');
+    // Landing replan, 2026-09-18: the same five sections as `/`, in the same order, with the
+    // Korean heading ids. Read as positions so a reordered translation fails here.
+    const sections = [...copy.matchAll(/<section[^>]*\bid="([a-z-]+)"/g)].map(match => match[1]);
+    expect(sections).toEqual(["top", "compile", "why", "sources", "start"]);
+    expect(copy).toContain('href="/explore">공개 Compiled World 열기');
+    expect(copy).toContain('const startHref = (live ? "/login" : "/contact") as Route;');
+    expect(copy).toContain('const startLabel = live ? "내 자료로 시작하기" : "이용 문의";');
     // The language fact survives, once, rather than six times as a suffix.
     expect(copy, "a per-tile (EN) suffix is the inventory again").not.toContain('<span lang="en">(EN)</span>');
-    expect(copy).toContain("링크는 영문 페이지로 연결됩니다");
   });
 
   it("quotes no price, page count or limit it would have to keep in step", () => {

@@ -20,7 +20,7 @@ export type SiteLink = { href: string; label: string };
 /** Customer entry points. Technical and trust destinations remain in the footer and docs. */
 export const CUSTOMER_NAV: readonly SiteLink[] = [
   { href: "/product", label: "How it works" },
-  { href: "/integrations", label: "Connect" },
+  { href: "/integrations", label: "Integrations" },
   { href: "/pricing", label: "Pricing" },
 ] as const;
 
@@ -105,7 +105,7 @@ export const KO_CHROME = {
   */
   nav: {
     "/product": "작동 방식",
-    "/integrations": "연결",
+    "/integrations": "연동",
     "/pricing": "요금",
   } as Record<string, string>,
   menu: "메뉴",
@@ -149,7 +149,7 @@ export const KO_CHROME = {
     "/refunds": "환불 정책",
   } as Record<string, string>,
   tagline: "모든 결과에서 원문까지 다시 따라갈 수 있도록 컴파일합니다.",
-  stateLine: "공개 Compiled World: 지금 전체 열람 가능 · 내 자료 컴파일: 협의 후 진행",
+  stateLine: "공개 샘플: 열람 가능 · 내 자료: 협의로 진행",
 } as const;
 
 /**

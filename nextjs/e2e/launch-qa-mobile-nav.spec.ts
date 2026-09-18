@@ -2,7 +2,7 @@
  * The customer mobile menu, exercised in Chromium, Firefox and WebKit.
  *
  * The one-path IA deliberately exposes only three customer choices in the public header:
- * How it works, Connect and Pricing. Technical, research and trust destinations remain in the
+ * How it works, Integrations and Pricing. Technical, research and trust destinations remain in the
  * footer/docs instead of being nested disclosures in the phone menu. These tests keep the parts
  * only a browser can prove: viewport containment, 44px targets, keyboard escape/focus behaviour,
  * active-route ownership and closing after navigation.
@@ -18,7 +18,7 @@ test.use({ viewport: { width: 390, height: 844 } });
 
 const CUSTOMER_LINKS = [
   { label: "How it works", href: "/product" },
-  { label: "Connect", href: "/integrations" },
+  { label: "Integrations", href: "/integrations" },
   { label: "Pricing", href: "/pricing" },
 ] as const;
 
@@ -53,11 +53,11 @@ test("the mobile menu ships only the customer choices and one commercial action"
   expect(html.match(/nav-actions/g)?.length ?? 0, "and the header still carries it").toBeGreaterThan(0);
 });
 
-test("Connect owns the Sources route without adding another top-level choice", async ({ page }) => {
+test("Integrations owns the Sources route without adding another top-level choice", async ({ page }) => {
   await page.goto("/sources");
   const { panel } = await openMenu(page);
   await expect(panel.locator("a.mobile-nav-direct")).toHaveCount(3);
-  await expect(panel.getByRole("link", { name: "Connect", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(panel.getByRole("link", { name: "Integrations", exact: true })).toHaveAttribute("aria-current", "page");
 });
 
 test("Escape closes the menu and returns focus to the control that opened it", async ({ page }) => {

@@ -22,11 +22,13 @@ test("the approved Hero V2 stays on the encoded-film path across the former canv
         One decoder, one element: the player sets `src` on the <video> rather than swapping
         `<source>` children, because replacing a live element's children does nothing until
         `load()` is called -- which is what let a stage change silently keep the previous cut.
-        The bytes pinned here are the same bytes.
+        The bytes pinned here are the re-rendered master the landing replan put in the hero
+        (2026-09-18). The four original cuts stay byte-locked and this page plays none of them.
       */
       await expect(video.locator("source")).toHaveCount(0);
-      await expect(video).toHaveAttribute("src", "/film/compile-cut.mp4");
-      await expect(video).toHaveAttribute("poster", "/film/poster-1-hero.webp");
+      const narrow = width < 900;
+      await expect(video).toHaveAttribute("src", narrow ? "/film/compile-cut-hq-1440.mp4" : "/film/compile-cut-hq.mp4");
+      await expect(video).toHaveAttribute("poster", "/film/poster-1-hero-2x.webp");
     } finally {
       await context.close();
     }
@@ -40,7 +42,7 @@ test("reduced motion gives the first screen its value, actions and explicit Play
     const heading = page.getByRole("heading", { level: 1 });
     await expect(heading).toContainText("Bring your knowledge.");
     await expect(heading).toContainText("ready for AI.");
-    const actions = page.locator("#s1 .one-path-actions a");
+    const actions = page.locator("#top .one-path-actions a");
     await expect(actions).toHaveCount(2);
     for (const action of await actions.all()) await expect(action).toBeVisible();
     await expect(hero.locator(".compile-film-still")).toBeVisible();

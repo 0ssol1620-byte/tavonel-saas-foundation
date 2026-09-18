@@ -3,18 +3,23 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /*
-  The logomark, pinned to decision A-06 (BA-230).
+  The logomark, pinned to LOCUS (landing replan, 2026-09-18).
 
   The nine-cell dot grid is the single most common AI/ML mark in circulation, and it kept coming
-  back because nothing in the repository said what the mark is. A-06 does: verso page x 2.5-9.5
-  with a corner cut, a shorter recto page x 14.5-21.5, one thread at -34.2 degrees between them,
-  strokes 1.9 and 1.6. These assertions are that specification, so a redraw that loses it fails
-  here rather than in a screenshot review.
+  back because nothing in the repository said what the mark is (BA-230). A-06's two pages and a
+  thread replaced it, and at 16px merged into one grey blob. LOCUS is the mark now: a page 15 x 17
+  with its corner cut at 35 degrees from (14.5,3.5) to (19.5,7), and the bottom-left corner of
+  the evidence box inside it -- a 4-unit rise at x 9.5 and a 5.5-unit rule at y 16. Strokes 2.5
+  and 2.0, one ink, no opacity. These assertions are that specification, so a redraw that loses it
+  fails here rather than in a screenshot review.
 */
 const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 const mark = read("components/logomark.tsx");
 const favicon = read("app/icon.svg");
 const shareCard = read("lib/og-card.tsx");
+
+const PAGE = "M4.5 3.5H14.5L19.5 7V20.5H4.5Z";
+const BOX = "M9.5 12V16H15";
 
 describe("the logomark", () => {
   it("is not a dot grid", () => {
@@ -24,22 +29,30 @@ describe("the logomark", () => {
     expect(mark).not.toContain("row === 1 && col === 1");
   });
 
-  it("draws A-06's two pages at the specified x extents", () => {
-    expect(mark).toContain("M2.5 5.5H7.4L9.5 7.6V18.5H2.5Z"); // verso, corner cut
-    expect(mark).toContain("M14.5 8.2H21.5V18.5H14.5Z"); // recto, shorter
-    expect(mark).toContain("strokeWidth={1.9}");
+  it("draws the page with its corner cut at the site's own diagonal", () => {
+    expect(mark).toContain(PAGE);
+    expect(mark).toContain("strokeWidth={2.5}");
+    // (14.5,3.5) -> (19.5,7): 35 degrees, the -34 family the design master owns, not a 45 file icon.
+    const degrees = (Math.atan2(7 - 3.5, 19.5 - 14.5) * 180) / Math.PI;
+    expect(degrees).toBeGreaterThan(33);
+    expect(degrees).toBeLessThan(36);
   });
 
-  it("crosses the thread between them at -34.2 degrees", () => {
-    const thread = mark.match(/M9\.5 (\d+(?:\.\d+)?)L14\.5 (\d+(?:\.\d+)?)/);
-    expect(thread).not.toBeNull();
-    const from = Number(thread![1]);
-    const to = Number(thread![2]);
-    // SVG y grows downward, so a -34.2 degree thread rises to the right.
-    const degrees = (Math.atan2(to - from, 14.5 - 9.5) * 180) / Math.PI;
-    expect(degrees).toBeGreaterThan(-35.2);
-    expect(degrees).toBeLessThan(-33.2);
-    expect(mark).toContain("strokeWidth={1.6}");
+  it("draws the evidence box as one corner, clear of every page edge", () => {
+    expect(mark).toContain(BOX);
+    expect(mark).toContain("strokeWidth={2}");
+    // Ink clearance to the page's inner edges must survive 16px: >= 2.25 units = 1.5px.
+    const inner = { left: 4.5 + 1.25, right: 19.5 - 1.25, bottom: 20.5 - 1.25 };
+    expect(9.5 - 1 - inner.left).toBeGreaterThanOrEqual(2.25);
+    expect(inner.right - (15 + 1)).toBeGreaterThanOrEqual(2.25);
+    expect(inner.bottom - (16 + 1)).toBeGreaterThanOrEqual(2.25);
+  });
+
+  it("has two elements, two stroke weights and no opacity", () => {
+    expect(mark.match(/<path/g)).toHaveLength(2);
+    expect(mark).not.toMatch(/opacity=/);
+    expect(favicon).not.toContain("opacity");
+    expect(shareCard.slice(shareCard.indexOf("OgLogomark"), shareCard.indexOf("renderOgCard"))).not.toContain("opacity");
   });
 
   it("carries no state colour, because it is a brand mark and not a state", () => {
@@ -50,60 +63,38 @@ describe("the logomark", () => {
   });
 
   it("keeps the favicon the same mark as the nav", () => {
-    // Same three paths, scaled 24 -> 32 (x 4/3). A favicon that drifts is a second logo.
+    // Same two paths, scaled 24 -> 32 (x 4/3). A favicon that drifts is a second logo.
     for (const [nav, tab] of [
-      [2.5, 3.3],
-      [9.5, 12.7],
+      [4.5, 6],
       [14.5, 19.3],
-      [21.5, 28.7],
+      [19.5, 26],
+      [20.5, 27.3],
+      [9.5, 12.7],
+      [16, 21.3],
+      [15, 20],
     ] as const) {
       expect(Math.abs(nav * (32 / 24) - tab), `${nav} -> ${tab}`).toBeLessThan(0.15);
       expect(favicon).toContain(String(tab));
     }
-    /*
-      chrome-15. Faithful to the nav is not the same as sized for the tile.
-
-      Drawn at 24 -> 32 into a filled rounded tile the glyph covered 79% of the width and 54% of
-      the height and read as a blob at 16px. The scale is a transform about the tile centre, so
-      the coordinates above are untouched and this stays one mark -- and it is pinned here so it
-      cannot quietly go back to 1.
-    */
+    // chrome-15: scaled about the tile centre so the glyph fills the tile, and pinned so it
+    // cannot quietly go back to 1 -- or through the tile edge (the mark is 20 wide at 24 -> 26.7 at 32).
     const scale = Number(favicon.match(/translate\(16 16\) scale\(([\d.]+)\)/)?.[1]);
     expect(scale, "the glyph is scaled to the tile").toBeGreaterThan(1.1);
-    // The mark is 25.4 wide; anything past 1.26 puts it through the tile edge.
-    expect(scale * 25.4, "and stays inside the tile").toBeLessThan(32);
+    expect(scale * 26.7 + 3.3, "and stays inside the tile").toBeLessThan(34);
   });
 
-  /*
-    BQ-008. The guard above pinned two of the three files that drew a mark, and the third was the
-    one most readers actually saw.
-
-    `lib/og-card.tsx` and `app/opengraph-image.tsx` each drew the banned nine-cell grid, on
-    twenty-nine share cards; `app/icon.tsx` drew a fourth mark again -- the retired cream tile
-    with a blue/teal T -- and shipped it as `/icon` beside `app/icon.svg`. Three marks, one
-    brand. The assertions follow the files rather than the pictures: a second drawing has to go
-    somewhere, and these are the somewheres.
-  */
   it("draws the same mark on the share cards, from the same geometry", () => {
     expect(shareCard.match(/<rect/g)).toBeNull();
     expect(shareCard).not.toContain("Cell lit");
-    expect(shareCard).toContain("M2.5 5.5H7.4L9.5 7.6V18.5H2.5Z");
-    expect(shareCard).toContain("M14.5 8.2H21.5V18.5H14.5Z");
-    expect(shareCard).toContain("M9.5 15.5L14.5 12.1");
+    expect(shareCard).toContain(PAGE);
+    expect(shareCard).toContain(BOX);
     // The root card is the same `ogCard` as the other twenty-nine, not a second drawing.
     expect(read("app/opengraph-image.tsx")).toContain("ogCard(BRAND_LINE.headline");
     expect(read("app/opengraph-image.tsx")).not.toContain("ImageResponse");
   });
 
   it("draws both copies in one ink, above the 3:1 a graphical object needs", () => {
-    // BQ-131. `--text-mid` is #9AA3A8; the two pages were 0.66 of `--text-lo` (2.95:1 at 20px)
-    // in the nav and #C8CED2 in the tab -- one mark, two greys, one of them under the floor.
-    expect(mark).not.toContain("opacity={0.66}");
-    expect(mark.match(/opacity=\{0\.8\}/g)).toHaveLength(2);
-    // The share-card copy -- twenty-nine cards, the apple icon and the root OG card -- kept 0.66
-    // when the other two moved. One number, and this is the third place it is pinned.
-    expect(shareCard).not.toContain("opacity={0.66}");
-    expect(shareCard.match(/opacity=\{0\.8\}/g)).toHaveLength(2);
+    // BQ-131. `--text-mid` is #9AA3A8 (about 5.2:1 on the ground) in the nav and in the tab.
     expect(read("app/one-path.css")).toContain(".wordmark .logomark { color: var(--text-mid); }");
     expect(favicon).toContain('stroke="#9AA3A8"');
     expect(favicon).not.toContain("#C8CED2");

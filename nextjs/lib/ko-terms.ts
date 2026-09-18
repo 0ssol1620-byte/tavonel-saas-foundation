@@ -26,7 +26,7 @@
 /** English term to the one Korean spelling of it, in public copy. */
 export const KO_TERMS = {
   "Knowledge Compiler": "지식 컴파일러",
-  // A product name, kept in English exactly as `KO_CHROME.stateLine` already prints it: it is
+  // A product name, kept in English exactly as the Korean page already prints it: it is
   // the name of an artifact a reader will also see in the product, in a file name and in a
   // digest, and a translated name would not match any of them.
   "Compiled World": "Compiled World",

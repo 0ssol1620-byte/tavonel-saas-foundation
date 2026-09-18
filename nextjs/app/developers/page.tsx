@@ -8,6 +8,7 @@ import { TrackedLink } from "@/components/tracked-link";
 import { PageToc, tocEntries } from "@/components/docs/page-toc";
 import { PACKAGE_CONTENTS } from "@/lib/package-contents";
 import { MCP_TOOL_COUNT_WORD, MCP_TOOL_NAMES } from "@/lib/mcp-tools";
+import { FIRST_CALL } from "@/lib/developer-snippets";
 
 export const metadata: Metadata = {
   // Each page declares its own address. Without this every route inherited the root
@@ -37,8 +38,7 @@ export const metadata: Metadata = {
 */
 /* The curl block above the tooling tiles, hoisted so the copy control and the <pre> are one
    string rather than two that have to agree. */
-const FIRST_CALL = `curl -H "Authorization: Bearer $TAVONEL_API_KEY" \\
-  https://tavonel.com/api/v1/documents`;
+// The two lines the landing page also prints, from one string (`lib/developer-snippets.ts`).
 
 const PATHS = [
   {

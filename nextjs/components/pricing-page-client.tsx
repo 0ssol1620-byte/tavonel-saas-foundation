@@ -16,7 +16,8 @@ import {
 } from "@/lib/billing-catalog";
 import { COMPILE_MAX_DOCUMENTS, CORPUS_MAX_DOCUMENTS } from "@/lib/compile-limits";
 import { trackFunnel } from "@/lib/funnel-events";
-import type { SiteLink } from "@/lib/site-navigation";
+import { activationPolicy } from "@/lib/activation-policy";
+import { ACCESS_CTA, type SiteLink } from "@/lib/site-navigation";
 import { jsonLdHtml } from "@/lib/structured-data";
 import {
   MAX_UNITS_PER_PAGE,
@@ -615,7 +616,15 @@ export default function PricingPageClient({
     would offer a checkout the API then refused.
   */
   const [liveCheckout, setLiveCheckout] = useState(initialLiveCheckout);
-  const [selfService, setSelfService] = useState(initialSelfService);
+  const [selfServiceFlag, setSelfServiceFlag] = useState(initialSelfService);
+  /*
+    TRUST-03. `ACCESS_MODE` is a necessary condition for a self-serve evaluation, not a
+    sufficient one. While `activationPolicy.customerData` is closed this deployment compiles
+    no visitor files at all, so "Start free evaluation" sent a buyer to a sign-in that leads
+    nowhere. The page offers the site's one access action instead -- the same action the
+    header and the landing page offer, from the same constant.
+  */
+  const selfService = selfServiceFlag && activationPolicy.customerData.enabled;
   /*
     BA-128. 348 read as leftover test data. The default is now the Developer plan's included
     pages, so the control opens on "your plan already covers this" rather than on a figure
@@ -659,13 +668,13 @@ export default function PricingPageClient({
         const status = await response.json() as { liveCheckout?: boolean; selfService?: boolean };
         if (!cancelled) {
           setLiveCheckout(status.liveCheckout === true);
-          setSelfService(status.selfService === true);
+          setSelfServiceFlag(status.selfService === true);
         }
       } catch {
         // Fail closed: an unreachable status endpoint must never open checkout or public signup.
         if (!cancelled) {
           setLiveCheckout(false);
-          setSelfService(false);
+          setSelfServiceFlag(false);
         }
       }
     })();
@@ -687,7 +696,7 @@ export default function PricingPageClient({
   */
   const planHref = (plan: (typeof PLANS)[number]) => {
     if (plan.anchor) return `#${plan.anchor}`;
-    if (plan.name === "Evaluation") return selfService ? "/login" : "/contact";
+    if (plan.name === "Evaluation") return selfService ? "/login" : ACCESS_CTA.href;
     if (!plan.offerCode || !liveCheckout) return "/contact";
     return loginUrlForOffer(plan.offerCode);
   };
@@ -839,7 +848,7 @@ export default function PricingPageClient({
                     }}
                   >
                     {plan.name === "Evaluation"
-                      ? selfService ? "Start free evaluation" : "Request evaluation"
+                      ? selfService ? "Start free evaluation" : ACCESS_CTA.label
                       : !plan.offerCode
                         ? plan.name === "Enterprise" ? "How an Enterprise quote is built" : `Talk to us about ${plan.name}`
                         : !liveCheckout

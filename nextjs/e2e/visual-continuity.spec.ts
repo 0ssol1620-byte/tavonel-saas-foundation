@@ -20,14 +20,20 @@ test.describe("visual continuity — locked film side", () => {
     expect(createHash("sha256").update(bytes).digest("hex")).toBe(cut4!.sha256);
 
     await page.goto("/");
-    await expect(page.getByTestId("one-path-hero-film").getByRole("tab", { name: /WORLD|USE WITH AI/i })).toHaveCount(0);
-    await expect(page.getByTestId("one-path-works-film").getByRole("tab", { name: /WORLD|USE WITH AI/i })).toHaveCount(0);
-    const output = page.locator("#ready-for-ai");
+    /*
+      Landing replan, 2026-09-18. The Works film and its tablist are gone -- one film, in the
+      hero, and no tab anywhere on the page -- so the retired WORLD stage cannot return through a
+      tab that does not exist. The three output destinations moved with the section they were in:
+      they are the `Out` column of the input/output grid in `#sources` now.
+    */
+    await expect(page.getByRole("tab")).toHaveCount(0);
+    await expect(page.getByTestId("one-path-works-film")).toHaveCount(0);
+    const output = page.locator("#sources .one-path-io-col").nth(1);
     await output.scrollIntoViewIfNeeded();
-    await expect(output.getByRole("heading", { name: "Ready for your AI." })).toBeVisible();
-    await expect(output.getByRole("link", { name: /^AI assistant/ })).toHaveAttribute("href", "/docs/use-with-ai");
-    await expect(output.getByRole("link", { name: /^Your application/ })).toHaveAttribute("href", "/docs/quickstart");
-    await expect(output.getByRole("link", { name: /^Portable files/ })).toHaveAttribute("href", "/docs/cli");
+    await expect(output.getByRole("heading", { name: "Out", exact: true })).toBeVisible();
+    await expect(output.getByRole("link", { name: "Use results with AI" })).toHaveAttribute("href", "/docs/use-with-ai");
+    await expect(output.getByRole("link", { name: "Quickstart" })).toHaveAttribute("href", "/docs/quickstart");
+    await expect(output.getByRole("link", { name: "CLI and package verification" })).toHaveAttribute("href", "/docs/cli");
   });
 });
 

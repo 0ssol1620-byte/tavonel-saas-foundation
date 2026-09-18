@@ -5,6 +5,8 @@ export type CompileStage = {
   label: string;
   line: string;
   src: string;
+  /** A lighter encode for the phone pan (below 900px); the master when absent. */
+  phoneSrc?: string;
   poster: string;
 };
 

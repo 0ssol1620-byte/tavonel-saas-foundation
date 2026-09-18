@@ -204,24 +204,24 @@ test("keeps the header's primary action reachable at the width the section row a
   The desktop half sets its own viewport, because the section row does not exist below 1080px and
   this file runs in every width project.
 */
-test("is owned by Connect on desktop and phone and remains directly reachable from the footer", async ({ page }) => {
+test("is owned by Integrations on desktop and phone and remains directly reachable from the footer", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/sources");
 
-  // Sources is not another top-level choice: the customer-facing Connect destination owns it.
+  // Sources is not another top-level choice: the customer-facing Integrations destination owns it.
   const desktopConnect = page.locator('header.nav .one-path-primary-nav a[href="/integrations"]');
-  await expect(desktopConnect).toHaveText("Connect");
+  await expect(desktopConnect).toHaveText("Integrations");
   await expect(desktopConnect).toHaveAttribute("aria-current", "page");
 
   // The footer, which needs no menu at all.
   await expect(page.locator('.site-footer-groups a[href="/sources"]')).toHaveCount(1);
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", "https://tavonel.com/sources");
 
-  // Phone: the same three-choice customer IA, with Connect marked current.
+  // Phone: the same three-choice customer IA, with Integrations marked current.
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator("header.nav details.mobile-primary-nav > summary").click();
   const mobileConnect = page.locator('header.nav details.mobile-primary-nav > nav a[href="/integrations"]');
-  await expect(mobileConnect).toHaveText("Connect");
+  await expect(mobileConnect).toHaveText("Integrations");
   await expect(mobileConnect).toHaveAttribute("aria-current", "page");
   await expect(page.locator("header.nav details.mobile-primary-nav details.mobile-nav-group")).toHaveCount(0);
 
