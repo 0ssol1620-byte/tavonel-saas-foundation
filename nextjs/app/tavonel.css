@@ -1134,8 +1134,10 @@
       budget. The 44px link rows are the part that may not shrink, so the padding gives way
       instead: the block above the groups is what was generous, not the targets inside them.
     */
-    /* Outrank the later footer.site base padding without reducing the 44px link targets. */
-    footer.site { padding-top: 26px; padding-bottom: calc(var(--bar) + 22px); }
+    /* `body footer.site`, not `footer.site`: the base rule further down the file ties a bare
+       `footer.site` on specificity and wins on order, which is how this block sat here doing
+       nothing while the footer measured 797px against the 759.6px budget. */
+    body footer.site { padding-top: 26px; padding-bottom: calc(var(--bar) + 22px); }
     .compile-film-viewport { max-height: calc(100svh - 260px); }
   }
   .artifact { padding: 18px 20px; background: var(--g1); }
@@ -3016,9 +3018,26 @@
       min-height: 44px;
       display: flex;
       align-items: flex-start;
-      padding-block: 12px;
+      /*
+        One row height, wrapped or not. `padding-block: 12px` over a 21px line made a 45px row and
+        a 66px row wherever "Supported files", "Knowledge Compiler" or "MCP and agents" wrapped in
+        its 86px cell at 390 -- three of them, 63px, and the phone footer over its 90%-of-viewport
+        budget. Top padding only and a 1.25 line: one line is 10 + 16 in a 44px row, two lines are
+        10 + 33 in the same 44px row, and the first lines still share a baseline (chrome-12).
+      */
+      padding: 10px 0 0;
+      line-height: 1.25;
     }
     .site-footer-groups nav { gap: 0; }
+    /* At 360 the four effective columns are 75px and two single words do not fit them at 13px:
+       "Methodology" (78px) ran into "Research" with no gap and "Subprocessors" (83px) spilled 8px
+       into the gutter. No arrangement of two group columns holds a 69px + 83px pair inside 328px,
+       and `hyphens: auto` is a dictionary the browser may not have. Below 380 the links take the
+       12px step of the scale: 72px and 77px, and the one word still 1px over sits in the outer
+       gutter where nothing follows it. */
+    @media (max-width: 380px) {
+      .site-footer-groups a { font-size: var(--t-1); }
+    }
     /* "Sign in" is a two-word text link in a header row that is already full at 360px: the
        wordmark, MENU and the access action measure 322px of a 360px viewport before it. It takes
        the 44px height and as much width as the row can spare. */
@@ -3617,7 +3636,7 @@
        with an equal negative margin, so the line box keeps its text height and the paragraph does
        not reflow. Unscoped -- the footer, the policy pages and the docs pager are exactly the
        places that failed, and every one of them sat outside the wrapper this was scoped to. */
-    :is(.fine, .lede, .policy-copy, .site-footer, .faq, .tile, .link, .docs-pager, .src-matrix, .doc-breadcrumb) a,
+    :is(.fine, .lede, .policy-copy, .site-footer, .faq, .tile, .link, .docs-pager, .src-matrix, .doc-breadcrumb, .notice) a,
     a[href^="mailto:"],
     a[href^="tel:"] {
       display: inline-block;
