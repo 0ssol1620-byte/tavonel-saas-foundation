@@ -13,7 +13,22 @@ export default function MobilePrimaryNav({ korean = false }: { korean?: boolean 
     const details = ref.current;
     if (details) details.open = false;
   }, []);
-  useEffect(() => { close(); }, [pathname, close]);
+  /*
+    Close on a route change, not on mount.
+
+    `useEffect(() => { close(); }, [pathname])` also ran once at hydration, and hydration lands
+    after `load`: a reader who opened the menu in that window -- or Launch QA's WebKit keyboard
+    test, which pressed Enter on the summary the moment the page was ready -- watched the native
+    disclosure open and then snap shut when React arrived. Twice in eight CI runs. The disclosure
+    is server-rendered closed, so mount has nothing to close; only a pathname that differs from
+    the one this instance was born with does.
+  */
+  const lastPathname = useRef(pathname);
+  useEffect(() => {
+    if (lastPathname.current === pathname) return;
+    lastPathname.current = pathname;
+    close();
+  }, [pathname, close]);
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || !ref.current?.open) return;
