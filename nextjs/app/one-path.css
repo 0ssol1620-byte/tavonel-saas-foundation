@@ -599,6 +599,17 @@
 .one-path-footer { padding-block: 48px 68px; }
 .one-path-footer .site-footer-groups { margin-top: 30px; }
 /*
+  On a phone the landing footer is the same footer as every other route (D33, one footer shape):
+  the 26/22 padding and 14px group offset tavonel.css gives `footer.site` below 480px. Written here
+  and not there because this sheet is unlayered and tavonel.css is layered -- the two rules above
+  beat any selector in a layer, which is how `/` measured 798px at 390 while the rest of the site
+  measured 714px.
+*/
+@media (max-width: 480px) {
+  .one-path-footer { padding-block: 26px calc(var(--bar, 0px) + 22px); }
+  .one-path-footer .site-footer-groups { margin-top: 14px; }
+}
+/*
   BQ-129: `overflow-wrap: anywhere` on every text element of the landing page is deleted.
 
   It was there for a long filename in a narrow card, and it applied to the H1 as well: a headline

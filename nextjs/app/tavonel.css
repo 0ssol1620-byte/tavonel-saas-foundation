@@ -1137,12 +1137,9 @@
     /* `body footer.site`, not `footer.site`: the base rule further down the file ties a bare
        `footer.site` on specificity and wins on order, which is how this block sat here doing
        nothing while the footer measured 797px against the 759.6px budget. */
-    body footer.site,
-    body .one-path-footer { padding-top: 26px; padding-bottom: calc(var(--bar) + 22px); }
-    /* The landing footer keeps its own 48/68 breath and 30px group offset on a desktop; on a phone
-       it is the same footer as every other route (D33, one footer shape) -- it measured 798px at
-       390 against the 714px the rest of the site had just been brought to. */
-    .one-path-footer .site-footer-groups { margin-top: 14px; }
+    body footer.site { padding-top: 26px; padding-bottom: calc(var(--bar) + 22px); }
+    /* The landing footer (`.one-path-footer`) takes the same numbers from one-path.css: that sheet
+       is unlayered and this one is layered, so no selector written here can reach it. */
     .compile-film-viewport { max-height: calc(100svh - 260px); }
   }
   .artifact { padding: 18px 20px; background: var(--g1); }
